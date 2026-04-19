@@ -228,21 +228,34 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   defp persist_dm(conn, to_session, attrs) do
-    case Messages.create_message(attrs) do
-      {:ok, msg} ->
-        EyeInTheSky.Events.session_new_dm(to_session.id, msg)
+    case Messages.find_recent_dm(to_session.id, attrs.body, seconds: 30) do
+      nil ->
+        case Messages.create_message(attrs) do
+          {:ok, msg} ->
+            EyeInTheSky.Events.session_new_dm(to_session.id, msg)
 
+            conn
+            |> put_status(:created)
+            |> json(%{
+              success: true,
+              message: "DM delivered to session #{to_session.id}",
+              message_id: to_string(msg.id),
+              message_uuid: msg.uuid
+            })
+
+          {:error, _cs} ->
+            {:error, "Failed to persist DM"}
+        end
+
+      existing ->
         conn
         |> put_status(:created)
         |> json(%{
           success: true,
           message: "DM delivered to session #{to_session.id}",
-          message_id: to_string(msg.id),
-          message_uuid: msg.uuid
+          message_id: to_string(existing.id),
+          message_uuid: existing.uuid
         })
-
-      {:error, _cs} ->
-        {:error, "Failed to persist DM"}
     end
   end
 

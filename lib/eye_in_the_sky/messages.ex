@@ -371,11 +371,25 @@ defmodule EyeInTheSky.Messages do
   def find_unlinked_message(session_id, sender_role, body) do
     case Deduplicator.find_recent_message(session_id, body,
            sender_role: sender_role,
-           require_nil_source_uuid: true
+           require_nil_source_uuid: true,
+           max_age_seconds: 86_400
          ) do
       nil -> :not_found
       message -> {:ok, message}
     end
+  end
+
+  @doc """
+  Returns an existing DM message with the same body sent to the same session within
+  the given window (default 30 seconds). Used for idempotency on DM creation.
+  """
+  def find_recent_dm(session_id, body, opts \\ []) do
+    seconds = Keyword.get(opts, :seconds, 30)
+
+    Deduplicator.find_recent_message(session_id, body,
+      sender_role: "agent",
+      max_age_seconds: seconds
+    )
   end
 
   defp with_timestamps(attrs) do

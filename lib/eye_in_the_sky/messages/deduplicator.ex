@@ -40,9 +40,12 @@ defmodule EyeInTheSky.Messages.Deduplicator do
   def find_recent_message(session_id, body, opts \\ []) do
     sender_role = Keyword.get(opts, :sender_role, "agent")
     require_nil_source_uuid = Keyword.get(opts, :require_nil_source_uuid, false)
+    max_age_seconds = Keyword.get(opts, :max_age_seconds, 60)
 
-    one_minute_ago =
-      DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+    cutoff =
+      DateTime.utc_now()
+      |> DateTime.add(-max_age_seconds, :second)
+      |> DateTime.truncate(:second)
 
     Message
     |> where(
@@ -50,7 +53,7 @@ defmodule EyeInTheSky.Messages.Deduplicator do
       m.session_id == ^session_id and
         m.sender_role == ^sender_role and
         m.body == ^body and
-        m.inserted_at >= ^one_minute_ago
+        m.inserted_at >= ^cutoff
     )
     |> then(fn query ->
       if require_nil_source_uuid, do: where(query, [m], is_nil(m.source_uuid)), else: query

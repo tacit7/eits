@@ -353,8 +353,11 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           />
         <% end %>
         <%= if @canvas_sessions == [] and not is_nil(@active_canvas_id) do %>
-          <div class="flex items-center justify-center h-full text-base-content/30 text-sm select-none">
-            No sessions -- use "Add to Canvas" on a session card.
+          <div class="flex flex-col items-center justify-center h-full gap-2 select-none">
+            <.icon name="hero-squares-2x2" class="w-10 h-10 text-base-content/20" />
+            <span class="text-base-content/40 text-sm font-medium">No sessions on this canvas</span>
+            <span class="text-base-content/30 text-xs">Go to Sessions and use Add to Canvas to attach one.</span>
+            <.link navigate={~p"/sessions"} class="btn btn-sm btn-ghost text-base-content/40 mt-1">Go to Sessions</.link>
           </div>
         <% end %>
         <%= if @canvases == [] do %>

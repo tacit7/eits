@@ -91,6 +91,7 @@ defmodule EyeInTheSky.Tasks.Queries do
           on: ts.task_id == t.id,
           where: ts.session_id in ^session_ids,
           preload: [:state],
+          order_by: [asc: ts.session_id, desc: t.priority, asc: t.created_at],
           select: {ts.session_id, t}
         )
         |> Repo.all()

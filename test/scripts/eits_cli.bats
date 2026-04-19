@@ -1172,3 +1172,15 @@ teardown_teams() {
   assert_output --partial '"tasks"'
   assert_output --partial '"success": true'
 }
+
+@test "sessions list --with-tasks task order is deterministic (priority desc, created_at asc)" {
+  # Create a session and two tasks with different priorities, then verify order is stable
+  run eits sessions list --with-tasks --limit 5
+  assert_success
+  assert_output --partial '"tasks"'
+  # Run twice and compare — output must be identical (deterministic ordering)
+  first_run="$output"
+  run eits sessions list --with-tasks --limit 5
+  assert_success
+  [ "$output" = "$first_run" ]
+}

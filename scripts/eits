@@ -241,8 +241,8 @@ cmd_tasks() {
       ;;
     create)
       # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>] [--team <id>] [--due-at <ISO8601>]
-      # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID)
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id="" due_at=""
+      # Defaults: --agent from $EITS_AGENT_UUID, --project from _project_id() (env → path lookup), --session from $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID)
+      local title="" description="" project_id="$(_project_id)" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id="" due_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
@@ -360,7 +360,7 @@ cmd_tasks() {
     begin|quick)
       # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
       # Creates a task, links the current session, and starts it — all in one command.
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
+      local title="" description="" project_id="$(_project_id)" priority="" quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --title)       title="$2";       shift 2 ;;
@@ -396,7 +396,7 @@ cmd_tasks() {
       local query="${1:-}"; [[ -n "$query" ]] || die "query is required"
       shift
       local qs="q=$(printf '%s' "$query" | jq -Rr @uri)"
-      local project_id="${EITS_PROJECT_ID:-}"
+      local project_id="$(_project_id)"
       local limit="" state_id=""
       while [[ $# -gt 0 ]]; do
         case "$1" in

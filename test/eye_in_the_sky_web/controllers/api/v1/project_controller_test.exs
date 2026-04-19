@@ -2,8 +2,15 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Accounts.ApiKey
 
   import EyeInTheSky.Factory
+
+  defp api_conn do
+    token = "test_api_key_#{System.unique_integer([:positive])}"
+    {:ok, _} = ApiKey.create(token, "test")
+    Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+  end
 
   defp create_project(overrides \\ %{}) do
     n = uniq()
@@ -27,9 +34,9 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
   # ---- GET /api/v1/projects ----
 
   describe "GET /api/v1/projects" do
-    test "returns project list", %{conn: conn} do
+    test "returns project list" do
       create_project()
-      conn = get(conn, ~p"/api/v1/projects")
+      conn = get(api_conn(), ~p"/api/v1/projects")
       resp = json_response(conn, 200)
 
       assert resp["success"] == true
@@ -37,9 +44,9 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
       assert resp["projects"] != []
     end
 
-    test "each project has expected fields", %{conn: conn} do
+    test "each project has expected fields" do
       project = create_project()
-      conn = get(conn, ~p"/api/v1/projects")
+      conn = get(api_conn(), ~p"/api/v1/projects")
       resp = json_response(conn, 200)
 
       found = Enum.find(resp["projects"], &(&1["id"] == project.id))
@@ -48,14 +55,37 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
       assert found["slug"] == project.slug
       assert Map.has_key?(found, "active")
     end
+
+    test "filters by path when ?path= is given" do
+      n = uniq()
+      target_path = "/tmp/target-project-#{n}"
+      target = create_project(%{path: target_path})
+      other = create_project(%{path: "/tmp/other-project-#{n}"})
+
+      conn = get(api_conn(), ~p"/api/v1/projects", path: target_path)
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      ids = Enum.map(resp["projects"], & &1["id"])
+      assert target.id in ids
+      refute other.id in ids
+    end
+
+    test "returns empty list when ?path= matches nothing" do
+      conn = get(api_conn(), ~p"/api/v1/projects", path: "/tmp/no-such-project-#{uniq()}")
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["projects"] == []
+    end
   end
 
   # ---- GET /api/v1/projects/:id ----
 
   describe "GET /api/v1/projects/:id" do
-    test "returns a project by id", %{conn: conn} do
+    test "returns a project by id" do
       project = create_project()
-      conn = get(conn, ~p"/api/v1/projects/#{project.id}")
+      conn = get(api_conn(), ~p"/api/v1/projects/#{project.id}")
       resp = json_response(conn, 200)
 
       assert resp["success"] == true
@@ -64,8 +94,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
       assert resp["project"]["slug"] == project.slug
     end
 
-    test "returns 404 for unknown project", %{conn: conn} do
-      conn = get(conn, ~p"/api/v1/projects/9999999")
+    test "returns 404 for unknown project" do
+      conn = get(api_conn(), ~p"/api/v1/projects/9999999")
       assert json_response(conn, 404)["error"] == "Project not found"
     end
   end
@@ -73,11 +103,11 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
   # ---- POST /api/v1/projects ----
 
   describe "POST /api/v1/projects" do
-    test "creates a project with valid params", %{conn: conn} do
+    test "creates a project with valid params" do
       n = uniq()
 
       conn =
-        post(conn, ~p"/api/v1/projects", %{
+        post(api_conn(), ~p"/api/v1/projects", %{
           "name" => "New Project #{n}",
           "slug" => "new-project-#{n}",
           "path" => "/tmp/new-project-#{n}"
@@ -90,12 +120,12 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
       assert is_integer(resp["project_id"])
     end
 
-    test "project is retrievable after creation", %{conn: conn} do
+    test "project is retrievable after creation" do
       n = uniq()
       slug = "retrieve-project-#{n}"
 
       conn =
-        post(conn, ~p"/api/v1/projects", %{
+        post(api_conn(), ~p"/api/v1/projects", %{
           "name" => "Retrieve Project #{n}",
           "slug" => slug
         })
@@ -105,8 +135,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectControllerTest do
       assert project.slug == slug
     end
 
-    test "returns 422 when name is missing", %{conn: conn} do
-      conn = post(conn, ~p"/api/v1/projects", %{"slug" => "no-name"})
+    test "returns 422 when name is missing" do
+      conn = post(api_conn(), ~p"/api/v1/projects", %{"slug" => "no-name"})
       resp = json_response(conn, 422)
 
       assert resp["error"] == "Failed to create project"

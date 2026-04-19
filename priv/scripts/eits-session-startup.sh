@@ -51,21 +51,31 @@ fi
 
 # Check if session was pre-registered (spawned by workable task worker)
 EXISTING_AGENT_UUID=""
-SESSION_INFO=$(eits sessions get "$SESSION_ID" 2>/dev/null || true)
-if [ -n "$SESSION_INFO" ]; then
-  EXISTING_AGENT_UUID=$(echo "$SESSION_INFO" | jq -r '.agent_id // empty')
-  _log "session found: agent_id=${EXISTING_AGENT_UUID:-none}"
-  echo "[EITS] startup: pre-registered agent_id=${EXISTING_AGENT_UUID:-none}" >&2
+if [ -n "${EITS_AGENT_UUID:-}" ]; then
+  EXISTING_AGENT_UUID="$EITS_AGENT_UUID"
+  _log "agent_uuid from env: $EXISTING_AGENT_UUID"
+else
+  SESSION_INFO=$(eits sessions get "$SESSION_ID" 2>/dev/null || true)
+  if [ -n "$SESSION_INFO" ]; then
+    EXISTING_AGENT_UUID=$(echo "$SESSION_INFO" | jq -r '.agent_id // empty')
+    _log "session found: agent_id=${EXISTING_AGENT_UUID:-none}"
+    echo "[EITS] startup: pre-registered agent_id=${EXISTING_AGENT_UUID:-none}" >&2
+  fi
 fi
 
 # Resolve or create project using the canonical (non-worktree) path
-PROJECT_ID=$(eits projects list 2>/dev/null | jq -r --arg path "$LOOKUP_DIR" '.projects[]? | select(.path == $path) | .id' | head -1 || true)
-if [ -z "$PROJECT_ID" ]; then
-  _log "project not found, creating: $(basename "$LOOKUP_DIR")"
-  PROJECT_ID=$(eits projects create --name "$(basename "$LOOKUP_DIR")" --path "$LOOKUP_DIR" 2>/dev/null | jq -r '.id // empty' || true)
-  _log "project created: id=${PROJECT_ID:-FAILED}"
+if [ -n "${EITS_PROJECT_ID:-}" ]; then
+  PROJECT_ID="$EITS_PROJECT_ID"
+  _log "project_id from env: $PROJECT_ID"
 else
-  _log "project found: id=$PROJECT_ID"
+  PROJECT_ID=$(eits projects list 2>/dev/null | jq -r --arg path "$LOOKUP_DIR" '.projects[]? | select(.path == $path) | .id' | head -1 || true)
+  if [ -z "$PROJECT_ID" ]; then
+    _log "project not found, creating: $(basename "$LOOKUP_DIR")"
+    PROJECT_ID=$(eits projects create --name "$(basename "$LOOKUP_DIR")" --path "$LOOKUP_DIR" 2>/dev/null | jq -r '.id // empty' || true)
+    _log "project created: id=${PROJECT_ID:-FAILED}"
+  else
+    _log "project found: id=$PROJECT_ID"
+  fi
 fi
 
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then

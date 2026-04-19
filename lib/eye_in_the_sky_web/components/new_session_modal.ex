@@ -44,12 +44,16 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       end
     else
       project_path = if assigns[:current_project], do: assigns[:current_project].path
-      available_agents = list_agents(project_path)
+      available_agents = Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
 
       socket =
         socket
         |> assign(Map.put(assigns, :available_agents, available_agents))
-        |> then(fn s -> if opening, do: assign(s, :agent_search, ""), else: s end)
+        |> then(fn s ->
+          if opening && !Map.has_key?(assigns, :agent_search),
+            do: assign(s, :agent_search, ""),
+            else: s
+        end)
 
       {:ok, socket}
     end

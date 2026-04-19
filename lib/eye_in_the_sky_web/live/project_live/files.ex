@@ -12,7 +12,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   alias EyeInTheSky.Projects
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
-  @tree_cache_ttl 300
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -33,7 +32,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
         file_tree =
           if project.path do
-            cached_file_tree(project.id, project.path)
+            build_file_tree(project.path, project.path)
           else
             []
           end
@@ -53,21 +52,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> assign(:project, nil)
          |> assign(:error, "Invalid project ID")
          |> put_flash(:error, "Invalid project ID")}
-    end
-  end
-
-  defp cached_file_tree(project_id, path) do
-    key = {__MODULE__, :file_tree, project_id}
-    now = System.os_time(:second)
-
-    case :persistent_term.get(key, nil) do
-      {tree, built_at} when now - built_at < @tree_cache_ttl ->
-        tree
-
-      _ ->
-        tree = build_file_tree(path, path)
-        :persistent_term.put(key, {tree, now})
-        tree
     end
   end
 

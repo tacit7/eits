@@ -155,7 +155,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           </li>
         <% end %>
         <%= if @agent.uuid do %>
-          <li><hr class="border-base-content/10 my-1" /></li>
+          <li class="pointer-events-none"><hr class="border-base-content/10 my-1" /></li>
           <%= if @agent.archived_at do %>
             <li>
               <button
@@ -245,7 +245,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               </button>
             </li>
           <% end %>
-          <li><hr class="border-base-content/10 my-0.5" /></li>
+          <li class="pointer-events-none"><hr class="border-base-content/10 my-0.5" /></li>
           <%= if @show_new_canvas_for != to_string(@agent.id) do %>
             <li>
               <button

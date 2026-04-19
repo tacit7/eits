@@ -777,8 +777,8 @@ teardown_teams() {
   [[ "$output" =~ "unknown flag" ]]
 }
 
-@test "jobs list: rejects unknown flags" {
-  run "$EITS" jobs list --bogus foo 2>&1
+@test "jobs list --limit: rejects unsupported flag" {
+  run "$EITS" jobs list --limit 10 2>&1
   [ "$status" -ne 0 ]
   [[ "$output" =~ "unknown flag" ]]
 }

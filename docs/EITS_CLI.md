@@ -19,6 +19,14 @@ export EITS_PROJECT_ID=<project-id>
 
 Requires `curl` and `jq`.
 
+Pass `--help` to any subcommand for usage details (e.g. `eits tasks --help`, `eits dm --help`).
+
+### JSON parsing
+
+The script's internal `json()` helper coerces numeric values only for keys whose name ends in `_id` (e.g. `task_id`, `project_id`, `session_id`). Other numeric-looking fields (hashes, freeform numeric strings) are preserved as-is, preventing unintended integer/float conversion.
+
+`AUTH_HEADER` is internally an array so multiple `-H` flags can be passed to `curl` without quoting issues. Do not treat it as a scalar when editing the script.
+
 ---
 
 ## sessions

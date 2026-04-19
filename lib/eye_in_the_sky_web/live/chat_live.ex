@@ -377,6 +377,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-hidden">
       <.svelte
         name="AgentMessagesPanel"
+        ssr={false}
         props={
           %{
             activeChannelId: @active_channel_id,

@@ -257,6 +257,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
       <.flyout
         open={@flyout_open}
+        mobile_open={@mobile_open}
         active_section={@active_section}
         sidebar_project={@sidebar_project}
         active_channel_id={@active_channel_id}

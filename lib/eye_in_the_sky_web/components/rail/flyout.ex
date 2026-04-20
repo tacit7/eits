@@ -3,6 +3,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   use EyeInTheSkyWeb, :html
 
   attr :open, :boolean, required: true
+  # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
+  # This prevents the 236px panel from compressing content on first load.
+  attr :mobile_open, :boolean, default: false
   attr :active_section, :atom, required: true
   attr :sidebar_project, :any, default: nil
   # Accepted for assign compatibility with Sidebar interface; unused in MVP (no channel list).
@@ -17,7 +20,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       data-flyout-panel
       class={[
         "flex flex-col border-r border-base-content/8 bg-base-100 overflow-hidden flex-shrink-0 transition-[width] duration-150",
-        if(@open, do: "w-[236px]", else: "w-0")
+        # Desktop (≥md): show when open. Mobile: only show when mobile_open is also true.
+        if(@open, do: "md:w-[236px]", else: "w-0"),
+        if(@open && @mobile_open, do: "w-[236px]")
       ]}
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>

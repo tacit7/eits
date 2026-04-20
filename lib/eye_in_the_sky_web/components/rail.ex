@@ -62,7 +62,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   def update(assigns, socket) do
-    sidebar_project = Map.get(assigns, :sidebar_project, socket.assigns[:sidebar_project])
+    # Only adopt parent's sidebar_project if it's non-nil — prevents parent re-renders from
+    # clearing a project that was locally selected via the rail's own project picker.
+    sidebar_project =
+      case assigns do
+        %{sidebar_project: p} when not is_nil(p) -> p
+        _ -> socket.assigns[:sidebar_project]
+      end
     sidebar_tab = Map.get(assigns, :sidebar_tab, socket.assigns[:sidebar_tab] || :sessions)
     active_channel_id = Map.get(assigns, :active_channel_id, socket.assigns[:active_channel_id])
 
@@ -235,7 +241,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           <.icon name="hero-cog-6-tooth-mini" class="w-4 h-4" />
         </.link>
 
-        <.link href="/users/log_out" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors" aria-label="Sign out">
+        <.link href="/auth/logout" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors" aria-label="Sign out">
           <.icon name="hero-arrow-left-on-rectangle-mini" class="w-4 h-4" />
         </.link>
       </nav>

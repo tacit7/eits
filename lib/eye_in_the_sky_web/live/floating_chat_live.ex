@@ -35,11 +35,12 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_event("fab_set_bookmarks", %{"bookmarks" => bookmarks}, socket) do
-    statuses = fetch_bookmark_statuses()
+    bookmarks = if is_list(bookmarks), do: bookmarks, else: []
+    statuses = fetch_bookmark_statuses(bookmarks)
 
     socket =
       socket
-      |> assign(:fab_bookmarks, bookmarks || [])
+      |> assign(:fab_bookmarks, bookmarks)
       |> assign(:fab_statuses, statuses)
       |> schedule_fab_refresh()
 
@@ -48,7 +49,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_event("fab_request_statuses", _params, socket) do
-    statuses = fetch_bookmark_statuses()
+    statuses = fetch_bookmark_statuses(socket.assigns.fab_bookmarks)
 
     socket =
       socket
@@ -166,7 +167,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_info(:fab_refresh_statuses, socket) do
-    statuses = fetch_bookmark_statuses()
+    statuses = fetch_bookmark_statuses(socket.assigns.fab_bookmarks)
 
     socket =
       socket
@@ -268,13 +269,28 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     assign(socket, :fab_timer, timer)
   end
 
-  defp fetch_bookmark_statuses do
-    Sessions.list_sessions_with_agent(include_archived: false)
-    |> Enum.reduce(%{}, fn s, acc ->
-      status = s.status || "idle"
-      acc = Map.put(acc, to_string(s.id), status)
-      if s.uuid, do: Map.put(acc, s.uuid, status), else: acc
-    end)
+  defp fetch_bookmark_statuses(bookmarks) when not is_list(bookmarks), do: %{}
+  defp fetch_bookmark_statuses([]), do: %{}
+
+  defp fetch_bookmark_statuses(bookmarks) do
+    ids = for id when is_binary(id) or is_integer(id) <- bookmarks, do: to_string(id)
+
+    if ids == [] do
+      %{}
+    else
+      bookmark_set = MapSet.new(ids)
+
+      Sessions.list_sessions_with_agent(include_archived: false)
+      |> Enum.filter(fn s ->
+        MapSet.member?(bookmark_set, to_string(s.id)) or
+          (not is_nil(s.uuid) and MapSet.member?(bookmark_set, s.uuid))
+      end)
+      |> Enum.reduce(%{}, fn s, acc ->
+        status = s.status || "idle"
+        acc = Map.put(acc, to_string(s.id), status)
+        if s.uuid, do: Map.put(acc, s.uuid, status), else: acc
+      end)
+    end
   end
 
   defp update_fab_component(socket) do

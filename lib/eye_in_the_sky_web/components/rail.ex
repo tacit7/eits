@@ -66,6 +66,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     end
   end
 
+  # Both clauses below are triggered via send_update from floating_chat_live.ex,
+  # which attaches them as handle_info hooks (attach_hook(:fab_info, :handle_info, ...)).
+  # handle_info only fires on connected sockets, so no connected?(socket) guard is needed.
   @impl true
   def update(%{notification_count: :refresh}, socket) do
     {:ok, assign(socket, :notification_count, Notifications.unread_count())}

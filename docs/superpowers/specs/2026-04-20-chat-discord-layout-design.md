@@ -23,7 +23,7 @@ Implementation: add a `layout: false` or a dedicated `chat_layout.html.heex` tha
 
 A new fixed-width left panel (≈200px) renders inside `ChatLive`. It contains:
 
-- **Back button** at the top — `hero-arrow-left` icon + "Back" text. Uses the same inline pattern already established in `canvas_live.ex`: `onclick="history.length > 1 ? history.back() : window.location.href = '/'"`. No new hook needed. Styled as a small ghost button (`btn btn-ghost btn-xs`).
+- **Back button** at the top — `hero-arrow-left` icon only (no text label). Uses the same inline pattern from `canvas_live.ex`: `onclick="history.length > 1 ? history.back() : window.location.href = '/'"`. No new hook needed. Styled as a small ghost button (`btn btn-ghost btn-xs`).
 - **"Channels" section header** with a `+` button to create a new channel (existing inline form behavior).
 - **Channel list** — one row per channel, `#name` format, active channel highlighted. Same click-to-navigate behavior as the current sidebar list.
 
@@ -64,16 +64,15 @@ Reuse the pattern from `canvas_live.ex` verbatim:
 ```heex
 <button
   onclick="history.length > 1 ? history.back() : window.location.href = '/'"
-  class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
+  class="btn btn-ghost btn-xs px-1.5 self-center mr-1 text-base-content/50 hover:text-base-content"
   aria-label="Go back"
   title="Go back"
 >
   <.icon name="hero-arrow-left" class="w-4 h-4" />
-  <span class="text-xs ml-1">Back</span>
 </button>
 ```
 
-No new JS hook needed. Falls back to `/` if no browser history.
+No new JS hook needed. Falls back to `/` if no browser history. Icon only — no text label.
 
 ---
 

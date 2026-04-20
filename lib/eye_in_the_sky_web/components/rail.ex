@@ -89,6 +89,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         socket
       end
 
+    # Reset mobile_open on any parent update (navigation/page change) so the flyout
+    # doesn't stay open after the user navigates to a new page.
+    socket = assign(socket, :mobile_open, false)
+
     {:ok, socket}
   end
 

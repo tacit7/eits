@@ -19,6 +19,11 @@ defmodule EyeInTheSky.Tasks.Associations do
 
   defp do_link_session(_task_id, nil), do: :ok
 
+  defp do_link_session(task_id, session_id) when is_integer(session_id) do
+    TaskSessions.link_session_to_task(task_id, session_id)
+    :ok
+  end
+
   defp do_link_session(task_id, session_id) when is_binary(session_id) do
     int_id =
       case ToolHelpers.parse_int(session_id) do

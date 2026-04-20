@@ -356,25 +356,26 @@
 
                 <div class="min-w-0 flex-1">
                   <div class="flex items-baseline gap-2 flex-wrap">
-                    <span class="text-[13px] font-semibold {message.sender_role === 'user' ? 'text-base-content/70' : 'text-primary/80'}">
-                      {message.sender_role === 'user' ? 'You' : (message.provider || 'Agent')}
-                    </span>
+                    <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
 
-                    {#if message.sender_role === 'agent' && message.session_id}
+                    {#if message.sender_role === 'user'}
+                      <span class="text-[13px] font-semibold text-base-content/70">You</span>
+                    {:else if message.session_id}
                       {@const agent = activeAgents.find(a => a.id === message.session_id)}
                       <button
-                        class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35 hover:text-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                        class="text-[13px] font-semibold text-primary/80 hover:text-primary transition-colors cursor-pointer"
                         on:click={() => navigateToDm(message.session_id)}
                         title="Session #{message.session_id}"
                       >
-                        {truncate(agent?.name || message.session_name) || `@${message.session_id}`}
+                        {agent?.name || message.session_name || `@${message.session_id}`}
                       </button>
+                    {:else}
+                      <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                     {/if}
 
                     {#if message.number}
                       <span class="font-mono text-xs text-base-content/20">#{message.number}</span>
                     {/if}
-                    <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
                     <button
                       class="opacity-0 group-hover:opacity-100 ml-auto text-base-content/20 hover:text-error transition-all cursor-pointer"
                       on:click={() => live.pushEvent('delete_message', { id: String(message.id) })}

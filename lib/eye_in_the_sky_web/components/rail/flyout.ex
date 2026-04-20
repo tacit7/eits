@@ -23,7 +23,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         # w-0 is always the mobile base; md:w-[236px] overrides on desktop when open.
         # w-[236px] overrides on mobile only when mobile_open is also true.
         if(@open, do: "w-0 md:w-[236px]", else: "w-0"),
-        if(@open && @mobile_open, do: "w-[236px]")
+        if(@open && @mobile_open, do: "w-[236px]"),
+        # On mobile, sit above the z-40 backdrop so the flyout is interactive.
+        # md:z-auto resets to normal stacking on desktop where the backdrop is hidden.
+        "z-50 md:z-auto"
       ]}
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>

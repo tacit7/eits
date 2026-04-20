@@ -458,6 +458,45 @@ The `Deduplicator` module guards DM and broadcast endpoints against duplicate de
 
 ---
 
+## Tool Result Message UI
+
+**Commit:** `76d6d61e`
+
+Tool result messages in the DM chat have special UI treatment to reduce visual clutter.
+
+**Display rules:**
+- **Header hidden**: Sender name, timestamp, model, and cost badges are not shown
+- **Output closed by default**: `<details>` element renders without the `open` attribute, so tool output is collapsed
+- **Content alignment**: Tool result content is indented to align with message body text (padding-left: `pl-[26px]`)
+- **Minimal vertical spacing**: Padding reduced from `py-3` to `py-0.5` to keep tool results compact
+
+**UI behavior:**
+1. User sees a compact "Code Block" header with toggle arrow
+2. Click header to expand and reveal tool output
+3. Expanded output shows full code or command result
+4. Collapse hides output again without dismissing the message
+
+**Implementation:** `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex`
+
+---
+
+## Rejection of DMs from Terminated Sessions
+
+**Commit:** `106e5b9f`
+
+The DM endpoint rejects messages from sessions in terminal states (completed or failed).
+
+**Behavior:**
+- Sessions with status `"completed"` or `"failed"` cannot send DMs
+- Endpoints return `422 Unprocessable Entity` with error message: `"Sender session is terminated and cannot send DMs"`
+- Prevents zombie agent sessions from flooding the message queue with repeated DMs after their work is done
+
+**Check location:** `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` in `do_dm/4`
+
+**Use case:** Agent sessions that have finished work are blocked from issuing further messages, so stale broadcast signals or retry loops don't pollute the DM queue.
+
+---
+
 ## Copy-to-Clipboard
 
 **Commits:** `d04b7f63`, `10d75ff3`

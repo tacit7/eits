@@ -1,6 +1,7 @@
 <script>
   import { formatTime, formatDateRelative } from '../../utils/datetime.js'
   import { autoScroll } from '../../actions/autoScroll.js'
+  import { isGrouped, isNewDate } from '../../utils/messageGrouping.js'
 
   export let activeChannelId = null
   export let messages = []
@@ -34,6 +35,12 @@
         name: m.session_name || agent?.name || agent?.agent_description || `@${m.session_id}`
       }
     })
+
+  $: renderedMessages = (messages || []).map((message, index) => ({
+    message,
+    grouped: isGrouped(message, (messages || [])[index - 1]),
+    startsNewDate: isNewDate(message, (messages || [])[index - 1]),
+  }))
 
   // Message history for up/down navigation
   let messageHistory = []
@@ -316,9 +323,9 @@
   >
     {#if messages && messages.length > 0}
       <div class="space-y-0">
-        {#each messages as message, idx}
+        {#each renderedMessages as { message, grouped, startsNewDate }}
           <!-- Date separator -->
-          {#if idx === 0 || formatDateRelative(messages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
+          {#if startsNewDate}
             <div class="flex items-center gap-3 my-4">
               <div class="flex-1 h-px bg-base-content/5"></div>
               <span class="text-xs uppercase tracking-wider font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
@@ -328,10 +335,10 @@
 
           <!-- Message -->
           <div
-            class="group py-3 px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? '' : message.sender_role === 'agent' ? 'bg-primary/[0.03]' : 'hover:bg-base-content/[0.02]'}"
+            class="group relative py-1 px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? '' : grouped ? 'hover:bg-base-content/[0.02]' : message.sender_role === 'agent' ? 'bg-primary/[0.03]' : 'hover:bg-base-content/[0.02]'}"
           >
             {#if message.sender_role === 'system'}
-              <!-- System message -->
+              <!-- System message — unchanged -->
               <div class="flex items-center gap-2 text-xs text-base-content/30 italic px-1">
                 <span class="w-1 h-1 rounded-full bg-base-content/20 flex-shrink-0"></span>
                 <span class="flex-1">{message.body}</span>
@@ -343,7 +350,29 @@
                   <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                 </button>
               </div>
+            {:else if grouped}
+              <!-- Grouped message: no header, indented to text column -->
+              <div class="flex items-start gap-2.5 pr-16">
+                <!-- Spacer matching avatar width -->
+                <div class="w-4 flex-shrink-0"></div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
+                  <!-- Token metadata for grouped child — opacity-toggled, no layout shift -->
+                  {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
+                    <div class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 pointer-events-none">
+                      <span class="font-mono text-[10px] text-base-content/20">${message.metadata.total_cost_usd.toFixed(4)}</span>
+                      {#if message.metadata.usage?.input_tokens}<span class="font-mono text-[10px] text-base-content/20">{message.metadata.usage.input_tokens}in</span>{/if}
+                      {#if message.metadata.usage?.output_tokens}<span class="font-mono text-[10px] text-base-content/20">{message.metadata.usage.output_tokens}out</span>{/if}
+                    </div>
+                  {/if}
+                  <!-- Grouped timestamp on hover -->
+                  <div class="absolute right-2 bottom-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <span class="text-[10px] text-base-content/20">{formatTime(message.inserted_at)}</span>
+                  </div>
+                </div>
+              </div>
             {:else}
+              <!-- First message in group: full header -->
               <div class="flex items-start gap-2.5">
                 <!-- Sender icon -->
                 {#if message.sender_role === 'user'}
@@ -355,7 +384,7 @@
                 {/if}
 
                 <div class="min-w-0 flex-1">
-                  <div class="flex items-baseline gap-2 flex-wrap">
+                  <div class="flex items-baseline gap-2 flex-wrap pr-16">
                     <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
 
                     {#if message.sender_role === 'user'}
@@ -387,34 +416,14 @@
 
                   <p class="mt-1 text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
 
-                  <!-- Usage metadata for agent messages -->
+                  <!-- Token metadata — opacity-toggled, no layout shift -->
                   {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                    <div class="mt-2 flex flex-wrap gap-1.5">
-                      {#if message.metadata.total_cost_usd}
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          ${message.metadata.total_cost_usd.toFixed(4)}
-                        </span>
-                      {/if}
-                      {#if message.metadata.usage?.input_tokens}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          {message.metadata.usage.input_tokens} in
-                        </span>
-                      {/if}
-                      {#if message.metadata.usage?.output_tokens}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          {message.metadata.usage.output_tokens} out
-                        </span>
-                      {/if}
-                      {#if message.metadata.duration_ms}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          {(message.metadata.duration_ms / 1000).toFixed(1)}s
-                        </span>
-                      {/if}
-                      {#if message.metadata.num_turns}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          {message.metadata.num_turns} turns
-                        </span>
-                      {/if}
+                    <div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 pointer-events-none">
+                      <span class="font-mono text-[10px] text-base-content/20">${message.metadata.total_cost_usd.toFixed(4)}</span>
+                      {#if message.metadata.usage?.input_tokens}<span class="font-mono text-[10px] text-base-content/20">{message.metadata.usage.input_tokens}in</span>{/if}
+                      {#if message.metadata.usage?.output_tokens}<span class="font-mono text-[10px] text-base-content/20">{message.metadata.usage.output_tokens}out</span>{/if}
+                      {#if message.metadata.duration_ms}<span class="font-mono text-[10px] text-base-content/20">{(message.metadata.duration_ms / 1000).toFixed(1)}s</span>{/if}
+                      {#if message.metadata.num_turns}<span class="font-mono text-[10px] text-base-content/20">{message.metadata.num_turns}t</span>{/if}
                     </div>
                   {/if}
                 </div>

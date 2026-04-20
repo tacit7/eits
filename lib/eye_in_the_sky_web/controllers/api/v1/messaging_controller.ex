@@ -54,33 +54,31 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     end
   end
 
-  # Resolve a session from an integer ID, UUID, or agent UUID (legacy sender_id).
-  defp resolve_from_session(raw) do
+  # Resolves a session from a raw value. :from also falls back to agent UUID lookup (legacy sender_id).
+  defp resolve_session_target(%{raw: raw, kind: :from}) do
     if int_id = ToolHelpers.parse_int(raw) do
       Sessions.get_session(int_id)
     else
-      # Try as session UUID first
       case Sessions.get_session_by_uuid(raw) do
-        {:ok, session} -> {:ok, session}
-        {:error, :not_found} -> resolve_session_from_agent_uuid(raw)
+        {:ok, session} ->
+          {:ok, session}
+
+        {:error, :not_found} ->
+          case Agents.get_agent_by_uuid(raw) do
+            {:ok, agent} ->
+              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+                [session | _] -> {:ok, session}
+                _ -> {:error, :not_found}
+              end
+
+            _ ->
+              {:error, :not_found}
+          end
       end
     end
   end
 
-  defp resolve_session_from_agent_uuid(raw) do
-    case Agents.get_agent_by_uuid(raw) do
-      {:ok, agent} ->
-        case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-          [session | _] -> {:ok, session}
-          _ -> {:error, :not_found}
-        end
-
-      _ ->
-        {:error, :not_found}
-    end
-  end
-
-  defp resolve_to_session(raw) do
+  defp resolve_session_target(%{raw: raw, kind: :to}) do
     if int_id = ToolHelpers.parse_int(raw),
       do: Sessions.get_session(int_id),
       else: Sessions.get_session_by_uuid(raw)
@@ -89,10 +87,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   @terminated_statuses ~w(completed failed)
 
   defp do_dm(conn, params, from_raw, to_raw) do
-    with {:from, {:ok, from_session}} <- {:from, resolve_from_session(from_raw)},
+    with {:from, {:ok, from_session}} <- {:from, resolve_session_target(%{raw: from_raw, kind: :from})},
          {:from_active, false} <-
            {:from_active, from_session.status in @terminated_statuses},
-         {:to, {:ok, to_session}} <- {:to, resolve_to_session(to_raw)} do
+         {:to, {:ok, to_session}} <- {:to, resolve_session_target(%{raw: to_raw, kind: :to})} do
       response_required = params["response_required"] in [true, "true", "1", 1]
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
@@ -110,14 +108,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
         nil ->
           case deliver_and_persist_dm(to_session.id, from_session.id, dm_body, metadata) do
             {:ok, msg} ->
-              conn
-              |> put_status(:created)
-              |> json(%{
-                success: true,
-                message: "DM delivered to session #{to_session.id}",
-                message_id: to_string(msg.id),
-                message_uuid: msg.uuid
-              })
+              success_response(conn, to_session, msg)
 
             {:error, reason} ->
               Logger.error("DM routing failed for session #{to_session.id}: #{inspect(reason)}")
@@ -125,14 +116,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
           end
 
         existing ->
-          conn
-          |> put_status(:created)
-          |> json(%{
-            success: true,
-            message: "DM delivered to session #{to_session.id}",
-            message_id: to_string(existing.id),
-            message_uuid: existing.uuid
-          })
+          success_response(conn, to_session, existing)
       end
     else
       {:from, {:error, :not_found}} ->
@@ -144,6 +128,17 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       {:to, {:error, :not_found}} ->
         {:error, :not_found, "Target session not found"}
     end
+  end
+
+  defp success_response(conn, to_session, msg) do
+    conn
+    |> put_status(:created)
+    |> json(%{
+      success: true,
+      message: "DM delivered to session #{to_session.id}",
+      message_id: to_string(msg.id),
+      message_uuid: msg.uuid
+    })
   end
 
   @doc """
@@ -298,31 +293,33 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   # Fan out DMs to channel members with notifications="all", excluding the sender.
-  # Failures are logged but do not affect the channel message response.
+  # Runs async so the channel message response is not held hostage by N serial DMs.
   defp notify_channel_members(channel_id, sender_session_id, body) do
-    members =
-      EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      members =
+        EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
 
-    sender_label = get_sender_name(sender_session_id)
+      sender_label = get_sender_name(sender_session_id)
 
-    for member <- members do
-      dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
+      for member <- members do
+        dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
 
-      case deliver_and_persist_dm(
-             member.session_id,
-             sender_session_id,
-             dm_body,
-             %{channel_id: channel_id, channel_notification: true}
-           ) do
-        {:ok, _} ->
-          :ok
+        case deliver_and_persist_dm(
+               member.session_id,
+               sender_session_id,
+               dm_body,
+               %{channel_id: channel_id, channel_notification: true}
+             ) do
+          {:ok, _} ->
+            :ok
 
-        {:error, reason} ->
-          Logger.warning(
-            "channel notify failed for session #{member.session_id}: #{inspect(reason)}"
-          )
+          {:error, reason} ->
+            Logger.warning(
+              "channel notify failed for session #{member.session_id}: #{inspect(reason)}"
+            )
+        end
       end
-    end
+    end)
 
     :ok
   end
@@ -335,38 +332,37 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   # Fan out DMs to all active team members when broadcast_to_team_id is supplied on channel send.
-  # Requires sender to be a member of the team. Skips completed/failed sessions.
-  # Failures are logged and do not affect the channel message response.
+  # Runs async so the channel message response is not held hostage by N serial DMs.
   defp broadcast_to_team(channel_id, sender_session_id, team_id, body) do
-    case Teams.get_team(team_id) do
-      {:ok, team} ->
-        members = Teams.list_members(team_id)
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      case Teams.get_team(team_id) do
+        {:ok, team} ->
+          members = Teams.list_members(team_id)
 
-        if Enum.any?(members, &(&1.session_id == sender_session_id)) do
-          sender_label = get_sender_name(sender_session_id)
+          if Enum.any?(members, &(&1.session_id == sender_session_id)) do
+            sender_label = get_sender_name(sender_session_id)
 
-          dm_body =
-            "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"
+            dm_body =
+              "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"
 
-          members
-          |> Enum.filter(fn m ->
-            m.session_id &&
-              m.session_id != sender_session_id &&
-              m.session &&
-              m.session.status not in @terminated_statuses
-          end)
-          |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
-        else
-          Logger.warning(
-            "broadcast_to_team: session #{sender_session_id} is not a member of team #{team_id}, skipping"
-          )
+            members
+            |> Enum.filter(fn m ->
+              m.session_id &&
+                m.session_id != sender_session_id &&
+                m.session &&
+                m.session.status not in @terminated_statuses
+            end)
+            |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
+          else
+            Logger.warning(
+              "broadcast_to_team: session #{sender_session_id} is not a member of team #{team_id}, skipping"
+            )
+          end
 
-          :ok
-        end
-
-      _ ->
-        Logger.warning("broadcast_to_team: team #{team_id} not found, skipping fanout")
-    end
+        _ ->
+          Logger.warning("broadcast_to_team: team #{team_id} not found, skipping fanout")
+      end
+    end)
   end
 
   defp deliver_team_dm(target_session_id, from_session_id, dm_body, channel_id) do

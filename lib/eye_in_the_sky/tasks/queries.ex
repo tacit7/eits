@@ -45,7 +45,7 @@ defmodule EyeInTheSky.Tasks.Queries do
   @doc """
   Returns the list of tasks for a specific agent.
   """
-  def list_tasks_for_agent(agent_id) do
+  def list_tasks_for_agent(agent_id, opts \\ []) do
     Task
     |> where([t], t.agent_id == ^agent_id)
     |> preload(^@full_task_preloads)
@@ -54,6 +54,7 @@ defmodule EyeInTheSky.Tasks.Queries do
       desc: t.priority,
       asc: t.created_at
     )
+    |> QueryBuilder.maybe_limit(opts)
     |> Repo.all()
   end
 
@@ -193,7 +194,7 @@ defmodule EyeInTheSky.Tasks.Queries do
   @doc """
   Search tasks using PostgreSQL full-text search.
   """
-  def search_tasks(query, project_id \\ nil) when is_binary(query) do
+  def search_tasks(query, project_id \\ nil, opts \\ []) when is_binary(query) do
     extra_where =
       if project_id, do: dynamic([t], t.project_id == ^project_id)
 
@@ -205,7 +206,8 @@ defmodule EyeInTheSky.Tasks.Queries do
       sql_params: if(project_id, do: [project_id], else: []),
       extra_where: extra_where,
       order_by: [desc: :priority, desc: :created_at],
-      preload: @full_task_preloads
+      preload: @full_task_preloads,
+      limit: Keyword.get(opts, :limit)
     )
   end
 

@@ -18,10 +18,10 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
 
     notes =
       if params["session_id"] do
-        Notes.list_notes_for_session(params["session_id"]) |> Enum.take(limit)
+        Notes.list_notes_for_session(params["session_id"], limit: limit)
       else
         query = params["q"] || ""
-        Notes.search_notes(query) |> Enum.take(limit)
+        Notes.search_notes(query, [], limit: limit)
       end
 
     json(conn, %{

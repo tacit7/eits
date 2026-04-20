@@ -108,6 +108,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        socket
        |> assign(:active_section, section)
        |> assign(:flyout_open, true)
+       |> assign(:mobile_open, true)
        |> assign(:proj_picker_open, false)
        |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project))}
     end

@@ -274,191 +274,220 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col h-full bg-base-100">
-      <div id="canvas-tablist" role="tablist" phx-hook="CanvasStatusHook" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
-        <button
-          onclick="history.length > 1 ? history.back() : window.location.href = '/'"
-          class="btn btn-ghost btn-xs px-1.5 self-center mr-1 text-base-content/50 hover:text-base-content"
-          aria-label="Go back"
-          title="Go back"
-        >
-          <.icon name="hero-arrow-left" class="w-4 h-4" />
-        </button>
-        <%= for canvas <- @canvases do %>
-          <%= if @renaming_canvas_id == canvas.id do %>
-            <form
-              id={"rename-canvas-form-#{canvas.id}"}
-              phx-submit="rename_canvas"
-              phx-value-canvas-id={canvas.id}
-              class="flex items-center px-1"
-            >
-              <input
-                type="text"
-                name="name"
-                value={canvas.name}
-                class="input input-xs w-28 text-base"
-                phx-keydown="cancel_rename"
-                phx-key="Escape"
-                phx-blur={JS.dispatch("submit", to: "#rename-canvas-form-#{canvas.id}")}
-                autofocus
-              />
-            </form>
-          <% else %>
-            <a
-              role="tab"
-              id={"canvas-tab-#{canvas.id}"}
-              data-canvas-id={canvas.id}
-              phx-hook="CanvasTabHook"
-              class={["tab tab-sm", if(@active_canvas_id == canvas.id, do: "tab-active")]}
-              phx-click="switch_tab"
-              phx-value-canvas-id={canvas.id}
-            >
-              {canvas.name}
-              <span
-                :if={Map.get(@canvas_session_counts, canvas.id, 0) > 0}
-                class="badge badge-xs badge-ghost ml-1"
-              >{Map.get(@canvas_session_counts, canvas.id, 0)}</span>
-              <button
-                :if={@active_canvas_id == canvas.id}
-                type="button"
-                phx-click.stop="delete_canvas"
-                phx-value-canvas-id={canvas.id}
-                phx-confirm="Delete canvas and all its windows?"
-                class="ml-1 opacity-50 hover:opacity-100"
-              >
-                <.icon name="hero-trash-mini" class="w-3 h-3" />
-              </button>
-            </a>
-          <% end %>
-        <% end %>
-        <%= if @creating_canvas do %>
-          <form phx-submit="create_canvas" class="flex items-center gap-1 px-2">
+      <.canvas_tabs
+        canvases={@canvases}
+        active_canvas_id={@active_canvas_id}
+        canvas_sessions={@canvas_sessions}
+        canvas_session_counts={@canvas_session_counts}
+        renaming_canvas_id={@renaming_canvas_id}
+        creating_canvas={@creating_canvas}
+      />
+      <.canvas_area
+        canvases={@canvases}
+        canvas_sessions={@canvas_sessions}
+        active_canvas_id={@active_canvas_id}
+      />
+      <.session_picker_modal
+        :if={@show_session_picker}
+        session_search={@session_search}
+        filtered_sessions={@filtered_sessions}
+      />
+    </div>
+    """
+  end
+
+  defp canvas_tabs(assigns) do
+    ~H"""
+    <div id="canvas-tablist" role="tablist" phx-hook="CanvasStatusHook" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
+      <button
+        onclick="history.length > 1 ? history.back() : window.location.href = '/'"
+        class="btn btn-ghost btn-xs px-1.5 self-center mr-1 text-base-content/50 hover:text-base-content"
+        aria-label="Go back"
+        title="Go back"
+      >
+        <.icon name="hero-arrow-left" class="w-4 h-4" />
+      </button>
+      <%= for canvas <- @canvases do %>
+        <%= if @renaming_canvas_id == canvas.id do %>
+          <form
+            id={"rename-canvas-form-#{canvas.id}"}
+            phx-submit="rename_canvas"
+            phx-value-canvas-id={canvas.id}
+            class="flex items-center px-1"
+          >
             <input
               type="text"
               name="name"
+              value={canvas.name}
               class="input input-xs w-28 text-base"
-              placeholder="Canvas name"
+              phx-keydown="cancel_rename"
+              phx-key="Escape"
+              phx-blur={JS.dispatch("submit", to: "#rename-canvas-form-#{canvas.id}")}
               autofocus
             />
-            <button type="submit" class="btn btn-primary btn-xs min-h-[44px]">+</button>
           </form>
         <% else %>
           <a
             role="tab"
-            class="tab tab-sm text-base-content/40"
-            phx-click="start_new_canvas"
+            id={"canvas-tab-#{canvas.id}"}
+            data-canvas-id={canvas.id}
+            phx-hook="CanvasTabHook"
+            class={["tab tab-sm", if(@active_canvas_id == canvas.id, do: "tab-active")]}
+            phx-click="switch_tab"
+            phx-value-canvas-id={canvas.id}
           >
-            + New
+            {canvas.name}
+            <span
+              :if={Map.get(@canvas_session_counts, canvas.id, 0) > 0}
+              class="badge badge-xs badge-ghost ml-1"
+            >{Map.get(@canvas_session_counts, canvas.id, 0)}</span>
+            <button
+              :if={@active_canvas_id == canvas.id}
+              type="button"
+              phx-click.stop="delete_canvas"
+              phx-value-canvas-id={canvas.id}
+              phx-confirm="Delete canvas and all its windows?"
+              class="ml-1 opacity-50 hover:opacity-100"
+            >
+              <.icon name="hero-trash-mini" class="w-3 h-3" />
+            </button>
           </a>
         <% end %>
-        <span id="canvas-ws-badge" class="badge badge-warning badge-sm gap-1 self-center mx-2 hidden">
-          <span class="loading loading-spinner loading-xs"></span> Reconnecting...
-        </span>
-        <button
-          :if={not is_nil(@active_canvas_id)}
-          phx-click={JS.dispatch("palette:open-command", to: "#command-palette", detail: %{commandId: "canvas-add-session"})}
-          class="ml-auto btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
-          title="Add session to canvas"
-        >
-          <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
-        </button>
-        <button
-          :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
-          phx-hook="CanvasLayoutHook"
-          id="layout-2up"
-          data-layout-btn="2up"
-          phx-update="ignore"
-          class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
-          title="2-up layout"
-        >
-          <.icon name="hero-view-columns" class="w-4 h-4" />
-        </button>
-        <button
-          :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
-          phx-hook="CanvasLayoutHook"
-          id="layout-4up"
-          data-layout-btn="4up"
-          phx-update="ignore"
-          class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
-          title="4-up layout"
-        >
-          <.icon name="hero-squares-2x2" class="w-4 h-4" />
-        </button>
-        <button
-          :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
-          phx-click="tidy_layout"
-          class="mr-2 btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
-          title="Tidy windows"
-        >
-          <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      <div data-canvas-area id="canvas-area" phx-hook="CanvasPanHook" class="relative flex-1 overflow-hidden">
-        <%= for cs <- @canvas_sessions do %>
-          <.live_component
-            module={ChatWindowComponent}
-            id={"chat-window-#{cs.id}"}
-            canvas_session={cs}
+      <% end %>
+      <%= if @creating_canvas do %>
+        <form phx-submit="create_canvas" class="flex items-center gap-1 px-2">
+          <input
+            type="text"
+            name="name"
+            class="input input-xs w-28 text-base"
+            placeholder="Canvas name"
+            autofocus
           />
-        <% end %>
-        <%= if @canvas_sessions == [] and not is_nil(@active_canvas_id) do %>
-          <div class="flex flex-col items-center justify-center h-full gap-2 select-none">
-            <.icon name="hero-squares-2x2" class="w-10 h-10 text-base-content/20" />
-            <span class="text-base-content/40 text-sm font-medium">No sessions on this canvas</span>
-            <span class="text-base-content/30 text-xs">Go to Sessions and use Add to Canvas to attach one.</span>
-            <.link navigate={~p"/sessions"} class="btn btn-sm btn-ghost text-base-content/40 mt-1">Go to Sessions</.link>
-          </div>
-        <% end %>
-        <%= if @canvases == [] do %>
-          <div class="flex flex-col items-center justify-center h-full gap-3 text-base-content/30 text-sm select-none">
-            <.icon name="hero-squares-2x2" class="w-8 h-8" />
-            <span>No canvases yet. Create one with "+ New" above.</span>
-          </div>
-        <% end %>
-      </div>
+          <button type="submit" class="btn btn-primary btn-xs min-h-[44px]">+</button>
+        </form>
+      <% else %>
+        <a
+          role="tab"
+          class="tab tab-sm text-base-content/40"
+          phx-click="start_new_canvas"
+        >
+          + New
+        </a>
+      <% end %>
+      <span id="canvas-ws-badge" class="badge badge-warning badge-sm gap-1 self-center mx-2 hidden">
+        <span class="loading loading-spinner loading-xs"></span> Reconnecting...
+      </span>
+      <button
+        :if={not is_nil(@active_canvas_id)}
+        phx-click={JS.dispatch("palette:open-command", to: "#command-palette", detail: %{commandId: "canvas-add-session"})}
+        class="ml-auto btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
+        title="Add session to canvas"
+      >
+        <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+      </button>
+      <button
+        :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
+        phx-hook="CanvasLayoutHook"
+        id="layout-2up"
+        data-layout-btn="2up"
+        phx-update="ignore"
+        class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
+        title="2-up layout"
+      >
+        <.icon name="hero-view-columns" class="w-4 h-4" />
+      </button>
+      <button
+        :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
+        phx-hook="CanvasLayoutHook"
+        id="layout-4up"
+        data-layout-btn="4up"
+        phx-update="ignore"
+        class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
+        title="4-up layout"
+      >
+        <.icon name="hero-squares-2x2" class="w-4 h-4" />
+      </button>
+      <button
+        :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
+        phx-click="tidy_layout"
+        class="mr-2 btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
+        title="Tidy windows"
+      >
+        <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
+      </button>
+    </div>
+    """
+  end
 
-      <%= if @show_session_picker do %>
-        <div class="fixed inset-0 z-50 flex items-center justify-center">
-          <div class="absolute inset-0 bg-base-300/60" phx-click="close_session_picker"></div>
-          <div class="relative z-10 card bg-base-100 shadow-xl w-96 max-h-[70vh] flex flex-col">
-            <div class="card-body p-4 flex flex-col gap-3 min-h-0">
-              <div class="flex items-center justify-between shrink-0">
-                <h3 class="font-semibold text-sm">Add Session to Canvas</h3>
-                <button type="button" phx-click="close_session_picker" class="btn btn-ghost btn-xs btn-circle">
-                  <.icon name="hero-x-mark-mini" class="w-4 h-4" />
-                </button>
-              </div>
-              <form phx-change="search_sessions" class="shrink-0">
-                <input
-                  type="text"
-                  placeholder="Search sessions..."
-                  value={@session_search}
-                  phx-debounce="200"
-                  name="query"
-                  class="input input-sm w-full"
-                  autofocus
-                />
-              </form>
-              <div class="overflow-y-auto flex flex-col gap-0.5 min-h-0">
-                <%= for s <- @filtered_sessions do %>
-                  <button
-                    type="button"
-                    phx-click="pick_session"
-                    phx-value-session-id={s.id}
-                    class="btn btn-ghost btn-sm justify-start gap-2 text-left w-full"
-                  >
-                    <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
-                    <span class={["badge badge-xs shrink-0", session_status_class(s.status)]}>{s.status}</span>
-                  </button>
-                <% end %>
-                <%= if @filtered_sessions == [] do %>
-                  <p class="text-center text-base-content/40 text-xs py-4">No sessions found</p>
-                <% end %>
-              </div>
-            </div>
-          </div>
+  defp canvas_area(assigns) do
+    ~H"""
+    <div data-canvas-area id="canvas-area" phx-hook="CanvasPanHook" class="relative flex-1 overflow-hidden">
+      <%= for cs <- @canvas_sessions do %>
+        <.live_component
+          module={ChatWindowComponent}
+          id={"chat-window-#{cs.id}"}
+          canvas_session={cs}
+        />
+      <% end %>
+      <%= if @canvas_sessions == [] and not is_nil(@active_canvas_id) do %>
+        <div class="flex flex-col items-center justify-center h-full gap-2 select-none">
+          <.icon name="hero-squares-2x2" class="w-10 h-10 text-base-content/20" />
+          <span class="text-base-content/40 text-sm font-medium">No sessions on this canvas</span>
+          <span class="text-base-content/30 text-xs">Go to Sessions and use Add to Canvas to attach one.</span>
+          <.link navigate={~p"/sessions"} class="btn btn-sm btn-ghost text-base-content/40 mt-1">Go to Sessions</.link>
         </div>
       <% end %>
+      <%= if @canvases == [] do %>
+        <div class="flex flex-col items-center justify-center h-full gap-3 text-base-content/30 text-sm select-none">
+          <.icon name="hero-squares-2x2" class="w-8 h-8" />
+          <span>No canvases yet. Create one with "+ New" above.</span>
+        </div>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp session_picker_modal(assigns) do
+    ~H"""
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-base-300/60" phx-click="close_session_picker"></div>
+      <div class="relative z-10 card bg-base-100 shadow-xl w-96 max-h-[70vh] flex flex-col">
+        <div class="card-body p-4 flex flex-col gap-3 min-h-0">
+          <div class="flex items-center justify-between shrink-0">
+            <h3 class="font-semibold text-sm">Add Session to Canvas</h3>
+            <button type="button" phx-click="close_session_picker" class="btn btn-ghost btn-xs btn-circle">
+              <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+            </button>
+          </div>
+          <form phx-change="search_sessions" class="shrink-0">
+            <input
+              type="text"
+              placeholder="Search sessions..."
+              value={@session_search}
+              phx-debounce="200"
+              name="query"
+              class="input input-sm w-full"
+              autofocus
+            />
+          </form>
+          <div class="overflow-y-auto flex flex-col gap-0.5 min-h-0">
+            <%= for s <- @filtered_sessions do %>
+              <button
+                type="button"
+                phx-click="pick_session"
+                phx-value-session-id={s.id}
+                class="btn btn-ghost btn-sm justify-start gap-2 text-left w-full"
+              >
+                <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
+                <span class={["badge badge-xs shrink-0", session_status_class(s.status)]}>{s.status}</span>
+              </button>
+            <% end %>
+            <%= if @filtered_sessions == [] do %>
+              <p class="text-center text-base-content/40 text-xs py-4">No sessions found</p>
+            <% end %>
+          </div>
+        </div>
+      </div>
     </div>
     """
   end

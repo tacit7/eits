@@ -8,6 +8,7 @@ config :eye_in_the_sky,
   secret_key_base: "N/iElaaIGg/5yCN4JOKd13aAXziMbsBDWfTjQFgjjLY32KpeZ7hBDnQEx1AcpSLO",
   server_base_url: "http://localhost:#{System.get_env("PORT", "5001")}"
 config :eye_in_the_sky, :bypass_auth, System.get_env("BYPASS_AUTH", "true") in ~w(true 1)
+config :eye_in_the_sky, digest_desktop_path: Path.expand("~/Desktop")
 # Allow unsigned webhooks in dev when no secret is set (never enable in prod)
 config :eye_in_the_sky, :allow_unsigned_webhooks, true
 

@@ -91,60 +91,64 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   @impl true
   def handle_event("create_entry", %{"name" => raw_name}, socket) do
     name = String.trim(raw_name)
+    current_rel = socket.assigns.current_path
+    base = if current_rel, do: Path.join(@claude_dir, current_rel), else: @claude_dir
+
+    with :ok <- validate_entry_name(name),
+         :ok <- validate_entry_path(base, name) do
+      do_create_entry(socket, base, name, socket.assigns.creating)
+    else
+      {:assign_error, msg} -> {:noreply, assign(socket, :error, msg)}
+      {:flash_error, msg} -> {:noreply, put_flash(socket, :error, msg)}
+    end
+  end
+
+  defp validate_entry_name(name) do
+    cond do
+      name == "" -> {:assign_error, "Name cannot be empty"}
+      String.contains?(name, "/") or String.contains?(name, "..") -> {:assign_error, "Invalid name"}
+      true -> :ok
+    end
+  end
+
+  defp validate_entry_path(base, name) do
+    full = Path.join(base, name)
+    real_base = @claude_dir |> Path.expand() |> resolve_real_path()
+    # Resolve the *parent* directory (which must exist) to catch symlink traversal.
+    # Appending the validated name is safe because name contains no "/" or "..".
+    real_parent = base |> Path.expand() |> resolve_real_path()
+    real_full = Path.join(real_parent, name)
 
     cond do
-      name == "" ->
-        {:noreply, assign(socket, :error, "Name cannot be empty")}
+      not String.starts_with?(real_full, real_base <> "/") -> {:flash_error, "Access denied"}
+      File.exists?(full) -> {:flash_error, "Already exists: #{name}"}
+      true -> :ok
+    end
+  end
 
-      String.contains?(name, "/") or String.contains?(name, "..") ->
-        {:noreply, assign(socket, :error, "Invalid name")}
+  defp do_create_entry(socket, base, name, type) do
+    full = Path.join(base, name)
+    current_rel = socket.assigns.current_path
+    rel = if current_rel, do: Path.join(current_rel, name), else: name
 
-      true ->
-        current_rel = socket.assigns.current_path
-        base = if current_rel, do: Path.join(@claude_dir, current_rel), else: @claude_dir
-        full = Path.join(base, name)
-        real_base = @claude_dir |> Path.expand() |> resolve_real_path()
-        # Resolve the *parent* directory (which must exist) to catch symlink traversal.
-        # Appending the validated name is safe because name contains no "/" or "..".
-        real_parent = base |> Path.expand() |> resolve_real_path()
-        real_full = Path.join(real_parent, name)
-
-        cond do
-          not String.starts_with?(real_full, real_base <> "/") ->
-            {:noreply, put_flash(socket, :error, "Access denied")}
-
-          File.exists?(full) ->
-            {:noreply, put_flash(socket, :error, "Already exists: #{name}")}
-
-          true ->
-            rel = if current_rel, do: Path.join(current_rel, name), else: name
-
-            case socket.assigns.creating do
-              :dir ->
-                case File.mkdir(full) do
-                  :ok ->
-                    {:noreply, socket |> assign(:creating, nil) |> load_list_path(rel)}
-
-                  {:error, reason} ->
-                    {:noreply, put_flash(socket, :error, "Failed to create directory: #{reason}")}
-                end
-
-              :file ->
-                case File.write(full, "") do
-                  :ok ->
-                    {:noreply,
-                     socket
-                     |> assign(:creating, nil)
-                     |> push_patch(to: ~p"/config?path=#{rel}")}
-
-                  {:error, reason} ->
-                    {:noreply, put_flash(socket, :error, "Failed to create file: #{reason}")}
-                end
-
-              _ ->
-                {:noreply, socket}
-            end
+    case type do
+      :dir ->
+        case File.mkdir(full) do
+          :ok -> {:noreply, socket |> assign(:creating, nil) |> load_list_path(rel)}
+          {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to create directory: #{reason}")}
         end
+
+      :file ->
+        case File.write(full, "") do
+          :ok ->
+            {:noreply, socket |> assign(:creating, nil) |> push_patch(to: ~p"/config?path=#{rel}")}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to create file: #{reason}")}
+        end
+
+      _ ->
+        {:noreply, socket}
     end
   end
 

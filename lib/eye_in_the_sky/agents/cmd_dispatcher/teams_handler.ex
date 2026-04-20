@@ -14,8 +14,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
 
   require Logger
 
-  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
+  alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSky.{Sessions, Teams}
   alias EyeInTheSky.Utils.ToolHelpers
 
@@ -128,7 +128,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
         sender_name = from_session.name || "session:#{from_session.uuid}"
         dm_body = "[team broadcast] from #{sender_name}: #{message}"
 
-        Enum.each(members, &broadcast_to_member(&1, dm_body))
+        Enum.each(members, &broadcast_to_member(&1, from_session_id, dm_body))
 
         notify_success(from_session_id, "team broadcast sent to #{length(members)} members")
 
@@ -182,9 +182,14 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
     end
   end
 
-  defp broadcast_to_member(member, dm_body) do
+  defp broadcast_to_member(member, from_session_id, dm_body) do
     Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-      AgentManager.send_message(member.session_id, dm_body)
+      case DMDelivery.deliver_and_persist(member.session_id, from_session_id, dm_body, %{
+             broadcast: true
+           }) do
+        {:ok, _} -> :ok
+        {:error, reason} -> Logger.warning("team broadcast persist failed: #{inspect(reason)}")
+      end
     end)
   end
 end

@@ -14,7 +14,10 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
   def index(conn, params) do
     projects =
       if path = params["path"] do
-        Projects.list_projects_by_path(path)
+        case Projects.get_project_by_path(path) do
+          {:ok, project} -> [project]
+          {:error, :not_found} -> []
+        end
       else
         Projects.list_projects()
       end

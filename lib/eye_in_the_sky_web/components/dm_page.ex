@@ -46,8 +46,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
   attr :overlay_data, :map, default: %{active_overlay: nil, active_timer: nil, reloading: false}
 
+  defp normalize_message_data(message_data) do
+    Map.merge(
+      %{messages: [], has_more_messages: false, message_search_query: "", queued_prompts: []},
+      message_data
+    )
+  end
+
   def dm_page(assigns) do
-    assigns = assign(assigns, :tabs, @tabs)
+    assigns =
+      assigns
+      |> assign(:tabs, @tabs)
+      |> update(:message_data, &normalize_message_data/1)
 
     ~H"""
     <div

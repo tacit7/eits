@@ -60,51 +60,39 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     end
   end
 
-  # Initial mount — called once with project_id + project attrs.
+  # Regular update — always syncs project_id/project; initialises one-time assigns on first call.
   def update(assigns, socket) do
-    if Map.has_key?(socket.assigns, :project_id) do
-      # Re-mount (e.g. project context changed); refresh jobs if project changed.
-      prev_project_id = socket.assigns.project_id
+    prev_project_id = socket.assigns[:project_id]
 
-      socket =
+    socket =
+      socket
+      |> assign(:project_id, assigns.project_id)
+      |> assign(:project, assigns.project)
+      |> assign_new(:form_scope, fn -> if(assigns.project_id, do: "project", else: "global") end)
+      |> assign_new(:show_form, fn -> false end)
+      |> assign_new(:editing_job, fn -> nil end)
+      |> assign_new(:form, fn -> to_form(ScheduledJobs.change_job(%ScheduledJob{})) end)
+      |> assign_new(:form_job_type, fn -> "spawn_agent" end)
+      |> assign_new(:form_schedule_type, fn -> "interval" end)
+      |> assign_new(:form_config, fn -> %{} end)
+      |> assign_new(:expanded_job_id, fn -> nil end)
+      |> assign_new(:runs, fn -> [] end)
+      |> assign_new(:search_query, fn -> "" end)
+      |> assign_new(:filter_type, fn -> "all" end)
+      |> assign_new(:filter_status, fn -> "all" end)
+      |> assign_new(:filter_origin, fn -> "all" end)
+      |> assign_new(:running_ids, fn -> MapSet.new(ScheduledJobs.list_running_job_ids()) end)
+      |> assign_new(:last_run_map, fn -> ScheduledJobs.last_run_status_map() end)
+      |> assign_new(:active_tab, fn -> :all_jobs end)
+
+    socket =
+      if is_nil(prev_project_id) or assigns.project_id != prev_project_id do
+        load_jobs(socket, apply_filters: false)
+      else
         socket
-        |> assign(:project_id, assigns.project_id)
-        |> assign(:project, assigns.project)
+      end
 
-      socket =
-        if assigns.project_id != prev_project_id do
-          socket
-          |> load_jobs(apply_filters: false)
-        else
-          socket
-        end
-
-      {:ok, socket}
-    else
-      socket =
-        socket
-        |> assign(:project_id, assigns.project_id)
-        |> assign(:project, assigns.project)
-        |> assign(:form_scope, if(assigns.project_id, do: "project", else: "global"))
-        |> assign(:show_form, false)
-        |> assign(:editing_job, nil)
-        |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
-        |> assign(:form_job_type, "spawn_agent")
-        |> assign(:form_schedule_type, "interval")
-        |> assign(:form_config, %{})
-        |> assign(:expanded_job_id, nil)
-        |> assign(:runs, [])
-        |> assign(:search_query, "")
-        |> assign(:filter_type, "all")
-        |> assign(:filter_status, "all")
-        |> assign(:filter_origin, "all")
-        |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
-        |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
-        |> assign(:active_tab, :all_jobs)
-        |> load_jobs(apply_filters: false)
-
-      {:ok, socket}
-    end
+    {:ok, socket}
   end
 
   # ---------------------------------------------------------------------------

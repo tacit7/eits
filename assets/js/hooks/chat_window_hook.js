@@ -134,9 +134,19 @@ export const ChatWindowHook = {
       })
     }
 
+    // Track current dimensions so updated() can restore them after a LiveView
+    // patch (which re-writes the style attr from DB values and would otherwise
+    // snap the window back to its last-saved size mid-interaction).
+    this._width  = this.el.offsetWidth
+    this._height = this.el.offsetHeight
+
     // --- Resize (native browser handle) ---
     let resizePersistTimer = null
     const observer = new ResizeObserver(() => {
+      // Update tracked dims immediately — don't wait for the persist debounce —
+      // so updated() restores correctly if a message is sent mid-resize.
+      this._width  = this.el.offsetWidth
+      this._height = this.el.offsetHeight
       clearTimeout(resizePersistTimer)
       resizePersistTimer = setTimeout(() => {
         this.pushEventTo(this.el, "window_resized", {
@@ -303,7 +313,11 @@ export const ChatWindowHook = {
           else handle.appendChild(dot)
         }
       } else if (this._autoScroll) {
-        scrollToBottom()
+        // Defer by one rAF so the browser finishes reflowing the new message
+        // before we read scrollHeight. Without this, the layout flush from the
+        // height-restoration in updated() can cause scrollToBottom() to land
+        // short of the actual bottom.
+        requestAnimationFrame(() => scrollToBottom())
       } else {
         this._newMsgCount = (this._newMsgCount || 0) + 1
         if (newMsgPill) {
@@ -361,6 +375,15 @@ export const ChatWindowHook = {
     if (this._dragging) {
       this.el.style.left = `${this._dragLeft}px`
       this.el.style.top  = `${this._dragTop}px`
+    }
+
+    // LiveView re-writes the style attr with DB-saved width/height on every patch
+    // (e.g. when a message is sent). If the user has resized the window since the
+    // last DB persist, this would snap it back. Restore JS-tracked dimensions
+    // instead. Skip when maximized — that mode manages its own dimensions.
+    if (!this._maximized && this._width != null && this._height != null) {
+      this.el.style.width  = `${this._width}px`
+      this.el.style.height = `${this._height}px`
     }
 
     if (this._minimized) this._applyMinimized()

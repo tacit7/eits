@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSkyWeb.ControllerHelpers
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
-  import Phoenix.LiveView, only: [put_flash: 3]
+  import Phoenix.LiveView, only: [put_flash: 3, push_patch: 2]
   import EyeInTheSkyWeb.Helpers.UploadHelpers
 
   @spec handle_add_agent(Phoenix.LiveView.Socket.t(), map()) ::
@@ -79,8 +79,35 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
 
   @spec handle_create_channel(Phoenix.LiveView.Socket.t(), map()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
-  def handle_create_channel(socket, _params) do
-    {:noreply, put_flash(socket, :info, "Channel creation coming soon")}
+  def handle_create_channel(socket, params) do
+    name = (params["name"] || socket.assigns[:new_channel_name] || "") |> String.trim()
+
+    if name == "" do
+      {:noreply, Phoenix.Component.assign(socket, :new_channel_name, nil)}
+    else
+      project_id = socket.assigns[:project_id] || 1
+      channel_id = EyeInTheSky.Channels.Channel.generate_id(project_id, name)
+
+      case Channels.create_channel(%{
+             id: channel_id,
+             uuid: Ecto.UUID.generate(),
+             name: name,
+             channel_type: "public",
+             project_id: project_id
+           }) do
+        {:ok, _channel} ->
+          channels = EyeInTheSky.Channels.list_channels_for_project(project_id)
+
+          {:noreply,
+           socket
+           |> Phoenix.Component.assign(:channels, EyeInTheSkyWeb.ChatPresenter.serialize_channels(channels))
+           |> Phoenix.Component.assign(:new_channel_name, nil)
+           |> push_patch(to: "/chat?channel_id=#{channel_id}")}
+
+        {:error, _changeset} ->
+          {:noreply, Phoenix.Component.assign(socket, :new_channel_name, nil)}
+      end
+    end
   end
 
   @spec handle_create_agent(Phoenix.LiveView.Socket.t(), map()) ::

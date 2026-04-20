@@ -7,30 +7,21 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   import EyeInTheSkyWeb.Components.Sidebar.ChatSection
   import EyeInTheSkyWeb.Components.Sidebar.ProjectsSection
 
-  alias EyeInTheSky.{Channels, Notifications, Projects}
-  alias EyeInTheSkyWeb.Components.Sidebar.{ChannelActions, ProjectActions}
+  alias EyeInTheSky.{Notifications, Projects}
+  alias EyeInTheSkyWeb.Components.Sidebar.ProjectActions
 
   @impl true
   def mount(socket) do
     projects = Projects.list_projects_for_sidebar()
 
-    channels =
-      case Channels.list_channels() do
-        channels when is_list(channels) -> channels
-        _ -> []
-      end
-
     {:ok,
      assign(socket,
        projects: projects,
-       channels: channels,
        collapsed: false,
        mobile_open: false,
        expanded_all_projects: true,
        expanded_projects: true,
        expanded_system: true,
-       expanded_chat: false,
-       new_channel_name: nil,
        new_project_path: nil,
        notification_count: Notifications.unread_count(),
        renaming_project_id: nil,
@@ -58,16 +49,13 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
     sidebar_project =
       assigns[:sidebar_project] || socket.assigns[:sidebar_project]
 
-    # Auto-expand chat when on chat page
     sidebar_tab = assigns[:sidebar_tab] || :sessions
-    expanded_chat = if sidebar_tab == :chat, do: true, else: socket.assigns.expanded_chat
 
     {:ok,
      socket
      |> assign(:sidebar_tab, sidebar_tab)
      |> assign(:sidebar_project, sidebar_project)
      |> assign(:active_channel_id, assigns[:active_channel_id])
-     |> assign(:expanded_chat, expanded_chat)
      |> assign(:mobile_open, false)
      |> assign(:expanded_all_projects, Map.get(socket.assigns, :expanded_all_projects, true))
      |> assign(:expanded_projects, Map.get(socket.assigns, :expanded_projects, true))
@@ -103,10 +91,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   @impl true
   def handle_event("toggle_system", _params, socket),
     do: {:noreply, assign(socket, :expanded_system, !socket.assigns.expanded_system)}
-
-  @impl true
-  def handle_event("toggle_chat", _params, socket),
-    do: {:noreply, assign(socket, :expanded_chat, !socket.assigns.expanded_chat)}
 
   # --- Project actions ---
 
@@ -157,24 +141,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
   @impl true
   def handle_event("create_project", _params, socket),
     do: ProjectActions.handle_create_project(socket)
-
-  # --- Channel actions ---
-
-  @impl true
-  def handle_event("show_new_channel", _params, socket),
-    do: ChannelActions.handle_show_new_channel(socket)
-
-  @impl true
-  def handle_event("cancel_new_channel", _params, socket),
-    do: ChannelActions.handle_cancel_new_channel(socket)
-
-  @impl true
-  def handle_event("update_channel_name", params, socket),
-    do: ChannelActions.handle_update_channel_name(params, socket)
-
-  @impl true
-  def handle_event("create_channel", _params, socket),
-    do: ChannelActions.handle_create_channel(socket)
 
   # --- Async handlers ---
 
@@ -250,11 +216,6 @@ defmodule EyeInTheSkyWeb.Components.Sidebar do
           <.chat_section
             sidebar_tab={@sidebar_tab}
             collapsed={@collapsed}
-            expanded_chat={@expanded_chat}
-            channels={@channels}
-            active_channel_id={@active_channel_id}
-            new_channel_name={@new_channel_name}
-            myself={@myself}
           />
           <.projects_section
             projects={@projects}

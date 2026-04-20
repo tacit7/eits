@@ -87,11 +87,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         handle_full_path(socket, full_path, path, proj_path)
 
       {path, nil} when is_binary(path) ->
-        {:noreply,
-         socket
-         |> assign(:file_full_path, nil)
-         |> assign(:error, "Project path not configured")
-         |> assign(:file_content, nil)}
+        {:noreply, file_error(socket, "Project path not configured")}
 
       {nil, _} ->
         load_root_listing(socket, mode)
@@ -133,12 +129,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   defp handle_full_path(socket, full_path, path, project_path) do
     if not path_within?(full_path, project_path) do
-      {:noreply,
-       socket
-       |> assign(:file_full_path, nil)
-       |> assign(:error, "Access denied: path outside project directory")
-       |> assign(:file_content, nil)
-       |> assign(:files, [])}
+      {:noreply, file_error(socket, "Access denied: path outside project directory")}
     else
       dispatch_path(socket, full_path, path)
     end
@@ -153,12 +144,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         handle_file(socket, full_path, path)
 
       _ ->
-        {:noreply,
-         socket
-         |> assign(:file_full_path, nil)
-         |> assign(:error, "File not found: #{path}")
-         |> assign(:file_content, nil)
-         |> assign(:files, [])}
+        {:noreply, file_error(socket, "File not found: #{path}")}
     end
   end
 
@@ -175,12 +161,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> assign(:error, nil)}
 
       {:error, reason} ->
-        {:noreply,
-         socket
-         |> unsubscribe_editor()
-         |> assign(:file_full_path, nil)
-         |> assign(:error, "Failed to read directory: #{reason}")
-         |> assign(:files, [])}
+        {:noreply, file_error(socket, "Failed to read directory: #{reason}")}
     end
   end
 
@@ -228,6 +209,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     |> assign(:file_full_path, nil)
     |> assign(:error, message)
     |> assign(:file_content, nil)
+    |> assign(:files, [])
   end
 
   defp subscribe_editor(socket, path) do

@@ -13,6 +13,50 @@
   let inputValue = ''
   let inputElement
 
+  // Scroll / jump-to-bottom
+  let messagesContainer
+  let isAtBottom = true
+
+  function handleScrollState() {
+    if (!messagesContainer) return
+    isAtBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop <= messagesContainer.clientHeight + 120
+  }
+
+  function jumpToBottom() {
+    if (!messagesContainer) return
+    messagesContainer.scrollTop = messagesContainer.scrollHeight
+    isAtBottom = true
+  }
+
+  // Search
+  let showSearch = false
+  let searchQuery = ''
+  let searchInput
+
+  $: filteredMessages = searchQuery.trim()
+    ? messages.filter(m => (m.body || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    : messages
+
+  function openSearch() {
+    showSearch = true
+    setTimeout(() => searchInput?.focus(), 0)
+  }
+
+  function closeSearch() {
+    showSearch = false
+    searchQuery = ''
+  }
+
+  function handleDocKeydown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f' && document.activeElement !== inputElement) {
+      e.preventDefault()
+      openSearch()
+    }
+    if (e.key === 'Escape' && showSearch) {
+      closeSearch()
+    }
+  }
+
   // @ mention autocomplete state
   let showAutocomplete = false
   let autocompleteOptions = []
@@ -307,18 +351,47 @@
   }
 </style>
 
-<div class="flex flex-col h-full">
+<svelte:document on:keydown={handleDocKeydown} />
+
+<div class="relative flex flex-col h-full">
+  <!-- Search bar -->
+  {#if showSearch}
+    <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/5 bg-base-100">
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1">
+          <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30 pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+          <input
+            bind:this={searchInput}
+            bind:value={searchQuery}
+            type="text"
+            placeholder="Search messages..."
+            class="w-full input input-xs bg-base-200/50 border-base-content/8 pl-8 pr-4 text-base placeholder:text-base-content/25 focus:border-primary/30"
+            autocomplete="off"
+          />
+        </div>
+        {#if searchQuery}
+          <span class="text-[11px] text-base-content/30 whitespace-nowrap">{filteredMessages.length} result{filteredMessages.length !== 1 ? 's' : ''}</span>
+        {/if}
+        <button on:click={closeSearch} class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0" title="Close (Esc)">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
+        </button>
+      </div>
+    </div>
+  {/if}
+
   <!-- Messages Container -->
   <div
-    use:autoScroll={{ trigger: messages?.length }}
+    bind:this={messagesContainer}
+    on:scroll={handleScrollState}
+    use:autoScroll={{ trigger: filteredMessages?.length }}
     class="flex-1 overflow-y-auto px-4 py-2"
     style="scrollbar-width: none; -ms-overflow-style: none;"
   >
-    {#if messages && messages.length > 0}
+    {#if filteredMessages && filteredMessages.length > 0}
       <div class="space-y-0">
-        {#each messages as message, idx}
+        {#each filteredMessages as message, idx}
           <!-- Date separator -->
-          {#if idx === 0 || formatDateRelative(messages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
+          {#if idx === 0 || formatDateRelative(filteredMessages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
             <div class="flex items-center gap-3 my-4">
               <div class="flex-1 h-px bg-base-content/5"></div>
               <span class="text-xs uppercase tracking-wider font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
@@ -347,8 +420,10 @@
               <div class="flex items-start gap-2.5">
                 <!-- Sender icon -->
                 {#if message.sender_role === 'user'}
-                  <div class="w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
-                    <div class="w-1.5 h-1.5 rounded-full bg-success"></div>
+                  <div class="w-4 h-4 mt-1 flex-shrink-0 text-base-content/40">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                      <path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" />
+                    </svg>
                   </div>
                 {:else}
                   <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0" alt={message.provider || 'Agent'} />
@@ -430,11 +505,28 @@
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
         </div>
-        <p class="text-sm font-semibold text-base-content/60">No messages yet</p>
-        <p class="mt-1 text-xs text-base-content/30">Messages from agents will appear here</p>
+        {#if searchQuery}
+          <p class="text-sm font-semibold text-base-content/60">No results for "{searchQuery}"</p>
+          <p class="mt-1 text-xs text-base-content/30">Try a different search term</p>
+        {:else}
+          <p class="text-sm font-semibold text-base-content/60">No messages yet</p>
+          <p class="mt-1 text-xs text-base-content/30">Messages from agents will appear here</p>
+        {/if}
       </div>
     {/if}
   </div>
+
+  <!-- Jump to bottom -->
+  {#if !isAtBottom}
+    <button
+      on:click={jumpToBottom}
+      class="absolute bottom-28 right-4 z-10 w-8 h-8 rounded-full bg-base-200 border border-base-content/10 shadow-md flex items-center justify-center text-base-content/50 hover:text-base-content hover:bg-base-300 transition-all"
+      title="Jump to bottom"
+      aria-label="Jump to bottom"
+    >
+      <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v10.638l3.96-4.158a.75.75 0 1 1 1.08 1.04l-5.25 5.5a.75.75 0 0 1-1.08 0l-5.25-5.5a.75.75 0 1 1 1.08-1.04l3.96 4.158V3.75A.75.75 0 0 1 10 3Z" clip-rule="evenodd" /></svg>
+    </button>
+  {/if}
 
   <!-- Typing indicator -->
   {#if workingMembers.length > 0}
@@ -465,6 +557,15 @@
       class="relative bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm p-4 flex flex-col"
     >
       <div class="flex gap-2">
+        <button
+          type="button"
+          on:click={openSearch}
+          class="flex-shrink-0 w-8 h-10 flex items-center justify-center text-base-content/30 hover:text-base-content/60 transition-colors"
+          title="Search messages (⌘F)"
+          aria-label="Search messages"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+        </button>
         <div class="relative flex-1">
           <input
             type="text"

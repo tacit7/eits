@@ -16,6 +16,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   attr :context_project_id, :any, default: nil
 
   def agent_schedule_form(assigns) do
+    assigns = assign(assigns, :config, decode_job_config(assigns.job && assigns.job.config))
+
     ~H"""
     <%= if @show do %>
       <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_schedule"></div>
@@ -26,6 +28,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           <.form_body
             prompt={@prompt}
             job={@job}
+            config={@config}
             projects={@projects}
             context_project_id={@context_project_id}
           />
@@ -38,6 +41,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           <.form_body
             prompt={@prompt}
             job={@job}
+            config={@config}
             projects={@projects}
             context_project_id={@context_project_id}
           />
@@ -49,40 +53,18 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   attr :prompt, :any, required: true
   attr :job, :any, default: nil
+  attr :config, :map, required: true
   attr :projects, :list, required: true
   attr :context_project_id, :any, default: nil
 
   defp form_body(assigns) do
-    raw_config = assigns.job && assigns.job.config
-
-    config =
-      cond do
-        is_map(raw_config) ->
-          raw_config
-
-        is_binary(raw_config) ->
-          case Jason.decode(raw_config) do
-            {:ok, m} ->
-              m
-
-            {:error, reason} ->
-              require Logger
-              Logger.warning("[AgentScheduleForm] Failed to decode job config: #{inspect(reason)}")
-              %{}
-          end
-
-        true ->
-          %{}
-      end
-
     assigns =
       assigns
       |> assign(:editing, not is_nil(assigns.job))
       |> assign(:schedule_type, job_field(assigns.job, :schedule_type, "cron"))
       |> assign(:schedule_value, job_field(assigns.job, :schedule_value, ""))
-      |> assign(:model, Map.get(config, "model", "sonnet"))
+      |> assign(:model, Map.get(assigns.config, "model", "sonnet"))
       |> assign(:timezone, job_field(assigns.job, :timezone, system_timezone()))
-      |> assign(:config, config)
 
     ~H"""
     <div class="flex items-start justify-between mb-4">
@@ -613,6 +595,22 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     </div>
     """
   end
+
+  defp decode_job_config(raw) when is_map(raw), do: raw
+
+  defp decode_job_config(raw) when is_binary(raw) do
+    case Jason.decode(raw) do
+      {:ok, m} ->
+        m
+
+      {:error, reason} ->
+        require Logger
+        Logger.warning("[AgentScheduleForm] Failed to decode job config: #{inspect(reason)}")
+        %{}
+    end
+  end
+
+  defp decode_job_config(_), do: %{}
 
   defp job_field(nil, _field, default), do: default
   defp job_field(job, field, default), do: Map.get(job, field) || default

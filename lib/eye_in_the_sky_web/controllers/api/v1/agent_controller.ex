@@ -20,9 +20,9 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
     agents =
       if params["project_id"] do
-        Agents.list_agents_by_project(parse_int(params["project_id"], nil)) |> Enum.take(limit)
+        Agents.list_agents_by_project(parse_int(params["project_id"], nil), limit: limit)
       else
-        Agents.list_agents() |> Enum.take(limit)
+        Agents.list_agents(limit: limit)
       end
 
     agents =

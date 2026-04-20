@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     tasks = fetch_tasks_by_filter(params, limit)
 
     if state_id = parse_int(params["state_id"], nil) do
-      tasks |> Enum.filter(&(&1.state_id == state_id)) |> Enum.take(limit)
+      Enum.filter(tasks, &(&1.state_id == state_id))
     else
       tasks
     end
@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp fetch_tasks_by_filter(%{"q" => q} = params, limit) when is_binary(q) and q != "" do
     project_id = parse_int(params["project_id"], nil)
-    Tasks.search_tasks(q, project_id) |> Enum.take(limit)
+    Tasks.search_tasks(q, project_id, limit: limit)
   end
 
   defp fetch_tasks_by_filter(%{"session_id" => session_id}, limit) do
@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       end
 
     if session_int_id,
-      do: Tasks.list_tasks_for_session(session_int_id) |> Enum.take(limit),
+      do: Tasks.list_tasks_for_session(session_int_id, limit: limit),
       else: []
   end
 
@@ -56,19 +56,19 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     agent_int_id = resolve_agent_int_id(agent_id)
 
     if agent_int_id,
-      do: Tasks.list_tasks_for_agent(agent_int_id) |> Enum.take(limit),
+      do: Tasks.list_tasks_for_agent(agent_int_id, limit: limit),
       else: []
   end
 
   defp fetch_tasks_by_filter(%{"project_id" => project_id}, limit) do
     case parse_int(project_id, nil) do
       nil -> []
-      project_int_id -> Tasks.list_tasks_for_project(project_int_id) |> Enum.take(limit)
+      project_int_id -> Tasks.list_tasks_for_project(project_int_id, limit: limit)
     end
   end
 
   defp fetch_tasks_by_filter(_params, limit) do
-    Tasks.list_tasks() |> Enum.take(limit)
+    Tasks.list_tasks(limit: limit)
   end
 
   @doc """

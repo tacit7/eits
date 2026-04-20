@@ -188,7 +188,9 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         do: Keyword.put(opts, :name_filter, params["name"]),
         else: opts
 
-    results = Sessions.list_sessions_filtered(opts) |> Enum.take(limit)
+    opts = Keyword.put(opts, :limit, limit)
+
+    results = Sessions.list_sessions_filtered(opts)
 
     with_tasks = params["with_tasks"] in ["true", "1", true]
 

@@ -11,8 +11,10 @@ defmodule EyeInTheSky.Commits do
   @doc """
   Returns the list of commits.
   """
-  def list_commits do
-    Repo.all(Commit)
+  def list_commits(opts \\ []) do
+    Commit
+    |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
+    |> Repo.all()
   end
 
   @doc """

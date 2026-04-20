@@ -188,13 +188,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     if binary_file?(path) do
       {:noreply,
        socket
-       |> unsubscribe_editor()
+       |> file_error("Binary file — cannot preview")
        |> assign(:file_path, path)
-       |> assign(:file_full_path, nil)
-       |> assign(:file_content, nil)
        |> assign(:file_type, nil)
-       |> assign(:files, [])
-       |> assign(:error, "Binary file — cannot preview")}
+       |> assign(:files, [])}
     else
       case read_file_safe_detailed(full_path) do
         {:ok, content} ->
@@ -211,31 +208,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         {:error, :too_large} ->
           {:noreply,
            socket
-           |> unsubscribe_editor()
+           |> file_error("File too large to display (over 1 MB)")
            |> assign(:file_path, path)
-           |> assign(:file_full_path, nil)
-           |> assign(:file_content, nil)
            |> assign(:file_type, nil)
-           |> assign(:files, [])
-           |> assign(:error, "File too large to display (over 1 MB)")}
+           |> assign(:files, [])}
 
         {:error, {:stat_error, reason}} ->
-          {:noreply,
-           socket
-           |> unsubscribe_editor()
-           |> assign(:file_full_path, nil)
-           |> assign(:error, "Failed to stat file: #{reason}")
-           |> assign(:file_content, nil)}
+          {:noreply, file_error(socket, "Failed to stat file: #{reason}")}
 
         {:error, {:read_error, reason}} ->
-          {:noreply,
-           socket
-           |> unsubscribe_editor()
-           |> assign(:file_full_path, nil)
-           |> assign(:error, "Failed to read file: #{reason}")
-           |> assign(:file_content, nil)}
+          {:noreply, file_error(socket, "Failed to read file: #{reason}")}
       end
     end
+  end
+
+  defp file_error(socket, message) do
+    socket
+    |> unsubscribe_editor()
+    |> assign(:file_full_path, nil)
+    |> assign(:error, message)
+    |> assign(:file_content, nil)
   end
 
   defp subscribe_editor(socket, path) do

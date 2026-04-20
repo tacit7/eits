@@ -32,10 +32,12 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
     session_result = Sessions.resolve(session_id_param)
+    current_user = socket.assigns[:current_user]
 
     with {:session, {:ok, session}} <- {:session, session_result},
-         {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
-      MountState.maybe_subscribe(connected?(socket), session.id)
+         {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)},
+         {:auth, :ok} <- {:auth, check_session_ownership(connected?(socket), session.id, current_user)} do
+      MountState.maybe_subscribe(connected?(socket), session.id, current_user)
 
       socket =
         socket
@@ -55,7 +57,22 @@ defmodule EyeInTheSkyWeb.DmLive do
       {:agent, {:error, :not_found}} ->
         {:ok,
          socket |> put_flash(:error, "Agent not found for this session") |> redirect(to: "/")}
+
+      {:auth, :unauthorized} ->
+        {:ok, socket |> put_flash(:error, "You don't have access to this session") |> redirect(to: "/")}
     end
+  end
+
+  defp check_session_ownership(is_connected, _session_id, _current_user) when not is_connected do
+    :ok
+  end
+
+  defp check_session_ownership(_is_connected, _session_id, nil) do
+    :unauthorized
+  end
+
+  defp check_session_ownership(_is_connected, _session_id, _current_user) do
+    :ok
   end
 
   # ---------------------------------------------------------------------------

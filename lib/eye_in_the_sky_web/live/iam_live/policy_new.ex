@@ -25,6 +25,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   @impl true
   def mount(_params, _session, socket) do
     changeset = Policy.create_changeset(%Policy{priority: 0, enabled: true}, %{})
+    projects = if connected?(socket), do: Projects.list_projects(), else: []
 
     {:ok,
      socket
@@ -34,7 +35,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
      |> assign(:form, to_form(changeset))
      |> assign(:condition_text, "{}")
      |> assign(:scope, "global")
-     |> assign(:projects, Projects.list_projects())}
+     |> assign(:projects, projects)}
   end
 
   @impl true

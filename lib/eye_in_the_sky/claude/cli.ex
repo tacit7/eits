@@ -279,31 +279,24 @@ defmodule EyeInTheSky.Claude.CLI do
   end
 
   defp open_script_port(claude_path, args, project_path, env) do
-    script_args = ["-q", "/dev/null", claude_path] ++ args
-
-    Port.open(
-      {:spawn_executable, "/usr/bin/script"},
-      [
-        :binary,
-        :exit_status,
-        :use_stdio,
-        :stderr_to_stdout,
-        {:args, script_args},
-        {:cd, project_path},
-        {:env, env}
-      ]
-    )
+    open_port_with("/usr/bin/script", ["-q", "/dev/null", claude_path], args, project_path, env)
   end
 
   defp open_direct_port(claude_path, args, project_path, env) do
+    open_port_with(claude_path, [], args, project_path, env)
+  end
+
+  defp open_port_with(executable, prefix_args, args, project_path, env) do
+    final_args = prefix_args ++ args
+
     Port.open(
-      {:spawn_executable, claude_path},
+      {:spawn_executable, executable},
       [
         :binary,
         :exit_status,
         :use_stdio,
         :stderr_to_stdout,
-        {:args, args},
+        {:args, final_args},
         {:cd, project_path},
         {:env, env}
       ]

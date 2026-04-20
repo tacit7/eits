@@ -317,11 +317,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
     Logger.info("📬 Loaded #{length(messages)} messages from DB")
 
-    channels =
-      case Channels.list_channels_for_project(socket.assigns.project_id) do
-        channels when is_list(channels) -> channels
-        _ -> []
-      end
+    channels = load_channels(socket.assigns.project_id)
 
     unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
 

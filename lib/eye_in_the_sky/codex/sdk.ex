@@ -272,25 +272,7 @@ defmodule EyeInTheSky.Codex.SDK do
     %{sdk_ref: sdk_ref, caller_pid: caller_pid, accumulated_text: acc} = state
 
     final_session_id = data[:session_id] || state[:session_id]
-
-    parts_text =
-      state.accumulated_parts
-      |> Enum.reduce("", fn
-        {:text, text}, acc ->
-          acc <> text
-
-        {:tool, summary}, acc ->
-          prefix = if acc == "" or String.ends_with?(acc, "\n\n"), do: "", else: "\n\n"
-          acc <> prefix <> summary <> "\n\n"
-      end)
-      |> String.trim()
-
-    result_text =
-      cond do
-        parts_text != "" -> parts_text
-        acc != "" -> acc
-        true -> nil
-      end
+    result_text = build_result_text(state.accumulated_parts, acc)
 
     metadata = %{
       session_id: final_session_id,
@@ -320,17 +302,40 @@ defmodule EyeInTheSky.Codex.SDK do
     end
 
     send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
-
-    :telemetry.execute(
-      [:eits, :codex, :sdk, :complete],
-      %{system_time: System.system_time()},
-      %{session_id: final_session_id}
-    )
-
-    Logger.info("[telemetry] codex.sdk.complete session_id=#{final_session_id}")
+    emit_completion_telemetry(final_session_id)
 
     MessageHandler.finalize_after_terminal_event(sdk_ref, final_session_id, @loop_opts)
     :ok
+  end
+
+  defp build_result_text(parts, acc) do
+    parts_text =
+      parts
+      |> Enum.reduce("", fn
+        {:text, text}, a ->
+          a <> text
+
+        {:tool, summary}, a ->
+          prefix = if a == "" or String.ends_with?(a, "\n\n"), do: "", else: "\n\n"
+          a <> prefix <> summary <> "\n\n"
+      end)
+      |> String.trim()
+
+    cond do
+      parts_text != "" -> parts_text
+      acc != "" -> acc
+      true -> nil
+    end
+  end
+
+  defp emit_completion_telemetry(session_id) do
+    :telemetry.execute(
+      [:eits, :codex, :sdk, :complete],
+      %{system_time: System.system_time()},
+      %{session_id: session_id}
+    )
+
+    Logger.info("[telemetry] codex.sdk.complete session_id=#{session_id}")
   end
 
   @impl MessageHandler

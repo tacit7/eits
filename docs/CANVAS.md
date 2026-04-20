@@ -61,6 +61,21 @@ def handle_params(_params, _url, socket)
   # No ID — redirect to first canvas or stay on empty canvas list
 ```
 
+## Keyboard Shortcuts & Controls
+
+### Keyboard Shortcuts Help
+- **`?` key** — Toggle keyboard shortcuts help panel. Lazily creates modal overlay listing all canvas shortcuts. Escape or backdrop click closes; input fields guarded so typing in search boxes doesn't trigger.
+
+### Canvas & Tab Navigation
+- **`Cmd+1` through `Cmd+9`** — Tab switcher to quickly jump between open canvas tabs
+- **`Esc`** — Minimize focused window
+
+### Viewport Controls
+- **`Spacebar + drag`** — Pan viewport to reposition all windows without moving them individually
+
+### Chat Window
+- **Auto-scroll toggle** — Click button in chat window footer to enable/disable. When enabled (default), new messages scroll to bottom. When disabled, stays in current position and shows unread message count pill; clicking pill re-enables auto-scroll and jumps to bottom.
+
 ### Event Handlers
 
 #### Canvas Management
@@ -73,7 +88,20 @@ def handle_params(_params, _url, socket)
 - **`window_moved`** — Records x/y position delta; calls `Canvases.update_window_layout/2`
 - **`window_resized`** — Records width/height delta; calls `Canvases.update_window_layout/2`
 - **`remove_window`** — Removes session from canvas and unsubscribes from PubSub
-- **`raise_window`** — Clicking any canvas window raises it to the front by updating z-order state in `CanvasLive` (commit 10d75ff3)
+- **`raise_window`** — Clicking any canvas window raises it to the front by updating z-order state in `CanvasLive`
+- **`minimize_window`** — Minimize/collapse toggle for individual windows. Minimized windows show unread indicator dot.
+- **`maximize_window`** — Restore window to full size if minimized. Includes unread dot on minimized windows.
+
+### Canvas Management Events
+
+#### Toolbar Controls
+- **`+` button** — Opens Add Session submenu directly via command palette (jumps to session picker without full search). Implemented via `palette:open-command` event with `commandId=canvas-add-session`.
+- **Delete canvas button** — Wired event handler to delete canvas from toolbar.
+- **Tidy button** — Cascades all windows into clean layout via `Canvases.tidy/1`, which resets positions and applies consistent spacing.
+
+#### Tab Operations
+- **Double-click tab** — Rename canvas inline. Updates page title on successful rename.
+- **Page title** — Shows active canvas name; resets on last canvas delete.
 
 ### PubSub Integration
 
@@ -89,6 +117,7 @@ subscribe_all(session_ids)  # Subscribe to events for all canvas sessions
 - `{:claude_response, _ref, parsed}` — Agent response received
 - `{:session_status, session_id, status}` — Session status changed (working → stopped)
 - `{:remove_canvas_window, cs_id}` — Remote signal to close a window (e.g., session cleanup)
+- `{:canvas_session_added, session_id}` — Session added to canvas; updates session list and badge counts
 
 When events arrive, the handler calls `send_update/3` to update the `ChatWindowComponent` for that canvas session, keeping UI synchronized without full page refresh.
 
@@ -101,6 +130,9 @@ When events arrive, the handler calls `send_update/3` to update the `ChatWindowC
 - **Events:** Emits `window_moved`, `window_resized`, `remove_window`, `raise_window` to parent `CanvasLive`
 - **Updates:** Receives `send_update` calls from PubSub event handlers to re-render with latest message
 - **Message rendering:** Delegates to shared `DmMessageComponents.message_body/1` and `tool_result_body/1` with `compact` and `extra_id` attrs so the same components render both the DM page (default sizing) and canvas chat window (compact). Private duplicates in `MessagesTab` and `ChatWindowComponent` were removed in commit 10d75ff3.
+- **Status indicator:** Session status dot uses `status_dot_class` with classes for all states: working (primary color with pulse animation), completed, failed, and idle.
+- **Focus ring:** Active window shows visible focus ring to indicate interaction target.
+- **Scroll behavior:** ChatWindowHook owns all scroll behavior. Auto-scroll enabled by default; disabled when user scrolls up and shows unread message count pill. Clicking pill re-enables auto-scroll and jumps to bottom. Automatically scrolls to bottom when user sends new message.
 
 ### AgentList Integration
 - **File:** `lib/eye_in_the_sky_web/components/agent_list.ex`
@@ -210,6 +242,18 @@ While canvas page is standalone, chat windows display session messages. Clicking
 - ChatWindowComponent is a live_component with its own event handling
 - Parent (CanvasLive) owns layout and routing; children own rendering
 - send_update patterns allow parent to trigger re-renders without full replacement
+
+## Layout & Display
+
+### Canvas Page Layout
+- **Full-screen mode:** Dedicated canvas page with full viewport. Back button available to return to previous page. No sidebar visible during canvas interactions.
+- **Page title:** Browser tab shows active canvas name for easy identification when multiple canvases are open.
+- **Window positioning:** Cascade layout applied by default if window positions not previously persisted. Tidy button resets all windows and cascades them into clean grid layout.
+
+### Status & Visual Feedback
+- **Working status pulse** — Session status dot animates with continuous pulse effect when session is in working state
+- **Unread indicators** — Minimized windows show unread message dot; unread count pill appears when auto-scroll is disabled and new messages arrive
+- **Session added badge** — Refresh badge displayed on add_session to provide visual feedback that canvas was updated
 
 ## Related Files
 

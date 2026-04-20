@@ -343,6 +343,15 @@ All errors return JSON with an `error` field and optional `details`:
 {"error": "Failed to create session", "details": {"status": ["is invalid"]}}
 ```
 
+**Generic error responses:**
+
+Controllers can return errors in these formats, which FallbackController handles:
+
+- `{:error, reason}` — 400 Bad Request with reason as error message
+- `{:error, status, reason}` — Custom HTTP status with reason (e.g. `{:error, :unauthorized, "Invalid token"}`)
+- `{:error, status}` — Custom HTTP status with status atom as error message (e.g. `{:error, :forbidden}` → `{"error": "forbidden"}`)
+- `{:error, changeset}` — 422 Unprocessable Entity with changeset errors
+
 ## PubSub Topics
 
 These endpoints broadcast events for real-time LiveView updates:
@@ -616,6 +625,86 @@ eits channels messages 1 -n 5
 
 ---
 
+### POST /api/v1/channels
+
+Create a new channel.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Channel name |
+| `project_id` | integer | no | Project ID to associate with |
+| `channel_type` | string | no | Channel type (default: `"public"`) |
+| `description` | string | no | Channel description |
+| `session_id` | string | no | Session ID (integer or UUID) |
+
+**Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "id": "ch-1",
+  "name": "dev-updates",
+  "description": "Development updates channel",
+  "channel_type": "public",
+  "project_id": 1
+}
+```
+
+**Example:**
+
+```bash
+eits channels create --name "dev-updates" --project 1 --description "Development updates"
+```
+
+---
+
+### POST /api/v1/channels/:id/members
+
+Add a member to a channel.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | string | yes | Session ID (integer or UUID) |
+| `notifications` | string | no | Notification setting (`"all"`, `"none"`, default: `"none"`) |
+
+**Response:** `201 Created`
+
+```json
+{
+  "channel_id": "ch-1",
+  "session_id": 42,
+  "notifications": "all"
+}
+```
+
+---
+
+### DELETE /api/v1/channels/:id/members/:session_id
+
+Remove a member from a channel.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | string | Channel ID |
+| `session_id` | string or integer | Session ID (integer or UUID) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Member removed"
+}
+```
+
+---
+
 ### POST /api/v1/channels/:channel_id/messages
 
 Send a message to a channel.
@@ -629,6 +718,7 @@ Send a message to a channel.
 | `sender_role` | string | no | Default: `"agent"` |
 | `recipient_role` | string | no | Default: `"user"` |
 | `provider` | string | no | Default: `"claude"` |
+| `broadcast_to_team_id` | integer | no | When present, fans out DMs to all team members with active sessions (excluding sender) after message is persisted |
 
 **Response:** `201 Created`
 
@@ -647,6 +737,265 @@ eits channels send 1 --session 1179 --body "hello from CLI"
 ```
 
 ---
+
+---
+
+### GET /api/v1/sessions (list with filters)
+
+List sessions with optional filtering.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `q` | string | no | Full-text search query |
+| `project_id` | integer | no | Filter by project ID |
+| `status` | string | no | Filter by status |
+| `name` | string | no | Filter by session name (ilike match) |
+| `with_tasks` | boolean | no | When `true`, embeds task list per session |
+| `include_archived` | boolean | no | Include archived sessions |
+| `limit` | integer | no | Max results (default 20) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Found 2 session(s)",
+  "results": [
+    {
+      "id": 42,
+      "uuid": "abc-123",
+      "name": "fix auth bug",
+      "description": "fixing the oauth flow",
+      "status": "working",
+      "tasks": [
+        {
+          "id": 1,
+          "title": "Add unit tests",
+          "state_id": 2,
+          "state": "In Progress"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+eits sessions list --name "auth" --with-tasks
+eits sessions list --project 1 --include-archived
+```
+
+---
+
+### GET /api/v1/sessions/:session_id/timer
+
+Get the active timer for a session, if any.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `session_id` | string or integer | Session ID (UUID or integer) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "session_id": 42,
+  "delay_ms": 300000,
+  "mode": "once",
+  "message": null,
+  "scheduled_at": "2026-04-19T12:30:00Z",
+  "active": true
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/sessions/42/timer
+```
+
+---
+
+### POST /api/v1/sessions/:session_id/timer
+
+Schedule a wake-up timer for a session.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `session_id` | string or integer | Session ID (UUID or integer) |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `delay_ms` | integer | no | Delay in milliseconds (e.g. 300000 for 5 minutes) |
+| `preset` | string | no | Preset delay: `"5m"`, `"10m"`, `"15m"`, `"30m"`, `"1h"`. Used if `delay_ms` is absent |
+| `mode` | string | no | Timer mode: `"once"` (default) or `"repeating"` |
+| `message` | string | no | Optional message override |
+
+**Response:** `201 Created`
+
+```json
+{
+  "session_id": 42,
+  "delay_ms": 300000,
+  "mode": "once",
+  "message": null,
+  "scheduled_at": "2026-04-19T12:30:00Z"
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/sessions/42/timer \
+  -H 'Content-Type: application/json' \
+  -d '{"preset": "5m", "mode": "once"}'
+```
+
+---
+
+### DELETE /api/v1/sessions/:session_id/timer
+
+Cancel the active timer for a session.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `session_id` | string or integer | Session ID (UUID or integer) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Timer cancelled"
+}
+```
+
+---
+
+### PATCH /api/v1/teams/:id
+
+Update team metadata.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | no | Team name |
+| `description` | string | no | Team description |
+
+**Response:** `200 OK`
+
+```json
+{
+  "id": 1,
+  "name": "Platform Team",
+  "description": "Core platform development",
+  "updated_at": "2026-04-19T12:00:00Z"
+}
+```
+
+**Example:**
+
+```bash
+eits teams update 1 --name "Platform Team" --description "Core platform dev"
+```
+
+---
+
+### POST /api/v1/teams/:id/broadcast
+
+Broadcast a message to all team members with active sessions.
+
+Fans out direct messages to all team members, excluding the sender. Used for team-wide announcements or status updates.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `body` | string | yes | Message content |
+| `from_session_id` | string or integer | no | Sender session ID (defaults to request context) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "team_id": 1,
+  "sent_count": 5,
+  "failed": 0
+}
+```
+
+**Example:**
+
+```bash
+eits teams broadcast 1 --body "Deploying release v2.0 in 10 minutes"
+```
+
+---
+
+### POST /api/v1/tasks/:id/tags
+
+Add tags to a task.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tag_names` | string[] | yes | List of tag names to add |
+
+**Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "task_id": 1,
+  "tags": [
+    {"id": 1, "name": "bug"},
+    {"id": 2, "name": "urgent"}
+  ]
+}
+```
+
+---
+
+### GET /api/v1/tasks/:id/sessions
+
+Get all sessions linked to a task.
+
+**Response:** `200 OK`
+
+```json
+{
+  "task_id": 1,
+  "sessions": [
+    {
+      "id": 42,
+      "uuid": "abc-123",
+      "name": "fix auth bug",
+      "status": "working"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+eits tasks sessions 1
+```
 
 ---
 

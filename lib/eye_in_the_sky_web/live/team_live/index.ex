@@ -43,33 +43,25 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   @impl true
   def handle_event("delete_team", %{"id" => id}, socket) do
-    case parse_int(id) do
-      nil ->
-        {:noreply, socket}
+    with_parsed_int(socket, id, fn team_id ->
+      team = Teams.get_team!(team_id)
+      {:ok, _} = Teams.delete_team(team)
 
-      team_id ->
-        team = Teams.get_team!(team_id)
-        {:ok, _} = Teams.delete_team(team)
+      socket =
+        socket
+        |> assign(:teams, load_teams(socket.assigns.show_archived))
+        |> maybe_close_if_deleted(team.id)
 
-        socket =
-          socket
-          |> assign(:teams, load_teams(socket.assigns.show_archived))
-          |> maybe_close_if_deleted(team.id)
-
-        {:noreply, socket}
-    end
+      {:noreply, socket}
+    end)
   end
 
   @impl true
   def handle_event("select_team", %{"id" => id}, socket) do
-    case parse_int(id) do
-      nil ->
-        {:noreply, socket}
-
-      team_id ->
-        team = Teams.get_team!(team_id) |> load_team_detail()
-        {:noreply, socket |> assign(:agent_session_id, nil) |> show_team_detail(team_id, team)}
-    end
+    with_parsed_int(socket, id, fn team_id ->
+      team = Teams.get_team!(team_id) |> load_team_detail()
+      {:noreply, socket |> assign(:agent_session_id, nil) |> show_team_detail(team_id, team)}
+    end)
   end
 
   @impl true
@@ -79,20 +71,16 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   @impl true
   def handle_event("select_agent", %{"id" => session_id_str}, socket) do
-    case parse_int(session_id_str) do
-      nil ->
-        {:noreply, socket}
+    with_parsed_int(socket, session_id_str, fn session_id ->
+      member = Enum.find(socket.assigns.selected_team.members, &(&1.session_id == session_id))
 
-      session_id ->
-        member = Enum.find(socket.assigns.selected_team.members, &(&1.session_id == session_id))
+      socket =
+        socket
+        |> assign(:agent_session_id, session_id)
+        |> maybe_open_fab_chat(member)
 
-        socket =
-          socket
-          |> assign(:agent_session_id, session_id)
-          |> maybe_open_fab_chat(member)
-
-        {:noreply, socket}
-    end
+      {:noreply, socket}
+    end)
   end
 
   # No-ops for session_row swipe actions (not applicable in teams context)
@@ -372,6 +360,13 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
       socket |> assign(:agent_session_id, nil) |> show_team_list()
     else
       socket
+    end
+  end
+
+  defp with_parsed_int(socket, value, fun) do
+    case parse_int(value) do
+      nil -> {:noreply, socket}
+      id -> fun.(id)
     end
   end
 end

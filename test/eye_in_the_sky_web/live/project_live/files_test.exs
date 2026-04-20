@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=hello.ex")
 
-      render_hook(view, "file_changed", %{"content" => "# new content"})
+      render_hook(view, "file_save", %{"content" => "# new content"})
 
       assert File.read!(Path.join(dir, "hello.ex")) == "# new content"
     end
@@ -97,12 +97,47 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       File.chmod!(file_path, 0o444)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=readonly.ex")
-      render_hook(view, "file_changed", %{"content" => "new"})
+      render_hook(view, "file_save", %{"content" => "new"})
 
       assert has_element?(view, "[role='alert']") or render(view) =~ "Save failed"
 
       # Restore permissions for cleanup
       File.chmod!(file_path, 0o644)
+    end
+  end
+
+  describe "handle_params — error paths" do
+    # path_within? uses realpath, so non-existent paths resolve to Access denied
+    test "non-existent file path assigns an error", %{conn: conn} do
+      {project, _dir} = create_project_with_dir()
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=does_not_exist.ex")
+
+      assert render(view) =~ "Access denied"
+    end
+
+    test "directory path loads listing without error", %{conn: conn} do
+      {project, dir} = create_project_with_dir()
+      subdir = Path.join(dir, "src")
+      File.mkdir_p!(subdir)
+      File.write!(Path.join(subdir, "app.ex"), "# app")
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=src")
+
+      html = render(view)
+      refute html =~ "Access denied"
+      assert html =~ "app.ex"
+    end
+
+    test "valid file path renders content pane without error", %{conn: conn} do
+      {project, dir} = create_project_with_dir()
+      File.write!(Path.join(dir, "main.ex"), "defmodule Main, do: nil")
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=main.ex")
+
+      html = render(view)
+      refute html =~ "Access denied"
+      refute html =~ "No files"
     end
   end
 end

@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-03-17
-Last updated: 2026-03-17 (security hardening pass — 7 findings closed)
+Last updated: 2026-04-19 (IAM Phases 3.5–5 documentation: dry-run simulator, built-in matchers, hook evaluation, policy CRUD UI, message security)
 
 ## Authentication
 
@@ -332,6 +332,59 @@ Security-relevant dependencies:
 | `bandit` | ~> 1.5 | HTTP server |
 | `web_push_encryption` | ~> 0.3 | VAPID-signed web push |
 | `dotenvy` | ~> 0.8 | Environment variable loading from `.env` |
+
+## Identity and Access Management (IAM)
+
+IAM provides fine-grained policy control over Claude Code and API operations, evaluated via hook-based decision points.
+
+### Architecture
+
+**Policy model**: Rules with conditions, effects (allow/deny/instruct), and optional builtin matchers. System policies are immutable; custom policies can be created, edited, or deleted via the LiveView CRUD interface.
+
+**Hook evaluation**: Policies are evaluated at three points in the Claude workflow:
+- `UserPromptSubmit`: Evaluate before the user prompt is sent to Claude
+- `PostToolUse`: Evaluate after a tool use completes
+- `Stop`: Evaluate when Claude requests to stop execution
+
+**Condition evaluation**: Pure, declarative JSON-based predicates (e.g., `time_between`, `file_matches`, action filters).
+
+**Builtin matchers**: For policy detection that needs Elixir code (command parsing, path resolution, git-state inspection), policies can specify a `builtin_matcher` that dispatches to a dedicated module. Evaluation is wrapped in error handling (fail-closed: does not match on error) and telemetry. Current matchers: `block_sudo`, `block_rm_rf`, `protect_env_vars`, `block_env_files`, `block_curl_api_keys`, `sanitize_prompt_api_keys`, `workflow_business_hours_only`, and others.
+
+### Phases
+
+**Phase 3.5 (Dry-run simulator)**: New endpoint `/iam/policies/simulate` allows testing policy evaluation on a payload without triggering actual enforcement. Useful for auditing policy behavior before activation.
+
+**Phase 4a (Built-in matchers + seeded policies)**: 
+- Added `builtin_matcher` column to `policies` table
+- Registered 9 stable matcher keys in `BuiltinMatcher.Registry`
+- Seeded system policies: `block_sudo`, `block_rm_rf`, `protect_env_vars`, `block_env_files`, `block_curl_api_keys`, `sanitize_prompt_api_keys`, and others (9 total)
+- System policies are immutable (cannot be edited or deleted from the UI)
+
+**Phase 4a (UserPromptSubmit hook)**:
+- Evaluator extended to support `:user_prompt_submit` events
+- `SanitizePromptApiKeys` builtin matcher redacts secret patterns in prompts (Anthropic, OpenAI, GitHub, AWS, generic API keys)
+- Hook response shape: `suppressUserPrompt` + `hookSpecificOutput.userPrompt` replaces the original prompt with redacted version
+- `sanitize_prompt_api_keys` policy seeded with `effect:instruct` for all agents
+
+**Phase 4b (PostToolUse hook)**: Hook evaluation extended to support `:post_tool_use` events. Similar response shapes: `suppressOutput` + `hookSpecificOutput.toolResult` for tool result manipulation.
+
+**Phase 4c (Stop hook + workflow policies)**:
+- Hook evaluation extended to support Claude Code `:stop` events
+- `workflow_business_hours_only` builtin matcher with `time_between` predicate
+- Two new seeded policies: `workflow_business_hours_only` and `workflow_stop_gate` (both disabled by default)
+- Normalization and evaluation handle Stop payloads correctly
+
+**Phase 5 (Policy CRUD LiveView)**:
+- New UI under `/iam/policies` for operator-facing policy management
+- Three LiveViews: index (list + quick toggle), new (create), edit (update)
+- Index view has filters by agent_type, action, effect, and enabled status
+- System policies cannot be deleted (no delete button rendered); custom policies have full CRUD
+- System policies in edit view have locked fields and `disabled` input attributes; server-side `enforce_locked_fields/1` guard prevents bypass attempts
+- Changeset errors (e.g., invalid JSON in conditions) surface cleanly in the form
+
+### Message Security
+
+DMs from terminated sessions (status `completed` or `failed`) are rejected with `422 Unprocessable Entity`. This prevents zombie agent sessions from flooding the message queue after their work is complete.
 
 ## Known Gaps
 

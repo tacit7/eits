@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
     with {:session, {:ok, session}} <- {:session, session_result},
          {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
-      MountState.maybe_subscribe(connected?(socket), session.id)
+      MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
 
       socket =
         socket
@@ -82,16 +82,10 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("toggle_effort_menu", _params, socket), do: handle_toggle_effort_menu(socket)
 
   @impl true
-  def handle_event("toggle_new_task_drawer", _params, socket) do
-    {:noreply,
-     assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_drawer))}
-  end
+  def handle_event("toggle_new_task_drawer", _params, socket), do: toggle_active_overlay(socket, :task_drawer)
 
   @impl true
-  def handle_event("toggle_task_detail_drawer", _params, socket) do
-    {:noreply,
-     assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, :task_detail))}
-  end
+  def handle_event("toggle_task_detail_drawer", _params, socket), do: toggle_active_overlay(socket, :task_detail)
 
   @impl true
   def handle_event("open_schedule_timer", _params, socket) do
@@ -423,6 +417,10 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  defp toggle_active_overlay(socket, overlay) do
+    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, overlay))}
+  end
 
   # ---------------------------------------------------------------------------
   # Render

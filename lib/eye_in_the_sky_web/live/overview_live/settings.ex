@@ -266,17 +266,20 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   end
 
   defp load_table_counts do
-    tables = ~w(sessions agents tasks notes messages projects commits prompts)
+    sql = """
+    SELECT 'sessions', COUNT(*) FROM sessions
+    UNION ALL SELECT 'agents', COUNT(*) FROM agents
+    UNION ALL SELECT 'tasks', COUNT(*) FROM tasks
+    UNION ALL SELECT 'notes', COUNT(*) FROM notes
+    UNION ALL SELECT 'messages', COUNT(*) FROM messages
+    UNION ALL SELECT 'projects', COUNT(*) FROM projects
+    UNION ALL SELECT 'commits', COUNT(*) FROM commits
+    UNION ALL SELECT 'prompts', COUNT(*) FROM prompts
+    """
 
-    Enum.map(tables, fn table ->
-      count =
-        case Repo.query("SELECT COUNT(*) FROM #{table}") do
-          {:ok, %{rows: [[c]]}} -> c
-          _ -> 0
-        end
-
-      {table, count}
-    end)
+    case Repo.query!(sql) do
+      %{rows: rows} -> Enum.map(rows, fn [table, count] -> {table, count} end)
+    end
   end
 
   @impl true

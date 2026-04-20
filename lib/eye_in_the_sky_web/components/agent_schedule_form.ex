@@ -16,29 +16,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   attr :context_project_id, :any, default: nil
 
   def agent_schedule_form(assigns) do
-    raw_config = assigns.job && assigns.job.config
-
-    config =
-      cond do
-        is_map(raw_config) ->
-          raw_config
-
-        is_binary(raw_config) ->
-          case Jason.decode(raw_config) do
-            {:ok, m} ->
-              m
-
-            {:error, reason} ->
-              require Logger
-              Logger.warning("[AgentScheduleForm] Failed to decode job config: #{inspect(reason)}")
-              %{}
-          end
-
-        true ->
-          %{}
-      end
-
-    assigns = assign(assigns, :config, config)
+    assigns = assign(assigns, :config, decode_job_config(assigns.job && assigns.job.config))
 
     ~H"""
     <%= if @show do %>
@@ -617,6 +595,22 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     </div>
     """
   end
+
+  defp decode_job_config(raw) when is_map(raw), do: raw
+
+  defp decode_job_config(raw) when is_binary(raw) do
+    case Jason.decode(raw) do
+      {:ok, m} ->
+        m
+
+      {:error, reason} ->
+        require Logger
+        Logger.warning("[AgentScheduleForm] Failed to decode job config: #{inspect(reason)}")
+        %{}
+    end
+  end
+
+  defp decode_job_config(_), do: %{}
 
   defp job_field(nil, _field, default), do: default
   defp job_field(job, field, default), do: Map.get(job, field) || default

@@ -142,11 +142,25 @@
             <p class="text-sm">No messages yet. Start a conversation!</p>
           </div>
         {:else}
-          <div class="space-y-2">
+          <div class="space-y-0">
             {#each messages as message}
-              <div class="chat {message.sender_role === 'user' ? 'chat-end' : 'chat-start'}">
-                <div class="chat-bubble {message.sender_role === 'user' ? 'chat-bubble-primary' : ''}">
-                  {message.body}
+              <div class="group py-2 px-1 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+                <div class="flex items-start gap-2">
+                  {#if message.sender_role === 'user'}
+                    <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
+                      <div class="w-1 h-1 rounded-full bg-success"></div>
+                    </div>
+                  {:else}
+                    <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-primary/20 flex items-center justify-center">
+                      <div class="w-1 h-1 rounded-full bg-primary/60"></div>
+                    </div>
+                  {/if}
+                  <div class="min-w-0 flex-1">
+                    <span class="text-[11px] font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'} mr-1.5">
+                      {message.sender_role === 'user' ? 'You' : 'Agent'}
+                    </span>
+                    <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">{message.body}</p>
+                  </div>
                 </div>
               </div>
             {/each}

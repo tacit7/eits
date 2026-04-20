@@ -92,10 +92,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
     """
   end
 
-  # Safe initial extraction — handles nil project, nil name, and empty names
-  defp project_initial(nil), do: "E"
+  # Safe initial extraction — handles nil project, nil name, and empty names.
+  # Public so Rail can import it and avoid duplicating this logic.
+  def project_initial(nil), do: "E"
 
-  defp project_initial(%{name: name}) when is_binary(name) do
+  def project_initial(%{name: name}) when is_binary(name) do
     name
     |> String.trim()
     |> case do
@@ -104,5 +105,5 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
     end
   end
 
-  defp project_initial(_), do: "E"
+  def project_initial(_), do: "E"
 end

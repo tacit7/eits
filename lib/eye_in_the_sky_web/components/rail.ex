@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.Components.Rail.Flyout
-  import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
+  import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1, project_initial: 1]
 
   alias EyeInTheSky.{Notifications, Projects, Sessions}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
@@ -89,9 +89,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         socket
       end
 
-    # Reset mobile_open on any parent update (navigation/page change) so the flyout
-    # doesn't stay open after the user navigates to a new page.
-    socket = assign(socket, :mobile_open, false)
+    # Only reset mobile_open when the tab changes (real navigation). Resetting on every
+    # parent update — e.g. a notification count tick — closes the flyout mid-interaction.
+    socket =
+      if sidebar_tab != previous_tab do
+        assign(socket, :mobile_open, false)
+      else
+        socket
+      end
 
     {:ok, socket}
   end
@@ -302,16 +307,4 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     """
   end
 
-  defp project_initial(nil), do: "E"
-
-  defp project_initial(%{name: name}) when is_binary(name) do
-    name
-    |> String.trim()
-    |> case do
-      "" -> "E"
-      trimmed -> trimmed |> String.first() |> String.upcase()
-    end
-  end
-
-  defp project_initial(_), do: "E"
 end

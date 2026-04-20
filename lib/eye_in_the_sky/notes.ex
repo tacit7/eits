@@ -33,11 +33,7 @@ defmodule EyeInTheSky.Notes do
 
       query =
         Note
-        |> where(
-          [n],
-          n.parent_type == "session" and
-            (n.parent_id == ^session_int_str or n.parent_id == ^session.uuid)
-        )
+        |> scope_by_parent("session", session_int_str, session.uuid)
         |> order_by([n], desc: n.created_at)
 
       query = if limit_val, do: limit(query, ^limit_val), else: query
@@ -58,11 +54,7 @@ defmodule EyeInTheSky.Notes do
       session_int_str = to_string(session.id)
 
       Note
-      |> where(
-        [n],
-        n.parent_type == "session" and
-          (n.parent_id == ^session_int_str or n.parent_id == ^session.uuid)
-      )
+      |> scope_by_parent("session", session_int_str, session.uuid)
       |> Repo.aggregate(:count, :id)
     else
       {:error, _} -> 0
@@ -82,8 +74,7 @@ defmodule EyeInTheSky.Notes do
 
       {int_id, uuid} ->
         Note
-        |> where([n], n.parent_type == "task")
-        |> where([n], n.parent_id == ^to_string(int_id) or n.parent_id == ^uuid)
+        |> scope_by_parent("task", to_string(int_id), uuid)
         |> order_by([n], desc: n.created_at)
         |> Repo.all()
     end
@@ -282,6 +273,10 @@ defmodule EyeInTheSky.Notes do
 
   defp maybe_add_dynamic(list, false, _fun), do: list
   defp maybe_add_dynamic(list, true, fun), do: list ++ [fun.()]
+
+  defp scope_by_parent(query, type, id_str, uuid) do
+    where(query, [n], n.parent_type == ^type and (n.parent_id == ^id_str or n.parent_id == ^uuid))
+  end
 
   defp resolve_session(session_id) do
     Sessions.resolve(to_string(session_id))

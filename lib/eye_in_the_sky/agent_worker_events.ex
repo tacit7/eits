@@ -74,18 +74,11 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     end
   end
 
-  @doc "Worker hit a systemic error (billing/auth/watchdog) — mark session failed and fire Teams cleanup."
+  @doc "Worker hit a systemic error (billing/auth/watchdog) — overwrite idle DB status with failed."
   def on_session_failed(session_id, provider_conversation_id) do
     Events.stream_error(session_id, provider_conversation_id, "Systemic error — session failed")
-
-    case update_session_status(session_id, "failed") do
-      {:ok, session} ->
-        Events.session_idle(session_id)
-        Events.agent_stopped(session)
-
-      :error ->
-        :ok
-    end
+    update_session_status(session_id, "failed")
+    :ok
   end
 
   @doc "SDK spawn failed — record system error message."

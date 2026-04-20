@@ -14,8 +14,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   def mount(%{"id" => _} = params, _session, socket) do
     if connected?(socket), do: subscribe_tasks()
 
-    workflow_states = Tasks.list_workflow_states()
-
     socket =
       socket
       |> mount_project(params,
@@ -26,7 +24,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:search_query, "")
       |> assign(:filter_state_id, nil)
       |> assign(:sort_by, "created_desc")
-      |> assign(:workflow_states, workflow_states)
+      |> assign(:workflow_states, [])
       |> assign(:show_new_task_drawer, false)
       |> assign(:show_filter_sheet, false)
       |> assign(:show_task_detail_drawer, false)
@@ -38,7 +36,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:total_tasks, 0)
       |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
 
-    socket = if socket.assigns.project, do: load_tasks(socket), else: socket
+    socket =
+      if connected?(socket) do
+        socket
+        |> assign(:workflow_states, Tasks.list_workflow_states())
+        |> then(fn s -> if s.assigns.project, do: load_tasks(s), else: s end)
+      else
+        socket
+      end
 
     {:ok, socket}
   end

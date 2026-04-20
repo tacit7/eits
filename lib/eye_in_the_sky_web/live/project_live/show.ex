@@ -14,57 +14,69 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
   def mount(%{"id" => id}, _session, socket) do
     project_id = parse_int(id)
 
-    # Load project only if ID is valid
     socket =
       if project_id do
         project = Projects.get_project!(project_id)
 
-        # Load tasks manually due to type mismatch (projects.id is INT, tasks.project_id is TEXT)
-        tasks = Tasks.list_tasks_for_project(project_id)
+        socket =
+          socket
+          |> assign(:page_title, "Project: #{project.name}")
+          |> assign(:project, project)
+          |> assign(:sidebar_tab, :overview)
+          |> assign(:sidebar_project, project)
+          |> assign(:tasks, [])
+          |> assign(:active_sessions, [])
+          |> assign(:recent_notes, [])
+          |> assign(:agent_count, 0)
+          |> assign(:working_agent_count, 0)
+          |> assign(:session_count, 0)
+          |> assign(:recent_commits, [])
+          |> assign(:open_tasks, 0)
+          |> assign(:done_tasks, 0)
+          |> assign(:claude_files, [])
 
-        # Load active sessions for this project (max 5) — filtered in SQL
-        active_sessions =
-          Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
+        if connected?(socket) do
+          tasks = Tasks.list_tasks_for_project(project_id)
 
-        # Load recent notes for this project (max 5)
-        recent_notes = Notes.list_notes_for_project(project_id, limit: 5)
+          active_sessions =
+            Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
 
-        # Agent counts — aggregate query, no need to load full structs
-        {agent_count, working_agent_count} = Agents.count_agents_for_project(project_id)
+          recent_notes = Notes.list_notes_for_project(project_id, limit: 5)
+          {agent_count, working_agent_count} = Agents.count_agents_for_project(project_id)
+          {session_count, session_ids} = Sessions.count_and_ids_for_project(project_id)
+          recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
+          open_tasks = Enum.count(tasks, &is_nil(&1.completed_at))
+          done_tasks = Enum.count(tasks, & &1.completed_at)
+          claude_files = scan_claude_files(project.path)
 
-        # Lightweight count + IDs for display and commits query (no preloads)
-        {session_count, session_ids} = Sessions.count_and_ids_for_project(project_id)
-
-        # Load recent commits via single batch query
-        recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
-
-        # Task stats
-        open_tasks = Enum.count(tasks, &is_nil(&1.completed_at))
-        done_tasks = Enum.count(tasks, & &1.completed_at)
-
-        claude_files = scan_claude_files(project.path)
-
-        socket
-        |> assign(:page_title, "Project: #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :overview)
-        |> assign(:sidebar_project, project)
-        |> assign(:tasks, tasks)
-        |> assign(:active_sessions, active_sessions)
-        |> assign(:recent_notes, recent_notes)
-        |> assign(:agent_count, agent_count)
-        |> assign(:working_agent_count, working_agent_count)
-        |> assign(:session_count, session_count)
-        |> assign(:recent_commits, recent_commits)
-        |> assign(:open_tasks, open_tasks)
-        |> assign(:done_tasks, done_tasks)
-        |> assign(:claude_files, claude_files)
+          socket
+          |> assign(:tasks, tasks)
+          |> assign(:active_sessions, active_sessions)
+          |> assign(:recent_notes, recent_notes)
+          |> assign(:agent_count, agent_count)
+          |> assign(:working_agent_count, working_agent_count)
+          |> assign(:session_count, session_count)
+          |> assign(:recent_commits, recent_commits)
+          |> assign(:open_tasks, open_tasks)
+          |> assign(:done_tasks, done_tasks)
+          |> assign(:claude_files, claude_files)
+        else
+          socket
+        end
       else
-        # Invalid project ID - show error
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
         |> assign(:tasks, [])
+        |> assign(:active_sessions, [])
+        |> assign(:recent_notes, [])
+        |> assign(:agent_count, 0)
+        |> assign(:working_agent_count, 0)
+        |> assign(:session_count, 0)
+        |> assign(:recent_commits, [])
+        |> assign(:open_tasks, 0)
+        |> assign(:done_tasks, 0)
+        |> assign(:claude_files, [])
         |> put_flash(:error, "Invalid project ID")
       end
 

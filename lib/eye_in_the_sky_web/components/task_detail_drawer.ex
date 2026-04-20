@@ -13,7 +13,9 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   attr :task, :map, default: nil
   attr :notes, :list, default: []
   attr :workflow_states, :list, required: true
-  attr :toggle_event, :string, required: true
+  attr :toggle_event, :any, required: true
+  attr :close_event_name, :string, default: nil
+  attr :close_event_key, :string, default: nil
   attr :update_event, :string, required: true
   attr :delete_event, :string, required: true
   attr :copy_event, :string, default: nil
@@ -37,7 +39,8 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
         <div
           id="task-detail-panel"
           phx-hook="DrawerSwipeClose"
-          data-close-event={@toggle_event}
+          data-close-event={@close_event_name || @toggle_event}
+          data-close-key={@close_event_key}
           class="fixed inset-y-0 right-0 safe-inset-y z-50 w-full max-w-lg bg-base-100 shadow-xl flex flex-col"
         >
           <%= if @task do %>

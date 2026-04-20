@@ -286,6 +286,42 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   end
 
   @doc """
+  POST /api/v1/sessions/:uuid/archive - Archive a session.
+  """
+  def archive(conn, %{"uuid" => uuid}) do
+    with {:ok, session} <- resolve_session(uuid) do
+      case Sessions.archive_session(session) do
+        {:ok, updated} ->
+          EyeInTheSky.Events.session_updated(updated)
+          json(conn, %{success: true, uuid: updated.uuid, archived: true})
+
+        {:error, _} ->
+          {:error, "Failed to archive session"}
+      end
+    else
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
+    end
+  end
+
+  @doc """
+  POST /api/v1/sessions/:uuid/unarchive - Unarchive a session.
+  """
+  def unarchive(conn, %{"uuid" => uuid}) do
+    with {:ok, session} <- resolve_session(uuid) do
+      case Sessions.unarchive_session(session) do
+        {:ok, updated} ->
+          EyeInTheSky.Events.session_updated(updated)
+          json(conn, %{success: true, uuid: updated.uuid, archived: false})
+
+        {:error, _} ->
+          {:error, "Failed to unarchive session"}
+      end
+    else
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
+    end
+  end
+
+  @doc """
   GET /api/v1/sessions/:uuid/context - Load session context.
   """
   def get_context(conn, %{"uuid" => uuid}) do

@@ -291,14 +291,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
 
     entries =
       if File.dir?(claude_dir) do
-        children =
-          claude_dir
-          |> File.ls!()
-          |> Enum.reject(&String.starts_with?(&1, "."))
-          |> Enum.sort()
-          |> Enum.map(&build_claude_entry(&1, claude_dir))
+        case File.ls(claude_dir) do
+          {:error, _} ->
+            entries
 
-        entries ++ children
+          {:ok, children} ->
+            mapped =
+              children
+              |> Enum.reject(&String.starts_with?(&1, "."))
+              |> Enum.sort()
+              |> Enum.map(&build_claude_entry(&1, claude_dir))
+
+            entries ++ mapped
+        end
       else
         entries
       end

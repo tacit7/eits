@@ -85,7 +85,7 @@ _project_id() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|archive|unarchive|context|tasks|notes>"; return 0; }
   case "$sub" in
     list)
       # eits sessions list [--search <q>] [--name <partial>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>] [--mine] [--include-archived] [--with-tasks]
@@ -177,6 +177,16 @@ cmd_sessions() {
         _post "/sessions/$uuid/end" '{}'
       fi
       ;;
+    archive)
+      # eits sessions archive <uuid>
+      local uuid="${1:-}"; need uuid
+      _post "/sessions/$uuid/archive" '{}'
+      ;;
+    unarchive)
+      # eits sessions unarchive <uuid>
+      local uuid="${1:-}"; need uuid
+      _post "/sessions/$uuid/unarchive" '{}'
+      ;;
     context)
       # eits sessions context <uuid>                                    (GET)
       # eits sessions context <uuid> --text <text> [--metadata <json>]  (PATCH)
@@ -205,7 +215,7 @@ cmd_sessions() {
       fi
       ;;
     *)
-      echo "usage: eits sessions <list|get|create|update|end|context|tasks|notes>"
+      echo "usage: eits sessions <list|get|create|update|end|archive|unarchive|context|tasks|notes>"
       ;;
   esac
 }
@@ -589,8 +599,9 @@ cmd_agents() {
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { cat <<'USAGE'
 usage: eits agents spawn --instructions <text> [options]
 
-Required:
-  --instructions <text>        Agent instructions
+Required (one of):
+  --instructions <text>        Agent instructions (inline)
+  --instructions-file <path>   Read instructions from file
 
 Options:
   --model <m>                  Model name (default: server default)
@@ -598,6 +609,7 @@ Options:
   --project-id <n>             Project ID (default: $EITS_PROJECT_ID)
   --project-path <path>        Project path (default: current dir)
   --worktree <branch>          Git worktree branch to create for the agent
+  --stash-if-dirty             Auto-stash uncommitted changes before worktree create
   --effort-level <level>       Effort level hint
   --parent-session-id <n>      Parent session integer ID (links spawned session)
   --parent-agent-id <n>        Parent agent ID
@@ -609,20 +621,23 @@ Options:
 
 Examples:
   eits agents spawn --instructions "Review PR #42" --parent-session-id $EITS_SESSION_ID
+  eits agents spawn --instructions-file /tmp/agent.txt --worktree fix/my-bug --stash-if-dirty
   eits agents spawn --instructions "Fix bug" --worktree fix/my-bug --team-name "audit"
 USAGE
         return 0; }
-      local instructions="" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
-      local worktree="" effort_level="" parent_session_id="" parent_agent_id=""
+      local instructions="" instructions_file="" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
+      local worktree="" stash_if_dirty="false" effort_level="" parent_session_id="" parent_agent_id=""
       local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --instructions)      instructions="$2";      shift 2 ;;
+          --instructions-file) instructions_file="$2"; shift 2 ;;
           --model)             model="$2";             shift 2 ;;
           --provider)          provider="$2";          shift 2 ;;
           --project-id)        project_id="$2";        shift 2 ;;
           --project-path)      project_path="$2";      shift 2 ;;
           --worktree)          worktree="$2";          shift 2 ;;
+          --stash-if-dirty)    stash_if_dirty="true";  shift ;;
           --effort-level)      effort_level="$2";      shift 2 ;;
           --parent-session-id) parent_session_id="$2"; shift 2 ;;
           --parent-agent-id)   parent_agent_id="$2";   shift 2 ;;
@@ -634,6 +649,11 @@ USAGE
           *) die "unknown flag: $1" ;;
         esac
       done
+      # --instructions-file overrides --instructions; both can't be empty
+      if [[ -n "$instructions_file" ]]; then
+        [[ -f "$instructions_file" ]] || die "--instructions-file: file not found: $instructions_file"
+        instructions="$(cat "$instructions_file")"
+      fi
       need instructions
       local payload
       payload=$(jq -n \
@@ -651,6 +671,7 @@ USAGE
         --argjson parent_session_id "${parent_session_id:-null}" \
         --argjson parent_agent_id   "${parent_agent_id:-null}" \
         --argjson bypass_sandbox    "$bypass_sandbox" \
+        --argjson stash_if_dirty    "$stash_if_dirty" \
         '{instructions: $instructions}
          + (if $model             != "" then {model: $model}                           else {} end)
          + (if $provider          != "" then {provider: $provider}                     else {} end)
@@ -664,7 +685,8 @@ USAGE
          + (if $project_id        != null then {project_id: $project_id}               else {} end)
          + (if $parent_session_id != null then {parent_session_id: $parent_session_id} else {} end)
          + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)
-         + (if $bypass_sandbox           then {bypass_sandbox: true}                   else {} end)')
+         + (if $bypass_sandbox           then {bypass_sandbox: true}                   else {} end)
+         + (if $stash_if_dirty           then {stash_if_dirty: true}                   else {} end)')
       _post "/agents" "$payload"
       ;;
     *)

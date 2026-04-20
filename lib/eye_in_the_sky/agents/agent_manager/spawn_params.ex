@@ -42,6 +42,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnParams do
       name: name,
       description: name,
       worktree: params["worktree"],
+      stash_if_dirty: params["stash_if_dirty"] == true,
       effort_level: params["effort_level"],
       parent_agent_id: params["parent_agent_id"],
       parent_session_id: params["parent_session_id"],

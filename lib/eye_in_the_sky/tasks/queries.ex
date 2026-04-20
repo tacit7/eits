@@ -48,6 +48,7 @@ defmodule EyeInTheSky.Tasks.Queries do
   def list_tasks_for_agent(agent_id, opts \\ []) do
     Task
     |> where([t], t.agent_id == ^agent_id)
+    |> QueryBuilder.maybe_where(opts, :state_id)
     |> preload(^@full_task_preloads)
     |> order_by([t],
       desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", t.archived),
@@ -62,18 +63,21 @@ defmodule EyeInTheSky.Tasks.Queries do
   Returns the list of tasks for a specific session.
   """
   def list_tasks_for_session(session_id, opts \\ []) do
-    query =
-      QueryHelpers.for_session_join(Task, session_id, "task_sessions",
-        preload: [:state, :tags],
-        order_by: [desc: :priority, asc: :created_at],
-        limit: Keyword.get(opts, :limit),
-        offset: Keyword.get(opts, :offset)
-      )
+    tasks =
+      Task
+      |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
+      |> where([t, ts], ts.session_id == ^session_id)
+      |> QueryBuilder.maybe_where(opts, :state_id)
+      |> order_by([t], desc: t.priority, asc: t.created_at)
+      |> preload([:state, :tags])
+      |> QueryBuilder.maybe_limit(opts)
+      |> QueryBuilder.maybe_offset(opts)
+      |> Repo.all()
 
     if Keyword.get(opts, :notes_count, true) do
-      NoteQueries.with_notes_count(query)
+      NoteQueries.with_notes_count(tasks)
     else
-      query
+      tasks
     end
   end
 

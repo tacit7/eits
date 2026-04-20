@@ -161,27 +161,31 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     provider_conversation_id = Keyword.fetch!(opts, :provider_conversation_id)
     agent_id = Keyword.fetch!(opts, :agent_id)
     project_id = Keyword.get(opts, :project_id)
-    project_path = Keyword.get(opts, :project_path, File.cwd!())
+    project_path = Keyword.get(opts, :project_path)
     provider = Keyword.get(opts, :provider, "claude")
     worktree = Keyword.get(opts, :worktree)
 
-    state = %__MODULE__{
-      session_id: session_id,
-      eits_session_uuid: eits_session_uuid,
-      provider_conversation_id: provider_conversation_id,
-      agent_id: agent_id,
-      project_id: project_id,
-      project_path: project_path,
-      provider: provider,
-      worktree: worktree,
-      stream: stream_assembler_for(provider)
-    }
+    if is_nil(project_path) do
+      {:stop, :no_project_path}
+    else
+      state = %__MODULE__{
+        session_id: session_id,
+        eits_session_uuid: eits_session_uuid,
+        provider_conversation_id: provider_conversation_id,
+        agent_id: agent_id,
+        project_id: project_id,
+        project_path: project_path,
+        provider: provider,
+        worktree: worktree,
+        stream: stream_assembler_for(provider)
+      }
 
-    Logger.info(
-      "AgentWorker started for session=#{session_id} agent=#{agent_id} provider=#{provider}"
-    )
+      Logger.info(
+        "AgentWorker started for session=#{session_id} agent=#{agent_id} provider=#{provider}"
+      )
 
-    {:ok, IdleTimer.schedule(state)}
+      {:ok, IdleTimer.schedule(state)}
+    end
   end
 
   @impl true

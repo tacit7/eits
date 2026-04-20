@@ -152,7 +152,7 @@ defmodule EyeInTheSky.Messages do
   """
   @spec create_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_message(attrs \\ %{}) do
-    attrs = with_timestamps(attrs)
+    attrs = message_defaults(attrs)
 
     %Message{}
     |> Message.changeset(attrs)
@@ -165,7 +165,7 @@ defmodule EyeInTheSky.Messages do
   """
   @spec create_channel_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_channel_message(attrs \\ %{}) do
-    attrs = with_timestamps(attrs)
+    attrs = message_defaults(attrs)
 
     cid = Map.get(attrs, :channel_id)
     has_number = Map.get(attrs, :channel_message_number)
@@ -187,7 +187,6 @@ defmodule EyeInTheSky.Messages do
   @spec send_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def send_message(attrs) do
     attrs
-    |> Map.put(:uuid, Ecto.UUID.generate())
     |> Map.put(:direction, "outbound")
     |> Map.put(:status, "pending")
     |> create_message()
@@ -216,7 +215,10 @@ defmodule EyeInTheSky.Messages do
       metadata: metadata
     }
 
-    attrs = if channel_id, do: Map.put(attrs, :channel_id, channel_id), else: attrs
+    attrs =
+      attrs
+      |> then(fn a -> if channel_id, do: Map.put(a, :channel_id, channel_id), else: a end)
+      |> message_defaults()
 
     Deduplicator.find_or_create(attrs, metadata)
     |> broadcast_and_return()
@@ -392,16 +394,24 @@ defmodule EyeInTheSky.Messages do
     )
   end
 
-  defp with_timestamps(attrs) do
+  defp message_defaults(attrs) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
-    %{inserted_at: now, updated_at: now} |> Map.merge(attrs)
+
+    attrs
+    |> Map.put_new(:uuid, Ecto.UUID.generate())
+    |> Map.put_new(:inserted_at, now)
+    |> Map.put_new(:updated_at, now)
   end
 
   defp broadcast_and_return({:ok, message}) do
-    EyeInTheSky.Events.session_new_message(message.session_id, message)
-
-    if message.channel_id do
-      EyeInTheSky.Events.channel_message(message.channel_id, message)
+    try do
+      if message.channel_id do
+        EyeInTheSky.Events.channel_message(message.channel_id, message)
+      else
+        EyeInTheSky.Events.session_new_message(message.session_id, message)
+      end
+    rescue
+      e -> Logger.error("broadcast failed for message #{message.id}: #{Exception.message(e)}")
     end
 
     {:ok, message}

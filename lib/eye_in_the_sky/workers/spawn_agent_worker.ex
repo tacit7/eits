@@ -64,10 +64,11 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
       instructions: instructions,
       model: config["model"],
       project_path: config["project_path"],
-      description: config["description"] || "Scheduled agent",
+      description: config["description"] || job.name,
       project_id: job.project_id,
       session_uuid: session_uuid
     ]
+    |> maybe_put(:agent, config["agent"])
     |> maybe_put(:max_budget_usd, parse_float(config["max_budget_usd"]))
     |> maybe_put(:max_turns, ToolHelpers.parse_int(config["max_turns"]))
     |> maybe_put(:fallback_model, config["fallback_model"])

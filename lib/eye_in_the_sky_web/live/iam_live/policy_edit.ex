@@ -17,11 +17,18 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    case Integer.parse(id) do
-      {int_id, ""} ->
+    case ToolHelpers.parse_int(id) do
+      nil ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Invalid policy ID.")
+         |> push_navigate(to: ~p"/iam/policies")}
+
+      int_id ->
         case IAM.get_policy(int_id) do
           {:ok, %Policy{} = policy} ->
             changeset = Policy.update_changeset(policy, %{})
@@ -45,12 +52,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
              |> put_flash(:error, "Policy not found.")
              |> push_navigate(to: ~p"/iam/policies")}
         end
-
-      _ ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Invalid policy ID.")
-         |> push_navigate(to: ~p"/iam/policies")}
     end
   end
 

@@ -37,6 +37,14 @@ defmodule EyeInTheSky.Codex.SDK do
     forward_raw_lines: true
   ]
 
+  @eits_cli_reference """
+    eits tasks begin --title "<title>"
+    eits tasks annotate <id> --body "..."
+    eits tasks update <id> --state 4
+    eits dm --to <session_uuid> --message "<text>"
+    eits commits create --hash <hash>
+  """
+
   @doc """
   Build the EITS init prompt prepended to new Codex sessions.
 
@@ -54,12 +62,7 @@ defmodule EyeInTheSky.Codex.SDK do
 
     Use the eits CLI script for all EITS operations:
 
-      eits tasks begin --title "<title>"
-      eits tasks annotate <id> --body "..."
-      eits tasks update <id> --state 4
-      eits dm --to <session_uuid> --message "<text>"
-      eits commits create --hash <hash>
-
+    #{@eits_cli_reference}
     To spawn a child agent, always pass --provider codex:
       eits agents spawn --provider codex --instructions "<text>" [--model <model>]
 

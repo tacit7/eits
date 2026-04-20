@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
 
   alias EyeInTheSky.IAM.Context
   alias EyeInTheSky.IAM.Simulator
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @default_form %{
     "event" => "pre_tool_use",
@@ -120,7 +121,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
     %Context{
       event: parse_event(form["event"]),
       agent_type: blank_to_default(form["agent_type"], "root"),
-      project_id: parse_int(form["project_id"]),
+      project_id: ToolHelpers.parse_int(form["project_id"]),
       project_path: nil,
       tool: blank_to_nil(form["tool"]),
       resource_type: infer_resource_type(form["tool"]),
@@ -139,15 +140,6 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
 
   defp parse_permission("deny"), do: :deny
   defp parse_permission(_), do: :allow
-
-  defp parse_int(v) when is_binary(v) do
-    case Integer.parse(String.trim(v)) do
-      {n, ""} -> n
-      _ -> nil
-    end
-  end
-
-  defp parse_int(_), do: nil
 
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil

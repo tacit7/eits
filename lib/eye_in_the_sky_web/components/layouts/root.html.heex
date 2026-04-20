@@ -57,7 +57,7 @@
           else: fn "/" <> _ = p -> p end
       }
     />
-    <script>
+    <script nonce={assigns.csp_nonce}>
       // Override server-rendered data-theme if localStorage has a saved value
       const saved = localStorage.getItem("theme");
       if (saved) document.documentElement.setAttribute("data-theme", saved);

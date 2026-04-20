@@ -16,43 +16,6 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   attr :context_project_id, :any, default: nil
 
   def agent_schedule_form(assigns) do
-    ~H"""
-    <%= if @show do %>
-      <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_schedule"></div>
-
-      <%!-- Mobile drawer --%>
-      <div class="sm:hidden fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-base-100 shadow-xl overflow-y-auto">
-        <div class="p-5">
-          <.form_body
-            prompt={@prompt}
-            job={@job}
-            projects={@projects}
-            context_project_id={@context_project_id}
-          />
-        </div>
-      </div>
-
-      <%!-- Desktop modal --%>
-      <div class="hidden sm:flex fixed inset-0 z-50 items-center justify-center">
-        <div class="bg-base-100 rounded-xl shadow-2xl w-full max-w-lg p-6 border border-base-300 max-h-[90vh] overflow-y-auto">
-          <.form_body
-            prompt={@prompt}
-            job={@job}
-            projects={@projects}
-            context_project_id={@context_project_id}
-          />
-        </div>
-      </div>
-    <% end %>
-    """
-  end
-
-  attr :prompt, :any, required: true
-  attr :job, :any, default: nil
-  attr :projects, :list, required: true
-  attr :context_project_id, :any, default: nil
-
-  defp form_body(assigns) do
     raw_config = assigns.job && assigns.job.config
 
     config =
@@ -75,14 +38,55 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           %{}
       end
 
+    assigns = assign(assigns, :config, config)
+
+    ~H"""
+    <%= if @show do %>
+      <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_schedule"></div>
+
+      <%!-- Mobile drawer --%>
+      <div class="sm:hidden fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-base-100 shadow-xl overflow-y-auto">
+        <div class="p-5">
+          <.form_body
+            prompt={@prompt}
+            job={@job}
+            config={@config}
+            projects={@projects}
+            context_project_id={@context_project_id}
+          />
+        </div>
+      </div>
+
+      <%!-- Desktop modal --%>
+      <div class="hidden sm:flex fixed inset-0 z-50 items-center justify-center">
+        <div class="bg-base-100 rounded-xl shadow-2xl w-full max-w-lg p-6 border border-base-300 max-h-[90vh] overflow-y-auto">
+          <.form_body
+            prompt={@prompt}
+            job={@job}
+            config={@config}
+            projects={@projects}
+            context_project_id={@context_project_id}
+          />
+        </div>
+      </div>
+    <% end %>
+    """
+  end
+
+  attr :prompt, :any, required: true
+  attr :job, :any, default: nil
+  attr :config, :map, required: true
+  attr :projects, :list, required: true
+  attr :context_project_id, :any, default: nil
+
+  defp form_body(assigns) do
     assigns =
       assigns
       |> assign(:editing, not is_nil(assigns.job))
       |> assign(:schedule_type, job_field(assigns.job, :schedule_type, "cron"))
       |> assign(:schedule_value, job_field(assigns.job, :schedule_value, ""))
-      |> assign(:model, Map.get(config, "model", "sonnet"))
+      |> assign(:model, Map.get(assigns.config, "model", "sonnet"))
       |> assign(:timezone, job_field(assigns.job, :timezone, system_timezone()))
-      |> assign(:config, config)
 
     ~H"""
     <div class="flex items-start justify-between mb-4">

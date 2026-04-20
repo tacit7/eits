@@ -10,13 +10,17 @@ defmodule EyeInTheSky.Git.Worktrees do
   @doc """
   Validates that the repo has no uncommitted changes and creates (or reuses) a worktree.
 
+  Options:
+    - `stash_if_dirty: true` — auto-stash tracked changes before creating the worktree instead
+      of returning `{:error, :dirty_working_tree}`.
+
   Returns `{:ok, worktree_path}` on success, `{:error, reason}` on failure.
   If worktree creation fails when explicitly requested, returns an error — does NOT silently
   fall back to the main project path.
   """
-  @spec prepare_session_worktree(String.t(), String.t()) ::
+  @spec prepare_session_worktree(String.t(), String.t(), keyword()) ::
           {:ok, String.t()} | {:error, :dirty_working_tree | term()}
-  def prepare_session_worktree(project_path, worktree_name) do
+  def prepare_session_worktree(project_path, worktree_name, opts \\ []) do
     wt_path = Path.join([project_path, ".claude", "worktrees", worktree_name])
     branch = "worktree-#{worktree_name}"
 
@@ -25,10 +29,32 @@ defmodule EyeInTheSky.Git.Worktrees do
       Logger.info("prepare_session_worktree: reusing existing worktree at #{wt_path}")
       {:ok, wt_path}
     else
-      with :ok <- check_clean_working_tree(project_path),
+      with :ok <- maybe_stash(project_path, opts),
+           :ok <- check_clean_working_tree(project_path),
            :ok <- ensure_git_worktree(project_path, wt_path, branch) do
         {:ok, wt_path}
       end
+    end
+  end
+
+  # Stash tracked changes if `stash_if_dirty: true` is set and the tree is dirty.
+  # Runs before check_clean_working_tree so the clean check passes afterwards.
+  defp maybe_stash(project_path, opts) do
+    if opts[:stash_if_dirty] do
+      case check_clean_working_tree(project_path) do
+        :ok ->
+          :ok
+
+        {:error, :dirty_working_tree} ->
+          Logger.info("prepare_session_worktree: stashing dirty working tree before worktree create")
+
+          case System.cmd("git", ["-C", project_path, "stash"], stderr_to_stdout: true) do
+            {_, 0} -> :ok
+            {output, _} -> {:error, {:stash_failed, output}}
+          end
+      end
+    else
+      :ok
     end
   end
 

@@ -73,7 +73,9 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
         {:ok, opts[:project_path]}
 
       wt ->
-        case Worktrees.prepare_session_worktree(opts[:project_path], wt) do
+        wt_opts = [stash_if_dirty: opts[:stash_if_dirty] == true]
+
+        case Worktrees.prepare_session_worktree(opts[:project_path], wt, wt_opts) do
           {:ok, _} = ok ->
             ok
 

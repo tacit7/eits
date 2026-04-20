@@ -193,6 +193,8 @@ defmodule EyeInTheSkyWeb.Router do
     get "/sessions/:uuid", SessionController, :show
     patch "/sessions/:uuid", SessionController, :update
     post "/sessions/:uuid/end", SessionController, :end_session
+    post "/sessions/:uuid/archive", SessionController, :archive
+    post "/sessions/:uuid/unarchive", SessionController, :unarchive
     post "/sessions/:uuid/tool-events", SessionController, :tool_event
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context

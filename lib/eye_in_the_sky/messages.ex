@@ -438,7 +438,6 @@ defmodule EyeInTheSky.Messages do
 
   @doc """
   Returns the most recent inbound DMs received by a session, oldest-first.
-  Used by EITS-CMD `dm list` to inject recent context back into an agent.
   """
   @spec list_inbound_dms(integer(), pos_integer()) :: [Message.t()]
   def list_inbound_dms(session_id, limit \\ 20) when is_integer(session_id) do

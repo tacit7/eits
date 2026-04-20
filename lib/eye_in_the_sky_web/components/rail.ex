@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.Components.Rail.Flyout
-  import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1], only: [project_initial: 1]
+  import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
 
   alias EyeInTheSky.{Notifications, Projects, Sessions}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions

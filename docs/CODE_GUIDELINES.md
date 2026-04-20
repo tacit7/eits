@@ -1441,3 +1441,171 @@ Settings are read in the `CodeMirrorHook` mounted callback and applied to the ed
 
 **Rule:** Do not hardcode tab size, font size, or vim mode in the CodeMirror extension config. Always read from `localStorage` with a sensible default. Settings UI toggles must write to `localStorage` before dispatching the reconfiguration.
 
+---
+
+## API Controllers and FallbackController Pattern
+
+### Error Handling via action_fallback
+
+All API controllers wire `action_fallback EyeInTheSkyWeb.Api.V1.FallbackController` to handle error tuples consistently without boilerplate response wrapping:
+
+```elixir
+defmodule EyeInTheSkyWeb.Api.V1.TaskController do
+  use EyeInTheSkyWeb, :controller
+
+  action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
+
+  def show(conn, %{"id" => id}) do
+    case Tasks.get_task(id) do
+      {:ok, task} -> json(conn, %{task: task})
+      error -> error  # FallbackController handles the tuple
+    end
+  end
+end
+```
+
+**FallbackController handles these tuple shapes:**
+- `{:error, :not_found}` → 404
+- `{:error, %Ecto.Changeset{}}` → 422 with validation details
+- `{:error, "string_reason"}` → 422 with reason text
+- `{:error, :atom}` → 500 (or specific HTTP status atom)
+- `{:error, :status_atom, "reason"}` → explicit HTTP status + reason
+
+**Benefits:**
+- Controllers return error tuples directly; no manual status/JSON wrapping
+- Consistent error response shape across all endpoints
+- Changeset validation errors automatically translated
+
+**Rule:** All API controllers must wire `action_fallback`. Never use `put_status/2` + `json/2` for error handling inline. Return the error tuple and let FallbackController format it.
+
+---
+
+## Module Extraction from Large Contexts
+
+When a context module grows large with distinct responsibilities, extract domain logic into sub-modules. Each sub-module focuses on a single concern (data transformation, parsing, building, validation) and is tested independently.
+
+### Pattern
+
+**Before:** Logic is embedded in the main context.
+```elixir
+# lib/eye_in_the_sky/agent_definitions.ex — 200+ lines, mixed concerns
+defmodule AgentDefinitions do
+  def load_definition(path) do
+    # Parsing logic
+    # Schema validation logic
+    # Definition extraction logic
+    # ... all tangled together
+  end
+end
+```
+
+**After:** Extract each concern into a sub-module.
+```elixir
+# lib/eye_in_the_sky/agent_definitions.ex — focuses on public API
+defmodule AgentDefinitions do
+  alias AgentDefinitions.FrontmatterParser
+
+  def load_definition(path) do
+    content = File.read!(path)
+    FrontmatterParser.parse(content)
+  end
+end
+
+# lib/eye_in_the_sky/agent_definitions/frontmatter_parser.ex — single concern
+defmodule AgentDefinitions.FrontmatterParser do
+  def parse(content) do
+    # Parsing logic only
+  end
+end
+```
+
+### Examples in Codebase
+
+| Parent | Sub-module | Responsibility |
+|--------|-----------|-----------------|
+| `AgentManager` | `AgentManager.RecordBuilder` | UUID/project/worktree resolution, agent + session record creation |
+| `AgentDefinitions` | `AgentDefinitions.FrontmatterParser` | Parse frontmatter YAML from definition files |
+| `Codex.SDK` | `Codex.ToolMapper` | Map tool descriptions for Codex API requests |
+
+### When to Extract
+
+- Logic is 50+ lines and logically separate from orchestration
+- Logic is reused or would be reused from multiple callers
+- Logic has different test requirements (unit vs integration)
+- Module would benefit from sub-namespace organization
+
+**Rule:** Extract to sub-modules to keep contexts under 200 lines and each module focused on one job. Sub-modules are named `Parent.SubModule` and live in `lib/parent/sub_module.ex`.
+
+---
+
+## JavaScript MutationObserver Pattern for DOM State
+
+### SessionsDropdownGuard Example
+
+Use `MutationObserver` to track DOM patches and restore stateful UI (e.g., focus, open dropdowns) when LiveView replaces stream items.
+
+**Problem:** When `stream_insert` replaces a DOM row, any open dropdowns or focused elements close because the old DOM is removed. Standard hook callbacks (`beforeUpdate`, `updated`) don't fire on stream patches since the hook element's attributes don't change.
+
+**Solution:** Combine three layers to survive a stream patch:
+
+1. **focusin/focusout listeners** track which row has focus.
+2. **isConnected check** on focusout detects whether the element was removed (stream patch) or deliberately blurred.
+3. **MutationObserver** watches for new rows and re-focuses the button in the replacement element.
+
+**Implementation:**
+```javascript
+export const SessionsDropdownGuard = {
+  mounted() {
+    this._focusedItemId = null;
+
+    this._onFocusIn = (e) => {
+      const item = e.target.closest("[id^='si-']");
+      this._focusedItemId = item?.id ?? null;
+    };
+
+    this._onFocusOut = (e) => {
+      // If still connected, user deliberately blurred; clear state.
+      // If disconnected (removed by stream), keep ID for re-focus.
+      if (e.target.isConnected) {
+        this._focusedItemId = null;
+      }
+    };
+
+    this.el.addEventListener("focusin", this._onFocusIn);
+    this.el.addEventListener("focusout", this._onFocusOut);
+
+    // Re-focus button in replacement element after stream patch
+    this._observer = new MutationObserver(() => {
+      if (!this._focusedItemId) return;
+      const item = document.getElementById(this._focusedItemId);
+      this._focusedItemId = null;
+      if (!item || item.contains(document.activeElement)) return;
+      const btn = item.querySelector(".dropdown [tabindex='0']");
+      if (btn) btn.focus();
+    });
+
+    // childList only — no need to watch attribute changes
+    this._observer.observe(this.el, { childList: true });
+  },
+
+  destroyed() {
+    this._observer?.disconnect();
+    this.el.removeEventListener("focusin", this._onFocusIn);
+    this.el.removeEventListener("focusout", this._onFocusOut);
+  },
+};
+```
+
+### Why MutationObserver Works Here
+
+- **Runs after the DOM batch completes:** The observer fires as a microtask *after* the stream patch inserts the new element
+- **Tracks only structural changes:** `childList: true` watches for child additions/removals, not attribute changes (cheaper and more precise)
+- **Pairs with LiveView lifecycle:** Works around the gap in hook callbacks when attributes are unchanged
+
+**When to use this pattern:**
+- UI state (focus, open dropdowns, expanded sections) must survive stream patches
+- The old and new DOM elements have stable IDs you can reference
+- Standard hook callbacks don't fire on the patch (attributes are unchanged)
+
+**Rule:** Use MutationObserver + focus tracking for state that must survive stream patches. Do not use to work around missing `beforeUpdate` — if the hook element's attributes change, the standard callbacks will fire.
+

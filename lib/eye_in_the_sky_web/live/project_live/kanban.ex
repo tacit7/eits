@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Notes, Tasks}
+  alias EyeInTheSky.{Notes, Projects, Tasks}
   alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, TasksHelpers}
   alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, DatePickerHandlers, FilterHandlers}
 
@@ -50,13 +50,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("toggle_new_task_drawer", _params, socket) do
-    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
-  end
-
-  @impl true
-  def handle_event("toggle_task_detail_drawer", _params, socket) do
-    {:noreply, assign(socket, :show_task_detail_drawer, !socket.assigns.show_task_detail_drawer)}
+  def handle_event("toggle_overlay", %{"key" => key}, socket) do
+    atom = String.to_existing_atom(key)
+    {:noreply, assign(socket, atom, !socket.assigns[atom])}
   end
 
   @impl true
@@ -334,7 +330,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       id="new-task-drawer"
       show={@show_new_task_drawer}
       workflow_states={@workflow_states}
-      toggle_event="toggle_new_task_drawer"
+      toggle_event={JS.push("toggle_overlay", value: %{key: "show_new_task_drawer"})}
       submit_event="create_new_task"
     />
 
@@ -344,10 +340,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       task={@selected_task}
       notes={@task_notes}
       workflow_states={@workflow_states}
-      projects={@all_projects}
+      projects={if @all_projects.ok?, do: @all_projects.result, else: []}
       current_project_id={@project_id}
       focus={@task_detail_focus}
-      toggle_event="toggle_task_detail_drawer"
+      toggle_event={JS.push("toggle_overlay", value: %{key: "show_task_detail_drawer"})}
+      close_event_name="toggle_overlay"
+      close_event_key="show_task_detail_drawer"
       update_event="update_task"
       delete_event="delete_task"
       copy_event="copy_task_to_project"
@@ -394,18 +392,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   # PubSub only delivers events that fire while the LiveView is connected, so without
   # this, any session that went working/waiting before mount is invisible to the board.
   defp rebuild_session_status_ids(socket) do
-    all_sessions =
+    {working_ids, waiting_ids} =
       (socket.assigns[:tasks] || [])
       |> Enum.flat_map(&(Map.get(&1, :sessions, []) || []))
-
-    working_ids =
-      all_sessions |> Enum.filter(&(&1.status == "working")) |> Enum.map(& &1.id) |> MapSet.new()
-
-    waiting_ids =
-      all_sessions |> Enum.filter(&(&1.status == "waiting")) |> Enum.map(& &1.id) |> MapSet.new()
+      |> Enum.reduce({MapSet.new(), MapSet.new()}, fn session, {working, waiting} ->
+        case session.status do
+          "working" -> {MapSet.put(working, session.id), waiting}
+          "waiting" -> {working, MapSet.put(waiting, session.id)}
+          _ -> {working, waiting}
+        end
+      end)
 
     socket
-    |> update(:working_session_ids, &MapSet.union(&1, working_ids))
+    |> assign(:working_session_ids, working_ids)
     |> assign(:waiting_session_ids, waiting_ids)
   end
 
@@ -430,7 +429,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     |> assign(:show_archived, false)
     |> assign(:selected_tasks, MapSet.new())
     |> assign(:bulk_mode, false)
-    |> assign(:all_projects, EyeInTheSky.Projects.list_projects())
+    |> assign_async(:all_projects, fn -> {:ok, %{all_projects: Projects.list_projects()}} end)
     |> assign(:show_filters, false)
     |> assign(:show_filter_drawer, false)
     |> assign(:filter_due_date, nil)

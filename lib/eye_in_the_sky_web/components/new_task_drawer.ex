@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
   attr :id, :string, required: true
   attr :show, :boolean, required: true
   attr :workflow_states, :list, required: true
-  attr :toggle_event, :string, required: true
+  attr :toggle_event, :any, required: true
   attr :submit_event, :string, required: true
 
   def new_task_drawer(assigns) do

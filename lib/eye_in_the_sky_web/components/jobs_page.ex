@@ -39,12 +39,21 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   @impl true
   # PubSub relay: parent's handle_info(:jobs_updated) calls
   # send_update(__MODULE__, id: "jobs-page", jobs_refresh: true)
+  # Debounced: cancels any pending timer and schedules a 250ms delayed reload.
   def update(%{jobs_refresh: true}, socket) do
+    if ref = socket.assigns[:reload_timer_ref], do: Process.cancel_timer(ref)
+    ref = Process.send_after(self(), :do_reload_jobs, 250)
+    {:ok, assign(socket, :reload_timer_ref, ref)}
+  end
+
+  # Actual reload — triggered by parent's handle_info(:do_reload_jobs).
+  def update(%{do_reload_jobs: true}, socket) do
     socket =
       socket
       |> load_jobs()
       |> assign(:running_ids, MapSet.new(ScheduledJobs.list_running_job_ids()))
       |> assign(:last_run_map, ScheduledJobs.last_run_status_map())
+      |> assign(:reload_timer_ref, nil)
 
     send_update(AgentScheduleSection, id: "agent-schedule-section", action: :refresh)
 

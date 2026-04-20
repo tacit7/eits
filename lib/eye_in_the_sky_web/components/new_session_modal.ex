@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
+  alias EyeInTheSky.Projects
   alias EyeInTheSky.Settings
 
   @impl true
@@ -62,16 +63,16 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   end
 
   def handle_event("project_changed", %{"project_id" => project_id_str}, socket) do
-    projects = socket.assigns[:projects] || []
-
     project_path =
       case parse_int(project_id_str) do
         nil ->
           nil
 
         id ->
-          project = Enum.find(projects, fn p -> p.id == id end)
-          if(project, do: project.path)
+          case Projects.get_project(id) do
+            {:ok, project} -> project.path
+            {:error, :not_found} -> nil
+          end
       end
 
     {:noreply, assign(socket, :available_agents, list_agents(project_path))}

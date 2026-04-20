@@ -1,5 +1,16 @@
 import Config
 
+hexdocs_data_path = Path.expand("~/.hexdocs_mcp")
+
+config :hexdocs_mcp,
+  data_path: hexdocs_data_path,
+  default_embedding_model: "nomic-embed-text",
+  project_paths: System.get_env("HEXDOCS_MCP_MIX_PROJECT_PATHS", "/Users/urielmaldonado/projects/eits/web/mix.exs"),
+  system_command: "mix hex.docs.mcp"
+
+config :hexdocs_mcp, HexdocsMcp.Repo,
+  database: Path.join(hexdocs_data_path, "hexdocs_mcp.db")
+
 # Gitea webhook HMAC secret — set this in Gitea webhook settings and here
 config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 config :eye_in_the_sky, :env, :dev

@@ -61,6 +61,21 @@ def handle_params(_params, _url, socket)
   # No ID — redirect to first canvas or stay on empty canvas list
 ```
 
+## Keyboard Shortcuts & Controls
+
+### Keyboard Shortcuts Help
+- **`?` key** — Toggle keyboard shortcuts help panel. Lazily creates modal overlay listing all canvas shortcuts. Escape or backdrop click closes; input fields guarded so typing in search boxes doesn't trigger.
+
+### Canvas & Tab Navigation
+- **`Cmd+1` through `Cmd+9`** — Tab switcher to quickly jump between open canvas tabs
+- **`Esc`** — Minimize focused window
+
+### Viewport Controls
+- **`Spacebar + drag`** — Pan viewport to reposition all windows without moving them individually
+
+### Chat Window
+- **Auto-scroll toggle** — Click button in chat window footer to enable/disable. When enabled (default), new messages scroll to bottom. When disabled, stays in current position and shows unread message count pill; clicking pill re-enables auto-scroll and jumps to bottom.
+
 ### Event Handlers
 
 #### Canvas Management
@@ -73,7 +88,20 @@ def handle_params(_params, _url, socket)
 - **`window_moved`** — Records x/y position delta; calls `Canvases.update_window_layout/2`
 - **`window_resized`** — Records width/height delta; calls `Canvases.update_window_layout/2`
 - **`remove_window`** — Removes session from canvas and unsubscribes from PubSub
-- **`raise_window`** — Clicking any canvas window raises it to the front by updating z-order state in `CanvasLive` (commit 10d75ff3)
+- **`raise_window`** — Clicking any canvas window raises it to the front by updating z-order state in `CanvasLive`
+- **`minimize_window`** — Minimize/collapse toggle for individual windows. Minimized windows show unread indicator dot.
+- **`maximize_window`** — Restore window to full size if minimized. Includes unread dot on minimized windows.
+
+### Canvas Management Events
+
+#### Toolbar Controls
+- **`+` button** — Opens Add Session submenu directly via command palette (jumps to session picker without full search). Implemented via `palette:open-command` event with `commandId=canvas-add-session`.
+- **Delete canvas button** — Wired event handler to delete canvas from toolbar.
+- **Tidy button** — Cascades all windows into clean layout via `Canvases.tidy/1`, which resets positions and applies consistent spacing.
+
+#### Tab Operations
+- **Double-click tab** — Rename canvas inline. Updates page title on successful rename.
+- **Page title** — Shows active canvas name; resets on last canvas delete.
 
 ### PubSub Integration
 
@@ -89,6 +117,7 @@ subscribe_all(session_ids)  # Subscribe to events for all canvas sessions
 - `{:claude_response, _ref, parsed}` — Agent response received
 - `{:session_status, session_id, status}` — Session status changed (working → stopped)
 - `{:remove_canvas_window, cs_id}` — Remote signal to close a window (e.g., session cleanup)
+- `{:canvas_session_added, session_id}` — Session added to canvas; updates session list and badge counts
 
 When events arrive, the handler calls `send_update/3` to update the `ChatWindowComponent` for that canvas session, keeping UI synchronized without full page refresh.
 

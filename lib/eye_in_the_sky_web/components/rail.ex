@@ -3,7 +3,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   use EyeInTheSkyWeb, :live_component
 
   import EyeInTheSkyWeb.Components.Rail.Flyout
-  import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1, project_initial: 1]
+  import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
+  import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
 
   alias EyeInTheSky.{Notifications, Projects, Sessions}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
@@ -106,18 +107,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         socket
       end
 
+    # On navigation (tab change): update active section and close mobile flyout.
+    # Keeping these together avoids a duplicate conditional and makes the
+    # "tab changed → reset nav state" intent explicit.
     socket =
       if sidebar_tab != previous_tab do
-        assign(socket, :active_section, next_section)
-      else
         socket
-      end
-
-    # Only reset mobile_open when the tab changes (real navigation). Resetting on every
-    # parent update — e.g. a notification count tick — closes the flyout mid-interaction.
-    socket =
-      if sidebar_tab != previous_tab do
-        assign(socket, :mobile_open, false)
+        |> assign(:active_section, next_section)
+        |> assign(:mobile_open, false)
       else
         socket
       end

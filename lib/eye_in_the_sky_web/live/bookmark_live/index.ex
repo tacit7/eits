@@ -12,7 +12,9 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
       |> assign(:filter_category, nil)
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
-      |> load_bookmarks()
+      |> assign(:bookmarks, [])
+
+    socket = if connected?(socket), do: load_bookmarks(socket), else: socket
 
     {:ok, socket}
   end
@@ -126,7 +128,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
                   <div class="flex items-start justify-between gap-4">
                     <!-- Bookmark Icon -->
                     <div class="flex-shrink-0">
-                      {bookmark_type_icon(bookmark.bookmark_type)}
+                      <.bookmark_type_icon type={bookmark.bookmark_type} />
                     </div>
                     
     <!-- Content -->
@@ -190,28 +192,23 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
 
   # Helper functions
 
-  defp bookmark_type_icon(type) do
-    case type do
-      "file" ->
-        assigns = %{}
-        ~H[<.icon name="hero-document-text" class="w-5 h-5 text-primary" />]
+  attr :type, :string, required: true
 
-      "note" ->
-        assigns = %{}
-        ~H[<.icon name="hero-clipboard-document-list" class="w-5 h-5 text-secondary" />]
-
-      "agent" ->
-        assigns = %{}
-        ~H[<.icon name="hero-user" class="w-5 h-5 text-accent" />]
-
-      "url" ->
-        assigns = %{}
-        ~H[<.icon name="hero-link" class="w-5 h-5 text-info" />]
-
-      _ ->
-        assigns = %{}
-        ~H[<.icon name="hero-bookmark" class="w-5 h-5 text-base-content/40" />]
-    end
+  defp bookmark_type_icon(assigns) do
+    ~H"""
+    <%= case @type do %>
+      <% "file" -> %>
+        <.icon name="hero-document-text" class="w-5 h-5 text-primary" />
+      <% "note" -> %>
+        <.icon name="hero-clipboard-document-list" class="w-5 h-5 text-secondary" />
+      <% "agent" -> %>
+        <.icon name="hero-user" class="w-5 h-5 text-accent" />
+      <% "url" -> %>
+        <.icon name="hero-link" class="w-5 h-5 text-info" />
+      <% _ -> %>
+        <.icon name="hero-bookmark" class="w-5 h-5 text-base-content/40" />
+    <% end %>
+    """
   end
 
   defp bookmark_display_text(bookmark) do

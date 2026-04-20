@@ -15,15 +15,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
         project =
           Projects.get_project!(project_id)
 
-        socket
-        |> assign(:page_title, "Prompts - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :prompts)
-        |> assign(:sidebar_project, project)
-        |> assign(:project_id, project_id)
-        |> assign(:search_query, "")
-        |> assign(:prompts, [])
-        |> load_prompts()
+        socket =
+          socket
+          |> assign(:page_title, "Prompts - #{project.name}")
+          |> assign(:project, project)
+          |> assign(:sidebar_tab, :prompts)
+          |> assign(:sidebar_project, project)
+          |> assign(:project_id, project_id)
+          |> assign(:search_query, "")
+          |> assign(:prompts, [])
+
+        if connected?(socket), do: load_prompts(socket), else: socket
       else
         socket
         |> assign(:page_title, "Project Not Found")

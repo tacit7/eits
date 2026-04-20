@@ -16,9 +16,16 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
       subscribe_agents()
     end
 
-    sessions = Sessions.list_session_overview_rows(limit: @per_page, offset: 0)
-    total = Sessions.count_session_overview_rows()
-    projects = EyeInTheSky.Projects.list_projects()
+    {sessions, total, projects} =
+      if connected?(socket) do
+        {
+          Sessions.list_session_overview_rows(limit: @per_page, offset: 0),
+          Sessions.count_session_overview_rows(),
+          EyeInTheSky.Projects.list_projects()
+        }
+      else
+        {[], 0, []}
+      end
 
     socket =
       socket
@@ -218,7 +225,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   end
 
   def handle_info({:agent_updated, _agent}, socket) do
-    {:noreply, reload_sessions(socket)}
+    {:noreply, socket}
   end
 
   # Full reload for creates/deletes since counts and ordering can shift.

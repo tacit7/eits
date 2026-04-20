@@ -39,14 +39,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       EyeInTheSky.Events.subscribe_settings()
     end
 
-    settings = Settings.all()
-    # Normalize empty theme to default
-    if settings["theme"] == "" do
-      Settings.put("theme", "dark")
-    end
+    {settings, db_info} =
+      if connected?(socket) do
+        s = Settings.all()
+        # Normalize empty theme to default
+        if s["theme"] == "" do
+          Settings.put("theme", "dark")
+        end
 
-    settings = if settings["theme"] == "", do: Map.put(settings, "theme", "dark"), else: settings
-    db_info = load_db_info()
+        s = if s["theme"] == "", do: Map.put(s, "theme", "dark"), else: s
+        {s, load_db_info()}
+      else
+        {%{}, %{path: "", size: 0, table_counts: []}}
+      end
 
     socket =
       socket

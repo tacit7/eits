@@ -19,8 +19,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       subscribe_agent_working()
     end
 
-    projects = EyeInTheSky.Projects.list_projects()
-
     socket =
       socket
       |> assign(:page_title, "Eye in the Sky - Agents")
@@ -29,17 +27,26 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       |> assign(:session_filter, "all")
       |> assign(:agents, [])
       |> assign(:show_new_session_drawer, false)
-      |> assign(:projects, projects)
+      |> assign(:projects, [])
       |> assign(:timer_ref, nil)
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
       |> assign(:selected_ids, MapSet.new())
       |> assign(:show_delete_confirm, false)
       |> assign(:editing_session_id, nil)
-      |> assign(:canvases, EyeInTheSky.Canvases.list_canvases())
+      |> assign(:canvases, [])
       |> assign(:show_new_canvas_for, nil)
-      |> IndexActions.load_agents()
-      |> schedule_refresh()
+
+    socket =
+      if connected?(socket) do
+        socket
+        |> assign(:projects, EyeInTheSky.Projects.list_projects())
+        |> assign(:canvases, EyeInTheSky.Canvases.list_canvases())
+        |> IndexActions.load_agents()
+        |> schedule_refresh()
+      else
+        socket
+      end
 
     {:ok, socket}
   end

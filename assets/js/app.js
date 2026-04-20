@@ -184,7 +184,7 @@ document.addEventListener("click", (e) => {
 window.addEventListener("click", (e) => {
   const btn = e.target.closest("[phx-click='toggle_collapsed']")
   if (btn) {
-    const sidebar = document.getElementById("app-sidebar")
+    const sidebar = document.getElementById("app-rail")
     if (sidebar) {
       // Toggle: if currently expanded on desktop, it's about to collapse
       const isCurrentlyExpanded = sidebar.classList.contains("md:w-60")

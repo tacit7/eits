@@ -20,7 +20,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notes do
       |> assign(:sidebar_project, nil)
       |> assign(:show_quick_note_modal, false)
       |> assign(:type_filter, "all")
-      |> load_notes()
+
+    socket = if connected?(socket), do: load_notes(socket), else: socket
 
     {:ok, socket}
   end

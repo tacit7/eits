@@ -75,6 +75,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
+  def handle_params(_params, _uri, %{assigns: %{project: nil}} = socket) do
+    {:noreply, push_navigate(socket, to: ~p"/")}
+  end
+
   def handle_params(params, _uri, socket) do
     current_mode = socket.assigns[:view_mode] || :list
     mode = parse_mode(params, current_mode)

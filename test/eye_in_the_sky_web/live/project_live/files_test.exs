@@ -106,6 +106,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
     end
   end
 
+  describe "handle_params — nil project guard" do
+    test "non-integer project id redirects to root instead of crashing", %{conn: conn} do
+      assert {:error, {:live_redirect, %{to: "/"}}} =
+               live(conn, ~p"/projects/notanid/files")
+    end
+  end
+
   describe "handle_params — error paths" do
     # path_within? uses realpath, so non-existent paths resolve to Access denied
     test "non-existent file path assigns an error", %{conn: conn} do

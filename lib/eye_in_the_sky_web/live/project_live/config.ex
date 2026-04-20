@@ -16,27 +16,34 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
         _ -> nil
       end
 
-    socket = assign(socket, default_assigns())
+    socket =
+      socket
+      |> assign(default_assigns())
+      |> assign(:page_title, "Config")
+      |> assign(:project, nil)
+      |> assign(:sidebar_tab, :config)
+      |> assign(:sidebar_project, nil)
+      |> assign(:claude_dir, nil)
 
     socket =
-      if project_id do
-        project =
-          Projects.get_project!(project_id)
+      cond do
+        is_nil(project_id) ->
+          socket
+          |> assign(:page_title, "Project Not Found")
+          |> put_flash(:error, "Invalid project ID")
 
-        claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
+        connected?(socket) ->
+          project = Projects.get_project!(project_id)
+          claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 
-        socket
-        |> assign(:page_title, "Config - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :config)
-        |> assign(:sidebar_project, project)
-        |> assign(:claude_dir, claude_dir)
-      else
-        socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:claude_dir, nil)
-        |> put_flash(:error, "Invalid project ID")
+          socket
+          |> assign(:page_title, "Config - #{project.name}")
+          |> assign(:project, project)
+          |> assign(:sidebar_project, project)
+          |> assign(:claude_dir, claude_dir)
+
+        true ->
+          socket
       end
 
     {:ok, socket}

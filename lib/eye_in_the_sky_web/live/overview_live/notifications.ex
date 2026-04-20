@@ -11,12 +11,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
       Notifications.subscribe()
     end
 
+    notifications =
+      if connected?(socket), do: Notifications.list_notifications(), else: []
+
     socket =
       socket
       |> assign(:page_title, "Notifications")
       |> assign(:sidebar_tab, :notifications)
       |> assign(:sidebar_project, nil)
-      |> assign(:notifications, Notifications.list_notifications())
+      |> assign(:notifications, notifications)
       |> assign(:filter, "all")
 
     {:ok, socket}

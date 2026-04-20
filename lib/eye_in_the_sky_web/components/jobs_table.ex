@@ -34,6 +34,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   attr :last_run_map, :map, required: true
   attr :last_failed_runs, :map, required: true
   attr :show_origin, :boolean, default: false
+  attr :target, :any, default: nil
 
   def jobs_table(assigns) do
     ~H"""
@@ -42,7 +43,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
           <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
-            <button class="w-full text-left" phx-click="expand_job" phx-value-id={job.id}>
+            <button class="w-full text-left" phx-click="expand_job" phx-value-id={job.id} phx-target={@target}>
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
@@ -78,6 +79,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   class="btn btn-ghost btn-sm min-h-[44px] text-error shrink-0"
                   phx-click="run_now"
                   phx-value-id={job.id}
+                  phx-target={@target}
                   title="Retry"
                 >
                   <.icon name="hero-arrow-path" class="w-3 h-3" />
@@ -116,12 +118,14 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   checked={job.enabled}
                   phx-click="toggle_job"
                   phx-value-id={job.id}
+                  phx-target={@target}
                 />
               </label>
               <button
                 class="btn btn-ghost btn-sm min-h-[44px]"
                 phx-click="run_now"
                 phx-value-id={job.id}
+                phx-target={@target}
                 title="Run Now"
               >
                 <.icon name="hero-play" class="w-3 h-3" />
@@ -130,6 +134,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 class="btn btn-ghost btn-sm min-h-[44px]"
                 phx-click="edit_job"
                 phx-value-id={job.id}
+                phx-target={@target}
                 title="Edit"
               >
                 <.icon name="hero-pencil-square" class="w-3 h-3" />
@@ -138,6 +143,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 class="btn btn-ghost btn-sm min-h-[44px] text-error"
                 phx-click="delete_job"
                 phx-value-id={job.id}
+                phx-target={@target}
                 data-confirm="Delete this job?"
                 title="Delete"
               >
@@ -198,6 +204,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   class={"cursor-pointer #{row_border_class(row_state)}"}
                   phx-click="expand_job"
                   phx-value-id={job.id}
+                  phx-target={@target}
                 >
                   <div class="flex items-center gap-1.5">
                     <div class="font-medium">{job.name}</div>
@@ -224,6 +231,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                         class="btn btn-ghost btn-sm min-h-[44px] text-error"
                         phx-click="run_now"
                         phx-value-id={job.id}
+                        phx-target={@target}
                         title="Retry"
                       >
                         <.icon name="hero-arrow-path" class="w-3 h-3" />
@@ -256,6 +264,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     checked={job.enabled}
                     phx-click="toggle_job"
                     phx-value-id={job.id}
+                    phx-target={@target}
                   />
                 </td>
                 <td class="text-xs" title={format_datetime_short_time(job.last_run_at)}>
@@ -271,6 +280,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                       class="btn btn-ghost btn-sm min-h-[44px]"
                       phx-click="run_now"
                       phx-value-id={job.id}
+                      phx-target={@target}
                       title="Run Now"
                       aria-label="Run job now"
                     >
@@ -281,6 +291,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                         class="btn btn-ghost btn-sm min-h-[44px]"
                         phx-click="edit_job"
                         phx-value-id={job.id}
+                        phx-target={@target}
                         title="Edit"
                         aria-label="Edit job"
                       >
@@ -290,6 +301,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                         class="btn btn-ghost btn-sm min-h-[44px] text-error"
                         phx-click="delete_job"
                         phx-value-id={job.id}
+                        phx-target={@target}
                         data-confirm="Delete this job?"
                         title="Delete"
                         aria-label="Delete job"

@@ -38,6 +38,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
   attr :project, :any, default: nil
   attr :form_scope, :string, default: nil
   attr :show_daily_digest, :boolean, default: false
+  attr :target, :any, default: nil
 
   def job_form_drawer(assigns) do
     ~H"""
@@ -60,7 +61,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 </p>
               <% end %>
             </div>
-            <button class="btn btn-ghost btn-square min-w-[44px] min-h-[44px]" phx-click="cancel_form">
+            <button class="btn btn-ghost btn-square min-w-[44px] min-h-[44px]" phx-click="cancel_form" phx-target={@target}>
               <span class="sr-only">Close job form</span>
               <.icon name="hero-x-mark" class="w-4 h-4" />
             </button>
@@ -70,6 +71,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
             for={@form}
             phx-submit="save_job"
             phx-change="change_job_type"
+            phx-target={@target}
             class="space-y-4"
           >
             <%= if @project_id do %>
@@ -124,6 +126,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   name="job[schedule_type]"
                   class="select select-bordered w-full"
                   phx-change="change_schedule_type"
+                  phx-target={@target}
                 >
                   <option value="interval" selected={@form_schedule_type == "interval"}>
                     Interval
@@ -259,7 +262,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
             <% end %>
 
             <div class="sticky bottom-0 bg-base-100 pt-4 pb-1 flex justify-end gap-2">
-              <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_form">
+              <button type="button" class="btn btn-ghost btn-sm min-h-[44px]" phx-click="cancel_form" phx-target={@target}>
                 Cancel
               </button>
               <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Save</button>
@@ -268,7 +271,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
         </div>
       </div>
       <%= if @show do %>
-        <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_form"></div>
+        <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_form" phx-target={@target}></div>
       <% end %>
     </div>
     """

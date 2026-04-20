@@ -218,7 +218,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
   end
 
   def handle_info({:agent_updated, _agent}, socket) do
-    {:noreply, reload_sessions(socket)}
+    {:noreply, socket}
   end
 
   # Full reload for creates/deletes since counts and ordering can shift.

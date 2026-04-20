@@ -29,10 +29,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Jobs do
     {:noreply, socket}
   end
 
-  # Forward all events from child function components (job_form_drawer,
-  # jobs_table, agent_schedule_form) that lack phx-target to the component.
+  # agent_schedule_form lacks phx-target so its events still bubble here.
   @impl true
-  def handle_event(event, params, socket) do
+  def handle_event(event, params, socket)
+      when event in ["cancel_schedule", "save_schedule"] do
     send_update(JobsPage, id: "jobs-page", event_relay: {event, params})
     {:noreply, socket}
   end

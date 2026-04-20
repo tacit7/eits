@@ -63,9 +63,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("keydown", _params, socket), do: {:noreply, socket}
-
-  @impl true
   def handle_event("change_tab", %{"tab" => tab}, socket) do
     socket =
       socket

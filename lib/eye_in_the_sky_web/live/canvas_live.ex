@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.CanvasLive do
   use EyeInTheSkyWeb, :live_view
 
+  require Logger
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Canvases
@@ -225,7 +226,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
-  def handle_event(_event, _params, socket), do: {:noreply, socket}
+  def handle_event(event, _params, socket) do
+    Logger.warning("CanvasLive: unhandled event #{inspect(event)}")
+    {:noreply, socket}
+  end
 
   @impl true
   def handle_info({:new_dm, message}, socket) do

@@ -13,60 +13,185 @@ Make the channel chat feel like a polished messaging app (Slack/Discord) rather 
 
 ## 1. Message Grouping
 
-**Rule:** Consecutive messages from the same `session_id` (or same `sender_role` for user messages) sent within 5 minutes of each other are grouped. Only the first message in a group shows the full header (avatar + name + timestamp). Subsequent messages in the group show body only, indented to align with the first message's text column.
+Messages are visually grouped when consecutive messages come from the same sender in a short window. Only the first message in a group shows the full header (avatar + name + timestamp). Subsequent messages show body only, indented to align with the first message's text column.
 
-**Hover behavior:** A muted timestamp appears inline on the right edge of each grouped message on hover, so the time is still accessible without cluttering every line.
+### Grouping Identity
 
-**Group break conditions:**
-- Different sender
-- More than 5 minutes since last message from that sender
-- A system message between two agent messages (system messages always render standalone)
-- A date separator
+Define a normalized sender key:
+- User messages: `"user"`
+- Agent/session messages: `"session:${session_id}"`
+- Other senders: fallback to `sender_role`
 
-**Implementation:** Add a `isGrouped(message, prevMessage)` helper that returns true when both conditions are met. Pass `isGrouped` as a derived boolean into the message render block.
+Messages group only when **all** of the following are true:
+- Neither message is a system message
+- Sender keys match
+- Messages are on the same calendar date
+- Time gap is ≤ 5 minutes
+- Both timestamps are valid
+
+### Implementation
+
+Derive a view model before rendering:
+
+```ts
+$: renderedMessages = messages.map((message, index) => ({
+  message,
+  grouped: isGrouped(message, messages[index - 1]),
+  startsNewDate: isNewDate(message, messages[index - 1])
+}))
+```
+
+Grouping helper (uses `inserted_at` — the actual field in this component):
+
+```ts
+const GROUP_WINDOW_MS = 5 * 60 * 1000
+
+function isSystemMessage(m) {
+  return m.sender_role === 'system'
+}
+
+function senderKey(m) {
+  if (!m) return null
+  if (m.sender_role === 'user') return 'user'
+  if (m.session_id) return `session:${m.session_id}`
+  return m.sender_role ?? null
+}
+
+function sameCalendarDay(a, b) {
+  const da = new Date(a), db = new Date(b)
+  return da.getFullYear() === db.getFullYear()
+    && da.getMonth() === db.getMonth()
+    && da.getDate() === db.getDate()
+}
+
+function isGrouped(message, prev) {
+  if (!message || !prev) return false
+  if (isSystemMessage(message) || isSystemMessage(prev)) return false
+  const key = senderKey(message), prevKey = senderKey(prev)
+  if (!key || key !== prevKey) return false
+  if (!sameCalendarDay(message.inserted_at, prev.inserted_at)) return false
+  const t = new Date(message.inserted_at).getTime()
+  const pt = new Date(prev.inserted_at).getTime()
+  if (Number.isNaN(t) || Number.isNaN(pt)) return false
+  return t - pt <= GROUP_WINDOW_MS
+}
+```
+
+### Hover behavior
+
+On hover of a grouped (no-header) message, show a muted timestamp right-aligned on that message row. Implemented via `opacity-0 group-hover:opacity-100` — no layout shift.
+
+### Group break conditions (summary)
+
+- Different normalized sender key
+- > 5 minutes since last message from that sender
+- System message (current or previous)
+- Different calendar date / date separator
+- Missing or invalid timestamps
 
 ---
 
-## 2. Input Bar
+## 2. Input Bar (Textarea)
 
-Replace the current single-line `<input>` with a `<textarea>`:
-- Min height: 1 line (~40px). Max height: ~6 lines (~144px). Auto-grows with content via `rows` or a resize observer.
-- `Enter` submits. `Shift+Enter` inserts a newline.
-- Existing `@` mention autocomplete and `/` slash autocomplete stay fully intact — only the element type changes.
-- Styling: rounded border (`rounded-xl`), slightly more padding, matches the Discord composer look.
+Replace the current single-line `<input>` with an auto-growing `<textarea>`.
+
+### Sizing
+
+- Min height: ~40px (1 line). Max height: 144px (~6 lines).
+- Auto-grows using `scrollHeight`:
+
+```ts
+function resizeTextarea(node) {
+  node.style.height = 'auto'
+  node.style.height = `${Math.min(node.scrollHeight, 144)}px`
+}
+```
+
+Run on: input event, after submit clear, on mount. Set `overflow-y: auto` once max height is reached.
+
+### Interaction Rules
+
+Priority order (strict):
+
+1. If autocomplete is open and has an active item, `Enter` selects the active suggestion.
+2. If autocomplete is closed, `Enter` submits the message.
+3. `Shift+Enter` always inserts a newline.
+4. `Escape` closes autocomplete.
+5. Arrow keys navigate autocomplete while open.
+6. `Enter` does **not** submit while `event.isComposing` is true (IME input in progress).
+
+Submit behavior:
+
+```ts
+if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+  event.preventDefault()
+  submit()
+}
+```
+
+After submit: clear value, reset to one-line height, keep focus.
+
+Empty or whitespace-only messages do not submit.
+
+### Autocomplete Compatibility
+
+Existing `@` mention and `/` slash autocomplete logic stays intact — only the element type changes from `<input>` to `<textarea>`. Cursor position handling for autocomplete insertion must be verified to work with multiline text.
 
 ---
 
-## 3. Token Metadata (Collapsed)
+## 3. Token Metadata (Collapsed, Per-Message)
 
-The cost/token pills (`$0.00xx`, `N in`, `N out`, `N turns`) currently render as a full row below every agent message. New behavior:
-- Hidden by default.
-- On message group hover, the pills appear inline on the far right of the header row, at very low opacity (`text-base-content/20`, `text-[10px]`).
-- No dedicated row. No layout shift.
+Token metadata (`$cost`, `N in`, `N out`, `N turns`) remains **per message** — no aggregation.
+
+- **Default:** hidden (`opacity-0`).
+- **On hover:** visible at low opacity (`opacity-100`, `text-base-content/20`, `text-[10px]`).
+- **First message in a group:** metadata appears in the header row on hover, right-aligned.
+- **Grouped child messages:** metadata appears right-aligned on that message's own row on hover.
+- **No layout shift:** keep metadata mounted in the DOM, toggle opacity only. Use `absolute` positioning or reserved space.
+
+Example pattern:
+```html
+<div class="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity">
+  <!-- token pills -->
+</div>
+```
 
 ---
 
-## 4. What Doesn't Change
+## 4. Mobile / Touch Behavior
 
-- Avatar size and type (provider icon / user dot) — unchanged.
-- Delete button on hover — unchanged.
-- Date separators — unchanged.
-- System message rendering — unchanged.
-- All PubSub / LiveView event handling — no backend changes.
-- `@all`, `@mention`, `/slash` autocomplete behavior — unchanged.
+Desktop-first for this pass. Hover-only timestamp and metadata behavior is **out of scope for mobile/touch**. The existing component has no touch fallback and this refresh does not add one.
 
 ---
 
-## Files Touched
+## 5. What Doesn't Change
+
+- Avatar size and type (provider icon / user dot)
+- Delete button on hover
+- Date separators (still rendered; also force group breaks)
+- System message rendering (standalone, never grouped)
+- All PubSub / LiveView event handling
+- `@all`, `@mention`, `/slash` autocomplete behavior
+
+---
+
+## 6. Files Touched
 
 - `assets/svelte/components/tabs/AgentMessagesPanel.svelte` — all changes land here.
 
 ---
 
-## Success Criteria
+## 7. Success Criteria
 
 - Consecutive messages from the same sender show no repeated header.
-- Input textarea auto-grows; Enter submits, Shift+Enter newlines.
-- Token pills are invisible by default, appear faintly on hover.
-- Existing autocomplete (@ and /) still works correctly.
-- No regressions on system messages or date separators.
+- Messages sent across midnight do not group across the date separator.
+- System messages always render standalone.
+- Input textarea auto-grows; `Enter` submits, `Shift+Enter` newlines.
+- Enter does not submit during IME composition.
+- Autocomplete `Enter` selection fires before submit logic.
+- Autocomplete opens correctly after multiline text (cursor position preserved).
+- Token pills invisible by default; appear faintly on hover per-message.
+- No layout shift when token metadata becomes visible.
+- Messages with missing/invalid timestamps do not group.
+- Code blocks remain readable inside grouped messages.
+- Long messages maintain text-column indentation alignment.

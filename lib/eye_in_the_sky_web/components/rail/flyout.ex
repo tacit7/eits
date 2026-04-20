@@ -20,8 +20,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       data-flyout-panel
       class={[
         "flex flex-col border-r border-base-content/8 bg-base-100 overflow-hidden flex-shrink-0 transition-[width] duration-150",
-        # Desktop (≥md): show when open. Mobile: only show when mobile_open is also true.
-        if(@open, do: "md:w-[236px]", else: "w-0"),
+        # w-0 is always the mobile base; md:w-[236px] overrides on desktop when open.
+        # w-[236px] overrides on mobile only when mobile_open is also true.
+        if(@open, do: "w-0 md:w-[236px]", else: "w-0"),
         if(@open && @mobile_open, do: "w-[236px]")
       ]}
     >

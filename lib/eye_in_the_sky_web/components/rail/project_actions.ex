@@ -64,14 +64,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
               {:noreply,
                socket
                |> put_flash(:error, "Failed to rename project")
+               |> assign(:projects, Projects.list_projects_for_sidebar())
                |> assign(:renaming_project_id, nil)
                |> assign(:rename_value, "")}
           end
 
         {:error, _} ->
+          # Project deleted while rename UI was open — reload to clear stale entry.
           {:noreply,
            socket
            |> put_flash(:error, "Project not found")
+           |> assign(:projects, Projects.list_projects_for_sidebar())
            |> assign(:renaming_project_id, nil)
            |> assign(:rename_value, "")}
       end

@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
     end
   end
 
-  @doc "Update a single session's status in-memory and re-render the view."
+  @doc "Update a single session's status in-memory and re-render only that row."
   def update_agent_status_in_list(socket, session_id, new_status) do
     now = DateTime.utc_now()
 
@@ -87,9 +87,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
         &AgentStatusHelpers.apply_agent_status(&1, session_id, new_status, now)
       )
 
-    socket
-    |> assign(:all_agents, updated)
-    |> apply_agent_view()
+    socket = assign(socket, :all_agents, updated)
+
+    # Only stream_insert the changed row — inserting every visible agent causes the
+    # stream's remove→morph→reinsert cycle on all rows, which resets :hover state
+    # and makes the ... menu flicker via its opacity transition.
+    case Enum.find(updated, &(&1.id == session_id)) do
+      nil ->
+        socket
+
+      changed_agent ->
+        agents =
+          Enum.map(socket.assigns.agents, fn a ->
+            if a.id == session_id, do: changed_agent, else: a
+          end)
+
+        socket
+        |> assign(:agents, agents)
+        |> stream_insert(:session_list, changed_agent)
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -132,11 +132,17 @@ if config_env() == :prod do
 
   maybe_ipv6 = if get_env.("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
+  ssl_opts =
+    case System.get_env("DATABASE_SSL_VERIFY") do
+      "none" -> [verify: :verify_none]
+      _ -> [verify: :verify_peer, cacerts: :public_key.cacerts_get(), customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]]
+    end
+
   config :eye_in_the_sky, EyeInTheSky.Repo,
     url: database_url,
     pool_size: String.to_integer(get_env.("POOL_SIZE") || "10"),
     socket_options: maybe_ipv6,
-    ssl: [verify: :verify_none],
+    ssl: ssl_opts,
     prepare: :unnamed
 
   # The secret key base is used to sign/encrypt cookies and other secrets.

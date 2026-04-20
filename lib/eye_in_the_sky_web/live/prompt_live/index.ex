@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.PromptLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    prompts = Prompts.list_prompts()
+    prompts = if connected?(socket), do: Prompts.list_prompts(), else: []
 
     socket =
       socket

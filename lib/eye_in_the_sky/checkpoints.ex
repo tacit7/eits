@@ -153,8 +153,15 @@ defmodule EyeInTheSky.Checkpoints do
          ) do
       {output, 0} ->
         case Regex.run(~r/stash@\{(\d+)\}/, output) do
-          [_, n] -> resolve_stash_ref(project_path, n)
-          _ -> nil
+          [_, n] ->
+            resolve_stash_ref(project_path, n)
+
+          _ ->
+            Logger.warning(
+              "git stash push succeeded but output did not match stash ref pattern: #{inspect(output)}"
+            )
+
+            nil
         end
 
       {reason, code} ->
@@ -246,26 +253,24 @@ defmodule EyeInTheSky.Checkpoints do
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    result =
-      Enum.reduce_while(messages_to_copy, :ok, fn msg, _acc ->
-        case Messages.create_message(%{
-               uuid: Ecto.UUID.generate(),
-               session_id: dest_session_id,
-               sender_role: msg.sender_role,
-               recipient_role: msg.recipient_role,
-               direction: msg.direction || "inbound",
-               body: msg.body,
-               status: "delivered",
-               provider: msg.provider || "claude",
-               metadata: msg.metadata || %{},
-               inserted_at: msg.inserted_at || now,
-               updated_at: now
-             }) do
-          {:ok, _} -> {:cont, :ok}
-          {:error, reason} -> {:halt, {:error, reason}}
-        end
+    rows =
+      Enum.map(messages_to_copy, fn msg ->
+        %{
+          uuid: Ecto.UUID.generate(),
+          session_id: dest_session_id,
+          sender_role: msg.sender_role,
+          recipient_role: msg.recipient_role,
+          direction: msg.direction || "inbound",
+          body: msg.body,
+          status: "delivered",
+          provider: msg.provider || "claude",
+          metadata: msg.metadata || %{},
+          inserted_at: msg.inserted_at || now,
+          updated_at: now
+        }
       end)
 
-    result
+    Repo.insert_all(EyeInTheSky.Messages.Message, rows)
+    :ok
   end
 end

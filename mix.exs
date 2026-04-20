@@ -77,6 +77,7 @@ defmodule EyeInTheSky.MixProject do
       {:dotenvy, "~> 0.8.0"},
       {:hammer, "~> 7.0"},
       {:remote_ip, "~> 1.2"},
+      {:hexdocs_mcp, "~> 0.5.0", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:sobelow, "~> 0.13", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

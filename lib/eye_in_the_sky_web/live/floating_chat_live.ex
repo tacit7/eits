@@ -209,8 +209,8 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
 
   defp handle_fab_info({event, _}, socket)
        when event in [:notification_created, :notifications_updated, :notification_read] do
-    send_update(EyeInTheSkyWeb.Components.Sidebar,
-      id: "app-sidebar",
+    send_update(EyeInTheSkyWeb.Components.Rail,
+      id: "app-rail",
       notification_count: :refresh
     )
 
@@ -218,8 +218,8 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_info({:project_updated, _project}, socket) do
-    send_update(EyeInTheSkyWeb.Components.Sidebar,
-      id: "app-sidebar",
+    send_update(EyeInTheSkyWeb.Components.Rail,
+      id: "app-rail",
       refresh_projects: true
     )
 

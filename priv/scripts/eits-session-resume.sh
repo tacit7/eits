@@ -8,6 +8,9 @@ set -uo pipefail
 [ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
 # --- End Workflow Guard ---
 
+. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
+
+
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [resume] $*" >> "$LOG_FILE" 2>/dev/null; }
 

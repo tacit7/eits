@@ -8,6 +8,9 @@ set -uo pipefail
 [ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
 # --- End Workflow Guard ---
 
+. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
+
+
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 

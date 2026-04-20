@@ -1,4 +1,17 @@
 #!/bin/bash
+
+# Server availability guard (inlined — this hook lives outside priv/scripts/)
+_eu="${EITS_URL:-http://localhost:5001/api/v1}"
+_eu_scheme="${_eu%%://*}"; _eu="${_eu#*://}"; _eu="${_eu%%/*}"; _eu="${_eu##*@}"
+if [[ "${_eu}" =~ ^(.*):([0-9]+)$ ]]; then
+  _eu_h="${BASH_REMATCH[1]#[}"; _eu_h="${_eu_h%]}"; _eu_p="${BASH_REMATCH[2]}"
+else
+  _eu_h="${_eu#[}"; _eu_h="${_eu_h%]}"
+  case "${_eu_scheme}" in https) _eu_p=443 ;; *) _eu_p=80 ;; esac
+fi
+(exec 3<>/dev/tcp/"${_eu_h}"/"${_eu_p}") 2>/dev/null || exit 0
+unset _eu _eu_scheme _eu_h _eu_p
+
 # eits-task-gate.sh
 # Stop hook: blocks agent from stopping if it has in-progress EITS tasks.
 # Fires on every Stop event. Reads EITS_AGENT_UUID from env.

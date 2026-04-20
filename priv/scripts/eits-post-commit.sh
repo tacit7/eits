@@ -14,6 +14,9 @@ elif [ "$EITS_WORKFLOW" = "0" ]; then
 fi
 # --- End Workflow Guard ---
 
+. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
+
+
 GIT_DIR="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
 SESSION_FILE="$GIT_DIR/eits-session"
 AGENT_FILE="$GIT_DIR/eits-agent"

@@ -10,17 +10,24 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    {canvases, counts} =
+      if connected?(socket) do
+        {Canvases.list_canvases(), Canvases.count_sessions_per_canvas()}
+      else
+        {[], %{}}
+      end
+
     {:ok,
      socket
      |> assign(:page_title, "Canvas")
      |> assign(:sidebar_tab, :canvas)
-     |> assign(:canvases, Canvases.list_canvases())
+     |> assign(:canvases, canvases)
      |> assign(:active_canvas_id, nil)
      |> assign(:canvas_sessions, [])
      |> assign(:subscribed_session_ids, [])
      |> assign(:creating_canvas, false)
      |> assign(:renaming_canvas_id, nil)
-     |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
+     |> assign(:canvas_session_counts, counts)
      |> assign(:show_session_picker, false)
      |> assign(:session_search, "")
      |> assign(:filtered_sessions, [])}
@@ -533,30 +540,42 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   defp activate_canvas(socket, canvas_id) do
-    if prev = socket.assigns.active_canvas_id, do: Events.unsubscribe_canvas(prev)
-    unsubscribe_all(socket.assigns.subscribed_session_ids)
-    sessions = Canvases.list_canvas_sessions(canvas_id)
-    session_ids = Enum.map(sessions, & &1.session_id)
-    subscribe_all(session_ids)
-    Events.subscribe_canvas(canvas_id)
+    if connected?(socket) do
+      if prev = socket.assigns.active_canvas_id, do: Events.unsubscribe_canvas(prev)
+      unsubscribe_all(socket.assigns.subscribed_session_ids)
+      sessions = Canvases.list_canvas_sessions(canvas_id)
+      session_ids = Enum.map(sessions, & &1.session_id)
+      subscribe_all(session_ids)
+      Events.subscribe_canvas(canvas_id)
 
-    canvas_name =
-      case Canvases.get_canvas(canvas_id) do
-        {:ok, c} -> c.name
-        _ -> "Canvas"
-      end
+      canvas_name =
+        case Canvases.get_canvas(canvas_id) do
+          {:ok, c} -> c.name
+          _ -> "Canvas"
+        end
 
-    sessions = apply_default_positions(sessions)
+      sessions = apply_default_positions(sessions)
 
-    socket
-    |> assign(:page_title, canvas_name <> " — Canvas")
-    |> assign(:active_canvas_id, canvas_id)
-    |> assign(:canvas_sessions, sessions)
-    |> assign(:subscribed_session_ids, session_ids)
-    |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
-    |> assign(:show_session_picker, false)
-    |> assign(:filtered_sessions, [])
-    |> assign(:session_search, "")
+      socket
+      |> assign(:page_title, canvas_name <> " — Canvas")
+      |> assign(:active_canvas_id, canvas_id)
+      |> assign(:canvas_sessions, sessions)
+      |> assign(:subscribed_session_ids, session_ids)
+      |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
+      |> assign(:show_session_picker, false)
+      |> assign(:filtered_sessions, [])
+      |> assign(:session_search, "")
+    else
+      socket
+      |> assign(:page_title, "Canvas")
+      |> assign(:active_canvas_id, canvas_id)
+      |> assign(:canvas_sessions, [])
+      |> assign(:subscribed_session_ids, [])
+      |> assign(:canvas_session_counts, %{})
+      |> assign(:show_session_picker, false)
+      |> assign(:filtered_sessions, [])
+      |> assign(:session_search, "")
+    end
   end
 
   defp subscribe_all(ids) do

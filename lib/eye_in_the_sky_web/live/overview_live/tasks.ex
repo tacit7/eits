@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
       EyeInTheSky.Events.subscribe_tasks()
     end
 
-    workflow_states = Tasks.list_workflow_states()
+    workflow_states = if connected?(socket), do: Tasks.list_workflow_states(), else: []
 
     socket =
       socket

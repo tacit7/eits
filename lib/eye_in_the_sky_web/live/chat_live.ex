@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    session_id = Sessions.ensure_web_ui_session()
+    session_id = if connected?(socket), do: Sessions.ensure_web_ui_session(), else: nil
 
     if connected?(socket) do
       subscribe_agent_working()

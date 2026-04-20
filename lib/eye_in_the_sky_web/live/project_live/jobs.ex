@@ -25,6 +25,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
     {:noreply, socket}
   end
 
+  def handle_info(:do_reload_jobs, socket) do
+    send_update(JobsPage, id: "jobs-page", do_reload_jobs: true)
+    {:noreply, socket}
+  end
+
   # Forward all events from child function components (job_form_drawer,
   # jobs_table, agent_schedule_form) that lack phx-target to the component.
   @impl true

@@ -26,21 +26,17 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   defp fetch_tasks(params, limit) do
-    tasks = fetch_tasks_by_filter(params, limit)
-
-    if state_id = parse_int(params["state_id"], nil) do
-      Enum.filter(tasks, &(&1.state_id == state_id))
-    else
-      tasks
-    end
+    state_id = parse_int(params["state_id"], nil)
+    opts = [limit: limit] ++ if(state_id, do: [state_id: state_id], else: [])
+    fetch_tasks_by_filter(params, opts)
   end
 
-  defp fetch_tasks_by_filter(%{"q" => q} = params, limit) when is_binary(q) and q != "" do
+  defp fetch_tasks_by_filter(%{"q" => q} = params, opts) when is_binary(q) and q != "" do
     project_id = parse_int(params["project_id"], nil)
-    Tasks.search_tasks(q, project_id, limit: limit)
+    Tasks.search_tasks(q, project_id, opts)
   end
 
-  defp fetch_tasks_by_filter(%{"session_id" => session_id}, limit) do
+  defp fetch_tasks_by_filter(%{"session_id" => session_id}, opts) do
     session_int_id =
       case Helpers.resolve_session_int_id(session_id) do
         {:ok, id} -> id
@@ -48,27 +44,27 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       end
 
     if session_int_id,
-      do: Tasks.list_tasks_for_session(session_int_id, limit: limit),
+      do: Tasks.list_tasks_for_session(session_int_id, opts),
       else: []
   end
 
-  defp fetch_tasks_by_filter(%{"agent_id" => agent_id}, limit) do
+  defp fetch_tasks_by_filter(%{"agent_id" => agent_id}, opts) do
     agent_int_id = resolve_agent_int_id(agent_id)
 
     if agent_int_id,
-      do: Tasks.list_tasks_for_agent(agent_int_id, limit: limit),
+      do: Tasks.list_tasks_for_agent(agent_int_id, opts),
       else: []
   end
 
-  defp fetch_tasks_by_filter(%{"project_id" => project_id}, limit) do
+  defp fetch_tasks_by_filter(%{"project_id" => project_id}, opts) do
     case parse_int(project_id, nil) do
       nil -> []
-      project_int_id -> Tasks.list_tasks_for_project(project_int_id, limit: limit)
+      project_int_id -> Tasks.list_tasks_for_project(project_int_id, opts)
     end
   end
 
-  defp fetch_tasks_by_filter(_params, limit) do
-    Tasks.list_tasks(limit: limit)
+  defp fetch_tasks_by_filter(_params, opts) do
+    Tasks.list_tasks(opts)
   end
 
   @doc """

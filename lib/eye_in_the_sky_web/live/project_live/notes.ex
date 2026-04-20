@@ -13,22 +13,32 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
 
     socket =
       if project_id do
-        project =
-          Projects.get_project_with_agents!(project_id)
+        project = Projects.get_project!(project_id)
 
-        socket
-        |> assign(:page_title, "Notes - #{project.name}")
-        |> assign(:project, project)
-        |> assign(:sidebar_tab, :notes)
-        |> assign(:sidebar_project, project)
-        |> assign(:search_query, "")
-        |> assign(:starred_filter, false)
-        |> assign(:notes_sort_by, "newest")
-        |> assign(:notes, [])
-        |> assign(:editing_note_id, nil)
-        |> assign(:show_quick_note_modal, false)
-        |> assign(:type_filter, "all")
-        |> load_notes()
+        socket =
+          socket
+          |> assign(:page_title, "Notes - #{project.name}")
+          |> assign(:project, project)
+          |> assign(:sidebar_tab, :notes)
+          |> assign(:sidebar_project, project)
+          |> assign(:search_query, "")
+          |> assign(:starred_filter, false)
+          |> assign(:notes_sort_by, "newest")
+          |> assign(:notes, [])
+          |> assign(:editing_note_id, nil)
+          |> assign(:show_quick_note_modal, false)
+          |> assign(:type_filter, "all")
+
+        if connected?(socket) do
+          project = Projects.get_project_with_agents!(project_id)
+
+          socket
+          |> assign(:project, project)
+          |> assign(:sidebar_project, project)
+          |> load_notes()
+        else
+          socket
+        end
       else
         socket
         |> assign(:page_title, "Project Not Found")

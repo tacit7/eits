@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
   """
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [put_flash: 3]
+  import Phoenix.LiveView, only: [connected?: 1, put_flash: 3]
 
   alias EyeInTheSky.Projects
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
         else: nil
 
     project =
-      if not is_nil(project) && preload != [],
+      if not is_nil(project) && preload != [] && connected?(socket),
         do: Projects.preload_project(project, preload),
         else: project
 

@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       |> assign(:user_agents, [])
 
     socket =
-      if socket.assigns.project do
+      if connected?(socket) && socket.assigns.project do
         project = socket.assigns.project
 
         project_agents_dir =

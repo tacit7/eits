@@ -7,12 +7,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket) do
-      Notifications.subscribe()
-    end
-
     notifications =
-      if connected?(socket), do: Notifications.list_notifications(), else: []
+      if connected?(socket) do
+        Notifications.subscribe()
+        Notifications.list_notifications()
+      else
+        []
+      end
 
     socket =
       socket

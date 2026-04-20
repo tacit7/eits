@@ -69,12 +69,22 @@ defmodule EyeInTheSky.TaskTags do
 
   @doc """
   Links a tag to a task via the task_tags join table.
+
+  Returns `:ok` on success (including when the association already exists),
+  `{:error, :not_found}` when either the task_id or tag_id does not exist
+  (FK violation), or `{:error, reason}` for other DB errors.
   """
+  @spec link_tag_to_task(integer(), integer()) ::
+          :ok | {:error, :not_found} | {:error, term()}
   def link_tag_to_task(task_id, tag_id)
       when is_integer(task_id) and is_integer(tag_id) do
-    {count, _} =
-      Repo.insert_all("task_tags", [%{task_id: task_id, tag_id: tag_id}], on_conflict: :nothing)
-
-    {:ok, count}
+    case Repo.query(
+           "INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+           [task_id, tag_id]
+         ) do
+      {:ok, _} -> :ok
+      {:error, %{postgres: %{code: :foreign_key_violation}}} -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
   end
 end

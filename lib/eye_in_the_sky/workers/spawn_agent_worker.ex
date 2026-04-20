@@ -104,6 +104,6 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
   end
 
   defp server_base_url do
-    EyeInTheSkyWeb.Endpoint.url()
+    Application.get_env(:eye_in_the_sky, :server_base_url, "http://localhost:5001")
   end
 end

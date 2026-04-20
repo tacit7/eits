@@ -33,4 +33,10 @@ defmodule EyeInTheSkyWeb.Api.V1.FallbackController do
     |> put_status(status)
     |> json(%{error: to_string(status)})
   end
+
+  def call(conn, {:error, _reason}) do
+    conn
+    |> put_status(:internal_server_error)
+    |> json(%{error: "Internal server error"})
+  end
 end

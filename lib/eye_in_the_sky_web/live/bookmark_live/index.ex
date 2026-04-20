@@ -12,7 +12,9 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
       |> assign(:filter_category, nil)
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
-      |> load_bookmarks()
+      |> assign(:bookmarks, [])
+
+    socket = if connected?(socket), do: load_bookmarks(socket), else: socket
 
     {:ok, socket}
   end

@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
 
   @impl true
   def mount(_params, _session, socket) do
-    skills = load_skills()
+    skills = if connected?(socket), do: load_skills(), else: []
 
     socket =
       socket

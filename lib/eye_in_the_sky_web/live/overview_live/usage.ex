@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
       |> assign(:sidebar_project, nil)
       |> assign(:recalculating, false)
       |> assign(:date_range, range)
-      |> load_all(range)
+      |> load_all_async(range)
 
     {:ok, socket}
   end
@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
   @impl true
   def handle_event("set_range", %{"range" => range}, socket)
       when is_map_key(@date_ranges, range) do
-    {:noreply, socket |> assign(:date_range, range) |> load_all(range)}
+    {:noreply, socket |> assign(:date_range, range) |> load_all_async(range)}
   end
 
   def handle_event("set_range", _params, socket), do: {:noreply, socket}
@@ -45,23 +45,31 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
 
     socket =
       socket
-      |> load_all(socket.assigns.date_range)
+      |> load_all_async(socket.assigns.date_range)
       |> assign(:recalculating, false)
       |> put_flash(:info, "Ingested #{ingested}, skipped #{skipped}, errors #{errors}")
 
     {:noreply, socket}
   end
 
-  defp load_all(socket, range) do
-    cutoff = cutoff_timestamp(range)
+  defp load_all_async(socket, range) do
+    assign_async(
+      socket,
+      [:totals, :model_breakdown, :by_project, :top_sessions, :by_month, :by_week],
+      fn ->
+        cutoff = cutoff_timestamp(range)
 
-    socket
-    |> assign(:totals, UsageReport.totals(cutoff))
-    |> assign(:model_breakdown, UsageReport.model_breakdown(cutoff))
-    |> assign(:by_project, UsageReport.by_project(cutoff))
-    |> assign(:top_sessions, UsageReport.top_sessions(cutoff))
-    |> assign(:by_month, UsageReport.by_month())
-    |> assign(:by_week, UsageReport.by_week())
+        {:ok,
+         %{
+           totals: UsageReport.totals(cutoff),
+           model_breakdown: UsageReport.model_breakdown(cutoff),
+           by_project: UsageReport.by_project(cutoff),
+           top_sessions: UsageReport.top_sessions(cutoff),
+           by_month: UsageReport.by_month(),
+           by_week: UsageReport.by_week()
+         }}
+      end
+    )
   end
 
   defp cutoff_timestamp(range) do
@@ -81,12 +89,21 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-7xl mx-auto space-y-8">
         <.usage_header date_range={@date_range} recalculating={@recalculating} />
-        <.usage_totals totals={@totals} recalculating={@recalculating} />
-        <.project_breakdown_table by_project={@by_project} recalculating={@recalculating} />
-        <.by_month_table by_month={@by_month} />
-        <.by_week_table by_week={@by_week} />
-        <.model_breakdown_table model_breakdown={@model_breakdown} recalculating={@recalculating} />
-        <.top_sessions_table top_sessions={@top_sessions} recalculating={@recalculating} />
+        <%= if @totals.loading? do %>
+          <div class="flex items-center justify-center py-16">
+            <span class="loading loading-spinner loading-lg text-base-content/30"></span>
+          </div>
+        <% else %>
+          <.usage_totals totals={@totals.result} recalculating={@recalculating} />
+          <.project_breakdown_table by_project={@by_project.result} recalculating={@recalculating} />
+          <.by_month_table by_month={@by_month.result} />
+          <.by_week_table by_week={@by_week.result} />
+          <.model_breakdown_table
+            model_breakdown={@model_breakdown.result}
+            recalculating={@recalculating}
+          />
+          <.top_sessions_table top_sessions={@top_sessions.result} recalculating={@recalculating} />
+        <% end %>
       </div>
     </div>
     """

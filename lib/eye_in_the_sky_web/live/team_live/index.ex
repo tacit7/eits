@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
      |> assign(:sidebar_project, nil)
      |> assign(:show_archived, false)
      |> assign(:search, "")
-     |> assign(:teams, load_teams(false))
+     |> assign(:teams, if(connected?(socket), do: load_teams(false), else: []))
      |> assign(:selected_team_id, nil)
      |> assign(:selected_team, nil)
      |> assign(:mobile_view, :list)

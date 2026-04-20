@@ -283,7 +283,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
       Sessions.list_sessions_with_agent(include_archived: false)
       |> Enum.filter(fn s ->
         MapSet.member?(bookmark_set, to_string(s.id)) or
-          (s.uuid && MapSet.member?(bookmark_set, s.uuid))
+          (not is_nil(s.uuid) and MapSet.member?(bookmark_set, s.uuid))
       end)
       |> Enum.reduce(%{}, fn s, acc ->
         status = s.status || "idle"

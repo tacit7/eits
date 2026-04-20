@@ -313,7 +313,11 @@ export const ChatWindowHook = {
           else handle.appendChild(dot)
         }
       } else if (this._autoScroll) {
-        scrollToBottom()
+        // Defer by one rAF so the browser finishes reflowing the new message
+        // before we read scrollHeight. Without this, the layout flush from the
+        // height-restoration in updated() can cause scrollToBottom() to land
+        // short of the actual bottom.
+        requestAnimationFrame(() => scrollToBottom())
       } else {
         this._newMsgCount = (this._newMsgCount || 0) + 1
         if (newMsgPill) {

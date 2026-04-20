@@ -89,28 +89,32 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
     socket = assign(socket, :all_agents, updated)
 
-    # Only stream_insert the changed row — inserting every visible agent causes the
-    # stream's remove→morph→reinsert cycle on all rows, which resets :hover state
-    # and makes the ... menu flicker via its opacity transition.
-    #
-    # Guard: skip stream_insert entirely when the session is outside the current
-    # visible/paginated slice. stream_insert on a non-visible ID injects it into
-    # the stream and breaks pagination consistency.
-    visible_ids = MapSet.new(socket.assigns.agents, & &1.id)
+    # Re-apply filter/sort so @agents, @depths, and @has_more stay consistent
+    # with any sort_by that depends on status (e.g. "status", "last_message").
+    # Then only stream_insert the one changed row — bulk stream_insert triggers
+    # the stream's remove→morph→reinsert cycle on every row, which resets :hover
+    # and makes the ... button flicker via its opacity classes.
+    {ordered_agents, depths} =
+      updated
+      |> filter_agents_by_status(socket.assigns.session_filter)
+      |> filter_agents_by_search(socket.assigns.search_query)
+      |> sort_agents(socket.assigns.sort_by)
+      |> build_tree_order()
 
-    case Enum.find(updated, &(&1.id == session_id)) do
-      changed_agent when not is_nil(changed_agent) and is_map_key(visible_ids, session_id) ->
-        agents =
-          Enum.map(socket.assigns.agents, fn a ->
-            if a.id == session_id, do: changed_agent, else: a
-          end)
+    visible_count = socket.assigns.visible_count
+    visible_agents = Enum.take(ordered_agents, visible_count)
 
-        socket
-        |> assign(:agents, agents)
-        |> stream_insert(:session_list, changed_agent)
+    socket =
+      socket
+      |> assign(:agents, ordered_agents)
+      |> assign(:depths, depths)
+      |> assign(:has_more, length(ordered_agents) > visible_count)
 
-      _ ->
-        socket
+    # Guard: skip stream_insert when the changed session is outside the visible
+    # slice — inserting off-screen IDs into the stream breaks pagination.
+    case Enum.find(visible_agents, &(&1.id == session_id)) do
+      nil -> socket
+      changed_agent -> stream_insert(socket, :session_list, changed_agent)
     end
   end
 

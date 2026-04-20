@@ -42,9 +42,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     {settings, db_info} =
       if connected?(socket) do
         s = Settings.all()
-        # Normalize empty theme to default
+
         if s["theme"] == "" do
-          Settings.put("theme", "dark")
+          send(self(), :set_default_theme)
         end
 
         s = if s["theme"] == "", do: Map.put(s, "theme", "dark"), else: s
@@ -239,6 +239,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     Settings.put(key, to_string(!current))
     settings = Settings.all()
     {:noreply, socket |> assign(:settings, settings) |> flash_saved(key)}
+  end
+
+  @impl true
+  def handle_info(:set_default_theme, socket) do
+    if Settings.get("theme") == "" do
+      Settings.put("theme", "dark")
+    end
+
+    {:noreply, socket}
   end
 
   @impl true

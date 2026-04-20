@@ -31,28 +31,46 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
          |> push_navigate(to: ~p"/iam/policies")}
 
       int_id ->
-        case IAM.get_policy(int_id) do
-          {:ok, %Policy{} = policy} ->
-            changeset = Policy.update_changeset(policy, %{})
+        if connected?(socket) do
+          case IAM.get_policy(int_id) do
+            {:ok, %Policy{} = policy} ->
+              changeset = Policy.update_changeset(policy, %{})
 
-            {:ok,
-             socket
-             |> assign(:page_title, "Edit: #{policy.name}")
-             |> assign(:sidebar_tab, :iam)
-             |> assign(:sidebar_project, nil)
-             |> assign(:policy, policy)
-             |> assign(:system?, not is_nil(policy.system_key))
-             |> assign(:editable_fields, MapSet.new(policy.editable_fields || []))
-             |> assign(:form, to_form(changeset))
-             |> assign(:condition_text, encode_condition(policy.condition))
-             |> assign(:scope, infer_scope(policy))
-             |> assign(:projects, Projects.list_projects())}
+              {:ok,
+               socket
+               |> assign(:page_title, "Edit: #{policy.name}")
+               |> assign(:sidebar_tab, :iam)
+               |> assign(:sidebar_project, nil)
+               |> assign(:policy, policy)
+               |> assign(:system?, not is_nil(policy.system_key))
+               |> assign(:editable_fields, MapSet.new(policy.editable_fields || []))
+               |> assign(:form, to_form(changeset))
+               |> assign(:condition_text, encode_condition(policy.condition))
+               |> assign(:scope, infer_scope(policy))
+               |> assign(:projects, Projects.list_projects())}
 
-          {:error, :not_found} ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Policy not found.")
-             |> push_navigate(to: ~p"/iam/policies")}
+            {:error, :not_found} ->
+              {:ok,
+               socket
+               |> put_flash(:error, "Policy not found.")
+               |> push_navigate(to: ~p"/iam/policies")}
+          end
+        else
+          blank = %Policy{}
+          changeset = Policy.update_changeset(blank, %{})
+
+          {:ok,
+           socket
+           |> assign(:page_title, "Edit policy")
+           |> assign(:sidebar_tab, :iam)
+           |> assign(:sidebar_project, nil)
+           |> assign(:policy, blank)
+           |> assign(:system?, false)
+           |> assign(:editable_fields, MapSet.new([]))
+           |> assign(:form, to_form(changeset))
+           |> assign(:condition_text, "{}")
+           |> assign(:scope, "global")
+           |> assign(:projects, [])}
         end
     end
   end

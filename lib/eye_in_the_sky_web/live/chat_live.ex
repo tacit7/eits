@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    session_id = Sessions.ensure_web_ui_session()
+    session_id = if connected?(socket), do: Sessions.ensure_web_ui_session(), else: nil
 
     if connected?(socket) do
       subscribe_agent_working()
@@ -48,8 +48,19 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   defp resolve_channel(params, socket) do
     project_id = get_project_id(params)
-    channels = load_channels(project_id)
-    channel_id = params["channel_id"] || get_default_channel_id(channels, project_id)
+    new_channel_id = params["channel_id"]
+    current_channel_id = socket.assigns[:active_channel_id]
+
+    channels =
+      if new_channel_id != nil and current_channel_id != nil and
+           to_string(new_channel_id) == to_string(current_channel_id) and
+           socket.assigns[:project_id] == project_id do
+        socket.assigns[:channels] || load_channels(project_id)
+      else
+        load_channels(project_id)
+      end
+
+    channel_id = new_channel_id || get_default_channel_id(channels, project_id)
     {channel_id, channels} = ensure_default_channel(channel_id, channels, project_id, socket)
 
     if connected?(socket) && channel_id do
@@ -247,13 +258,17 @@ defmodule EyeInTheSkyWeb.ChatLive do
   defp ensure_default_channel(nil, [], project_id, socket) do
     session_id = get_session_id(socket)
 
-    case Channels.create_default_channel(project_id, session_id) do
-      {:ok, channel} ->
-        channels = Channels.list_channels_for_project(project_id)
-        {channel.id, channels}
+    if is_nil(session_id) do
+      {nil, []}
+    else
+      case Channels.create_default_channel(project_id, session_id) do
+        {:ok, channel} ->
+          channels = Channels.list_channels_for_project(project_id)
+          {channel.id, channels}
 
-      {:error, _} ->
-        {nil, []}
+        {:error, _} ->
+          {nil, []}
+      end
     end
   end
 

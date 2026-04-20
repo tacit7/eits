@@ -56,10 +56,10 @@ defmodule EyeInTheSky.ScheduledJobsTest do
     Map.merge(
       %{
         "name" => "Test Job",
-        "job_type" => "shell_command",
+        "job_type" => "mix_task",
         "schedule_type" => "interval",
         "schedule_value" => "60",
-        "config" => Jason.encode!(%{"command" => "echo hello", "working_dir" => "/tmp"})
+        "config" => Jason.encode!(%{"task" => "ecto.migrate", "args" => []})
       },
       overrides
     )
@@ -142,7 +142,7 @@ defmodule EyeInTheSky.ScheduledJobsTest do
     test "creates a job with required fields" do
       assert {:ok, %ScheduledJob{} = job} = ScheduledJobs.create_job(job_attrs())
       assert job.name == "Test Job"
-      assert job.job_type == "shell_command"
+      assert job.job_type == "mix_task"
       assert job.origin == "user"
       assert job.enabled == true
     end
@@ -359,13 +359,13 @@ defmodule EyeInTheSky.ScheduledJobsTest do
     test "computes correct interval next run" do
       from = ~N[2025-01-01 00:00:00]
       result = ScheduledJobs.compute_next_run_at("interval", "3600", from)
-      assert result == "2025-01-01T01:00:00Z"
+      assert result == ~U[2025-01-01 01:00:00Z]
     end
 
     test "computes correct cron next run" do
       from = ~N[2025-01-01 00:00:00]
       result = ScheduledJobs.compute_next_run_at("cron", "0 9 * * *", from)
-      assert result == "2025-01-01T09:00:00Z"
+      assert result == ~U[2025-01-01 09:00:00Z]
     end
 
     test "returns nil for invalid cron expression" do

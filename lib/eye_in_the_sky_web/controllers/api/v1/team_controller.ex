@@ -5,8 +5,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Messages, Sessions, Teams}
-  alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Sessions, Teams}
+  alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @terminated_statuses ~w(completed failed)
@@ -279,7 +279,17 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       dm_body =
         "Broadcast from #{sender_name} (session:#{from_session.uuid}) [team:#{team.name}] #{body}"
 
-      results = Enum.map(targets, &deliver_broadcast_dm(&1, from_session, dm_body))
+      results =
+        Enum.map(targets, fn m ->
+          case DMDelivery.deliver_and_persist(m.session_id, from_session.id, dm_body, %{
+                 from_session_uuid: from_session.uuid,
+                 to_session_id: m.session_id,
+                 broadcast: true
+               }) do
+            {:ok, _} -> :ok
+            {:error, _} = err -> err
+          end
+        end)
 
       sent = Enum.count(results, &match?(:ok, &1))
       failed = Enum.count(results, &match?({:error, _}, &1))
@@ -306,42 +316,4 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-  defp deliver_broadcast_dm(member, from_session, dm_body) do
-    case agent_manager_mod().send_message(member.session_id, dm_body) do
-      result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
-        attrs = %{
-          uuid: Ecto.UUID.generate(),
-          session_id: member.session_id,
-          from_session_id: from_session.id,
-          to_session_id: member.session_id,
-          body: dm_body,
-          sender_role: "agent",
-          recipient_role: "agent",
-          direction: "inbound",
-          status: "sent",
-          provider: "claude",
-          metadata: %{
-            from_session_uuid: from_session.uuid,
-            to_session_id: member.session_id,
-            broadcast: true
-          }
-        }
-
-        case Messages.create_message(attrs) do
-          {:ok, msg} ->
-            EyeInTheSky.Events.session_new_dm(member.session_id, msg)
-            :ok
-
-          {:error, reason} ->
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp agent_manager_mod do
-    Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
-  end
 end

@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions, Teams}
-  alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -452,40 +452,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   defp deliver_and_persist_dm(to_session_id, from_session_id, dm_body, metadata) do
-    case agent_manager_mod().send_message(to_session_id, dm_body) do
-      result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
-        attrs = %{
-          uuid: Ecto.UUID.generate(),
-          session_id: to_session_id,
-          from_session_id: from_session_id,
-          to_session_id: to_session_id,
-          body: dm_body,
-          sender_role: "agent",
-          recipient_role: "agent",
-          direction: "inbound",
-          status: "sent",
-          provider: "claude",
-          metadata: metadata
-        }
-
-        case Messages.create_message(attrs) do
-          {:ok, msg} ->
-            EyeInTheSky.Events.session_new_dm(to_session_id, msg)
-            {:ok, msg}
-
-          {:error, _} = err ->
-            err
-        end
-
-      {:error, _} = err ->
-        err
-    end
+    DMDelivery.deliver_and_persist(to_session_id, from_session_id, dm_body, metadata)
   end
-
-  defp agent_manager_mod do
-    Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
-  end
-
-  # Resolve a readable name from the sender session.
-  # Priority: team member name > session name > agent description > "agent"
 end

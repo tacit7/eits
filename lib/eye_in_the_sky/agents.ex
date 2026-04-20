@@ -144,9 +144,7 @@ defmodule EyeInTheSky.Agents do
   """
   @spec create_agent(map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def create_agent(attrs \\ %{}) do
-    result = %Agent{} |> Agent.changeset(attrs) |> Repo.insert()
-    with {:ok, agent} <- result, do: EyeInTheSky.Events.agent_created(agent)
-    result
+    %Agent{} |> Agent.changeset(attrs) |> Repo.insert() |> broadcast_result(&EyeInTheSky.Events.agent_created/1)
   end
 
   @doc """
@@ -182,9 +180,7 @@ defmodule EyeInTheSky.Agents do
   """
   @spec update_agent(Agent.t(), map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def update_agent(%Agent{} = agent, attrs) do
-    result = agent |> Agent.changeset(attrs) |> Repo.update()
-    with {:ok, updated} <- result, do: EyeInTheSky.Events.agent_updated(updated)
-    result
+    agent |> Agent.changeset(attrs) |> Repo.update() |> broadcast_result(&EyeInTheSky.Events.agent_updated/1)
   end
 
   @doc """
@@ -211,10 +207,15 @@ defmodule EyeInTheSky.Agents do
   """
   @spec delete_agent(Agent.t()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def delete_agent(%Agent{} = agent) do
-    result = Repo.delete(agent)
-    with {:ok, deleted} <- result, do: EyeInTheSky.Events.agent_deleted(deleted)
+    Repo.delete(agent) |> broadcast_result(&EyeInTheSky.Events.agent_deleted/1)
+  end
+
+  defp broadcast_result({:ok, record} = result, event_fn) do
+    event_fn.(record)
     result
   end
+
+  defp broadcast_result(result, _event_fn), do: result
 
   @doc """
   Returns an `%Ecto.Changeset{}` for tracking agent changes.

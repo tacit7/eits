@@ -48,14 +48,17 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
 
     body = format_digest(date_label, sessions, tasks, commits)
 
-    desktop_path = Path.expand("~/Desktop/daily-digest-#{date_label}.md")
+    case Application.get_env(:eye_in_the_sky, :digest_desktop_path) do
+      nil ->
+        :ok
 
-    case File.write(desktop_path, body) do
-      :ok ->
-        Logger.info("DailyDigestWorker: wrote #{desktop_path}")
+      dir ->
+        path = Path.join(dir, "daily-digest-#{date_label}.md")
 
-      {:error, reason} ->
-        Logger.error("DailyDigestWorker: failed to write to Desktop: #{inspect(reason)}")
+        case File.write(path, body) do
+          :ok -> Logger.info("DailyDigestWorker: wrote #{path}")
+          {:error, reason} -> Logger.error("DailyDigestWorker: failed to write digest: #{inspect(reason)}")
+        end
     end
 
     notes_mod = Application.get_env(:eye_in_the_sky, :notes_module, EyeInTheSky.Notes)

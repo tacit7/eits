@@ -43,7 +43,7 @@ defmodule EyeInTheSky.Tasks do
   # Delegates to Tasks.Queries sub-module
   defdelegate list_tasks(opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks(opts \\ []), to: EyeInTheSky.Tasks.Queries
-  defdelegate list_tasks_for_agent(agent_id), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_tasks_for_agent(agent_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_session(session_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_sessions(session_ids), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_team(team_id), to: EyeInTheSky.Tasks.Queries
@@ -314,7 +314,7 @@ defmodule EyeInTheSky.Tasks do
     Task.changeset(task, attrs)
   end
 
-  defdelegate search_tasks(query, project_id \\ nil), to: EyeInTheSky.Tasks.Queries
+  defdelegate search_tasks(query, project_id \\ nil, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
   # Delegates to TaskSessions context (session-linking operations)
   defdelegate link_session_to_task(task_id, session_id), to: EyeInTheSky.TaskSessions

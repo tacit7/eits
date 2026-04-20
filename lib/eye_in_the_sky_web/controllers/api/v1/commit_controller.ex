@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
           end
 
         true ->
-          Commits.list_commits() |> Enum.take(limit)
+          Commits.list_commits(limit: limit)
       end
 
     json(conn, %{

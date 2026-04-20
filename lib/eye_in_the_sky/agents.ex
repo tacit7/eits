@@ -14,9 +14,11 @@ defmodule EyeInTheSky.Agents do
   @doc """
   Returns the list of agents.
   """
-  @spec list_agents() :: [Agent.t()]
-  def list_agents do
-    Repo.all(Agent)
+  @spec list_agents(keyword()) :: [Agent.t()]
+  def list_agents(opts \\ []) do
+    Agent
+    |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
+    |> Repo.all()
   end
 
   @doc """
@@ -227,11 +229,12 @@ defmodule EyeInTheSky.Agents do
   @doc """
   Lists agents by project ID.
   """
-  def list_agents_by_project(project_id) do
+  def list_agents_by_project(project_id, opts \\ []) do
     Agent
     |> where([a], a.project_id == ^project_id)
     |> preload([:project])
     |> order_by([a], asc: a.created_at)
+    |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
     |> Repo.all()
     |> Enum.map(&populate_project_name/1)
   end

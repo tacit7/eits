@@ -45,28 +45,40 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
   def handle_commit_rename(socket) do
     name = String.trim(socket.assigns.rename_value)
+    project_id = socket.assigns.renaming_project_id
 
-    socket =
-      if name != "" && not is_nil(socket.assigns.renaming_project_id) do
-        case Projects.get_project(socket.assigns.renaming_project_id) do
-          {:ok, project} ->
-            case Projects.update_project(project, %{name: name}) do
-              {:ok, _} -> socket
-              {:error, _} -> put_flash(socket, :error, "Failed to rename project")
-            end
+    if name == "" or is_nil(project_id) do
+      {:noreply, assign(socket, renaming_project_id: nil, rename_value: "")}
+    else
+      case Projects.get_project(project_id) do
+        {:ok, project} ->
+          case Projects.update_project(project, %{name: name}) do
+            {:ok, _} ->
+              {:noreply,
+               socket
+               |> assign(:projects, Projects.list_projects_for_sidebar())
+               |> assign(:renaming_project_id, nil)
+               |> assign(:rename_value, "")}
 
-          {:error, _} ->
-            put_flash(socket, :error, "Project not found")
-        end
-      else
-        socket
+            {:error, _} ->
+              {:noreply,
+               socket
+               |> put_flash(:error, "Failed to rename project")
+               |> assign(:projects, Projects.list_projects_for_sidebar())
+               |> assign(:renaming_project_id, nil)
+               |> assign(:rename_value, "")}
+          end
+
+        {:error, _} ->
+          # Project deleted while rename UI was open — reload to clear stale entry.
+          {:noreply,
+           socket
+           |> put_flash(:error, "Project not found")
+           |> assign(:projects, Projects.list_projects_for_sidebar())
+           |> assign(:renaming_project_id, nil)
+           |> assign(:rename_value, "")}
       end
-
-    {:noreply,
-     socket
-     |> assign(:projects, Projects.list_projects_for_sidebar())
-     |> assign(:renaming_project_id, nil)
-     |> assign(:rename_value, "")}
+    end
   end
 
   def handle_delete_project(%{"project_id" => id_str}, socket) do

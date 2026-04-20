@@ -66,6 +66,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     end
   end
 
+  # Both clauses below are triggered via send_update from floating_chat_live.ex,
+  # which attaches them as handle_info hooks (attach_hook(:fab_info, :handle_info, ...)).
+  # handle_info only fires on connected sockets, so no connected?(socket) guard is needed.
   @impl true
   def update(%{notification_count: :refresh}, socket) do
     {:ok, assign(socket, :notification_count, Notifications.unread_count())}
@@ -156,11 +159,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     do: {:noreply, assign(socket, mobile_open: true, flyout_open: true)}
 
   def handle_event("select_project", params, socket) do
+    previous_project = socket.assigns.sidebar_project
     {:noreply, socket2} = ProjectActions.handle_select_project(params, socket)
-    {:noreply,
-     socket2
-     |> assign(:proj_picker_open, false)
-     |> assign(:flyout_sessions, load_flyout_sessions(socket2.assigns.sidebar_project))}
+    new_project = socket2.assigns.sidebar_project
+
+    socket3 =
+      if new_project != previous_project do
+        assign(socket2, :flyout_sessions, load_flyout_sessions(new_project))
+      else
+        socket2
+      end
+
+    {:noreply, assign(socket3, :proj_picker_open, false)}
   end
 
   def handle_event("show_new_project", _params, socket),

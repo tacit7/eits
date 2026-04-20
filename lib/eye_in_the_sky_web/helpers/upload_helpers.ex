@@ -11,9 +11,16 @@ defmodule EyeInTheSkyWeb.Helpers.UploadHelpers do
   def consume_agent_images(socket) do
     consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
       destination = agent_image_destination(entry.client_name)
-      File.mkdir_p!(Path.dirname(destination))
-      File.cp!(temp_path, destination)
-      {:ok, destination}
+
+      with :ok <- File.mkdir_p(Path.dirname(destination)),
+           :ok <- File.cp(temp_path, destination) do
+        {:ok, destination}
+      else
+        {:error, reason} ->
+          require Logger
+          Logger.warning("consume_agent_images: failed to copy #{entry.client_name}: #{inspect(reason)}")
+          {:postpone, entry}
+      end
     end)
   end
 

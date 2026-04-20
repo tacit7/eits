@@ -71,23 +71,35 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     commands_dir = Path.expand("~/.claude/commands")
 
     if File.dir?(commands_dir) do
-      commands_dir
-      |> File.ls!()
-      |> Enum.filter(&String.ends_with?(&1, ".md"))
-      |> Enum.map(fn filename ->
-        path = Path.join(commands_dir, filename)
-        slug = String.replace_trailing(filename, ".md", "")
-        content = File.read!(path)
+      case File.ls(commands_dir) do
+        {:error, _} ->
+          []
 
-        %Skill{
-          slug: slug,
-          filename: filename,
-          source: :commands,
-          description: extract_description(content),
-          content: content,
-          size: byte_size(content)
-        }
-      end)
+        {:ok, entries} ->
+          entries
+          |> Enum.filter(&String.ends_with?(&1, ".md"))
+          |> Enum.flat_map(fn filename ->
+            path = Path.join(commands_dir, filename)
+            slug = String.replace_trailing(filename, ".md", "")
+
+            case File.read(path) do
+              {:error, _} ->
+                []
+
+              {:ok, content} ->
+                [
+                  %Skill{
+                    slug: slug,
+                    filename: filename,
+                    source: :commands,
+                    description: extract_description(content),
+                    content: content,
+                    size: byte_size(content)
+                  }
+                ]
+            end
+          end)
+      end
     else
       []
     end
@@ -98,24 +110,36 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     skills_dir = Path.expand("~/.claude/skills")
 
     if File.dir?(skills_dir) do
-      skills_dir
-      |> File.ls!()
-      |> Enum.filter(fn dir ->
-        Path.join([skills_dir, dir, "SKILL.md"]) |> File.exists?()
-      end)
-      |> Enum.map(fn dir ->
-        path = Path.join([skills_dir, dir, "SKILL.md"])
-        content = File.read!(path)
+      case File.ls(skills_dir) do
+        {:error, _} ->
+          []
 
-        %Skill{
-          slug: dir,
-          filename: "skills/#{dir}/SKILL.md",
-          source: :skills,
-          description: extract_description(content),
-          content: content,
-          size: byte_size(content)
-        }
-      end)
+        {:ok, entries} ->
+          entries
+          |> Enum.filter(fn dir ->
+            Path.join([skills_dir, dir, "SKILL.md"]) |> File.exists?()
+          end)
+          |> Enum.flat_map(fn dir ->
+            path = Path.join([skills_dir, dir, "SKILL.md"])
+
+            case File.read(path) do
+              {:error, _} ->
+                []
+
+              {:ok, content} ->
+                [
+                  %Skill{
+                    slug: dir,
+                    filename: "skills/#{dir}/SKILL.md",
+                    source: :skills,
+                    description: extract_description(content),
+                    content: content,
+                    size: byte_size(content)
+                  }
+                ]
+            end
+          end)
+      end
     else
       []
     end

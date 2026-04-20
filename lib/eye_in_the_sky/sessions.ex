@@ -314,39 +314,12 @@ defmodule EyeInTheSky.Sessions do
           {:ok, %{session: Session.t(), agent: struct()}}
           | {:error, :agent | :session, Ecto.Changeset.t()}
   def register_from_hook(params, project_id) do
-    session_uuid = params["session_id"]
-
-    agent_attrs = %{
-      uuid: params["agent_id"] || session_uuid,
-      description: params["agent_description"] || params["description"],
-      project_id: project_id,
-      project_name: params["project_name"],
-      git_worktree_path: params["worktree_path"],
-      source: "hook"
-    }
-
-    case EyeInTheSky.Agents.find_or_create_agent(agent_attrs) do
+    case EyeInTheSky.Agents.find_or_create_agent(build_agent_attrs(params, project_id)) do
       {:ok, agent} ->
-        {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
-
-        session_attrs = %{
-          uuid: session_uuid,
-          agent_id: agent.id,
-          name: params["name"],
-          description: params["description"],
-          status: "working",
-          started_at: DateTime.utc_now(),
-          provider: params["provider"] || "claude",
-          model: params["model"],
-          model_provider: model_provider,
-          model_name: model_name,
-          project_id: project_id,
-          git_worktree_path: params["worktree_path"],
-          entrypoint: params["entrypoint"]
-        }
+        session_attrs = build_session_attrs(params, agent, project_id)
 
         result =
-          if model_name,
+          if session_attrs.model_name,
             do: create_session_with_model(session_attrs),
             else: create_session(session_attrs)
 
@@ -362,6 +335,37 @@ defmodule EyeInTheSky.Sessions do
       {:error, changeset} ->
         {:error, :agent, changeset}
     end
+  end
+
+  defp build_agent_attrs(params, project_id) do
+    %{
+      uuid: params["agent_id"] || params["session_id"],
+      description: params["agent_description"] || params["description"],
+      project_id: project_id,
+      project_name: params["project_name"],
+      git_worktree_path: params["worktree_path"],
+      source: "hook"
+    }
+  end
+
+  defp build_session_attrs(params, agent, project_id) do
+    {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
+
+    %{
+      uuid: params["session_id"],
+      agent_id: agent.id,
+      name: params["name"],
+      description: params["description"],
+      status: "working",
+      started_at: DateTime.utc_now(),
+      provider: params["provider"] || "claude",
+      model: params["model"],
+      model_provider: model_provider,
+      model_name: model_name,
+      project_id: project_id,
+      git_worktree_path: params["worktree_path"],
+      entrypoint: params["entrypoint"]
+    }
   end
 
   defdelegate record_tool_event(session, type, params),

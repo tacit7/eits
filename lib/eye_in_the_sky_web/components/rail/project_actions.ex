@@ -18,7 +18,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
         if current_id == id do
           {:noreply, assign(socket, :sidebar_project, nil)}
         else
-          {:noreply, assign(socket, :sidebar_project, Projects.get_project!(id))}
+          case Projects.get_project(id) do
+            {:ok, project} -> {:noreply, assign(socket, :sidebar_project, project)}
+            {:error, _} -> {:noreply, socket}
+          end
         end
     end
   end
@@ -27,8 +30,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     case parse_int(id_str) do
       nil -> {:noreply, socket}
       id ->
-        project = Projects.get_project!(id)
-        {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
+        case Projects.get_project(id) do
+          {:ok, project} -> {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
+          {:error, _} -> {:noreply, socket}
+        end
     end
   end
 
@@ -42,8 +47,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     name = String.trim(socket.assigns.rename_value)
 
     if name != "" && not is_nil(socket.assigns.renaming_project_id) do
-      project = Projects.get_project!(socket.assigns.renaming_project_id)
-      Projects.update_project(project, %{name: name})
+      case Projects.get_project(socket.assigns.renaming_project_id) do
+        {:ok, project} -> Projects.update_project(project, %{name: name})
+        {:error, _} -> :ok
+      end
     end
 
     {:noreply,
@@ -57,7 +64,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     case parse_int(id_str) do
       nil -> {:noreply, socket}
       id ->
-        Projects.get_project!(id) |> Projects.delete_project()
+        case Projects.get_project(id) do
+          {:ok, project} -> Projects.delete_project(project)
+          {:error, _} -> :ok
+        end
         {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
     end
   end

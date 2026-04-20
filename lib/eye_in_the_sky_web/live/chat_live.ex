@@ -48,8 +48,18 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   defp resolve_channel(params, socket) do
     project_id = get_project_id(params)
-    channels = load_channels(project_id)
-    channel_id = params["channel_id"] || get_default_channel_id(channels, project_id)
+    new_channel_id = params["channel_id"]
+    current_channel_id = socket.assigns[:active_channel_id]
+
+    channels =
+      if new_channel_id != nil and current_channel_id != nil and
+           to_string(new_channel_id) == to_string(current_channel_id) do
+        socket.assigns[:channels] || load_channels(project_id)
+      else
+        load_channels(project_id)
+      end
+
+    channel_id = new_channel_id || get_default_channel_id(channels, project_id)
     {channel_id, channels} = ensure_default_channel(channel_id, channels, project_id, socket)
 
     if connected?(socket) && channel_id do

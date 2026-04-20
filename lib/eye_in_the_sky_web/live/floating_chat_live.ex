@@ -35,11 +35,12 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_event("fab_set_bookmarks", %{"bookmarks" => bookmarks}, socket) do
-    statuses = fetch_bookmark_statuses()
+    bookmarks = bookmarks || []
+    statuses = fetch_bookmark_statuses(bookmarks)
 
     socket =
       socket
-      |> assign(:fab_bookmarks, bookmarks || [])
+      |> assign(:fab_bookmarks, bookmarks)
       |> assign(:fab_statuses, statuses)
       |> schedule_fab_refresh()
 
@@ -48,7 +49,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_event("fab_request_statuses", _params, socket) do
-    statuses = fetch_bookmark_statuses()
+    statuses = fetch_bookmark_statuses(socket.assigns.fab_bookmarks)
 
     socket =
       socket
@@ -166,7 +167,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_info(:fab_refresh_statuses, socket) do
-    statuses = fetch_bookmark_statuses()
+    statuses = fetch_bookmark_statuses(socket.assigns.fab_bookmarks)
 
     socket =
       socket
@@ -268,8 +269,16 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     assign(socket, :fab_timer, timer)
   end
 
-  defp fetch_bookmark_statuses do
+  defp fetch_bookmark_statuses([]), do: %{}
+
+  defp fetch_bookmark_statuses(bookmarks) do
+    bookmark_set = MapSet.new(Enum.map(bookmarks, &to_string/1))
+
     Sessions.list_sessions_with_agent(include_archived: false)
+    |> Enum.filter(fn s ->
+      MapSet.member?(bookmark_set, to_string(s.id)) or
+        (s.uuid && MapSet.member?(bookmark_set, s.uuid))
+    end)
     |> Enum.reduce(%{}, fn s, acc ->
       status = s.status || "idle"
       acc = Map.put(acc, to_string(s.id), status)

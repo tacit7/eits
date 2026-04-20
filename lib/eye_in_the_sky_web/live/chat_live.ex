@@ -53,7 +53,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
     channels =
       if new_channel_id != nil and current_channel_id != nil and
-           to_string(new_channel_id) == to_string(current_channel_id) do
+           to_string(new_channel_id) == to_string(current_channel_id) and
+           socket.assigns[:project_id] == project_id do
         socket.assigns[:channels] || load_channels(project_id)
       else
         load_channels(project_id)

@@ -271,19 +271,25 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
 
   defp fetch_bookmark_statuses([]), do: %{}
 
-  defp fetch_bookmark_statuses(bookmarks) do
-    bookmark_set = MapSet.new(Enum.map(bookmarks, &to_string/1))
+  defp fetch_bookmark_statuses(bookmarks) when is_list(bookmarks) do
+    ids = for id when is_binary(id) or is_integer(id) <- bookmarks, do: to_string(id)
 
-    Sessions.list_sessions_with_agent(include_archived: false)
-    |> Enum.filter(fn s ->
-      MapSet.member?(bookmark_set, to_string(s.id)) or
-        (s.uuid && MapSet.member?(bookmark_set, s.uuid))
-    end)
-    |> Enum.reduce(%{}, fn s, acc ->
-      status = s.status || "idle"
-      acc = Map.put(acc, to_string(s.id), status)
-      if s.uuid, do: Map.put(acc, s.uuid, status), else: acc
-    end)
+    if ids == [] do
+      %{}
+    else
+      bookmark_set = MapSet.new(ids)
+
+      Sessions.list_sessions_with_agent(include_archived: false)
+      |> Enum.filter(fn s ->
+        MapSet.member?(bookmark_set, to_string(s.id)) or
+          (s.uuid && MapSet.member?(bookmark_set, s.uuid))
+      end)
+      |> Enum.reduce(%{}, fn s, acc ->
+        status = s.status || "idle"
+        acc = Map.put(acc, to_string(s.id), status)
+        if s.uuid, do: Map.put(acc, s.uuid, status), else: acc
+      end)
+    end
   end
 
   defp update_fab_component(socket) do

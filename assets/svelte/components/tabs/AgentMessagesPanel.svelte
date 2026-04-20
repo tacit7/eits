@@ -328,7 +328,7 @@
 
           <!-- Message -->
           <div
-            class="group py-3 px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? '' : message.sender_role === 'agent' ? 'bg-primary/[0.03]' : 'hover:bg-base-content/[0.02]'}"
+            class="group py-3 px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? '' : 'hover:bg-base-content/[0.02]'}"
           >
             {#if message.sender_role === 'system'}
               <!-- System message -->

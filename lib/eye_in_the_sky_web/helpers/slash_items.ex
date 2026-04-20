@@ -58,9 +58,10 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
 
   defp load_commands(commands_dir) do
     if File.dir?(commands_dir) do
-      commands_dir
-      |> File.ls!()
-      |> Enum.flat_map(&load_command_entry(commands_dir, &1))
+      case File.ls(commands_dir) do
+        {:ok, entries} -> Enum.flat_map(entries, &load_command_entry(commands_dir, &1))
+        {:error, _} -> []
+      end
     else
       []
     end
@@ -72,17 +73,28 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
     cond do
       String.ends_with?(entry, ".md") and File.regular?(path) ->
         slug = String.replace_trailing(entry, ".md", "")
-        content = File.read!(path)
-        [%{slug: slug, type: "command", description: extract_description(content)}]
+
+        case File.read(path) do
+          {:ok, content} -> [%{slug: slug, type: "command", description: extract_description(content)}]
+          {:error, _} -> []
+        end
 
       File.dir?(path) ->
-        path
-        |> File.ls!()
+        sub_entries =
+          case File.ls(path) do
+            {:ok, entries} -> entries
+            {:error, _} -> []
+          end
+
+        sub_entries
         |> Enum.filter(&String.ends_with?(&1, ".md"))
-        |> Enum.map(fn filename ->
+        |> Enum.flat_map(fn filename ->
           subslug = "#{entry}:#{String.replace_trailing(filename, ".md", "")}"
-          content = File.read!(Path.join(path, filename))
-          %{slug: subslug, type: "command", description: extract_description(content)}
+
+          case File.read(Path.join(path, filename)) do
+            {:ok, content} -> [%{slug: subslug, type: "command", description: extract_description(content)}]
+            {:error, _} -> []
+          end
         end)
 
       true ->
@@ -92,15 +104,22 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
 
   defp load_skill_dirs(skills_dir) do
     if File.dir?(skills_dir) do
-      skills_dir
-      |> File.ls!()
-      |> Enum.filter(fn dir ->
-        Path.join([skills_dir, dir, "SKILL.md"]) |> File.exists?()
-      end)
-      |> Enum.map(fn dir ->
-        content = File.read!(Path.join([skills_dir, dir, "SKILL.md"]))
-        %{slug: dir, type: "skill", description: extract_description(content)}
-      end)
+      case File.ls(skills_dir) do
+        {:ok, entries} ->
+          entries
+          |> Enum.filter(fn dir ->
+            Path.join([skills_dir, dir, "SKILL.md"]) |> File.exists?()
+          end)
+          |> Enum.flat_map(fn dir ->
+            case File.read(Path.join([skills_dir, dir, "SKILL.md"])) do
+              {:ok, content} -> [%{slug: dir, type: "skill", description: extract_description(content)}]
+              {:error, _} -> []
+            end
+          end)
+
+        {:error, _} ->
+          []
+      end
     else
       []
     end
@@ -144,8 +163,13 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
   end
 
   defp load_plugin_versions(plugin_dir, plugin_name) do
-    plugin_dir
-    |> File.ls!()
+    versions =
+      case File.ls(plugin_dir) do
+        {:ok, entries} -> entries
+        {:error, _} -> []
+      end
+
+    versions
     |> Enum.flat_map(fn version ->
       skills_dir = Path.join([plugin_dir, version, "skills"])
       load_skills_from_version_dir(skills_dir, plugin_name)
@@ -155,17 +179,26 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
 
   defp load_skills_from_version_dir(skills_dir, plugin_name) do
     if File.dir?(skills_dir) do
-      skills_dir
-      |> File.ls!()
-      |> Enum.filter(fn skill_name ->
-        Path.join([skills_dir, skill_name, "SKILL.md"]) |> File.exists?()
-      end)
-      |> Enum.map(fn skill_name ->
-        content = File.read!(Path.join([skills_dir, skill_name, "SKILL.md"]))
-        slug = "#{plugin_name}:#{skill_name}"
+      case File.ls(skills_dir) do
+        {:ok, entries} ->
+          entries
+          |> Enum.filter(fn skill_name ->
+            Path.join([skills_dir, skill_name, "SKILL.md"]) |> File.exists?()
+          end)
+          |> Enum.flat_map(fn skill_name ->
+            case File.read(Path.join([skills_dir, skill_name, "SKILL.md"])) do
+              {:ok, content} ->
+                slug = "#{plugin_name}:#{skill_name}"
+                [%{slug: slug, type: "skill", description: extract_description(content)}]
 
-        %{slug: slug, type: "skill", description: extract_description(content)}
-      end)
+              {:error, _} ->
+                []
+            end
+          end)
+
+        {:error, _} ->
+          []
+      end
     else
       []
     end

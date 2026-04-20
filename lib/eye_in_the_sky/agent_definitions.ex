@@ -170,7 +170,13 @@ defmodule EyeInTheSky.AgentDefinitions do
   end
 
   defp sync_one(file_path, slug, %{scope: scope, project_id: project_id, now: now}) do
-    content = File.read!(file_path)
+    case File.read(file_path) do
+      {:error, _} -> {:error, :missing}
+      {:ok, content} -> sync_one_content(file_path, content, slug, %{scope: scope, project_id: project_id, now: now})
+    end
+  end
+
+  defp sync_one_content(file_path, content, slug, %{scope: scope, project_id: project_id, now: now}) do
     checksum = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
 
     existing = find_existing(slug, scope, project_id)

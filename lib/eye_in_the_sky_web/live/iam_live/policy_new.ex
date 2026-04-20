@@ -16,6 +16,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   """
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.IAMLive.PolicyFormHelpers
+
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.Projects
@@ -92,79 +94,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
     end
   end
 
-  # ── helpers ───────────────────────────────────────────────────────────────
-
-  # Translate the Scope radio into underlying fields. Switching scope always
-  # clears the fields belonging to the other scopes so stale values never
-  # leak across a scope change.
-  defp apply_scope(params, "global") do
-    params
-    |> Map.put("project_id", "")
-    |> Map.put("project_path", "*")
-  end
-
-  defp apply_scope(params, "project") do
-    Map.put(params, "project_path", "*")
-  end
-
-  defp apply_scope(params, "path") do
-    Map.put(params, "project_id", "")
-  end
-
-  defp apply_scope(params, _), do: params
-
-  defp merge_condition(params, condition_text) do
-    trimmed = String.trim(condition_text || "")
-
-    cond do
-      trimmed == "" ->
-        {Map.put(params, "condition", %{}), nil}
-
-      true ->
-        case Jason.decode(trimmed) do
-          {:ok, %{} = decoded} ->
-            {Map.put(params, "condition", decoded), nil}
-
-          {:ok, _other} ->
-            {Map.put(params, "condition", %{}), "must be a JSON object"}
-
-          {:error, %Jason.DecodeError{} = err} ->
-            {Map.put(params, "condition", %{}),
-             "invalid JSON: #{Exception.message(err)}"}
-        end
-    end
-  end
-
-  defp apply_condition_error(changeset, nil), do: changeset
-
-  defp apply_condition_error(changeset, message) do
-    Ecto.Changeset.add_error(changeset, :condition, message)
-  end
-
-  # Only a subset of fields need empty-string scrubbing:
-  #   * `:id`-cast fields fail on "" (project_id)
-  #   * fields with a non-nil schema default (agent_type, project_path, action)
-  #     should drop to let the default win when left blank
-  #   * `resource_glob` is optional; empty string triggers a "must not be
-  #     empty" error from `validate_glob_or_wildcard`
-  #
-  # Required string fields (`name`, `effect`) are intentionally preserved so
-  # `validate_required` surfaces a `"can't be blank"` error in the form.
-  @scrub_when_empty ~w(project_id agent_type project_path action resource_glob)
-
-  defp scrub_empty(params) when is_map(params) do
-    Enum.reduce(@scrub_when_empty, params, fn key, acc ->
-      case Map.get(acc, key) do
-        "" -> Map.delete(acc, key)
-        _ -> acc
-      end
-    end)
-  end
-
-  defp project_options(projects) do
-    [{"-- select a project --", ""} | Enum.map(projects, &{&1.name, &1.id})]
-  end
-
   # ── rendering ─────────────────────────────────────────────────────────────
 
   @impl true
@@ -208,78 +137,12 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
           </div>
         </section>
 
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-3">
-            <div class="flex items-center justify-between">
-              <h2 class="font-semibold flex items-center gap-2">
-                <.icon name="hero-funnel" class="w-5 h-5" /> Scope
-              </h2>
-              <span class="text-xs text-base-content/60">
-                Controls which hook contexts this policy matches.
-              </span>
-            </div>
-
-            <div class="flex flex-wrap gap-4">
-              <label class="label cursor-pointer gap-2">
-                <input type="radio" name="scope" value="global" checked={@scope == "global"} class="radio radio-sm" />
-                <span class="label-text">Global <span class="text-xs opacity-60">— every project</span></span>
-              </label>
-              <label class="label cursor-pointer gap-2">
-                <input type="radio" name="scope" value="project" checked={@scope == "project"} class="radio radio-sm" />
-                <span class="label-text">Project <span class="text-xs opacity-60">— pick one</span></span>
-              </label>
-              <label class="label cursor-pointer gap-2">
-                <input type="radio" name="scope" value="path" checked={@scope == "path"} class="radio radio-sm" />
-                <span class="label-text">Path glob <span class="text-xs opacity-60">— match by filesystem path</span></span>
-              </label>
-            </div>
-
-            <%= cond do %>
-              <% @scope == "project" -> %>
-                <.input
-                  field={@form[:project_id]}
-                  type="select"
-                  label="Project"
-                  options={project_options(@projects)}
-                />
-              <% @scope == "path" -> %>
-                <.input
-                  field={@form[:project_path]}
-                  type="text"
-                  label="Project path glob"
-                  placeholder="/Users/me/projects/*"
-                />
-              <% true -> %>
-                <p class="text-xs text-base-content/60">
-                  This policy will apply to every project.
-                </p>
-            <% end %>
-          </div>
-        </section>
-
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-2">
-            <div class="flex items-center justify-between">
-              <h2 class="font-semibold flex items-center gap-2">
-                <.icon name="hero-code-bracket" class="w-5 h-5" /> Condition (JSON)
-              </h2>
-              <span class="text-xs text-base-content/60">
-                Predicates: time_between, env_equals, session_state_equals
-              </span>
-            </div>
-
-            <textarea
-              name="condition_text"
-              rows="6"
-              class="textarea textarea-bordered textarea-sm font-mono text-xs w-full"
-              placeholder='{"time_between": ["09:00", "17:00"]}'
-            ><%= @condition_text %></textarea>
-
-            <%= if cond_error = @form[:condition].errors |> List.first() do %>
-              <p class="text-error text-xs"><%= elem(cond_error, 0) %></p>
-            <% end %>
-          </div>
-        </section>
+        <.policy_form_fields
+          form={@form}
+          scope={@scope}
+          projects={@projects}
+          condition_text={@condition_text}
+        />
 
         <div class="flex justify-end gap-2">
           <.link navigate={~p"/iam/policies"} class="btn btn-ghost">Cancel</.link>

@@ -10,8 +10,6 @@
   export let messages
   export let live
 
-  $: console.log('Messages received:', messages)
-
   let selectedProvider = 'claude'
 
   function handleSubmit(e) {
@@ -29,64 +27,47 @@
   }
 </script>
 
-<style>
-  .messages-container {
-    display: flex;
-    flex-direction: column;
-    height: 600px;
-  }
-
-  .messages-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem 1.5rem;
-  }
-
-  /* Date separator */
-  .date-separator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 1.5rem 0;
-  }
-
-  .date-badge {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.25rem 0.75rem;
-  }
-</style>
-
-<div class="messages-container">
+<div class="flex flex-col h-[600px]">
   <!-- Messages scroll area -->
   <div
     use:autoScroll={{ trigger: messages?.length }}
-    class="messages-scroll"
+    class="flex-1 overflow-y-auto px-6 py-4"
   >
     {#if messages && messages.length > 0}
       {#each messages as message, idx}
         <!-- Date separator -->
         {#if idx === 0 || formatDateRelative(messages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
-          <div class="date-separator">
-            <div class="badge badge-ghost badge-sm date-badge">
+          <div class="flex items-center justify-center my-6">
+            <div class="badge badge-ghost badge-sm text-xs font-semibold px-3 py-1">
               {formatDateRelative(message.inserted_at)}
             </div>
           </div>
         {/if}
 
-        <!-- Message card -->
-        <div class="card bg-base-100 shadow-sm mb-3 {message.sender_role === 'user' ? 'border-l-4 border-primary' : 'border-l-4 border-base-300'}">
-          <div class="card-body p-4">
-            <div class="flex items-center gap-2 mb-2">
-              <h3 class="card-title text-sm">
-                {message.sender_role === 'user' ? 'You' : message.sender_role === 'agent' ? 'Agent' : message.sender_role}
-              </h3>
-              {#if message.provider}
-                <span class="badge badge-xs badge-ghost">{message.provider}</span>
-              {/if}
-              <time class="text-xs opacity-50 ml-auto">{formatTime(message.inserted_at)}</time>
+        <!-- Message row -->
+        <div class="group py-2 px-1 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+          <div class="flex items-start gap-2">
+            {#if message.sender_role === 'user'}
+              <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
+                <div class="w-1 h-1 rounded-full bg-success"></div>
+              </div>
+            {:else}
+              <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-primary/20 flex items-center justify-center">
+                <div class="w-1 h-1 rounded-full bg-primary/60"></div>
+              </div>
+            {/if}
+            <div class="min-w-0 flex-1">
+              <div class="flex items-baseline gap-1.5 mb-0.5">
+                <span class="text-[11px] font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'}">
+                  {message.sender_role === 'user' ? 'You' : message.sender_role === 'agent' ? 'Agent' : message.sender_role}
+                </span>
+                {#if message.provider}
+                  <span class="badge badge-xs badge-ghost">{message.provider}</span>
+                {/if}
+                <time class="text-[10px] text-base-content/30 ml-auto">{formatTime(message.inserted_at)}</time>
+              </div>
+              <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
             </div>
-            <p class="text-sm whitespace-pre-wrap">{message.body}</p>
           </div>
         </div>
       {/each}

@@ -2,10 +2,9 @@
 # Hook: Save compact_summary to ~/.claude/compact-summaries/ after compaction (PostCompact)
 set -uo pipefail
 
-. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
-
-
 [ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
+
+. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 [ -z "$input_json" ] && exit 0

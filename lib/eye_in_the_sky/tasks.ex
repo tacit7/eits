@@ -340,6 +340,7 @@ defmodule EyeInTheSky.Tasks do
   end
 
   defp broadcast_change(_) do
-    EyeInTheSky.Events.tasks_changed()
+    Logger.warning("task operation failed, skipping broadcast")
+    :ok
   end
 end

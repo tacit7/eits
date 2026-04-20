@@ -237,6 +237,7 @@ defmodule EyeInTheSky.ScheduledJobs do
         "mix_task" -> EyeInTheSky.Workers.MixTaskWorker
         "daily_digest" -> EyeInTheSky.Workers.DailyDigestWorker
         "workable_task" -> EyeInTheSky.Workers.WorkableTaskWorker
+        other -> {:error, {:unknown_job_type, other}}
       end
 
     %{"job_id" => job.id}

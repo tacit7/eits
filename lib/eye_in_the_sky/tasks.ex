@@ -191,7 +191,7 @@ defmodule EyeInTheSky.Tasks do
       |> Repo.update()
 
     case result do
-      {:ok, task} -> broadcast_change({:ok, task})
+      {:ok, task} -> broadcast_change({:updated, task})
       _ -> :ok
     end
 
@@ -258,15 +258,23 @@ defmodule EyeInTheSky.Tasks do
   def reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
     now = DateTime.utc_now()
 
-    Repo.transaction(fn ->
+    {placeholders, extra_params} =
       ordered_uuids
       |> Enum.with_index(1)
-      |> Enum.each(fn {uuid, pos} ->
-        from(t in Task, where: t.uuid == ^uuid)
-        |> Repo.update_all(set: [position: pos, updated_at: now])
+      |> Enum.reduce({[], []}, fn {uuid, pos}, {phs, params} ->
+        base = 2 + length(params)
+        {phs ++ ["($#{base}, $#{base + 1})"], params ++ [uuid, pos]}
       end)
-    end)
 
+    sql = """
+    UPDATE tasks
+    SET position = v.pos,
+        updated_at = $1
+    FROM (VALUES #{Enum.join(placeholders, ", ")}) AS v(uuid_val, pos)
+    WHERE tasks.uuid = v.uuid_val::uuid
+    """
+
+    Ecto.Adapters.SQL.query!(Repo, sql, [now | extra_params])
     :ok
   end
 

@@ -21,13 +21,21 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "IAM Policies")
-     |> assign(:sidebar_tab, :iam)
-     |> assign(:sidebar_project, nil)
-     |> assign(:filters, @default_filters)
-     |> assign_policies()}
+    socket =
+      socket
+      |> assign(:page_title, "IAM Policies")
+      |> assign(:sidebar_tab, :iam)
+      |> assign(:sidebar_project, nil)
+      |> assign(:filters, @default_filters)
+
+    socket =
+      if connected?(socket) do
+        assign_policies(socket)
+      else
+        assign(socket, :policies, [])
+      end
+
+    {:ok, socket}
   end
 
   @impl true

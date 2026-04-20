@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
   def index(conn, params) do
     projects =
       if path = params["path"] do
-        Projects.list_projects_by_path(path)
+        Projects.get_project_by_path(path) |> List.wrap() |> Enum.reject(&is_nil/1)
       else
         Projects.list_projects()
       end

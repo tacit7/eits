@@ -19,9 +19,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
       if project_id do
         project = Projects.get_project!(project_id)
 
-        # Load tasks manually due to type mismatch (projects.id is INT, tasks.project_id is TEXT)
-        tasks = Tasks.list_tasks_for_project(project_id)
-
         # Load active sessions for this project (max 5) — filtered in SQL
         active_sessions =
           Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
@@ -38,33 +35,41 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         # Load recent commits via single batch query
         recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
 
-        # Task stats
-        open_tasks = Enum.count(tasks, &is_nil(&1.completed_at))
-        done_tasks = Enum.count(tasks, & &1.completed_at)
-
-        claude_files = scan_claude_files(project.path)
+        project_path = project.path
 
         socket
         |> assign(:page_title, "Project: #{project.name}")
         |> assign(:project, project)
         |> assign(:sidebar_tab, :overview)
         |> assign(:sidebar_project, project)
-        |> assign(:tasks, tasks)
         |> assign(:active_sessions, active_sessions)
         |> assign(:recent_notes, recent_notes)
         |> assign(:agent_count, agent_count)
         |> assign(:working_agent_count, working_agent_count)
         |> assign(:session_count, session_count)
         |> assign(:recent_commits, recent_commits)
-        |> assign(:open_tasks, open_tasks)
-        |> assign(:done_tasks, done_tasks)
-        |> assign(:claude_files, claude_files)
+        |> assign_async([:tasks, :open_tasks, :done_tasks], fn ->
+          tasks = Tasks.list_tasks_for_project(project_id)
+
+          {:ok,
+           %{
+             tasks: tasks,
+             open_tasks: Enum.count(tasks, &is_nil(&1.completed_at)),
+             done_tasks: Enum.count(tasks, & &1.completed_at)
+           }}
+        end)
+        |> assign_async(:claude_files, fn ->
+          {:ok, %{claude_files: scan_claude_files(project_path)}}
+        end)
       else
         # Invalid project ID - show error
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
-        |> assign(:tasks, [])
+        |> assign_async([:tasks, :open_tasks, :done_tasks], fn ->
+          {:ok, %{tasks: [], open_tasks: 0, done_tasks: 0}}
+        end)
+        |> assign_async(:claude_files, fn -> {:ok, %{claude_files: []}} end)
         |> put_flash(:error, "Invalid project ID")
       end
 
@@ -88,8 +93,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-3">
               <p class="text-xs text-base-content/50 uppercase tracking-wider">Tasks</p>
-              <p class="text-2xl font-semibold text-base-content">{length(@tasks)}</p>
-              <p class="text-xs text-base-content/40">{@open_tasks} open · {@done_tasks} done</p>
+              <p class="text-2xl font-semibold text-base-content">
+                {if @tasks.ok?, do: length(@tasks.result), else: "-"}
+              </p>
+              <p class="text-xs text-base-content/40">
+                {(@open_tasks.result || 0)} open · {(@done_tasks.result || 0)} done
+              </p>
             </div>
           </div>
           <div class="card bg-base-100 shadow-sm">
@@ -122,9 +131,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                   <p class="text-xs font-mono text-base-content/90 break-all">{@project.path}</p>
                 </div>
               <% end %>
-              <%= if @claude_files != [] do %>
+              <%= if @claude_files.ok? && @claude_files.result != [] do %>
                 <div class="space-y-1">
-                  <%= for entry <- @claude_files do %>
+                  <%= for entry <- (@claude_files.result || []) do %>
                     <a
                       href={~p"/projects/#{@project.id}/files?path=#{entry.rel_path}"}
                       class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors"
@@ -186,12 +195,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <% end %>
           
     <!-- Recent Tasks -->
-          <%= if @tasks != [] do %>
+          <%= if @tasks.ok? && @tasks.result != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-2">Recent Tasks</h2>
                 <div class="space-y-1">
-                  <%= for task <- @tasks |> Enum.sort_by(& &1.created_at, :desc) |> Enum.take(5) do %>
+                  <%= for task <- (@tasks.result || []) |> Enum.sort_by(& &1.created_at, :desc) |> Enum.take(5) do %>
                     <div class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
                       <div class="flex-shrink-0">
                         <%= if task.completed_at do %>
@@ -292,11 +301,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     entries =
       if File.dir?(claude_dir) do
         children =
-          claude_dir
-          |> File.ls!()
-          |> Enum.reject(&String.starts_with?(&1, "."))
-          |> Enum.sort()
-          |> Enum.map(&build_claude_entry(&1, claude_dir))
+          case File.ls(claude_dir) do
+            {:ok, ls_entries} ->
+              ls_entries
+              |> Enum.reject(&String.starts_with?(&1, "."))
+              |> Enum.sort()
+              |> Enum.map(&build_claude_entry(&1, claude_dir))
+
+            {:error, _} ->
+              []
+          end
 
         entries ++ children
       else

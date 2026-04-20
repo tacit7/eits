@@ -470,7 +470,7 @@ git commit -m "feat: message grouping — skip headers for consecutive same-send
 **Files:**
 - Modify: `assets/svelte/components/tabs/AgentMessagesPanel.svelte`
 
-- [ ] **Step 3.1: Add `tick` import and `textareaEl` variable + `resizeTextarea` + `clearComposer`**
+- [ ] **Step 3.1: Add `tick` import, replace `inputElement` with `textareaEl`, add `resizeTextarea` + `clearComposer`**
 
 At the top of the `<script>` block, add to the imports line:
 
@@ -481,12 +481,13 @@ At the top of the `<script>` block, add to the imports line:
   // ... rest
 ```
 
-Find where `let inputElement` is declared (it's in the variable declarations section near the top). Add alongside it:
+Find where `let inputElement` is declared (it's in the variable declarations section near the top). **Replace it** with `textareaEl`:
 
 ```js
-let inputElement     // keep for backward compat if referenced elsewhere
 let textareaEl
 ```
+
+**Do not keep `inputElement`.** Both `selectAutocomplete` and `selectSlashItem` reference `inputElement` for cursor operations — these must be updated in Step 3.1b below.
 
 Add these two functions in the script block (after the existing helper functions, before `handleSubmit`):
 
@@ -502,6 +503,94 @@ async function clearComposer() {
   await tick()
   resizeTextarea(textareaEl)
   textareaEl?.focus()
+}
+```
+
+- [ ] **Step 3.1b: Update `selectAutocomplete` and `selectSlashItem` to use `textareaEl`**
+
+Both functions currently reference `inputElement` for cursor position. After removing `inputElement` in Step 3.1, these will throw. Replace all three references in each function.
+
+Find `selectAutocomplete` (currently around line 247):
+
+```js
+function selectAutocomplete(sessionId) {
+  const cursorPos = inputElement.selectionStart
+  const textBeforeCursor = inputValue.substring(0, cursorPos)
+  const textAfterCursor = inputValue.substring(cursorPos)
+  const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+
+  const mentionText = sessionId === 'all' ? 'all' : String(sessionId)
+  inputValue = textBeforeCursor.substring(0, lastAtIndex) + `@${mentionText} ` + textAfterCursor
+  showAutocomplete = false
+
+  setTimeout(() => {
+    const newPos = lastAtIndex + mentionText.length + 2
+    inputElement.setSelectionRange(newPos, newPos)
+    inputElement.focus()
+  }, 0)
+}
+```
+
+Replace with:
+
+```js
+function selectAutocomplete(sessionId) {
+  const cursorPos = textareaEl.selectionStart
+  const textBeforeCursor = inputValue.substring(0, cursorPos)
+  const textAfterCursor = inputValue.substring(cursorPos)
+  const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+
+  const mentionText = sessionId === 'all' ? 'all' : String(sessionId)
+  inputValue = textBeforeCursor.substring(0, lastAtIndex) + `@${mentionText} ` + textAfterCursor
+  showAutocomplete = false
+
+  setTimeout(() => {
+    const newPos = lastAtIndex + mentionText.length + 2
+    textareaEl.setSelectionRange(newPos, newPos)
+    textareaEl.focus()
+  }, 0)
+}
+```
+
+Find `selectSlashItem` (currently around line 264):
+
+```js
+function selectSlashItem(item) {
+  if (!item) return
+  const cursorPos = inputElement.selectionStart
+  const prefix = inputValue.slice(0, slashTriggerPos)
+  const suffix = inputValue.slice(cursorPos)
+  const insertion = item.type === 'agent' ? `@${item.slug} ` : `/${item.slug} `
+
+  inputValue = prefix + insertion + suffix
+  showSlashAutocomplete = false
+
+  setTimeout(() => {
+    const newPos = prefix.length + insertion.length
+    inputElement.setSelectionRange(newPos, newPos)
+    inputElement.focus()
+  }, 0)
+}
+```
+
+Replace with:
+
+```js
+function selectSlashItem(item) {
+  if (!item) return
+  const cursorPos = textareaEl.selectionStart
+  const prefix = inputValue.slice(0, slashTriggerPos)
+  const suffix = inputValue.slice(cursorPos)
+  const insertion = item.type === 'agent' ? `@${item.slug} ` : `/${item.slug} `
+
+  inputValue = prefix + insertion + suffix
+  showSlashAutocomplete = false
+
+  setTimeout(() => {
+    const newPos = prefix.length + insertion.length
+    textareaEl.setSelectionRange(newPos, newPos)
+    textareaEl.focus()
+  }, 0)
 }
 ```
 
@@ -535,7 +624,7 @@ function handleSubmit(e) {
 Replace with:
 
 ```js
-async function handleSubmit(e) {
+async function handleSubmit() {
   const body = inputValue.trim()
 
   if (body) {

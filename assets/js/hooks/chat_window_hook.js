@@ -247,8 +247,14 @@ export const ChatWindowHook = {
     const autoScrollBtn = this.el.querySelector("[data-autoscroll-btn]")
     const newMsgPill = this.el.querySelector("[data-new-msg-pill]")
 
+    // Re-query [data-chat-body] each call to avoid stale references after patches.
+    // Also scroll this.el as a fallback: if the flex layout collapses chatBody to
+    // zero height, this.el (overflow:auto) becomes the visible scroll container.
     const scrollToBottom = () => {
-      if (chatBody) chatBody.scrollTop = chatBody.scrollHeight
+      const body = this.el.querySelector("[data-chat-body]")
+      if (body) body.scrollTop = body.scrollHeight
+      // Fallback: harmless when this.el has no overflow (scrollTop clamps to 0)
+      this.el.scrollTop = this.el.scrollHeight
     }
 
     const setAutoScroll = (enabled) => {
@@ -275,6 +281,18 @@ export const ChatWindowHook = {
         }
       })
     }
+
+    // Also track scroll state on the outer container — if chatBody collapses,
+    // this.el becomes the visible scroll target and we need to detect up/down.
+    this.el.addEventListener("scroll", () => {
+      const atBottom = this.el.scrollTop + this.el.clientHeight >= this.el.scrollHeight - 10
+      const scrolledUp = this.el.scrollTop + this.el.clientHeight < this.el.scrollHeight - 20
+      if (atBottom && !this._autoScroll) {
+        setAutoScroll(true)
+      } else if (scrolledUp && this._autoScroll) {
+        setAutoScroll(false)
+      }
+    })
 
     if (autoScrollBtn) {
       autoScrollBtn.addEventListener("click", () => {

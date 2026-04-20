@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_event("fab_set_bookmarks", %{"bookmarks" => bookmarks}, socket) do
-    bookmarks = bookmarks || []
+    bookmarks = if is_list(bookmarks), do: bookmarks, else: []
     statuses = fetch_bookmark_statuses(bookmarks)
 
     socket =
@@ -269,9 +269,10 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     assign(socket, :fab_timer, timer)
   end
 
+  defp fetch_bookmark_statuses(bookmarks) when not is_list(bookmarks), do: %{}
   defp fetch_bookmark_statuses([]), do: %{}
 
-  defp fetch_bookmark_statuses(bookmarks) when is_list(bookmarks) do
+  defp fetch_bookmark_statuses(bookmarks) do
     ids = for id when is_binary(id) or is_integer(id) <- bookmarks, do: to_string(id)
 
     if ids == [] do

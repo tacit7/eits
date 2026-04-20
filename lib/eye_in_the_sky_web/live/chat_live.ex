@@ -31,6 +31,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:working_agents, %{})
       |> assign(:sidebar_tab, :chat)
       |> assign(:sidebar_project, nil)
+      |> assign(:new_channel_name, nil)
       |> allow_upload(:agent_images,
         accept: ~w(.jpg .jpeg .png .gif .webp),
         max_entries: 5,
@@ -294,6 +295,21 @@ defmodule EyeInTheSkyWeb.ChatLive do
     do: ChannelActions.handle_create_agent(socket, params)
 
   @impl true
+  def handle_event("show_new_channel", _params, socket) do
+    {:noreply, assign(socket, :new_channel_name, "")}
+  end
+
+  @impl true
+  def handle_event("cancel_new_channel", _params, socket) do
+    {:noreply, assign(socket, :new_channel_name, nil)}
+  end
+
+  @impl true
+  def handle_event("update_channel_name", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :new_channel_name, value)}
+  end
+
+  @impl true
   def handle_info({:agent_working, msg}, socket) do
     AgentStatusHelpers.handle_agent_working(socket, msg, fn socket, session_id ->
       assign(socket, :working_agents, Map.put(socket.assigns.working_agents, session_id, true))
@@ -337,31 +353,70 @@ defmodule EyeInTheSkyWeb.ChatLive do
     assigns = assign(assigns, :active_channel, active_channel)
 
     ~H"""
-    <div class="flex flex-col h-[calc(100dvh-3rem)] md:h-[calc(100dvh-2rem)] px-4 sm:px-6 lg:px-8 py-4">
-      <ChannelHeader.channel_header
-        active_channel={@active_channel}
-        agent_status_counts={@agent_status_counts}
-        show_members={@show_members}
-        channel_members={@channel_members}
-        sessions_by_project={@sessions_by_project}
-        session_search={@session_search}
-      />
-      <.message_feed
-        active_channel_id={@active_channel_id}
-        messages={@messages}
-        active_agents={@active_agents}
-        channel_members={@channel_members}
-        working_agents={@working_agents}
-        slash_items={@slash_items}
-        socket={@socket}
-      />
-      <.agent_drawer
-        show={@show_agent_drawer}
-        all_projects={@all_projects}
-        prompts={@prompts}
-        agent_templates={@agent_templates}
-        uploads={@uploads}
-      />
+    <div class="flex h-[var(--app-viewport-height)] bg-base-100">
+      <nav class="w-[200px] flex-shrink-0 flex flex-col border-r border-base-content/8 bg-base-100" aria-label="Channels">
+        <div class="px-2 pt-2 pb-1 border-b border-base-content/8">
+          <button
+            onclick="history.length > 1 ? history.back() : window.location.href = '/'"
+            class="btn btn-ghost btn-xs px-1.5 self-center mr-1 text-base-content/50 hover:text-base-content"
+            aria-label="Go back"
+            title="Go back"
+          >
+            <.icon name="hero-arrow-left" class="w-4 h-4" />
+          </button>
+        </div>
+        <div class="flex items-center justify-between px-3 pt-3 pb-1">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-base-content/30">Channels</span>
+          <button phx-click="show_new_channel" class="text-base-content/30 hover:text-base-content/60 transition-colors leading-none text-base" title="New channel" aria-label="New channel">+</button>
+        </div>
+        <div class="flex-1 overflow-y-auto py-1">
+          <%= for channel <- @channels do %>
+            <.link
+              navigate={~p"/chat?channel_id=#{channel.id}"}
+              class={["flex items-center gap-1 px-2.5 py-1 mx-1.5 rounded text-sm transition-colors",
+                if(not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id),
+                  do: "bg-primary/10 text-primary font-semibold",
+                  else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5")]}
+            >
+              <span class="text-base-content/25 text-[13px]">#</span>{channel.name}
+            </.link>
+          <% end %>
+          <%= if @new_channel_name do %>
+            <form phx-submit="create_channel" phx-keydown="cancel_new_channel" class="flex items-center gap-1 px-2.5 mx-1.5 py-1">
+              <span class="text-base-content/25 text-[13px]">#</span>
+              <input type="text" name="name" value={@new_channel_name} phx-keyup="update_channel_name" placeholder="channel-name" class="flex-1 bg-transparent border-b border-base-content/15 text-sm text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono" autofocus />
+            </form>
+          <% else %>
+            <button phx-click="show_new_channel" class="flex items-center gap-1 px-2.5 mx-1.5 py-1 text-sm text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left">+ New Channel</button>
+          <% end %>
+        </div>
+      </nav>
+      <div class="flex-1 flex flex-col min-w-0">
+        <ChannelHeader.channel_header
+          active_channel={@active_channel}
+          agent_status_counts={@agent_status_counts}
+          show_members={@show_members}
+          channel_members={@channel_members}
+          sessions_by_project={@sessions_by_project}
+          session_search={@session_search}
+        />
+        <.message_feed
+          active_channel_id={@active_channel_id}
+          messages={@messages}
+          active_agents={@active_agents}
+          channel_members={@channel_members}
+          working_agents={@working_agents}
+          slash_items={@slash_items}
+          socket={@socket}
+        />
+        <.agent_drawer
+          show={@show_agent_drawer}
+          all_projects={@all_projects}
+          prompts={@prompts}
+          agent_templates={@agent_templates}
+          uploads={@uploads}
+        />
+      </div>
     </div>
     """
   end
@@ -370,7 +425,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   defp message_feed(assigns) do
     ~H"""
-    <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden">
       <.svelte
         name="AgentMessagesPanel"
         ssr={false}

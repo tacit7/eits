@@ -132,6 +132,17 @@ The `stream_thinking` assign:
 - Allows the UI to display inline reasoning while the agent thinks
 - Works for both complete blocks (Codex) and character-by-character deltas (Claude)
 
+### Raw Output Broadcasting
+
+Codex's raw JSONL output lines are broadcast directly from `MessageHandler` (not relayed through AgentWorker). Each raw line is sent via PubSub using the session's `eits_session_id`:
+
+```elixir
+# lib/eye_in_the_sky/sdk/message_handler.ex
+PubSub.broadcast(topic: "codex:#{eits_session_id}", event: "raw_line", data: raw_line)
+```
+
+This enables live debugging and inspection of the raw Codex JSONL stream without coupling the broadcast to AgentWorker's internal state.
+
 ## JSONL Event Types
 
 Events emitted by `codex exec --json`:
@@ -194,14 +205,17 @@ The first message to a new Codex session is prepended with `codex_eits_init/1`, 
 
 | Module | File | Role |
 |--------|------|------|
-| `Codex.CLI` | `lib/eye_in_the_sky_web/codex/cli.ex` | Port spawning, arg building, env setup |
-| `Codex.SDK` | `lib/eye_in_the_sky_web/codex/sdk.ex` | High-level API; message protocol adapter |
-| `Codex.Parser` | `lib/eye_in_the_sky_web/codex/parser.ex` | JSONL line -> Message struct |
-| `Codex.StreamAssembler` | `lib/eye_in_the_sky_web/codex/stream_assembler.ex` | Stream state for Codex PubSub events |
-| `Claude.StreamAssembler` | `lib/eye_in_the_sky_web/claude/stream_assembler.ex` | Stream state for Claude PubSub events |
-| `AgentWorker` | `lib/eye_in_the_sky_web/claude/agent_worker.ex` | Provider-polymorphic worker |
-| `AgentManager` | `lib/eye_in_the_sky_web/claude/agent_manager.ex` | Session creation, worker lifecycle |
-| `WorkerEvents` | `lib/eye_in_the_sky_web/agent_worker_events.ex` | DB persistence, PubSub broadcasts |
+| `Codex.CLI` | `lib/eye_in_the_sky/codex/cli.ex` | Port spawning, arg building, env setup |
+| `Codex.SDK` | `lib/eye_in_the_sky/codex/sdk.ex` | High-level API; message protocol adapter |
+| `Codex.ToolMapper` | `lib/eye_in_the_sky/codex/tool_mapper.ex` | Map MCP tool definitions to Codex format |
+| `Codex.Parser` | `lib/eye_in_the_sky/codex/parser.ex` | JSONL line -> Message struct |
+| `Codex.StreamAssembler` | `lib/eye_in_the_sky/codex/stream_assembler.ex` | Stream state for Codex PubSub events |
+| `Codex.ReviewInstructions` | `lib/eye_in_the_sky/codex/review_instructions.ex` | Build review prompt for GitHub PRs |
+| `Claude.StreamAssembler` | `lib/eye_in_the_sky/claude/stream_assembler.ex` | Stream state for Claude PubSub events |
+| `AgentWorker` | `lib/eye_in_the_sky/claude/agent_worker.ex` | Provider-polymorphic worker |
+| `AgentManager` | `lib/eye_in_the_sky/claude/agent_manager.ex` | Session creation, worker lifecycle |
+| `MessageHandler` | `lib/eye_in_the_sky/sdk/message_handler.ex` | JSONL parsing, raw broadcasts from Codex output |
+| `WorkerEvents` | `lib/eye_in_the_sky/agent_worker_events.ex` | DB persistence, PubSub broadcasts |
 
 ## Streaming vs Claude
 

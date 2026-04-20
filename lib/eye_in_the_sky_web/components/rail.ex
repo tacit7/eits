@@ -130,21 +130,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     if current == section && socket.assigns.flyout_open do
       {:noreply, assign(socket, flyout_open: false, mobile_open: false)}
     else
-      current_project = socket.assigns.sidebar_project
-      sessions =
-        if socket.assigns.flyout_sessions == [] do
-          load_flyout_sessions(current_project)
-        else
-          socket.assigns.flyout_sessions
-        end
-
       {:noreply,
        socket
        |> assign(:active_section, section)
        |> assign(:flyout_open, true)
        |> assign(:mobile_open, true)
        |> assign(:proj_picker_open, false)
-       |> assign(:flyout_sessions, sessions)}
+       |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project))}
     end
   end
 

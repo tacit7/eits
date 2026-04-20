@@ -246,7 +246,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
         socket
 
       id ->
-        Phoenix.PubSub.unsubscribe(EyeInTheSky.PubSub, "session:#{id}")
+        EyeInTheSky.Events.unsubscribe_session(id)
         assign(socket, :fab_active_session_id, nil)
     end
   end
@@ -257,7 +257,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
         socket
 
       id ->
-        Phoenix.PubSub.unsubscribe(EyeInTheSky.PubSub, "session:#{id}")
+        EyeInTheSky.Events.unsubscribe_session(id)
         assign(socket, :config_guide_active_session_id, nil)
     end
   end

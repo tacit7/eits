@@ -2,6 +2,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
+  import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
+
   attr :projects, :list, required: true
   attr :sidebar_project, :any, default: nil
   attr :open, :boolean, default: false
@@ -92,17 +94,4 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
     """
   end
 
-  # Safe initial extraction — handles nil project, nil name, and empty names
-  defp project_initial(nil), do: "E"
-
-  defp project_initial(%{name: name}) when is_binary(name) do
-    name
-    |> String.trim()
-    |> case do
-      "" -> "E"
-      trimmed -> trimmed |> String.first() |> String.upcase()
-    end
-  end
-
-  defp project_initial(_), do: "E"
 end

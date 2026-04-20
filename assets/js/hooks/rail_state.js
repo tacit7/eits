@@ -31,9 +31,9 @@ export const RailState = {
       })
       this._grabHandle = document.getElementById('rail-grab-handle')
       if (this._grabHandle) {
-        this._grabHandle.addEventListener('touchstart', this._edgeGesture.onTouchStart)
-        this._grabHandle.addEventListener('touchmove', this._edgeGesture.onTouchMove)
-        this._grabHandle.addEventListener('touchend', this._edgeGesture.onTouchEnd)
+        this._grabHandle.addEventListener('touchstart', this._edgeGesture.onTouchStart, { passive: true })
+        this._grabHandle.addEventListener('touchmove', this._edgeGesture.onTouchMove, { passive: true })
+        this._grabHandle.addEventListener('touchend', this._edgeGesture.onTouchEnd, { passive: true })
       }
     }
   },

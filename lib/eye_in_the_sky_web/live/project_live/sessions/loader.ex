@@ -92,11 +92,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
     # Only stream_insert the changed row — inserting every visible agent causes the
     # stream's remove→morph→reinsert cycle on all rows, which resets :hover state
     # and makes the ... menu flicker via its opacity transition.
-    case Enum.find(updated, &(&1.id == session_id)) do
-      nil ->
-        socket
+    #
+    # Guard: skip stream_insert entirely when the session is outside the current
+    # visible/paginated slice. stream_insert on a non-visible ID injects it into
+    # the stream and breaks pagination consistency.
+    visible_ids = MapSet.new(socket.assigns.agents, & &1.id)
 
-      changed_agent ->
+    case Enum.find(updated, &(&1.id == session_id)) do
+      changed_agent when not is_nil(changed_agent) and is_map_key(visible_ids, session_id) ->
         agents =
           Enum.map(socket.assigns.agents, fn a ->
             if a.id == session_id, do: changed_agent, else: a
@@ -105,6 +108,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
         socket
         |> assign(:agents, agents)
         |> stream_insert(:session_list, changed_agent)
+
+      _ ->
+        socket
     end
   end
 

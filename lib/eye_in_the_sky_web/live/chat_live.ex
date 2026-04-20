@@ -1,21 +1,15 @@
 defmodule EyeInTheSkyWeb.ChatLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{ChannelMessages, Channels, MessageReactions, Messages, Sessions}
-  alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.Claude.ChannelProtocol
-  alias EyeInTheSkyWeb.ChatLive.ChannelActions
+  alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSkyWeb.ChatLive.ChannelDataLoader
   alias EyeInTheSkyWeb.ChatLive.ChannelHeader
-  alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
+  alias EyeInTheSkyWeb.ChatLive.EventHandlers
+  alias EyeInTheSkyWeb.ChatLive.PubSubHandlers
   alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.Helpers.SlashItems
-  alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
-  import EyeInTheSkyWeb.Helpers.ChannelRoutingHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
-  import EyeInTheSkyWeb.Helpers.UploadHelpers
-  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1, parse_int: 2]
-  require Logger
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -111,237 +105,10 @@ defmodule EyeInTheSkyWeb.ChatLive do
   end
 
   @impl true
-  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, enabled in [true, "true", "on", 1, "1"])}
-  end
+  def handle_event(event, params, socket), do: EventHandlers.handle_event(event, params, socket)
 
   @impl true
-  def handle_event("change_channel", %{"channel_id" => channel_id}, socket) do
-    {:noreply, push_patch(socket, to: ~p"/chat?channel_id=#{channel_id}")}
-  end
-
-  @impl true
-  def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
-    session_id = get_session_id(socket)
-    content_blocks = consume_agent_images_as_content_blocks(socket)
-
-    case ChannelMessages.send_channel_message(%{
-           channel_id: channel_id,
-           session_id: session_id,
-           sender_role: "user",
-           recipient_role: "agent",
-           provider: "claude",
-           body: body
-         }) do
-      {:ok, message} ->
-        EyeInTheSky.Events.channel_message(channel_id, message)
-        Channels.mark_as_read(channel_id, session_id)
-        ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
-        {:noreply, refresh_members_and_picker(socket)}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to send message")}
-    end
-  end
-
-  @impl true
-  def handle_event(
-        "send_direct_message",
-        %{"session_id" => target_session_id_str, "body" => body} = params,
-        socket
-      ) do
-    session_id = get_session_id(socket)
-    channel_id = params["channel_id"] || socket.assigns.active_channel_id
-
-    target_session_id = parse_int(target_session_id_str)
-
-    case create_dm_channel_message(channel_id, body, session_id) do
-      {:ok, _message} ->
-        if target_session_id do
-          case Channels.get_channel(channel_id) do
-            nil ->
-              :ok
-
-            channel ->
-              channel_ctx = %{id: channel.id, name: channel.name}
-              prompt = ChannelProtocol.build_prompt(:direct, body, channel_ctx)
-              AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
-          end
-        end
-
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to send message")}
-    end
-  end
-
-  @impl true
-  def handle_event("add_agent_to_channel", params, socket),
-    do: ChannelActions.handle_add_agent(socket, params)
-
-  @impl true
-  def handle_event("remove_agent_from_channel", params, socket),
-    do: ChannelActions.handle_remove_agent(socket, params)
-
-  @impl true
-  def handle_event("open_thread", %{"message_id" => message_id}, socket) do
-    {:noreply,
-     push_patch(socket,
-       to: ~p"/chat?channel_id=#{socket.assigns.active_channel_id}&thread_id=#{message_id}"
-     )}
-  end
-
-  @impl true
-  def handle_event("close_thread", _params, socket) do
-    {:noreply, push_patch(socket, to: ~p"/chat?channel_id=#{socket.assigns.active_channel_id}")}
-  end
-
-  @impl true
-  def handle_event(
-        "send_thread_reply",
-        %{"parent_message_id" => parent_id, "body" => body},
-        socket
-      ) do
-    session_id = get_session_id(socket)
-    channel_id = socket.assigns.active_channel_id
-
-    case ChannelMessages.create_thread_reply(parent_id, %{
-           channel_id: channel_id,
-           session_id: session_id,
-           sender_role: "user",
-           recipient_role: "agent",
-           provider: "claude",
-           body: body
-         }) do
-      {:ok, message} ->
-        EyeInTheSky.Events.channel_message(channel_id, message)
-        active_thread = ChannelDataLoader.load_thread(parent_id)
-        {:noreply, assign(socket, :active_thread, active_thread)}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to send reply")}
-    end
-  end
-
-  @impl true
-  def handle_event("toggle_reaction", %{"message_id" => message_id, "emoji" => emoji}, socket) do
-    session_id = get_session_id(socket)
-
-    case MessageReactions.toggle_reaction(message_id, session_id, emoji) do
-      {:ok, _action} ->
-        {:noreply, assign(socket, :messages, reload_messages(socket))}
-
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to add reaction")}
-    end
-  end
-
-  @impl true
-  def handle_event("delete_message", %{"id" => id_str}, socket) do
-    case parse_int(id_str) do
-      nil ->
-        {:noreply, socket}
-
-      id ->
-        message = Messages.get_message!(id)
-        {:ok, _} = Messages.delete_message(message)
-
-        {:noreply, assign(socket, :messages, reload_messages(socket))}
-    end
-  end
-
-  @impl true
-  def handle_event("search_sessions", %{"session_search" => query}, socket) do
-    sessions_by_project =
-      ChannelHelpers.build_sessions_by_project(
-        socket.assigns.channel_members,
-        socket.assigns.all_projects,
-        query
-      )
-
-    {:noreply,
-     socket
-     |> assign(:session_search, query)
-     |> assign(:sessions_by_project, sessions_by_project)}
-  end
-
-  @impl true
-  def handle_event("toggle_members", _params, socket) do
-    {:noreply, assign(socket, :show_members, !socket.assigns.show_members)}
-  end
-
-  @impl true
-  def handle_event("toggle_agent_drawer", _params, socket) do
-    {:noreply, assign(socket, :show_agent_drawer, !socket.assigns.show_agent_drawer)}
-  end
-
-  @impl true
-  def handle_event("validate_agent_upload", _params, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("cancel_agent_upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :agent_images, ref)}
-  end
-
-  @impl true
-  def handle_event("create_channel", params, socket),
-    do: ChannelActions.handle_create_channel(socket, params)
-
-  @impl true
-  def handle_event("create_agent", params, socket),
-    do: ChannelActions.handle_create_agent(socket, params)
-
-  @impl true
-  def handle_event("show_new_channel", _params, socket) do
-    {:noreply, assign(socket, :new_channel_name, "")}
-  end
-
-  @impl true
-  def handle_event("cancel_new_channel", _params, socket) do
-    {:noreply, assign(socket, :new_channel_name, nil)}
-  end
-
-  @impl true
-  def handle_event("update_channel_name", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :new_channel_name, value)}
-  end
-
-  @impl true
-  def handle_info({:agent_working, msg}, socket) do
-    AgentStatusHelpers.handle_agent_working(socket, msg, fn socket, session_id ->
-      assign(socket, :working_agents, Map.put(socket.assigns.working_agents, session_id, true))
-    end)
-  end
-
-  @impl true
-  def handle_info({:agent_stopped, msg}, socket) do
-    AgentStatusHelpers.handle_agent_stopped(socket, msg, fn socket, session_id ->
-      assign(socket, :working_agents, Map.delete(socket.assigns.working_agents, session_id))
-    end)
-  end
-
-  @impl true
-  def handle_info({:new_message, _message}, socket) do
-    Logger.info(
-      "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
-    )
-
-    messages = reload_messages(socket)
-
-    Logger.info("📬 Loaded #{length(messages)} messages from DB")
-
-    channels = load_channels(socket.assigns.project_id)
-
-    unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
-
-    {:noreply,
-     socket
-     |> assign(:messages, messages)
-     |> assign(:unread_counts, unread_counts)}
-  end
+  def handle_info(msg, socket), do: PubSubHandlers.handle_info(msg, socket)
 
   @impl true
   def render(assigns) do
@@ -498,25 +265,4 @@ defmodule EyeInTheSkyWeb.ChatLive do
     socket.assigns[:session_id]
   end
 
-  defp refresh_members_and_picker(socket) do
-    channel_id = socket.assigns.active_channel_id
-    channel_members = ChannelHelpers.load_channel_members(channel_id)
-    search = socket.assigns[:session_search] || ""
-
-    sessions_by_project =
-      ChannelHelpers.build_sessions_by_project(
-        channel_members,
-        socket.assigns.all_projects,
-        search
-      )
-
-    socket
-    |> assign(:channel_members, channel_members)
-    |> assign(:sessions_by_project, sessions_by_project)
-  end
-
-  defp reload_messages(socket) do
-    ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-    |> ChatPresenter.serialize_messages()
-  end
 end

@@ -14,7 +14,9 @@ elif [ "$EITS_WORKFLOW" = "0" ]; then
 fi
 # --- End Workflow Guard ---
 
-. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
+# Resolve symlinks so eits-lib.sh is found when this script runs as .git/hooks/post-commit
+_sf="${BASH_SOURCE[0]}"; [ -L "$_sf" ] && _sf="$(readlink "$_sf")"
+. "$(cd "$(dirname "$_sf")" && pwd)/eits-lib.sh"; unset _sf
 
 
 GIT_DIR="$(git rev-parse --git-dir 2>/dev/null)" || exit 0

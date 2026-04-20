@@ -147,7 +147,18 @@ Session status is set by lifecycle hooks and reflects the CLI process state:
 | `stopped` | Stop hook | Session explicitly stopped; CLI stopped gracefully |
 | `waiting` | SessionEnd hook (sdk-cli) | Headless session ended; can be resumed |
 | `completed` | i-end-session skill | Interactive session finished (manually set) |
-| `failed` | SessionWorker on error | Process crashed or error during execution |
+| `failed` | SessionWorker on systemic error | Billing/auth/watchdog error; session persisted to DB, Teams cleanup fired |
+
+**Systemic Error Handling:**
+When SessionWorker encounters a systemic error (billing failure, auth error, or watchdog timeout), it calls `AgentWorkerEvents.on_session_failed/2`:
+1. Streams error event to session channel
+2. Overwrites session status in DB to `"failed"` (ensuring final status persists even if previous status was `"idle"`)
+3. Fires Teams cleanup events (_no_ duplicate `session_idle`/`agent_stopped` calls — deduped to avoid broadcast storms)
+
+This design ensures:
+- Systemic failures are distinguishable from graceful stops (UI shows red status)
+- Teams are notified once per failure (not broadcast duplication)
+- Status is written to DB (survives worker restart)
 
 **Status indicator styling:**
 - `stopped` → Yellow left border (warning color) on session card
@@ -159,6 +170,27 @@ Session status is set by lifecycle hooks and reflects the CLI process state:
 - Stopped status is **not** auto-set on CLI exit
 - Completed status must be set **explicitly** via i-end-session skill
 - This prevents incorrect status when sessions are retried or resumed
+
+---
+
+## Sessions REST API
+
+The Sessions API at `PATCH /api/v1/sessions/:uuid` and related endpoints uses `Sessions.resolve(uuid)` to support both numeric session IDs and UUIDs:
+
+```elixir
+# Both work:
+PATCH /api/v1/sessions/3185                                        # numeric session ID
+PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
+```
+
+**Endpoints using `resolve_session/1`:**
+- `PATCH /api/v1/sessions/:uuid` — Update session status (lifecycle hooks)
+- `POST /api/v1/sessions/:uuid/tool_event` — Record tool event
+- `POST /api/v1/sessions/:uuid/end` — End session with final status
+- `GET /api/v1/sessions/:uuid/context` — Load session context
+- `POST /api/v1/sessions/:uuid/context` — Upsert context
+
+This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
 
 ---
 

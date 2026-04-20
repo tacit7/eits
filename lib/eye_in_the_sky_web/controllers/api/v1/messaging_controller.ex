@@ -99,32 +99,40 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       dm_body =
         "DM from:#{sender_name} (session:#{from_session.uuid}) #{trim_param(params["message"])}"
 
-      attrs = %{
-        uuid: Ecto.UUID.generate(),
-        session_id: to_session.id,
-        from_session_id: from_session.id,
-        to_session_id: to_session.id,
-        body: dm_body,
-        sender_role: "agent",
-        recipient_role: "agent",
-        direction: "inbound",
-        status: "sent",
-        provider: "claude",
-        metadata: %{
-          sender_name: sender_name,
-          from_session_uuid: from_session.uuid,
-          to_session_uuid: to_session.uuid,
-          response_required: response_required
-        }
+      metadata = %{
+        sender_name: sender_name,
+        from_session_uuid: from_session.uuid,
+        to_session_uuid: to_session.uuid,
+        response_required: response_required
       }
 
-      case agent_manager_mod().send_message(to_session.id, dm_body) do
-        result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
-          persist_dm(conn, to_session, attrs)
+      case Messages.find_recent_dm(to_session.id, dm_body, seconds: 30) do
+        nil ->
+          case deliver_and_persist_dm(to_session.id, from_session.id, dm_body, metadata) do
+            {:ok, msg} ->
+              conn
+              |> put_status(:created)
+              |> json(%{
+                success: true,
+                message: "DM delivered to session #{to_session.id}",
+                message_id: to_string(msg.id),
+                message_uuid: msg.uuid
+              })
 
-        {:error, reason} ->
-          Logger.error("DM routing failed for session #{to_session.id}: #{inspect(reason)}")
-          {:error, :internal_server_error, "Failed to deliver message"}
+            {:error, reason} ->
+              Logger.error("DM routing failed for session #{to_session.id}: #{inspect(reason)}")
+              {:error, :internal_server_error, "Failed to deliver message"}
+          end
+
+        existing ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            success: true,
+            message: "DM delivered to session #{to_session.id}",
+            message_id: to_string(existing.id),
+            message_uuid: existing.uuid
+          })
       end
     else
       {:from, {:error, :not_found}} ->
@@ -300,33 +308,18 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     for member <- members do
       dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
 
-      case agent_manager_mod().send_message(member.session_id, dm_body) do
-        result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
-          attrs = %{
-            uuid: Ecto.UUID.generate(),
-            session_id: member.session_id,
-            from_session_id: sender_session_id,
-            to_session_id: member.session_id,
-            body: dm_body,
-            sender_role: "agent",
-            recipient_role: "agent",
-            direction: "inbound",
-            status: "sent",
-            provider: "claude",
-            metadata: %{channel_id: channel_id, channel_notification: true}
-          }
-
-          case Messages.create_message(attrs) do
-            {:ok, msg} ->
-              EyeInTheSky.Events.session_new_dm(member.session_id, msg)
-
-            {:error, err} ->
-              Logger.warning("channel notify persist failed for session #{member.session_id}: #{inspect(err)}")
-          end
+      case deliver_and_persist_dm(
+             member.session_id,
+             sender_session_id,
+             dm_body,
+             %{channel_id: channel_id, channel_notification: true}
+           ) do
+        {:ok, _} ->
+          :ok
 
         {:error, reason} ->
           Logger.warning(
-            "channel notify delivery failed for session #{member.session_id}: #{inspect(reason)}"
+            "channel notify failed for session #{member.session_id}: #{inspect(reason)}"
           )
       end
     end
@@ -377,33 +370,18 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   defp deliver_team_dm(target_session_id, from_session_id, dm_body, channel_id) do
-    case agent_manager_mod().send_message(target_session_id, dm_body) do
-      result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
-        attrs = %{
-          uuid: Ecto.UUID.generate(),
-          session_id: target_session_id,
-          from_session_id: from_session_id,
-          to_session_id: target_session_id,
-          body: dm_body,
-          sender_role: "agent",
-          recipient_role: "agent",
-          direction: "inbound",
-          status: "sent",
-          provider: "claude",
-          metadata: %{channel_id: channel_id, broadcast: true}
-        }
-
-        case Messages.create_message(attrs) do
-          {:ok, msg} ->
-            EyeInTheSky.Events.session_new_dm(target_session_id, msg)
-
-          {:error, err} ->
-            Logger.warning("team broadcast persist failed for session #{target_session_id}: #{inspect(err)}")
-        end
+    case deliver_and_persist_dm(
+           target_session_id,
+           from_session_id,
+           dm_body,
+           %{channel_id: channel_id, broadcast: true}
+         ) do
+      {:ok, _} ->
+        :ok
 
       {:error, reason} ->
         Logger.warning(
-          "team broadcast delivery failed for session #{target_session_id}: #{inspect(reason)}"
+          "team broadcast failed for session #{target_session_id}: #{inspect(reason)}"
         )
     end
   end
@@ -477,35 +455,34 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     })
   end
 
-  defp persist_dm(conn, to_session, attrs) do
-    case Messages.find_recent_dm(to_session.id, attrs.body, seconds: 30) do
-      nil ->
+  defp deliver_and_persist_dm(to_session_id, from_session_id, dm_body, metadata) do
+    case agent_manager_mod().send_message(to_session_id, dm_body) do
+      result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
+        attrs = %{
+          uuid: Ecto.UUID.generate(),
+          session_id: to_session_id,
+          from_session_id: from_session_id,
+          to_session_id: to_session_id,
+          body: dm_body,
+          sender_role: "agent",
+          recipient_role: "agent",
+          direction: "inbound",
+          status: "sent",
+          provider: "claude",
+          metadata: metadata
+        }
+
         case Messages.create_message(attrs) do
           {:ok, msg} ->
-            EyeInTheSky.Events.session_new_dm(to_session.id, msg)
+            EyeInTheSky.Events.session_new_dm(to_session_id, msg)
+            {:ok, msg}
 
-            conn
-            |> put_status(:created)
-            |> json(%{
-              success: true,
-              message: "DM delivered to session #{to_session.id}",
-              message_id: to_string(msg.id),
-              message_uuid: msg.uuid
-            })
-
-          {:error, _cs} ->
-            {:error, "Failed to persist DM"}
+          {:error, _} = err ->
+            err
         end
 
-      existing ->
-        conn
-        |> put_status(:created)
-        |> json(%{
-          success: true,
-          message: "DM delivered to session #{to_session.id}",
-          message_id: to_string(existing.id),
-          message_uuid: existing.uuid
-        })
+      {:error, _} = err ->
+        err
     end
   end
 

@@ -313,8 +313,6 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         </button>
       </div>
 
-      <%!-- Job Form Drawer — events (cancel_form, save_job, etc.) go to parent LiveView
-           which relays them back here via send_update event_relay. --%>
       <%= if @project_id do %>
         <.job_form_drawer
           show={@show_form}
@@ -327,6 +325,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           project={@project}
           form_scope={@form_scope}
           show_daily_digest={true}
+          target={@myself}
         />
       <% else %>
         <.job_form_drawer
@@ -336,6 +335,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           form_job_type={@form_job_type}
           form_schedule_type={@form_schedule_type}
           form_config={@form_config}
+          target={@myself}
         />
       <% end %>
 
@@ -410,6 +410,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               running_ids={@running_ids}
               last_run_map={@last_run_map}
               last_failed_runs={@last_failed_runs}
+              target={@myself}
             />
           </div>
 
@@ -438,6 +439,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               running_ids={@running_ids}
               last_run_map={@last_run_map}
               last_failed_runs={@last_failed_runs}
+              target={@myself}
             />
           </div>
         <% else %>
@@ -450,6 +452,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
             last_run_map={@last_run_map}
             last_failed_runs={@last_failed_runs}
             show_origin={true}
+            target={@myself}
           />
         <% end %>
       <% end %>

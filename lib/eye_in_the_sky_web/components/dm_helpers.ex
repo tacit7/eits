@@ -187,6 +187,24 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   # Tool widget parsing
   # ---------------------------------------------------------------------------
 
+  @tool_meta %{
+    "Bash" => {"hero-command-line", "Bash", "command"},
+    "Read" => {"hero-document-text", "Read", "file_path"},
+    "Write" => {"hero-pencil-square", "Write", "file_path"},
+    "Edit" => {"hero-pencil-square", "Edit", "file_path"},
+    "Glob" => {"hero-folder-open", "Glob", "pattern"},
+    "Task" => {"hero-cpu-chip", "Task", "prompt"},
+    "Grep" => {"hero-magnifying-glass", "Grep", "pattern"},
+    "WebSearch" => {"hero-globe-alt", "WebSearch", "query"}
+  }
+
+  defp extract_param(rest, key) do
+    case Jason.decode(rest) do
+      {:ok, %{^key => val}} -> val
+      _ -> rest
+    end
+  end
+
   def parse_body_segments(nil), do: [{:text, ""}]
 
   def parse_body_segments(body) when is_binary(body) do
@@ -231,46 +249,6 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
     {"hero-command-line", "Bash", command}
   end
 
-  def tool_widget_meta("Read", rest) do
-    path =
-      case Jason.decode(rest) do
-        {:ok, %{"file_path" => p}} -> p
-        _ -> rest
-      end
-
-    {"hero-document-text", "Read", path}
-  end
-
-  def tool_widget_meta("Write", rest) do
-    path =
-      case Jason.decode(rest) do
-        {:ok, %{"file_path" => p}} -> p
-        _ -> rest
-      end
-
-    {"hero-pencil-square", "Write", path}
-  end
-
-  def tool_widget_meta("Edit", rest) do
-    path =
-      case Jason.decode(rest) do
-        {:ok, %{"file_path" => p}} -> p
-        _ -> rest
-      end
-
-    {"hero-pencil-square", "Edit", path}
-  end
-
-  def tool_widget_meta("Glob", rest) do
-    pat =
-      case Jason.decode(rest) do
-        {:ok, %{"pattern" => p}} -> p
-        _ -> rest
-      end
-
-    {"hero-folder-open", "Glob", pat}
-  end
-
   def tool_widget_meta("Task", rest) do
     prompt =
       case Jason.decode(rest) do
@@ -301,16 +279,6 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
             {"hero-magnifying-glass", "Grep", rest}
         end
     end
-  end
-
-  def tool_widget_meta("WebSearch", rest) do
-    query =
-      case Jason.decode(rest) do
-        {:ok, %{"query" => q}} -> q
-        _ -> rest
-      end
-
-    {"hero-globe-alt", "WebSearch", query}
   end
 
   def tool_widget_meta(name, rest) when is_binary(name) and binary_part(name, 0, 4) == "mcp_" do
@@ -349,6 +317,9 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   end
 
   def tool_widget_meta(name, rest) do
-    {"hero-wrench-screwdriver", name, rest}
+    case Map.get(@tool_meta, name) do
+      {icon, label, key} -> {icon, label, extract_param(rest, key)}
+      nil -> {"hero-wrench-screwdriver", name, rest}
+    end
   end
 end

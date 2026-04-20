@@ -81,6 +81,33 @@ Claude and Codex agent processes have a configurable idle timeout — if the sub
 - `lib/eye_in_the_sky/claude/agent_worker.ex` — `do_handle_sdk_error/2` recovery logic
 - `lib/eye_in_the_sky_web/live/overview_live/settings.ex` — UI
 
+---
+
+## Systemic Error Recovery
+
+When AgentWorker encounters a systemic error (billing/auth failure, API limits), it terminates the session and fires Teams cleanup rather than retrying.
+
+**Systemic vs. Transient Errors:**
+- **Systemic** (non-recoverable): billing/auth/quota errors — calling `on_session_failed/2` → writes `failed` status to DB, fires Teams cleanup event via PubSub
+- **Transient** (recoverable): timeout, connection issues — worker survives, drops job, processes next queue item
+
+**on_session_failed/2 behavior:**
+1. Writes session status to `failed` in the database
+2. Fires `on_session_failed` PubSub event to notify any Teams orchestrator or observers
+3. Deduplicates events: ensures only one `session_idle` and one `agent_stopped` event fire per session (no duplicate idempotency)
+4. Logs error details for debugging
+
+**Error classification:**
+- Systemic errors invoke `on_session_failed/2`
+- Transient errors fall through to standard recovery (next job in queue)
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — `do_handle_sdk_error/2` classification logic
+- `lib/eye_in_the_sky/claude/agent_worker/error_recovery.ex` — `on_session_failed/2` and deduplication
+- `lib/eye_in_the_sky/worker_events.ex` — PubSub event broadcasting
+
+**Commits:** 62933518 (systemic error handling + DB write + Teams cleanup), af425751 (deduplication fix)
+
 ## JobDispatcherWorker
 
 Periodically scans for workable tasks and spawns appropriate agents.

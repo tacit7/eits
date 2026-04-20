@@ -89,20 +89,31 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-7xl mx-auto space-y-8">
         <.usage_header date_range={@date_range} recalculating={@recalculating} />
-        <%= if @totals.loading? do %>
-          <div class="flex items-center justify-center py-16">
-            <span class="loading loading-spinner loading-lg text-base-content/30"></span>
-          </div>
-        <% else %>
-          <.usage_totals totals={@totals.result} recalculating={@recalculating} />
-          <.project_breakdown_table by_project={@by_project.result} recalculating={@recalculating} />
-          <.by_month_table by_month={@by_month.result} />
-          <.by_week_table by_week={@by_week.result} />
-          <.model_breakdown_table
-            model_breakdown={@model_breakdown.result}
-            recalculating={@recalculating}
-          />
-          <.top_sessions_table top_sessions={@top_sessions.result} recalculating={@recalculating} />
+        <%= cond do %>
+          <% @totals.loading? -> %>
+            <div class="flex items-center justify-center py-16">
+              <span class="loading loading-spinner loading-lg text-base-content/30"></span>
+            </div>
+          <% @totals.failed? -> %>
+            <div class="flex items-center justify-center py-16">
+              <p class="text-sm text-error/70">Failed to load usage data. Try refreshing.</p>
+            </div>
+          <% true -> %>
+            <.usage_totals totals={@totals.result} recalculating={@recalculating} />
+            <.project_breakdown_table
+              by_project={@by_project.result}
+              recalculating={@recalculating}
+            />
+            <.by_month_table by_month={@by_month.result} />
+            <.by_week_table by_week={@by_week.result} />
+            <.model_breakdown_table
+              model_breakdown={@model_breakdown.result}
+              recalculating={@recalculating}
+            />
+            <.top_sessions_table
+              top_sessions={@top_sessions.result}
+              recalculating={@recalculating}
+            />
         <% end %>
       </div>
     </div>

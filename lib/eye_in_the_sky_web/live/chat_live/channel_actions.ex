@@ -139,31 +139,35 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
       case Enum.find(socket.assigns.all_projects, fn p ->
              to_string(p.id) == to_string(params["project_id"])
            end) do
-        nil -> File.cwd!()
+        nil -> nil
         project -> project.path
       end
 
-    opts =
-      AgentCreationHelpers.build_opts(params,
-        project_path: project_path,
-        description: agent_description,
-        instructions: instructions
-      )
+    if is_nil(project_path) do
+      {:noreply, put_flash(socket, :error, "No project path configured for this agent")}
+    else
+      opts =
+        AgentCreationHelpers.build_opts(params,
+          project_path: project_path,
+          description: agent_description,
+          instructions: instructions
+        )
 
-    case AgentManager.create_agent(opts) do
-      {:ok, %{agent: agent, session: session}} ->
-        join_agent_to_channel(channel_id, agent, session, agent_description)
+      case AgentManager.create_agent(opts) do
+        {:ok, %{agent: agent, session: session}} ->
+          join_agent_to_channel(channel_id, agent, session, agent_description)
 
-        {:noreply,
-         socket
-         |> Phoenix.Component.assign(:show_agent_drawer, false)
-         |> refresh_members_and_picker()}
+          {:noreply,
+           socket
+           |> Phoenix.Component.assign(:show_agent_drawer, false)
+           |> refresh_members_and_picker()}
 
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> Phoenix.Component.assign(:show_agent_drawer, false)
-         |> put_flash(:error, "Failed to create agent: #{inspect(reason)}")}
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> Phoenix.Component.assign(:show_agent_drawer, false)
+           |> put_flash(:error, "Failed to create agent: #{inspect(reason)}")}
+      end
     end
   end
 

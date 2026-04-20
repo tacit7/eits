@@ -559,6 +559,30 @@ defmodule EyeInTheSky.ScheduledJobsTest do
   end
 
   # ---------------------------------------------------------------------------
+  # enqueue_job/1
+  # ---------------------------------------------------------------------------
+
+  describe "enqueue_job/1" do
+    test "returns {:error, {:unknown_job_type, type}} for unrecognized job_type" do
+      job = %EyeInTheSky.ScheduledJobs.ScheduledJob{
+        id: 0,
+        job_type: "nonexistent_type",
+        name: "Fake",
+        schedule_type: "interval",
+        schedule_value: "60"
+      }
+
+      assert {:error, {:unknown_job_type, "nonexistent_type"}} = ScheduledJobs.enqueue_job(job)
+    end
+
+    test "enqueue_job/1 with workable_task job_type enqueues without error" do
+      {:ok, job} = ScheduledJobs.create_job(workable_attrs())
+
+      assert {:ok, _oban_job} = ScheduledJobs.enqueue_job(job)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # create_job/1 duplicate prompt_id
   # ---------------------------------------------------------------------------
 

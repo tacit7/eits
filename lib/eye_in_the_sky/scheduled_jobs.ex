@@ -231,15 +231,16 @@ defmodule EyeInTheSky.ScheduledJobs do
 
   @doc "Enqueue the appropriate Oban worker for a scheduled job."
   def enqueue_job(%ScheduledJob{} = job) do
-    worker =
-      case job.job_type do
-        "spawn_agent" -> EyeInTheSky.Workers.SpawnAgentWorker
-        "mix_task" -> EyeInTheSky.Workers.MixTaskWorker
-        "daily_digest" -> EyeInTheSky.Workers.DailyDigestWorker
-        "workable_task" -> EyeInTheSky.Workers.WorkableTaskWorker
-        other -> {:error, {:unknown_job_type, other}}
-      end
+    case job.job_type do
+      "spawn_agent" -> do_enqueue(EyeInTheSky.Workers.SpawnAgentWorker, job)
+      "mix_task" -> do_enqueue(EyeInTheSky.Workers.MixTaskWorker, job)
+      "daily_digest" -> do_enqueue(EyeInTheSky.Workers.DailyDigestWorker, job)
+      "workable_task" -> do_enqueue(EyeInTheSky.Workers.WorkableTaskWorker, job)
+      other -> {:error, {:unknown_job_type, other}}
+    end
+  end
 
+  defp do_enqueue(worker, job) do
     %{"job_id" => job.id}
     |> worker.new(
       unique: [period: 30, fields: [:args, :worker], states: [:available, :scheduled, :executing]]

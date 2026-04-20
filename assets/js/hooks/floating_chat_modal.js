@@ -147,16 +147,25 @@ export class FloatingChatModal {
       const closeBtn = this._cfg.errorCloseButton
         ? `<button onclick="document.getElementById('${this._id}')?.remove()" class="text-xs underline mt-1 opacity-70">Close</button>`
         : ''
-      return `<div class="flex justify-start">
-        <div class="bg-error/10 text-error rounded-xl px-3 py-2 text-sm max-w-[80%]">
-          <p>${FloatingChatModal.escape(m.body)}</p>
-          ${closeBtn}
+      return `<div class="flex items-start gap-2 px-1 py-1.5">
+        <div class="w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 bg-error/20 flex items-center justify-center">
+          <div class="w-1 h-1 rounded-full bg-error"></div>
         </div>
+        <div class="min-w-0 flex-1 text-sm text-error whitespace-pre-wrap break-words">${FloatingChatModal.escape(m.body)}${closeBtn ? '<br>' + closeBtn : ''}</div>
       </div>`
     }
     const isUser = m.sender_role === 'user'
-    return `<div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
-      <div class="${isUser ? 'bg-primary/90 text-primary-content rounded-xl rounded-br-sm' : 'bg-base-200/60 rounded-xl rounded-bl-sm'} px-3 py-2 text-sm max-w-[80%] whitespace-pre-wrap">${FloatingChatModal.escape(m.body)}</div>
+    const dotInner = isUser
+      ? `<div class="w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 bg-success/20 flex items-center justify-center"><div class="w-1 h-1 rounded-full bg-success"></div></div>`
+      : `<div class="w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 bg-primary/20 flex items-center justify-center"><div class="w-1 h-1 rounded-full bg-primary/60"></div></div>`
+    const nameColor = isUser ? 'text-base-content/60' : 'text-primary/70'
+    const label = isUser ? 'You' : 'Agent'
+    return `<div class="flex items-start gap-2 px-1 py-1.5 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+      ${dotInner}
+      <div class="min-w-0 flex-1">
+        <span class="text-[11px] font-semibold ${nameColor} mr-1">${label}</span>
+        <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">${FloatingChatModal.escape(m.body)}</p>
+      </div>
     </div>`
   }
 

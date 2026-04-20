@@ -125,6 +125,29 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
     end
   end
 
+  describe "on_session_failed/2" do
+    test "sets session DB status to failed" do
+      {_agent, session} = create_session(%{status: "working"})
+
+      AgentWorkerEvents.on_sdk_errored(session.id, session.uuid)
+      AgentWorkerEvents.on_session_failed(session.id, session.uuid)
+
+      assert reload_session(session).status == "failed"
+    end
+
+    test "emits exactly one session_idle broadcast for the systemic-error sequence" do
+      {_agent, session} = create_session(%{status: "working"})
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session_lifecycle")
+
+      AgentWorkerEvents.on_sdk_errored(session.id, session.uuid)
+      AgentWorkerEvents.on_session_failed(session.id, session.uuid)
+
+      session_id = session.id
+      assert_receive {:session_idle, ^session_id}, 1_000
+      refute_receive {:session_idle, ^session_id}, 200
+    end
+  end
+
   # --- session_idle broadcast ordering ---
 
   describe "session_idle broadcast" do

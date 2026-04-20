@@ -3,8 +3,9 @@
 # Codex does not expose transcript_path, so annotation enforcement is simplified:
 # blocks if an in-progress task exists with no annotation this turn.
 set -uo pipefail
-
 [ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
+
+. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
 
 input_json=$(timeout 2 cat 2>/dev/null) || exit 0
 [ -z "$input_json" ] && exit 0

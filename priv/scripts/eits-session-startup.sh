@@ -11,6 +11,9 @@ if [ "${EITS_WORKFLOW:-}" = "0" ]; then
 fi
 # --- End Workflow Guard ---
 
+. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
+
+
 LOG_FILE="${HOME}/.claude/hooks/eits.log"
 _log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [startup] $*" >> "$LOG_FILE" 2>/dev/null; }
 

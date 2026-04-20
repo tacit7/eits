@@ -134,10 +134,15 @@ defmodule EyeInTheSky.AgentDefinitions do
   defp sync_directory_contents(dir, scope, project_id, now) do
     if File.dir?(dir) do
       md_files =
-        dir
-        |> File.ls!()
-        |> Enum.filter(&String.ends_with?(&1, ".md"))
-        |> Enum.reject(&(&1 == "README.md"))
+        case File.ls(dir) do
+          {:ok, files} ->
+            files
+            |> Enum.filter(&String.ends_with?(&1, ".md"))
+            |> Enum.reject(&(&1 == "README.md"))
+
+          {:error, _} ->
+            []
+        end
 
       ctx = %{scope: scope, project_id: project_id, now: now}
 
@@ -170,7 +175,13 @@ defmodule EyeInTheSky.AgentDefinitions do
   end
 
   defp sync_one(file_path, slug, %{scope: scope, project_id: project_id, now: now}) do
-    content = File.read!(file_path)
+    case File.read(file_path) do
+      {:error, reason} -> {:error, reason}
+      {:ok, content} -> sync_content(content, file_path, slug, scope, project_id, now)
+    end
+  end
+
+  defp sync_content(content, file_path, slug, scope, project_id, now) do
     checksum = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
 
     existing = find_existing(slug, scope, project_id)

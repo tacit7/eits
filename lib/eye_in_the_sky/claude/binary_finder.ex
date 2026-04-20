@@ -48,11 +48,16 @@ defmodule EyeInTheSky.Claude.BinaryFinder do
     versions_dir = Path.join(nvm_dir, "versions/node")
 
     if File.dir?(versions_dir) do
-      versions_dir
-      |> File.ls!()
-      |> Enum.filter(&semver_dir?/1)
-      |> Enum.sort_by(&parse_version/1, {:desc, Version})
-      |> Enum.find_value(&find_claude_in_nvm_dir(versions_dir, &1))
+      case File.ls(versions_dir) do
+        {:ok, entries} ->
+          entries
+          |> Enum.filter(&semver_dir?/1)
+          |> Enum.sort_by(&parse_version/1, {:desc, Version})
+          |> Enum.find_value(&find_claude_in_nvm_dir(versions_dir, &1))
+
+        {:error, _} ->
+          nil
+      end
     else
       nil
     end

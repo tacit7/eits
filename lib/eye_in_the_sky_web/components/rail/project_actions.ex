@@ -46,12 +46,21 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   def handle_commit_rename(socket) do
     name = String.trim(socket.assigns.rename_value)
 
-    if name != "" && not is_nil(socket.assigns.renaming_project_id) do
-      case Projects.get_project(socket.assigns.renaming_project_id) do
-        {:ok, project} -> Projects.update_project(project, %{name: name})
-        {:error, _} -> :ok
+    socket =
+      if name != "" && not is_nil(socket.assigns.renaming_project_id) do
+        case Projects.get_project(socket.assigns.renaming_project_id) do
+          {:ok, project} ->
+            case Projects.update_project(project, %{name: name}) do
+              {:ok, _} -> socket
+              {:error, _} -> put_flash(socket, :error, "Failed to rename project")
+            end
+
+          {:error, _} ->
+            put_flash(socket, :error, "Project not found")
+        end
+      else
+        socket
       end
-    end
 
     {:noreply,
      socket

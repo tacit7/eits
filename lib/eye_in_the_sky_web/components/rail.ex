@@ -34,22 +34,35 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   @impl true
   def mount(socket) do
-    {:ok,
-     assign(socket,
-       projects: Projects.list_projects_for_sidebar(),
-       flyout_open: true,
-       proj_picker_open: false,
-       active_section: :sessions,
-       flyout_sessions: load_flyout_sessions(nil),
-       notification_count: Notifications.unread_count(),
-       new_project_path: nil,
-       renaming_project_id: nil,
-       rename_value: "",
-       mobile_open: false,
-       sidebar_project: nil,
-       sidebar_tab: :sessions,
-       active_channel_id: nil
-     )}
+    socket =
+      assign(socket,
+        projects: [],
+        flyout_open: true,
+        proj_picker_open: false,
+        active_section: :sessions,
+        flyout_sessions: [],
+        notification_count: 0,
+        new_project_path: nil,
+        renaming_project_id: nil,
+        rename_value: "",
+        mobile_open: false,
+        sidebar_project: nil,
+        sidebar_tab: :sessions,
+        active_channel_id: nil
+      )
+
+    # Skip DB queries on the dead render (mount runs twice — static + connected).
+    # This component mounts on every page, so the unguarded path doubles DB load.
+    if connected?(socket) do
+      {:ok,
+       assign(socket,
+         projects: Projects.list_projects_for_sidebar(),
+         flyout_sessions: load_flyout_sessions(nil),
+         notification_count: Notifications.unread_count()
+       )}
+    else
+      {:ok, socket}
+    end
   end
 
   @impl true
@@ -75,12 +88,23 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     previous_tab = socket.assigns[:sidebar_tab]
     next_section = Map.get(@section_map, sidebar_tab, :sessions)
 
+    previous_project = socket.assigns[:sidebar_project]
+
     socket =
       socket
       |> assign(:sidebar_tab, sidebar_tab)
       |> assign(:sidebar_project, sidebar_project)
       |> assign(:active_channel_id, active_channel_id)
-      |> assign(:flyout_sessions, load_flyout_sessions(sidebar_project))
+
+    # Only reload flyout sessions when the project actually changes — not on every
+    # parent re-render. Every PubSub broadcast through the parent would otherwise
+    # fire a Sessions.list_sessions_filtered query on each page.
+    socket =
+      if sidebar_project != previous_project do
+        assign(socket, :flyout_sessions, load_flyout_sessions(sidebar_project))
+      else
+        socket
+      end
 
     socket =
       if sidebar_tab != previous_tab do

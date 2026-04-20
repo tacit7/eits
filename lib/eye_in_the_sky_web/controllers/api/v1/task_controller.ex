@@ -343,6 +343,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp maybe_link_session(_task_id, nil), do: :ok
 
+  defp maybe_link_session(task_id, session_id) when is_integer(session_id) do
+    case parse_task_id(task_id) do
+      nil -> :ok
+      task_int_id -> Tasks.link_session_to_task(task_int_id, session_id)
+    end
+
+    :ok
+  end
+
   defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
     int_id =
       case Helpers.resolve_session_int_id(session_id) do

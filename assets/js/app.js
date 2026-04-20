@@ -56,6 +56,7 @@ import {Highlight} from "./hooks/highlight"
 import {LocalTime} from "./hooks/local_time"
 import {DragUpload} from "./hooks/drag_upload"
 import {SidebarState} from "./hooks/sidebar_state"
+import {RailState} from "./hooks/rail_state"
 import {DrawerSwipeClose} from "./hooks/drawer_swipe_close"
 import {QuickCreateNote, QuickCreateAgent, QuickUpdateAgent, QuickGetAgent, QuickDeleteAgent, QuickResumeAgent, QuickCreateChat, QuickCreateTask} from "./hooks/quick_create"
 import {CommandPalette} from "./hooks/command_palette"
@@ -114,6 +115,7 @@ Hooks.Highlight = Highlight
 Hooks.LocalTime = LocalTime
 Hooks.DragUpload = DragUpload
 Hooks.SidebarState = SidebarState
+Hooks.RailState = RailState
 Hooks.DrawerSwipeClose = DrawerSwipeClose
 Hooks.QuickCreateNote = QuickCreateNote
 Hooks.QuickCreateAgent = QuickCreateAgent
@@ -182,7 +184,7 @@ document.addEventListener("click", (e) => {
 window.addEventListener("click", (e) => {
   const btn = e.target.closest("[phx-click='toggle_collapsed']")
   if (btn) {
-    const sidebar = document.getElementById("app-sidebar")
+    const sidebar = document.getElementById("app-rail")
     if (sidebar) {
       // Toggle: if currently expanded on desktop, it's about to collapse
       const isCurrentlyExpanded = sidebar.classList.contains("md:w-60")

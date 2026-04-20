@@ -246,6 +246,26 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
 
       assert count == 1
     end
+
+    test "links session when session_id is an integer (JSON-decoded)", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+      task = create_task()
+
+      patch(conn, ~p"/api/v1/tasks/#{task.id}", %{
+        "state" => "start",
+        "session_id" => session.id
+      })
+
+      linked =
+        Repo.exists?(
+          from(ts in "task_sessions",
+            where: ts.task_id == ^task.id and ts.session_id == ^session.id
+          )
+        )
+
+      assert linked
+    end
   end
 
   # ---- tasks quick workflow (POST /tasks + PATCH /tasks/:id state=start) ----

@@ -89,6 +89,29 @@ defmodule EyeInTheSkyWeb.Live.ConfigGuideChatTest do
     })
   end
 
+  test "fab_close_chat unsubscribes — messages no longer arrive after close", %{
+    conn: conn,
+    session: session
+  } do
+    {:ok, view, _html} = live(conn, ~p"/config")
+
+    view |> render_hook("fab_open_chat", %{"session_id" => session.uuid})
+    assert_push_event(view, "fab_chat_history", %{})
+
+    view |> render_hook("fab_close_chat", %{})
+
+    msg = %EyeInTheSky.Messages.Message{
+      id: 9001,
+      session_id: session.id,
+      body: "should not arrive",
+      sender_role: "assistant",
+      inserted_at: ~U[2026-03-15 12:00:00Z]
+    }
+
+    send(view.pid, {:new_message, msg})
+    refute_push_event(view, "fab_chat_message", %{}, 100)
+  end
+
   test "incoming message on config guide session does NOT emit fab_chat_message", %{
     conn: conn,
     session: session

@@ -130,6 +130,9 @@ When events arrive, the handler calls `send_update/3` to update the `ChatWindowC
 - **Events:** Emits `window_moved`, `window_resized`, `remove_window`, `raise_window` to parent `CanvasLive`
 - **Updates:** Receives `send_update` calls from PubSub event handlers to re-render with latest message
 - **Message rendering:** Delegates to shared `DmMessageComponents.message_body/1` and `tool_result_body/1` with `compact` and `extra_id` attrs so the same components render both the DM page (default sizing) and canvas chat window (compact). Private duplicates in `MessagesTab` and `ChatWindowComponent` were removed in commit 10d75ff3.
+- **Status indicator:** Session status dot uses `status_dot_class` with classes for all states: working (primary color with pulse animation), completed, failed, and idle.
+- **Focus ring:** Active window shows visible focus ring to indicate interaction target.
+- **Scroll behavior:** ChatWindowHook owns all scroll behavior. Auto-scroll enabled by default; disabled when user scrolls up and shows unread message count pill. Clicking pill re-enables auto-scroll and jumps to bottom. Automatically scrolls to bottom when user sends new message.
 
 ### AgentList Integration
 - **File:** `lib/eye_in_the_sky_web/components/agent_list.ex`
@@ -239,6 +242,18 @@ While canvas page is standalone, chat windows display session messages. Clicking
 - ChatWindowComponent is a live_component with its own event handling
 - Parent (CanvasLive) owns layout and routing; children own rendering
 - send_update patterns allow parent to trigger re-renders without full replacement
+
+## Layout & Display
+
+### Canvas Page Layout
+- **Full-screen mode:** Dedicated canvas page with full viewport. Back button available to return to previous page. No sidebar visible during canvas interactions.
+- **Page title:** Browser tab shows active canvas name for easy identification when multiple canvases are open.
+- **Window positioning:** Cascade layout applied by default if window positions not previously persisted. Tidy button resets all windows and cascades them into clean grid layout.
+
+### Status & Visual Feedback
+- **Working status pulse** — Session status dot animates with continuous pulse effect when session is in working state
+- **Unread indicators** — Minimized windows show unread message dot; unread count pill appears when auto-scroll is disabled and new messages arrive
+- **Session added badge** — Refresh badge displayed on add_session to provide visual feedback that canvas was updated
 
 ## Related Files
 

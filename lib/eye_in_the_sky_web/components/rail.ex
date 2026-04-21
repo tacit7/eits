@@ -144,8 +144,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     section = parse_section(section_str)
     current = socket.assigns.active_section
 
+    sticky = sticky_section(socket.assigns.sidebar_tab)
+
     if current == section && socket.assigns.flyout_open && section not in [:chat, :canvas] do
-      {:noreply, assign(socket, flyout_open: false, mobile_open: false)}
+      if sticky do
+        {:noreply,
+         socket
+         |> assign(:active_section, sticky)
+         |> assign(:flyout_open, true)
+         |> assign(:mobile_open, false)}
+      else
+        {:noreply, assign(socket, flyout_open: false, mobile_open: false)}
+      end
     else
       {:noreply,
        socket
@@ -161,8 +171,19 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     end
   end
 
-  def handle_event("close_flyout", _params, socket),
-    do: {:noreply, assign(socket, flyout_open: false, mobile_open: false)}
+  def handle_event("close_flyout", _params, socket) do
+    case sticky_section(socket.assigns.sidebar_tab) do
+      nil ->
+        {:noreply, assign(socket, flyout_open: false, mobile_open: false)}
+
+      sticky ->
+        {:noreply,
+         socket
+         |> assign(:active_section, sticky)
+         |> assign(:flyout_open, true)
+         |> assign(:mobile_open, false)}
+    end
+  end
 
   def handle_event("restore_section", %{"section" => section_str}, socket),
     do: {:noreply, assign(socket, :active_section, parse_section(section_str))}
@@ -258,6 +279,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_async(:pick_folder, _result, socket),
     do: ProjectActions.handle_pick_folder(:cancelled, socket)
+
+  # Returns the section that should always remain visible for a given page.
+  # nil means the flyout can be fully closed.
+  defp sticky_section(sidebar_tab) when sidebar_tab in [:canvas, :canvases], do: :canvas
+  defp sticky_section(:chat), do: :chat
+  defp sticky_section(_), do: nil
 
   defp parse_section(section_str) when section_str in @valid_sections,
     do: String.to_existing_atom(section_str)

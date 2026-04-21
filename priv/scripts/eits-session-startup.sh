@@ -124,7 +124,7 @@ if [ -f "$_PENDING_LOG" ] && [ -s "$_PENDING_LOG" ]; then
   fi
   if mkdir "$_DRAIN_LOCK_DIR" 2>/dev/null; then
     echo $$ > "$_DRAIN_LOCK_PID_FILE"
-    trap 'rmdir "$_DRAIN_LOCK_DIR" 2>/dev/null' EXIT
+    trap '/bin/rm -rf "$_DRAIN_LOCK_DIR" 2>/dev/null' EXIT
     _log "draining pending annotations from $_PENDING_LOG"
     echo "[EITS] startup: draining pending annotations" >&2
     _tmp_log="${_PENDING_LOG}.processing.$$"
@@ -163,7 +163,7 @@ if [ -f "$_PENDING_LOG" ] && [ -s "$_PENDING_LOG" ]; then
     if [ ${#_failed_lines[@]} -gt 0 ]; then
       printf '%s\n' "${_failed_lines[@]}" >> "$_PENDING_LOG"
     fi
-    rmdir "$_DRAIN_LOCK_DIR" 2>/dev/null
+    /bin/rm -rf "$_DRAIN_LOCK_DIR" 2>/dev/null
     trap - EXIT
   else
     _log "drain skipped: another session startup is already draining"

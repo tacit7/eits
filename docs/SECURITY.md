@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-03-17
-Last updated: 2026-04-19 (IAM Phases 3.5–5 documentation: dry-run simulator, built-in matchers, hook evaluation, policy CRUD UI, message security)
+Last updated: 2026-04-20 (CSP nonce implementation, Postgres TLS verification, auth test coverage)
 
 ## Authentication
 
@@ -19,9 +19,11 @@ All browser routes require WebAuthn passkey authentication via `AuthHook` (LiveV
 - **WebAuthn origin**: Configured via `WEBAUTHN_ORIGIN` env var. Required in production (raises on startup if unset). Falls back to the hardcoded default in dev/test.
 - **DISABLE_AUTH bypass**: The `DISABLE_AUTH=true` env var skips LiveView auth. Guarded at both compile time (`config_env() != :prod`) and runtime (`env != :prod`). Cannot be activated in production.
 
+**Test coverage**: The Accounts context and WebAuthn functions are tested in `test/eye_in_the_sky/accounts_test.exs` with 38 tests covering passkey creation/update/lookup, credential building, registration token lifecycle (create/peek/consume with expiry and one-time-use guarantees), and user session creation/validation/deletion.
+
 ### API — Bearer Token
 
-All `/api/v1/*` routes (except webhooks and public settings) require a Bearer token via the `RequireAuth` plug.
+All `/api/v1/*` routes (except webhooks and public settings) require a Bearer token via the `RequireAuth` plug. The `Accounts` context (which manages API keys, users, and sessions) has comprehensive test coverage: 38 tests in `test/eye_in_the_sky/accounts_test.exs` covering all 14 public functions including user CRUD, passkey lifecycle, registration tokens, user sessions, and API key validation.
 
 #### Token Validation
 
@@ -34,6 +36,8 @@ All `/api/v1/*` routes (except webhooks and public settings) require a Bearer to
   5. Return `true` if any active key matches; otherwise `false`
 - **Production validation**: If no active keys exist and `EITS_API_KEY` is unset, all requests are rejected with `401 Unauthorized`.
 - **Development validation**: Dev/test environments allow passthrough for convenience when no keys are configured.
+
+**Test coverage**: The `RequireAuth` plug has 18 tests covering missing headers, malformed headers (Basic/empty/no-token), unknown tokens, valid/expired DB API keys, env-var key matching, and 401 response shape. Located in `test/eye_in_the_sky_web/plugs/require_auth_test.exs`.
 
 #### Key Storage and Rotation
 
@@ -187,6 +191,27 @@ Defined in `endpoint.ex` `@session_options`:
 - **Tailscale support**: Includes explicit trust for Tailscale CGNAT range `100.64.0.0/10` to properly rewrite `X-Forwarded-For` headers from Tailscale Funnel and other Tailscale reverse proxies.
 - **Configuration**: Configured via `RemoteIp` plug with `proxies` option in `endpoint.ex`.
 
+### Database TLS Verification
+
+PostgreSQL connections use TLS with certificate verification in production to prevent MITM attacks.
+
+**Configuration** (in `config/runtime.exs`):
+- **Production**: Defaults to `verify_peer` with OTP system CA bundle and hostname verification
+- **Development/Self-hosted**: Can override via `DATABASE_SSL_VERIFY=none` environment variable to disable verification if proper CAs are not available
+
+**Implementation**:
+```elixir
+ssl_opts = case System.get_env("DATABASE_SSL_VERIFY") do
+  "none" -> [verify: :verify_none]
+  _ -> [verify: :verify_peer, cacerts: :public_key.cacerts_get(), customize_hostname_check: [...]]
+end
+```
+
+**Verification details**:
+- Uses OTP's `:public_key.cacerts_get()` to load system CA certificates
+- Performs hostname verification via `:public_key.pkix_verify_hostname_match_fun(:https)`
+- Rejects connections with invalid or self-signed certificates (unless explicitly disabled)
+
 ## Rate Limiting
 
 Hammer v7 with ETS backend, applied to the `:webauthn` and `:api` pipelines.
@@ -259,7 +284,23 @@ Phoenix's `put_secure_browser_headers` plug adds:
 | `x-content-type-options` | `nosniff` |
 | `x-xss-protection` | `1; mode=block` |
 
-**Not yet implemented**: Content-Security-Policy (CSP). The app uses inline scripts for theme initialization and loads Google Fonts from external CDNs, which requires a nonce-based or hash-based CSP configuration.
+### Content-Security-Policy (CSP)
+
+CSP is enforced via per-request nonce to allow inline scripts while maintaining XSS protection.
+
+**Implementation**:
+- `CspNonce` plug generates a unique base64-encoded nonce (16 random bytes) per request
+- Nonce is stored in `conn.assigns.csp_nonce` and injected into the CSP header
+- The nonce attribute is added to inline `<script>` tags in `root.html.heex` (theme initialization script)
+- Production CSP uses `script-src 'self' 'nonce-<value>'` (no `unsafe-inline`)
+- Development CSP uses `script-src 'self' 'unsafe-inline'` for convenience
+
+**CSP Header (Production)**:
+```
+default-src 'self'; script-src 'self' 'nonce-<unique>'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; ...
+```
+
+**Benefits**: Inline scripts execute only if they carry the correct nonce. Any XSS-injected script without the nonce is blocked, protecting against inline script injection attacks.
 
 ## Secrets Management
 
@@ -388,6 +429,5 @@ DMs from terminated sessions (status `completed` or `failed`) are rejected with 
 
 ## Known Gaps
 
-- **No Content-Security-Policy header** — inline theme script and Google Fonts CDN need nonce-based or hash-based CSP. Planned but deferred.
 - **No per-scope API keys** — `api_keys` table supports multiple keys but no scope/permission model. All keys have full API access. Acceptable for single-user deployment.
 - **No audit logging** — auth failures and webhook rejections log to application logger but there is no structured security event store.

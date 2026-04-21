@@ -1,8 +1,18 @@
 const LS_KEY = (csId) => `cw_${csId}`
 
-export function saveWindowLayout(csId, x, y, w, h) {
+export function saveWindowLayout(csId, x, y, w, h, z) {
   try {
-    localStorage.setItem(LS_KEY(csId), JSON.stringify({ x, y, w: Math.round(w), h: Math.round(h) }))
+    const existing = loadWindowLayout(csId) || {}
+    const entry = { ...existing, x, y, w: Math.round(w), h: Math.round(h) }
+    if (z !== undefined) entry.z = z
+    localStorage.setItem(LS_KEY(csId), JSON.stringify(entry))
+  } catch (_) {}
+}
+
+export function saveWindowZ(csId, z) {
+  try {
+    const existing = loadWindowLayout(csId) || {}
+    localStorage.setItem(LS_KEY(csId), JSON.stringify({ ...existing, z }))
   } catch (_) {}
 }
 

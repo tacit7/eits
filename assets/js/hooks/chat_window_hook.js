@@ -1,4 +1,4 @@
-import { saveWindowLayout, loadWindowLayout } from './canvas_layout_hook'
+import { saveWindowLayout, saveWindowZ, loadWindowLayout } from './canvas_layout_hook'
 
 const SNAP_THRESHOLD = 80
 
@@ -45,7 +45,7 @@ export const ChatWindowHook = {
     this._zIndex = "1"
     this.el.dataset.savedZIndex = "1"
 
-    // Restore last-known position/size from localStorage (set by layout buttons and drag/resize).
+    // Restore last-known position/size/z from localStorage (set by layout buttons, drag, resize, and focus).
     const csId = this.el.dataset.csId
     const saved = loadWindowLayout(csId)
     if (saved) {
@@ -57,6 +57,11 @@ export const ChatWindowHook = {
       this._height = saved.h
       this._dragLeft = saved.x
       this._dragTop  = saved.y
+      if (saved.z != null) {
+        this.el.style.zIndex = String(saved.z)
+        this._zIndex = String(saved.z)
+        this.el.dataset.savedZIndex = String(saved.z)
+      }
     }
 
     // Keep instance vars in sync when a layout button repositions this window.
@@ -248,6 +253,7 @@ export const ChatWindowHook = {
           this.el.style.zIndex = "20"
           this._zIndex = "20"
           this.el.dataset.savedZIndex = "20"
+          saveWindowZ(this.el.dataset.csId, 20)
         } else {
           this.el.style.left = this.el.dataset.savedLeft || "0px"
           this.el.style.top = this.el.dataset.savedTop || "0px"
@@ -257,6 +263,7 @@ export const ChatWindowHook = {
           this.el.style.zIndex = "1"
           this._zIndex = "1"
           this.el.dataset.savedZIndex = "1"
+          saveWindowZ(this.el.dataset.csId, 1)
         }
       })
     }
@@ -388,12 +395,14 @@ export const ChatWindowHook = {
       w.style.zIndex = "1"
       w.dataset.savedZIndex = "1"  // update shared memory so peers' updated() won't undo this
       w.classList.remove("ring-2", "ring-primary/40")
+      if (w !== this.el) saveWindowZ(w.dataset.csId, 1)
     })
     const zVal = this._maximized ? "20" : String(Math.max(10, maxZ))
     this.el.style.zIndex = zVal
     this._zIndex = zVal
     this.el.dataset.savedZIndex = zVal
     this.el.classList.add("ring-2", "ring-primary/40")
+    saveWindowZ(this.el.dataset.csId, parseInt(zVal, 10))
   },
 
   _applyMinimized() {

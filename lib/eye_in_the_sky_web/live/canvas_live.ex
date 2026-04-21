@@ -232,6 +232,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   @impl true
+  def handle_info({:new_message, message}, socket) do
+    {:noreply, refresh_window(socket, message.session_id)}
+  end
+
   def handle_info({:new_dm, message}, socket) do
     {:noreply, refresh_window(socket, message.session_id)}
   end

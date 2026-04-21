@@ -96,6 +96,7 @@ eits agents spawn \
   --model gpt-5.3-codex \
   --project-path "$(pwd)" \
   --parent-session-id <MY_SESSION_ID> \
+  --name "codex-review-pr<PR_NUMBER>" \
   --instructions "You are a code reviewer. Review PR #<PR_NUMBER> in the eits repo.
 
 PR Title: <PR_TITLE>
@@ -160,6 +161,7 @@ Commit: <hash>"
 ```bash
 eits agents spawn --model opus --project-id 1 \
   --parent-session-id <MY_SESSION_ID> \
+  --name "review-pr<PR_NUMBER>-r<N>" \
   --instructions "<same reviewer instructions>"
 ```
 5. Wait for next DM. Repeat until LGTM.

@@ -52,6 +52,7 @@ eits agents spawn \
   --model gpt-5.3-codex \
   --project-path "$(pwd)" \
   --parent-session-id <MY_SESSION_INT_ID> \
+  --name "codex-review-pr<PR_NUMBER>" \
   --dangerouslySkipPermissions \
   --instructions "..."
 ```
@@ -121,6 +122,7 @@ When Codex review arrives:
       eits agents spawn --provider codex --model gpt-5.3-codex \
         --project-path "$(pwd)" \
         --parent-session-id <MY_SESSION_INT_ID> \
+        --name "codex-review-pr<PR_NUMBER>-r<N>" \
         --instructions "<same reviewer instructions with updated branch>"
       ```
    g. Wait for the next review DM from Codex

@@ -639,12 +639,12 @@ Examples:
   eits agents spawn --instructions-file /tmp/agent.txt --interpolate-env
 USAGE
         return 0; }
-      local instructions="" instructions_file="" interpolate_env="false" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
+      local instructions="" instructions_set=0 instructions_file="" interpolate_env="false" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" stash_if_dirty="false" effort_level="" parent_session_id="" parent_agent_id=""
       local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --instructions)      instructions="$2";       shift 2 ;;
+          --instructions)      instructions="$2"; instructions_set=1; shift 2 ;;
           --instructions-file) instructions_file="$2";  shift 2 ;;
           --interpolate-env)   interpolate_env="true";  shift ;;
           --model)             model="$2";              shift 2 ;;
@@ -665,7 +665,7 @@ USAGE
         esac
       done
       # Mutual exclusion: --instructions and --instructions-file cannot both be set
-      [[ -n "$instructions" && -n "$instructions_file" ]] && die "--instructions and --instructions-file are mutually exclusive"
+      [[ $instructions_set -eq 1 && -n "$instructions_file" ]] && die "--instructions and --instructions-file are mutually exclusive"
       # Load from file if provided
       if [[ -n "$instructions_file" ]]; then
         [[ -f "$instructions_file" ]] || die "--instructions-file: file not found: $instructions_file"
@@ -677,7 +677,7 @@ USAGE
         if command -v envsubst &>/dev/null; then
           instructions=$(printf '%s\n' "$instructions" | envsubst)
         elif command -v perl &>/dev/null; then
-          instructions=$(printf '%s' "$instructions" | perl -pe 's/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/defined $ENV{$1} ? $ENV{$1} : ""/ge; s/\$([A-Za-z_][A-Za-z0-9_]*)/defined $ENV{$1} ? $ENV{$1} : ""/ge')
+          instructions=$(printf '%s' "$instructions" | perl -pe 's/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/my $k=$1//$2; defined $ENV{$k} ? $ENV{$k} : ""/ge')
         else
           die "--interpolate-env requires envsubst (gettext) or perl"
         fi

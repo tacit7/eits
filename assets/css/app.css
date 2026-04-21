@@ -223,6 +223,14 @@ form:focus-visible {
   background: oklch(50% 0 0 / 0.2);
 }
 
+/* ===== Flyout panel scrollbar — hidden ===== */
+[data-flyout-panel] .overflow-y-auto {
+  scrollbar-width: none;
+}
+[data-flyout-panel] .overflow-y-auto::-webkit-scrollbar {
+  display: none;
+}
+
 /* ===== Main content scrollbar ===== */
 main {
   overflow-y: auto !important;

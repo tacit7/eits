@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   alias EyeInTheSky.Canvases
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.Components.ChatWindowComponent
 
@@ -39,6 +40,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   @impl true
   def handle_params(%{"id" => id_str} = params, _url, socket) do
     focus_session_id = parse_int(params["focus"])
+    socket = maybe_assign_sidebar_project(socket, params)
 
     case parse_int(id_str) do
       nil ->
@@ -50,9 +52,25 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
-  def handle_params(_params, _url, socket) do
+  def handle_params(params, _url, socket) do
+    socket = maybe_assign_sidebar_project(socket, params)
     {:noreply, redirect_to_first_or_stay(socket)}
   end
+
+  defp maybe_assign_sidebar_project(socket, %{"project_id" => pid_str}) do
+    case parse_int(pid_str) do
+      nil ->
+        socket
+
+      project_id ->
+        case Projects.get_project(project_id) do
+          {:ok, project} -> assign(socket, :sidebar_project, project)
+          _ -> socket
+        end
+    end
+  end
+
+  defp maybe_assign_sidebar_project(socket, _params), do: socket
 
   @impl true
   def handle_event("switch_tab", %{"canvas-id" => id_str}, socket) do

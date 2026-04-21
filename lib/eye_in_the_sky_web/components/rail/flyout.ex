@@ -76,7 +76,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :teams -> %>
               <.teams_content teams={@flyout_teams} sidebar_project={@sidebar_project} />
             <% :canvas -> %>
-              <.canvas_content canvases={@flyout_canvases} />
+              <.canvas_content canvases={@flyout_canvases} sidebar_project={@sidebar_project} />
             <% :notifications -> %>
               <.simple_link href="/notifications" label="Notifications" icon="hero-bell" />
             <% _ -> %>
@@ -384,12 +384,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   # Canvas flyout: canvases with their sessions
   attr :canvases, :list, default: []
+  attr :sidebar_project, :any, default: nil
 
   defp canvas_content(assigns) do
     ~H"""
     <div class="px-3 pt-2 pb-1">
       <.link
-        navigate="/canvases"
+        navigate={canvas_base_url(@sidebar_project)}
         class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
       >
         All Canvases &rarr;
@@ -400,7 +401,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <% end %>
     <%= for canvas <- @canvases do %>
       <.link
-        navigate={"/canvases/#{canvas.id}"}
+        navigate={canvas_url(@sidebar_project, canvas.id)}
         class="flex items-center gap-2 px-3 py-1.5 text-sm text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
         <.icon name="hero-squares-2x2" class="w-3 h-3 flex-shrink-0 text-base-content/30" />
@@ -409,7 +410,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <%= for session <- canvas.sessions do %>
         <div class="flex items-center hover:bg-base-content/5 transition-colors group">
           <.link
-            navigate={"/canvases/#{canvas.id}?focus=#{session.id}"}
+            navigate={canvas_url(@sidebar_project, canvas.id, session.id)}
             class="flex items-center gap-2 pl-7 py-1 flex-1 min-w-0 text-xs text-base-content/50 group-hover:text-base-content/80"
           >
             <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />
@@ -561,4 +562,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   end
 
   defp format_session_time(_), do: ""
+
+  # Canvas URL helpers — preserve project context as a query param so CanvasLive
+  # can restore sidebar_project on mount, keeping the Kanban link visible.
+  defp canvas_base_url(nil), do: "/canvases"
+  defp canvas_base_url(project), do: "/canvases?project_id=#{project.id}"
+
+  defp canvas_url(nil, canvas_id), do: "/canvases/#{canvas_id}"
+  defp canvas_url(project, canvas_id), do: "/canvases/#{canvas_id}?project_id=#{project.id}"
+
+  defp canvas_url(nil, canvas_id, focus_id), do: "/canvases/#{canvas_id}?focus=#{focus_id}"
+  defp canvas_url(project, canvas_id, focus_id), do: "/canvases/#{canvas_id}?project_id=#{project.id}&focus=#{focus_id}"
 end

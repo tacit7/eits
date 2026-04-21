@@ -31,23 +31,52 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
   def message_sender_name(message), do: message.provider || "Agent"
 
+  # New format: [DM from agent: <name>]\n<body>\n\nReply: eits dm --to <id> --message ""
+  # Legacy format: DM from:<name> (session:<uuid>) <body>
+
   def strip_dm_prefix(body) when is_binary(body) do
-    case Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\)\s*(.*)$/s, body) do
-      [_, content] -> String.trim(content)
-      _ -> body
+    cond do
+      # New bracketed format — strip header and reply footer
+      match = Regex.run(~r/^\[DM from agent: [^\]]+\]\n(.*?)(?:\n\nReply: eits dm --to \d+ --message "")?$/s, body) ->
+        [_, content] = match
+        String.trim(content)
+
+      # Legacy format
+      match = Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\)\s*(.*)$/s, body) ->
+        [_, content] = match
+        String.trim(content)
+
+      true ->
+        body
     end
   end
 
   def strip_dm_prefix(body), do: body
 
   def parse_dm_info(body) when is_binary(body) do
-    case Regex.run(~r/^DM from:([^\(]+)\(session:[^\)]+\)\s*(.*)/s, body) do
-      [_, sender, rest] ->
+    cond do
+      # New format: [DM from agent: <name>]\n...\n\nReply: eits dm --to <id> --message ""
+      match = Regex.run(~r/^\[DM from agent: ([^\]]+)\]\n(.*?)(?:\n\nReply: eits dm --to (\d+) --message "")?$/s, body) ->
+        case match do
+          [_, sender, rest, session_id] ->
+            rest = String.trim(rest)
+            {status, url} = extract_dm_status_and_url(rest)
+            %{sender: String.trim(sender), status: status, url: url, session_id: session_id, format: :agent}
+
+          [_, sender, rest] ->
+            rest = String.trim(rest)
+            {status, url} = extract_dm_status_and_url(rest)
+            %{sender: String.trim(sender), status: status, url: url, session_id: nil, format: :agent}
+        end
+
+      # Legacy format: DM from:<name> (session:<uuid>) <body>
+      match = Regex.run(~r/^DM from:([^\(]+)\(session:[^\)]+\)\s*(.*)/s, body) ->
+        [_, sender, rest] = match
         rest = String.trim(rest)
         {status, url} = extract_dm_status_and_url(rest)
-        %{sender: String.trim(sender), status: status, url: url}
+        %{sender: String.trim(sender), status: status, url: url, session_id: nil, format: :legacy}
 
-      _ ->
+      true ->
         nil
     end
   end

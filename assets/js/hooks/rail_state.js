@@ -1,13 +1,34 @@
 import { TOUCH_DEVICE, createSwipeDetector } from './touch_gesture'
 
+const STORAGE_KEY_SECTION = 'rail_section'
+const STORAGE_KEY_PROJECT = 'rail_project_id'
+
 export const RailState = {
   mounted() {
-    // Future-compatible restore. MVP does not write rail_section — this is a no-op until
-    // write-back is added. Do not add localStorage.setItem calls here.
-    const savedSection = localStorage.getItem('rail_section')
+    // Restore last section from localStorage (no-op if rail_section is never written)
+    const savedSection = localStorage.getItem(STORAGE_KEY_SECTION)
     if (savedSection) {
       this.pushEventTo(this.el, 'restore_section', { section: savedSection })
     }
+
+    // Restore last selected project across LiveView navigations.
+    // The rail LiveComponent remounts on cross-LV navigation, losing sidebar_project.
+    // We persist the project_id here and push it back on every mount so the server
+    // can restore it if no project is provided by the parent LiveView.
+    const savedProjectId = localStorage.getItem(STORAGE_KEY_PROJECT)
+    if (savedProjectId) {
+      this.pushEventTo(this.el, 'restore_project', { project_id: savedProjectId })
+    }
+
+    // Listen for save_project events pushed from the server when a project is selected.
+    // project_id is a string (or null to clear).
+    this.handleEvent('save_project', ({ project_id }) => {
+      if (project_id) {
+        localStorage.setItem(STORAGE_KEY_PROJECT, String(project_id))
+      } else {
+        localStorage.removeItem(STORAGE_KEY_PROJECT)
+      }
+    })
 
     // Listen for mobile open event dispatched from app header
     this._openHandler = () => this.pushEventTo(this.el, 'open_mobile', {})

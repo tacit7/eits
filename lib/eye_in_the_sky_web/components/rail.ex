@@ -192,6 +192,35 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("restore_section", %{"section" => section_str}, socket),
     do: {:noreply, assign(socket, :active_section, parse_section(section_str))}
 
+  # Restore the last selected project from localStorage after a cross-LiveView navigation.
+  # Only applies when the parent has not already provided a project (sidebar_project is nil).
+  # Project-scoped pages set sidebar_project in update/2 before the hook fires, so we
+  # skip the restore in that case to avoid overriding the route-derived context.
+  def handle_event("restore_project", %{"project_id" => id_str}, socket)
+      when is_nil(socket.assigns.sidebar_project) do
+    case EyeInTheSkyWeb.ControllerHelpers.parse_int(id_str) do
+      nil ->
+        {:noreply, socket}
+
+      id ->
+        case Projects.get_project(id) do
+          {:ok, project} ->
+            socket =
+              socket
+              |> assign(:sidebar_project, project)
+              |> assign(:flyout_sessions, load_flyout_sessions(project, socket.assigns.session_sort, socket.assigns.session_name_filter))
+
+            {:noreply, socket}
+
+          {:error, _} ->
+            # Project was deleted or inaccessible — clear the stale localStorage entry
+            {:noreply, push_event(socket, "save_project", %{project_id: nil})}
+        end
+    end
+  end
+
+  def handle_event("restore_project", _params, socket), do: {:noreply, socket}
+
   def handle_event("toggle_proj_picker", _params, socket),
     do: {:noreply, assign(socket, :proj_picker_open, !socket.assigns.proj_picker_open)}
 
@@ -213,7 +242,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         socket2
       end
 
-    {:noreply, assign(socket3, :proj_picker_open, false)}
+    # Persist the selected project_id to localStorage via the RailState hook so it
+    # survives cross-LiveView navigation (where the LiveComponent remounts).
+    project_id = new_project && new_project.id
+    socket4 = push_event(socket3, "save_project", %{project_id: project_id})
+
+    {:noreply, assign(socket4, :proj_picker_open, false)}
   end
 
   def handle_event("show_new_project", _params, socket),

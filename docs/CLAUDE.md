@@ -21,6 +21,7 @@
 - [EVENTS.md](EVENTS.md) — PubSub Events: all topics, payload shapes, subscribe helpers
 - [ORCHESTRATOR_TIMERS.md](ORCHESTRATOR_TIMERS.md) — OrchestratorTimers: session-scoped auto-nudge timers, PubSub events, UI integration
 - [MOBILE.md](MOBILE.md) — Mobile layout standards: touch targets, sticky offsets, viewport, overflow
+- [RAIL_MENU.md](RAIL_MENU.md) — Rail menu: section map, sticky sections, lazy loaders, project context, known project-persistence bug
 
 ## Claude API Key Blocking
 

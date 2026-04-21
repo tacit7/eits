@@ -23,6 +23,9 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnTeamContext do
 
   def record_spawn_failure(nil, _member_name), do: :ok
 
+  # Intentionally omits agent_id and session_id — no agent/session was created.
+  # Downstream code must tolerate nil session_id on team members (attach_claimed_tasks,
+  # list_broadcast_targets, and mark_member_done_by_session all have nil guards).
   def record_spawn_failure(team, member_name) do
     name = member_name || "unknown-#{System.unique_integer([:positive])}"
 

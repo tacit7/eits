@@ -682,23 +682,37 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       assert json_response(conn, 404)
     end
 
-    test "second claim replaces first claim's session ownership", %{conn: _conn} do
+    test "second claim on an In Progress task returns already_claimed", %{conn: _conn} do
       task = create_task(%{state_id: 1})
       session_a = new_session()
       session_b = new_session()
 
-      # Both claims via context to avoid exhausting the rate limit bucket across test suite
       {:ok, task_after_first} = Tasks.get_task(task.id)
       assert {:ok, _} = Tasks.claim_task(task_after_first, session_a.id)
 
       {:ok, task_after_second_pre} = Tasks.get_task(task.id)
-      assert {:ok, _} = Tasks.claim_task(task_after_second_pre, session_b.id)
+      assert {:error, :already_claimed} = Tasks.claim_task(task_after_second_pre, session_b.id)
 
       linked_ids =
         Repo.all(from ts in "task_sessions", where: ts.task_id == ^task.id, select: ts.session_id)
 
-      assert linked_ids == [session_b.id]
-      refute session_a.id in linked_ids
+      assert linked_ids == [session_a.id]
+    end
+
+    test "claim on a Done task returns task_not_claimable", %{conn: _conn} do
+      task = create_task(%{state_id: 3})
+      session = new_session()
+
+      {:ok, loaded} = Tasks.get_task(task.id)
+      assert {:error, :task_not_claimable} = Tasks.claim_task(loaded, session.id)
+    end
+
+    test "claim on an In Review task returns task_not_claimable", %{conn: _conn} do
+      task = create_task(%{state_id: 4})
+      session = new_session()
+
+      {:ok, loaded} = Tasks.get_task(task.id)
+      assert {:error, :task_not_claimable} = Tasks.claim_task(loaded, session.id)
     end
   end
 end

@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             class={[
               "w-3.5 h-3.5 shrink-0",
               DmHelpers.provider_icon_class(@session && @session.provider),
-              @session && @session.status == "working" && "[animation:spin_2s_linear_infinite]"
+              @session && @session.status == "working" && "animate-pulse"
             ]}
             alt={(@session && @session.provider) || "agent"}
           />

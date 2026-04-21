@@ -103,6 +103,10 @@ defmodule EyeInTheSky.Channels do
 
   # Channel Membership Functions
 
+  defp channel_member_query(channel_id, session_id) when is_nil(session_id) do
+    from(m in ChannelMember, where: m.channel_id == ^channel_id and is_nil(m.session_id))
+  end
+
   defp channel_member_query(channel_id, session_id) do
     from(m in ChannelMember, where: m.channel_id == ^channel_id and m.session_id == ^session_id)
   end

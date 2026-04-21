@@ -385,7 +385,8 @@ cmd_tasks() {
         esac
       done
       need message
-      _post "/tasks/$id/complete" "$(json message "$message")"
+      local _sess_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      _post "/tasks/$id/complete" "$(json message "$message" session_id "$_sess_id")"
       ;;
     begin|quick)
       # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]

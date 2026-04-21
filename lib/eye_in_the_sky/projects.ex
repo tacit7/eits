@@ -80,6 +80,28 @@ defmodule EyeInTheSky.Projects do
   end
 
   @doc """
+  Gets a project whose path ends with `/basename` or equals `basename`.
+  Useful for resolving an agent's `project_name` (a short dir name) to a project record.
+  Returns `{:ok, project}` or `{:error, :not_found}`.
+  """
+  def get_project_by_path_basename(basename) when is_binary(basename) do
+    import Ecto.Query
+
+    result =
+      Repo.one(
+        from p in Project,
+          where: like(p.path, ^"%/#{basename}") or p.path == ^basename,
+          order_by: [desc: p.id],
+          limit: 1
+      )
+
+    case result do
+      nil -> {:error, :not_found}
+      project -> {:ok, project}
+    end
+  end
+
+  @doc """
   Creates a project.
   """
   def create_project(attrs \\ %{}), do: create(attrs)

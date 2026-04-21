@@ -224,7 +224,7 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions> [--mine] [--quiet]"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions|states> [--mine] [--quiet]"; return 0; }
   case "$sub" in
     list)
       # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine]
@@ -402,6 +402,17 @@ cmd_tasks() {
       done
       need title
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      if [[ -n "$_sess" ]]; then
+        local _enc_title
+        _enc_title=$(printf '%s' "$title" | jq -Rr @uri)
+        local _dup_count
+        _dup_count=$(_curl "$BASE_URL/tasks?session_id=$_sess&q=$_enc_title" 2>/dev/null \
+          | jq -r --arg t "$title" '([.tasks[]? | select(.title == $t)] | length)' 2>/dev/null || echo "0")
+        if [[ "${_dup_count:-0}" -gt 0 ]]; then
+          echo "warning: task '$title' already exists for this session — refusing to create duplicate" >&2
+          exit 1
+        fi
+      fi
       local body
       body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$_sess")"
       local create_resp task_id
@@ -451,8 +462,14 @@ cmd_tasks() {
       local tag_id="${1:-}"; need tag_id
       _post "/tasks/$task_id/tags" "$(json tag_id "$tag_id")"
       ;;
+    states)
+      printf '%s\t%s\n' 1 "To Do"
+      printf '%s\t%s\n' 2 "In Progress"
+      printf '%s\t%s\n' 3 "Done"
+      printf '%s\t%s\n' 4 "In Review"
+      ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag> [--mine] [--title] [--quiet]"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag|states> [--mine] [--title] [--quiet]"
       ;;
   esac
 }

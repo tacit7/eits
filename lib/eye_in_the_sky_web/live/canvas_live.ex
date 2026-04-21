@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   def mount(_params, _session, socket) do
     {canvases, counts} =
       if connected?(socket) do
+        Events.subscribe_agent_working()
         {Canvases.list_canvases(), Canvases.count_sessions_per_canvas()}
       else
         {[], %{}}
@@ -246,16 +247,15 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   def handle_info({:session_status, session_id, _status}, socket) do
-    cs = Enum.find(socket.assigns.canvas_sessions, &(&1.session_id == session_id))
+    {:noreply, refresh_window(socket, session_id)}
+  end
 
-    if cs do
-      send_update(ChatWindowComponent,
-        id: "chat-window-#{cs.id}",
-        canvas_session: cs
-      )
-    end
+  def handle_info({:agent_working, %{id: session_id}}, socket) do
+    {:noreply, refresh_window(socket, session_id)}
+  end
 
-    {:noreply, socket}
+  def handle_info({:agent_stopped, %{id: session_id}}, socket) do
+    {:noreply, refresh_window(socket, session_id)}
   end
 
   def handle_info({:remove_canvas_window, cs_id}, socket) do

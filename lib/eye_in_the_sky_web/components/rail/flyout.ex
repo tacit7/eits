@@ -105,7 +105,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         name="value"
         value={@name_filter}
         placeholder="Filter by name…"
-        phx-change="update_session_name_filter"
+        phx-keyup="update_session_name_filter"
         phx-target={@myself}
         phx-debounce="300"
         class="flex-1 bg-base-200 text-xs text-base-content/80 placeholder-base-content/30 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary/40 min-w-0"
@@ -131,7 +131,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
         <div class="text-[9px] font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">Sort by</div>
         <div class="flex flex-col gap-0.5">
-          <.sort_option label="Last activity" value="last_activity" current={@sort} myself={@myself} />
           <.sort_option label="Created" value="created" current={@sort} myself={@myself} />
           <.sort_option label="Name" value="name" current={@sort} myself={@myself} />
         </div>

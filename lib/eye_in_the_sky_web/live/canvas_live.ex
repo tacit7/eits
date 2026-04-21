@@ -32,17 +32,21 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      |> assign(:canvas_session_counts, counts)
      |> assign(:show_session_picker, false)
      |> assign(:session_search, "")
-     |> assign(:filtered_sessions, [])}
+     |> assign(:filtered_sessions, [])
+     |> assign(:focus_session_id, nil)}
   end
 
   @impl true
-  def handle_params(%{"id" => id_str}, _url, socket) do
+  def handle_params(%{"id" => id_str} = params, _url, socket) do
+    focus_session_id = parse_int(params["focus"])
+
     case parse_int(id_str) do
       nil ->
         {:noreply, redirect_to_first_or_stay(socket)}
 
       canvas_id ->
-        {:noreply, activate_canvas(socket, canvas_id)}
+        socket = activate_canvas(socket, canvas_id)
+        {:noreply, assign(socket, :focus_session_id, focus_session_id)}
     end
   end
 
@@ -457,6 +461,13 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           <.icon name="hero-squares-2x2" class="w-8 h-8" />
           <span>No canvases yet. Create one with "+ New" above.</span>
         </div>
+      <% end %>
+      <%= if @focus_session_id do %>
+        <span
+          id={"canvas-focus-trigger-#{@focus_session_id}"}
+          class="hidden"
+          phx-mounted={JS.dispatch("canvas:focus-session", detail: %{sessionId: @focus_session_id})}
+        />
       <% end %>
     </div>
     """

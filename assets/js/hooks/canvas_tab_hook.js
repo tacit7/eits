@@ -10,17 +10,22 @@ const SHORTCUTS = [
   { keys: "?",            desc: "Show this help" },
 ]
 
+function closeHelp() {
+  const el = document.getElementById("canvas-shortcuts-help")
+  if (el) el.style.display = "none"
+}
+
 function getOrCreateHelp() {
   let el = document.getElementById("canvas-shortcuts-help")
   if (el) return el
 
   el = document.createElement("div")
   el.id = "canvas-shortcuts-help"
-  el.style.cssText = "position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center"
+  el.style.cssText = "position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center"
 
   const backdrop = document.createElement("div")
   backdrop.style.cssText = "position:absolute;inset:0;background:oklch(var(--b3)/0.6)"
-  backdrop.addEventListener("click", () => el.classList.add("hidden"))
+  backdrop.addEventListener("click", closeHelp)
 
   const card = document.createElement("div")
   card.style.cssText = "position:relative;z-index:1;min-width:280px"
@@ -52,13 +57,22 @@ function getOrCreateHelp() {
   return el
 }
 
+function isHelpVisible() {
+  const el = document.getElementById("canvas-shortcuts-help")
+  return el && el.style.display !== "none"
+}
+
 function onKeydown(e) {
   // Skip when typing in inputs
   if (e.target.matches("input, textarea, [contenteditable]")) return
 
   if (e.key === "?") {
-    const help = getOrCreateHelp()
-    help.classList.toggle("hidden")
+    if (isHelpVisible()) {
+      closeHelp()
+    } else {
+      const help = getOrCreateHelp()
+      help.style.display = "flex"
+    }
     return
   }
 
@@ -74,10 +88,8 @@ function onKeydown(e) {
   }
 
   if (e.key === "Escape") {
-    // Close help panel first if open
-    const help = document.getElementById("canvas-shortcuts-help")
-    if (help && !help.classList.contains("hidden")) {
-      help.classList.add("hidden")
+    if (isHelpVisible()) {
+      closeHelp()
       return
     }
 

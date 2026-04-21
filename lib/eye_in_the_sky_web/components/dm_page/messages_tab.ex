@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   use EyeInTheSkyWeb, :html
 
   alias EyeInTheSkyWeb.Components.DmHelpers
-  import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1]
+  import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1, parse_body_segments: 1]
   import EyeInTheSkyWeb.Components.DmMessageComponents,
     only: [message_body: 1, message_metrics: 1, message_attachments: 1]
 
@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <% end %>
             </div>
 
-            <div class="space-y-4">
+            <div class="space-y-1">
               <%= for message <- @messages do %>
                 <.message_item message={message} />
               <% end %>
@@ -123,21 +123,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     role = if assigns.message.sender_role == "user", do: :user, else: :agent
     is_dm = dm_message?(assigns.message)
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
-    is_tool_result = stream_type == "tool_result"
+    segments = parse_body_segments(assigns.message.body)
+    body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+    is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
 
     assigns =
-      assign(assigns, :role, role)
+      assigns
+      |> assign(:role, role)
       |> assign(:is_dm, is_dm)
-      |> assign(:is_tool_result, is_tool_result)
+      |> assign(:is_tool_event, is_tool_event)
 
     ~H"""
     <div
-      class={[
-        "px-2 -mx-2 rounded-lg",
-        @is_tool_result && "py-0 -mt-3",
-        !@is_tool_result && "py-3",
-        @is_dm && "border-l-2 border-primary/30 pl-3 bg-primary/[0.03]"
-      ]}
       id={"dm-message-#{@message.id}"}
       phx-mounted={
         JS.transition(
@@ -146,69 +143,30 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         )
       }
     >
-      <%= if @is_tool_result do %>
-        <div class="pl-[26px]">
-          <.message_body message={@message} />
+      <%= if @is_tool_event do %>
+        <div class="max-w-[70%] px-1 my-0.5">
+          <.message_body message={@message} compact={false} />
         </div>
       <% else %>
-        <div class="flex items-start gap-2.5">
-          <%!-- Sender icon --%>
-          <%= if @role == :user do %>
-            <div class="w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
-              <div class="w-1.5 h-1.5 rounded-full bg-success" />
+        <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
+          <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
+            <div class={[
+              "leading-snug break-words",
+              @role == :user &&
+                "px-3 py-2 bg-base-200 text-base-content rounded-2xl rounded-br-sm text-sm",
+              @role == :user && @is_dm && "border border-primary/20",
+              @role == :agent && "py-1 text-base-content/90"
+            ]}>
+              <.message_body message={@message} compact={false} />
             </div>
-          <% else %>
-            <img
-              src={provider_icon(@message.provider)}
-              class={"w-4 h-4 mt-1 flex-shrink-0 #{provider_icon_class(@message.provider)}"}
-              alt={@message.provider || "Agent"}
-              width="16"
-              height="16"
-              loading="lazy"
-            />
-          <% end %>
-
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span class={[
-                "text-[13px] font-semibold",
-                @role == :agent && "text-primary/80",
-                @role == :user && "text-base-content/70"
-              ]}>
-                {message_sender_name(@message)}
-              </span>
-              <%!-- DM badge --%>
-              <span
-                :if={@is_dm}
-                class="inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/40 uppercase tracking-wide"
-              >
-                <.icon name="hero-envelope-mini" class="w-2.5 h-2.5" /> dm
-              </span>
-              <span
-                :if={@role == :agent && message_model(@message)}
-                class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
-              >
-                {message_model(@message)}
-              </span>
-              <span
-                :if={@role == :agent && message_cost(@message)}
-                class="text-[11px] font-mono text-base-content/30"
-              >
-                ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
-              </span>
-              <time
-                id={"msg-time-#{@message.id}"}
-                class="text-[11px] text-base-content/25"
-                data-utc={to_utc_string(@message.inserted_at)}
-                phx-hook="LocalTime"
-              >
-              </time>
-            </div>
-
-            <.message_body message={@message} />
-
             <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
             <.message_attachments attachments={@message.attachments || []} />
+            <time
+              id={"msg-time-#{@message.id}"}
+              class="text-[9px] text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+              data-utc={to_utc_string(@message.inserted_at)}
+              phx-hook="LocalTime"
+            />
           </div>
         </div>
       <% end %>
@@ -254,11 +212,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defp stream_provider_label(_session), do: "Claude"
 
   defdelegate dm_message?(msg), to: DmHelpers
-  defdelegate message_sender_name(msg), to: DmHelpers
-  defdelegate provider_icon(provider), to: DmHelpers
-  defdelegate provider_icon_class(provider), to: DmHelpers
-  defdelegate message_model(msg), to: DmHelpers
-  defdelegate message_cost(msg), to: DmHelpers
 
   defp show_message_metrics?(message) do
     message.sender_role == "agent" and is_map(message.metadata) and

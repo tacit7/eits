@@ -23,6 +23,8 @@ export function loadWindowLayout(csId) {
   } catch (_) { return null }
 }
 
+const GAP = 8  // px between tiled windows
+
 export const CanvasLayoutHook = {
   mounted() {
     this.el.addEventListener('click', () => {
@@ -34,9 +36,17 @@ export const CanvasLayoutHook = {
       const windows = Array.from(document.querySelectorAll('[data-chat-window]'))
       if (windows.length === 0) return
 
+      const colW = Math.round((W - GAP) / 2)
+      const rowH = Math.round((H - GAP) / 2)
+
       const positions = preset === '2up'
-        ? windows.slice(0, 2).map((_, i) => ({ x: Math.round(i * (W / 2)), y: 0, w: Math.round(W / 2), h: H }))
-        : windows.slice(0, 4).map((_, i) => ({ x: Math.round((i % 2) * (W / 2)), y: Math.round(Math.floor(i / 2) * (H / 2)), w: Math.round(W / 2), h: Math.round(H / 2) }))
+        ? windows.slice(0, 2).map((_, i) => ({ x: Math.round(i * (colW + GAP)), y: 0, w: colW, h: H }))
+        : windows.slice(0, 4).map((_, i) => ({
+            x: Math.round((i % 2) * (colW + GAP)),
+            y: Math.round(Math.floor(i / 2) * (rowH + GAP)),
+            w: colW,
+            h: rowH
+          }))
 
       positions.forEach((pos, i) => {
         const win = windows[i]

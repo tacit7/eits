@@ -11,7 +11,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
-  alias EyeInTheSky.{Messages, Sessions}
+  alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2]
@@ -79,8 +79,16 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
   end
 
   defp send_dm(from_session, to_session, message, from_session_id) do
-    sender_name = from_session.name || "session:#{from_session.uuid}"
-    dm_body = "DM from:#{sender_name} (session:#{from_session.uuid}) #{message}"
+    agent_name =
+      case from_session.agent_id && Agents.get_agent(from_session.agent_id) do
+        {:ok, agent} when is_binary(agent.name) and agent.name != "" -> agent.name
+        _ -> nil
+      end
+
+    display_name = agent_name || from_session.name || "session:#{from_session.id}"
+
+    dm_body =
+      "[DM from agent: #{display_name}]\n#{message}\n\nReply: eits dm --to #{from_session.id} --message \"\""
 
     attrs = %{
       uuid: Ecto.UUID.generate(),
@@ -94,7 +102,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
       status: "sent",
       provider: "claude",
       metadata: %{
-        sender_name: sender_name,
+        sender_name: display_name,
+        agent_name: agent_name,
+        session_name: from_session.name,
+        from_session_id: from_session.id,
         from_session_uuid: from_session.uuid,
         to_session_uuid: to_session.uuid
       }

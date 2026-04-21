@@ -112,7 +112,10 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
   def message_body(assigns) do
     raw_body = assigns.message.body || ""
-    is_dm_body = dm_message?(assigns.message) or String.starts_with?(raw_body, "DM from:")
+    is_dm_body =
+      dm_message?(assigns.message) or
+        String.starts_with?(raw_body, "DM from:") or
+        String.starts_with?(raw_body, "[DM from agent:")
 
     {dm_info, body} =
       if is_dm_body do
@@ -143,8 +146,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       <%= if @dm_info do %>
         <div class="flex items-center gap-1.5 flex-wrap mb-1">
           <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 text-[10px] font-mono font-semibold">
-            <.icon name="hero-chat-bubble-left-ellipsis" class="w-3 h-3" />
+            <.icon name="hero-cpu-chip" class="w-3 h-3" />
             {@dm_info.sender}
+            <%= if @dm_info[:session_id] && @dm_info[:session_id] != "" do %>
+              <span class="text-primary/40 font-normal">#{@dm_info[:session_id]}</span>
+            <% end %>
           </span>
           <%= if @dm_info.status do %>
             <span class={[

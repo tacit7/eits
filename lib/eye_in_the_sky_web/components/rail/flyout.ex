@@ -402,25 +402,25 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       </.link>
       <%= for session <- canvas.sessions do %>
         <div class="flex items-center hover:bg-base-content/5 transition-colors group">
-          <.link
-            navigate={"/dm/#{session.id}"}
-            class="flex items-center gap-2 pl-7 py-1 flex-1 min-w-0 text-xs text-base-content/50 group-hover:text-base-content/80"
+          <button
+            type="button"
+            phx-click={JS.dispatch("canvas:focus-session", detail: %{sessionId: session.id})}
+            class="flex items-center gap-2 pl-7 py-1 flex-1 min-w-0 text-xs text-base-content/50 group-hover:text-base-content/80 cursor-pointer text-left"
           >
             <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />
             <span class="truncate">{session.name || "unnamed"}</span>
-          </.link>
-          <button
-            type="button"
-            class={["flex-shrink-0 px-3 py-1 transition-opacity cursor-pointer hover:opacity-80", if(session.status == "working", do: "opacity-80", else: "opacity-30")]}
-            phx-click={JS.dispatch("canvas:focus-session", detail: %{sessionId: session.id})}
-            title="Focus window"
+          </button>
+          <.link
+            navigate={"/dm/#{session.id}"}
+            class={["flex-shrink-0 px-3 py-1 transition-opacity hover:opacity-80", if(session.status == "working", do: "opacity-80", else: "opacity-30")]}
+            title="Open DM"
           >
             <img
               src={canvas_provider_icon(session.provider)}
-              class={["w-3.5 h-3.5 pointer-events-none", canvas_provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
+              class={["w-3.5 h-3.5", canvas_provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
               alt={session.provider || "agent"}
             />
-          </button>
+          </.link>
         </div>
       <% end %>
       <%= if canvas.sessions == [] do %>

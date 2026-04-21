@@ -124,6 +124,13 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         attrs
       end
 
+    attrs =
+      if status && status != "waiting" && !params["status_reason"] do
+        Map.put(attrs, :status_reason, nil)
+      else
+        attrs
+      end
+
     if status in ["completed", "failed"] do
       Map.put(attrs, :ended_at, params["ended_at"] || DateTime.utc_now())
     else

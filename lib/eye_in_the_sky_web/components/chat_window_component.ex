@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
               No messages yet
             </div>
           <% else %>
-            <div class="space-y-2">
+            <div class="space-y-1">
               <%= for message <- @messages do %>
                 <.message_item message={message} cs_id={@canvas_session.id} agent_name={session_label(@session)} />
               <% end %>
@@ -206,53 +206,41 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       |> assign(:is_tool_result, is_tool_result)
 
     ~H"""
-    <div
-      class={[
-        "px-1.5 -mx-1.5 rounded-lg",
-        @is_tool_result && "py-0.5",
-        !@is_tool_result && "py-2",
-        @is_dm && "border-l-2 border-primary/30 pl-2 bg-primary/[0.03]"
-      ]}
-      id={"chat-msg-#{@cs_id}-#{@message.id}"}
-    >
+    <div id={"chat-msg-#{@cs_id}-#{@message.id}"} class="mb-1">
       <%= if @is_tool_result do %>
-        <div class="pl-[22px]">
-          <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
+        <div class="flex justify-center my-0.5">
+          <div class="max-w-[90%] bg-base-300/40 rounded-lg px-2 py-0.5 text-[10px] text-base-content/40 italic">
+            <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
+          </div>
         </div>
       <% else %>
-        <div class="flex items-start gap-2">
-          <%= if @role == :user do %>
-            <div class="w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 bg-success/20 flex items-center justify-center">
-              <div class="w-1 h-1 rounded-full bg-success" />
-            </div>
-          <% else %>
+        <div class={["flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
+          <%= if @role == :agent do %>
             <img
               src={DmHelpers.provider_icon(@message.provider)}
-              class={"w-3.5 h-3.5 mt-0.5 flex-shrink-0 #{DmHelpers.provider_icon_class(@message.provider)}"}
+              class={"w-4 h-4 mb-0.5 flex-shrink-0 #{DmHelpers.provider_icon_class(@message.provider)}"}
               alt={@message.provider || "Agent"}
-              width="14"
-              height="14"
+              width="16"
+              height="16"
               loading="lazy"
             />
           <% end %>
 
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-              <time
-                id={"msg-time-#{@cs_id}-#{@message.id}"}
-                class="text-[10px] text-base-content/25"
-                data-utc={to_utc_string(@message.inserted_at)}
-                phx-hook="LocalTime"
-              />
-              <span class={[
-                "text-[11px] font-semibold",
-                @role == :agent && "text-primary/80",
-                @role == :user && "text-base-content/70"
-              ]}>
-                {if @role == :user, do: "You", else: @agent_name}
-              </span>
+          <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
+            <div class={[
+              "px-3 py-2 text-sm leading-snug break-words",
+              @role == :user && "bg-primary text-primary-content rounded-2xl rounded-br-sm",
+              @role == :agent && "bg-base-200 text-base-content rounded-2xl rounded-bl-sm",
+              @is_dm && "border border-primary/20"
+            ]}>
+              <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
             </div>
-            <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
+            <time
+              id={"msg-time-#{@cs_id}-#{@message.id}"}
+              class="text-[9px] text-base-content/30 mt-0.5 px-1"
+              data-utc={to_utc_string(@message.inserted_at)}
+              phx-hook="LocalTime"
+            />
           </div>
         </div>
       <% end %>

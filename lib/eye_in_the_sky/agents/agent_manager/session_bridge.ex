@@ -84,12 +84,15 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
       agent.project_id ->
         lookup_project_path(agent.project_id, "agent.project_id", session.id)
 
+      agent.project_name ->
+        lookup_project_path_by_basename(agent.project_name, session.id)
+
       true ->
         Logger.error(
           "resolve_project_path: no path for session.id=#{session.id}; " <>
-            "session.git_worktree_path=#{inspect(session.git_worktree_path)}, " <>
-            "agent.git_worktree_path=#{inspect(agent.git_worktree_path)}, " <>
-            "project.path=#{inspect(if agent.project, do: agent.project.path)}"
+            "all resolution strategies exhausted " <>
+            "(session.project_id=nil, agent.project_id=nil, agent.project_name=nil, " <>
+            "session.git_worktree_path=nil, agent.git_worktree_path=nil)"
         )
 
         {:error, :missing_project_path}
@@ -105,7 +108,48 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
 
         {:ok, path}
 
-      _ ->
+      {:ok, project} ->
+        Logger.error(
+          "resolve_project_path: #{source}=#{project_id} found project.id=#{project.id} " <>
+            "but path is nil for session.id=#{session_id}"
+        )
+
+        {:error, :missing_project_path}
+
+      {:error, :not_found} ->
+        Logger.error(
+          "resolve_project_path: #{source}=#{project_id} not found in projects table " <>
+            "for session.id=#{session_id}"
+        )
+
+        {:error, :missing_project_path}
+    end
+  end
+
+  defp lookup_project_path_by_basename(project_name, session_id) do
+    case Projects.get_project_by_path_basename(project_name) do
+      {:ok, %{path: path} = project} when not is_nil(path) ->
+        Logger.info(
+          "resolve_project_path: resolved via project_name=#{project_name} -> " <>
+            "project.id=#{project.id}, path=#{path} for session.id=#{session_id}"
+        )
+
+        {:ok, path}
+
+      {:ok, project} ->
+        Logger.error(
+          "resolve_project_path: project_name=#{project_name} matched project.id=#{project.id} " <>
+            "but path is nil for session.id=#{session_id}"
+        )
+
+        {:error, :missing_project_path}
+
+      {:error, :not_found} ->
+        Logger.error(
+          "resolve_project_path: project_name=#{project_name} did not match any project path " <>
+            "for session.id=#{session_id}"
+        )
+
         {:error, :missing_project_path}
     end
   end

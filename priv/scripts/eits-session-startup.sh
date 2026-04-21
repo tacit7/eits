@@ -110,7 +110,20 @@ eits sessions update "$SESSION_ID" --status "working" >/dev/null 2>&1 &
 _PENDING_LOG="${HOME}/.eits/pending-annotations.log"
 _DRAIN_LOCK_DIR="${HOME}/.eits/pending-annotations.lock.d"
 if [ -f "$_PENDING_LOG" ] && [ -s "$_PENDING_LOG" ]; then
+  # Stale lock recovery: if the lock dir exists but the owning PID is dead, remove it.
+  _DRAIN_LOCK_PID_FILE="${_DRAIN_LOCK_DIR}/pid"
+  if [ -d "$_DRAIN_LOCK_DIR" ]; then
+    _lock_pid=""
+    [ -f "$_DRAIN_LOCK_PID_FILE" ] && _lock_pid=$(cat "$_DRAIN_LOCK_PID_FILE" 2>/dev/null)
+    if [ -n "$_lock_pid" ] && kill -0 "$_lock_pid" 2>/dev/null; then
+      _log "drain skipped: lock held by live PID $_lock_pid"
+    else
+      _log "drain: removing stale lock (PID ${_lock_pid:-unknown} is dead)"
+      /bin/rm -rf "$_DRAIN_LOCK_DIR"
+    fi
+  fi
   if mkdir "$_DRAIN_LOCK_DIR" 2>/dev/null; then
+    echo $$ > "$_DRAIN_LOCK_PID_FILE"
     trap 'rmdir "$_DRAIN_LOCK_DIR" 2>/dev/null' EXIT
     _log "draining pending annotations from $_PENDING_LOG"
     echo "[EITS] startup: draining pending annotations" >&2
@@ -138,9 +151,11 @@ if [ -f "$_PENDING_LOG" ] && [ -s "$_PENDING_LOG" ]; then
         "$_ann_base_url/tasks/$_task_id/annotations")
       if [ "${_ann_status:-0}" -ge 200 ] && [ "${_ann_status:-0}" -lt 300 ]; then
         _log "drained annotation for task $_task_id"
-      else
-        _log "drain failed for task $_task_id (HTTP ${_ann_status:-?}), re-queuing"
+      elif [ "${_ann_status:-0}" = "429" ] || [ "${_ann_status:-0}" -ge 500 ]; then
+        _log "drain failed for task $_task_id (HTTP ${_ann_status:-?}), re-queuing (retriable)"
         _failed_lines+=("$_line")
+      else
+        _log "drain dropped task $_task_id annotation (HTTP ${_ann_status:-?}) — not retriable (task deleted/bad request)"
       fi
     done < "$_tmp_log"
     rm -f "$_tmp_log"

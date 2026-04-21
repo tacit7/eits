@@ -254,11 +254,13 @@ defmodule EyeInTheSky.Tasks do
 
     result =
       Repo.transaction(fn ->
-        locked_state =
-          from(t in "tasks", where: t.id == ^task.id, select: t.state_id, lock: "FOR UPDATE")
+        locked_row =
+          from(t in "tasks", where: t.id == ^task.id, select: {t.id, t.state_id}, lock: "FOR UPDATE")
           |> Repo.one()
 
-        if is_nil(locked_state), do: Repo.rollback(:task_not_found)
+        # Distinguish missing row (id is nil) from row with nil state_id (data anomaly)
+        if is_nil(locked_row), do: Repo.rollback(:task_not_found)
+        locked_state = elem(locked_row, 1)
         # Reject In Progress tasks as a duplicate claim attempt
         if locked_state == in_progress_id, do: Repo.rollback(:already_claimed)
         # Reject Done/In Review — claiming them would silently regress their state
@@ -277,8 +279,11 @@ defmodule EyeInTheSky.Tasks do
 
     case result do
       {:ok, updated} ->
-        EyeInTheSky.Events.task_updated(updated)
-        {:ok, updated}
+        # Preload associations before broadcasting — Repo.update returns the raw
+        # struct with NotLoaded associations; subscribers expect the same shape as get_task.
+        reloaded = Repo.preload(updated, @full_task_preloads)
+        EyeInTheSky.Events.task_updated(reloaded)
+        {:ok, reloaded}
 
       {:error, reason} ->
         {:error, reason}

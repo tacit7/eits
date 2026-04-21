@@ -379,14 +379,21 @@ cmd_tasks() {
         break
       done
       if [[ $_ann_ok -eq 0 ]]; then
-        local _pending_dir="${HOME}/.eits"
-        mkdir -p "$_pending_dir"
-        printf '%s\n' "$(printf '{"task_id":%s,"body":%s,"title":%s}' \
-          "$(printf '%s' "$id" | jq -Rs .)" \
-          "$(printf '%s' "$body" | jq -Rs .)" \
-          "$(printf '%s' "$title" | jq -Rs .)")" \
-          >> "${_pending_dir}/pending-annotations.log"
-        echo "annotate failed after retries — queued to ~/.eits/pending-annotations.log" >&2
+        # Only queue retriable failures (429 rate-limit or 5xx server error).
+        # 4xx client errors (400 bad body, 404 task deleted, 422 validation) will
+        # never succeed on retry — fail loud instead of queuing forever.
+        if [[ "$_ann_status" == "429" || "$_ann_status" -ge 500 ]]; then
+          local _pending_dir="${HOME}/.eits"
+          mkdir -p "$_pending_dir"
+          printf '%s\n' "$(printf '{"task_id":%s,"body":%s,"title":%s}' \
+            "$(printf '%s' "$id" | jq -Rs .)" \
+            "$(printf '%s' "$body" | jq -Rs .)" \
+            "$(printf '%s' "$title" | jq -Rs .)")" \
+            >> "${_pending_dir}/pending-annotations.log"
+          echo "annotate failed (HTTP ${_ann_status}) — queued to ~/.eits/pending-annotations.log" >&2
+        else
+          echo "annotate failed (HTTP ${_ann_status}) — not retriable, skipping queue" >&2
+        fi
         return 1
       fi
       ;;

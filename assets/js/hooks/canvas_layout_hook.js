@@ -23,7 +23,8 @@ export function loadWindowLayout(csId) {
   } catch (_) { return null }
 }
 
-const GAP = 8  // px between tiled windows
+const GAP  = 8  // px between tiled windows
+const EDGE = 8  // px from canvas edges
 
 export const CanvasLayoutHook = {
   mounted() {
@@ -31,8 +32,8 @@ export const CanvasLayoutHook = {
       const preset = this.el.dataset.layoutBtn  // '2up' or '4up'
       const canvasArea = document.querySelector('[data-canvas-area]')
       if (!canvasArea) return
-      const W = canvasArea.offsetWidth
-      const H = canvasArea.offsetHeight
+      const W = canvasArea.offsetWidth  - EDGE * 2
+      const H = canvasArea.offsetHeight - EDGE * 2
       const windows = Array.from(document.querySelectorAll('[data-chat-window]'))
       if (windows.length === 0) return
 
@@ -40,10 +41,10 @@ export const CanvasLayoutHook = {
       const rowH = Math.round((H - GAP) / 2)
 
       const positions = preset === '2up'
-        ? windows.slice(0, 2).map((_, i) => ({ x: Math.round(i * (colW + GAP)), y: 0, w: colW, h: H }))
+        ? windows.slice(0, 2).map((_, i) => ({ x: EDGE + Math.round(i * (colW + GAP)), y: EDGE, w: colW, h: H }))
         : windows.slice(0, 4).map((_, i) => ({
-            x: Math.round((i % 2) * (colW + GAP)),
-            y: Math.round(Math.floor(i / 2) * (rowH + GAP)),
+            x: EDGE + Math.round((i % 2) * (colW + GAP)),
+            y: EDGE + Math.round(Math.floor(i / 2) * (rowH + GAP)),
             w: colW,
             h: rowH
           }))

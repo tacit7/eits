@@ -44,6 +44,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       id={"chat-window-#{@canvas_session.id}"}
       data-chat-window
       data-cs-id={@canvas_session.id}
+      data-session-id={@canvas_session.session_id}
       phx-hook="ChatWindowHook"
       style={"position: absolute; left: #{@canvas_session.pos_x}px; top: #{@canvas_session.pos_y}px; width: #{@canvas_session.width}px; height: #{@canvas_session.height}px; resize: both; overflow: auto;"}
       class="bg-base-100 rounded-xl shadow-2xl border border-base-300 flex flex-col"
@@ -53,15 +54,13 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-base-300 rounded-t-xl cursor-move select-none shrink-0"
       >
         <div class="flex items-center gap-2 min-w-0">
-          <img
-            src={DmHelpers.provider_icon(@session && @session.provider)}
-            class={[
-              "w-3.5 h-3.5 shrink-0",
-              DmHelpers.provider_icon_class(@session && @session.provider),
-              @session && @session.status == "working" && "animate-pulse"
-            ]}
-            alt={(@session && @session.provider) || "agent"}
-          />
+          <%= if @session do %>
+            <img
+              src={DmHelpers.provider_icon(@session.provider)}
+              class={["w-3.5 h-3.5 shrink-0", DmHelpers.provider_icon_class(@session.provider), @session.status == "working" && "animate-pulse"]}
+              alt={@session.provider || "agent"}
+            />
+          <% end %>
           <span class="text-xs font-medium truncate">{session_label(@session)}</span>
         </div>
         <div class="flex items-center gap-1.5">
@@ -216,18 +215,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
         </div>
       <% else %>
-        <div class={["flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
-          <%= if @role == :agent do %>
-            <img
-              src={DmHelpers.provider_icon(@message.provider)}
-              class={"w-4 h-4 mb-0.5 flex-shrink-0 #{DmHelpers.provider_icon_class(@message.provider)}"}
-              alt={@message.provider || "Agent"}
-              width="16"
-              height="16"
-              loading="lazy"
-            />
-          <% end %>
-
+        <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
           <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
             <div class={[
               "text-sm leading-snug break-words",
@@ -239,7 +227,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             </div>
             <time
               id={"msg-time-#{@cs_id}-#{@message.id}"}
-              class="text-[9px] text-base-content/30 mt-0.5 px-1"
+              class="text-[9px] text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
               data-utc={to_utc_string(@message.inserted_at)}
               phx-hook="LocalTime"
             />

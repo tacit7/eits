@@ -271,6 +271,19 @@ export const ChatWindowHook = {
     // --- Click-to-focus: raise window on any mousedown ---
     this.el.addEventListener("mousedown", () => { this._raiseToFront() })
 
+    // --- Rail icon click: focus this window by session ID ---
+    window.addEventListener("canvas:focus-session", this._onFocusSession = (e) => {
+      const targetId = String(e.detail?.sessionId)
+      if (targetId && targetId === this.el.dataset.sessionId) {
+        this._raiseToFront()
+        // Un-minimize if collapsed
+        if (this._minimized) {
+          const btn = this.el.querySelector("[data-minimize-btn]")
+          if (btn) btn.click()
+        }
+      }
+    })
+
     document.addEventListener("mousedown", this._onBlurWindows = (e) => {
       if (!e.target.closest("[data-chat-window]")) {
         document.querySelectorAll("[data-chat-window]").forEach(w => {
@@ -451,5 +464,6 @@ export const ChatWindowHook = {
   destroyed() {
     if (this._resizeObserver) this._resizeObserver.disconnect()
     document.removeEventListener("mousedown", this._onBlurWindows)
+    window.removeEventListener("canvas:focus-session", this._onFocusSession)
   }
 }

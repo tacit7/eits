@@ -293,16 +293,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />
             <span class="truncate">{session.name || "unnamed"}</span>
           </.link>
-          <.link
-            navigate={"/dm/#{session.id}"}
-            class="flex-shrink-0 px-3 py-1 opacity-30 hover:opacity-80 transition-opacity"
+          <button
+            type="button"
+            class="flex-shrink-0 px-3 py-1 opacity-30 hover:opacity-80 transition-opacity cursor-pointer"
+            phx-click={JS.dispatch("canvas:focus-session", detail: %{sessionId: session.id})}
+            title="Focus window"
           >
             <img
               src={canvas_provider_icon(session.provider)}
-              class={["w-3.5 h-3.5", canvas_provider_icon_class(session.provider)]}
+              class={["w-3.5 h-3.5 pointer-events-none", canvas_provider_icon_class(session.provider)]}
               alt={session.provider || "agent"}
             />
-          </.link>
+          </button>
         </div>
       <% end %>
       <%= if canvas.sessions == [] do %>

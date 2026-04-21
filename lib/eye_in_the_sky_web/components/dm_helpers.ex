@@ -268,8 +268,43 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   def parse_body_segments(body) when is_binary(body) do
     body
     |> String.trim()
-    |> String.split(~r/\n\n/, trim: true)
+    |> split_outside_fences()
     |> Enum.map(&parse_body_segment/1)
+  end
+
+  # Split on blank lines only when outside a fenced code block.
+  # A fence opens/closes on lines that start with ``` or ~~~ (after optional whitespace).
+  # Blank lines inside a fence are kept as part of the current segment.
+  defp split_outside_fences(text) do
+    {segs, buf, _in_fence} =
+      text
+      |> String.split("\n")
+      |> Enum.reduce({[], [], false}, fn line, {segs, buf, in_fence} ->
+        trimmed = String.trim_leading(line)
+        is_fence = String.starts_with?(trimmed, "```") or String.starts_with?(trimmed, "~~~")
+        next_in_fence = if is_fence, do: !in_fence, else: in_fence
+
+        if String.trim(line) == "" and not in_fence do
+          # Blank line outside fence — flush current segment
+          case buf do
+            [] -> {segs, [], false}
+            _ -> {[buf |> Enum.reverse() |> Enum.join("\n") | segs], [], false}
+          end
+        else
+          {segs, [line | buf], next_in_fence}
+        end
+      end)
+
+    # Flush any remaining buffer
+    final =
+      case buf do
+        [] -> segs
+        _ -> [buf |> Enum.reverse() |> Enum.join("\n") | segs]
+      end
+
+    final
+    |> Enum.reverse()
+    |> Enum.reject(&(String.trim(&1) == ""))
   end
 
   def parse_body_segment(text) do

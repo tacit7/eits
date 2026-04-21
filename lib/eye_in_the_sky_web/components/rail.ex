@@ -55,6 +55,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_teams: [],
         flyout_tasks: [],
         task_search: "",
+        task_state_filter: nil,
         task_filter_open: false,
         session_filter_open: false,
         session_sort: :last_activity,
@@ -241,8 +242,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     do: {:noreply, assign(socket, :task_filter_open, !socket.assigns.task_filter_open)}
 
   def handle_event("update_task_search", %{"value" => value}, socket) do
-    tasks = load_flyout_tasks(socket.assigns.sidebar_project, value)
+    tasks = load_flyout_tasks(socket.assigns.sidebar_project, value, socket.assigns.task_state_filter)
     {:noreply, socket |> assign(:task_search, value) |> assign(:flyout_tasks, tasks)}
+  end
+
+  def handle_event("set_task_state_filter", %{"state" => state_str}, socket) do
+    state_id = parse_task_state(state_str)
+    tasks = load_flyout_tasks(socket.assigns.sidebar_project, socket.assigns.task_search, state_id)
+    {:noreply, socket |> assign(:task_state_filter, state_id) |> assign(:flyout_tasks, tasks)}
   end
 
   @impl true
@@ -352,6 +359,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_teams={@flyout_teams}
         flyout_tasks={@flyout_tasks}
         task_search={@task_search}
+        task_state_filter={@task_state_filter}
         task_filter_open={@task_filter_open}
         session_filter_open={@session_filter_open}
         session_sort={@session_sort}
@@ -439,26 +447,33 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   defp maybe_load_teams(socket, _section, _project), do: socket
 
   defp maybe_load_tasks(socket, :tasks, project) do
-    tasks = load_flyout_tasks(project, socket.assigns[:task_search] || "")
+    tasks = load_flyout_tasks(project, socket.assigns[:task_search] || "", socket.assigns[:task_state_filter])
     assign(socket, :flyout_tasks, tasks)
   end
 
   defp maybe_load_tasks(socket, _section, _project), do: socket
 
-  defp load_flyout_tasks(project, search) do
+  defp load_flyout_tasks(project, search, state_id) do
     project_id = project && project.id
+    state_opts = if state_id, do: [state_id: state_id], else: []
 
     cond do
       search != "" ->
-        Tasks.search_tasks(search, project_id, limit: 50)
+        Tasks.search_tasks(search, project_id, [limit: 50] ++ state_opts)
 
       project_id ->
-        Tasks.list_tasks_for_project(project_id, limit: 50, sort_by: "created_desc")
+        Tasks.list_tasks_for_project(project_id, [limit: 50, sort_by: "created_desc"] ++ state_opts)
 
       true ->
-        Tasks.list_tasks(limit: 50, sort_by: "created_desc")
+        Tasks.list_tasks([limit: 50, sort_by: "created_desc"] ++ state_opts)
     end
   end
+
+  defp parse_task_state("1"), do: 1
+  defp parse_task_state("2"), do: 2
+  defp parse_task_state("3"), do: 3
+  defp parse_task_state("4"), do: 4
+  defp parse_task_state(_), do: nil
 
   # Load channels only when navigating to the :chat section — avoids a DB query on every page.
   defp maybe_load_channels(socket, :chat, project) do

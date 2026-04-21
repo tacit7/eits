@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_teams, :list, default: []
   attr :flyout_tasks, :list, default: []
   attr :task_search, :string, default: ""
+  attr :task_state_filter, :any, default: nil
   attr :task_filter_open, :boolean, default: false
   attr :session_filter_open, :boolean, default: false
   attr :session_sort, :atom, default: :last_activity
@@ -59,6 +60,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.tasks_content
                 tasks={@flyout_tasks}
                 task_search={@task_search}
+                state_filter={@task_state_filter}
                 filter_open={@task_filter_open}
                 sidebar_project={@sidebar_project}
                 myself={@myself}
@@ -229,9 +231,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
-  # Tasks flyout: list tasks with search
+  # Tasks flyout: list tasks with search and state filter
   attr :tasks, :list, default: []
   attr :task_search, :string, default: ""
+  attr :state_filter, :any, default: nil
   attr :filter_open, :boolean, default: false
   attr :sidebar_project, :any, default: nil
   attr :myself, :any, required: true
@@ -249,7 +252,34 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         phx-debounce="300"
         class="flex-1 bg-base-200 text-xs text-base-content/80 placeholder-base-content/30 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary/40 min-w-0"
       />
+      <button
+        phx-click="toggle_task_filter"
+        phx-target={@myself}
+        title="Filter by state"
+        class={[
+          "w-6 h-6 flex items-center justify-center rounded transition-colors flex-shrink-0",
+          if(@filter_open or not is_nil(@state_filter),
+            do: "text-primary bg-primary/10",
+            else: "text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8"
+          )
+        ]}
+      >
+        <.icon name="hero-funnel-mini" class="w-3.5 h-3.5" />
+      </button>
     </div>
+
+    <%= if @filter_open do %>
+      <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
+        <div class="text-[9px] font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">State</div>
+        <div class="flex flex-col gap-0.5">
+          <.task_state_option label="All" value="all" current={@state_filter} myself={@myself} />
+          <.task_state_option label="To Do" value="1" current={@state_filter} myself={@myself} />
+          <.task_state_option label="In Progress" value="2" current={@state_filter} myself={@myself} />
+          <.task_state_option label="In Review" value="4" current={@state_filter} myself={@myself} />
+          <.task_state_option label="Done" value="3" current={@state_filter} myself={@myself} />
+        </div>
+      </div>
+    <% end %>
 
     <.task_row :for={t <- @tasks} task={t} />
 
@@ -265,6 +295,32 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         View all &rarr;
       </.link>
     </div>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :value, :string, required: true
+  attr :current, :any, default: nil
+  attr :myself, :any, required: true
+
+  defp task_state_option(assigns) do
+    ~H"""
+    <% active = (@value == "all" and is_nil(@current)) or to_string(@current) == @value %>
+    <button
+      phx-click="set_task_state_filter"
+      phx-value-state={@value}
+      phx-target={@myself}
+      class={[
+        "flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded transition-colors",
+        if(active,
+          do: "text-primary bg-primary/10 font-medium",
+          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/8"
+        )
+      ]}
+    >
+      <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", if(active, do: "bg-primary", else: "bg-transparent")]} />
+      {@label}
+    </button>
     """
   end
 

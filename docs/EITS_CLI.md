@@ -102,10 +102,13 @@ eits tasks begin --title <t> [--description <d>] [--project <id>] \
 eits tasks update <id> [--state <id>|--state-name <done|start|in-progress|in-review|todo>] \
   [--priority <p>] [--title <t>] [--description <d>] [--due-at <ISO8601>]
 
-# State shorthands
-eits tasks start <id>          # → In Progress (state 2), auto-links session
-eits tasks claim <id>          # Alias for start; auto-links session
-eits tasks done <id>           # → Done (state 3)
+# State shorthands (canonical)
+eits tasks claim <id>          # → In Progress (state 2), auto-links session (preferred)
+eits tasks complete <id> <message>  # Annotate + mark done + DM lead (preferred)
+
+# Deprecated aliases (kept for backwards compatibility, emit warning to stderr)
+eits tasks start <id>          # DEPRECATED: use claim instead
+eits tasks done <id>           # DEPRECATED: use complete instead
 
 # Complete with message
 eits tasks complete <id> <message>
@@ -202,6 +205,7 @@ eits agents list [--project <id>] [--status <status>] [--limit <n>]
 eits agents get <id>
 
 eits agents spawn --instructions <text> | --instructions-file <path> \
+  [--interpolate-env] \
   [--model <m>] [--provider <p>] \
   [--project-id <n>] [--project-path <path>] [--worktree <branch>] \
   [--stash-if-dirty] \
@@ -210,7 +214,9 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
   [--name <session-name>] [--yolo]
 ```
 
-**Instructions**: `--instructions <text>` or `--instructions-file <path>` (required, one of). `--instructions-file` reads instructions from a file instead of requiring inline text.
+**Instructions**: `--instructions <text>` or `--instructions-file <path>` (required, mutually exclusive). `--instructions-file` reads instructions from a file — useful for large payloads that break shell escaping.
+
+**Env interpolation**: `--interpolate-env` substitutes `$VAR` and `${VAR}` patterns in the instructions using the current process environment before sending to the API. Requires `envsubst` (gettext) or `perl`. Useful when instructions come from a file and need to embed runtime values like `$EITS_SESSION_UUID`.
 
 **Project defaults**: `--project-id` defaults to `$EITS_PROJECT_ID`; `--project-path` defaults to `$PWD`.
 

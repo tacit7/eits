@@ -212,7 +212,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
     ~H"""
     <div id={"chat-msg-#{@cs_id}-#{@message.id}"} class="mb-1">
       <%= if @is_tool_event do %>
-        <div class="max-w-[85%] px-1 my-0.5">
+        <div class="max-w-[70%] px-1 my-0.5">
           <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
         </div>
       <% else %>

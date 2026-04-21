@@ -283,6 +283,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         task: ApiPresenter.present_task(updated)
       })
     else
+      {:session, {:error, :no_session}} -> {:error, :bad_request, "session_id is required"}
+      {:session, {:error, :invalid_session}} -> {:error, :bad_request, "session_id is invalid"}
       {:session, _} -> {:error, :bad_request, "session_id is required"}
       {:task, {:error, :not_found}} -> {:error, :not_found, "Task not found"}
       {:claim, {:error, :already_claimed}} -> {:error, :conflict, "Task is already in progress"}
@@ -295,9 +297,12 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     do: {:error, :no_session}
 
   defp resolve_claimer_session(session_id) do
-    Helpers.resolve_session_int_id(session_id)
+    case Helpers.resolve_session_int_id(session_id) do
+      {:ok, int_id} -> {:ok, int_id}
+      {:error, _msg} -> {:error, :invalid_session}
+    end
   rescue
-    Ecto.Query.CastError -> {:error, :no_session}
+    Ecto.Query.CastError -> {:error, :invalid_session}
   end
 
   @doc """

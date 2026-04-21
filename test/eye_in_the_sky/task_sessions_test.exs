@@ -68,11 +68,10 @@ defmodule EyeInTheSky.TaskSessionsTest do
       assert linked_ids == [claimer.id]
     end
 
-    test "raises FK constraint error on non-existent task id" do
+    test "returns task_not_found for non-existent task id" do
       session = new_session()
-      assert_raise Postgrex.Error, fn ->
-        TaskSessions.transfer_session_ownership(999_999_999, session.id)
-      end
+      assert {:error, :task_not_found} =
+               TaskSessions.transfer_session_ownership(999_999_999, session.id)
     end
   end
 

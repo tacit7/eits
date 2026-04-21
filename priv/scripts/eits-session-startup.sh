@@ -106,39 +106,49 @@ eits sessions update "$SESSION_ID" --status "working" >/dev/null 2>&1 &
 # Drain pending annotations that failed (429) in a previous session.
 # Uses direct curl (not eits tasks annotate) to avoid triggering the pending-log
 # fallback inside annotate — that would double-write failed entries.
+# Uses a lockfile so concurrent session startups do not race on the same .processing file.
 _PENDING_LOG="${HOME}/.eits/pending-annotations.log"
+_DRAIN_LOCK="${HOME}/.eits/pending-annotations.lock"
 if [ -f "$_PENDING_LOG" ] && [ -s "$_PENDING_LOG" ]; then
-  _log "draining pending annotations from $_PENDING_LOG"
-  echo "[EITS] startup: draining pending annotations" >&2
-  _tmp_log="${_PENDING_LOG}.processing"
-  mv "$_PENDING_LOG" "$_tmp_log"
-  _failed_lines=()
-  _ann_base_url="${EITS_URL:-http://localhost:5001/api/v1}"
-  while IFS= read -r _line; do
-    _task_id=$(echo "$_line" | jq -r '.task_id' 2>/dev/null) || continue
-    _body_val=$(echo "$_line" | jq -r '.body' 2>/dev/null) || continue
-    _title_val=$(echo "$_line" | jq -r '.title // ""' 2>/dev/null || echo "")
-    [ -n "$_task_id" ] && [ -n "$_body_val" ] || continue
-    _ann_payload=$(printf '{"body":%s,"title":%s}' \
-      "$(printf '%s' "$_body_val" | jq -Rs .)" \
-      "$(printf '%s' "$_title_val" | jq -Rs .)")
-    _ann_status=$(curl -sk -o /dev/null -w '%{http_code}' -X POST \
-      -H "Content-Type: application/json" \
-      ${EITS_API_KEY:+-H "Authorization: Bearer $EITS_API_KEY"} \
-      -d "$_ann_payload" \
-      "$_ann_base_url/tasks/$_task_id/annotations")
-    if [ "${_ann_status:-0}" -ge 200 ] && [ "${_ann_status:-0}" -lt 300 ]; then
-      _log "drained annotation for task $_task_id"
-    else
-      _log "drain failed for task $_task_id (HTTP ${_ann_status:-?}), re-queuing"
-      _failed_lines+=("$_line")
+  (
+    flock -n 9 || exit 0  # another startup is already draining; skip
+    _log "draining pending annotations from $_PENDING_LOG"
+    echo "[EITS] startup: draining pending annotations" >&2
+    _tmp_log="${_PENDING_LOG}.processing.$$"
+    mv "$_PENDING_LOG" "$_tmp_log"
+    _failed_lines=()
+    _ann_base_url="${EITS_URL:-http://localhost:5001/api/v1}"
+    while IFS= read -r _line; do
+      _task_id=$(echo "$_line" | jq -r '.task_id' 2>/dev/null)
+      _body_val=$(echo "$_line" | jq -r '.body' 2>/dev/null)
+      _title_val=$(echo "$_line" | jq -r '.title // ""' 2>/dev/null || echo "")
+      # Re-queue unparseable lines rather than silently dropping them
+      if [ -z "$_task_id" ] || [ -z "$_body_val" ]; then
+        _log "drain: unparseable line, re-queuing: $_line"
+        _failed_lines+=("$_line")
+        continue
+      fi
+      _ann_payload=$(printf '{"body":%s,"title":%s}' \
+        "$(printf '%s' "$_body_val" | jq -Rs .)" \
+        "$(printf '%s' "$_title_val" | jq -Rs .)")
+      _ann_status=$(curl -sk -o /dev/null -w '%{http_code}' -X POST \
+        -H "Content-Type: application/json" \
+        ${EITS_API_KEY:+-H "Authorization: Bearer $EITS_API_KEY"} \
+        -d "$_ann_payload" \
+        "$_ann_base_url/tasks/$_task_id/annotations")
+      if [ "${_ann_status:-0}" -ge 200 ] && [ "${_ann_status:-0}" -lt 300 ]; then
+        _log "drained annotation for task $_task_id"
+      else
+        _log "drain failed for task $_task_id (HTTP ${_ann_status:-?}), re-queuing"
+        _failed_lines+=("$_line")
+      fi
+    done < "$_tmp_log"
+    rm -f "$_tmp_log"
+    # Write failures back once — avoids the double-write that `eits tasks annotate` would cause
+    if [ ${#_failed_lines[@]} -gt 0 ]; then
+      printf '%s\n' "${_failed_lines[@]}" >> "$_PENDING_LOG"
     fi
-  done < "$_tmp_log"
-  rm -f "$_tmp_log"
-  # Write failures back once — avoids the double-write that `eits tasks annotate` would cause
-  if [ ${#_failed_lines[@]} -gt 0 ]; then
-    printf '%s\n' "${_failed_lines[@]}" >> "$_PENDING_LOG"
-  fi
+  ) 9>"$_DRAIN_LOCK"
 fi
 
 # Build project type string

@@ -249,6 +249,7 @@ defmodule EyeInTheSky.Tasks do
   """
   def claim_task(%Task{} = task, session_int_id) when is_integer(session_int_id) do
     in_progress_id = WorkflowState.in_progress_id()
+    todo_id = WorkflowState.todo_id()
     now = DateTime.utc_now()
 
     result =
@@ -258,7 +259,8 @@ defmodule EyeInTheSky.Tasks do
           |> Repo.one()
 
         if is_nil(locked_state), do: Repo.rollback(:task_not_found)
-        if locked_state == in_progress_id, do: Repo.rollback(:already_claimed)
+        # Reject any state that is not To Do — Done and In Review tasks must not be silently reset
+        if locked_state != todo_id, do: Repo.rollback(:already_claimed)
 
         Repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
         Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])

@@ -682,23 +682,24 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       assert json_response(conn, 404)
     end
 
-    test "second claim replaces first claim's session ownership", %{conn: _conn} do
+    test "second claim on an In Progress task returns already_claimed", %{conn: _conn} do
       task = create_task(%{state_id: 1})
       session_a = new_session()
       session_b = new_session()
 
-      # Both claims via context to avoid exhausting the rate limit bucket across test suite
       {:ok, task_after_first} = Tasks.get_task(task.id)
       assert {:ok, _} = Tasks.claim_task(task_after_first, session_a.id)
 
+      # Task is now In Progress — a second claim must be rejected to prevent
+      # silent state regressions on Done/In Review tasks.
       {:ok, task_after_second_pre} = Tasks.get_task(task.id)
-      assert {:ok, _} = Tasks.claim_task(task_after_second_pre, session_b.id)
+      assert {:error, :already_claimed} = Tasks.claim_task(task_after_second_pre, session_b.id)
 
+      # session_a's ownership is preserved
       linked_ids =
         Repo.all(from ts in "task_sessions", where: ts.task_id == ^task.id, select: ts.session_id)
 
-      assert linked_ids == [session_b.id]
-      refute session_a.id in linked_ids
+      assert linked_ids == [session_a.id]
     end
   end
 end

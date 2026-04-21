@@ -1290,17 +1290,19 @@ print(json.dumps(d))
           ($members | map(select(.session_status == "failed")) | length) as $failed |
           "Team: \($t.name) (ID: \($t.id))",
           "Members: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) failed" else "" end)",
-          "",
-          "Member detail:",
-          ($members[] |
-            (if .session_status == "waiting" and .session_status_reason then
-              "\(.session_status):\(.session_status_reason)"
-            else
-              (.session_status // "unknown")
-            end) as $status_str |
-            (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
-            "  \(.name) (\(.role)) — \($status_str)\($task_str)"
-          )
+          (if $total > 0 then
+            "",
+            "Member detail:",
+            ($members[] |
+              (if .session_status == "waiting" and .session_status_reason then
+                "\(.session_status):\(.session_status_reason)"
+              else
+                (.session_status // "unknown")
+              end) as $status_str |
+              (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
+              "  \(.name) (\(.role)) — \($status_str)\($task_str)"
+            )
+          else empty end)
         '
       else
         _curl "$BASE_URL/teams/$id" | jq .

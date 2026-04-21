@@ -112,10 +112,11 @@ defmodule EyeInTheSky.Teams do
         from(t in EitsTask,
           join: ts in "task_sessions", on: ts.task_id == t.id,
           where: ts.session_id in ^session_ids and t.state_id == 2 and t.archived == false,
+          order_by: [asc: ts.session_id, desc: t.updated_at],
           select: {ts.session_id, %{id: t.id, title: t.title, state_id: t.state_id}}
         )
         |> Repo.all()
-        |> Map.new()
+        |> Enum.reduce(%{}, fn {sid, task}, acc -> Map.put_new(acc, sid, task) end)
       end
 
     Enum.map(members, fn m ->

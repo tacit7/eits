@@ -260,7 +260,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       session_uuid: loaded_field(m.session, :uuid),
       session_status: loaded_field(m.session, :status),
       session_status_reason: loaded_field(m.session, :status_reason),
-      claimed_task: format_claimed_task(Map.get(m, :claimed_task)),
+      claimed_task: format_claimed_task(m.claimed_task),
       joined_at: if(m.joined_at, do: to_string(m.joined_at)),
       last_activity_at: if(m.last_activity_at, do: to_string(m.last_activity_at))
     }

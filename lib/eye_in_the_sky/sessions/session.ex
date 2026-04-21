@@ -122,6 +122,7 @@ defmodule EyeInTheSky.Sessions.Session do
       "failed",
       "archived"
     ])
+    |> validate_inclusion(:status_reason, [nil, "session_ended", "sdk_completed"])
   end
 
   @doc """

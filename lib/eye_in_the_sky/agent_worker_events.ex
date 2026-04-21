@@ -214,7 +214,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         do: %{status: status, last_activity_at: DateTime.utc_now()},
         else: %{status: status}
 
-    attrs = if reason, do: Map.put(attrs, :status_reason, reason), else: attrs
+    attrs = Map.put(attrs, :status_reason, reason)
 
     case Sessions.get_session(session_id) do
       {:ok, session} -> apply_session_update(session, attrs, session_id, idle_like?)

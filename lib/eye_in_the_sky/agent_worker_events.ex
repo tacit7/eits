@@ -223,6 +223,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     case Sessions.update_session(session, attrs) do
       {:ok, updated} ->
         if idle_like?, do: Events.session_idle(session_id)
+        Events.session_status(session_id, updated.status)
         {:ok, updated}
 
       {:error, reason} ->

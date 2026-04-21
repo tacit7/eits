@@ -732,7 +732,17 @@ USAGE
          + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)
          + (if $bypass_sandbox           then {bypass_sandbox: true}                   else {} end)
          + (if $stash_if_dirty           then {stash_if_dirty: true}                   else {} end)')
-      _post "/agents" "$payload"
+      local spawn_log="${EITS_SPAWN_LOG:-$HOME/.eits/spawn-errors.log}"
+      local _spawn_resp _spawn_rc=0
+      _spawn_resp=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/agents" 2>&1) || _spawn_rc=$?
+      if [[ $_spawn_rc -ne 0 ]]; then
+        local _ts; _ts=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+        mkdir -p "$(dirname "$spawn_log")"
+        printf '%s rc=%d cmd=agents/spawn %s\n' "$_ts" "$_spawn_rc" "$_spawn_resp" >> "$spawn_log"
+        printf 'spawn failed (rc=%d): %s\n' "$_spawn_rc" "$_spawn_resp" >&2
+        return $_spawn_rc
+      fi
+      printf '%s\n' "$_spawn_resp" | jq .
       ;;
     *)
       echo "usage: eits agents <list|get|spawn>"
@@ -1285,7 +1295,21 @@ print(json.dumps(d))
       ;;
     status)
       # eits teams status <id> [--summary]
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits teams status <id> [--summary]"; return 0; }
+      # member_status: team membership state (active, done, spawn_failed, idle) — authoritative for orchestrators
+      # session_status: Claude process lifecycle (working, stopped, waiting, completed, failed)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'HELP'
+usage: eits teams status <id> [--summary|-s]
+
+Fields per member:
+  member_status  — team membership state (active, done, spawn_failed, idle)
+                   Use this to check if an agent is done with their work.
+  session_status — Claude process lifecycle (working, stopped, waiting, completed, failed)
+                   Reflects the Claude Code process state, not task completion.
+
+Orchestrators should check member_status, not session_status.
+HELP
+        return 0; }
       local id="${1:-}"; need id; shift
       local summary=0
       while [[ $# -gt 0 ]]; do
@@ -1303,21 +1327,23 @@ print(json.dumps(d))
           ($members | length) as $total |
           ($members | map(select(.session_status == "working")) | length) as $working |
           ($members | map(select(.session_status == "stopped" or .session_status == "waiting")) | length) as $idle |
-          ($members | map(select(.session_status == "completed")) | length) as $done |
+          ($members | map(select(.member_status == "done" or .session_status == "completed")) | length) as $done |
           ($members | map(select(.session_status == "failed")) | length) as $failed |
+          ($members | map(select(.member_status == "spawn_failed")) | length) as $spawn_failed |
           "Team: \($t.name) (ID: \($t.id))",
-          "Members: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) failed" else "" end)",
+          "Members: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) session_failed" else "" end)\(if $spawn_failed > 0 then ", \($spawn_failed) spawn_failed" else "" end)",
           (if $total > 0 then
             "",
             "Member detail:",
             ($members[] |
+              (.member_status // .status // "unknown") as $member_str |
               (if .session_status == "waiting" and .session_status_reason then
                 "\(.session_status):\(.session_status_reason)"
               else
-                (.session_status // "unknown")
-              end) as $status_str |
+                (.session_status // "none")
+              end) as $session_str |
               (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
-              "  \(.name) (\(.role)) — \($status_str)\($task_str)"
+              "  \(.name) (\(.role)) — member:\($member_str) session:\($session_str)\($task_str)"
             )
           else empty end)
         '

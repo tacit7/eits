@@ -106,6 +106,18 @@ defmodule EyeInTheSky.Tasks.Queries do
   end
 
   @doc """
+  Returns the session IDs linked to the given task via task_sessions.
+  Used to trigger team member status updates when a task is completed.
+  """
+  def list_session_ids_for_task(task_id) do
+    from(ts in "task_sessions",
+      where: ts.task_id == ^task_id,
+      select: ts.session_id
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns the list of tasks for a specific team.
   """
   def list_tasks_for_team(team_id) do

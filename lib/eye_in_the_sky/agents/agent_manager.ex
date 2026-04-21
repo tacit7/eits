@@ -126,6 +126,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
           end
 
         error ->
+          SpawnTeamContext.record_spawn_failure(team, params["member_name"])
           error
       end
     end

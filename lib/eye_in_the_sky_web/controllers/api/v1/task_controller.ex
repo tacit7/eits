@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Notes, Tasks}
+  alias EyeInTheSky.{Agents, Notes, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -219,6 +219,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     with false <- message == "",
          {:ok, task} <- Tasks.get_task(id),
          {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
+      session_ids = Tasks.list_session_ids_for_task(updated.id)
+      Enum.each(session_ids, &Teams.mark_member_done_by_session/1)
+
       json(conn, %{
         success: true,
         message: "Task completed",

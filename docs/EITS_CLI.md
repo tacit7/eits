@@ -366,7 +366,20 @@ eits teams broadcast <team_id> --body <text> [--from <session_id|uuid>]
 eits teams my-teams                            # List teams where current agent is a member
 ```
 
-`teams status --summary` prints a concise human-readable status showing member counts by state (working, idle, done, failed).
+`teams status --summary` prints a concise human-readable status showing member counts by state (working, idle, done, failed, spawn_failed).
+
+### Status Fields Explained
+
+Each team member has two status fields:
+
+| Field | Description | Authoritative for |
+|-------|-------------|-------------------|
+| `member_status` | Team membership state: `active`, `done`, `spawn_failed`, `idle` | Orchestrators checking work completion |
+| `session_status` | Claude process lifecycle: `working`, `stopped`, `waiting`, `completed`, `failed` | Monitoring Claude Code process state |
+
+**Orchestrators should check `member_status`** to know if an agent has finished its work. `session_status` reflects the Claude Code process and can lag behind — an agent that calls `eits tasks complete` will have `member_status: done` immediately, but `session_status` may still show `working` until the session ends.
+
+**`spawn_failed`** in `member_status` means the spawn API returned an error for that team member slot. The member record exists with no linked session or agent.
 
 ---
 

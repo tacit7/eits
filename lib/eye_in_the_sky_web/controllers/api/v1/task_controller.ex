@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Notes, Tasks}
+  alias EyeInTheSky.{Agents, Notes, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -219,6 +219,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     with false <- message == "",
          {:ok, task} <- Tasks.get_task(id),
          {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
+      maybe_mark_member_done(params["session_id"])
+
       json(conn, %{
         success: true,
         message: "Task completed",
@@ -382,6 +384,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp parse_tag_id(n) when is_integer(n), do: {:ok, n}
   defp parse_tag_id(raw) when is_binary(raw), do: parse_int_param(raw, "tag_id must be an integer")
   defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
+
+  defp maybe_mark_member_done(nil), do: :ok
+  defp maybe_mark_member_done(""), do: :ok
+
+  defp maybe_mark_member_done(session_id) do
+    case Helpers.resolve_session_int_id(session_id) do
+      {:ok, int_id} -> Teams.mark_member_done_by_session(int_id)
+      _ -> :ok
+    end
+  end
 
   defp parse_int_param(n, _msg) when is_integer(n), do: {:ok, n}
 

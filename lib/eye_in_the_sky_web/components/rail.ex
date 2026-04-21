@@ -32,6 +32,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   }
 
   @valid_sections ~w(sessions tasks prompts chat notes skills teams canvas notifications)
+  @sticky_sections [:chat, :canvas]
 
   @impl true
   def mount(socket) do
@@ -146,7 +147,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
     sticky = sticky_section(socket.assigns.sidebar_tab)
 
-    if current == section && socket.assigns.flyout_open && section not in [:chat, :canvas] do
+    if current == section && socket.assigns.flyout_open && not sticky_section?(section) do
       if sticky do
         {:noreply,
          socket
@@ -306,6 +307,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   defp parse_session_sort("created"), do: :created
   defp parse_session_sort("name"), do: :name
   defp parse_session_sort(_), do: :last_activity
+
+  defp sticky_section?(section), do: section in @sticky_sections
 
   @impl true
   def render(assigns) do

@@ -288,7 +288,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     UNION ALL SELECT 'messages', COUNT(*) FROM messages
     UNION ALL SELECT 'projects', COUNT(*) FROM projects
     UNION ALL SELECT 'commits', COUNT(*) FROM commits
-    UNION ALL SELECT 'prompts', COUNT(*) FROM prompts
+    UNION ALL SELECT 'prompts', COUNT(*) FROM subagent_prompts
     """
 
     case Repo.query!(sql) do

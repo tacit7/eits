@@ -10,6 +10,7 @@ defmodule EyeInTheSky.Teams.TeamMember do
     field :status, :string, default: "idle"
     field :joined_at, :utc_datetime
     field :last_activity_at, :utc_datetime
+    field :claimed_task, :map, virtual: true
 
     belongs_to :team, EyeInTheSky.Teams.Team
     belongs_to :agent, EyeInTheSky.Agents.Agent

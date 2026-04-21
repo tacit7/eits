@@ -110,6 +110,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     attrs =
       %{}
       |> Helpers.maybe_put(:status, status)
+      |> Helpers.maybe_put(:status_reason, params["status_reason"])
       |> Helpers.maybe_put(:intent, params["intent"])
       |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
       |> Helpers.maybe_put(:name, params["name"])
@@ -119,6 +120,13 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     attrs =
       if params["clear_entrypoint"] in [true, "true"] do
         Map.put(attrs, :entrypoint, nil)
+      else
+        attrs
+      end
+
+    attrs =
+      if status && status != "waiting" && !params["status_reason"] do
+        Map.put(attrs, :status_reason, nil)
       else
         attrs
       end

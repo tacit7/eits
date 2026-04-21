@@ -24,12 +24,12 @@ eits tasks list --session "$session_id" --state 2 2>/dev/null \
       eits tasks update "$task_id" --state 4 >/dev/null 2>&1 || true
     done
 
-# cli = spawned/print mode → completed; cli_sdk = interactive → waiting
+# cli = spawned/print mode → completed; cli_sdk = interactive → waiting:session_ended
 entrypoint="${CLAUDE_CODE_ENTRYPOINT:-}"
 if [ "$entrypoint" = "cli" ]; then
   eits sessions update "$session_id" --status completed >/dev/null 2>&1 || true
 else
-  eits sessions update "$session_id" --status waiting >/dev/null 2>&1 || true
+  eits sessions update "$session_id" --status waiting --reason session_ended >/dev/null 2>&1 || true
 fi
 
 exit 0

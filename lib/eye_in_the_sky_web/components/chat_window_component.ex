@@ -54,13 +54,15 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-base-300 rounded-t-xl cursor-move select-none shrink-0"
       >
         <div class="flex items-center gap-2 min-w-0">
-          <%= if @session do %>
-            <img
-              src={DmHelpers.provider_icon(@session.provider)}
-              class={["w-3.5 h-3.5 shrink-0", DmHelpers.provider_icon_class(@session.provider), @session.status == "working" && "animate-pulse"]}
-              alt={@session.provider || "agent"}
-            />
-          <% end %>
+          <img
+            src={DmHelpers.provider_icon(@session && @session.provider)}
+            class={[
+              "w-3.5 h-3.5 shrink-0",
+              DmHelpers.provider_icon_class(@session && @session.provider),
+              @session && @session.status == "working" && "animate-pulse"
+            ]}
+            alt={(@session && @session.provider) || "agent"}
+          />
           <span class="text-xs font-medium truncate">{session_label(@session)}</span>
         </div>
         <div class="flex items-center gap-1.5">

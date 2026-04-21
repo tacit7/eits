@@ -442,9 +442,11 @@ export const ChatWindowHook = {
       this.el.style.zIndex = this._zIndex
     }
 
-    // If the user is mid-drag, LiveView may have snapped position back to DB values.
-    // Restore the visual position from the in-flight drag state.
-    if (this._dragging) {
+    // Restore position from last-known JS state. LiveView patches the style attr
+    // with DB-saved pos_x/pos_y on every render — this undoes that. We track
+    // _dragLeft/_dragTop from drag, layout buttons, and localStorage restore,
+    // so they're always authoritative once set.
+    if (this._dragLeft != null) {
       this.el.style.left = `${this._dragLeft}px`
       this.el.style.top  = `${this._dragTop}px`
     }

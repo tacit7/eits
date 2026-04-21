@@ -305,6 +305,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         canvases={@canvases}
         canvas_sessions={@canvas_sessions}
         active_canvas_id={@active_canvas_id}
+        focus_session_id={@focus_session_id}
       />
       <.session_picker_modal
         :if={@show_session_picker}

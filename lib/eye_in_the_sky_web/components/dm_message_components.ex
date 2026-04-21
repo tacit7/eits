@@ -111,10 +111,15 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :extra_id, :any, default: nil
 
   def message_body(assigns) do
-    body =
-      if dm_message?(assigns.message),
-        do: strip_dm_prefix(assigns.message.body),
-        else: assigns.message.body
+    raw_body = assigns.message.body || ""
+    is_dm_body = dm_message?(assigns.message) or String.starts_with?(raw_body, "DM from:")
+
+    {dm_info, body} =
+      if is_dm_body do
+        {parse_dm_info(raw_body), strip_dm_prefix(raw_body)}
+      else
+        {nil, raw_body}
+      end
 
     segments = parse_body_segments(body)
     thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
@@ -127,6 +132,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       |> assign(:thinking, thinking)
       |> assign(:stream_type, stream_type)
       |> assign(:id_prefix, id_prefix)
+      |> assign(:dm_info, dm_info)
 
     ~H"""
     <div class={[
@@ -134,6 +140,36 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       !@compact && "mt-1",
       @compact && @stream_type != "tool_result" && "mt-0.5"
     ]}>
+      <%= if @dm_info do %>
+        <div class="flex items-center gap-1.5 flex-wrap mb-1">
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 text-[10px] font-mono font-semibold">
+            <.icon name="hero-chat-bubble-left-ellipsis" class="w-3 h-3" />
+            {@dm_info.sender}
+          </span>
+          <%= if @dm_info.status do %>
+            <span class={[
+              "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold",
+              @dm_info.status in ["done", "completed"] && "bg-success/15 text-success/80",
+              @dm_info.status == "failed" && "bg-error/15 text-error/80",
+              @dm_info.status not in ["done", "completed", "failed"] && "bg-base-content/8 text-base-content/50"
+            ]}>
+              {@dm_info.status}
+            </span>
+          <% end %>
+          <%= if @dm_info.url do %>
+            <a
+              href={@dm_info.url}
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/50 hover:text-primary/80 transition-colors text-[10px] font-mono truncate max-w-[220px]"
+              title={@dm_info.url}
+            >
+              <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3 flex-shrink-0" />
+              {URI.parse(@dm_info.url).host}{URI.parse(@dm_info.url).path}
+            </a>
+          <% end %>
+        </div>
+      <% end %>
       <details
         :if={@thinking && @thinking != ""}
         class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
@@ -192,7 +228,10 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :compact, :boolean, default: false
 
   def tool_result_body(assigns) do
+    assigns = assign(assigns, :body_blank, String.trim(assigns.body || "") == "")
+
     ~H"""
+    <%= if !@body_blank do %>
     <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
       <summary class={
         "flex items-center cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors " <>
@@ -225,6 +264,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         <pre class={if @compact, do: "font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto", else: "font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto"}>{@body}</pre>
       </div>
     </details>
+    <% end %>
     """
   end
 

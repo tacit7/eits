@@ -193,9 +193,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         status_dot_class(@session.status)
       ]} />
       <span class="truncate font-medium text-xs">{@session.name || "unnamed"}</span>
-      <span class="ml-auto text-[10px] text-base-content/30 flex-shrink-0">
-        {format_session_time(@session)}
-      </span>
     </.link>
     """
   end
@@ -534,31 +531,4 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp status_dot_class("waiting"), do: "bg-amber-400"
   defp status_dot_class(_), do: "bg-base-content/25"
 
-  # Session.last_activity_at is :utc_datetime_usec — Ecto returns %DateTime{} structs.
-  # Binary fallback handles any edge cases (cached data, API responses, etc.)
-  defp format_session_time(%{last_activity_at: %DateTime{} = dt}) do
-    diff = max(DateTime.diff(DateTime.utc_now(), dt, :second), 0)
-
-    cond do
-      diff < 60 -> "#{diff}s"
-      diff < 3600 -> "#{div(diff, 60)}m"
-      diff < 86_400 -> "#{div(diff, 3600)}h"
-      true -> "#{div(diff, 86_400)}d"
-    end
-  end
-
-  defp format_session_time(%{last_activity_at: %NaiveDateTime{} = ndt}) do
-    ndt
-    |> DateTime.from_naive!("Etc/UTC")
-    |> then(&format_session_time(%{last_activity_at: &1}))
-  end
-
-  defp format_session_time(%{last_activity_at: ts}) when is_binary(ts) do
-    case DateTime.from_iso8601(ts) do
-      {:ok, dt, _} -> format_session_time(%{last_activity_at: dt})
-      _ -> ""
-    end
-  end
-
-  defp format_session_time(_), do: ""
 end

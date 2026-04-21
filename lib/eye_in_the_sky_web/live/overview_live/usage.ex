@@ -90,11 +90,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
       <div class="max-w-7xl mx-auto space-y-8">
         <.usage_header date_range={@date_range} recalculating={@recalculating} />
         <%= cond do %>
-          <% @totals.loading? -> %>
+          <% not @totals.ok? and @totals.failed == nil -> %>
             <div class="flex items-center justify-center py-16">
               <span class="loading loading-spinner loading-lg text-base-content/30"></span>
             </div>
-          <% @totals.failed? -> %>
+          <% @totals.failed != nil -> %>
             <div class="flex items-center justify-center py-16">
               <p class="text-sm text-error/70">Failed to load usage data. Try refreshing.</p>
             </div>

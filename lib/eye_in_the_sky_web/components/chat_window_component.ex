@@ -208,10 +208,8 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
     ~H"""
     <div id={"chat-msg-#{@cs_id}-#{@message.id}"} class="mb-1">
       <%= if @is_tool_event do %>
-        <div class="flex justify-center my-0.5">
-          <div class="max-w-[90%] bg-base-300/40 rounded-lg px-2 py-0.5 text-[10px] text-base-content/40 italic">
-            <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
-          </div>
+        <div class="my-0.5 px-1 text-[10px] text-base-content/40 italic">
+          <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
         </div>
       <% else %>
         <div class={["flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>

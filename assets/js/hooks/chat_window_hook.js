@@ -1,3 +1,5 @@
+import { saveWindowLayout, loadWindowLayout } from './canvas_layout_hook'
+
 const SNAP_THRESHOLD = 80
 
 function getSnapZone(cursorX, cursorY, canvasW, canvasH) {
@@ -42,6 +44,29 @@ export const ChatWindowHook = {
     this.el.style.zIndex = "1"
     this._zIndex = "1"
     this.el.dataset.savedZIndex = "1"
+
+    // Restore last-known position/size from localStorage (set by layout buttons and drag/resize).
+    const csId = this.el.dataset.csId
+    const saved = loadWindowLayout(csId)
+    if (saved) {
+      this.el.style.left   = `${saved.x}px`
+      this.el.style.top    = `${saved.y}px`
+      this.el.style.width  = `${saved.w}px`
+      this.el.style.height = `${saved.h}px`
+      this._width  = saved.w
+      this._height = saved.h
+      this._dragLeft = saved.x
+      this._dragTop  = saved.y
+    }
+
+    // Keep instance vars in sync when a layout button repositions this window.
+    this.el.addEventListener('canvas:layout-applied', (e) => {
+      const { x, y, w, h } = e.detail
+      this._width    = w
+      this._height   = h
+      this._dragLeft = x
+      this._dragTop  = y
+    })
 
     // --- Drag + Snap ---
     const handle = this.el.querySelector("[data-drag-handle]")
@@ -109,6 +134,9 @@ export const ChatWindowHook = {
           this.pushEventTo(this.el, "window_moved", {
             id: this.el.dataset.csId, x, y
           })
+          saveWindowLayout(this.el.dataset.csId, x, y,
+            parseInt(this.el.style.width, 10) || this._width || 0,
+            parseInt(this.el.style.height, 10) || this._height || 0)
         }, 50)
       }
 
@@ -149,11 +177,15 @@ export const ChatWindowHook = {
       this._height = this.el.offsetHeight
       clearTimeout(resizePersistTimer)
       resizePersistTimer = setTimeout(() => {
+        const w = this.el.offsetWidth
+        const h = this.el.offsetHeight
         this.pushEventTo(this.el, "window_resized", {
-          id: this.el.dataset.csId,
-          w: this.el.offsetWidth,
-          h: this.el.offsetHeight
+          id: this.el.dataset.csId, w, h
         })
+        saveWindowLayout(this.el.dataset.csId,
+          parseInt(this.el.style.left, 10) || 0,
+          parseInt(this.el.style.top, 10)  || 0,
+          w, h)
       }, 400)
     })
     observer.observe(this.el)

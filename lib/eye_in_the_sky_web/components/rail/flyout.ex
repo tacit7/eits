@@ -35,18 +35,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       ]}
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>
-        <div class="flex items-center justify-between px-3.5 py-3 border-b border-base-content/8 flex-shrink-0">
+        <div class="px-3.5 py-3 border-b border-base-content/8 flex-shrink-0">
           <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40">
             {section_label(@active_section)}
           </span>
-          <button
-            phx-click="close_flyout"
-            phx-target={@myself}
-            class="text-base-content/30 hover:text-base-content/60 transition-colors"
-            aria-label="Close panel"
-          >
-            <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
-          </button>
         </div>
 
         <div class="flex-1 overflow-y-auto py-1">
@@ -295,13 +287,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           </.link>
           <button
             type="button"
-            class="flex-shrink-0 px-3 py-1 opacity-30 hover:opacity-80 transition-opacity cursor-pointer"
+            class={["flex-shrink-0 px-3 py-1 transition-opacity cursor-pointer hover:opacity-80", if(session.status == "working", do: "opacity-80", else: "opacity-30")]}
             phx-click={JS.dispatch("canvas:focus-session", detail: %{sessionId: session.id})}
             title="Focus window"
           >
             <img
               src={canvas_provider_icon(session.provider)}
-              class={["w-3.5 h-3.5 pointer-events-none", canvas_provider_icon_class(session.provider)]}
+              class={["w-3.5 h-3.5 pointer-events-none", canvas_provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
               alt={session.provider || "agent"}
             />
           </button>

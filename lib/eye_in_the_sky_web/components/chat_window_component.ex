@@ -198,7 +198,11 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
     role = if assigns.message.sender_role == "user", do: :user, else: :agent
     is_dm = DmHelpers.dm_message?(assigns.message)
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
-    is_tool_event = stream_type in ["tool_result", "tool_use"]
+
+    # Tool events: explicit stream_type OR body that parses entirely as tool calls
+    segments = DmHelpers.parse_body_segments(assigns.message.body)
+    body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+    is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
 
     assigns =
       assign(assigns, :role, role)
@@ -208,7 +212,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
     ~H"""
     <div id={"chat-msg-#{@cs_id}-#{@message.id}"} class="mb-1">
       <%= if @is_tool_event do %>
-        <div class="my-0.5 px-1 text-[10px] text-base-content/40 italic">
+        <div class="w-full px-1 my-0.5">
           <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
         </div>
       <% else %>

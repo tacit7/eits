@@ -223,7 +223,10 @@ defmodule EyeInTheSky.Tasks.Queries do
   defp task_order(query, _), do: order_by(query, [t], desc: t.created_at)
 
   defp base_tasks_query(opts) do
+    include_archived = Keyword.get(opts, :include_archived, false)
+
     Task
+    |> then(fn q -> if include_archived, do: q, else: where(q, [t], t.archived == false) end)
     |> QueryBuilder.maybe_where(opts, :state_id)
   end
 

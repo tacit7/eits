@@ -134,14 +134,17 @@ The `stream_thinking` assign:
 
 ### Raw Output Broadcasting
 
-Codex's raw JSONL output lines are broadcast directly from `MessageHandler` (not relayed through AgentWorker). Each raw line is sent via PubSub using the session's `eits_session_id`:
+Codex's raw JSONL output lines are broadcast directly from `MessageHandler` when `forward_raw_lines: true` is set in the SDK options. The broadcast uses the session's `eits_session_id` (not the Codex thread_id):
 
 ```elixir
 # lib/eye_in_the_sky/sdk/message_handler.ex
-PubSub.broadcast(topic: "codex:#{eits_session_id}", event: "raw_line", data: raw_line)
+if forward_raw_lines do
+  broadcast_id = Map.get(state, :eits_session_id) || session_id
+  EyeInTheSky.Events.broadcast_codex_raw(broadcast_id, line)
+end
 ```
 
-This enables live debugging and inspection of the raw Codex JSONL stream without coupling the broadcast to AgentWorker's internal state.
+This enables live debugging and inspection of the raw Codex JSONL stream without coupling the broadcast to AgentWorker. The `eits_session_id` ensures the broadcast reaches subscribers even before the Codex thread_id is available (before `thread.started` fires).
 
 ## JSONL Event Types
 
@@ -170,6 +173,18 @@ Events emitted by `codex exec --json`:
 | `plan_update` / `plan_updates` | Plan modifications |
 
 Note: Codex uses singular item type names (`file_change`, `mcp_tool_call`). The parser accepts both singular and plural forms.
+
+### Tool Normalization (Codex.ToolMapper)
+
+Codex tool calls are normalized into a canonical format for display and processing via `Codex.ToolMapper`:
+
+- **`command_execution`** → `Bash` tool (extracts `command` field)
+- **`web_search` / `web_searches`** → `WebSearch` tool (extracts `query` field)
+- **`plan_update` / `plan_updates`** → `Task` tool (extracts `summary`, `explanation`, or `plan` field)
+- **`mcp_tool_call` / `mcp_tool_calls`** → `mcp_{server}__{tool}` (extracts `server` and `tool` fields)
+- **Any other tool** → Passed through as-is with stringified fields
+
+This normalization allows the UI and downstream handlers to work with tool calls uniformly across different Codex versions and item type names.
 
 ## EITS Environment Variables
 
@@ -207,7 +222,7 @@ The first message to a new Codex session is prepended with `codex_eits_init/1`, 
 |--------|------|------|
 | `Codex.CLI` | `lib/eye_in_the_sky/codex/cli.ex` | Port spawning, arg building, env setup |
 | `Codex.SDK` | `lib/eye_in_the_sky/codex/sdk.ex` | High-level API; message protocol adapter |
-| `Codex.ToolMapper` | `lib/eye_in_the_sky/codex/tool_mapper.ex` | Map MCP tool definitions to Codex format |
+| `Codex.ToolMapper` | `lib/eye_in_the_sky/codex/tool_mapper.ex` | Normalize Codex tool calls to canonical format (command_execution→Bash, web_search→WebSearch, etc.) |
 | `Codex.Parser` | `lib/eye_in_the_sky/codex/parser.ex` | JSONL line -> Message struct |
 | `Codex.StreamAssembler` | `lib/eye_in_the_sky/codex/stream_assembler.ex` | Stream state for Codex PubSub events |
 | `Codex.ReviewInstructions` | `lib/eye_in_the_sky/codex/review_instructions.ex` | Build review prompt for GitHub PRs |

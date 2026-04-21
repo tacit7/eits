@@ -59,6 +59,10 @@ eits sessions update <uuid> [--status <s>] [--intent <text>] \
 
 eits sessions end <uuid> [--final-status <completed|failed|waiting>]
 
+eits sessions archive <uuid>
+
+eits sessions unarchive <uuid>
+
 eits sessions context <uuid> [--text <text>|--from-stdin] [--metadata <json>]
 
 eits sessions tasks <uuid>     # List tasks linked to session
@@ -197,16 +201,24 @@ eits agents list [--project <id>] [--status <status>] [--limit <n>]
 
 eits agents get <id>
 
-eits agents spawn --instructions <text> [--model <m>] [--provider <p>] \
+eits agents spawn --instructions <text> | --instructions-file <path> \
+  [--model <m>] [--provider <p>] \
   [--project-id <n>] [--project-path <path>] [--worktree <branch>] \
+  [--stash-if-dirty] \
   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>] \
   [--team-name <name>] [--member-name <alias>] [--agent <name>] \
   [--name <session-name>] [--yolo]
 ```
 
-`--parent-session-id` accepts integer session ID or UUID, linking the spawned agent's session to a parent.
+**Instructions**: `--instructions <text>` or `--instructions-file <path>` (required, one of). `--instructions-file` reads instructions from a file instead of requiring inline text.
 
-`--yolo` bypasses sandbox restrictions.
+**Project defaults**: `--project-id` defaults to `$EITS_PROJECT_ID`; `--project-path` defaults to `$PWD`.
+
+**Worktree cleanup**: `--stash-if-dirty` auto-stashes uncommitted changes before worktree creation (instead of failing with dirty_working_tree error).
+
+**Sandbox**: `--yolo` bypasses sandbox restrictions. `--provider codex` defaults `bypass_sandbox` to true (can be overridden with explicit flags if needed).
+
+**Session linking**: `--parent-session-id` accepts integer session ID or UUID, linking the spawned agent's session to a parent.
 
 ---
 
@@ -371,6 +383,24 @@ eits worktree remove <branch> [--project-path <path>]
 ```
 
 **Note**: Scoped to EITS Elixir projects (.claude/worktrees/ layout, mix compile verification).
+
+---
+
+## Hooks & Server Availability
+
+EITS hooks (stored in `priv/scripts/` and `.claude/hooks/`) use a shared TCP probe guard (`eits-lib.sh`) to verify the server is available before making API calls. If the server is down, the hook silently exits (exit 0) instead of hanging or erroring.
+
+Each hook sources `eits-lib.sh` after the `EITS_WORKFLOW` guard:
+
+```bash
+[ "${EITS_WORKFLOW:-}" = "0" ] && exit 0
+
+. "$(cd "$(dirname "$0")" && pwd)/eits-lib.sh"
+```
+
+The guard probes TCP to the host/port extracted from `$EITS_URL` (default: `http://localhost:5001/api/v1`). On localhost, the probe completes in sub-millisecond time with no measurable overhead.
+
+The `.claude/hooks/eits-task-gate.sh` hook (stored outside `priv/scripts/`) uses an inlined 2-line version for portability.
 
 ---
 

@@ -134,22 +134,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       </div>
     <% end %>
 
-    <% active = Enum.filter(@sessions, &(&1.status in ["working", "waiting"])) %>
-    <% stopped = Enum.filter(@sessions, &(&1.status not in ["working", "waiting"])) %>
-
-    <%= if active != [] do %>
-      <div class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-base-content/35">
-        Active
-      </div>
-      <.session_row :for={s <- active} session={s} />
-    <% end %>
-
-    <%= if stopped != [] do %>
-      <div class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-base-content/35">
-        Stopped
-      </div>
-      <.session_row :for={s <- Enum.take(stopped, 8)} session={s} />
-    <% end %>
+    <.session_row :for={s <- @sessions} session={s} />
 
     <%= if @sessions == [] do %>
       <div class="px-3 py-4 text-xs text-base-content/35 text-center">No sessions</div>
@@ -272,7 +257,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           class="flex items-center gap-2 pl-7 pr-3 py-1 text-xs text-base-content/50 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
         >
           <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />
-          <span class="truncate">{session.name || "unnamed"}</span>
+          <span class="truncate flex-1">{session.name || "unnamed"}</span>
+          <img
+            src={canvas_provider_icon(session.provider)}
+            class={["w-3 h-3 flex-shrink-0 opacity-50", canvas_provider_icon_class(session.provider)]}
+            alt={session.provider || "agent"}
+          />
         </.link>
       <% end %>
       <%= if canvas.sessions == [] do %>
@@ -285,6 +275,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp canvas_session_dot("working"), do: "bg-green-500"
   defp canvas_session_dot("waiting"), do: "bg-amber-400"
   defp canvas_session_dot(_), do: "bg-base-content/20"
+
+  defp canvas_provider_icon("openai"), do: "/images/openai.svg"
+  defp canvas_provider_icon("codex"), do: "/images/openai.svg"
+  defp canvas_provider_icon(_), do: "/images/claude.svg"
+
+  defp canvas_provider_icon_class("openai"), do: "dark:invert"
+  defp canvas_provider_icon_class("codex"), do: "dark:invert"
+  defp canvas_provider_icon_class(_), do: ""
 
   # Generic nav links per section
   attr :project, :any, default: nil

@@ -32,8 +32,8 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   def message_sender_name(message), do: message.provider || "Agent"
 
   def strip_dm_prefix(body) when is_binary(body) do
-    case Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\)\s*(.+)$/s, body) do
-      [_, content] -> content
+    case Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\)\s*(.*)$/s, body) do
+      [_, content] -> String.trim(content)
       _ -> body
     end
   end

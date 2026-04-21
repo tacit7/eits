@@ -1,6 +1,6 @@
 import { saveWindowLayout, saveWindowZ, loadWindowLayout } from './canvas_layout_hook'
 
-const SNAP_THRESHOLD = 80
+const SNAP_THRESHOLD = 40
 
 function getSnapZone(cursorX, cursorY, canvasW, canvasH) {
   canvasW = Math.round(canvasW)

@@ -153,12 +153,22 @@ Session status is set by lifecycle hooks and reflects the CLI process state:
 When SessionWorker encounters a systemic error (billing failure, auth error, or watchdog timeout), it calls `AgentWorkerEvents.on_session_failed/2`:
 1. Streams error event to session channel
 2. Overwrites session status in DB to `"failed"` (ensuring final status persists even if previous status was `"idle"`)
-3. Fires Teams cleanup events (_no_ duplicate `session_idle`/`agent_stopped` calls — deduped to avoid broadcast storms)
+
+Implementation in `on_session_failed/2` (after deduplication fix):
+```elixir
+def on_session_failed(session_id, provider_conversation_id) do
+  Events.stream_error(session_id, provider_conversation_id, "Systemic error — session failed")
+  update_session_status(session_id, "failed")
+  :ok
+end
+```
+
+The function no longer fires duplicate `session_idle`/`agent_stopped` events. Previous implementation called both on successful DB update, causing broadcast storms when multiple systemic errors fired in sequence. Removed to simplify status finalization — status update alone is sufficient.
 
 This design ensures:
 - Systemic failures are distinguishable from graceful stops (UI shows red status)
-- Teams are notified once per failure (not broadcast duplication)
 - Status is written to DB (survives worker restart)
+- No duplicate broadcast events from status finalization
 
 **Status indicator styling:**
 - `stopped` → Yellow left border (warning color) on session card
@@ -192,6 +202,28 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 
 This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
 
+**Integer Session ID Handling:**
+JSON decoding converts numeric `session_id` values to integers, but task linking functions only had clauses for nil and binary strings. Fixed by adding integer guards to `do_link_session/2` in `Tasks.Associations` and `maybe_link_session/2` in `TaskController`:
+
+```elixir
+# Tasks.Associations
+defp do_link_session(task_id, session_id) when is_integer(session_id) do
+  TaskSessions.link_session_to_task(task_id, session_id)
+  :ok
+end
+
+# TaskController
+defp maybe_link_session(task_id, session_id) when is_integer(session_id) do
+  case parse_task_id(task_id) do
+    nil -> :ok
+    task_int_id -> Tasks.link_session_to_task(task_int_id, session_id)
+  end
+  :ok
+end
+```
+
+This prevents `FunctionClauseError` when JSON payloads contain numeric session IDs.
+
 ---
 
 ## Worktree Management
@@ -210,6 +242,40 @@ Agent workers use git worktrees to isolate CLI processes and prevent conflicts o
 **Worktree fallback:**
 - If worktree creation fails, agent falls back to main project directory
 - Fallback is silent in non-critical paths; logged in debug contexts
+
+---
+
+## LiveView Safety Fixes
+
+### PubSub Unsubscribe Safety
+
+LiveViews must use `Events.unsubscribe_session/1` instead of raw `Phoenix.PubSub.unsubscribe` calls. The Events module wraps unsubscribe with proper topic formatting and deduplication:
+
+```elixir
+# WRONG — raw PubSub call
+Phoenix.PubSub.unsubscribe(EyeInTheSky.PubSub, "session:#{id}")
+
+# CORRECT — use Events module
+EyeInTheSky.Events.unsubscribe_session(id)
+```
+
+This ensures consistent topic naming and prevents unsubscribe errors when handlers change session topic subscriptions. Applied to `FloatingChatLive` (`fab_active_session_id`, `config_guide_active_session_id` handlers).
+
+### Nil Project Crash Guard
+
+`ProjectLive.Files.handle_params/3` must guard against nil project and redirect to home:
+
+```elixir
+def handle_params(_params, _uri, %{assigns: %{project: nil}} = socket) do
+  {:noreply, push_navigate(socket, to: ~p"/")}
+end
+
+def handle_params(params, _uri, socket) do
+  # ... normal flow
+end
+```
+
+Without this guard, accessing project files after the project was deleted or project context was lost would crash with undefined behavior. The guard routes to home safely.
 
 ---
 

@@ -159,6 +159,20 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             ]}>
               <.message_body message={@message} compact={false} />
             </div>
+            <div :if={@role == :agent} class="flex items-center gap-1.5 mt-0.5 px-1">
+              <span
+                :if={message_model(@message)}
+                class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
+              >
+                {message_model(@message)}
+              </span>
+              <span
+                :if={message_cost(@message)}
+                class="text-[11px] font-mono text-base-content/30"
+              >
+                ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
+              </span>
+            </div>
             <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
             <.message_attachments attachments={@message.attachments || []} />
             <time
@@ -212,6 +226,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defp stream_provider_label(_session), do: "Claude"
 
   defdelegate dm_message?(msg), to: DmHelpers
+  defdelegate message_model(msg), to: DmHelpers
+  defdelegate message_cost(msg), to: DmHelpers
 
   defp show_message_metrics?(message) do
     message.sender_role == "agent" and is_map(message.metadata) and

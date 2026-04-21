@@ -13,6 +13,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_channels, :list, default: []
   attr :flyout_canvases, :list, default: []
   attr :flyout_teams, :list, default: []
+  attr :flyout_tasks, :list, default: []
+  attr :task_search, :string, default: ""
+  attr :task_filter_open, :boolean, default: false
   attr :session_filter_open, :boolean, default: false
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
@@ -53,7 +56,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 myself={@myself}
               />
             <% :tasks -> %>
-              <.nav_links project={@sidebar_project} section={:tasks} />
+              <.tasks_content
+                tasks={@flyout_tasks}
+                task_search={@task_search}
+                filter_open={@task_filter_open}
+                sidebar_project={@sidebar_project}
+                myself={@myself}
+              />
             <% :prompts -> %>
               <.nav_links project={@sidebar_project} section={:prompts} />
             <% :chat -> %>
@@ -219,6 +228,65 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <% end %>
     """
   end
+
+  # Tasks flyout: list tasks with search
+  attr :tasks, :list, default: []
+  attr :task_search, :string, default: ""
+  attr :filter_open, :boolean, default: false
+  attr :sidebar_project, :any, default: nil
+  attr :myself, :any, required: true
+
+  defp tasks_content(assigns) do
+    ~H"""
+    <div class="px-3 py-2 border-b border-base-content/8 flex items-center gap-2">
+      <input
+        type="text"
+        name="value"
+        value={@task_search}
+        placeholder="Search tasks…"
+        phx-change="update_task_search"
+        phx-target={@myself}
+        phx-debounce="300"
+        class="flex-1 bg-base-200 text-xs text-base-content/80 placeholder-base-content/30 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary/40 min-w-0"
+      />
+    </div>
+
+    <.task_row :for={t <- @tasks} task={t} />
+
+    <%= if @tasks == [] do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No tasks</div>
+    <% end %>
+
+    <div class="px-3 pt-2 pb-1 border-t border-base-content/8 mt-1">
+      <.link
+        navigate={if @sidebar_project, do: "/projects/#{@sidebar_project.id}/tasks", else: "/tasks"}
+        class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
+      >
+        View all &rarr;
+      </.link>
+    </div>
+    """
+  end
+
+  attr :task, :map, required: true
+
+  defp task_row(assigns) do
+    ~H"""
+    <.link
+      navigate="/tasks"
+      class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+    >
+      <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0 mt-px", task_state_dot(@task.state_id)]} />
+      <span class="truncate">{@task.title}</span>
+    </.link>
+    """
+  end
+
+  defp task_state_dot(1), do: "bg-base-content/30"
+  defp task_state_dot(2), do: "bg-blue-500"
+  defp task_state_dot(3), do: "bg-green-500"
+  defp task_state_dot(4), do: "bg-amber-400"
+  defp task_state_dot(_), do: "bg-base-content/20"
 
   # Teams flyout: list teams for the current project
   attr :teams, :list, default: []

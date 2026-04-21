@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
 
-  alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, Sessions, Teams}
+  alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, Sessions, Tasks, Teams}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
 
   @section_map %{
@@ -53,6 +53,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         active_channel_id: nil,
         flyout_canvases: [],
         flyout_teams: [],
+        flyout_tasks: [],
+        task_search: "",
+        task_filter_open: false,
         session_filter_open: false,
         session_sort: :last_activity,
         session_name_filter: ""
@@ -127,6 +130,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> maybe_load_channels(next_section, sidebar_project)
         |> maybe_load_canvases(next_section)
         |> maybe_load_teams(next_section, sidebar_project)
+        |> maybe_load_tasks(next_section, sidebar_project)
       else
         socket
       end
@@ -151,7 +155,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project, socket.assigns.session_sort, socket.assigns.session_name_filter))
        |> maybe_load_channels(section, socket.assigns.sidebar_project)
        |> maybe_load_canvases(section)
-       |> maybe_load_teams(section, socket.assigns.sidebar_project)}
+       |> maybe_load_teams(section, socket.assigns.sidebar_project)
+       |> maybe_load_tasks(section, socket.assigns.sidebar_project)}
     end
   end
 
@@ -230,6 +235,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("update_session_name_filter", %{"value" => value}, socket) do
     sessions = load_flyout_sessions(socket.assigns.sidebar_project, socket.assigns.session_sort, value)
     {:noreply, socket |> assign(:session_name_filter, value) |> assign(:flyout_sessions, sessions)}
+  end
+
+  def handle_event("toggle_task_filter", _params, socket),
+    do: {:noreply, assign(socket, :task_filter_open, !socket.assigns.task_filter_open)}
+
+  def handle_event("update_task_search", %{"value" => value}, socket) do
+    tasks = load_flyout_tasks(socket.assigns.sidebar_project, value)
+    {:noreply, socket |> assign(:task_search, value) |> assign(:flyout_tasks, tasks)}
   end
 
   @impl true
@@ -337,6 +350,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_channels={@flyout_channels}
         flyout_canvases={@flyout_canvases}
         flyout_teams={@flyout_teams}
+        flyout_tasks={@flyout_tasks}
+        task_search={@task_search}
+        task_filter_open={@task_filter_open}
         session_filter_open={@session_filter_open}
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
@@ -421,6 +437,28 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   defp maybe_load_teams(socket, _section, _project), do: socket
+
+  defp maybe_load_tasks(socket, :tasks, project) do
+    tasks = load_flyout_tasks(project, socket.assigns[:task_search] || "")
+    assign(socket, :flyout_tasks, tasks)
+  end
+
+  defp maybe_load_tasks(socket, _section, _project), do: socket
+
+  defp load_flyout_tasks(project, search) do
+    project_id = project && project.id
+
+    cond do
+      search != "" ->
+        Tasks.search_tasks(search, project_id, limit: 50)
+
+      project_id ->
+        Tasks.list_tasks_for_project(project_id, limit: 50, sort_by: "created_desc")
+
+      true ->
+        Tasks.list_tasks(limit: 50, sort_by: "created_desc")
+    end
+  end
 
   # Load channels only when navigating to the :chat section — avoids a DB query on every page.
   defp maybe_load_channels(socket, :chat, project) do

@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
 
-  alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, Sessions, Tasks, Teams}
+  alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, ScheduledJobs, Sessions, Tasks, Teams}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
 
   @section_map %{
@@ -22,16 +22,16 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     canvas: :canvas,
     canvases: :canvas,
     notifications: :notifications,
-    usage: :sessions,
+    usage: :usage,
     config: :sessions,
-    jobs: :sessions,
+    jobs: :jobs,
     settings: :sessions,
     agents: :sessions,
     files: :sessions,
     bookmarks: :sessions
   }
 
-  @valid_sections ~w(sessions tasks prompts chat notes skills teams canvas notifications)
+  @valid_sections ~w(sessions tasks prompts chat notes skills teams canvas notifications usage jobs)
   @sticky_sections [:chat, :canvas]
 
   @impl true
@@ -60,7 +60,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         task_filter_open: false,
         session_filter_open: false,
         session_sort: :last_activity,
-        session_name_filter: ""
+        session_name_filter: "",
+        flyout_jobs: []
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
@@ -133,6 +134,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> maybe_load_canvases(next_section)
         |> maybe_load_teams(next_section, sidebar_project)
         |> maybe_load_tasks(next_section, sidebar_project)
+        |> maybe_load_jobs(next_section)
       else
         socket
       end
@@ -168,7 +170,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> maybe_load_channels(section, socket.assigns.sidebar_project)
        |> maybe_load_canvases(section)
        |> maybe_load_teams(section, socket.assigns.sidebar_project)
-       |> maybe_load_tasks(section, socket.assigns.sidebar_project)}
+       |> maybe_load_tasks(section, socket.assigns.sidebar_project)
+       |> maybe_load_jobs(section)}
     end
   end
 
@@ -349,6 +352,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
         <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
         <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
+        <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
+        <.rail_item section={:jobs} active_section={@active_section} flyout_open={@flyout_open} icon="hero-clock" label="Jobs" myself={@myself} />
 
         <div class="flex-1" />
 
@@ -395,6 +400,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
         notification_count={@notification_count}
+        flyout_jobs={@flyout_jobs}
         myself={@myself}
       />
     </div>
@@ -482,6 +488,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   defp maybe_load_tasks(socket, _section, _project), do: socket
+
+  defp maybe_load_jobs(socket, :jobs) do
+    jobs = ScheduledJobs.list_jobs() |> Enum.take(15)
+    assign(socket, :flyout_jobs, jobs)
+  end
+
+  defp maybe_load_jobs(socket, _section), do: socket
 
   defp load_flyout_tasks(project, search, state_id) do
     project_id = project && project.id

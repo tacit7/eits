@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
   attr :notification_count, :integer, default: 0
+  attr :flyout_jobs, :list, default: []
   attr :myself, :any, required: true
 
   def flyout(assigns) do
@@ -79,6 +80,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.canvas_content canvases={@flyout_canvases} />
             <% :notifications -> %>
               <.simple_link href="/notifications" label="Notifications" icon="hero-bell" />
+            <% :usage -> %>
+              <.usage_content sidebar_project={@sidebar_project} />
+            <% :jobs -> %>
+              <.jobs_content jobs={@flyout_jobs} sidebar_project={@sidebar_project} />
             <% _ -> %>
               <.nav_links project={@sidebar_project} section={:sessions} />
           <% end %>
@@ -523,6 +528,48 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
+  # Usage flyout: links to the usage dashboard
+  attr :sidebar_project, :any, default: nil
+
+  defp usage_content(assigns) do
+    ~H"""
+    <.simple_link href="/usage" label="Usage Dashboard" icon="hero-chart-bar" />
+    """
+  end
+
+  # Jobs flyout: list of scheduled jobs with name, schedule, and enabled state
+  attr :jobs, :list, default: []
+  attr :sidebar_project, :any, default: nil
+
+  defp jobs_content(assigns) do
+    ~H"""
+    <div class="px-3 pt-2 pb-1 border-b border-base-content/8 flex items-center gap-3">
+      <.link navigate="/jobs" class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors">All Jobs</.link>
+      <%= if @sidebar_project do %>
+        <.link navigate={"/projects/#{@sidebar_project.id}/jobs"} class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors">Project Jobs</.link>
+      <% end %>
+    </div>
+
+    <%= for job <- @jobs do %>
+      <.link
+        navigate="/jobs"
+        class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+      >
+        <span class={[
+          "w-1.5 h-1.5 rounded-full flex-shrink-0",
+          if(job.enabled, do: "bg-green-500", else: "bg-base-content/20")
+        ]} />
+        <span class="truncate font-medium flex-1">{job.name}</span>
+        <span class="text-[10px] text-base-content/30 flex-shrink-0 font-mono">{job.schedule_value}</span>
+      </.link>
+    <% end %>
+
+    <%= if @jobs == [] do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No jobs</div>
+    <% end %>
+    """
+  end
+
   defp section_label(:sessions), do: "Sessions"
   defp section_label(:tasks), do: "Tasks"
   defp section_label(:prompts), do: "Prompts"
@@ -532,6 +579,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp section_label(:teams), do: "Teams"
   defp section_label(:canvas), do: "Canvas"
   defp section_label(:notifications), do: "Notifications"
+  defp section_label(:usage), do: "Usage"
+  defp section_label(:jobs), do: "Jobs"
   defp section_label(_), do: "Navigation"
 
   defp status_dot_class("working"), do: "bg-green-500"

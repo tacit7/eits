@@ -137,7 +137,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     section = parse_section(section_str)
     current = socket.assigns.active_section
 
-    if current == section && socket.assigns.flyout_open do
+    if current == section && socket.assigns.flyout_open && section not in [:chat, :canvas] do
       {:noreply, assign(socket, flyout_open: false, mobile_open: false)}
     else
       {:noreply,

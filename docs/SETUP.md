@@ -347,7 +347,7 @@ export EITS_URL="http://localhost:5001/api/v1"
 eits projects list
 eits tasks list --project 1 --state 2
 eits tasks create --title "fix auth bug" --project 1
-eits tasks done 42
+eits tasks complete 42 "task finished"
 eits notes create --parent-type session --parent-id <uuid> --body "finding"
 eits dm --from agent-1 --to <session_uuid> --message "hello"
 ```

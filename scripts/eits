@@ -307,16 +307,28 @@ cmd_tasks() {
       _patch "/tasks/$id" "${updates}"
       ;;
     done)
+      echo "Warning: eits tasks done is deprecated. Use eits tasks complete instead." >&2
       local id="${1:-}"; need id
       _patch "/tasks/$id" '{"state":"done"}'
       ;;
-    start|claim)
+    claim)
       local id="${1:-}"; need id
       # Auto-link current session atomically with the state transition
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
       _patch "/tasks/$id" "$(json state "start" session_id "$_sess")"
       # Belt-and-suspenders: explicit follow-up link in case the session wasn't
       # in the DB yet when the PATCH was processed (silent no-op if already linked)
+      if [[ -n "$_sess" ]]; then
+        _curl -sf -X POST -H "Content-Type: application/json" \
+          -d "$(json session_id "$_sess")" \
+          "$BASE_URL/tasks/$id/sessions" >/dev/null 2>&1 || true
+      fi
+      ;;
+    start)
+      echo "Warning: eits tasks start is deprecated. Use eits tasks claim instead." >&2
+      local id="${1:-}"; need id
+      local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      _patch "/tasks/$id" "$(json state "start" session_id "$_sess")"
       if [[ -n "$_sess" ]]; then
         _curl -sf -X POST -H "Content-Type: application/json" \
           -d "$(json session_id "$_sess")" \
@@ -601,9 +613,10 @@ usage: eits agents spawn --instructions <text> [options]
 
 Required (one of):
   --instructions <text>        Agent instructions (inline)
-  --instructions-file <path>   Read instructions from file
+  --instructions-file <path>   Read instructions from file (mutually exclusive with --instructions)
 
 Options:
+  --interpolate-env            Substitute $VAR and ${VAR} in instructions using current environment
   --model <m>                  Model name (default: server default)
   --provider <p>               Provider (default: claude)
   --project-id <n>             Project ID (default: $EITS_PROJECT_ID)
@@ -623,38 +636,52 @@ Examples:
   eits agents spawn --instructions "Review PR #42" --parent-session-id $EITS_SESSION_ID
   eits agents spawn --instructions-file /tmp/agent.txt --worktree fix/my-bug --stash-if-dirty
   eits agents spawn --instructions "Fix bug" --worktree fix/my-bug --team-name "audit"
+  eits agents spawn --instructions-file /tmp/agent.txt --interpolate-env
 USAGE
         return 0; }
-      local instructions="" instructions_file="" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
+      local instructions="" instructions_set=0 instructions_file="" interpolate_env="false" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" stash_if_dirty="false" effort_level="" parent_session_id="" parent_agent_id=""
       local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --instructions)      instructions="$2";      shift 2 ;;
-          --instructions-file) instructions_file="$2"; shift 2 ;;
-          --model)             model="$2";             shift 2 ;;
-          --provider)          provider="$2";          shift 2 ;;
-          --project-id)        project_id="$2";        shift 2 ;;
-          --project-path)      project_path="$2";      shift 2 ;;
-          --worktree)          worktree="$2";          shift 2 ;;
-          --stash-if-dirty)    stash_if_dirty="true";  shift ;;
-          --effort-level)      effort_level="$2";      shift 2 ;;
-          --parent-session-id) parent_session_id="$2"; shift 2 ;;
-          --parent-agent-id)   parent_agent_id="$2";   shift 2 ;;
-          --team-name)         team_name="$2";         shift 2 ;;
-          --member-name)       member_name="$2";       shift 2 ;;
-          --agent)             agent_name="$2";        shift 2 ;;
-          --name)              session_name="$2";      shift 2 ;;
-          --yolo)              bypass_sandbox="true";  shift ;;
+          --instructions)      instructions="$2"; instructions_set=1; shift 2 ;;
+          --instructions-file) instructions_file="$2";  shift 2 ;;
+          --interpolate-env)   interpolate_env="true";  shift ;;
+          --model)             model="$2";              shift 2 ;;
+          --provider)          provider="$2";           shift 2 ;;
+          --project-id)        project_id="$2";         shift 2 ;;
+          --project-path)      project_path="$2";       shift 2 ;;
+          --worktree)          worktree="$2";           shift 2 ;;
+          --stash-if-dirty)    stash_if_dirty="true";   shift ;;
+          --effort-level)      effort_level="$2";       shift 2 ;;
+          --parent-session-id) parent_session_id="$2";  shift 2 ;;
+          --parent-agent-id)   parent_agent_id="$2";    shift 2 ;;
+          --team-name)         team_name="$2";          shift 2 ;;
+          --member-name)       member_name="$2";        shift 2 ;;
+          --agent)             agent_name="$2";         shift 2 ;;
+          --name)              session_name="$2";       shift 2 ;;
+          --yolo)              bypass_sandbox="true";   shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      # --instructions-file overrides --instructions; both can't be empty
+      # Mutual exclusion: --instructions and --instructions-file cannot both be set
+      [[ $instructions_set -eq 1 && -n "$instructions_file" ]] && die "--instructions and --instructions-file are mutually exclusive"
+      # Load from file if provided
       if [[ -n "$instructions_file" ]]; then
         [[ -f "$instructions_file" ]] || die "--instructions-file: file not found: $instructions_file"
         instructions="$(cat "$instructions_file")"
       fi
       need instructions
+      # Interpolate environment variables if requested
+      if [[ "$interpolate_env" == "true" ]]; then
+        if command -v envsubst &>/dev/null; then
+          instructions=$(printf '%s\n' "$instructions" | envsubst)
+        elif command -v perl &>/dev/null; then
+          instructions=$(printf '%s' "$instructions" | perl -pe 's/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/my $k=$1//$2; defined $ENV{$k} ? $ENV{$k} : ""/ge')
+        else
+          die "--interpolate-env requires envsubst (gettext) or perl"
+        fi
+      fi
       local payload
       payload=$(jq -n \
         --arg     instructions      "$instructions" \

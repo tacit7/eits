@@ -253,6 +253,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       id: m.id,
       name: m.name,
       role: m.role,
+      member_status: m.status,
       status: m.status,
       agent_id: m.agent_id,
       agent_uuid: loaded_field(m.agent, :uuid),

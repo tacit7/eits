@@ -46,10 +46,12 @@ defmodule EyeInTheSky.Tasks do
   defdelegate list_tasks_for_agent(agent_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_session(session_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_sessions(session_ids), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_session_ids_for_task(task_id), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_team(team_id), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_team_with_sessions(team_id), to: EyeInTheSky.Tasks.Queries
   defdelegate get_current_task_for_session(session_id), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks_for_session(session_id), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_tasks_created_by_session(session_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
   @doc """
   Gets a single task. Returns `{:ok, task}` or `{:error, :not_found}`.
@@ -236,6 +238,54 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Atomically claims a task for the given session in a single transaction:
+    1. Acquires a row-level lock on the task (FOR UPDATE) to serialize concurrent claims
+    2. Clears all existing task_sessions links
+    3. Inserts the claimer's session link
+    4. Transitions the task state to In Progress
+
+  Returns `{:ok, updated_task}` or `{:error, reason}`.
+  The PubSub broadcast fires after the transaction commits.
+  """
+  def claim_task(%Task{} = task, session_int_id) when is_integer(session_int_id) do
+    in_progress_id = WorkflowState.in_progress_id()
+    todo_id = WorkflowState.todo_id()
+    now = DateTime.utc_now()
+
+    result =
+      Repo.transaction(fn ->
+        locked_state =
+          from(t in "tasks", where: t.id == ^task.id, select: t.state_id, lock: "FOR UPDATE")
+          |> Repo.one()
+
+        if is_nil(locked_state), do: Repo.rollback(:task_not_found)
+        # Reject In Progress tasks as a duplicate claim attempt
+        if locked_state == in_progress_id, do: Repo.rollback(:already_claimed)
+        # Reject Done/In Review — claiming them would silently regress their state
+        if locked_state != todo_id, do: Repo.rollback(:task_not_claimable)
+
+        Repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
+        Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+
+        changeset = Task.changeset(task, %{state_id: in_progress_id, updated_at: now})
+
+        case Repo.update(changeset) do
+          {:ok, updated} -> updated
+          {:error, cs} -> Repo.rollback(cs)
+        end
+      end)
+
+    case result do
+      {:ok, updated} ->
+        EyeInTheSky.Events.task_updated(updated)
+        {:ok, updated}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
   Archives a task (sets archived = true). Non-destructive.
   """
   def archive_task(%Task{} = task) do
@@ -329,6 +379,7 @@ defmodule EyeInTheSky.Tasks do
   defdelegate task_linked_to_session?(task_id, session_id), to: EyeInTheSky.TaskSessions
   defdelegate unlink_session_from_task(task_id, session_id), to: EyeInTheSky.TaskSessions
   defdelegate active_task_count_for_session(session_id), to: EyeInTheSky.TaskSessions
+  defdelegate transfer_session_ownership(task_id, new_session_id), to: EyeInTheSky.TaskSessions
 
   defdelegate list_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries

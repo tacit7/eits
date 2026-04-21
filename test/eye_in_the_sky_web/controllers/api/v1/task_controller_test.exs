@@ -638,4 +638,81 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       assert json_response(conn, 400)
     end
   end
+
+  # ---- POST /api/v1/tasks/:id/claim ----
+
+  describe "POST /api/v1/tasks/:id/claim" do
+    test "transitions task to in-progress and transfers session ownership", %{conn: conn} do
+      creator = new_session()
+      claimer = new_session()
+      task = create_task(%{state_id: 1})
+
+      Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: creator.id}],
+        on_conflict: :nothing
+      )
+
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/claim", %{"session_id" => claimer.uuid})
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert resp["task"]["state_id"] == WorkflowState.in_progress_id()
+
+      linked_ids =
+        Repo.all(from ts in "task_sessions", where: ts.task_id == ^task.id, select: ts.session_id)
+
+      assert linked_ids == [claimer.id]
+      refute creator.id in linked_ids
+    end
+
+    test "claim without session_id returns 400", %{conn: conn} do
+      task = create_task()
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/claim", %{})
+      assert json_response(conn, 400)
+    end
+
+    test "claim with invalid session_id returns 400", %{conn: conn} do
+      task = create_task()
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/claim", %{"session_id" => "not-a-uuid"})
+      assert json_response(conn, 400)
+    end
+
+    test "claim on non-existent task returns 404", %{conn: conn} do
+      session = new_session()
+      conn = post(conn, ~p"/api/v1/tasks/9999999/claim", %{"session_id" => session.uuid})
+      assert json_response(conn, 404)
+    end
+
+    test "second claim on an In Progress task returns already_claimed", %{conn: _conn} do
+      task = create_task(%{state_id: 1})
+      session_a = new_session()
+      session_b = new_session()
+
+      {:ok, task_after_first} = Tasks.get_task(task.id)
+      assert {:ok, _} = Tasks.claim_task(task_after_first, session_a.id)
+
+      {:ok, task_after_second_pre} = Tasks.get_task(task.id)
+      assert {:error, :already_claimed} = Tasks.claim_task(task_after_second_pre, session_b.id)
+
+      linked_ids =
+        Repo.all(from ts in "task_sessions", where: ts.task_id == ^task.id, select: ts.session_id)
+
+      assert linked_ids == [session_a.id]
+    end
+
+    test "claim on a Done task returns task_not_claimable", %{conn: _conn} do
+      task = create_task(%{state_id: 3})
+      session = new_session()
+
+      {:ok, loaded} = Tasks.get_task(task.id)
+      assert {:error, :task_not_claimable} = Tasks.claim_task(loaded, session.id)
+    end
+
+    test "claim on an In Review task returns task_not_claimable", %{conn: _conn} do
+      task = create_task(%{state_id: 4})
+      session = new_session()
+
+      {:ok, loaded} = Tasks.get_task(task.id)
+      assert {:error, :task_not_claimable} = Tasks.claim_task(loaded, session.id)
+    end
+  end
 end

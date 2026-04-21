@@ -83,7 +83,10 @@ eits sessions notes <uuid>     # List notes attached to session
 # List / filter
 eits tasks list [--project <id>] [--session <uuid>] [--q <query>|--search <query>] \
   [--state <id>] [--state-name <todo|in-progress|done|in-review>] \
-  [--agent <uuid>] [--mine] [--limit <n>]
+  [--agent <uuid>] [--mine|--assigned] [--created-by] [--limit <n>]
+# --mine / --assigned  tasks where current session is the active executor (linked via task_sessions after claim)
+# --created-by         tasks created by the current session (via created_by_session_id)
+# Note: claim transfers session ownership, so --assigned shows only tasks you are currently executing
 
 # Get
 eits tasks get <id>
@@ -103,7 +106,8 @@ eits tasks update <id> [--state <id>|--state-name <done|start|in-progress|in-rev
   [--priority <p>] [--title <t>] [--description <d>] [--due-at <ISO8601>]
 
 # State shorthands (canonical)
-eits tasks claim <id>          # → In Progress (state 2), auto-links session (preferred)
+eits tasks claim <id>          # → In Progress (state 2), transfers session ownership to claimer (preferred)
+                               # Removes all existing task_sessions links, adds claimer's session atomically
 eits tasks complete <id> <message>  # Annotate + mark done + DM lead (preferred)
 
 # Deprecated aliases (kept for backwards compatibility, emit warning to stderr)
@@ -117,7 +121,7 @@ eits tasks complete <id> --message <text>
 # Delete
 eits tasks delete <id>
 
-# Annotations
+# Annotations (retries on 429 with 2s/4s/8s backoff; queues to ~/.eits/pending-annotations.log on failure)
 eits tasks annotate <id> --body <text> [--title <t>]
 
 # Session linking
@@ -366,7 +370,20 @@ eits teams broadcast <team_id> --body <text> [--from <session_id|uuid>]
 eits teams my-teams                            # List teams where current agent is a member
 ```
 
-`teams status --summary` prints a concise human-readable status showing member counts by state (working, idle, done, failed).
+`teams status --summary` prints a concise human-readable status showing member counts by state (working, idle, done, failed, spawn_failed).
+
+### Status Fields Explained
+
+Each team member has two status fields:
+
+| Field | Description | Authoritative for |
+|-------|-------------|-------------------|
+| `member_status` | Team membership state: `active`, `done`, `spawn_failed`, `idle` | Orchestrators checking work completion |
+| `session_status` | Claude process lifecycle: `working`, `stopped`, `waiting`, `completed`, `failed` | Monitoring Claude Code process state |
+
+**Orchestrators should check `member_status`** to know if an agent has finished its work. `session_status` reflects the Claude Code process and can lag behind — an agent that calls `eits tasks complete` will have `member_status: done` immediately, but `session_status` may still show `working` until the session ends.
+
+**`spawn_failed`** in `member_status` means the spawn API returned an error for that team member slot. The member record exists with no linked session or agent.
 
 ---
 

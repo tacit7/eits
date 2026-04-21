@@ -225,15 +225,17 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions|states> [--mine] [--quiet]"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions|states> [--mine|--assigned] [--created-by] [--quiet]"; return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by]
+      # --mine/--assigned: tasks where current session is the active executor (linked via task_sessions)
+      # --created-by: tasks created by the current session (via created_by_session_id)
       local qs="" _session_flag=0 _mine_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
-          --session) [[ $_mine_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --session) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
           --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
@@ -246,7 +248,8 @@ cmd_tasks() {
               *) die "unknown state name: $2" ;;
             esac ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
-          --mine)    [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
+          --mine|--assigned) [[ $_session_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine/--assigned requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
+          --created-by) local _creator="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_creator" ]] || die "--created-by requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&created_by_session_id=$_creator"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -314,16 +317,12 @@ cmd_tasks() {
       ;;
     claim)
       local id="${1:-}"; need id
-      # Auto-link current session atomically with the state transition
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
-      _patch "/tasks/$id" "$(json state "start" session_id "$_sess")"
-      # Belt-and-suspenders: explicit follow-up link in case the session wasn't
-      # in the DB yet when the PATCH was processed (silent no-op if already linked)
-      if [[ -n "$_sess" ]]; then
-        _curl -sf -X POST -H "Content-Type: application/json" \
-          -d "$(json session_id "$_sess")" \
-          "$BASE_URL/tasks/$id/sessions" >/dev/null 2>&1 || true
-      fi
+      # POST /tasks/:id/claim transfers session ownership atomically:
+      # removes all existing task_sessions links, adds claimer's session, transitions to In Progress
+      _curl -X POST -H "Content-Type: application/json" \
+        -d "$(json session_id "$_sess")" \
+        "$BASE_URL/tasks/$id/claim" | jq .
       ;;
     start)
       echo "Warning: eits tasks start is deprecated. Use eits tasks claim instead." >&2
@@ -342,6 +341,8 @@ cmd_tasks() {
       ;;
     annotate)
       # eits tasks annotate <id> --body <text> [--title <t>]
+      # Retries on 429 with exponential backoff (2s, 4s, 8s). On persistent failure,
+      # writes to ~/.eits/pending-annotations.log for drain on next session startup.
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks annotate <id> --body <text> [--title <title>]"; return 0; }
       local id="${1:-}"; need id; shift
       local body="" title=""
@@ -353,7 +354,41 @@ cmd_tasks() {
         esac
       done
       need body
-      _post "/tasks/$id/annotations" "$(json body "$body" title "$title")"
+      local _ann_payload; _ann_payload="$(json body "$body" title "$title")"
+      local _ann_attempt=0 _ann_delay=2 _ann_ok=0
+      while [[ $_ann_attempt -le 3 ]]; do
+        local _ann_body _ann_status
+        _ann_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
+          -H "Content-Type: application/json" \
+          "${AUTH_ARGS[@]}" \
+          -d "$_ann_payload" \
+          "$BASE_URL/tasks/$id/annotations")
+        _ann_status="${_ann_body##*$'\n'}"
+        _ann_body="${_ann_body%$'\n'*}"
+        if [[ "$_ann_status" == "429" && $_ann_attempt -lt 3 ]]; then
+          echo "annotate rate limited, retrying in ${_ann_delay}s..." >&2
+          sleep "$_ann_delay"
+          _ann_delay=$((_ann_delay * 2))
+          _ann_attempt=$((_ann_attempt + 1))
+          continue
+        fi
+        if [[ "$_ann_status" -lt 400 ]]; then
+          printf '%s\n' "$_ann_body" | jq .
+          _ann_ok=1
+        fi
+        break
+      done
+      if [[ $_ann_ok -eq 0 ]]; then
+        local _pending_dir="${HOME}/.eits"
+        mkdir -p "$_pending_dir"
+        printf '%s\n' "$(printf '{"task_id":%s,"body":%s,"title":%s}' \
+          "$(printf '%s' "$id" | jq -Rs .)" \
+          "$(printf '%s' "$body" | jq -Rs .)" \
+          "$(printf '%s' "$title" | jq -Rs .)")" \
+          >> "${_pending_dir}/pending-annotations.log"
+        echo "annotate failed after retries — queued to ~/.eits/pending-annotations.log" >&2
+        return 1
+      fi
       ;;
     link-session)
       # eits tasks link-session <task_id> [<session_uuid>]
@@ -385,7 +420,8 @@ cmd_tasks() {
         esac
       done
       need message
-      _post "/tasks/$id/complete" "$(json message "$message")"
+      local _sess_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      _post "/tasks/$id/complete" "$(json message "$message" session_id "$_sess_id")"
       ;;
     begin|quick)
       # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
@@ -470,7 +506,7 @@ cmd_tasks() {
       printf '%s\t%s\n' 4 "In Review"
       ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag|states> [--mine] [--title] [--quiet]"
+      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag|states> [--mine|--assigned] [--created-by] [--title] [--quiet]"
       ;;
   esac
 }
@@ -732,7 +768,17 @@ USAGE
          + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)
          + (if $bypass_sandbox           then {bypass_sandbox: true}                   else {} end)
          + (if $stash_if_dirty           then {stash_if_dirty: true}                   else {} end)')
-      _post "/agents" "$payload"
+      local spawn_log="${EITS_SPAWN_LOG:-$HOME/.eits/spawn-errors.log}"
+      local _spawn_resp _spawn_rc=0
+      _spawn_resp=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/agents" 2>&1) || _spawn_rc=$?
+      if [[ $_spawn_rc -ne 0 ]]; then
+        local _ts; _ts=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+        mkdir -p "$(dirname "$spawn_log")"
+        printf '%s rc=%d cmd=agents/spawn %s\n' "$_ts" "$_spawn_rc" "$_spawn_resp" >> "$spawn_log"
+        printf 'spawn failed (rc=%d): %s\n' "$_spawn_rc" "$_spawn_resp" >&2
+        return $_spawn_rc
+      fi
+      printf '%s\n' "$_spawn_resp" | jq .
       ;;
     *)
       echo "usage: eits agents <list|get|spawn>"
@@ -1285,7 +1331,21 @@ print(json.dumps(d))
       ;;
     status)
       # eits teams status <id> [--summary]
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits teams status <id> [--summary]"; return 0; }
+      # member_status: team membership state (active, done, spawn_failed, idle) — authoritative for orchestrators
+      # session_status: Claude process lifecycle (working, stopped, waiting, completed, failed)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'HELP'
+usage: eits teams status <id> [--summary|-s]
+
+Fields per member:
+  member_status  — team membership state (active, done, spawn_failed, idle)
+                   Use this to check if an agent is done with their work.
+  session_status — Claude process lifecycle (working, stopped, waiting, completed, failed)
+                   Reflects the Claude Code process state, not task completion.
+
+Orchestrators should check member_status, not session_status.
+HELP
+        return 0; }
       local id="${1:-}"; need id; shift
       local summary=0
       while [[ $# -gt 0 ]]; do
@@ -1303,21 +1363,23 @@ print(json.dumps(d))
           ($members | length) as $total |
           ($members | map(select(.session_status == "working")) | length) as $working |
           ($members | map(select(.session_status == "stopped" or .session_status == "waiting")) | length) as $idle |
-          ($members | map(select(.session_status == "completed")) | length) as $done |
+          ($members | map(select(.member_status == "done" or .session_status == "completed")) | length) as $done |
           ($members | map(select(.session_status == "failed")) | length) as $failed |
+          ($members | map(select(.member_status == "spawn_failed")) | length) as $spawn_failed |
           "Team: \($t.name) (ID: \($t.id))",
-          "Members: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) failed" else "" end)",
+          "Members: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) session_failed" else "" end)\(if $spawn_failed > 0 then ", \($spawn_failed) spawn_failed" else "" end)",
           (if $total > 0 then
             "",
             "Member detail:",
             ($members[] |
+              (.member_status // .status // "unknown") as $member_str |
               (if .session_status == "waiting" and .session_status_reason then
                 "\(.session_status):\(.session_status_reason)"
               else
-                (.session_status // "unknown")
-              end) as $status_str |
+                (.session_status // "none")
+              end) as $session_str |
               (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
-              "  \(.name) (\(.role)) — \($status_str)\($task_str)"
+              "  \(.name) (\(.role)) — member:\($member_str) session:\($session_str)\($task_str)"
             )
           else empty end)
         '

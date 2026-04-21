@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Notes, Tasks}
+  alias EyeInTheSky.{Agents, Notes, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -48,6 +48,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       else: []
   end
 
+  defp fetch_tasks_by_filter(%{"created_by_session_id" => session_id}, opts) do
+    session_int_id =
+      case Helpers.resolve_session_int_id(session_id) do
+        {:ok, id} -> id
+        _ -> nil
+      end
+
+    if session_int_id,
+      do: Tasks.list_tasks_created_by_session(session_int_id, opts),
+      else: []
+  end
+
   defp fetch_tasks_by_filter(%{"agent_id" => agent_id}, opts) do
     agent_int_id = resolve_agent_int_id(agent_id)
 
@@ -71,6 +83,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   POST /api/v1/tasks - Create a task.
   """
   def create(conn, params) do
+    creator_session_int_id =
+      case params["session_id"] do
+        sid when is_binary(sid) and sid != "" ->
+          case Helpers.resolve_session_int_id(sid) do
+            {:ok, id} -> id
+            _ -> nil
+          end
+
+        _ ->
+          nil
+      end
+
     attrs = %{
       uuid: Ecto.UUID.generate(),
       title: trim_param(params["title"]),
@@ -80,6 +104,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       project_id: params["project_id"],
       team_id: parse_int(params["team_id"], nil),
       agent_id: resolve_agent_int_id(params["agent_id"]),
+      created_by_session_id: creator_session_int_id,
       due_at: params["due_at"],
       created_at: DateTime.utc_now()
     }
@@ -219,6 +244,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     with false <- message == "",
          {:ok, task} <- Tasks.get_task(id),
          {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
+      maybe_mark_member_done(params["session_id"])
+
       json(conn, %{
         success: true,
         message: "Task completed",
@@ -237,6 +264,46 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       {:error, _reason} ->
         {:error, "Failed to complete task"}
     end
+  end
+
+  @doc """
+  POST /api/v1/tasks/:id/claim - Atomically claim a task.
+  Transitions to In Progress, removes all existing session links, and adds the
+  claimer's session in a single transaction with a row-level lock.
+  Body: session_id (UUID or integer string) — required.
+  """
+  def claim(conn, %{"id" => task_id} = params) do
+    with {:session, {:ok, session_int_id}} <-
+           {:session, resolve_claimer_session(params["session_id"])},
+         {:task, {:ok, task}} <- {:task, Tasks.get_task(task_id)},
+         {:claim, {:ok, updated}} <- {:claim, Tasks.claim_task(task, session_int_id)} do
+      json(conn, %{
+        success: true,
+        message: "Task claimed",
+        task: ApiPresenter.present_task(updated)
+      })
+    else
+      {:session, {:error, :no_session}} -> {:error, :bad_request, "session_id is required"}
+      {:session, {:error, :invalid_session}} -> {:error, :bad_request, "session_id is invalid"}
+      {:session, _} -> {:error, :bad_request, "session_id is required"}
+      {:task, {:error, :not_found}} -> {:error, :not_found, "Task not found"}
+      {:claim, {:error, :already_claimed}} -> {:error, :conflict, "Task is already in progress"}
+      {:claim, {:error, :task_not_claimable}} -> {:error, :conflict, "Task cannot be claimed from its current state"}
+      {:claim, {:error, :task_not_found}} -> {:error, :not_found, "Task not found"}
+      {:claim, {:error, changeset}} -> {:error, changeset}
+    end
+  end
+
+  defp resolve_claimer_session(sid) when is_nil(sid) or sid == "",
+    do: {:error, :no_session}
+
+  defp resolve_claimer_session(session_id) do
+    case Helpers.resolve_session_int_id(session_id) do
+      {:ok, int_id} -> {:ok, int_id}
+      {:error, _msg} -> {:error, :invalid_session}
+    end
+  rescue
+    Ecto.Query.CastError -> {:error, :invalid_session}
   end
 
   @doc """
@@ -382,6 +449,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp parse_tag_id(n) when is_integer(n), do: {:ok, n}
   defp parse_tag_id(raw) when is_binary(raw), do: parse_int_param(raw, "tag_id must be an integer")
   defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
+
+  defp maybe_mark_member_done(nil), do: :ok
+  defp maybe_mark_member_done(""), do: :ok
+
+  defp maybe_mark_member_done(session_id) do
+    case Helpers.resolve_session_int_id(session_id) do
+      {:ok, int_id} -> Teams.mark_member_done_by_session(int_id)
+      _ -> :ok
+    end
+  end
 
   defp parse_int_param(n, _msg) when is_integer(n), do: {:ok, n}
 

@@ -21,6 +21,32 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnTeamContext do
     instructions <> "\n\n" <> EyeInTheSky.Agents.InstructionTemplates.team_context(team, member_name)
   end
 
+  def record_spawn_failure(nil, _member_name), do: :ok
+
+  # Intentionally omits agent_id and session_id — no agent/session was created.
+  # Downstream code must tolerate nil session_id on team members (attach_claimed_tasks,
+  # list_broadcast_targets, and mark_member_done_by_session all have nil guards).
+  def record_spawn_failure(team, member_name) do
+    name = member_name || "unknown-#{System.unique_integer([:positive])}"
+
+    case Teams.join_team(%{
+           team_id: team.id,
+           name: name,
+           role: "member",
+           status: "spawn_failed"
+         }) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "record_spawn_failure: could not record for team_id=#{team.id} name=#{inspect(name)} reason=#{inspect(reason)}"
+        )
+
+        :ok
+    end
+  end
+
   def maybe_join(nil, _agent, _session, _name), do: :ok
 
   def maybe_join(team, agent, session, member_name) do

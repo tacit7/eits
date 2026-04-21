@@ -263,7 +263,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="hero-cpu-chip" label="Sessions" myself={@myself} />
         <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-clipboard-document-list" label="Tasks" myself={@myself} />
         <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-right" label="Prompts" myself={@myself} />
-        <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
+        <%= if @sidebar_tab == :chat do %>
+          <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
+        <% else %>
+          <.link
+            navigate="/chat"
+            title="Chat"
+            aria-label="Chat"
+            class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"
+          >
+            <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4" />
+          </.link>
+        <% end %>
         <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Notes" myself={@myself} />
         <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
         <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />

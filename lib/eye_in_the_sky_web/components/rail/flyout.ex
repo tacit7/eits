@@ -8,9 +8,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :mobile_open, :boolean, default: false
   attr :active_section, :atom, required: true
   attr :sidebar_project, :any, default: nil
-  # Accepted for assign compatibility with Sidebar interface; unused in MVP (no channel list).
   attr :active_channel_id, :any, default: nil
   attr :flyout_sessions, :list, default: []
+  attr :flyout_channels, :list, default: []
   attr :notification_count, :integer, default: 0
   attr :myself, :any, required: true
 
@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :prompts -> %>
               <.nav_links project={@sidebar_project} section={:prompts} />
             <% :chat -> %>
-              <.chat_content />
+              <.chat_content channels={@flyout_channels} active_channel_id={@active_channel_id} myself={@myself} />
             <% :notes -> %>
               <.nav_links project={@sidebar_project} section={:notes} />
             <% :skills -> %>
@@ -128,11 +128,34 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
-  # Chat flyout: navigation links only (no channel list in MVP)
+  # Chat flyout: real channel list
+  attr :channels, :list, default: []
+  attr :active_channel_id, :any, default: nil
+  attr :myself, :any, required: true
+
   defp chat_content(assigns) do
     ~H"""
-    <.simple_link href="/chat" label="Channels" icon="hero-chat-bubble-left-ellipsis" />
-    <.simple_link href="/dms" label="Direct Messages" icon="hero-chat-bubble-left-right" />
+    <%= for channel <- @channels do %>
+      <% active = not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
+      <.link
+        navigate={"/chat?channel_id=#{channel.id}"}
+        class={[
+          "flex items-center gap-2 px-3 py-2 text-sm transition-colors",
+          if(active,
+            do: "text-primary bg-primary/8 font-medium",
+            else: "text-base-content/60 hover:text-base-content/85 hover:bg-base-content/5"
+          )
+        ]}
+      >
+        <span class={["text-[13px] flex-shrink-0", if(active, do: "text-primary/60", else: "text-base-content/25")]}>
+          #
+        </span>
+        <span class="truncate">{channel.name}</span>
+      </.link>
+    <% end %>
+    <%= if @channels == [] do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No channels</div>
+    <% end %>
     """
   end
 

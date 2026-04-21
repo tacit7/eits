@@ -132,43 +132,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
     ~H"""
     <div class="flex h-[var(--app-viewport-height)] bg-base-100">
-      <nav class="w-[200px] flex-shrink-0 flex flex-col border-r border-base-content/8 bg-base-100" aria-label="Channels">
-        <div class="px-2 pt-2 pb-1 border-b border-base-content/8">
-          <button
-            onclick="history.length > 1 ? history.back() : window.location.href = '/'"
-            class="btn btn-ghost btn-xs px-1.5 self-center mr-1 text-base-content/50 hover:text-base-content"
-            aria-label="Go back"
-            title="Go back"
-          >
-            <.icon name="hero-arrow-left" class="w-4 h-4" />
-          </button>
-        </div>
-        <div class="flex items-center justify-between px-3 pt-3 pb-1">
-          <span class="text-[10px] font-bold uppercase tracking-widest text-base-content/30">Channels</span>
-          <button phx-click="show_new_channel" class="text-base-content/30 hover:text-base-content/60 transition-colors leading-none text-base" title="New channel" aria-label="New channel">+</button>
-        </div>
-        <div class="flex-1 overflow-y-auto py-1">
-          <%= for channel <- @channels do %>
-            <.link
-              navigate={~p"/chat?channel_id=#{channel.id}"}
-              class={["flex items-center gap-1 px-2.5 py-1 mx-1.5 rounded text-sm transition-colors",
-                if(not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id),
-                  do: "bg-primary/10 text-primary font-semibold",
-                  else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/5")]}
-            >
-              <span class="text-base-content/25 text-[13px]">#</span>{channel.name}
-            </.link>
-          <% end %>
-          <%= if @new_channel_name do %>
-            <form phx-submit="create_channel" phx-keydown="cancel_new_channel" class="flex items-center gap-1 px-2.5 mx-1.5 py-1">
-              <span class="text-base-content/25 text-[13px]">#</span>
-              <input type="text" name="name" value={@new_channel_name} phx-keyup="update_channel_name" placeholder="channel-name" class="flex-1 bg-transparent border-b border-base-content/15 text-sm text-base-content/70 placeholder:text-base-content/25 outline-none py-0.5 font-mono" autofocus />
-            </form>
-          <% else %>
-            <button phx-click="show_new_channel" class="flex items-center gap-1 px-2.5 mx-1.5 py-1 text-sm text-base-content/30 hover:text-base-content/55 transition-colors w-full text-left">+ New Channel</button>
-          <% end %>
-        </div>
-      </nav>
       <div class="flex-1 flex flex-col min-w-0">
         <ChannelHeader.channel_header
           active_channel={@active_channel}

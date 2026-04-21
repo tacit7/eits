@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
 
-  alias EyeInTheSky.{Notifications, Projects, Sessions}
+  alias EyeInTheSky.{Channels, Notifications, Projects, Sessions}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
 
   @section_map %{
@@ -42,6 +42,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         proj_picker_open: false,
         active_section: :sessions,
         flyout_sessions: [],
+        flyout_channels: [],
         notification_count: 0,
         new_project_path: nil,
         renaming_project_id: nil,
@@ -118,6 +119,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         socket
         |> assign(:active_section, next_section)
         |> assign(:mobile_open, false)
+        |> maybe_load_channels(next_section, sidebar_project)
       else
         socket
       end
@@ -139,7 +141,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> assign(:flyout_open, true)
        |> assign(:mobile_open, true)
        |> assign(:proj_picker_open, false)
-       |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project))}
+       |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project))
+       |> maybe_load_channels(section, socket.assigns.sidebar_project)}
     end
   end
 
@@ -314,6 +317,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         sidebar_project={@sidebar_project}
         active_channel_id={@active_channel_id}
         flyout_sessions={@flyout_sessions}
+        flyout_channels={@flyout_channels}
         notification_count={@notification_count}
         myself={@myself}
       />
@@ -348,5 +352,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     </button>
     """
   end
+
+  # Load channels only when navigating to the :chat section — avoids a DB query on every page.
+  defp maybe_load_channels(socket, :chat, project) do
+    project_id = project && project.id
+    channels =
+      case Channels.list_channels_for_project(project_id) do
+        list when is_list(list) -> list
+        _ -> []
+      end
+    assign(socket, :flyout_channels, channels)
+  end
+
+  defp maybe_load_channels(socket, _section, _project), do: socket
 
 end

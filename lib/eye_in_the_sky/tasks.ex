@@ -50,6 +50,7 @@ defmodule EyeInTheSky.Tasks do
   defdelegate list_tasks_for_team_with_sessions(team_id), to: EyeInTheSky.Tasks.Queries
   defdelegate get_current_task_for_session(session_id), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks_for_session(session_id), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_tasks_created_by_session(session_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
   @doc """
   Gets a single task. Returns `{:ok, task}` or `{:error, :not_found}`.
@@ -329,6 +330,7 @@ defmodule EyeInTheSky.Tasks do
   defdelegate task_linked_to_session?(task_id, session_id), to: EyeInTheSky.TaskSessions
   defdelegate unlink_session_from_task(task_id, session_id), to: EyeInTheSky.TaskSessions
   defdelegate active_task_count_for_session(session_id), to: EyeInTheSky.TaskSessions
+  defdelegate transfer_session_ownership(task_id, new_session_id), to: EyeInTheSky.TaskSessions
 
   defdelegate list_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries

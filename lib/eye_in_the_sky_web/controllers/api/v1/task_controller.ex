@@ -48,6 +48,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       else: []
   end
 
+  defp fetch_tasks_by_filter(%{"created_by_session_id" => session_id}, opts) do
+    session_int_id =
+      case Helpers.resolve_session_int_id(session_id) do
+        {:ok, id} -> id
+        _ -> nil
+      end
+
+    if session_int_id,
+      do: Tasks.list_tasks_created_by_session(session_int_id, opts),
+      else: []
+  end
+
   defp fetch_tasks_by_filter(%{"agent_id" => agent_id}, opts) do
     agent_int_id = resolve_agent_int_id(agent_id)
 
@@ -71,6 +83,12 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   POST /api/v1/tasks - Create a task.
   """
   def create(conn, params) do
+    creator_session_int_id =
+      case Helpers.resolve_session_int_id(params["session_id"] || "") do
+        {:ok, id} -> id
+        _ -> nil
+      end
+
     attrs = %{
       uuid: Ecto.UUID.generate(),
       title: trim_param(params["title"]),
@@ -80,6 +98,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       project_id: params["project_id"],
       team_id: parse_int(params["team_id"], nil),
       agent_id: resolve_agent_int_id(params["agent_id"]),
+      created_by_session_id: creator_session_int_id,
       due_at: params["due_at"],
       created_at: DateTime.utc_now()
     }
@@ -236,6 +255,46 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
       {:error, _reason} ->
         {:error, "Failed to complete task"}
+    end
+  end
+
+  @doc """
+  POST /api/v1/tasks/:id/claim - Claim a task: transitions to In Progress and transfers
+  session ownership (removes all existing session links, adds the claimer's session).
+  Body: session_id (UUID or integer string)
+  """
+  def claim(conn, %{"id" => task_id} = params) do
+    session_id = params["session_id"]
+
+    with {:ok, task} <- Tasks.get_task(task_id),
+         {:ok, state} <- Tasks.get_workflow_state_by_name("in-progress"),
+         {:ok, updated} <- Tasks.update_task_state(task, state.id) do
+      if session_id do
+        int_id =
+          case Helpers.resolve_session_int_id(session_id) do
+            {:ok, id} -> id
+            _ -> nil
+          end
+
+        if int_id do
+          task_int_id =
+            case Helpers.parse_int(task_id) do
+              nil -> updated.id
+              n -> n
+            end
+
+          Tasks.transfer_session_ownership(task_int_id, int_id)
+        end
+      end
+
+      json(conn, %{
+        success: true,
+        message: "Task claimed",
+        task: ApiPresenter.present_task(updated)
+      })
+    else
+      {:error, :not_found} -> {:error, :not_found, "Task not found"}
+      {:error, changeset} -> {:error, changeset}
     end
   end
 

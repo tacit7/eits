@@ -51,6 +51,27 @@ defmodule EyeInTheSky.TaskSessions do
   end
 
   @doc """
+  Atomically transfers executor ownership of a task to a new session.
+  Removes all existing task_sessions entries for the task and inserts the new one.
+  Used by claim to ensure the stop hook fires on the session actually executing the task.
+  """
+  def transfer_session_ownership(task_id, new_session_id)
+      when is_integer(task_id) and is_integer(new_session_id) do
+    Repo.transaction(fn ->
+      from(ts in "task_sessions", where: ts.task_id == ^task_id)
+      |> Repo.delete_all()
+
+      Repo.insert_all(
+        "task_sessions",
+        [%{task_id: task_id, session_id: new_session_id}],
+        on_conflict: :nothing
+      )
+    end)
+
+    {:ok, new_session_id}
+  end
+
+  @doc """
   Returns the count of active (not done, not archived) tasks linked to the given session.
   Used by the scheduler to determine if an idle session can be auto-archived.
   State ID 3 = Done.

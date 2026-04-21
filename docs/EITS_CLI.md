@@ -83,7 +83,10 @@ eits sessions notes <uuid>     # List notes attached to session
 # List / filter
 eits tasks list [--project <id>] [--session <uuid>] [--q <query>|--search <query>] \
   [--state <id>] [--state-name <todo|in-progress|done|in-review>] \
-  [--agent <uuid>] [--mine] [--limit <n>]
+  [--agent <uuid>] [--mine|--assigned] [--created-by] [--limit <n>]
+# --mine / --assigned  tasks where current session is the active executor (linked via task_sessions after claim)
+# --created-by         tasks created by the current session (via created_by_session_id)
+# Note: claim transfers session ownership, so --assigned shows only tasks you are currently executing
 
 # Get
 eits tasks get <id>
@@ -103,7 +106,8 @@ eits tasks update <id> [--state <id>|--state-name <done|start|in-progress|in-rev
   [--priority <p>] [--title <t>] [--description <d>] [--due-at <ISO8601>]
 
 # State shorthands (canonical)
-eits tasks claim <id>          # → In Progress (state 2), auto-links session (preferred)
+eits tasks claim <id>          # → In Progress (state 2), transfers session ownership to claimer (preferred)
+                               # Removes all existing task_sessions links, adds claimer's session atomically
 eits tasks complete <id> <message>  # Annotate + mark done + DM lead (preferred)
 
 # Deprecated aliases (kept for backwards compatibility, emit warning to stderr)
@@ -117,7 +121,7 @@ eits tasks complete <id> --message <text>
 # Delete
 eits tasks delete <id>
 
-# Annotations
+# Annotations (retries on 429 with 2s/4s/8s backoff; queues to ~/.eits/pending-annotations.log on failure)
 eits tasks annotate <id> --body <text> [--title <t>]
 
 # Session linking

@@ -103,6 +103,26 @@ fi
 # Mark session as working
 eits sessions update "$SESSION_ID" --status "working" >/dev/null 2>&1 &
 
+# Drain pending annotations that failed (429) in a previous session
+_PENDING_LOG="${HOME}/.eits/pending-annotations.log"
+if [ -f "$_PENDING_LOG" ] && [ -s "$_PENDING_LOG" ]; then
+  _log "draining pending annotations from $_PENDING_LOG"
+  echo "[EITS] startup: draining pending annotations" >&2
+  _tmp_log="${_PENDING_LOG}.processing"
+  mv "$_PENDING_LOG" "$_tmp_log"
+  while IFS= read -r _line; do
+    _task_id=$(echo "$_line" | jq -r '.task_id' 2>/dev/null) || continue
+    _body=$(echo "$_line" | jq -r '.body' 2>/dev/null) || continue
+    _title=$(echo "$_line" | jq -r '.title // ""' 2>/dev/null || echo "")
+    if [ -n "$_task_id" ] && [ -n "$_body" ]; then
+      eits tasks annotate "$_task_id" --body "$_body" ${_title:+--title "$_title"} >/dev/null 2>&1 \
+        && _log "drained annotation for task $_task_id" \
+        || { _log "drain failed for task $_task_id, re-queuing"; echo "$_line" >> "$_PENDING_LOG"; }
+    fi
+  done < "$_tmp_log"
+  rm -f "$_tmp_log"
+fi
+
 # Build project type string
 if [ -f "$PROJECT_DIR/mix.exs" ]; then
   PROJECT_TYPE="Elixir/Phoenix"

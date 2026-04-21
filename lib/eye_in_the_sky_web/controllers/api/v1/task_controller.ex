@@ -84,9 +84,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   """
   def create(conn, params) do
     creator_session_int_id =
-      case Helpers.resolve_session_int_id(params["session_id"] || "") do
-        {:ok, id} -> id
-        _ -> nil
+      case params["session_id"] do
+        sid when is_binary(sid) and sid != "" ->
+          case Helpers.resolve_session_int_id(sid) do
+            {:ok, id} -> id
+            _ -> nil
+          end
+
+        _ ->
+          nil
       end
 
     attrs = %{
@@ -259,43 +265,35 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   @doc """
-  POST /api/v1/tasks/:id/claim - Claim a task: transitions to In Progress and transfers
-  session ownership (removes all existing session links, adds the claimer's session).
-  Body: session_id (UUID or integer string)
+  POST /api/v1/tasks/:id/claim - Atomically claim a task.
+  Transitions to In Progress, removes all existing session links, and adds the
+  claimer's session in a single transaction with a row-level lock.
+  Body: session_id (UUID or integer string) — required.
   """
   def claim(conn, %{"id" => task_id} = params) do
-    session_id = params["session_id"]
-
-    with {:ok, task} <- Tasks.get_task(task_id),
-         {:ok, state} <- Tasks.get_workflow_state_by_name("in-progress"),
-         {:ok, updated} <- Tasks.update_task_state(task, state.id) do
-      if session_id do
-        int_id =
-          case Helpers.resolve_session_int_id(session_id) do
-            {:ok, id} -> id
-            _ -> nil
-          end
-
-        if int_id do
-          task_int_id =
-            case Helpers.parse_int(task_id) do
-              nil -> updated.id
-              n -> n
-            end
-
-          Tasks.transfer_session_ownership(task_int_id, int_id)
-        end
-      end
-
+    with {:session, {:ok, session_int_id}} <-
+           {:session, resolve_claimer_session(params["session_id"])},
+         {:task, {:ok, task}} <- {:task, Tasks.get_task(task_id)},
+         {:claim, {:ok, updated}} <- {:claim, Tasks.claim_task(task, session_int_id)} do
       json(conn, %{
         success: true,
         message: "Task claimed",
         task: ApiPresenter.present_task(updated)
       })
     else
-      {:error, :not_found} -> {:error, :not_found, "Task not found"}
-      {:error, changeset} -> {:error, changeset}
+      {:session, _} -> {:error, :bad_request, "session_id is required"}
+      {:task, {:error, :not_found}} -> {:error, :not_found, "Task not found"}
+      {:claim, {:error, changeset}} -> {:error, changeset}
     end
+  end
+
+  defp resolve_claimer_session(sid) when is_nil(sid) or sid == "",
+    do: {:error, :no_session}
+
+  defp resolve_claimer_session(session_id) do
+    Helpers.resolve_session_int_id(session_id)
+  rescue
+    Ecto.Query.CastError -> {:error, :no_session}
   end
 
   @doc """

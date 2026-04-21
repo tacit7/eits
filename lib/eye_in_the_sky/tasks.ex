@@ -237,6 +237,54 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Atomically claims a task for the given session in a single transaction:
+    1. Acquires a row-level lock on the task (FOR UPDATE) to serialize concurrent claims
+    2. Clears all existing task_sessions links
+    3. Inserts the claimer's session link
+    4. Transitions the task state to In Progress
+
+  Returns `{:ok, updated_task}` or `{:error, reason}`.
+  The PubSub broadcast fires after the transaction commits.
+  """
+  def claim_task(%Task{} = task, session_int_id) when is_integer(session_int_id) do
+    in_progress_id = WorkflowState.in_progress_id()
+    now = DateTime.utc_now()
+
+    result =
+      Repo.transaction(fn ->
+        from(t in "tasks", where: t.id == ^task.id, select: t.id, lock: "FOR UPDATE")
+      |> Repo.one()
+
+        Repo.delete_all_check = from(t in "tasks", where: t.id == ^task.id, select: t.state_id, lock: "FOR UPDATE") |> Repo.one()
+
+        if locked_state == in_progress_id, do: Repo.rollback(:already_claimed)
+
+        Repo.transaction(fn ->
+        from(t in "tasks", where: t.id == ^task.id, select: t.id, lock: "FOR UPDATE")
+      |> Repo.one()
+
+        Repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
+        Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+
+        changeset = Task.changeset(task, %{state_id: in_progress_id, updated_at: now})
+
+        case Repo.update(changeset) do
+          {:ok, updated} -> updated
+          {:error, cs} -> Repo.rollback(cs)
+        end
+      end)
+
+    case result do
+      {:ok, updated} ->
+        EyeInTheSky.Events.task_updated(updated)
+        {:ok, updated}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
   Archives a task (sets archived = true). Non-destructive.
   """
   def archive_task(%Task{} = task) do

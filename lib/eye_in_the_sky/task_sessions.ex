@@ -52,23 +52,29 @@ defmodule EyeInTheSky.TaskSessions do
 
   @doc """
   Atomically transfers executor ownership of a task to a new session.
-  Removes all existing task_sessions entries for the task and inserts the new one.
-  Used by claim to ensure the stop hook fires on the session actually executing the task.
+  Acquires a row-level lock (FOR UPDATE) on the task before clearing existing links
+  so concurrent claims on the same task serialize rather than race.
+  Returns `{:ok, new_session_id}` or `{:error, reason}`.
   """
   def transfer_session_ownership(task_id, new_session_id)
       when is_integer(task_id) and is_integer(new_session_id) do
     Repo.transaction(fn ->
+      task_row =
+        from(t in "tasks", where: t.id == ^task_id, select: t.id, lock: "FOR UPDATE")
+        |> Repo.one()
+
+      if is_nil(task_row), do: Repo.rollback(:task_not_found)
+
       from(ts in "task_sessions", where: ts.task_id == ^task_id)
       |> Repo.delete_all()
 
       Repo.insert_all(
         "task_sessions",
-        [%{task_id: task_id, session_id: new_session_id}],
-        on_conflict: :nothing
+        [%{task_id: task_id, session_id: new_session_id}]
       )
-    end)
 
-    {:ok, new_session_id}
+      new_session_id
+    end)
   end
 
   @doc """

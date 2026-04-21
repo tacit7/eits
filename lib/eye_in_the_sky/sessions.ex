@@ -44,6 +44,15 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Returns sessions with IDs in the given list. Returns [] for an empty list.
+  """
+  def list_sessions_by_ids([]), do: []
+
+  def list_sessions_by_ids(ids) do
+    Repo.all(from s in Session, where: s.id in ^ids)
+  end
+
+  @doc """
   Returns idle or waiting sessions that have not been archived and whose
   last activity (or started_at as fallback) is older than the given cutoff.
   Used by the scheduler to auto-archive dead idle sessions.

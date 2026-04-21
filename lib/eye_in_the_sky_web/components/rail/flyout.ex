@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :active_channel_id, :any, default: nil
   attr :flyout_sessions, :list, default: []
   attr :flyout_channels, :list, default: []
+  attr :flyout_canvases, :list, default: []
   attr :notification_count, :integer, default: 0
   attr :myself, :any, required: true
 
@@ -61,7 +62,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :teams -> %>
               <.simple_link href="/teams" label="All Teams" icon="hero-users" />
             <% :canvas -> %>
-              <.simple_link href="/canvases" label="All Canvases" icon="hero-squares-2x2" />
+              <.canvas_content canvases={@flyout_canvases} />
             <% :notifications -> %>
               <.simple_link href="/notifications" label="Notifications" icon="hero-bell" />
             <% _ -> %>
@@ -158,6 +159,50 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <% end %>
     """
   end
+
+  # Canvas flyout: canvases with their sessions
+  attr :canvases, :list, default: []
+
+  defp canvas_content(assigns) do
+    ~H"""
+    <div class="px-3 pt-2 pb-1">
+      <.link
+        navigate="/canvases"
+        class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
+      >
+        All Canvases &rarr;
+      </.link>
+    </div>
+    <%= if @canvases == [] do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No canvases</div>
+    <% end %>
+    <%= for canvas <- @canvases do %>
+      <.link
+        navigate={"/canvases/#{canvas.id}"}
+        class="flex items-center gap-2 px-3 py-1.5 text-sm text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+      >
+        <.icon name="hero-squares-2x2" class="w-3 h-3 flex-shrink-0 text-base-content/30" />
+        <span class="truncate font-medium text-xs">{canvas.name}</span>
+      </.link>
+      <%= for session <- canvas.sessions do %>
+        <.link
+          navigate={"/dm/#{session.id}"}
+          class="flex items-center gap-2 pl-7 pr-3 py-1 text-xs text-base-content/50 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
+        >
+          <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />
+          <span class="truncate">{session.name || "unnamed"}</span>
+        </.link>
+      <% end %>
+      <%= if canvas.sessions == [] do %>
+        <div class="pl-7 pr-3 py-1 text-[10px] text-base-content/30">no sessions</div>
+      <% end %>
+    <% end %>
+    """
+  end
+
+  defp canvas_session_dot("working"), do: "bg-green-500"
+  defp canvas_session_dot("waiting"), do: "bg-amber-400"
+  defp canvas_session_dot(_), do: "bg-base-content/20"
 
   # Generic nav links per section
   attr :project, :any, default: nil

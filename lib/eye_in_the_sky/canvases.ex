@@ -9,6 +9,10 @@ defmodule EyeInTheSky.Canvases do
     Repo.all(from c in Canvas, order_by: [asc: c.inserted_at])
   end
 
+  def list_canvases_preloaded do
+    Repo.all(from c in Canvas, order_by: [asc: c.inserted_at], preload: :canvas_sessions)
+  end
+
   def get_canvas(id) do
     case Repo.get(Canvas, id) do
       nil -> {:error, :not_found}

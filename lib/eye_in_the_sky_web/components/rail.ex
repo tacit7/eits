@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
 
-  alias EyeInTheSky.{Channels, Notifications, Projects, Sessions}
+  alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, Sessions}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
 
   @section_map %{
@@ -50,7 +50,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         mobile_open: false,
         sidebar_project: nil,
         sidebar_tab: :sessions,
-        active_channel_id: nil
+        active_channel_id: nil,
+        flyout_canvases: []
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
@@ -120,6 +121,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> assign(:active_section, next_section)
         |> assign(:mobile_open, false)
         |> maybe_load_channels(next_section, sidebar_project)
+        |> maybe_load_canvases(next_section)
       else
         socket
       end
@@ -142,7 +144,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> assign(:mobile_open, true)
        |> assign(:proj_picker_open, false)
        |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project))
-       |> maybe_load_channels(section, socket.assigns.sidebar_project)}
+       |> maybe_load_channels(section, socket.assigns.sidebar_project)
+       |> maybe_load_canvases(section)}
     end
   end
 
@@ -281,7 +284,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Notes" myself={@myself} />
         <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
         <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
-        <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
+        <%= if @sidebar_tab in [:canvas, :canvases] do %>
+          <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
+        <% else %>
+          <.link
+            navigate="/canvases"
+            title="Canvas"
+            aria-label="Canvas"
+            class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"
+          >
+            <.icon name="hero-squares-2x2" class="w-4 h-4" />
+          </.link>
+        <% end %>
 
         <div class="flex-1" />
 
@@ -318,6 +332,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         active_channel_id={@active_channel_id}
         flyout_sessions={@flyout_sessions}
         flyout_channels={@flyout_channels}
+        flyout_canvases={@flyout_canvases}
         notification_count={@notification_count}
         myself={@myself}
       />
@@ -352,6 +367,34 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     </button>
     """
   end
+
+  # Load canvases (with sessions) only when navigating to the :canvas section.
+  defp maybe_load_canvases(socket, :canvas) do
+    canvases = Canvases.list_canvases_preloaded()
+
+    session_ids =
+      canvases
+      |> Enum.flat_map(& Enum.map(&1.canvas_sessions, fn cs -> cs.session_id end))
+      |> Enum.uniq()
+
+    sessions_by_id =
+      Sessions.list_sessions_by_ids(session_ids)
+      |> Map.new(fn s -> {s.id, s} end)
+
+    flyout_canvases =
+      Enum.map(canvases, fn canvas ->
+        sessions =
+          canvas.canvas_sessions
+          |> Enum.map(fn cs -> sessions_by_id[cs.session_id] end)
+          |> Enum.reject(&is_nil/1)
+
+        %{id: canvas.id, name: canvas.name, sessions: sessions}
+      end)
+
+    assign(socket, :flyout_canvases, flyout_canvases)
+  end
+
+  defp maybe_load_canvases(socket, _section), do: socket
 
   # Load channels only when navigating to the :chat section — avoids a DB query on every page.
   defp maybe_load_channels(socket, :chat, project) do

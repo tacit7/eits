@@ -177,7 +177,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             <.message_attachments attachments={@message.attachments || []} />
             <time
               id={"msg-time-#{@message.id}"}
-              class="text-[9px] text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+              class="text-[9px] text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150"
               data-utc={to_utc_string(@message.inserted_at)}
               phx-hook="LocalTime"
             />

@@ -283,6 +283,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     else
       {:session, _} -> {:error, :bad_request, "session_id is required"}
       {:task, {:error, :not_found}} -> {:error, :not_found, "Task not found"}
+      {:claim, {:error, :already_claimed}} -> {:error, :conflict, "Task is already in progress"}
+      {:claim, {:error, :task_not_found}} -> {:error, :not_found, "Task not found"}
       {:claim, {:error, changeset}} -> {:error, changeset}
     end
   end

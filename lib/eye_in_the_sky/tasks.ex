@@ -252,16 +252,12 @@ defmodule EyeInTheSky.Tasks do
 
     result =
       Repo.transaction(fn ->
-        from(t in "tasks", where: t.id == ^task.id, select: t.id, lock: "FOR UPDATE")
-      |> Repo.one()
+        locked_state =
+          from(t in "tasks", where: t.id == ^task.id, select: t.state_id, lock: "FOR UPDATE")
+          |> Repo.one()
 
-        Repo.delete_all_check = from(t in "tasks", where: t.id == ^task.id, select: t.state_id, lock: "FOR UPDATE") |> Repo.one()
-
+        if is_nil(locked_state), do: Repo.rollback(:task_not_found)
         if locked_state == in_progress_id, do: Repo.rollback(:already_claimed)
-
-        Repo.transaction(fn ->
-        from(t in "tasks", where: t.id == ^task.id, select: t.id, lock: "FOR UPDATE")
-      |> Repo.one()
 
         Repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
         Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])

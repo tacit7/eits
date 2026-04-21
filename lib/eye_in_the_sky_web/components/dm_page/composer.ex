@@ -73,9 +73,63 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         ></textarea>
       </div>
 
+      <%!-- Format bar — hidden until Aa is clicked --%>
+      <div id="format-bar" class="hidden px-3 pb-1 flex items-center gap-0.5">
+        <button
+          type="button"
+          data-fmt="bold"
+          title="Bold (⌘B)"
+          class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+        >
+          <span class="font-bold text-sm leading-none">B</span>
+        </button>
+        <button
+          type="button"
+          data-fmt="italic"
+          title="Italic (⌘I)"
+          class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+        >
+          <span class="italic text-sm leading-none">I</span>
+        </button>
+        <button
+          type="button"
+          data-fmt="strike"
+          title="Strikethrough"
+          class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+        >
+          <span class="line-through text-sm leading-none">S</span>
+        </button>
+        <div class="w-px h-4 bg-base-content/10 mx-0.5"></div>
+        <button
+          type="button"
+          data-fmt="code"
+          title="Inline code (⌘E)"
+          class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+        >
+          <.icon name="hero-code-bracket" class="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          data-fmt="code-block"
+          title="Code block (⌘⇧E)"
+          class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+        >
+          <span class="font-mono text-[10px] leading-none tracking-tight">```</span>
+        </button>
+        <div class="w-px h-4 bg-base-content/10 mx-0.5"></div>
+        <button
+          type="button"
+          data-fmt="link"
+          title="Link"
+          class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+        >
+          <.icon name="hero-link" class="w-3.5 h-3.5" />
+        </button>
+      </div>
+
       <%!-- Bottom toolbar --%>
       <div class="flex items-center justify-between px-3 pb-3 pt-1" id="dm-composer-toolbar">
-        <%!-- Left: upload + budget + effort --%>
+        <%!-- Left: upload + format toggle + budget + effort --%>
         <div class="flex items-center gap-2">
           <label
             for={@uploads.files.ref}
@@ -84,6 +138,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           >
             <.icon name="hero-plus" class="w-5 h-5" />
           </label>
+          <button
+            type="button"
+            id="formatter-toggle"
+            title="Format text"
+            class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
+          >
+            <span class="text-xs font-semibold tracking-tight select-none">Aa</span>
+          </button>
           <.live_file_input upload={@uploads.files} class="hidden" />
           <%!-- Budget cap input --%>
           <div class="flex items-center gap-0.5 text-xs text-base-content/40">

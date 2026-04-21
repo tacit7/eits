@@ -53,8 +53,15 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-base-300 rounded-t-xl cursor-move select-none shrink-0"
       >
         <div class="flex items-center gap-2 min-w-0">
-          <span class={["w-2 h-2 rounded-full inline-block shrink-0", status_dot_class(@session)]}>
-          </span>
+          <img
+            src={DmHelpers.provider_icon(@session && @session.provider)}
+            class={[
+              "w-3.5 h-3.5 shrink-0",
+              DmHelpers.provider_icon_class(@session && @session.provider),
+              @session && @session.status == "working" && "[animation:spin_2s_linear_infinite]"
+            ]}
+            alt={(@session && @session.provider) || "agent"}
+          />
           <span class="text-xs font-medium truncate">{session_label(@session)}</span>
         </div>
         <div class="flex items-center gap-1.5">
@@ -252,13 +259,6 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
     </div>
     """
   end
-
-  defp status_dot_class(nil), do: "bg-base-content/20"
-  defp status_dot_class(%{status: "working"}), do: "bg-primary animate-pulse"
-  defp status_dot_class(%{status: "waiting"}), do: "bg-warning"
-  defp status_dot_class(%{status: "failed"}), do: "bg-error"
-  defp status_dot_class(%{status: "completed"}), do: "bg-success"
-  defp status_dot_class(_), do: "bg-base-content/20"
 
   defp session_label(nil), do: "Unknown session"
   defp session_label(%{name: name}) when is_binary(name) and name != "", do: name

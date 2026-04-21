@@ -130,18 +130,13 @@ defmodule EyeInTheSkyWeb.Router do
       live "/canvases/:id", CanvasLive, :show
     end
 
-    live_session :chat,
-      layout: {EyeInTheSkyWeb.Layouts, :canvas},
-      on_mount: [EyeInTheSkyWeb.AuthHook, EyeInTheSkyWeb.NavHook] do
-      live "/chat", ChatLive, :index
-    end
-
     live_session :app,
       on_mount: [
         EyeInTheSkyWeb.AuthHook,
         EyeInTheSkyWeb.FloatingChatLive,
         EyeInTheSkyWeb.NavHook
       ] do
+      live "/chat", ChatLive, :index
       live "/", AgentLive.Index, :index
       live "/notes", OverviewLive.Notes, :index
       live "/tasks", OverviewLive.Tasks, :index

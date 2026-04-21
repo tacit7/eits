@@ -230,6 +230,8 @@ defmodule EyeInTheSky.Channels do
   @doc """
   Counts unread messages for a session in a channel.
   """
+  def count_unread_messages(_channel_id, nil), do: 0
+
   def count_unread_messages(channel_id, session_id) do
     alias EyeInTheSky.Messages.Message
 

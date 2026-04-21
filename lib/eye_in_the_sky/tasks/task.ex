@@ -44,6 +44,8 @@ defmodule EyeInTheSky.Tasks.Task do
     has_many :checklist_items, EyeInTheSky.Tasks.ChecklistItem,
       preload_order: [asc: :position, asc: :id]
 
+    field :created_by_session_id, :integer
+
     field :created_at, :utc_datetime_usec
     field :updated_at, :utc_datetime_usec
 
@@ -72,6 +74,7 @@ defmodule EyeInTheSky.Tasks.Task do
       :due_at,
       :completed_at,
       :archived,
+      :created_by_session_id,
       :created_at,
       :updated_at
     ])

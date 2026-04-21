@@ -220,6 +220,7 @@ defmodule EyeInTheSkyWeb.Router do
     delete "/tasks/:id", TaskController, :delete
     post "/tasks/:id/annotations", TaskController, :annotate
     post "/tasks/:id/complete", TaskController, :complete
+    post "/tasks/:id/claim", TaskController, :claim
     post "/tasks/:id/sessions", TaskController, :link_session
     get "/tasks/:id/sessions", TaskController, :list_sessions
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session

@@ -63,6 +63,13 @@ def handle_params(_params, _url, socket)
 
 ## Keyboard Shortcuts & Controls
 
+### Global Keyboard Handling
+Keyboard events are managed via the `GlobalKeydown` hook registered in `assets/js/app.js`. This centralized hook:
+- Listens for keyboard events at the window level
+- Routes commands to appropriate handlers (canvas tab navigation, viewport panning, window minimization)
+- Prevents duplicate handling across multiple pages (canvas, DM, etc.)
+- Previously, CanvasLive had a catch-all event handler; now canvas-specific keydown events are handled by `GlobalKeydown` hook instead with explicit logging of unhandled events
+
 ### Keyboard Shortcuts Help
 - **`?` key** — Toggle keyboard shortcuts help panel. Lazily creates modal overlay listing all canvas shortcuts. Escape or backdrop click closes; input fields guarded so typing in search boxes doesn't trigger.
 
@@ -113,13 +120,42 @@ subscribe_all(session_ids)  # Subscribe to events for all canvas sessions
 ```
 
 **Event handlers for real-time updates:**
-- `{:new_dm, message}` — Message received in a canvas session
+- `{:new_message, message}` — New message received in canvas session; calls `refresh_window` to update chat window
+- `{:new_dm, message}` — Direct message received in a canvas session
 - `{:claude_response, _ref, parsed}` — Agent response received
 - `{:session_status, session_id, status}` — Session status changed (working → stopped)
 - `{:remove_canvas_window, cs_id}` — Remote signal to close a window (e.g., session cleanup)
 - `{:canvas_session_added, session_id}` — Session added to canvas; updates session list and badge counts
 
 When events arrive, the handler calls `send_update/3` to update the `ChatWindowComponent` for that canvas session, keeping UI synchronized without full page refresh.
+
+## JavaScript Hooks
+
+### Canvas Layout Hook
+- **File:** `assets/js/hooks/canvas_layout_hook.js`
+- **Purpose:** Manages preset layout buttons (2up, 4up) and localStorage persistence
+- **Exports:**
+  - `saveWindowLayout(csId, x, y, w, h, z)` — Persists window position, size, and optionally z-index to localStorage
+  - `loadWindowLayout(csId)` — Retrieves saved layout from localStorage
+  - `saveWindowZ(csId, z)` — Saves z-index separately (used when only stacking order changes)
+- **Events:** Dispatches `canvas:layout-applied` custom event to notify ChatWindowHook of preset layout application
+
+### Chat Window Hook
+- **File:** `assets/js/hooks/chat_window_hook.js`
+- **Purpose:** Handles window drag, resize, focus, minimize/maximize, and snap-to-edge detection
+- **Lifecycle:**
+  - On mount: Loads position/size/z-index from localStorage and dispatches layout-applied event listener
+  - During drag: Saves position to localStorage with 50ms debounce
+  - During resize: Saves dimensions to localStorage with 400ms debounce
+  - On focus/blur: Saves z-index to localStorage
+- **Snap zones:** Configurable threshold (40px) for edge snapping; snap zones detected based on cursor proximity to viewport edges
+- **Instance variables:** Maintains `_width`, `_height`, `_dragLeft`, `_dragTop`, `_zIndex` to track window state; these are synced when layout buttons are applied
+
+### Global Keydown Hook
+- **File:** `assets/js/hooks/global_keydown.js`
+- **Purpose:** Centralized keyboard event handling across all pages
+- **Registration:** Added to `Hooks` object in `assets/js/app.js`
+- **Prevents:** Duplicate keyboard handling in individual LiveViews (canvas, DM, etc.)
 
 ## Component Integration
 
@@ -129,7 +165,7 @@ When events arrive, the handler calls `send_update/3` to update the `ChatWindowC
 - **Props:** `canvas_session` (struct with pos_x, pos_y, width, height, session_id)
 - **Events:** Emits `window_moved`, `window_resized`, `remove_window`, `raise_window` to parent `CanvasLive`
 - **Updates:** Receives `send_update` calls from PubSub event handlers to re-render with latest message
-- **Message rendering:** Delegates to shared `DmMessageComponents.message_body/1` and `tool_result_body/1` with `compact` and `extra_id` attrs so the same components render both the DM page (default sizing) and canvas chat window (compact). Private duplicates in `MessagesTab` and `ChatWindowComponent` were removed in commit 10d75ff3.
+- **Message rendering:** Uses DM-style message display with provider icons, sender name, model badge, timestamp, markdown via MarkdownMessage hook, tool call widgets, thinking section, and tool result output blocks. Matches DM page styling for consistent message presentation.
 - **Status indicator:** Session status dot uses `status_dot_class` with classes for all states: working (primary color with pulse animation), completed, failed, and idle.
 - **Focus ring:** Active window shows visible focus ring to indicate interaction target.
 - **Scroll behavior:** ChatWindowHook owns all scroll behavior. Auto-scroll enabled by default; disabled when user scrolls up and shows unread message count pill. Clicking pill re-enables auto-scroll and jumps to bottom. Automatically scrolls to bottom when user sends new message.
@@ -194,13 +230,28 @@ This extracted module handles canvas-related events fired from the **AgentLive**
    - CanvasLive.handle_event removes session and unsubscribes
    - Session remains in database; only canvas link removed
 
-### Window Position Persistence
+### Window Position & Z-Index Persistence
 
+**Database Storage:**
 Window layout (x, y, width, height) is stored in the `canvas_sessions` join table:
 - `pos_x`, `pos_y` — Top-left corner offset (pixels)
 - `width`, `height` — Window dimensions
 
 When canvas is activated, positions are restored from database. If both are 0, a cascade layout is applied (each window offset by `24 + i*32` pixels) to avoid stack overlap.
+
+**localStorage Persistence:**
+In addition to database persistence, window layout and z-index are persisted to browser localStorage for immediate restoration across sessions:
+- **Position & size**: `canvas_layout_hook.js` provides `saveWindowLayout(csId, x, y, w, h)` and `loadWindowLayout(csId)` functions that store layout in `cw_{csId}` localStorage entry
+- **Z-index**: `saveWindowZ(csId, z)` persists window stacking order alongside layout data
+- **Restoration**: `ChatWindowHook` loads saved layout and z-index on mount, restoring windows to their last-known state
+- **Sync events**: When layout buttons (2up, 4up) apply preset positions, a `canvas:layout-applied` custom event is dispatched so ChatWindowHook can sync its instance variables (width, height, drag position)
+- **Drag/Resize debounce**: Window moves and resizes are debounced before localStorage save (50ms for move, 400ms for resize) to avoid excessive writes
+
+**Z-Index Lifecycle:**
+- **Mount**: Restored from localStorage if available, otherwise defaults to "1"
+- **Focus**: When user clicks window or tab to focus, z-index updates to "20" and is persisted
+- **Minimize/Maximize**: Z-index saved when toggling window state
+- **Other windows**: When a window is focused, all other windows reset to z-index "1" and are persisted
 
 ## Navigation Flow
 

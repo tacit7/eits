@@ -37,9 +37,13 @@ defmodule EyeInTheSky.Channels do
     include_archived = Keyword.get(opts, :include_archived, false)
 
     query =
-      from c in Channel,
-        where: c.project_id == ^project_id or is_nil(c.project_id),
-        order_by: [asc: c.inserted_at]
+      if is_nil(project_id) do
+        from c in Channel, order_by: [asc: c.inserted_at]
+      else
+        from c in Channel,
+          where: c.project_id == ^project_id or is_nil(c.project_id),
+          order_by: [asc: c.inserted_at]
+      end
 
     query =
       if include_archived do

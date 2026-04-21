@@ -259,8 +259,10 @@ defmodule EyeInTheSky.Tasks do
           |> Repo.one()
 
         if is_nil(locked_state), do: Repo.rollback(:task_not_found)
-        # Reject any state that is not To Do — Done and In Review tasks must not be silently reset
-        if locked_state != todo_id, do: Repo.rollback(:already_claimed)
+        # Reject In Progress tasks as a duplicate claim attempt
+        if locked_state == in_progress_id, do: Repo.rollback(:already_claimed)
+        # Reject Done/In Review — claiming them would silently regress their state
+        if locked_state != todo_id, do: Repo.rollback(:task_not_claimable)
 
         Repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
         Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])

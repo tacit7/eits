@@ -106,12 +106,12 @@ eits sessions update "$SESSION_ID" --status "working" >/dev/null 2>&1 &
 # Drain pending annotations that failed (429) in a previous session.
 # Uses direct curl (not eits tasks annotate) to avoid triggering the pending-log
 # fallback inside annotate — that would double-write failed entries.
-# Uses a lockfile so concurrent session startups do not race on the same .processing file.
+# Uses mkdir as a portable lock (atomic on macOS + Linux; flock is Linux-only).
 _PENDING_LOG="${HOME}/.eits/pending-annotations.log"
-_DRAIN_LOCK="${HOME}/.eits/pending-annotations.lock"
+_DRAIN_LOCK_DIR="${HOME}/.eits/pending-annotations.lock.d"
 if [ -f "$_PENDING_LOG" ] && [ -s "$_PENDING_LOG" ]; then
-  (
-    flock -n 9 || exit 0  # another startup is already draining; skip
+  if mkdir "$_DRAIN_LOCK_DIR" 2>/dev/null; then
+    trap 'rmdir "$_DRAIN_LOCK_DIR" 2>/dev/null' EXIT
     _log "draining pending annotations from $_PENDING_LOG"
     echo "[EITS] startup: draining pending annotations" >&2
     _tmp_log="${_PENDING_LOG}.processing.$$"
@@ -148,7 +148,11 @@ if [ -f "$_PENDING_LOG" ] && [ -s "$_PENDING_LOG" ]; then
     if [ ${#_failed_lines[@]} -gt 0 ]; then
       printf '%s\n' "${_failed_lines[@]}" >> "$_PENDING_LOG"
     fi
-  ) 9>"$_DRAIN_LOCK"
+    rmdir "$_DRAIN_LOCK_DIR" 2>/dev/null
+    trap - EXIT
+  else
+    _log "drain skipped: another session startup is already draining"
+  fi
 fi
 
 # Build project type string

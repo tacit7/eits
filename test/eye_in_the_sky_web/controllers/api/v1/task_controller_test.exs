@@ -690,16 +690,29 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       {:ok, task_after_first} = Tasks.get_task(task.id)
       assert {:ok, _} = Tasks.claim_task(task_after_first, session_a.id)
 
-      # Task is now In Progress — a second claim must be rejected to prevent
-      # silent state regressions on Done/In Review tasks.
       {:ok, task_after_second_pre} = Tasks.get_task(task.id)
       assert {:error, :already_claimed} = Tasks.claim_task(task_after_second_pre, session_b.id)
 
-      # session_a's ownership is preserved
       linked_ids =
         Repo.all(from ts in "task_sessions", where: ts.task_id == ^task.id, select: ts.session_id)
 
       assert linked_ids == [session_a.id]
+    end
+
+    test "claim on a Done task returns task_not_claimable", %{conn: _conn} do
+      task = create_task(%{state_id: 3})
+      session = new_session()
+
+      {:ok, loaded} = Tasks.get_task(task.id)
+      assert {:error, :task_not_claimable} = Tasks.claim_task(loaded, session.id)
+    end
+
+    test "claim on an In Review task returns task_not_claimable", %{conn: _conn} do
+      task = create_task(%{state_id: 4})
+      session = new_session()
+
+      {:ok, loaded} = Tasks.get_task(task.id)
+      assert {:error, :task_not_claimable} = Tasks.claim_task(loaded, session.id)
     end
   end
 end

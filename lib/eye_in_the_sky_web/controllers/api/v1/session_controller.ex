@@ -115,6 +115,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
       |> Helpers.maybe_put(:name, params["name"])
       |> Helpers.maybe_put(:description, params["description"])
+      |> Helpers.maybe_put(:project_id, parse_int(params["project_id"], nil))
       |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
 
     attrs =

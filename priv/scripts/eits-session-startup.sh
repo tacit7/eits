@@ -100,8 +100,10 @@ if [ -n "$GIT_DIR" ]; then
   _log "wrote git files"
 fi
 
-# Mark session as working
-eits sessions update "$SESSION_ID" --status "working" >/dev/null 2>&1 &
+# Mark session as working and patch project_id so workers can resolve the path
+_update_args=(--status "working")
+[ -n "$PROJECT_ID" ] && _update_args+=(--project-id "$PROJECT_ID")
+eits sessions update "$SESSION_ID" "${_update_args[@]}" >/dev/null 2>&1 &
 
 # Drain pending annotations that failed (429) in a previous session.
 # Uses direct curl (not eits tasks annotate) to avoid triggering the pending-log

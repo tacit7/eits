@@ -8,7 +8,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
 
   require Logger
 
-  alias EyeInTheSky.{Agents, Sessions}
+  alias EyeInTheSky.{Agents, Projects, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
 
   @registry EyeInTheSky.Claude.AgentRegistry
@@ -78,6 +78,12 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
       agent.project && agent.project.path ->
         {:ok, agent.project.path}
 
+      session.project_id ->
+        lookup_project_path(session.project_id, "session.project_id", session.id)
+
+      agent.project_id ->
+        lookup_project_path(agent.project_id, "agent.project_id", session.id)
+
       true ->
         Logger.error(
           "resolve_project_path: no path for session.id=#{session.id}; " <>
@@ -86,6 +92,20 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
             "project.path=#{inspect(if agent.project, do: agent.project.path)}"
         )
 
+        {:error, :missing_project_path}
+    end
+  end
+
+  defp lookup_project_path(project_id, source, session_id) do
+    case Projects.get_project(project_id) do
+      {:ok, %{path: path}} when not is_nil(path) ->
+        Logger.info(
+          "resolve_project_path: resolved via #{source}=#{project_id} for session.id=#{session_id}"
+        )
+
+        {:ok, path}
+
+      _ ->
         {:error, :missing_project_path}
     end
   end

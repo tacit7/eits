@@ -248,6 +248,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           navigate={"/projects/#{@sidebar_project.id}/kanban"}
           class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors"
         >Kanban</.link>
+      <% else %>
+        <span
+          class="text-xs text-base-content/20 cursor-default"
+          title="Select a project to view Kanban"
+        >Kanban</span>
       <% end %>
     </div>
 
@@ -257,7 +262,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         name="value"
         value={@task_search}
         placeholder="Search tasks…"
-        phx-change="update_task_search"
+        phx-keyup="update_task_search"
         phx-target={@myself}
         phx-debounce="300"
         class="flex-1 bg-base-200 text-xs text-base-content/80 placeholder-base-content/30 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary/40 min-w-0"
@@ -294,7 +299,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <.task_row :for={t <- @tasks} task={t} />
 
     <%= if @tasks == [] do %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No tasks</div>
+      <% filtering = @task_search != "" or not is_nil(@state_filter) %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">
+        {if filtering, do: "No matching tasks", else: "No tasks"}
+      </div>
     <% end %>
 
     """

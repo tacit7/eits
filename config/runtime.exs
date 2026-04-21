@@ -36,7 +36,7 @@ if vapid_private = get_env.("VAPID_PRIVATE_KEY") do
     public_key: get_env.("VAPID_PUBLIC_KEY"),
     private_key: vapid_private
 else
-  if config_env() == :prod do
+  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
     raise "VAPID_PRIVATE_KEY environment variable is required in production"
   end
 end
@@ -75,7 +75,7 @@ end
 if webauthn_origin = get_env.("WEBAUTHN_ORIGIN") do
   config :wax_, origin: webauthn_origin
 else
-  if config_env() == :prod do
+  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
     raise """
     environment variable WEBAUTHN_ORIGIN is missing.
     Set it to your app's origin, e.g.: https://eits.dev
@@ -88,7 +88,7 @@ end
 if webauthn_rp_id = get_env.("WEBAUTHN_RP_ID") do
   config :wax_, rp_id: webauthn_rp_id
 else
-  if config_env() == :prod do
+  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
     raise """
     environment variable WEBAUTHN_RP_ID is missing.
     Set it to your app's RP ID (the registrable domain), e.g.: eits.dev
@@ -135,6 +135,7 @@ if config_env() == :prod do
   ssl_opts =
     case System.get_env("DATABASE_SSL_VERIFY") do
       "none" -> [verify: :verify_none]
+      "false" -> false
       _ -> [verify: :verify_peer, cacerts: :public_key.cacerts_get(), customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]]
     end
 
@@ -173,9 +174,14 @@ if config_env() == :prod do
 
   allowed_origins = ["//#{host}" | extra_origins]
 
+  # Tauri desktop (DISABLE_AUTH=true): WKWebView may omit the Origin header on
+  # WebSocket upgrades. Disable origin checking so LiveView socket connects.
+  check_origin =
+    if get_env.("DISABLE_AUTH") in ~w(true 1), do: false, else: allowed_origins
+
   config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
-    check_origin: allowed_origins,
+    check_origin: check_origin,
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.

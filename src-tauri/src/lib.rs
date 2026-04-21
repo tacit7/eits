@@ -138,6 +138,17 @@ pub fn run() {
                 }
             })?;
 
+            // --- Global shortcut: Cmd+Option+I to open Web Inspector ---
+            let devtools_shortcut = "CmdOrCtrl+Alt+I".parse::<Shortcut>()?;
+            let app_handle_devtools = app.handle().clone();
+            app.global_shortcut().on_shortcut(devtools_shortcut, move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    if let Some(window) = app_handle_devtools.get_webview_window("main") {
+                        window.open_devtools();
+                    }
+                }
+            })?;
+
             // --- Deep links: eits://... URLs routed into the main webview ---
             let app_handle_dl = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
@@ -261,6 +272,7 @@ fn create_window(app_handle: &tauri::AppHandle) {
     .title("Eye in the Sky")
     .inner_size(1280.0, 800.0)
     .visible(false)
+    .devtools(true)
     .build()
     .unwrap();
 
@@ -370,6 +382,25 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         command.env("PORT", "5050");
         command.env("DISABLE_AUTH", "true");
         command.env("BYPASS_AUTH", "true");
+        // Disable SSL for local Postgres — bundled ERTS has no OpenSSL.
+        command.env("DATABASE_SSL_VERIFY", "false");
+        // Prevent Phoenix from redirecting http://localhost:5050 → https://
+        // WKWebView would get a redirect loop if force_ssl is active.
+        command.env("PHX_DISABLE_FORCE_SSL", "1");
+
+        // Required by runtime.exs in prod — raises if absent.
+        // For the desktop app: DATABASE_URL points to local Postgres,
+        // SECRET_KEY_BASE is a stable desktop-only secret (not web-facing).
+        if std::env::var("DATABASE_URL").is_err() {
+            command.env("DATABASE_URL", "postgres://postgres:postgres@localhost/eits_dev?sslmode=disable");
+        }
+        if std::env::var("SECRET_KEY_BASE").is_err() {
+            command.env(
+                "SECRET_KEY_BASE",
+                "bnsVqob9r8+zpVEcTxUEWHIamQVlRwx2xBgVP56XZAWIUJDTGAiG/WxzD7twxmPN7c2aaaaf50e1f72b3653c8f33bc1b3239e318214ceed08588536f5e62526b9dc405154507082f8caa48786531104ba0a8b66a9ffd7b3148e36649db0c28a1e3e",
+            );
+        }
+
         command
     }
 }

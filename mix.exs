@@ -12,7 +12,13 @@ defmodule EyeInTheSky.MixProject do
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader],
-      releases: [eye_in_the_sky: [validate_compile_env: false]]
+      releases: [
+        eye_in_the_sky: [
+          validate_compile_env: false,
+          steps: [:assemble, &maybe_codesign/1],
+          entitlements: "#{__DIR__}/src-tauri/Entitlements.plist"
+        ]
+      ]
     ]
   end
 
@@ -91,6 +97,17 @@ defmodule EyeInTheSky.MixProject do
   #     $ mix setup
   #
   # See the documentation for `Mix` for more info on aliases.
+  # Only codesign when APPLE_SIGNING_IDENTITY is set.
+  # In local dev/CI without a certificate, skip silently.
+  # In CI with a certificate, set APPLE_SIGNING_IDENTITY to run codesign.
+  defp maybe_codesign(release) do
+    if System.get_env("APPLE_SIGNING_IDENTITY") do
+      ElixirKit.Release.codesign(release)
+    else
+      release
+    end
+  end
+
   defp aliases do
     [
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],

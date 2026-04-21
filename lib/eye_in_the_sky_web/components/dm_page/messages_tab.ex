@@ -25,7 +25,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           id="messages-container"
           phx-hook="AutoScroll"
           data-has-more={if @has_more_messages, do: "true", else: "false"}
-          style="scrollbar-width: none; -ms-overflow-style: none;"
+          style="scrollbar-width: none; -ms-overflow-style: none; overflow-anchor: none;"
         >
           <%= if @messages == [] do %>
             <div class="flex flex-col items-center justify-center h-full py-20 text-center select-none">
@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               </div>
             <% end %>
             <%!-- Scroll anchor: keeps list pinned to bottom on resize (keyboard open/close) --%>
-            <div id="messages-scroll-anchor" style="overflow-anchor: auto; height: 1px;"></div>
+            <div id="messages-scroll-anchor" style="height: 1px;"></div>
           <% end %>
         </div>
       </div>

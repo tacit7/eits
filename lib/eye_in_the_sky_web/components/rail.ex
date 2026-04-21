@@ -291,36 +291,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           {project_initial(@sidebar_project)}
         </button>
 
-        <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="hero-cpu-chip" label="Sessions" myself={@myself} />
-        <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-clipboard-document-list" label="Tasks" myself={@myself} />
-        <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-right" label="Prompts" myself={@myself} />
-        <%= if @sidebar_tab == :chat do %>
-          <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
-        <% else %>
-          <.link
-            navigate="/chat"
-            title="Chat"
-            aria-label="Chat"
-            class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"
-          >
-            <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4" />
-          </.link>
-        <% end %>
-        <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Notes" myself={@myself} />
+        <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-robot" label="Sessions" myself={@myself} />
+        <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-check-circle" label="Tasks" myself={@myself} />
+        <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Prompts" myself={@myself} />
+        <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
+        <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-pencil-square" label="Notes" myself={@myself} />
         <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
         <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
-        <%= if @sidebar_tab in [:canvas, :canvases] do %>
-          <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
-        <% else %>
-          <.link
-            navigate="/canvases"
-            title="Canvas"
-            aria-label="Canvas"
-            class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"
-          >
-            <.icon name="hero-squares-2x2" class="w-4 h-4" />
-          </.link>
-        <% end %>
+        <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
 
         <div class="flex-1" />
 
@@ -392,7 +370,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         )
       ]}
     >
-      <.icon name={@icon} class="w-4 h-4" />
+      <%= if @icon == "lucide-robot" do %>
+        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 8V4H8"/>
+          <rect width="16" height="12" x="4" y="8" rx="2"/>
+          <path d="M2 14h2"/>
+          <path d="M20 14h2"/>
+          <path d="M15 13v2"/>
+          <path d="M9 13v2"/>
+        </svg>
+      <% else %>
+        <.icon name={@icon} class="w-4 h-4" />
+      <% end %>
     </button>
     """
   end

@@ -51,7 +51,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         sidebar_project: nil,
         sidebar_tab: :sessions,
         active_channel_id: nil,
-        flyout_canvases: []
+        flyout_canvases: [],
+        session_filter_open: false,
+        session_sort: :last_activity,
+        session_name_filter: ""
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
@@ -107,7 +110,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     # fire a Sessions.list_sessions_filtered query on each page.
     socket =
       if sidebar_project != previous_project do
-        assign(socket, :flyout_sessions, load_flyout_sessions(sidebar_project))
+        assign(socket, :flyout_sessions, load_flyout_sessions(sidebar_project, socket.assigns.session_sort, socket.assigns.session_name_filter))
       else
         socket
       end
@@ -143,7 +146,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> assign(:flyout_open, true)
        |> assign(:mobile_open, true)
        |> assign(:proj_picker_open, false)
-       |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project))
+       |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project, socket.assigns.session_sort, socket.assigns.session_name_filter))
        |> maybe_load_channels(section, socket.assigns.sidebar_project)
        |> maybe_load_canvases(section)}
     end
@@ -171,7 +174,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
     socket3 =
       if new_project != previous_project do
-        assign(socket2, :flyout_sessions, load_flyout_sessions(new_project))
+        assign(socket2, :flyout_sessions, load_flyout_sessions(new_project, socket2.assigns.session_sort, socket2.assigns.session_name_filter))
       else
         socket2
       end
@@ -212,6 +215,20 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("set_bookmark", params, socket),
     do: ProjectActions.handle_set_bookmark(params, socket)
 
+  def handle_event("toggle_session_filter", _params, socket),
+    do: {:noreply, assign(socket, :session_filter_open, !socket.assigns.session_filter_open)}
+
+  def handle_event("set_session_sort", %{"sort" => sort_str}, socket) do
+    sort = parse_session_sort(sort_str)
+    sessions = load_flyout_sessions(socket.assigns.sidebar_project, sort, socket.assigns.session_name_filter)
+    {:noreply, socket |> assign(:session_sort, sort) |> assign(:flyout_sessions, sessions)}
+  end
+
+  def handle_event("update_session_name_filter", %{"value" => value}, socket) do
+    sessions = load_flyout_sessions(socket.assigns.sidebar_project, socket.assigns.session_sort, value)
+    {:noreply, socket |> assign(:session_name_filter, value) |> assign(:flyout_sessions, sessions)}
+  end
+
   @impl true
   def handle_async(:pick_folder, {:ok, result}, socket),
     do: ProjectActions.handle_pick_folder(result, socket)
@@ -224,9 +241,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp parse_section(_), do: :sessions
 
-  defp load_flyout_sessions(project) do
-    opts = [limit: 15, status_filter: "all"]
+  defp load_flyout_sessions(project, sort \\ :last_activity, name_filter \\ "") do
+    opts = [limit: 15, status_filter: "all", sort_by: sort]
     opts = if project, do: Keyword.put(opts, :project_id, project.id), else: opts
+    opts = if name_filter != "", do: Keyword.put(opts, :name_filter, name_filter), else: opts
 
     case Sessions.list_sessions_filtered(opts) do
       sessions when is_list(sessions) -> sessions
@@ -234,6 +252,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       _ -> []
     end
   end
+
+  defp parse_session_sort("created"), do: :created
+  defp parse_session_sort("name"), do: :name
+  defp parse_session_sort(_), do: :last_activity
 
   @impl true
   def render(assigns) do
@@ -333,6 +355,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_sessions={@flyout_sessions}
         flyout_channels={@flyout_channels}
         flyout_canvases={@flyout_canvases}
+        session_filter_open={@session_filter_open}
+        session_sort={@session_sort}
+        session_name_filter={@session_name_filter}
         notification_count={@notification_count}
         myself={@myself}
       />

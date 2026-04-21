@@ -12,6 +12,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_sessions, :list, default: []
   attr :flyout_channels, :list, default: []
   attr :flyout_canvases, :list, default: []
+  attr :session_filter_open, :boolean, default: false
+  attr :session_sort, :atom, default: :last_activity
+  attr :session_name_filter, :string, default: ""
   attr :notification_count, :integer, default: 0
   attr :myself, :any, required: true
 
@@ -48,7 +51,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         <div class="flex-1 overflow-y-auto py-1">
           <%= case @active_section do %>
             <% :sessions -> %>
-              <.sessions_content sessions={@flyout_sessions} sidebar_project={@sidebar_project} />
+              <.sessions_content
+                sessions={@flyout_sessions}
+                sidebar_project={@sidebar_project}
+                filter_open={@session_filter_open}
+                sort={@session_sort}
+                name_filter={@session_name_filter}
+                myself={@myself}
+              />
             <% :tasks -> %>
               <.nav_links project={@sidebar_project} section={:tasks} />
             <% :prompts -> %>
@@ -74,9 +84,56 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
-  # Sessions flyout: real data with status dots
+  # Sessions flyout: real data with status dots and filter bar
+  attr :sessions, :list, required: true
+  attr :sidebar_project, :any, default: nil
+  attr :filter_open, :boolean, default: false
+  attr :sort, :atom, default: :last_activity
+  attr :name_filter, :string, default: ""
+  attr :myself, :any, required: true
+
   defp sessions_content(assigns) do
     ~H"""
+    <%!-- Filter toggle bar --%>
+    <div class="px-3 py-2 border-b border-base-content/8 flex items-center gap-2">
+      <input
+        type="text"
+        name="value"
+        value={@name_filter}
+        placeholder="Filter by name…"
+        phx-change="update_session_name_filter"
+        phx-target={@myself}
+        phx-debounce="300"
+        class="flex-1 bg-base-200 text-xs text-base-content/80 placeholder-base-content/30 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary/40 min-w-0"
+      />
+      <button
+        phx-click="toggle_session_filter"
+        phx-target={@myself}
+        title="Sort options"
+        class={[
+          "w-6 h-6 flex items-center justify-center rounded transition-colors flex-shrink-0",
+          if(@filter_open or @sort != :last_activity,
+            do: "text-primary bg-primary/10",
+            else: "text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8"
+          )
+        ]}
+      >
+        <.icon name="hero-bars-arrow-down-mini" class="w-3.5 h-3.5" />
+      </button>
+    </div>
+
+    <%!-- Sort popup --%>
+    <%= if @filter_open do %>
+      <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
+        <div class="text-[9px] font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">Sort by</div>
+        <div class="flex flex-col gap-0.5">
+          <.sort_option label="Last activity" value="last_activity" current={@sort} myself={@myself} />
+          <.sort_option label="Created" value="created" current={@sort} myself={@myself} />
+          <.sort_option label="Name" value="name" current={@sort} myself={@myself} />
+        </div>
+      </div>
+    <% end %>
+
     <% active = Enum.filter(@sessions, &(&1.status in ["working", "waiting"])) %>
     <% stopped = Enum.filter(@sessions, &(&1.status not in ["working", "waiting"])) %>
 
@@ -106,6 +163,31 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         View all &rarr;
       </.link>
     </div>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :value, :string, required: true
+  attr :current, :atom, required: true
+  attr :myself, :any, required: true
+
+  defp sort_option(assigns) do
+    ~H"""
+    <button
+      phx-click="set_session_sort"
+      phx-value-sort={@value}
+      phx-target={@myself}
+      class={[
+        "flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded transition-colors",
+        if(to_string(@current) == @value,
+          do: "text-primary bg-primary/10 font-medium",
+          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/8"
+        )
+      ]}
+    >
+      <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", if(to_string(@current) == @value, do: "bg-primary", else: "bg-transparent")]} />
+      {@label}
+    </button>
     """
   end
 

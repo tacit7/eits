@@ -40,12 +40,21 @@ defmodule EyeInTheSky.Sessions.Queries do
     project_id = Keyword.get(opts, :project_id, nil)
     agent_id = Keyword.get(opts, :agent_id, nil)
 
+    sort_by = Keyword.get(opts, :sort_by, :last_activity)
+
+    order =
+      case sort_by do
+        :created -> [desc: :started_at]
+        :name -> [asc_nulls_last: :name]
+        _ -> [desc_nulls_last: :last_activity_at, desc: :started_at]
+      end
+
     base_query =
       from s in Session,
         join: a in assoc(s, :agent),
         left_join: ad in assoc(a, :agent_definition),
         preload: [agent: {a, agent_definition: ad}],
-        order_by: [desc_nulls_last: s.last_activity_at, desc: s.started_at],
+        order_by: ^order,
         limit: ^limit,
         offset: ^offset
 

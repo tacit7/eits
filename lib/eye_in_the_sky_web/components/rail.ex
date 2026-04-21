@@ -380,14 +380,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
         <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-robot" label="Sessions" myself={@myself} />
         <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-check-circle" label="Tasks" myself={@myself} />
-        <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Prompts" myself={@myself} />
-        <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
         <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-pencil-square" label="Notes" myself={@myself} />
         <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
         <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
-        <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
-        <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
         <.rail_item section={:jobs} active_section={@active_section} flyout_open={@flyout_open} icon="hero-clock" label="Jobs" myself={@myself} />
+        <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
+        <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Prompts" myself={@myself} />
+        <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
+        <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
 
         <div class="flex-1" />
 

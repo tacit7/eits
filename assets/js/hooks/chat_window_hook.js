@@ -361,15 +361,15 @@ export const ChatWindowHook = {
     }
 
     // When the user sends a message, always scroll to bottom regardless of
-    // where they were scrolled. The _autoScroll flag may be stale if they
-    // scrolled up at any point while reading — reset it on submit.
-    const chatForm = this.el.querySelector("[data-chat-footer] form")
-    if (chatForm) {
-      chatForm.addEventListener("submit", () => {
+    // where they were scrolled. Use event delegation on this.el (never
+    // replaced by LiveView patches) rather than the <form> element directly,
+    // which morphdom may swap out after each re-render, detaching the listener.
+    this.el.addEventListener("submit", (e) => {
+      if (e.target.closest("[data-chat-footer]")) {
         setAutoScroll(true)
         requestAnimationFrame(() => scrollToBottom())
-      })
-    }
+      }
+    })
 
     this.handleEvent("messages-updated-" + this.el.dataset.csId, () => {
       if (this._minimized) {

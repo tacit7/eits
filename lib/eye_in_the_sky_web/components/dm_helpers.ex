@@ -32,13 +32,42 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   def message_sender_name(message), do: message.provider || "Agent"
 
   def strip_dm_prefix(body) when is_binary(body) do
-    case Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\) (.+)$/s, body) do
-      [_, content] -> content
+    case Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\)\s*(.*)$/s, body) do
+      [_, content] -> String.trim(content)
       _ -> body
     end
   end
 
   def strip_dm_prefix(body), do: body
+
+  def parse_dm_info(body) when is_binary(body) do
+    case Regex.run(~r/^DM from:([^\(]+)\(session:[^\)]+\)\s*(.*)/s, body) do
+      [_, sender, rest] ->
+        rest = String.trim(rest)
+        {status, url} = extract_dm_status_and_url(rest)
+        %{sender: String.trim(sender), status: status, url: url}
+
+      _ ->
+        nil
+    end
+  end
+
+  def parse_dm_info(_), do: nil
+
+  defp extract_dm_status_and_url(text) do
+    cond do
+      match = Regex.run(~r/(?:^|\s)(done|completed|failed|error):\s*(https?:\/\/\S+)/i, text) ->
+        [_, status, url] = match
+        {String.downcase(status), url}
+
+      match = Regex.run(~r/(https?:\/\/\S+)/, text) ->
+        [_, url] = match
+        {nil, url}
+
+      true ->
+        {nil, nil}
+    end
+  end
 
   def show_message_metrics?(message) do
     message.sender_role == "agent" and is_map(message.metadata) and

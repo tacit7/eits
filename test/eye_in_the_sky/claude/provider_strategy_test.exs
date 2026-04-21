@@ -143,7 +143,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
 
       assert prompt =~ "EITS_SESSION_UUID=abc-def"
       assert prompt =~ "EITS_SESSION_ID=100"
-      assert prompt =~ "EITS_AGENT_UUID=50"
+      assert prompt =~ "EITS_AGENT_ID=50"
       assert prompt =~ "EITS_PROJECT_ID=3"
     end
   end

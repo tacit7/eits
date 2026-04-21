@@ -57,7 +57,7 @@ defmodule EyeInTheSky.Codex.SDK do
     EITS context:
     - EITS_SESSION_UUID=#{state.eits_session_uuid}
     - EITS_SESSION_ID=#{state.session_id}
-    - EITS_AGENT_UUID=#{state.agent_id}
+    - EITS_AGENT_ID=#{state.agent_id}
     - EITS_PROJECT_ID=#{state.project_id}
 
     Use the eits CLI script for all EITS operations:

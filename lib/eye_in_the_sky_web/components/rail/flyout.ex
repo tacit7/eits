@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_sessions, :list, default: []
   attr :flyout_channels, :list, default: []
   attr :flyout_canvases, :list, default: []
+  attr :flyout_teams, :list, default: []
   attr :session_filter_open, :boolean, default: false
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
@@ -70,7 +71,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :skills -> %>
               <.simple_link href="/skills" label="All Skills" icon="hero-bolt" />
             <% :teams -> %>
-              <.simple_link href="/teams" label="All Teams" icon="hero-users" />
+              <.teams_content teams={@flyout_teams} sidebar_project={@sidebar_project} />
             <% :canvas -> %>
               <.canvas_content canvases={@flyout_canvases} />
             <% :notifications -> %>
@@ -227,6 +228,38 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
+  # Teams flyout: list teams for the current project
+  attr :teams, :list, default: []
+  attr :sidebar_project, :any, default: nil
+
+  defp teams_content(assigns) do
+    ~H"""
+    <div class="px-3 pt-2 pb-1">
+      <.link
+        navigate="/teams"
+        class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
+      >
+        All Teams &rarr;
+      </.link>
+    </div>
+    <%= if @teams == [] do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No teams</div>
+    <% end %>
+    <%= for team <- @teams do %>
+      <.link
+        navigate="/teams"
+        class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+      >
+        <.icon name="hero-users" class="w-3 h-3 flex-shrink-0 text-base-content/30" />
+        <span class="truncate text-xs font-medium">{team.name}</span>
+        <span class="ml-auto text-[10px] text-base-content/30 flex-shrink-0">
+          {length(team.members)}
+        </span>
+      </.link>
+    <% end %>
+    """
+  end
+
   # Canvas flyout: canvases with their sessions
   attr :canvases, :list, default: []
 
@@ -252,18 +285,25 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         <span class="truncate font-medium text-xs">{canvas.name}</span>
       </.link>
       <%= for session <- canvas.sessions do %>
-        <.link
-          navigate={"/dm/#{session.id}"}
-          class="flex items-center gap-2 pl-7 pr-3 py-1 text-xs text-base-content/50 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
-        >
-          <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />
-          <span class="truncate flex-1">{session.name || "unnamed"}</span>
-          <img
-            src={canvas_provider_icon(session.provider)}
-            class={["w-3 h-3 flex-shrink-0 opacity-50", canvas_provider_icon_class(session.provider)]}
-            alt={session.provider || "agent"}
-          />
-        </.link>
+        <div class="flex items-center hover:bg-base-content/5 transition-colors group">
+          <.link
+            navigate={"/dm/#{session.id}"}
+            class="flex items-center gap-2 pl-7 py-1 flex-1 min-w-0 text-xs text-base-content/50 group-hover:text-base-content/80"
+          >
+            <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />
+            <span class="truncate">{session.name || "unnamed"}</span>
+          </.link>
+          <.link
+            navigate={"/dm/#{session.id}"}
+            class="flex-shrink-0 px-3 py-1 opacity-30 hover:opacity-80 transition-opacity"
+          >
+            <img
+              src={canvas_provider_icon(session.provider)}
+              class={["w-3.5 h-3.5", canvas_provider_icon_class(session.provider)]}
+              alt={session.provider || "agent"}
+            />
+          </.link>
+        </div>
       <% end %>
       <%= if canvas.sessions == [] do %>
         <div class="pl-7 pr-3 py-1 text-[10px] text-base-content/30">no sessions</div>

@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
 
-  alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, Sessions}
+  alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, Sessions, Teams}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
 
   @section_map %{
@@ -52,6 +52,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         sidebar_tab: :sessions,
         active_channel_id: nil,
         flyout_canvases: [],
+        flyout_teams: [],
         session_filter_open: false,
         session_sort: :last_activity,
         session_name_filter: ""
@@ -125,6 +126,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> assign(:mobile_open, false)
         |> maybe_load_channels(next_section, sidebar_project)
         |> maybe_load_canvases(next_section)
+        |> maybe_load_teams(next_section, sidebar_project)
       else
         socket
       end
@@ -148,7 +150,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> assign(:proj_picker_open, false)
        |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project, socket.assigns.session_sort, socket.assigns.session_name_filter))
        |> maybe_load_channels(section, socket.assigns.sidebar_project)
-       |> maybe_load_canvases(section)}
+       |> maybe_load_canvases(section)
+       |> maybe_load_teams(section, socket.assigns.sidebar_project)}
     end
   end
 
@@ -355,6 +358,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_sessions={@flyout_sessions}
         flyout_channels={@flyout_channels}
         flyout_canvases={@flyout_canvases}
+        flyout_teams={@flyout_teams}
         session_filter_open={@session_filter_open}
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
@@ -420,6 +424,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   defp maybe_load_canvases(socket, _section), do: socket
+
+  defp maybe_load_teams(socket, :teams, project) do
+    opts = if project, do: [project_id: project.id], else: []
+    teams = Teams.list_teams(opts)
+    assign(socket, :flyout_teams, teams)
+  end
+
+  defp maybe_load_teams(socket, _section, _project), do: socket
 
   # Load channels only when navigating to the :chat section — avoids a DB query on every page.
   defp maybe_load_channels(socket, :chat, project) do

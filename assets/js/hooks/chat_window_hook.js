@@ -324,6 +324,10 @@ export const ChatWindowHook = {
     if (chatBody) {
       scrollToBottom()
       chatBody.addEventListener("scroll", () => {
+        // Ignore scroll events that fire during a LiveView morphdom patch triggered
+        // by sending a message. The patch can drop scrollTop drastically, which
+        // looks like "user scrolled up" but isn't. updated() clears this flag.
+        if (this._sendingMessage) return
         const atBottom = chatBody.scrollTop + chatBody.clientHeight >= chatBody.scrollHeight - 10
         const scrolledUp = chatBody.scrollTop + chatBody.clientHeight < chatBody.scrollHeight - 20
         if (atBottom && !this._autoScroll) {
@@ -337,6 +341,7 @@ export const ChatWindowHook = {
     // Also track scroll state on the outer container — if chatBody collapses,
     // this.el becomes the visible scroll target and we need to detect up/down.
     this.el.addEventListener("scroll", () => {
+      if (this._sendingMessage) return
       const atBottom = this.el.scrollTop + this.el.clientHeight >= this.el.scrollHeight - 10
       const scrolledUp = this.el.scrollTop + this.el.clientHeight < this.el.scrollHeight - 20
       if (atBottom && !this._autoScroll) {
@@ -364,8 +369,14 @@ export const ChatWindowHook = {
     // where they were scrolled. Use event delegation on this.el (never
     // replaced by LiveView patches) rather than the <form> element directly,
     // which morphdom may swap out after each re-render, detaching the listener.
+    //
+    // We set _sendingMessage = true here so the scroll listeners ignore the
+    // scroll event that fires when LiveView's morphdom re-renders the message
+    // list and temporarily drops scrollTop. Without this, the drop is mis-read
+    // as "user scrolled up" and _autoScroll gets set to false.
     this.el.addEventListener("submit", (e) => {
       if (e.target.closest("[data-chat-footer]")) {
+        this._sendingMessage = true
         setAutoScroll(true)
         requestAnimationFrame(() => scrollToBottom())
       }
@@ -461,6 +472,25 @@ export const ChatWindowHook = {
     }
 
     if (this._minimized) this._applyMinimized()
+
+    // If a message send is in flight, clear the suppression flag and force
+    // _autoScroll back on. The morphdom patch may have dropped scrollTop (firing
+    // a spurious scroll event that set _autoScroll = false), so we reset here.
+    //
+    // Also scroll to bottom after ANY patch when auto-scroll is on — this handles
+    // streaming agent responses where each chunk re-renders the component but
+    // messages-updated is not fired (same last-message ID).
+    if (this._sendingMessage) {
+      this._sendingMessage = false
+      this._autoScroll = true
+    }
+    if (this._autoScroll && !this._minimized) {
+      requestAnimationFrame(() => {
+        const body = this.el.querySelector("[data-chat-body]")
+        if (body) body.scrollTop = body.scrollHeight
+        this.el.scrollTop = this.el.scrollHeight
+      })
+    }
   },
 
   destroyed() {

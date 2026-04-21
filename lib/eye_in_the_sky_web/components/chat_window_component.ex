@@ -230,10 +230,10 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
           <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
             <div class={[
-              "px-3 py-2 text-sm leading-snug break-words",
-              @role == :user && "bg-primary text-primary-content rounded-2xl rounded-br-sm",
-              @role == :agent && "bg-base-200 text-base-content rounded-2xl rounded-bl-sm",
-              @is_dm && "border border-primary/20"
+              "text-sm leading-snug break-words",
+              @role == :user && "px-3 py-2 bg-base-200 text-base-content rounded-2xl rounded-br-sm",
+              @role == :agent && "py-1 text-base-content/90",
+              @is_dm && @role == :user && "border border-primary/20"
             ]}>
               <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
             </div>

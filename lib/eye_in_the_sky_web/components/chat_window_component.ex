@@ -109,9 +109,8 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             <div class="flex items-center gap-1.5 px-1 pt-2 pb-1">
               <img
                 src={DmHelpers.provider_icon(@session.provider)}
-                class={["w-4 h-4 shrink-0", DmHelpers.provider_icon_class(@session.provider), "animate-spin"]}
+                class={["w-4 h-4 shrink-0", DmHelpers.provider_icon_class(@session.provider), "animate-pulse"]}
                 alt="working"
-                style="animation-duration: 2s;"
               />
             </div>
           <% end %>

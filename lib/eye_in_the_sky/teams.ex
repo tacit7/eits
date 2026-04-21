@@ -2,6 +2,7 @@ defmodule EyeInTheSky.Teams do
   @moduledoc false
   import Ecto.Query, warn: false
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Tasks.Task, as: EitsTask
   alias EyeInTheSky.Teams.{Team, TeamMember}
   alias EyeInTheSky.Utils.ToolHelpers
 
@@ -89,11 +90,37 @@ defmodule EyeInTheSky.Teams do
   # ── Members ────────────────────────────────────────────────
 
   def list_members(team_id) do
-    TeamMember
-    |> where([m], m.team_id == ^team_id)
-    |> preload([:agent, :session])
-    |> order_by([m], asc: m.joined_at)
-    |> Repo.all()
+    members =
+      TeamMember
+      |> where([m], m.team_id == ^team_id)
+      |> preload([:agent, :session])
+      |> order_by([m], asc: m.joined_at)
+      |> Repo.all()
+
+    attach_claimed_tasks(members)
+  end
+
+  defp attach_claimed_tasks([]), do: []
+
+  defp attach_claimed_tasks(members) do
+    session_ids = members |> Enum.map(& &1.session_id) |> Enum.reject(&is_nil/1)
+
+    task_by_session =
+      if session_ids == [] do
+        %{}
+      else
+        from(t in EitsTask,
+          join: ts in "task_sessions", on: ts.task_id == t.id,
+          where: ts.session_id in ^session_ids and t.state_id == 2 and t.archived == false,
+          select: {ts.session_id, %{id: t.id, title: t.title, state_id: t.state_id}}
+        )
+        |> Repo.all()
+        |> Map.new()
+      end
+
+    Enum.map(members, fn m ->
+      %{m | claimed_task: Map.get(task_by_session, m.session_id)}
+    end)
   end
 
   def get_member(id) when is_integer(id) do

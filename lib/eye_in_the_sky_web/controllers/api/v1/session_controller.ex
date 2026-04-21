@@ -110,6 +110,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     attrs =
       %{}
       |> Helpers.maybe_put(:status, status)
+      |> Helpers.maybe_put(:status_reason, params["status_reason"])
       |> Helpers.maybe_put(:intent, params["intent"])
       |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
       |> Helpers.maybe_put(:name, params["name"])

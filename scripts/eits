@@ -143,13 +143,14 @@ cmd_sessions() {
       _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" project_path "$project_path" model "$model" entrypoint "$entrypoint")"
       ;;
     update)
-      # eits sessions update <uuid> [--status <status>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint] [--ended-at <ISO8601>]
+      # eits sessions update <uuid> [--status <status>] [--reason <reason>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint] [--ended-at <ISO8601>]
       local uuid="${1:-}"; need uuid; shift
       [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
-      local status="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at=""
+      local status="" reason="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --status)      status="$2";      shift 2 ;;
+          --reason)      reason="$2";      shift 2 ;;
           --intent)      intent="$2";      shift 2 ;;
           --entrypoint)  entrypoint="$2";  shift 2 ;;
           --name)        name="$2";        shift 2 ;;
@@ -159,7 +160,7 @@ cmd_sessions() {
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/sessions/$uuid" "$(json status "$status" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at")"
+      _patch "/sessions/$uuid" "$(json status "$status" status_reason "$reason" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at")"
       ;;
     end)
       # eits sessions end <uuid> [--final-status <completed|failed|waiting>]
@@ -1287,7 +1288,19 @@ print(json.dumps(d))
           ($members | map(select(.session_status == "stopped" or .session_status == "waiting")) | length) as $idle |
           ($members | map(select(.session_status == "completed")) | length) as $done |
           ($members | map(select(.session_status == "failed")) | length) as $failed |
-          "Team: \($t.name) (ID: \($t.id))\nMembers: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) failed" else "" end)"
+          "Team: \($t.name) (ID: \($t.id))",
+          "Members: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) failed" else "" end)",
+          "",
+          "Member detail:",
+          ($members[] |
+            (if .session_status == "waiting" and .session_status_reason then
+              "\(.session_status):\(.session_status_reason)"
+            else
+              (.session_status // "unknown")
+            end) as $status_str |
+            (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
+            "  \(.name) (\(.role)) — \($status_str)\($task_str)"
+          )
         '
       else
         _curl "$BASE_URL/teams/$id" | jq .

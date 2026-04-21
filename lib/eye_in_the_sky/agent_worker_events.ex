@@ -38,9 +38,10 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   @doc "SDK completed successfully."
   def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
-    status = if provider == "codex", do: "waiting", else: "idle"
+    {status, reason} =
+      if provider == "codex", do: {"waiting", "sdk_completed"}, else: {"idle", nil}
 
-    case update_session_status(session_id, status) do
+    case update_session_status(session_id, status, reason) do
       {:ok, session} ->
         Events.agent_stopped(session)
         notify_agent_complete(session_id, provider_conversation_id)
@@ -205,13 +206,15 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # two concurrent read-then-write pairs racing each other, and the session_idle
   # broadcast must only fire after a successful update.
   # Returns {:ok, updated_session} or :error.
-  defp update_session_status(session_id, status) do
+  defp update_session_status(session_id, status, reason \\ nil) do
     idle_like? = status in ["idle", "waiting"]
 
     attrs =
       if idle_like?,
         do: %{status: status, last_activity_at: DateTime.utc_now()},
         else: %{status: status}
+
+    attrs = if reason, do: Map.put(attrs, :status_reason, reason), else: attrs
 
     case Sessions.get_session(session_id) do
       {:ok, session} -> apply_session_update(session, attrs, session_id, idle_like?)

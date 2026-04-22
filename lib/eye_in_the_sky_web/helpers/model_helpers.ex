@@ -13,12 +13,25 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   def claude_models do
     [
       {"claude-opus-4-7", "Opus 4.7"},
-      {"claude-opus-4-6", "Opus 4.6"},
       {"claude-opus-4-5-20251101", "Opus 4.5"},
       {"claude-opus-4-1-20250805", "Opus 4.1"},
       {"claude-sonnet-4-6", "Sonnet 4.6"},
       {"claude-sonnet-4-5-20250929", "Sonnet 4.5"},
       {"claude-haiku-4-5-20251001", "Haiku 4.5"}
+    ]
+  end
+
+  @doc """
+  Returns Claude models with metadata {value, label, description, color} tuples for UI displays.
+  """
+  def claude_models_with_meta do
+    [
+      {"claude-opus-4-7", "Opus 4.7", "Most capable, latest", "text-warning"},
+      {"claude-opus-4-5-20251101", "Opus 4.5", "Capable, extended context", "text-warning"},
+      {"claude-opus-4-1-20250805", "Opus 4.1", "Capable", "text-warning"},
+      {"claude-sonnet-4-6", "Sonnet 4.6", "Everyday tasks, latest", "text-info"},
+      {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "Everyday tasks", "text-info"},
+      {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fast answers", "text-success"}
     ]
   end
 
@@ -32,6 +45,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
       {"gpt-5.2", "GPT-5.2"},
       {"gpt-5.1", "GPT-5.1"},
       {"gpt-5-codex-mini", "GPT-5 Codex Mini"}
+    ]
+  end
+
+  @doc """
+  Returns Codex models with metadata {value, label, description, color} tuples for UI displays.
+  """
+  def codex_models_with_meta do
+    [
+      {"gpt-5.3-codex", "GPT-5.3 Codex", "Frontier Codex-optimized", "text-warning"},
+      {"gpt-5.2-codex", "GPT-5.2 Codex", "Frontier agentic coding", "text-info"},
+      {"gpt-5.2", "GPT-5.2", "Long-running agents", "text-info"},
+      {"gpt-5.1", "GPT-5.1", "Deep and fast reasoning", "text-success"},
+      {"gpt-5-codex-mini", "GPT-5 Codex Mini", "Cheaper and faster", "text-success"}
     ]
   end
 

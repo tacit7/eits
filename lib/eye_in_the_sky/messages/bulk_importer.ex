@@ -6,7 +6,10 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   Provider-specific importers (Claude, Codex) prepare their messages and
   delegate here.
 
-  Uses Repo.transaction and Repo.insert_all for atomic, efficient batch operations.
+  Uses Repo.insert_all for efficient batch inserts. Per-row updates and inserts
+  are executed independently (no enclosing transaction) so one bad row does not
+  roll back other successful writes. Idempotency is guaranteed by the unique
+  index on source_uuid combined with `on_conflict: :nothing`.
   """
 
   alias EyeInTheSky.Messages
@@ -22,7 +25,9 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     - `:provider` - (required) provider string, e.g. "claude" or "codex"
     - `:metadata_fn` - optional 1-arity function returning a metadata map or nil for a message
 
-  Returns the count of successfully imported messages.
+  Returns the count of successfully persisted or skipped messages (insert,
+  update, fast-path skip, or DM dedup skip). Rows that conflict on source_uuid
+  are counted as processed because they are already present in the DB.
   """
   @spec import_messages(list(map()), integer(), keyword()) :: integer()
   def import_messages(messages, session_id, opts) do
@@ -48,48 +53,63 @@ defmodule EyeInTheSky.Messages.BulkImporter do
         process_message(msg, context, upd_acc, ins_acc, skip_count)
       end)
 
-    # Execute in transaction
-    result =
-      Repo.transaction(fn ->
-        # Batch insert new messages with conflict resolution
-        insert_count =
-          if Enum.empty?(inserts) do
-            0
-          else
-            {count, _} =
-              Repo.insert_all(Message, inserts,
-                on_conflict: :nothing,
-                conflict_target: :source_uuid
-              )
+    # Execute writes WITHOUT an enclosing transaction so one bad row does not
+    # roll back other successful writes. Idempotency is guaranteed by the unique
+    # index on source_uuid combined with on_conflict: :nothing.
+    insert_count = run_inserts(inserts)
+    update_count = run_updates(updates)
 
-            count
-          end
+    # Return rows newly written + linked + skipped by pre-fetched dedup.
+    # Race-conflict rows inside insert_all (rare: another session wrote the
+    # same source_uuid concurrently) are NOT counted — they would be counted
+    # as skips on the next import.
+    insert_count + update_count + skip_count
+  end
 
-        # Per-row updates (usually fewer than inserts)
-        update_count =
-          Enum.count(updates, fn {existing, update_attrs} ->
-            case Messages.update_message(existing, update_attrs) do
-              {:ok, _} ->
-                true
+  defp run_inserts([]), do: 0
 
-              {:error, reason} ->
-                Logger.debug(
-                  "BulkImporter: failed to link message #{existing.id}: #{inspect(reason)}"
-                )
+  defp run_inserts(inserts) do
+    try do
+      {count, _} =
+        Repo.insert_all(Message, inserts,
+          on_conflict: :nothing,
+          conflict_target: :source_uuid
+        )
 
-                false
-            end
-          end)
+      count
+    rescue
+      e in Postgrex.Error ->
+        Logger.warning(
+          "BulkImporter: insert_all failed for batch of #{length(inserts)}: #{inspect(e)}"
+        )
 
-        insert_count + update_count
-      end)
-
-    case result do
-      {:ok, count} -> count + skip_count
-      {:error, reason} ->
-        Logger.warning("BulkImporter: transaction failed: #{inspect(reason)}")
         0
     end
+  end
+
+  defp run_updates(updates) do
+    Enum.count(updates, &run_single_update/1)
+  end
+
+  defp run_single_update({existing, update_attrs}) do
+    case Messages.update_message(existing, update_attrs) do
+      {:ok, _} ->
+        true
+
+      {:error, reason} ->
+        Logger.debug(
+          "BulkImporter: failed to link message #{existing.id}: #{inspect(reason)}"
+        )
+
+        false
+    end
+  rescue
+    e in Postgrex.Error ->
+      Logger.warning(
+        "BulkImporter: Postgrex error updating message #{existing.id}: #{inspect(e)}"
+      )
+
+      false
   end
 
   # ---------------------------------------------------------------------------

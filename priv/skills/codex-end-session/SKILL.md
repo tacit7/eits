@@ -25,7 +25,7 @@ description: Clean session close for Codex agents. Completes in-progress tasks, 
    Fallback:
    ```bash
    eits tasks annotate <id> --body "Summary"
-   eits tasks update <id> --state 4
+   eits tasks update <id> --state 3
    ```
 
 2. **Log any unlogged commits** (PostToolUse hook does this automatically; verify):

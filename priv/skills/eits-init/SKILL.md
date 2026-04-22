@@ -54,7 +54,7 @@ All agents use the `eits` CLI script for DMs and commands:
 eits dm --to <session_uuid_or_integer_id> --message "your message"
 eits tasks begin --title "<title>"
 eits tasks annotate <id> --body "..."
-eits tasks update <id> --state 4
+eits tasks update <id> --state 3
 eits commits create --hash <hash>
 ```
 

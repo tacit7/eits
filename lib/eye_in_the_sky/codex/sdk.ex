@@ -40,7 +40,7 @@ defmodule EyeInTheSky.Codex.SDK do
   @eits_cli_reference """
     eits tasks begin --title "<title>"
     eits tasks annotate <id> --body "..."
-    eits tasks update <id> --state 4
+    eits tasks update <id> --state 3
     eits dm --to <session_uuid> --message "<text>"
     eits commits create --hash <hash>
   """

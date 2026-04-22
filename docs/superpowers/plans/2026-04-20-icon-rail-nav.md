@@ -1480,7 +1480,7 @@ done
 
 ```bash
 eits tasks annotate <task_id> --body "Icon rail nav implemented. Rail + Flyout + ProjectSwitcher components. JS hook. Layout updated. Browser smoke-tested."
-eits tasks update <task_id> --state 4
+eits tasks update <task_id> --state 3
 ```
 
 ---

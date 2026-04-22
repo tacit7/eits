@@ -105,7 +105,7 @@ All agents — interactive (`cli`) and headless (`sdk-cli`) — use the `eits` C
 ```bash
 eits tasks begin --title "Task name"   # create + start in one shot
 eits tasks annotate <id> --body "..."
-eits tasks update <id> --state 4
+eits tasks update <id> --state 3
 eits tasks complete <id> --message "Summary"
 eits dm --to <session_uuid> --message "done"
 eits dm --to 1740 --message "done"     # numeric session ID also works

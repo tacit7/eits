@@ -22,14 +22,14 @@ defmodule EyeInTheSky.Agents.InstructionTemplates do
 
       eits tasks begin --title "<title>"
       eits tasks annotate <id> --body "..."
-      eits tasks update <id> --state 4
+      eits tasks update <id> --state 3
       eits dm --to <session_uuid> --message "..."
       eits commits create --hash <hash>
 
     ## Task Completion
     When you finish a task, follow this sequence exactly:
     1. Annotate the task with a summary of what was done
-    2. Mark it done (or move to in-review, state 4)
+    2. Mark it done (state 3)
     3. DM the orchestrator session to report completion
     4. Run the `/i-update-status` slash command to commit work and update session tracking
     Do NOT skip any steps. The orchestrator needs to see what you did.

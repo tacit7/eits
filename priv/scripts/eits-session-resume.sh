@@ -121,7 +121,7 @@ eits tasks begin --title \"Task name\"
 
 # Finish
 eits tasks annotate <task_id> --body \"What happened\"
-eits tasks update <task_id> --state 4
+eits tasks update <task_id> --state 3
 
 # Log commits
 eits commits create --hash <hash>

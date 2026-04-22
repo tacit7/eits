@@ -26,12 +26,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models_with_meta do
     [
-      {"claude-opus-4-7", "Opus 4.7", "Most capable, latest", "text-warning"},
-      {"claude-opus-4-5-20251101", "Opus 4.5", "Capable, extended context", "text-warning"},
-      {"claude-opus-4-1-20250805", "Opus 4.1", "Capable", "text-warning"},
-      {"claude-sonnet-4-6", "Sonnet 4.6", "Everyday tasks, latest", "text-info"},
-      {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "Everyday tasks", "text-info"},
-      {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fast answers", "text-success"}
+      {"claude-opus-4-7", "Opus 4.7", "Most capable for complex work · 1M context", "text-warning"},
+      {"claude-opus-4-5-20251101", "Opus 4.5", "api", "text-warning"},
+      {"claude-opus-4-1-20250805", "Opus 4.1", "api", "text-warning"},
+      {"claude-sonnet-4-6", "Sonnet 4.6", "Best for everyday tasks", "text-info"},
+      {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "api", "text-info"},
+      {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fastest for quick answers", "text-success"}
     ]
   end
 

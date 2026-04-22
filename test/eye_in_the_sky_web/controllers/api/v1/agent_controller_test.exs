@@ -140,6 +140,20 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentControllerTest do
       assert resp["message"] =~ "parent_session_id"
     end
 
+    test "returns invalid_parameter when parent_session_id is a malformed string", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_session_id", "not-a-uuid"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "invalid_parameter"
+      assert resp["message"] =~ "parent_session_id"
+    end
+
+    test "returns invalid_parameter when parent_agent_id is a UUID string", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_agent_id", Ecto.UUID.generate()))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "invalid_parameter"
+      assert resp["message"] =~ "parent_agent_id"
+    end
+
     test "succeeds with baseline params (no parent IDs)", %{conn: conn} do
       conn = post_spawn(conn, @valid_params)
       assert json_response(conn, 201)["success"] == true

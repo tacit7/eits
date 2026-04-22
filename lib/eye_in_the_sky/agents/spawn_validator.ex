@@ -20,11 +20,11 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
 
     with {:ok, instructions} <- validate_instructions(params["instructions"]),
          {:ok, _} <- validate_provider_model(provider, model),
-         {:ok, parent_agent_id} <- coerce_parent_id(params["parent_agent_id"], "parent_agent_id"),
-         {:ok, parent_session_id} <-
-           coerce_parent_id(params["parent_session_id"], "parent_session_id"),
+         {:ok, parent_agent_id} <- coerce_int_id(params["parent_agent_id"], "parent_agent_id"),
+         {:ok, parent_session_ref} <-
+           coerce_session_ref(params["parent_session_id"], "parent_session_id"),
          {:ok, _} <- validate_parent_agent(parent_agent_id),
-         {:ok, _} <- validate_parent_session(parent_session_id),
+         {:ok, parent_session_id} <- validate_parent_session(parent_session_ref),
          {:ok, _} <- validate_parent_relationship(parent_agent_id, parent_session_id) do
       {:ok,
        Map.merge(params, %{
@@ -37,15 +37,41 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
     end
   end
 
-  defp coerce_parent_id(nil, _field), do: {:ok, nil}
-  defp coerce_parent_id("", _field), do: {:ok, nil}
-  defp coerce_parent_id(val, _field) when is_integer(val), do: {:ok, val}
+  defp coerce_int_id(nil, _field), do: {:ok, nil}
+  defp coerce_int_id("", _field), do: {:ok, nil}
+  defp coerce_int_id(val, _field) when is_integer(val), do: {:ok, val}
 
-  defp coerce_parent_id(val, _field) when is_binary(val) do
-    {:ok, val}
+  defp coerce_int_id(val, field) when is_binary(val) do
+    case Integer.parse(val) do
+      {int, ""} -> {:ok, int}
+      _ -> {:error, "invalid_parameter", "#{field} must be an integer"}
+    end
   end
 
-  defp coerce_parent_id(_val, field),
+  defp coerce_int_id(_val, field),
+    do: {:error, "invalid_parameter", "#{field} must be an integer"}
+
+  # Accepts integer, integer-parseable string, or a valid UUID string.
+  # Rejects malformed strings before they reach the DB (which would raise
+  # Ecto.Query.CastError on an invalid UUID).
+  defp coerce_session_ref(nil, _field), do: {:ok, nil}
+  defp coerce_session_ref("", _field), do: {:ok, nil}
+  defp coerce_session_ref(val, _field) when is_integer(val), do: {:ok, val}
+
+  defp coerce_session_ref(val, field) when is_binary(val) do
+    case Integer.parse(val) do
+      {int, ""} ->
+        {:ok, int}
+
+      _ ->
+        case Ecto.UUID.cast(val) do
+          {:ok, uuid} -> {:ok, uuid}
+          :error -> {:error, "invalid_parameter", "#{field} must be an integer or UUID"}
+        end
+    end
+  end
+
+  defp coerce_session_ref(_val, field),
     do: {:error, "invalid_parameter", "#{field} must be an integer or UUID"}
 
   defp validate_instructions(nil),

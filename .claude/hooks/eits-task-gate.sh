@@ -29,6 +29,31 @@ if [ -z "$EITS_AGENT_UUID" ]; then
   exit 0
 fi
 
+# Skip enforcement on spawn-only / orchestrator turns.
+#
+# Why: an orchestrator that only spawns sub-agents (Agent tool) and runs Bash/eits
+# coordination calls shouldn't be forced to close its tracking task at every Stop —
+# it's still coordinating. Only block Stop when this turn actually mutated files
+# (Edit, Write, MultiEdit, NotebookEdit). If no edits happened since the last user
+# turn boundary, exit 0.
+#
+# How: parse the transcript (JSONL) with jq; find the index of the most recent
+# user-role entry, then scan assistant tool_use entries after it for file-editing
+# tool names.
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
+if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+  had_edit=$(jq -s -r '''
+    (map(.type) | to_entries | map(select(.value == "user")) | last | .key // -1) as $u
+    | .[($u+1):]
+    | map(.message.content // [] | .[]? | select(.type == "tool_use") | .name)
+    | flatten
+    | any(. == "Edit" or . == "Write" or . == "MultiEdit" or . == "NotebookEdit")
+  ''' "$TRANSCRIPT_PATH" 2>/dev/null)
+  if [ "$had_edit" = "false" ]; then
+    exit 0
+  fi
+fi
+
 # Query in-progress tasks owned by this agent (agent_id FK, set on task creation).
 # Using --agent instead of --session so we only see tasks this agent explicitly claimed,
 # not historical session-task links that may reference unrelated sessions.

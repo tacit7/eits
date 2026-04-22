@@ -20,6 +20,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   alias EyeInTheSky.{Agents, Messages, Sessions}
 
+  alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
   alias EyeInTheSky.Events
 
   # --- Lifecycle Events ---
@@ -63,19 +64,23 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   @doc "Max retries exceeded — worker giving up."
-  def on_max_retries_exceeded(session_id, provider_conversation_id) do
+  def on_max_retries_exceeded(session_id, provider_conversation_id, reason \\ :retry_exhausted) do
     Events.stream_error(session_id, provider_conversation_id, "Max retries exceeded")
 
-    case update_session_status(session_id, "failed") do
+    case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
       {:ok, session} -> Events.agent_stopped(session)
       :error -> :ok
     end
   end
 
-  @doc "Worker hit a systemic error (billing/auth/watchdog) — overwrite idle DB status with failed."
-  def on_session_failed(session_id, provider_conversation_id) do
+  @doc """
+  Worker hit a systemic error (billing/auth/rate-limit/watchdog) — overwrite idle
+  DB status with failed and record the reason so the UI can render a distinct
+  badge ('Billing', 'Rate limited', etc.) instead of generic 'Failed'.
+  """
+  def on_session_failed(session_id, provider_conversation_id, reason \\ nil) do
     Events.stream_error(session_id, provider_conversation_id, "Systemic error — session failed")
-    update_session_status(session_id, "failed")
+    update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason))
     :ok
   end
 

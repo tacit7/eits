@@ -126,7 +126,17 @@ defmodule EyeInTheSky.Sessions.Session do
       "failed",
       "archived"
     ])
-    |> validate_inclusion(:status_reason, [nil, "session_ended", "sdk_completed", "zombie_swept"])
+    |> validate_inclusion(:status_reason, [
+      nil,
+      "session_ended",
+      "sdk_completed",
+      "zombie_swept",
+      "billing_error",
+      "authentication_error",
+      "rate_limit_error",
+      "watchdog_timeout",
+      "retry_exhausted"
+    ])
     |> unique_constraint(:uuid, name: :sessions_uuid_index)
   end
 

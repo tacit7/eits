@@ -26,18 +26,33 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   end
 
   @doc """
-  Derive display status with idle staleness tiers.
-  Returns one of: working | compacting | idle | idle_stale | idle_dead | completed | failed
+  Derive display status with idle staleness tiers and failure reason tiers.
+
+  Returns one of: working | compacting | idle | idle_stale | idle_dead |
+  completed | failed | failed_billing | failed_auth | failed_rate_limit |
+  failed_timeout | failed_retry_exhausted
+
+  Sessions carry `status_reason` (see `EyeInTheSky.Sessions.Session`); Agents do
+  not. `Map.get/3` gracefully handles both.
   """
   def derive_display_status(agent, _stale_threshold_hours \\ 24) do
-    status = agent.status
-
-    if status == "idle" do
-      idle_tier(agent)
-    else
-      status
+    case agent.status do
+      "idle" -> idle_tier(agent)
+      "failed" -> failed_tier(Map.get(agent, :status_reason))
+      other -> other
     end
   end
+
+  @doc """
+  Map `status_reason` to a display status so the badge can distinguish
+  billing / auth / rate-limit / timeout failures from a generic crash.
+  """
+  def failed_tier("billing_error"), do: "failed_billing"
+  def failed_tier("authentication_error"), do: "failed_auth"
+  def failed_tier("rate_limit_error"), do: "failed_rate_limit"
+  def failed_tier("watchdog_timeout"), do: "failed_timeout"
+  def failed_tier("retry_exhausted"), do: "failed_retry_exhausted"
+  def failed_tier(_), do: "failed"
 
   @doc """
   Compute idle staleness tier based on last_activity_at.
@@ -110,6 +125,11 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   defp status_label("idle_dead"), do: "Idle"
   defp status_label("completed"), do: "Done"
   defp status_label("failed"), do: "Failed"
+  defp status_label("failed_billing"), do: "Billing"
+  defp status_label("failed_auth"), do: "Auth"
+  defp status_label("failed_rate_limit"), do: "Rate limited"
+  defp status_label("failed_timeout"), do: "Timed out"
+  defp status_label("failed_retry_exhausted"), do: "Failed"
   defp status_label(s), do: s
 
   defp status_to_badge("working"), do: "badge-success"
@@ -119,6 +139,13 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   defp status_to_badge("idle_dead"), do: "badge-error badge-outline"
   defp status_to_badge("completed"), do: "badge-ghost"
   defp status_to_badge("failed"), do: "badge-error"
+  # All systemic-failure tiers render red. Rate-limit uses an outline to hint
+  # it is recoverable by waiting rather than a dead crash.
+  defp status_to_badge("failed_billing"), do: "badge-error"
+  defp status_to_badge("failed_auth"), do: "badge-error"
+  defp status_to_badge("failed_rate_limit"), do: "badge-error badge-outline"
+  defp status_to_badge("failed_timeout"), do: "badge-error"
+  defp status_to_badge("failed_retry_exhausted"), do: "badge-error"
   defp status_to_badge(_), do: "badge-ghost"
 
   defp render_no_project do

@@ -65,7 +65,7 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `status` | string | no | One of: `working`, `waiting`, `completed`, `failed` |
+| `status` | string | no | One of: `working`, `idle`, `waiting`, `completed`, `failed` |
 | `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`. Auto-cleared when transitioning away from waiting |
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
 
@@ -76,6 +76,7 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
   "id": 42,
   "uuid": "session-uuid",
   "status": "completed",
+  "status_reason": null,
   "ended_at": "2026-02-15T12:00:00Z"
 }
 ```
@@ -86,6 +87,80 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 curl -X PATCH localhost:5001/api/v1/sessions/abc-123 \
   -H 'Content-Type: application/json' \
   -d '{"status":"completed"}'
+```
+
+---
+
+### POST /sessions/:id/complete
+
+Mark a session as completed with automatic team member status sync.
+
+Accepts integer session ID or UUID string. Sets `status=completed`, `ended_at=now`, and syncs the session's team member status to `"done"` if the session belongs to a team.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | string or integer | Session ID (UUID or integer) |
+
+**Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "session_id": 42,
+  "session_status": "completed",
+  "member_synced": true
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/sessions/42/complete \
+  -H 'Content-Type: application/json'
+
+curl -X POST localhost:5001/api/v1/sessions/abc-123/complete \
+  -H 'Content-Type: application/json'
+```
+
+---
+
+### POST /sessions/:id/waiting
+
+Mark a session as waiting (paused/blocked) with automatic team member status sync.
+
+Accepts integer session ID or UUID string. Sets `status=waiting` and syncs the session's team member status to `"blocked"` if the session belongs to a team.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | string or integer | Session ID (UUID or integer) |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `reason` | string | no | Optional reason (e.g., `"waiting_for_approval"`, `"blocked_by_dependency"`) |
+
+**Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "session_id": 42,
+  "session_status": "waiting",
+  "member_synced": true
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/sessions/42/waiting \
+  -H 'Content-Type: application/json' \
+  -d '{"reason": "waiting_for_approval"}'
 ```
 
 ---
@@ -111,6 +186,7 @@ Fetch session detail with related resources (tasks, notes, commits).
   "agent_int_id": 10,
   "project_id": 1,
   "status": "working",
+  "status_reason": null,
   "name": "fix auth bug",
   "description": "fixing the oauth flow",
   "is_spawned": true,
@@ -463,6 +539,8 @@ List all registered push subscriptions for the current user.
 
 Send a message to an agent session. Rate-limited to protect against message injection flooding.
 
+Messages can only be delivered to sessions with `status` in `["working", "idle"]`. Attempts to DM sessions with other statuses (e.g., `waiting`, `completed`, `failed`) return `422 Unprocessable Entity`.
+
 **Request body (current format):**
 
 | Field | Type | Required | Description |
@@ -745,18 +823,18 @@ eits channels send 1 --session 1179 --body "hello from CLI"
 
 ### GET /api/v1/sessions (list with filters)
 
-List sessions with optional filtering.
+List sessions with optional filtering. Supports full-text search, name filters, project filtering, and optional task embedding.
 
 **Query params:**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `q` | string | no | Full-text search query |
+| `q` | string | no | Full-text search query (searches session name, description, notes) |
 | `project_id` | integer | no | Filter by project ID |
-| `status` | string | no | Filter by status |
-| `name` | string | no | Filter by session name (ilike match) |
-| `with_tasks` | boolean | no | When `true`, embeds task list per session |
-| `include_archived` | boolean | no | Include archived sessions |
+| `status` | string | no | Filter by status (`working`, `idle`, `waiting`, `completed`, `failed`) |
+| `name` | string | no | Filter by session name (case-insensitive ilike match) |
+| `with_tasks` | boolean | no | When `true`, embeds task list per session (id, title, state_id, state) |
+| `include_archived` | boolean | no | Include archived sessions (default false) |
 | `limit` | integer | no | Max results (default 20) |
 
 **Response:** `200 OK`
@@ -772,6 +850,7 @@ List sessions with optional filtering.
       "name": "fix auth bug",
       "description": "fixing the oauth flow",
       "status": "working",
+      "status_reason": null,
       "tasks": [
         {
           "id": 1,
@@ -790,6 +869,7 @@ List sessions with optional filtering.
 ```bash
 eits sessions list --name "auth" --with-tasks
 eits sessions list --project 1 --include-archived
+eits sessions list --name "deploy"
 ```
 
 ---
@@ -973,6 +1053,46 @@ Fans out direct messages to all team members, excluding the sender. Used for tea
 
 ```bash
 eits teams broadcast 1 --body "Deploying release v2.0 in 10 minutes"
+```
+
+---
+
+### POST /api/v1/tasks/search
+
+Search for tasks across projects with optional filtering.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | string | yes | Search query (searches task titles, descriptions, and body) |
+| `project_id` | integer | no | Filter to a specific project |
+| `state` | string | no | Filter by state (e.g., `"In Progress"`, `"To Do"`, `"Done"`) |
+| `limit` | integer | no | Max results (default 20, max 200) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Found 3 task(s)",
+  "results": [
+    {
+      "id": 1,
+      "title": "Fix auth bug",
+      "state": "In Progress",
+      "state_id": 2,
+      "project_id": 1,
+      "description": "OAuth flow is broken"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+eits tasks search "auth bug" --project 1 --state "In Progress"
 ```
 
 ---

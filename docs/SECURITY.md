@@ -380,48 +380,139 @@ IAM provides fine-grained policy control over Claude Code and API operations, ev
 
 ### Architecture
 
-**Policy model**: Rules with conditions, effects (allow/deny/instruct), and optional builtin matchers. System policies are immutable; custom policies can be created, edited, or deleted via the LiveView CRUD interface.
+**Policy model**: Rules with conditions, effects (allow/deny/instruct), and optional builtin matchers. Policies are matched against normalized hook payloads (tool name, action, resource path, environment context) and evaluated against optional conditions. System policies are immutable; custom policies can be created, edited, or deleted via the LiveView CRUD interface.
 
-**Hook evaluation**: Policies are evaluated at three points in the Claude workflow:
-- `UserPromptSubmit`: Evaluate before the user prompt is sent to Claude
-- `PostToolUse`: Evaluate after a tool use completes
-- `Stop`: Evaluate when Claude requests to stop execution
+**Hook evaluation**: Policies are evaluated at four points in the Claude workflow:
+- `UserPromptSubmit`: Evaluate before the user prompt is sent to Claude (can suppress/replace prompt)
+- `PreToolUse`: Evaluate before a tool is executed (can deny, allow, or instruct)
+- `PostToolUse`: Evaluate after a tool use completes (can suppress/modify output)
+- `Stop`: Evaluate when Claude requests to stop execution (can deny or instruct)
 
-**Condition evaluation**: Pure, declarative JSON-based predicates (e.g., `time_between`, `file_matches`, action filters).
+**Evaluation algorithm**:
+1. Coarse-filter: `agent_type` and `action` must match (or be `"*"`), and hook `event` must match (or policy has no `event` constraint)
+2. For each survivor, check project scope, resource glob pattern, and conditions
+3. Partition matches into denies, allows, and instructs
+4. Resolve permission: deny > allow > fallback (default allow). Instructions always attach regardless of permission
+5. Return decision with permission, winning policy, instructions, and reason
 
-**Builtin matchers**: For policy detection that needs Elixir code (command parsing, path resolution, git-state inspection), policies can specify a `builtin_matcher` that dispatches to a dedicated module. Evaluation is wrapped in error handling (fail-closed: does not match on error) and telemetry. Current matchers: `block_sudo`, `block_rm_rf`, `protect_env_vars`, `block_env_files`, `block_curl_api_keys`, `sanitize_prompt_api_keys`, `workflow_business_hours_only`, and others.
+**Condition evaluation**: Pure, declarative JSON-based predicates via `ConditionEval` (e.g., `time_between`, `env_equals`, `session_state_equals`). Conditions fail-closed with telemetry on malformed predicates.
 
-### Phases
+**Builtin matchers**: For policy detection that needs Elixir code (command parsing, path resolution, git-state inspection, API key redaction), policies can specify a `builtin_matcher` key that dispatches to a dedicated module in `EyeInTheSky.IAM.Builtin`. Matchers are registered in `BuiltinMatcher.Registry` — unknown keys are rejected at the changeset layer. Evaluation is wrapped in error handling (fail-closed: does not match on error) and telemetry.
 
-**Phase 3.5 (Dry-run simulator)**: New endpoint `/iam/policies/simulate` allows testing policy evaluation on a payload without triggering actual enforcement. Useful for auditing policy behavior before activation.
+**Seeded system policies** (12 builtin matchers, 13 system policies):
 
-**Phase 4a (Built-in matchers + seeded policies)**: 
-- Added `builtin_matcher` column to `policies` table
-- Registered 9 stable matcher keys in `BuiltinMatcher.Registry`
-- Seeded system policies: `block_sudo`, `block_rm_rf`, `protect_env_vars`, `block_env_files`, `block_curl_api_keys`, `sanitize_prompt_api_keys`, and others (9 total)
-- System policies are immutable (cannot be edited or deleted from the UI)
+| Key | Builtin Matcher | Action | Event | Effect | Purpose |
+|-----|-----------------|--------|-------|--------|---------|
+| `block_sudo` | `block_sudo` | Bash | PreToolUse | deny | Blocks `sudo`, `doas`, `pkexec`, `runas` privilege escalation |
+| `block_rm_rf` | `block_rm_rf` | Bash | PreToolUse | deny | Blocks `rm -rf` against system/home paths |
+| `protect_env_vars` | `protect_env_vars` | Bash | PreToolUse | deny | Blocks dumping/reading sensitive env vars (API keys, tokens) |
+| `block_env_files` | `block_env_files` | * | PreToolUse | deny | Blocks direct access to `.env` files |
+| `block_read_outside_cwd` | `block_read_outside_cwd` | * | PreToolUse | deny | Blocks reads outside the project working directory |
+| `block_push_master` | `block_push_master` | Bash | PreToolUse | deny | Blocks `git push` to protected branches (main/master) |
+| `block_curl_pipe_sh` | `block_curl_pipe_sh` | Bash | PreToolUse | deny | Blocks `curl|sh`, `bash <(curl)`, `eval "$(curl)"` remote execution patterns |
+| `block_work_on_main` | `block_work_on_main` | Bash | PreToolUse | deny | Blocks mutating git operations on protected branches |
+| `warn_destructive_sql` | `warn_destructive_sql` | Bash | PreToolUse | instruct | Warns on `DROP/TRUNCATE/DELETE` without `WHERE` clause |
+| `builtin.sanitize_api_keys` | `sanitize_api_keys` | * | PostToolUse | instruct | Redacts API keys from tool output (instructs to redaction) |
+| `builtin.sanitize_prompt_api_keys` | `sanitize_prompt_api_keys` | * | UserPromptSubmit | instruct | Redacts API keys from user prompt (Anthropic, OpenAI, GitHub, AWS, generic) |
+| `builtin.workflow_business_hours_only` | `workflow_business_hours_only` | * | PreToolUse | deny | Denies all PreToolUse when outside business hours (09:00–17:00 UTC via `time_between` condition) |
+| `builtin.workflow_stop_gate` | (none) | * | Stop | instruct | Example policy for Stop event (disabled by default, no builtin matcher) |
 
-**Phase 4a (UserPromptSubmit hook)**:
-- Evaluator extended to support `:user_prompt_submit` events
-- `SanitizePromptApiKeys` builtin matcher redacts secret patterns in prompts (Anthropic, OpenAI, GitHub, AWS, generic API keys)
-- Hook response shape: `suppressUserPrompt` + `hookSpecificOutput.userPrompt` replaces the original prompt with redacted version
-- `sanitize_prompt_api_keys` policy seeded with `effect:instruct` for all agents
+### Hook Response Shapes
 
-**Phase 4b (PostToolUse hook)**: Hook evaluation extended to support `:post_tool_use` events. Similar response shapes: `suppressOutput` + `hookSpecificOutput.toolResult` for tool result manipulation.
+IAM converts policy decisions into JSON responses per the Claude Code hook protocol. Response shape depends on permission, instructions, and hook event type.
 
-**Phase 4c (Stop hook + workflow policies)**:
-- Hook evaluation extended to support Claude Code `:stop` events
-- `workflow_business_hours_only` builtin matcher with `time_between` predicate
-- Two new seeded policies: `workflow_business_hours_only` and `workflow_stop_gate` (both disabled by default)
-- Normalization and evaluation handle Stop payloads correctly
+**PreToolUse — deny**:
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "<policy message>"
+  }
+}
+```
 
-**Phase 5 (Policy CRUD LiveView)**:
-- New UI under `/iam/policies` for operator-facing policy management
-- Three LiveViews: index (list + quick toggle), new (create), edit (update)
-- Index view has filters by agent_type, action, effect, and enabled status
-- System policies cannot be deleted (no delete button rendered); custom policies have full CRUD
-- System policies in edit view have locked fields and `disabled` input attributes; server-side `enforce_locked_fields/1` guard prevents bypass attempts
-- Changeset errors (e.g., invalid JSON in conditions) surface cleanly in the form
+**PreToolUse — allow (no instructions)**:
+```json
+{
+  "continue": true,
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow"
+  }
+}
+```
+
+**PreToolUse — allow (with instructions)**:
+```json
+{
+  "continue": true,
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "additionalContext": "<rendered markdown of policy instructions>"
+  }
+}
+```
+
+**UserPromptSubmit — allow (with instructions/redaction)**:
+```json
+{
+  "suppressUserPrompt": true,
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "userPrompt": "<redacted/sanitized prompt>"
+  }
+}
+```
+
+**PostToolUse/Stop — deny**:
+```json
+{
+  "continue": false,
+  "stopReason": "<policy message>"
+}
+```
+
+**PostToolUse/Stop — allow (with instructions)**:
+```json
+{
+  "continue": true,
+  "suppressOutput": true,
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "<rendered markdown of policy instructions>"
+  }
+}
+```
+
+### Hook Integration
+
+**Claude Code PreToolUse hook**: The app provides a shell script (`priv/scripts/iam-pretooluse.sh`) that Claude Code operators can wire into `settings.json` to enable hook-based policy evaluation. The script POSTs to `/api/v1/iam/decide` (unauthenticated, designed for CLI scripts with no session context) with the hook payload and receives a JSON decision. On network errors, the script fails open (never blocks tool calls).
+
+**Configuration**: See `docs/IAM_HOOK_INSTALL.md` for wiring the hook script into Claude Code settings.json.
+
+### Implementation Details
+
+**Normalizer** (`lib/eye_in_the_sky/iam/normalizer.ex`): Converts Claude Code hook payloads into a normalized `Context` struct. Tool-specific extractors parse Bash scripts, file paths, API calls, etc. Unknown tools fall through to `:unknown`.
+
+**Evaluator** (`lib/eye_in_the_sky/iam/evaluator.ex`): Core decision engine. Fetches enabled policies from cache, filters by agent_type/action/event, evaluates conditions and builtin matchers, resolves permission via deny > allow > fallback, and returns a `Decision` with all instructions attached (sorted by priority).
+
+**PolicyCache** (`lib/eye_in_the_sky/iam/policy_cache.ex`): ETS-backed GenServer singleton. Caches all enabled policies in-memory with cache-invalidation hook triggered by policy mutations. Hit/miss telemetry for observability.
+
+**Policy schema** (`lib/eye_in_the_sky/iam/policy.ex`): Ecto schema with `create_changeset` and `update_changeset` for custom policies, plus `enforce_locked_fields/1` guard that prevents editing of locked fields on system policies. Validates `builtin_matcher` against the Registry at write time.
+
+**Audit trail**: Every decision is asynchronously written to `iam_decisions` table with decision_id, project scope, raw payload snapshot, and policy trace (for debugging).
+
+### Policy CRUD LiveView
+
+New UI under `/iam/policies` (requires SessionAuth) for operator-facing policy management:
+
+- **Index** (`/iam/policies`): List view with toggles for enable/disable, filters by agent_type/action/effect/enabled status, delete button (unavailable for system policies)
+- **New** (`/iam/policies/new`): Create custom policy form with action, project scope, resource glob, conditions (decoded from JSON at submit time), effect, and priority. Changesets surface invalid JSON cleanly.
+- **Edit** (`/iam/policies/:id`): Update form. System policies render locked fields with `disabled` input attributes; custom policies allow full editing. Server-side `enforce_locked_fields/1` guard catches any UI bypass attempts.
+
+System policies cannot be deleted via the UI (no button rendered for rows with `system_key`). Custom policies have full CRUD.
 
 ### Message Security
 

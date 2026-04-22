@@ -75,6 +75,28 @@ On subsequent messages to the same session:
 
 Codex stores session history locally at `$CODEX_HOME/sessions` for up to 30 days.
 
+## Incremental Sync Watermark
+
+The `SessionImporter` tracks the last synced message UUID to avoid re-scanning the entire session history on each sync:
+
+```elixir
+# codex/session_importer.ex
+def sync(thread_id, session_id) do
+  last_uuid = Messages.get_last_source_uuid(session_id)
+  with {:ok, messages} <- SessionReader.read_messages_after_uuid(thread_id, last_uuid) do
+    {:ok, import_messages(messages, session_id)}
+  end
+end
+```
+
+The watermark is stored by tracking the `source_uuid` of the last successfully imported message:
+
+- `Messages.get_last_source_uuid(session_id)` returns the UUID of the most recent imported message for the session, or `nil` if no messages exist
+- `SessionReader.read_messages_after_uuid(thread_id, after_uuid)` filters the file to return only messages with UUIDs that come after the watermark
+- If `after_uuid` is `nil`, all messages are returned (first sync)
+- If the watermark UUID is not found in the file (e.g., file rotated), all messages are returned as a fallback
+- Each message imported updates the watermark, enabling resumable, incremental sync
+
 ## Streaming Pipeline
 
 ### Provider-Polymorphic Dispatch
@@ -237,8 +259,7 @@ Variables passed:
 |----------|--------|-------------|
 | `EITS_SESSION_UUID` | `state.provider_conversation_id` | Session UUID (may be temp until thread.started syncs) |
 | `EITS_SESSION_ID` | `state.session_id` | EITS integer session ID |
-| `EITS_AGENT_UUID` | `state.agent_id` | Agent UUID |
-| `EITS_AGENT_ID` | `state.agent_id` | Agent ID (same as UUID) |
+| `EITS_AGENT_ID` | `state.agent_id` | Agent ID (UUID) |
 | `EITS_PROJECT_ID` | `state.project_id` | EITS project integer ID |
 | `EITS_MODEL` | `context[:model]` | Model name (e.g., "o4-mini") |
 | `EITS_URL` | hardcoded | `http://localhost:5001/api/v1` |
@@ -246,6 +267,20 @@ Variables passed:
 ## Init Prompt
 
 The first message to a new Codex session is prepended with `codex_eits_init/1`, which tells the agent about the available env vars and the `eits` CLI workflow for task tracking.
+
+The init prompt uses the `@eits_cli_reference` module attribute to inject the canonical EITS CLI command reference:
+
+```elixir
+@eits_cli_reference """
+  eits tasks begin --title "<title>"
+  eits tasks annotate <id> --body "..."
+  eits tasks update <id> --state 4
+  eits dm --to <session_uuid> --message "<text>"
+  eits commits create --hash <hash>
+"""
+```
+
+This centralizes the CLI reference, ensuring all Codex sessions receive identical and up-to-date instructions.
 
 ## Key Modules
 
@@ -263,6 +298,22 @@ The first message to a new Codex session is prepended with `codex_eits_init/1`, 
 | `MessageHandler` | `lib/eye_in_the_sky/sdk/message_handler.ex` | JSONL parsing, raw Codex broadcasts when `forward_raw_lines: true` |
 | `WorkerEvents` | `lib/eye_in_the_sky/agent_worker_events.ex` | DB persistence, PubSub broadcasts |
 
+## Session Status Lifecycle
+
+Codex session status transitions are driven by JSONL events emitted by `codex exec --json`, handled in `lib/eye_in_the_sky/agent_worker_events.ex`:
+
+| Codex Event | Handler | Status Set |
+|-------------|---------|------------|
+| `thread.started` | `on_codex_thread_started/1` | `"working"` |
+| `turn.completed` | `on_sdk_completed/2` | `"idle"` |
+| SDK error | `on_sdk_errored/2` | `"idle"` |
+
+**`thread.started`**: Fires when Codex creates a new thread. The worker calls `on_codex_thread_started/1` immediately (not waiting for turn end) to promote the session to `"working"` and sync the real `thread_id` to `sessions.uuid`.
+
+**`turn.completed`**: Codex sessions transition to `"idle"` on completion, matching Claude behavior. Sessions are cleaned up normally; they do not park in a waiting state.
+
+**SDK error**: Failed turns transition to `"idle"` so the UI can display the failure and allow retry.
+
 ## Streaming vs Claude
 
 | Aspect | Claude | Codex |
@@ -278,6 +329,7 @@ The first message to a new Codex session is prepended with `codex_eits_init/1`, 
 | Local persistence | `~/.claude/sessions/` | `$CODEX_HOME/sessions/` (30 days) |
 | Binary | `claude` (Node.js) | `codex` (Rust) |
 | Auth env var | `ANTHROPIC_API_KEY` | `OPENAI_API_KEY` |
+| Completion status | `"idle"` | `"idle"` |
 
 ## Known Issues and Gotchas
 

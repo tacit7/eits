@@ -108,24 +108,101 @@ When AgentWorker encounters a systemic error (billing/auth failure, API limits),
 
 **Commits:** 62933518 (systemic error handling + DB write + Teams cleanup), af425751 (deduplication fix)
 
+---
+
+## Spawn Failure Tracking
+
+When an agent spawn request fails, the error is logged to disk and recorded in the team membership table.
+
+**Spawn Failure Logging:**
+- `eits agents spawn` logs non-2xx responses to `$EITS_SPAWN_LOG` (defaults to `~/.eits/spawn-errors.log`)
+- Timestamp, error code, and error message are written in line-delimited format
+- Errors are echoed to stderr immediately so backgrounded callers can catch failures
+
+**Team Member spawn_failed Status:**
+- When `AgentManager.spawn_agent` encounters an error and a team is set, it calls `SpawnTeamContext.record_spawn_failure/2`
+- This creates a team member row with `status: "spawn_failed"` (no linked session or agent)
+- `teams status --summary` counts spawn_failed members separately from other statuses
+- Orchestrators checking team status must handle spawn_failed members (retryable via spawn_agent again)
+
+**Code locations:**
+- `scripts/eits` — agents spawn error logging to `$EITS_SPAWN_LOG`
+- `lib/eye_in_the_sky/agents/agent_manager.ex` — calls `SpawnTeamContext.record_spawn_failure/2`
+- `lib/eye_in_the_sky/agents/agent_manager/spawn_team_context.ex` — records spawn failure as team member with nil session/agent
+
+**Commits:** 38fe1374 (spawn failure logging and spawn_failed status), fe293c52 (spawn UX merge)
+
+---
+
+## SpawnTeamContext and SpawnParams Modules
+
+Agent spawning logic was split into two focused sub-modules within `AgentManager`.
+
+**SpawnTeamContext** (`lib/eye_in_the_sky/agents/agent_manager/spawn_team_context.ex`):
+- `resolve_team(name)` — looks up a team by name, returns `{:ok, team}` or error
+- `apply_context(instructions, team, member_name)` — appends team context block to instructions
+- `record_spawn_failure(team, member_name)` — creates a team member row with `spawn_failed` status when spawn fails
+- `maybe_join(team, agent, session, member_name)` — adds agent/session to team on successful spawn
+
+**SpawnParams** (`lib/eye_in_the_sky/agents/agent_manager/spawn_params.ex`):
+- `resolve_session_name(params, team)` — determines session name via priority: explicit `name` param > `member_name @ team_name` > `member_name` > first 250 chars of instructions
+- `build(params, team)` — builds keyword opts for `create_agent` from raw HTTP spawn parameters
+
+**Code locations:**
+- `lib/eye_in_the_sky/agents/agent_manager/spawn_team_context.ex`
+- `lib/eye_in_the_sky/agents/agent_manager/spawn_params.ex`
+
+**Commits:** 13eb155f (refactor: extract SpawnTeamContext and SpawnParams)
+
+---
+
 ## JobDispatcherWorker
 
-Periodically scans for workable tasks and spawns appropriate agents.
+Oban worker that periodically scans for due scheduled jobs and enqueues appropriate execution workers.
 
-**Location:** `lib/eye_in_the_sky_web/workers/job_dispatcher_worker.ex`
+**Location:** `lib/eye_in_the_sky/workers/job_dispatcher_worker.ex`
 
 **Responsibilities:**
-- Poll the `tasks` table for tasks tagged as "workable" (tag_id 421, 422)
-- Spawn a new agent for each workable task
-- Pass task ID and model (haiku/sonnet) to the agent
+- Registered with `Oban.Plugins.Cron`, runs every minute
+- Queries `ScheduledJobs.due_jobs()` for jobs past their scheduled time
+- Claims each job atomically to prevent duplicate execution
+- Enqueues the appropriate execution worker (e.g., `SpawnAgentWorker`, `WorkableTaskWorker`)
+- Marks the job as executed after successful enqueue
 
-**Configuration:**
-- Starts automatically on app boot via `Supervisor`
-- Interval: configurable, defaults to every 30 seconds
+**Semantics:**
+- **Enqueue failure:** releases the claim so the next tick can retry
+- **Mark executed failure:** does NOT release (prevents re-enqueue if the job was already enqueued)
 
 **Integration:**
-- Uses `Agents.spawn_agent/3` context function
-- Reads task tags from `task_tags` join table
+- Replaced the older GenServer poll loop `JobEnqueuer`
+- Uses `ScheduledJobs` context: `due_jobs()`, `claim_job()`, `enqueue_job()`, `mark_job_executed()`
+- Fires `Oban.Job` tasks that handle the actual agent spawning or task work
+
+**Commits:** d5b6f9c4 (jobs create/update CLI), 13eb155f (consolidate list_jobs query variants, JobDispatcherWorker refactor)
+
+---
+
+## MessageHandler Codex Raw Line Broadcasting
+
+Codex raw output lines are now broadcast directly from the SDK MessageHandler, eliminating the relay through AgentWorker.
+
+**Before (removed):**
+- AgentWorker had a `handle_info({:codex_raw_line, ref, line}, ...)` clause
+- MessageHandler sent `{:codex_raw_line, sdk_ref, line}` to the calling AgentWorker
+- AgentWorker forwarded to `EyeInTheSky.Events.broadcast_codex_raw/2`
+- Stale refs from old SDK instances were silently ignored
+
+**After (current):**
+- MessageHandler directly calls `EyeInTheSky.Events.broadcast_codex_raw(session_id, line)`
+- Controlled by `forward_raw_lines` option passed to `MessageHandler.run_loop/3`
+- One fewer message send and no AgentWorker involvement
+- Simpler, more direct broadcast pipeline
+
+**Code locations:**
+- `lib/eye_in_the_sky/sdk/message_handler.ex` — line ~159-161, direct broadcast
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — removed `handle_info({:codex_raw_line, ...})` clause (line 298-308 deleted)
+
+**Commits:** 5585f8bf (refactor: broadcast codex raw lines directly from MessageHandler, remove AgentWorker relay)
 
 ---
 

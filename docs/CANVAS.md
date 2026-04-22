@@ -71,7 +71,7 @@ Keyboard events are managed via the `GlobalKeydown` hook registered in `assets/j
 - Previously, CanvasLive had a catch-all event handler; now canvas-specific keydown events are handled by `GlobalKeydown` hook instead with explicit logging of unhandled events
 
 ### Keyboard Shortcuts Help
-- **`?` key** — Toggle keyboard shortcuts help panel. Lazily creates modal overlay listing all canvas shortcuts. Escape or backdrop click closes; input fields guarded so typing in search boxes doesn't trigger.
+- **`?` key** — Toggle keyboard shortcuts help panel. Lazily creates modal overlay listing all canvas shortcuts. Escape or backdrop click closes correctly via `style.display` manipulation; input fields guarded so typing in search boxes doesn't trigger.
 
 ### Canvas & Tab Navigation
 - **`Cmd+1` through `Cmd+9`** — Tab switcher to quickly jump between open canvas tabs
@@ -133,23 +133,27 @@ When events arrive, the handler calls `send_update/3` to update the `ChatWindowC
 
 ### Canvas Layout Hook
 - **File:** `assets/js/hooks/canvas_layout_hook.js`
-- **Purpose:** Manages preset layout buttons (2up, 4up) and localStorage persistence
+- **Purpose:** Manages preset layout buttons (2up, 4up), applies tiled positioning, and exports localStorage persistence utilities
+- **Layout constants:**
+  - `EDGE = 8` — Pixel padding on all edges of the canvas area in tiled presets
+  - `GAP = 8` — Pixel gap between windows in 2up/4up tiled layouts
 - **Exports:**
-  - `saveWindowLayout(csId, x, y, w, h, z)` — Persists window position, size, and optionally z-index to localStorage
-  - `loadWindowLayout(csId)` — Retrieves saved layout from localStorage
-  - `saveWindowZ(csId, z)` — Saves z-index separately (used when only stacking order changes)
-- **Events:** Dispatches `canvas:layout-applied` custom event to notify ChatWindowHook of preset layout application
+  - `saveWindowLayout(csId, x, y, w, h, z)` — Persists window position, size, and optionally z-index to localStorage under key `cw_{csId}`
+  - `loadWindowLayout(csId)` — Retrieves saved layout from localStorage, returns `{x, y, w, h, z}` or null
+  - `saveWindowZ(csId, z)` — Saves z-index separately to existing layout entry (used when only stacking order changes)
+- **Events:** Dispatches `canvas:layout-applied` custom event with detail `{x, y, w, h}` to notify ChatWindowHook of preset layout application and allow syncing of instance variables
 
 ### Chat Window Hook
 - **File:** `assets/js/hooks/chat_window_hook.js`
-- **Purpose:** Handles window drag, resize, focus, minimize/maximize, and snap-to-edge detection
+- **Purpose:** Handles window drag, resize, focus, minimize/maximize, snap-to-edge detection, and localStorage persistence
 - **Lifecycle:**
-  - On mount: Loads position/size/z-index from localStorage and dispatches layout-applied event listener
-  - During drag: Saves position to localStorage with 50ms debounce
-  - During resize: Saves dimensions to localStorage with 400ms debounce
-  - On focus/blur: Saves z-index to localStorage
-- **Snap zones:** Configurable threshold (40px) for edge snapping; snap zones detected based on cursor proximity to viewport edges
-- **Instance variables:** Maintains `_width`, `_height`, `_dragLeft`, `_dragTop`, `_zIndex` to track window state; these are synced when layout buttons are applied
+  - On mount: Loads position/size/z-index from localStorage via `loadWindowLayout(csId)` and dispatches canvas:layout-applied event listener
+  - During drag: Saves position to localStorage with 50ms debounce via `saveWindowLayout()`
+  - During resize: Saves dimensions to localStorage with 400ms debounce via `saveWindowLayout()`
+  - On focus: Saves z-index to localStorage via `saveWindowZ()`
+- **Snap zones:** Configurable threshold (80px) for edge snapping; snap zones detected based on cursor proximity to viewport edges
+- **Instance variables:** Maintains `_width`, `_height`, `_dragLeft`, `_dragTop`, `_zIndex` to track window state; these are synced when layout buttons dispatch canvas:layout-applied event
+- **Z-Index Stacking:** When a window is focused (clicked), z-index updates to "20" and is persisted; all other windows reset to z-index "1". Z-index is restored from localStorage on mount, allowing window stacking order to persist across sessions.
 
 ### Global Keydown Hook
 - **File:** `assets/js/hooks/global_keydown.js`
@@ -165,8 +169,8 @@ When events arrive, the handler calls `send_update/3` to update the `ChatWindowC
 - **Props:** `canvas_session` (struct with pos_x, pos_y, width, height, session_id)
 - **Events:** Emits `window_moved`, `window_resized`, `remove_window`, `raise_window` to parent `CanvasLive`
 - **Updates:** Receives `send_update` calls from PubSub event handlers to re-render with latest message
-- **Message rendering:** Uses DM-style message display with provider icons, sender name, model badge, timestamp, markdown via MarkdownMessage hook, tool call widgets, thinking section, and tool result output blocks. Matches DM page styling for consistent message presentation.
-- **Status indicator:** Session status dot uses `status_dot_class` with classes for all states: working (primary color with pulse animation), completed, failed, and idle.
+- **Message rendering:** Uses iMessage-style bubble layout with provider icons, timestamps, and markdown via MarkdownMessage hook. **Bubble styling:** User messages appear on the right with primary-color bubbles; agent messages appear on the left with base-200 bubbles. **Tool call messages:** Rendered full-width without bubbles, detected via body segment parsing (messages where all segments are tool_call types). Tool result messages also render full-width. Regular DM-style messages (with explicit stream_type markers) use the standard bubble layout.
+- **Status indicator:** Session status dot uses `status_dot_class` with classes for all states: working (animated with `animate-pulse`), completed, failed, and idle. Provider icon in header animates with `animate-pulse` when session is working.
 - **Focus ring:** Active window shows visible focus ring to indicate interaction target.
 - **Scroll behavior:** ChatWindowHook owns all scroll behavior. Auto-scroll enabled by default; disabled when user scrolls up and shows unread message count pill. Clicking pill re-enables auto-scroll and jumps to bottom. Automatically scrolls to bottom when user sends new message.
 
@@ -240,18 +244,20 @@ Window layout (x, y, width, height) is stored in the `canvas_sessions` join tabl
 When canvas is activated, positions are restored from database. If both are 0, a cascade layout is applied (each window offset by `24 + i*32` pixels) to avoid stack overlap.
 
 **localStorage Persistence:**
-In addition to database persistence, window layout and z-index are persisted to browser localStorage for immediate restoration across sessions:
-- **Position & size**: `canvas_layout_hook.js` provides `saveWindowLayout(csId, x, y, w, h)` and `loadWindowLayout(csId)` functions that store layout in `cw_{csId}` localStorage entry
-- **Z-index**: `saveWindowZ(csId, z)` persists window stacking order alongside layout data
-- **Restoration**: `ChatWindowHook` loads saved layout and z-index on mount, restoring windows to their last-known state
-- **Sync events**: When layout buttons (2up, 4up) apply preset positions, a `canvas:layout-applied` custom event is dispatched so ChatWindowHook can sync its instance variables (width, height, drag position)
-- **Drag/Resize debounce**: Window moves and resizes are debounced before localStorage save (50ms for move, 400ms for resize) to avoid excessive writes
+In addition to database persistence, window layout and z-index are persisted to browser localStorage for immediate restoration across page reloads and browser sessions:
+- **Storage key**: `cw_{csId}` — Each canvas session has its own localStorage entry containing `{x, y, w, h, z}`
+- **Position & size**: `saveWindowLayout(csId, x, y, w, h, z?)` stores or updates all fields; `loadWindowLayout(csId)` retrieves them
+- **Z-index only**: `saveWindowZ(csId, z)` updates z-index without touching position/size (used when only stacking changes)
+- **Restoration**: `ChatWindowHook` calls `loadWindowLayout(csId)` on mount, applying saved position, size, and z-index before rendering
+- **Sync events**: When layout buttons (2up, 4up) apply preset positions, they dispatch a `canvas:layout-applied` custom event so `ChatWindowHook` can sync its instance variables (`_width`, `_height`, `_dragLeft`, `_dragTop`) for drag/resize tracking
+- **Drag/Resize debounce**: Window moves are saved with 50ms debounce; resizes with 400ms debounce to avoid excessive localStorage writes
 
 **Z-Index Lifecycle:**
-- **Mount**: Restored from localStorage if available, otherwise defaults to "1"
-- **Focus**: When user clicks window or tab to focus, z-index updates to "20" and is persisted
-- **Minimize/Maximize**: Z-index saved when toggling window state
-- **Other windows**: When a window is focused, all other windows reset to z-index "1" and are persisted
+- **Mount**: Restored from localStorage if available (`saved.z`), otherwise defaults to `"1"`
+- **Focus**: When user clicks window to focus, z-index updates to `"20"` and is persisted via `saveWindowZ()`
+- **Minimize/Maximize**: Z-index is updated and persisted when toggling window state
+- **Defocusing**: When a window is focused, all other windows reset to z-index `"1"` and are persisted
+- **Focus parameter**: URL param `?focus=:session_id` dispatches `canvas:focus-session` event which also raises the window to z-index `"20"` and persists it
 
 ## Navigation Flow
 
@@ -264,13 +270,23 @@ In addition to database persistence, window layout and z-index are persisted to 
 2. **From Sidebar**
    - Click "Canvas" tab in sidebar
    - Routes to `/canvases` (redirects to first canvas if available)
+   - Clicking a session name in the canvas rail navigates to `/canvases/:id?focus=:session_id` to focus that window
 
 3. **Direct URL**
    - User navigates to `/canvases` or `/canvases/:id` directly
+   - Optional `?focus=:session_id` parameter focuses (brings to front) the specified canvas session window
+
+### Focus Parameter
+
+The `?focus=` query parameter enables cross-canvas window focusing:
+- Clicking a session name in the canvas rail flyout navigates to `/canvases/:id?focus=:session_id`
+- `CanvasLive` reads the `focus_session_id` from `handle_params/3`
+- Renders a hidden span with `phx-mounted` that dispatches `canvas:focus-session` event after all windows are in DOM
+- `ChatWindowHook` listens for this event and raises (focuses) the matching window to z-index 20
 
 ### Canvas-to-Agent Navigation
 
-While canvas page is standalone, chat windows display session messages. Clicking a session name or message link should route back to `/agents/:id` (AgentLive) for full session context (code history, status details, etc.).
+While canvas page is standalone, chat windows display session messages. Clicking a session name or message link should route back to `/agents/:id` (AgentLive) for full session context (code history, status details, etc.). The canvas rail also provides a logo button (distinct from the session name link) that navigates directly to `/dm/:session_id` to open direct messaging with that session.
 
 ## Key Architectural Patterns
 

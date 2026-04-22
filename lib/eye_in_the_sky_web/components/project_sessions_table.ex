@@ -73,6 +73,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
         <div
           id="ps-list"
           phx-update="stream"
+          phx-hook="SessionsDropdownGuard"
           class="divide-y divide-base-content/5"
         >
           <div

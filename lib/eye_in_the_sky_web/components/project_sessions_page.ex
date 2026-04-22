@@ -22,6 +22,8 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   attr :project, :any, required: true
   attr :canvases, :list, default: []
   attr :show_new_canvas_for, :any, default: nil
+  attr :scope, :any, default: nil
+  attr :projects, :list, default: nil
 
   def page(assigns) do
     ~H"""
@@ -70,6 +72,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           search_query={@search_query}
           canvases={@canvases}
           show_new_canvas_for={@show_new_canvas_for}
+          scope={@scope}
         />
 
         <div
@@ -90,8 +93,8 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       module={EyeInTheSkyWeb.Components.NewSessionModal}
       id="new-session-modal-project"
       show={@show_new_session_drawer}
-      projects={nil}
-      current_project={@project}
+      projects={if @scope == :all, do: @projects, else: nil}
+      current_project={if @scope == :all, do: nil, else: @project}
       toggle_event="toggle_new_session_drawer"
       submit_event="create_new_session"
     />

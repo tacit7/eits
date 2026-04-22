@@ -37,11 +37,8 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   @doc "SDK completed successfully."
-  def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
-    {status, reason} =
-      if provider == "codex", do: {"waiting", "sdk_completed"}, else: {"idle", nil}
-
-    case update_session_status(session_id, status, reason) do
+  def on_sdk_completed(session_id, provider_conversation_id, _provider \\ "claude") do
+    case update_session_status(session_id, "idle", nil) do
       {:ok, session} ->
         Events.agent_stopped(session)
         notify_agent_complete(session_id, provider_conversation_id)

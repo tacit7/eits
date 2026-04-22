@@ -3,6 +3,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatusTest do
 
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Scheduler.AgentStatus
+  alias EyeInTheSky.Sessions
 
   # ---------------------------------------------------------------------------
   # Helpers
@@ -101,6 +102,37 @@ defmodule EyeInTheSky.Scheduler.AgentStatusTest do
 
       assert Process.alive?(pid)
       GenServer.stop(pid)
+    end
+
+    test "sweep_zombie_sessions marks stuck working sessions as failed" do
+      # Create an agent first (required for session)
+      {:ok, agent} =
+        Agents.create_agent(%{
+          uuid: Ecto.UUID.generate(),
+          description: "Test agent",
+          source: "test",
+          status: "working"
+        })
+
+      # Create a session with status working and last_activity_at > 30 min ago
+      cutoff = DateTime.utc_now() |> DateTime.add(-31 * 60, :second)
+
+      {:ok, session} =
+        Sessions.create_session(%{
+          agent_id: agent.id,
+          status: "working",
+          started_at: cutoff,
+          last_activity_at: cutoff,
+          provider: "claude"
+        })
+
+      # Call the sweep
+      AgentStatus.sweep_zombie_sessions_for_testing()
+
+      # Assert status is now failed
+      updated = Sessions.get_session!(session.id)
+      assert updated.status == "failed"
+      assert updated.status_reason == "zombie_swept"
     end
   end
 end

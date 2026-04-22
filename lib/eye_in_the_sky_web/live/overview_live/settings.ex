@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Settings
+  alias EyeInTheSkyWeb.Helpers.ModelHelpers
 
   alias EyeInTheSkyWeb.OverviewLive.Settings.{
     AuthTab,
@@ -12,12 +13,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     SystemTab,
     WorkflowTab
   }
-
-  @models [
-    {"haiku", "Haiku"},
-    {"sonnet", "Sonnet"},
-    {"opus", "Opus"}
-  ]
 
   @voices ["Ava", "Isha", "Lee", "Jamie", "Serena"]
 
@@ -60,7 +55,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:sidebar_project, nil)
       |> assign(:settings, settings)
       |> assign(:db_info, db_info)
-      |> assign(:models, @models)
+      |> assign(:models, ModelHelpers.claude_models())
       |> assign(:voices, @voices)
       |> assign(:themes, @themes)
       |> assign(:flash_key, nil)

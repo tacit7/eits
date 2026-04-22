@@ -279,24 +279,18 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                 editing_session_id={@editing_session_id}
               >
                 <:actions>
-                  <div
+                  <details
                     id={"session-actions-#{session.id}"}
                     phx-update="ignore"
-                    class="relative dropdown dropdown-end transition-all md:opacity-0 md:group-hover:opacity-100"
+                    class="relative dropdown dropdown-end md:opacity-0 md:group-hover:opacity-100 open:opacity-100"
                   >
-                    <button
-                      tabindex="0"
-                      type="button"
-                      class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/60 md:text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+                    <summary
+                      class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/60 md:text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors list-none cursor-pointer"
                       aria-label="More options"
-                      phx-click="noop"
                     >
                       <.icon name="hero-ellipsis-horizontal-mini" class="w-4 h-4" />
-                    </button>
-                    <ul
-                      tabindex="0"
-                      class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1"
-                    >
+                    </summary>
+                    <ul class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1">
                       <%= if session.id do %>
                         <li>
                           <a
@@ -330,7 +324,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                         </button>
                       </li>
                     </ul>
-                  </div>
+                  </details>
                 </:actions>
               </.session_row>
             </div>

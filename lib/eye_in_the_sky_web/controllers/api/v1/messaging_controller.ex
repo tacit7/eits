@@ -85,12 +85,17 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @terminated_statuses ~w(completed failed)
+  # Allowlist: only sessions actively processing or between turns can receive DMs.
+  # Any status not in this list (waiting, completed, failed, archived, compacting, etc.) is non-receivable.
+  @receivable_statuses ~w(working stopped)
 
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:from, {:ok, from_session}} <- {:from, resolve_session_target(%{raw: from_raw, kind: :from})},
          {:from_active, false} <-
            {:from_active, from_session.status in @terminated_statuses},
-         {:to, {:ok, to_session}} <- {:to, resolve_session_target(%{raw: to_raw, kind: :to})} do
+         {:to, {:ok, to_session}} <- {:to, resolve_session_target(%{raw: to_raw, kind: :to})},
+         {:to_receivable, true} <-
+           {:to_receivable, to_session.status in @receivable_statuses} do
       response_required = params["response_required"] in [true, "true", "1", 1]
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
@@ -127,6 +132,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       {:to, {:error, :not_found}} ->
         {:error, :not_found, "Target session not found"}
+
+      {:to_receivable, false} ->
+        {:error, :unprocessable_entity,
+         "Target session is not active and cannot receive DMs"}
     end
   end
 

@@ -21,14 +21,19 @@ command -v jq   &>/dev/null || { echo "error: jq is required" >&2; exit 1; }
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 _curl() {
-  local _body _status _attempt=0
-  while [[ $_attempt -lt 3 ]]; do
+  local _body _status _attempt=0 _delay=2
+  while [[ $_attempt -lt 4 ]]; do
     _body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$@")
     _status="${_body##*$'\n'}"
     _body="${_body%$'\n'*}"
     if [[ "$_status" == "429" ]]; then
       _attempt=$((_attempt + 1))
-      [[ $_attempt -lt 3 ]] && { echo "rate limited, retrying in ${_attempt}s..." >&2; sleep "$_attempt"; continue; }
+      if [[ $_attempt -lt 4 ]]; then
+        echo "rate limited, retrying in ${_delay}s..." >&2
+        sleep "$_delay"
+        _delay=$((_delay * 2))
+        continue
+      fi
     fi
     break
   done
@@ -422,7 +427,33 @@ cmd_tasks() {
       done
       need message
       local _sess_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
-      _post "/tasks/$id/complete" "$(json message "$message" session_id "$_sess_id")"
+      local _comp_payload; _comp_payload="$(json message "$message" session_id "$_sess_id")"
+      local _comp_attempt=0 _comp_delay=2 _comp_ok=0
+      while [[ $_comp_attempt -le 3 ]]; do
+        local _comp_body _comp_status
+        _comp_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
+          -H "Content-Type: application/json" \
+          "${AUTH_ARGS[@]}" \
+          -d "$_comp_payload" \
+          "$BASE_URL/tasks/$id/complete")
+        _comp_status="${_comp_body##*$'\n'}"
+        _comp_body="${_comp_body%$'\n'*}"
+        if [[ "$_comp_status" == "429" && $_comp_attempt -lt 3 ]]; then
+          echo "complete rate limited, retrying in ${_comp_delay}s..." >&2
+          sleep "$_comp_delay"
+          _comp_delay=$((_comp_delay * 2))
+          _comp_attempt=$((_comp_attempt + 1))
+          continue
+        fi
+        if [[ "$_comp_status" -lt 400 ]]; then
+          printf '%s\n' "$_comp_body" | jq .
+          _comp_ok=1
+        else
+          printf 'HTTP %s: %s\n' "$_comp_status" "$_comp_body" >&2
+        fi
+        break
+      done
+      [[ $_comp_ok -eq 1 ]] || { echo "complete failed after retries — task $id may need manual completion" >&2; return 1; }
       ;;
     begin|quick)
       # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
@@ -770,16 +801,36 @@ USAGE
          + (if $bypass_sandbox           then {bypass_sandbox: true}                   else {} end)
          + (if $stash_if_dirty           then {stash_if_dirty: true}                   else {} end)')
       local spawn_log="${EITS_SPAWN_LOG:-$HOME/.eits/spawn-errors.log}"
-      local _spawn_resp _spawn_rc=0
-      _spawn_resp=$(_curl -X POST -H "Content-Type: application/json" -d "$payload" "$BASE_URL/agents" 2>&1) || _spawn_rc=$?
-      if [[ $_spawn_rc -ne 0 ]]; then
+      local _sp_attempt=0 _sp_delay=2 _sp_ok=0
+      local _sp_body _sp_status _sp_resp_body
+      while [[ $_sp_attempt -le 3 ]]; do
+        _sp_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
+          -H "Content-Type: application/json" \
+          "${AUTH_ARGS[@]}" \
+          -d "$payload" \
+          "$BASE_URL/agents")
+        _sp_status="${_sp_body##*$'\n'}"
+        _sp_resp_body="${_sp_body%$'\n'*}"
+        if [[ "$_sp_status" == "429" && $_sp_attempt -lt 3 ]]; then
+          echo "spawn rate limited, retrying in ${_sp_delay}s..." >&2
+          sleep "$_sp_delay"
+          _sp_delay=$((_sp_delay * 2))
+          _sp_attempt=$((_sp_attempt + 1))
+          continue
+        fi
+        if [[ "$_sp_status" -lt 400 ]]; then
+          _sp_ok=1
+        fi
+        break
+      done
+      if [[ $_sp_ok -eq 0 ]]; then
         local _ts; _ts=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
         mkdir -p "$(dirname "$spawn_log")"
-        printf '%s rc=%d cmd=agents/spawn %s\n' "$_ts" "$_spawn_rc" "$_spawn_resp" >> "$spawn_log"
-        printf 'spawn failed (rc=%d): %s\n' "$_spawn_rc" "$_spawn_resp" >&2
-        return $_spawn_rc
+        printf '%s rc=%s cmd=agents/spawn %s\n' "$_ts" "$_sp_status" "$_sp_resp_body" >> "$spawn_log"
+        printf 'spawn failed (HTTP %s): %s\n' "$_sp_status" "$_sp_resp_body" >&2
+        return 1
       fi
-      printf '%s\n' "$_spawn_resp" | jq .
+      printf '%s\n' "$_sp_resp_body" | jq .
       ;;
     *)
       echo "usage: eits agents <list|get|spawn>"
@@ -1331,31 +1382,39 @@ print(json.dumps(d))
       _post "/teams/$team_id/members" "$(json name "$name" role "$role" session_id "$session_id" agent_id "$agent_id")"
       ;;
     status)
-      # eits teams status <id> [--summary]
+      # eits teams status <id> [--summary|-s] [--wait]
       # member_status: team membership state (active, done, spawn_failed, idle) — authoritative for orchestrators
       # session_status: Claude process lifecycle (working, stopped, waiting, completed, failed)
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
         cat <<'HELP'
-usage: eits teams status <id> [--summary|-s]
+usage: eits teams status <id> [--summary|-s] [--wait]
 
 Fields per member:
   member_status  — team membership state (active, done, spawn_failed, idle)
                    Use this to check if an agent is done with their work.
   session_status — Claude process lifecycle (working, stopped, waiting, completed, failed)
                    Reflects the Claude Code process state, not task completion.
+  session_uuid   — UUID for DM targeting; use with: eits dm --to <uuid> --message "..."
+  session_id     — Numeric session ID (alternative DM target)
 
 Orchestrators should check member_status, not session_status.
+
+--wait: Block until all members have member_status done or spawn_failed.
+        Polls every 5 seconds and prints a summary line each tick.
+        Exits with 0 when all done, 1 if any spawn_failed.
 HELP
         return 0; }
       local id="${1:-}"; need id; shift
-      local summary=0
+      local summary=0 wait=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --summary|-s) summary=1; shift ;;
+          --wait)       wait=1;    shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      if [[ $summary -eq 1 ]]; then
+
+      _teams_status_summary() {
         local resp
         resp=$(_curl "$BASE_URL/teams/$id") || return 1
         echo "$resp" | jq -r '
@@ -1380,10 +1439,63 @@ HELP
                 (.session_status // "none")
               end) as $session_str |
               (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
-              "  \(.name) (\(.role)) — member:\($member_str) session:\($session_str)\($task_str)"
+              (.session_uuid // "—") as $uuid_str |
+              (.session_id | tostring) as $sid_str |
+              "  \(.name) (\(.role)) — member:\($member_str) session:\($session_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
             )
           else empty end)
         '
+      }
+
+      if [[ $wait -eq 1 ]]; then
+        local spawn_failed_count=0
+        while true; do
+          local resp _wait_body _wait_status
+          _wait_body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$BASE_URL/teams/$id")
+          _wait_status="${_wait_body##*$'\n'}"
+          _wait_body="${_wait_body%$'\n'*}"
+          # Only retry on rate-limit (429) or server errors (5xx) — all other 4xx are permanent.
+          if [[ "$_wait_status" == "429" || "$_wait_status" -ge 500 ]]; then
+            printf 'teams status --wait: transient error (HTTP %s), retrying in 5s\n' "$_wait_status" >&2
+            sleep 5; continue
+          fi
+          if [[ "$_wait_status" -ge 400 ]]; then
+            printf 'teams status --wait: permanent error (HTTP %s) — %s\n' "$_wait_status" "$_wait_body" >&2
+            return 1
+          fi
+          resp="$_wait_body"
+          local pending
+          pending=$(echo "$resp" | jq '[.members // [] | .[] | select(.member_status != "done" and .member_status != "spawn_failed")] | length')
+          spawn_failed_count=$(echo "$resp" | jq '[.members // [] | .[] | select(.member_status == "spawn_failed")] | length')
+          local done_count total
+          done_count=$(echo "$resp" | jq '[.members // [] | .[] | select(.member_status == "done")] | length')
+          total=$(echo "$resp" | jq '.members // [] | length')
+          printf '[%s] waiting: %d/%d done, %d pending\n' "$(date -u +%H:%M:%S)" "$done_count" "$total" "$pending" >&2
+          if [[ "$pending" -eq 0 ]]; then
+            echo "$resp" | jq -r '
+              . as $t |
+              (.members // []) as $members |
+              ($members | length) as $total |
+              ($members | map(select(.member_status == "done")) | length) as $done |
+              ($members | map(select(.member_status == "spawn_failed")) | length) as $spawn_failed |
+              "Team: \($t.name) (ID: \($t.id)) — all members settled.",
+              "Done: \($done)/\($total)\(if $spawn_failed > 0 then ", spawn_failed: \($spawn_failed)" else "" end)",
+              "",
+              "Final member status:",
+              ($members[] |
+                (.member_status // .status // "unknown") as $member_str |
+                (.session_uuid // "—") as $uuid_str |
+                (.session_id | tostring) as $sid_str |
+                (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
+                "  \(.name) (\(.role)) — \($member_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
+              )
+            '
+            [[ "$spawn_failed_count" -gt 0 ]] && return 1 || return 0
+          fi
+          sleep 5
+        done
+      elif [[ $summary -eq 1 ]]; then
+        _teams_status_summary
       else
         _curl "$BASE_URL/teams/$id" | jq .
       fi

@@ -44,10 +44,11 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   end
 
   @doc """
-  Returns the default model slug for a provider.
+  Returns the default model slug for Codex.
+  Claude defaults remain in the caller (SpawnValidator) to preserve backward-compat
+  API behavior — spawning a Claude agent with no model still resolves to "haiku".
   """
   def default_model("codex"), do: "gpt-5.4"
-  def default_model(_), do: "claude-opus-4-7"
 
   @doc """
   Returns a flat list of valid model slugs for the given provider.

@@ -1450,8 +1450,21 @@ HELP
       if [[ $wait -eq 1 ]]; then
         local spawn_failed_count=0
         while true; do
-          local resp
-          resp=$(_curl "$BASE_URL/teams/$id") || { sleep 5; continue; }
+          local resp _wait_body _wait_status
+          _wait_body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$BASE_URL/teams/$id")
+          _wait_status="${_wait_body##*$'\n'}"
+          _wait_body="${_wait_body%$'\n'*}"
+          # Fail fast on permanent errors — retrying 404/401/403 will never recover.
+          if [[ "$_wait_status" == "404" || "$_wait_status" == "401" || "$_wait_status" == "403" ]]; then
+            printf 'teams status --wait: permanent error (HTTP %s) — %s\n' "$_wait_status" "$_wait_body" >&2
+            return 1
+          fi
+          # Transient errors (429, 5xx): retry after backoff.
+          if [[ "$_wait_status" -ge 400 ]]; then
+            printf 'teams status --wait: transient error (HTTP %s), retrying in 5s\n' "$_wait_status" >&2
+            sleep 5; continue
+          fi
+          resp="$_wait_body"
           local pending
           pending=$(echo "$resp" | jq '[.members // [] | .[] | select(.member_status != "done" and .member_status != "spawn_failed")] | length')
           spawn_failed_count=$(echo "$resp" | jq '[.members // [] | .[] | select(.member_status == "spawn_failed")] | length')

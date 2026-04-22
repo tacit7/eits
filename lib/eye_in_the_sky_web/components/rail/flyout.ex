@@ -501,12 +501,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp nav_links(%{section: :sessions} = assigns) do
     ~H"""
-    <.simple_link href="/" label="All Sessions" icon="hero-cpu-chip" />
+    <.simple_link href="/sessions" label="All Sessions" icon="hero-cpu-chip" />
     <%= if @project do %>
       <.simple_link
         href={"/projects/#{@project.id}/sessions"}
-        label={"#{@project.name} Sessions"}
-        icon="hero-folder"
+        label="List"
+        icon="hero-list-bullet"
       />
     <% end %>
     """

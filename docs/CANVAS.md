@@ -47,19 +47,29 @@ Located at: `lib/eye_in_the_sky_web/live/canvas_live.ex`
 - `:subscribed_session_ids` — session IDs with active PubSub subscriptions
 - `:creating_canvas` — boolean flag for new canvas form display
 - `:sidebar_tab` — set to `:canvas` to activate canvas sidebar section
+- `:focus_session_id` — session ID to focus/raise when canvas loads (set from `?focus=` URL param)
+
+`mount/3` also subscribes to the global `agent:working` topic to receive working/stopped broadcasts for all sessions.
 
 ### Route Handling
 
 ```elixir
-# handle_params/3 — activates canvas on route change
-def handle_params(%{"id" => id_str}, _url, socket)
+# handle_params/3 — activates canvas on route change and reads focus param
+def handle_params(%{"id" => id_str} = params, _url, socket)
   # Parse canvas ID, validate, and activate
+  # Parse optional focus param: focus_session_id = parse_int(params["focus"])
+  # Assign focus_session_id which triggers phx-mounted span to dispatch canvas:focus-session event
   # Subscribes to all sessions in that canvas
   # Sets up window position defaults (cascade layout if not set)
 
 def handle_params(_params, _url, socket)
   # No ID — redirect to first canvas or stay on empty canvas list
 ```
+
+**Focus parameter handling:**
+- If `:focus_session_id` is assigned, a hidden `<span>` with `phx-mounted` is rendered
+- On mount, the span dispatches a `canvas:focus-session` event with `{sessionId: @focus_session_id}` as detail
+- This defers the focus event until after all windows are rendered in the DOM
 
 ## Keyboard Shortcuts & Controls
 
@@ -71,7 +81,9 @@ Keyboard events are managed via the `GlobalKeydown` hook registered in `assets/j
 - Previously, CanvasLive had a catch-all event handler; now canvas-specific keydown events are handled by `GlobalKeydown` hook instead with explicit logging of unhandled events
 
 ### Keyboard Shortcuts Help
-- **`?` key** — Toggle keyboard shortcuts help panel. Lazily creates modal overlay listing all canvas shortcuts. Escape or backdrop click closes correctly via `style.display` manipulation; input fields guarded so typing in search boxes doesn't trigger.
+- **`?` key** — Toggle keyboard shortcuts help panel. Lazily creates modal overlay listing all canvas shortcuts.
+  - **Closing:** Panel closes correctly on `Esc` key press or backdrop click via `style.display` manipulation
+  - **Input guarding:** Typing in search boxes or form inputs does not trigger shortcuts (guarded by input type check)
 
 ### Canvas & Tab Navigation
 - **`Cmd+1` through `Cmd+9`** — Tab switcher to quickly jump between open canvas tabs
@@ -112,31 +124,38 @@ Keyboard events are managed via the `GlobalKeydown` hook registered in `assets/j
 
 ### PubSub Integration
 
-The canvas page subscribes to session event streams via `EyeInTheSky.Events`:
+The canvas page subscribes to multiple event streams for real-time synchronization:
 
-**In `activate_canvas/2`:**
+**Global subscriptions (in `mount/3`):**
+- `agent:working` — Subscribes to all agent working/stopped broadcasts globally; handlers trigger window refresh for any visible session
+
+**Per-canvas subscriptions (in `activate_canvas/2`):**
 ```elixir
-subscribe_all(session_ids)  # Subscribe to events for all canvas sessions
+Events.subscribe_all(session_ids)  # Subscribe to events for all canvas sessions
 ```
 
 **Event handlers for real-time updates:**
 - `{:new_message, message}` — New message received in canvas session; calls `refresh_window` to update chat window
 - `{:new_dm, message}` — Direct message received in a canvas session
-- `{:claude_response, _ref, parsed}` — Agent response received
-- `{:session_status, session_id, status}` — Session status changed (working → stopped)
+- `{:session_status, session_id, status}` — Session status changed (working → stopped); triggers `refresh_window` to pulse indicator
+- `{:agent_working, %{id: session_id}}` — Agent transitioned to working state (from `agent:working` subscription); triggers `refresh_window` to update pulse
+- `{:agent_stopped, %{id: session_id}}` — Agent transitioned to stopped state (from `agent:working` subscription); triggers `refresh_window` to stop pulse
 - `{:remove_canvas_window, cs_id}` — Remote signal to close a window (e.g., session cleanup)
 - `{:canvas_session_added, session_id}` — Session added to canvas; updates session list and badge counts
 
-When events arrive, the handler calls `send_update/3` to update the `ChatWindowComponent` for that canvas session, keeping UI synchronized without full page refresh.
+**Belt-and-suspenders approach:** Both `session_status` and `agent:working`/`agent:stopped` trigger `refresh_window`, ensuring working indicator pulses regardless of which code path transitions the session status.
+
+When events arrive, the handler calls `refresh_window/2` which calls `send_update/3` to update the `ChatWindowComponent` for that canvas session, keeping UI synchronized without full page refresh.
 
 ## JavaScript Hooks
 
 ### Canvas Layout Hook
 - **File:** `assets/js/hooks/canvas_layout_hook.js`
-- **Purpose:** Manages preset layout buttons (2up, 4up), applies tiled positioning, and exports localStorage persistence utilities
+- **Purpose:** Manages preset layout buttons (2up, 4up), applies tiled positioning with precise edge padding and gaps, and exports localStorage persistence utilities
 - **Layout constants:**
-  - `EDGE = 8` — Pixel padding on all edges of the canvas area in tiled presets
-  - `GAP = 8` — Pixel gap between windows in 2up/4up tiled layouts
+  - `EDGE = 8` — Pixel padding on all four edges of the canvas area in tiled presets
+  - `GAP = 8` — Pixel gap between adjacent windows in 2up/4up tiled layouts
+- **Layout calculation:** For 2up preset: 2 columns side-by-side across full canvas width; each window: `width = (canvasWidth - EDGE*2 - GAP) / 2`. For 4up preset: 2x2 grid; each window: `width = (canvasWidth - EDGE*2 - GAP) / 2`, `height = (canvasHeight - EDGE*2 - GAP) / 2`
 - **Exports:**
   - `saveWindowLayout(csId, x, y, w, h, z)` — Persists window position, size, and optionally z-index to localStorage under key `cw_{csId}`
   - `loadWindowLayout(csId)` — Retrieves saved layout from localStorage, returns `{x, y, w, h, z}` or null
@@ -145,15 +164,17 @@ When events arrive, the handler calls `send_update/3` to update the `ChatWindowC
 
 ### Chat Window Hook
 - **File:** `assets/js/hooks/chat_window_hook.js`
-- **Purpose:** Handles window drag, resize, focus, minimize/maximize, snap-to-edge detection, and localStorage persistence
+- **Purpose:** Handles window drag, resize, focus, minimize/maximize, snap-to-edge detection, localStorage persistence, and chat submission
 - **Lifecycle:**
-  - On mount: Loads position/size/z-index from localStorage via `loadWindowLayout(csId)` and dispatches canvas:layout-applied event listener
+  - On mount: Loads position/size/z-index from localStorage via `loadWindowLayout(csId)` and syncs instance variables; adds canvas:layout-applied event listener
   - During drag: Saves position to localStorage with 50ms debounce via `saveWindowLayout()`
-  - During resize: Saves dimensions to localStorage with 400ms debounce via `saveWindowLayout()`
-  - On focus: Saves z-index to localStorage via `saveWindowZ()`
+  - During resize: Prevents window from resizing when a message is being sent (guards against visual jitter); saves dimensions to localStorage with 400ms debounce via `saveWindowLayout()`
+  - On focus: Saves z-index to localStorage via `saveWindowZ()` and dispatches `canvas:focus-session` event
+  - On message send: Prevents window resize by temporarily disabling the resize handler
 - **Snap zones:** Configurable threshold (80px) for edge snapping; snap zones detected based on cursor proximity to viewport edges
 - **Instance variables:** Maintains `_width`, `_height`, `_dragLeft`, `_dragTop`, `_zIndex` to track window state; these are synced when layout buttons dispatch canvas:layout-applied event
 - **Z-Index Stacking:** When a window is focused (clicked), z-index updates to "20" and is persisted; all other windows reset to z-index "1". Z-index is restored from localStorage on mount, allowing window stacking order to persist across sessions.
+- **Chat submission:** Submit listener is delegated to the window root element (not the textarea) to capture events from nested components like the chat window. Scrolling to bottom is deferred by one rAF to allow DOM reflow to complete before measuring scroll position.
 
 ### Global Keydown Hook
 - **File:** `assets/js/hooks/global_keydown.js`
@@ -166,13 +187,18 @@ When events arrive, the handler calls `send_update/3` to update the `ChatWindowC
 ### ChatWindowComponent
 - **Located:** `lib/eye_in_the_sky_web/components/chat_window_component.ex`
 - **Role:** Renders draggable, resizable windows for each canvas session
-- **Props:** `canvas_session` (struct with pos_x, pos_y, width, height, session_id)
+- **Props:** `canvas_session` (struct with pos_x, pos_y, width, height, session_id), `focus_session_id` (for cross-canvas focus highlighting)
 - **Events:** Emits `window_moved`, `window_resized`, `remove_window`, `raise_window` to parent `CanvasLive`
-- **Updates:** Receives `send_update` calls from PubSub event handlers to re-render with latest message
-- **Message rendering:** Uses iMessage-style bubble layout with provider icons, timestamps, and markdown via MarkdownMessage hook. **Bubble styling:** User messages appear on the right with primary-color bubbles; agent messages appear on the left with base-200 bubbles. **Tool call messages:** Rendered full-width without bubbles, detected via body segment parsing (messages where all segments are tool_call types). Tool result messages also render full-width. Regular DM-style messages (with explicit stream_type markers) use the standard bubble layout.
-- **Status indicator:** Session status dot uses `status_dot_class` with classes for all states: working (animated with `animate-pulse`), completed, failed, and idle. Provider icon in header animates with `animate-pulse` when session is working.
+- **Updates:** Receives `send_update` calls from PubSub event handlers (`:session_status`, `:agent_working`, `:agent_stopped`, `:new_message`) to re-render with latest message
+- **Message rendering:** Uses iMessage-style bubble layout with provider icons, timestamps, and markdown via MarkdownMessage hook.
+  - **User messages:** Right-aligned with primary-color bubbles and base-200 background text
+  - **Agent messages:** Left-aligned with base-200 bubbles and base-content text
+  - **Tool call messages:** Full-width, no bubble, centered; detected via body segment parsing (messages where all segments are tool_call types); capped at 85% max-width
+  - **Tool result messages:** Centered, muted styling (base-300/40 background, base-content/40 text), capped at 90% max-width
+  - **Regular DM-style messages:** Standard bubble layout with optional left-border styling for explicit DMs
+- **Status indicator:** Session status dot uses `status_dot_class` with classes for all states: working (animated with `animate-pulse`), completed, failed, and idle. Provider icon in chat message body animates with `animate-pulse` when session is working.
 - **Focus ring:** Active window shows visible focus ring to indicate interaction target.
-- **Scroll behavior:** ChatWindowHook owns all scroll behavior. Auto-scroll enabled by default; disabled when user scrolls up and shows unread message count pill. Clicking pill re-enables auto-scroll and jumps to bottom. Automatically scrolls to bottom when user sends new message.
+- **Scroll behavior:** ChatWindowHook owns all scroll behavior. Auto-scroll enabled by default; disabled when user scrolls up and shows unread message count pill. Clicking pill re-enables auto-scroll and jumps to bottom. Automatically scrolls to bottom when user sends new message. Scroll-to-bottom is deferred by one rAF to allow DOM layout to stabilize before scrolling.
 
 ### AgentList Integration
 - **File:** `lib/eye_in_the_sky_web/components/agent_list.ex`
@@ -278,11 +304,12 @@ In addition to database persistence, window layout and z-index are persisted to 
 
 ### Focus Parameter
 
-The `?focus=` query parameter enables cross-canvas window focusing:
-- Clicking a session name in the canvas rail flyout navigates to `/canvases/:id?focus=:session_id`
-- `CanvasLive` reads the `focus_session_id` from `handle_params/3`
-- Renders a hidden span with `phx-mounted` that dispatches `canvas:focus-session` event after all windows are in DOM
-- `ChatWindowHook` listens for this event and raises (focuses) the matching window to z-index 20
+The `?focus=` query parameter enables cross-canvas window focusing and is passed to ChatWindowComponent for visual feedback:
+- **Rail navigation:** Clicking a session name in the canvas rail flyout navigates to `/canvases/:id?focus=:session_id` instead of dispatching JS directly
+- **CanvasLive handling:** `handle_params/3` parses the `focus` param and assigns it as `:focus_session_id`
+- **Deferred focus event:** Renders a hidden span with `phx-mounted` attribute that dispatches `canvas:focus-session` event with `{sessionId: @focus_session_id}` after all windows are rendered in DOM
+- **ChatWindowHook listener:** Listens for `canvas:focus-session` event and raises the matching window to z-index `"20"`, persisting the z-index to localStorage
+- **Component prop:** The `:focus_session_id` is also passed to ChatWindowComponent for potential visual highlighting or focus ring indication
 
 ### Canvas-to-Agent Navigation
 
@@ -318,9 +345,10 @@ While canvas page is standalone, chat windows display session messages. Clicking
 - **Window positioning:** Cascade layout applied by default if window positions not previously persisted. Tidy button resets all windows and cascades them into clean grid layout.
 
 ### Status & Visual Feedback
-- **Working status pulse** — Session status dot animates with continuous pulse effect when session is in working state
+- **Working status indicator** — Session status dot animates with continuous pulse effect (`animate-pulse`) when session is in working state; provider icon in message body also pulses during working state
 - **Unread indicators** — Minimized windows show unread message dot; unread count pill appears when auto-scroll is disabled and new messages arrive
 - **Session added badge** — Refresh badge displayed on add_session to provide visual feedback that canvas was updated
+- **Window focus ring** — Active window displays a visible focus ring to indicate interaction target
 
 ## Related Files
 

@@ -798,17 +798,19 @@ Options:
   --agent <name>               Agent definition name
   --name <n>                   Session name
   --yolo                       Bypass sandbox restrictions
+  --dry-run                    Validate inputs without hitting spawn endpoint; print the curl command
 
 Examples:
   eits agents spawn --instructions "Review PR #42" --parent-session-id $EITS_SESSION_ID
   eits agents spawn --instructions-file /tmp/agent.txt --worktree fix/my-bug --stash-if-dirty
   eits agents spawn --instructions "Fix bug" --worktree fix/my-bug --team-name "audit"
   eits agents spawn --instructions-file /tmp/agent.txt --interpolate-env
+  eits agents spawn --instructions "Deploy" --team-name test --dry-run
 USAGE
         return 0; }
       local instructions="" instructions_set=0 instructions_file="" interpolate_env="false" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" stash_if_dirty="false" effort_level="" parent_session_id="" parent_agent_id=""
-      local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false"
+      local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false" dry_run="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --instructions)      instructions="$2"; instructions_set=1; shift 2 ;;
@@ -828,6 +830,7 @@ USAGE
           --agent)             agent_name="$2";         shift 2 ;;
           --name)              session_name="$2";       shift 2 ;;
           --yolo)              bypass_sandbox="true";   shift ;;
+          --dry-run)           dry_run="true";          shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -836,9 +839,37 @@ USAGE
       # Load from file if provided
       if [[ -n "$instructions_file" ]]; then
         [[ -f "$instructions_file" ]] || die "--instructions-file: file not found: $instructions_file"
+        [[ -r "$instructions_file" ]] || die "--instructions-file: file not readable: $instructions_file"
         instructions="$(cat "$instructions_file")"
       fi
       need instructions
+
+      # Dry-run validations
+      if [[ "$dry_run" == "true" ]]; then
+        # Validate team exists if team_name is provided
+        if [[ -n "$team_name" ]]; then
+          local teams_list
+          teams_list=$(_curl "$BASE_URL/teams" 2>&1 || true)
+          if echo "$teams_list" | grep -q "HTTP"; then
+            die "--dry-run: Failed to fetch teams: $(echo "$teams_list" | grep "HTTP")"
+          fi
+          if ! echo "$teams_list" | jq -e ".teams | map(.name) | contains([\"$team_name\"])" >/dev/null 2>&1; then
+            die "--dry-run: Team not found: $team_name"
+          fi
+        fi
+
+        # Validate parent session exists if provided
+        if [[ -n "$parent_session_id" ]]; then
+          local session_check
+          session_check=$(_curl "$BASE_URL/sessions/$parent_session_id" 2>&1 || true)
+          if echo "$session_check" | grep -q "HTTP"; then
+            die "--dry-run: Failed to fetch session: $(echo "$session_check" | grep "HTTP")"
+          fi
+          if ! echo "$session_check" | jq -e ".id" >/dev/null 2>&1; then
+            die "--dry-run: Parent session not found: $parent_session_id"
+          fi
+        fi
+      fi
       # Interpolate environment variables if requested
       if [[ "$interpolate_env" == "true" ]]; then
         if command -v envsubst &>/dev/null; then
@@ -881,6 +912,23 @@ USAGE
          + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)
          + (if $bypass_sandbox           then {bypass_sandbox: true}                   else {} end)
          + (if $stash_if_dirty           then {stash_if_dirty: true}                   else {} end)')
+      # Dry-run: print the curl command and exit without making the request
+      if [[ "$dry_run" == "true" ]]; then
+        echo "Dry-run validation passed. Curl command that would execute:"
+        echo ""
+        echo "curl -sk -X POST \\"
+        echo "  -H 'Content-Type: application/json' \\"
+        if [[ -n "${EITS_API_KEY:-}" ]]; then
+          echo "  -H 'Authorization: Bearer <EITS_API_KEY>' \\"
+        fi
+        echo "  -d '$payload' \\"
+        echo "  '$BASE_URL/agents'"
+        echo ""
+        echo "Request payload:"
+        echo "$payload" | jq .
+        return 0
+      fi
+
       local spawn_log="${EITS_SPAWN_LOG:-$HOME/.eits/spawn-errors.log}"
       local _sp_attempt=0 _sp_delay=2 _sp_ok=0
       local _sp_body _sp_status _sp_resp_body

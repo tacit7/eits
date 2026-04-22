@@ -26,11 +26,19 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     metadata_fn = Keyword.get(opts, :metadata_fn, fn _msg -> nil end)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    context = %{session_id: session_id, now: now, provider: provider, metadata_fn: metadata_fn}
+    messages_with_uuid = Enum.filter(messages, & &1.uuid)
+    uuids = Enum.map(messages_with_uuid, & &1.uuid)
+    existing = Messages.existing_source_uuids(session_id, uuids)
 
-    messages
-    |> Enum.filter(& &1.uuid)
-    |> Enum.count(&import_message(&1, context))
+    context = %{
+      session_id: session_id,
+      now: now,
+      provider: provider,
+      metadata_fn: metadata_fn,
+      existing_source_uuids: existing
+    }
+
+    Enum.count(messages_with_uuid, &import_message(&1, context))
   end
 
   # ---------------------------------------------------------------------------
@@ -38,77 +46,79 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   # ---------------------------------------------------------------------------
 
   defp import_message(msg, context) do
-    %{session_id: session_id, now: now, metadata_fn: metadata_fn} = context
-    {sender_role, recipient_role, direction} = message_roles(msg.role)
-    inserted_at = parse_timestamp(msg.timestamp, now)
-    metadata = metadata_fn.(msg)
+    %{
+      session_id: session_id,
+      now: now,
+      provider: provider,
+      metadata_fn: metadata_fn,
+      existing_source_uuids: existing_source_uuids
+    } = context
 
-    # Avoid double-rendering DMs: when a DM arrives it is persisted as
-    # sender_role: "agent" (inbound) by DMDelivery, then forwarded to the local
-    # CLI as a user prompt which the session file replays as role: "user".
-    # Without this check the bulk importer would create a second outbound/user
-    # row with the same body, causing the chat UI to render the DM twice
-    # (once received, once "sent").
-    if msg.role == "user" and dm_already_recorded?(session_id, msg.content) do
-      true
-    else
-      do_import_message(msg, context, sender_role, recipient_role, direction, inserted_at, metadata)
-    end
-  end
+    cond do
+      # Fast-path: if this source_uuid is already in the DB, skip the expensive body scan.
+      MapSet.member?(existing_source_uuids, msg.uuid) ->
+        true
 
-  defp dm_already_recorded?(session_id, body) do
-    case Messages.find_recent_dm(session_id, body, seconds: 86_400) do
-      nil -> false
-      _msg -> true
-    end
-  end
+      # Avoid double-rendering DMs. When a DM arrives, DMDelivery persists it
+      # as sender_role: "agent" (inbound) and forwards it to the local CLI as
+      # a user prompt; the session file then replays that prompt as
+      # role: "user". The find_unlinked_message lookup below only matches on
+      # sender_role, so the inbound "agent" row is invisible to it and a
+      # second outbound/user row gets created with the same body, making the
+      # DM render twice in the chat (once received, once "sent"). Skip the
+      # import when a recent inbound DM with the same body already exists.
+      msg.role == "user" and dm_already_recorded?(session_id, msg.content) ->
+        true
 
-  defp do_import_message(msg, context, sender_role, recipient_role, direction, inserted_at, metadata) do
-    %{session_id: session_id, now: now, provider: provider} = context
+      true ->
+        {sender_role, recipient_role, direction} = message_roles(msg.role)
+        inserted_at = parse_timestamp(msg.timestamp, now)
+        metadata = metadata_fn.(msg)
 
-    case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
-      {:ok, existing} ->
-        update_attrs = %{source_uuid: msg.uuid, updated_at: now}
+        case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
+          {:ok, existing} ->
+            update_attrs = %{source_uuid: msg.uuid, updated_at: now}
 
-        update_attrs =
-          if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
+            update_attrs =
+              if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
 
-        case Messages.update_message(existing, update_attrs) do
-          {:ok, _} ->
-            true
+            case Messages.update_message(existing, update_attrs) do
+              {:ok, _} ->
+                true
 
-          {:error, reason} ->
-            Logger.debug(
-              "BulkImporter: failed to link #{provider} message #{existing.id}: #{inspect(reason)}"
-            )
+              {:error, reason} ->
+                Logger.debug(
+                  "BulkImporter: failed to link #{provider} message #{existing.id}: #{inspect(reason)}"
+                )
 
-            false
-        end
+                false
+            end
 
-      :not_found ->
-        case Messages.create_message(%{
-               uuid: Ecto.UUID.generate(),
-               source_uuid: msg.uuid,
-               session_id: session_id,
-               sender_role: sender_role,
-               recipient_role: recipient_role,
-               direction: direction,
-               body: msg.content,
-               status: "delivered",
-               provider: provider,
-               metadata: metadata,
-               inserted_at: inserted_at,
-               updated_at: now
-             }) do
-          {:ok, _} ->
-            true
+          :not_found ->
+            case Messages.create_message(%{
+                   uuid: Ecto.UUID.generate(),
+                   source_uuid: msg.uuid,
+                   session_id: session_id,
+                   sender_role: sender_role,
+                   recipient_role: recipient_role,
+                   direction: direction,
+                   body: msg.content,
+                   status: "delivered",
+                   provider: provider,
+                   metadata: metadata,
+                   inserted_at: inserted_at,
+                   updated_at: now
+                 }) do
+              {:ok, _} ->
+                true
 
-          {:error, reason} ->
-            Logger.debug(
-              "BulkImporter: skipping #{provider} message source_uuid=#{msg.uuid}: #{inspect(reason)}"
-            )
+              {:error, reason} ->
+                Logger.debug(
+                  "BulkImporter: skipping #{provider} message source_uuid=#{msg.uuid}: #{inspect(reason)}"
+                )
 
-            false
+                false
+            end
         end
     end
   rescue
@@ -118,6 +128,13 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       )
 
       false
+  end
+
+  defp dm_already_recorded?(session_id, body) do
+    case Messages.find_recent_dm(session_id, body, seconds: 86_400) do
+      nil -> false
+      _msg -> true
+    end
   end
 
   defp message_roles("user"), do: {"user", "agent", "outbound"}

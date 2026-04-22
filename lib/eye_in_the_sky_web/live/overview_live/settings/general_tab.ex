@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.OverviewLive.Settings.TabHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  alias EyeInTheSkyWeb.Helpers.ModelHelpers
 
   def render(assigns) do
     ~H"""
@@ -50,7 +51,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                     <option
                       :for={{val, label} <- @models}
                       value={val}
-                      selected={@settings["default_model"] == val}
+                      selected={ModelHelpers.normalize_model_alias(@settings["default_model"]) == val}
                     >
                       {label}
                     </option>

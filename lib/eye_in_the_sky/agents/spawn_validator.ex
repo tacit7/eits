@@ -14,7 +14,9 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   """
   def validate(params) do
     provider = params["provider"] || "claude"
-    model = params["model"] || if(provider == "codex", do: "gpt-5.3-codex", else: "haiku")
+    model =
+      params["model"] ||
+        if(provider == "codex", do: ModelConfig.default_model("codex"), else: "haiku")
 
     with {:ok, instructions} <- validate_instructions(params["instructions"]),
          {:ok, _} <- validate_provider_model(provider, model),

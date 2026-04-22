@@ -29,8 +29,26 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   Returns the list of Codex model slugs.
   """
   def codex_models do
-    ["gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.2", "gpt-5.1", "gpt-5-codex-mini"]
+    [
+      "gpt-5.4",
+      "gpt-5.2-codex",
+      "gpt-5.1-codex-max",
+      "gpt-5.4-mini",
+      "gpt-5.3-codex",
+      "gpt-5.2",
+      "gpt-5.1-codex-mini",
+      # backward compat for sessions spawned before the unified list
+      "gpt-5.1",
+      "gpt-5-codex-mini"
+    ]
   end
+
+  @doc """
+  Returns the default model slug for Codex.
+  Claude defaults remain in the caller (SpawnValidator) to preserve backward-compat
+  API behavior — spawning a Claude agent with no model still resolves to "haiku".
+  """
+  def default_model("codex"), do: "gpt-5.4"
 
   @doc """
   Returns a flat list of valid model slugs for the given provider.

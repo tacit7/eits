@@ -50,7 +50,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
-    default_model = if provider == "codex", do: "gpt-5.3-codex", else: default_claude_model()
+    default_model =
+      if provider == "codex",
+        do: EyeInTheSky.Agents.ModelConfig.default_model("codex"),
+        else: default_claude_model()
     {:noreply, assign(socket, selected_provider: provider, selected_model: default_model)}
   end
 

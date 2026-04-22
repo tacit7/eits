@@ -40,10 +40,20 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       ]}
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>
-        <div class="px-3.5 py-3 border-b border-base-content/8 flex-shrink-0">
+        <div class="px-3.5 py-3 border-b border-base-content/8 flex-shrink-0 flex items-center justify-between">
           <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40">
             {section_label(@active_section)}
           </span>
+          <%= if @active_section == :sessions do %>
+            <button
+              phx-click="toggle_new_session_form"
+              phx-target={@myself}
+              title="New agent"
+              class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+            >
+              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+            </button>
+          <% end %>
         </div>
 
         <div class="flex-1 overflow-y-auto py-1">
@@ -88,6 +98,20 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.nav_links project={@sidebar_project} section={:sessions} />
           <% end %>
         </div>
+
+        <%!-- Sticky nav footer — visible only in sessions section --%>
+        <%= if @active_section == :sessions do %>
+          <div class="border-t border-base-content/8 flex-shrink-0">
+            <.simple_link href="/sessions" label="All Sessions" icon="hero-cpu-chip" />
+            <%= if @sidebar_project do %>
+              <.simple_link
+                href={"/projects/#{@sidebar_project.id}/sessions"}
+                label="List"
+                icon="hero-list-bullet"
+              />
+            <% end %>
+          </div>
+        <% end %>
       </div>
     </div>
     """
@@ -148,16 +172,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <div class="px-3 py-4 text-xs text-base-content/35 text-center">No sessions</div>
     <% end %>
 
-    <div class="border-t border-base-content/8 mt-1">
-      <.simple_link href="/sessions" label="All Sessions" icon="hero-cpu-chip" />
-      <%= if @sidebar_project do %>
-        <.simple_link
-          href={"/projects/#{@sidebar_project.id}/sessions"}
-          label="List"
-          icon="hero-list-bullet"
-        />
-      <% end %>
-    </div>
     """
   end
 

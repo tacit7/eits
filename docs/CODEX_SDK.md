@@ -134,7 +134,19 @@ The `stream_thinking` assign:
 
 ### Raw Output Broadcasting
 
-Codex's raw JSONL output lines are broadcast directly from `MessageHandler` when `forward_raw_lines: true` is set in the SDK options. The broadcast uses the session's `eits_session_id` (not the Codex thread_id):
+Codex's raw JSONL output lines are broadcast directly from `MessageHandler` when `forward_raw_lines: true` is set in the SDK options. This is set in `Codex.SDK`'s `@loop_opts`:
+
+```elixir
+@loop_opts [
+  parser: Parser,
+  telemetry_prefix: [:eits, :codex, :sdk],
+  log_raw_key: "log_codex_raw",
+  log_raw_prefix: "codex.raw",
+  forward_raw_lines: true
+]
+```
+
+The broadcast uses the `eits_session_id` from the handler state (not the Codex thread_id):
 
 ```elixir
 # lib/eye_in_the_sky/sdk/message_handler.ex
@@ -144,7 +156,26 @@ if forward_raw_lines do
 end
 ```
 
-This enables live debugging and inspection of the raw Codex JSONL stream without coupling the broadcast to AgentWorker. The `eits_session_id` ensures the broadcast reaches subscribers even before the Codex thread_id is available (before `thread.started` fires).
+This enables live debugging and inspection of the raw Codex JSONL stream without coupling the broadcast to AgentWorker. The `eits_session_id` ensures the broadcast reaches subscribers even before the Codex thread_id is available (before `thread.started` fires). Previously, AgentWorker relayed these messages; now the broadcast happens directly in MessageHandler.
+
+## Sandbox Bypassing
+
+By default, all Codex sessions bypass sandbox approval checks and tooling restrictions with the `--dangerously-bypass-approvals-and-sandbox` flag. This is configured in two places:
+
+1. **RuntimeContext**: Sets `bypass_sandbox: true` by default for Codex provider:
+   ```elixir
+   bypass_sandbox: opts[:bypass_sandbox] || provider == "codex"
+   ```
+
+2. **Codex.CLI.build_args/1**: Defaults `bypass_sandbox` option to `true`:
+   ```elixir
+   if Keyword.get(opts, :bypass_sandbox, true) do
+     args ++ ["--dangerously-bypass-approvals-and-sandbox"]
+   else
+     full_auto = Keyword.get(opts, :full_auto, true)
+   ```
+
+This allows Codex agents to use file modifications, shell commands, and other restricted operations by default. To opt out (use approval requirements), explicitly pass `bypass_sandbox: false` when starting a session.
 
 ## JSONL Event Types
 
@@ -220,8 +251,8 @@ The first message to a new Codex session is prepended with `codex_eits_init/1`, 
 
 | Module | File | Role |
 |--------|------|------|
-| `Codex.CLI` | `lib/eye_in_the_sky/codex/cli.ex` | Port spawning, arg building, env setup |
-| `Codex.SDK` | `lib/eye_in_the_sky/codex/sdk.ex` | High-level API; message protocol adapter |
+| `Codex.CLI` | `lib/eye_in_the_sky/codex/cli.ex` | Port spawning, arg building, env setup; defaults `bypass_sandbox` to `true` |
+| `Codex.SDK` | `lib/eye_in_the_sky/codex/sdk.ex` | High-level API; message protocol adapter; init prompt with EITS CLI reference |
 | `Codex.ToolMapper` | `lib/eye_in_the_sky/codex/tool_mapper.ex` | Normalize Codex tool calls to canonical format (command_execution→Bash, web_search→WebSearch, etc.) |
 | `Codex.Parser` | `lib/eye_in_the_sky/codex/parser.ex` | JSONL line -> Message struct |
 | `Codex.StreamAssembler` | `lib/eye_in_the_sky/codex/stream_assembler.ex` | Stream state for Codex PubSub events |
@@ -229,7 +260,7 @@ The first message to a new Codex session is prepended with `codex_eits_init/1`, 
 | `Claude.StreamAssembler` | `lib/eye_in_the_sky/claude/stream_assembler.ex` | Stream state for Claude PubSub events |
 | `AgentWorker` | `lib/eye_in_the_sky/claude/agent_worker.ex` | Provider-polymorphic worker |
 | `AgentManager` | `lib/eye_in_the_sky/claude/agent_manager.ex` | Session creation, worker lifecycle |
-| `MessageHandler` | `lib/eye_in_the_sky/sdk/message_handler.ex` | JSONL parsing, raw broadcasts from Codex output |
+| `MessageHandler` | `lib/eye_in_the_sky/sdk/message_handler.ex` | JSONL parsing, raw Codex broadcasts when `forward_raw_lines: true` |
 | `WorkerEvents` | `lib/eye_in_the_sky/agent_worker_events.ex` | DB persistence, PubSub broadcasts |
 
 ## Streaming vs Claude

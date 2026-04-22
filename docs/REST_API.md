@@ -53,6 +53,8 @@ Update session status. Used by SessionEnd, Stop, and Compact hooks. Broadcasts o
 
 For terminal states (`completed`, `failed`), `ended_at` is auto-set to now if not provided.
 
+When transitioning away from `waiting` status (e.g., to `working`, `completed`, `failed`), `status_reason` is automatically cleared unless explicitly provided in the request.
+
 **URL params:**
 
 | Param | Type | Description |
@@ -64,6 +66,7 @@ For terminal states (`completed`, `failed`), `ended_at` is auto-set to now if no
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `status` | string | no | One of: `working`, `waiting`, `completed`, `failed` |
+| `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`. Auto-cleared when transitioning away from waiting |
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
 
 **Response:** `200 OK`
@@ -799,18 +802,28 @@ Get the active timer for a session, if any.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `session_id` | string or integer | Session ID (UUID or integer) |
+| `session_id` | string or integer | Session ID (UUID or integer). Returns 404 if session not found |
 
-**Response:** `200 OK`
+**Response:** `200 OK` (with timer)
 
 ```json
 {
-  "session_id": 42,
-  "delay_ms": 300000,
-  "mode": "once",
-  "message": null,
-  "scheduled_at": "2026-04-19T12:30:00Z",
-  "active": true
+  "success": true,
+  "timer": {
+    "mode": "once",
+    "interval_ms": 300000,
+    "message": "Check on task progress",
+    "started_at": "2026-04-19T12:30:00Z",
+    "next_fire_at": "2026-04-19T12:35:00Z"
+  }
+}
+```
+
+**Response:** `404 Not Found` (no active timer)
+
+```json
+{
+  "error": "no active timer for this session"
 }
 ```
 
@@ -818,47 +831,65 @@ Get the active timer for a session, if any.
 
 ```bash
 curl localhost:5001/api/v1/sessions/42/timer
+curl localhost:5001/api/v1/sessions/abc-123/timer  # UUID also works
 ```
 
 ---
 
 ### POST /api/v1/sessions/:session_id/timer
 
-Schedule a wake-up timer for a session.
+Schedule a wake-up timer for a session. Replaces any existing timer for that session.
 
 **URL params:**
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `session_id` | string or integer | Session ID (UUID or integer) |
+| `session_id` | string or integer | Session ID (UUID or integer). Returns 404 if session not found |
 
 **Request body:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `delay_ms` | integer | no | Delay in milliseconds (e.g. 300000 for 5 minutes) |
-| `preset` | string | no | Preset delay: `"5m"`, `"10m"`, `"15m"`, `"30m"`, `"1h"`. Used if `delay_ms` is absent |
-| `mode` | string | no | Timer mode: `"once"` (default) or `"repeating"` |
-| `message` | string | no | Optional message override |
+| `delay_ms` | integer | no | Delay in milliseconds (min 100). Takes precedence over `preset` if both supplied |
+| `preset` | string | no | Preset delay: `"5m"`, `"10m"`, `"15m"`, `"30m"`, `"1h"`. Used if `delay_ms` is absent. Returns 400 if invalid |
+| `mode` | string | no | Timer mode: `"once"` (default) or `"repeating"`. Returns 400 if invalid |
+| `message` | string | no | Optional message override. Whitespace-only messages fall back to default. Message is trimmed before use |
 
 **Response:** `201 Created`
 
 ```json
 {
-  "session_id": 42,
-  "delay_ms": 300000,
-  "mode": "once",
-  "message": null,
-  "scheduled_at": "2026-04-19T12:30:00Z"
+  "success": true,
+  "action": "scheduled",
+  "timer": {
+    "mode": "once",
+    "interval_ms": 300000,
+    "message": "Check on task progress",
+    "started_at": "2026-04-19T12:30:00Z",
+    "next_fire_at": "2026-04-19T12:35:00Z"
+  }
 }
 ```
+
+When replacing an existing timer, `action` is `"replaced"` instead of `"scheduled"`.
+
+**Error responses:**
+
+- `400 Bad Request` — Invalid delay_ms (< 100), missing both delay_ms and preset, invalid mode, or invalid preset
+- `404 Not Found` — Session not found
 
 **Example:**
 
 ```bash
+# With preset
 curl -X POST localhost:5001/api/v1/sessions/42/timer \
   -H 'Content-Type: application/json' \
   -d '{"preset": "5m", "mode": "once"}'
+
+# With custom delay and message
+curl -X POST localhost:5001/api/v1/sessions/42/timer \
+  -H 'Content-Type: application/json' \
+  -d '{"delay_ms": 600000, "message": "Deploy to staging", "mode": "once"}'
 ```
 
 ---
@@ -1069,6 +1100,97 @@ This also applies to the REST API `POST /api/v1/dm` endpoint — `to_session_id`
 
 ---
 
+### POST /api/v1/iam/decide
+
+Evaluate a Claude Code hook payload against IAM policies and return the hook-protocol JSON response.
+
+This endpoint is **unauthenticated** — hook scripts run in the Claude CLI process environment with no user session context and cannot send Bearer tokens.
+
+**Request body:**
+
+Raw Claude Code hook payload (JSON object). The endpoint normalizes the payload to extract:
+- `event` — Hook event type (`"PreToolUse"`, `"PostToolUse"`, `"UserPromptSubmit"`, `"Stop"`)
+- `session_uuid` — Session UUID (if available)
+- `tool` — Tool name being evaluated (for PreToolUse)
+- `resource_path` — File path or resource identifier
+- `project_id` — Project ID (from session or path resolution)
+- `project_path` — Project directory path
+- `agent_type` — Agent type from session
+
+**Response:** `200 OK` — Hook-protocol JSON
+
+Hook response shape depends on event type:
+
+**PreToolUse (permission decision):**
+
+```json
+{
+  "permissionDecision": "allow" | "deny",
+  "instructions": ["Instruction text from matching policy"],
+  "hookSpecificOutput": null
+}
+```
+
+**PostToolUse / UserPromptSubmit:**
+
+```json
+{
+  "continue": true | false,
+  "additionalContext": "Instruction text from matching policy or null",
+  "hookSpecificOutput": null
+}
+```
+
+For `UserPromptSubmit`, use `suppressUserPrompt` + `hookSpecificOutput.userPrompt` to replace the prompt:
+
+```json
+{
+  "continue": true,
+  "suppressUserPrompt": true,
+  "hookSpecificOutput": {
+    "userPrompt": "Modified prompt text"
+  }
+}
+```
+
+**Stop:**
+
+```json
+{
+  "continue": true | false,
+  "additionalContext": "Instruction text from matching policy or null"
+}
+```
+
+**Fire-and-forget audit:**
+
+Decision evaluations are written asynchronously to the `iam_decisions` table with:
+- Decision ID, session UUID, event type, project info
+- Tool and resource path
+- Permission result and winning policy
+- Instructions snapshot
+- Evaluation duration (microseconds)
+- Raw payload
+
+**Example hook script (curl):**
+
+```bash
+# Claude Code hook: PreToolUse
+# Payload comes from Claude CLI with Bearer token not available
+curl -X POST http://localhost:5001/api/v1/iam/decide \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "event": "PreToolUse",
+    "tool": "bash",
+    "session_uuid": "abc-123",
+    "resource_path": "/Users/me/project/src",
+    "project_id": 1,
+    "project_path": "/Users/me/project"
+  }'
+```
+
+---
+
 ## Hook Integration
 
 These endpoints map to Claude Code hooks:
@@ -1079,6 +1201,10 @@ These endpoints map to Claude Code hooks:
 | SessionEnd | PATCH /sessions/:uuid | `status: "completed"` |
 | Stop | PATCH /sessions/:uuid | `status: "failed"` |
 | Compact | PATCH /sessions/:uuid | `status: "compacted"` (if needed) |
+| PreToolUse (IAM policy evaluation) | POST /api/v1/iam/decide | Evaluate tool permission against policies |
+| PostToolUse (IAM policy evaluation) | POST /api/v1/iam/decide | Evaluate post-tool action against policies |
+| UserPromptSubmit (IAM policy evaluation) | POST /api/v1/iam/decide | Evaluate prompt against sanitization policies |
+| Stop (IAM policy evaluation) | POST /api/v1/iam/decide | Evaluate stop action against policies |
 | PostToolUse (i-commits) | POST /commits | After git commit tool use |
 | PostToolUse (i-note-add) | POST /notes | After note tool use |
 | PostToolUse (i-save-session-context) | POST /session-context | After context save |

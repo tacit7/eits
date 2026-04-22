@@ -137,6 +137,55 @@ Agent state is independent from session state and transitions through three stat
 
 ---
 
+## Team Member Status & Spawn Failures
+
+Team members track two independent status fields:
+
+| Field | Values | Set By | Purpose |
+|-------|--------|--------|---------|
+| `member_status` | `active`, `done`, `spawn_failed`, `idle` | Team/Tasks APIs | Team membership state; **authoritative for orchestrators** |
+| `session_status` | `working`, `stopped`, `waiting`, `completed`, `failed` | Lifecycle hooks | Claude process lifecycle; may lag behind member_status |
+
+**Key behavior:**
+- **`member_status: done`** fires immediately when `eits tasks complete` is called, not when the session ends
+- **`session_status`** reflects the Claude Code process and lags — a member can be done but still show `working`
+- **Orchestrators should check `member_status`**, not `session_status`
+
+### Spawn Failures
+
+When `eits agents spawn` fails (non-2xx response), the system records a team member with `member_status: spawn_failed`:
+
+**Flow:**
+1. `AgentManager.spawn_agent/2` encounters an error creating the agent
+2. Calls `SpawnTeamContext.record_spawn_failure(team, member_name)` 
+3. Inserts a member row with `status: "spawn_failed"` (no linked session or agent)
+4. Error is logged to `EITS_SPAWN_LOG` (default: `~/.eits/spawn-errors.log`) and echoed to stderr
+5. `eits teams status --summary` counts and displays spawn_failed members
+
+**Implementation** in `SpawnTeamContext.record_spawn_failure/2`:
+```elixir
+def record_spawn_failure(nil, _member_name), do: :ok
+
+def record_spawn_failure(team, member_name) do
+  name = member_name || "unknown-#{System.unique_integer([:positive])}"
+  Teams.join_team(%{
+    team_id: team.id,
+    name: name,
+    role: "member",
+    status: "spawn_failed"
+  })
+end
+```
+
+**Spawn log output** (`EITS_SPAWN_LOG`):
+```
+2026-04-21T02:34:07Z rc=1 cmd=agents/spawn spawn error: connection refused
+```
+
+This allows orchestrators to detect and recover from spawn failures without monitoring session status.
+
+---
+
 ## Session Status Lifecycle
 
 Session status is set by lifecycle hooks and reflects the CLI process state:
@@ -148,6 +197,27 @@ Session status is set by lifecycle hooks and reflects the CLI process state:
 | `waiting` | SessionEnd hook (sdk-cli) | Headless session ended; can be resumed |
 | `completed` | i-end-session skill | Interactive session finished (manually set) |
 | `failed` | SessionWorker on systemic error | Billing/auth/watchdog error; session persisted to DB, Teams cleanup fired |
+
+### Status Reason Field
+
+The `status_reason` field (`:string`) stores context for a session's status, particularly the `waiting` state. It is auto-cleared when a session transitions away from `waiting`:
+
+```elixir
+# In SessionController.build_update_attrs/2:
+attrs =
+  if status && status != "waiting" && !params["status_reason"] do
+    Map.put(attrs, :status_reason, nil)
+  else
+    attrs
+  end
+```
+
+**Example use cases:**
+- `waiting` + `status_reason: "awaiting resume signal"` — session paused, needs explicit resume
+- Transitioning to `working` with no explicit reason clears the field automatically
+- Explicit `status_reason` in a transition (e.g., `status: "waiting"` + `status_reason: "custom reason"`) is preserved
+
+Set via `PATCH /api/v1/sessions/:uuid` with `status_reason` parameter.
 
 **Systemic Error Handling:**
 When SessionWorker encounters a systemic error (billing failure, auth error, or watchdog timeout), it calls `AgentWorkerEvents.on_session_failed/2`:
@@ -223,6 +293,171 @@ end
 ```
 
 This prevents `FunctionClauseError` when JSON payloads contain numeric session IDs.
+
+---
+
+## Task Execution & Ownership
+
+### Claim & Session Transfer
+
+When a session claims a task via `POST /api/v1/tasks/:id/claim`, the system **atomically transfers session ownership** to the claimer:
+
+**Old approach (deprecated):**
+- `eits tasks claim` used `PATCH /tasks/:id` with `state: "start"` and called link_session separately
+- Risk: if the session wasn't in the DB yet, it might not be linked, and the stop hook would fire on the wrong session
+
+**New approach (atomic):**
+- `POST /api/v1/tasks/:id/claim` transitions to In Progress and atomically:
+  1. Removes **all** existing `task_sessions` entries for the task
+  2. Inserts a new entry linking the claimer's session
+  3. Transitions task state to "in-progress" (state_id = 2)
+
+This ensures the stop hook fires on the executing session, not the creator's session.
+
+**Implementation** in `TaskSessions.transfer_session_ownership/2`:
+```elixir
+def transfer_session_ownership(task_id, new_session_id)
+    when is_integer(task_id) and is_integer(new_session_id) do
+  Repo.transaction(fn ->
+    from(ts in "task_sessions", where: ts.task_id == ^task_id)
+    |> Repo.delete_all()
+
+    Repo.insert_all(
+      "task_sessions",
+      [%{task_id: task_id, session_id: new_session_id}],
+      on_conflict: :nothing
+    )
+  end)
+
+  {:ok, new_session_id}
+end
+```
+
+**Atomicity guards:**
+- Task row is locked with `FOR UPDATE` until the transaction completes
+- Precondition checks: `:task_not_found`, `:already_claimed` (if state is already in-progress)
+
+### Created By Tracking
+
+Tasks now track who created them via the `created_by_session_id` column. This is separate from session ownership (task_sessions).
+
+**Key distinctions:**
+- **`created_by_session_id`** — immutable, set at task creation, tracks the original creator
+- **`task_sessions`** — mutable via claim, tracks the current executor
+
+**Use in filtering:**
+```bash
+eits tasks list --created-by        # Tasks created by the current session
+eits tasks list --mine --assigned   # Tasks currently assigned to the current session (via task_sessions)
+```
+
+### Task Completion & Member Status
+
+When `eits tasks complete` is called, it marks the member as done **for the calling session only**:
+
+**Old behavior:**
+- `mark_member_done_by_session` was called for all sessions linked to the completed task
+- Could mark unrelated team members (e.g., the orchestrator) as done
+- Scope was too broad
+
+**New behavior:**
+- CLI passes `EITS_SESSION_UUID` (or `EITS_SESSION_ID`) as `session_id` parameter
+- Controller only marks that single session's member done
+- Other sessions remain unaffected
+
+**Implementation** in `TaskController.complete`:
+```elixir
+defp maybe_mark_member_done(nil), do: :ok
+defp maybe_mark_member_done(""), do: :ok
+
+defp maybe_mark_member_done(session_id) do
+  case Helpers.resolve_session_int_id(session_id) do
+    {:ok, int_id} -> Teams.mark_member_done_by_session(int_id)
+    _ -> :ok
+  end
+end
+```
+
+### Annotation Retry & Persistence
+
+Task annotations (`eits tasks annotate`) now retry on rate-limit (429) errors and persist to disk on failure:
+
+**Retry strategy:**
+- Exponential backoff: 2s, 4s, 8s (max 3 retries)
+- After 3 failed attempts, annotation is queued to `~/.eits/pending-annotations.log`
+
+**Persistence & drain:**
+- Failed annotations are serialized as JSON to `~/.eits/pending-annotations.log`
+- On next session startup, `eits-session-startup.sh` drains the log sequentially
+- Each drained annotation retries with the same backoff strategy
+- Successfully drained entries are removed; failed ones are re-queued
+
+**Log format:**
+```json
+{"task_id":"123","body":"Completed xyz","title":""}
+```
+
+This prevents losing annotations when the API is temporarily rate-limited or unavailable.
+
+---
+
+## Session Context & Metadata
+
+Session context is stored in the `session_context` table, linked to sessions and agents:
+
+**Schema** (`EyeInTheSky.Contexts.SessionContext`):
+```elixir
+schema "session_context" do
+  field :context, :string          # Serialized session context (CLAUDE.md, imports, etc.)
+  field :metadata, :map            # Key-value metadata with source tracking
+  field :agent_id, :integer        # Agent who owns this context
+  field :session_id, :integer      # Session ID (not a foreign key, just a field)
+  field :created_at, :utc_datetime_usec
+  field :updated_at, :utc_datetime_usec
+end
+```
+
+**Metadata Field:**
+The `metadata` field (`:map`) stores arbitrary metadata with a `source` key for tracking context origins:
+```json
+{
+  "source": "resolved via session.project_id"
+}
+```
+
+Indexed on `metadata->>'source'` for efficient filtering of context by origin.
+
+**Changeset fields:**
+Only these are writable: `:agent_id, :session_id, :context, :metadata`
+
+---
+
+## Project Path Resolution
+
+When spawning agents, the system must resolve the working directory (`resolve_project_path`). The resolution order is:
+
+1. **Agent project association** (`agent.project.path`) — direct path from agent's project
+2. **Session project path** (`session.project.path`) — project directly linked to session
+3. **Session project ID fallback** (`session.project_id`) — look up project by ID if path is nil
+4. **Agent project ID fallback** (`agent.project_id`) — look up project by ID if agent.project is nil
+5. **Missing** — return `{:error, :missing_project_path}`
+
+Implementation in `SessionBridge.resolve_project_path/1`:
+```elixir
+case {session.project && session.project.path, agent.project && agent.project.path} do
+  {path, _} when not is_nil(path) -> {:ok, path}
+  {_, path} when not is_nil(path) -> {:ok, path}
+  {_, _} ->
+    case session.project_id || agent.project_id do
+      project_id when is_integer(project_id) ->
+        lookup_project_path(project_id, source, session.id)
+      _ ->
+        {:error, :missing_project_path}
+    end
+end
+```
+
+The `--project-id` flag in `eits sessions update` and the session startup script allow new sessions to set their project_id early, enabling path resolution before other data arrives.
 
 ---
 

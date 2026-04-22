@@ -147,6 +147,21 @@ defmodule EyeInTheSky.Messages do
   end
 
   @doc """
+  Returns a MapSet of source_uuids (from the provided list) that already exist in the DB
+  for the given session. Used by BulkImporter to fast-path dedup without per-row SELECTs.
+  """
+  @spec existing_source_uuids(integer(), list(String.t())) :: MapSet.t()
+  def existing_source_uuids(_session_id, []), do: MapSet.new()
+
+  def existing_source_uuids(session_id, source_uuids) when is_list(source_uuids) do
+    Message
+    |> where([m], m.session_id == ^session_id and m.source_uuid in ^source_uuids)
+    |> select([m], m.source_uuid)
+    |> Repo.all()
+    |> MapSet.new()
+  end
+
+  @doc """
   Creates a message (plain insert without advisory lock).
   For channel messages with sequential numbering, use create_channel_message/1.
   """

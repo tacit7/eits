@@ -44,6 +44,67 @@ Only `--instructions` is required. `--project-id` is inherited from parent sessi
 
 ---
 
+## Designing the Work (do this BEFORE spawning)
+
+Most failures in multi-agent work are not merge conflicts — they are **interface mismatches**. File-ownership boundaries only protect against mechanical conflicts; they don't protect against two agents disagreeing on what an assign, function signature, or return shape looks like. Walk through this decision tree before you touch `eits agents spawn`.
+
+### Is the work actually parallelizable?
+
+- **Orthogonal** (e.g. two independent bug fixes in separate contexts): fan out, no shared contract needed.
+- **Producer/consumer** (A defines data, B renders it): **sequence them**, or give both a written contract. Parallel with hidden coupling is where wire-up gaps hide.
+- **Single refactor touching one subsystem**: do not fan out. One agent, no team.
+
+### Write the contract first
+
+If two agents share any interface — assigns, function signatures, struct fields, return shapes, URL params — write it down **before** spawning. Drop a `/tmp/contract-<team>.md` with:
+
+```md
+# Shared contract v1
+
+## Assigns
+- @scope :: :all | integer
+- @projects :: list(Project.t())  (always assigned by State.init)
+
+## Return shapes
+- Loader returns a list of maps; each map has :project_name key when scope == :all
+
+## Wire-up
+- ProjectLive.Sessions.render/1 MUST pass scope={@scope} projects={@projects} to <.page>
+```
+
+Every agent's instructions link to this file. Every reviewer checks against it. Every gap in the contract is a gap you will pay for in a follow-up commit.
+
+### Carve file ownership + note interface coupling
+
+Worker instructions must say two things:
+
+1. **Files you own** (edit these).
+2. **Files you MUST NOT touch** (merge-conflict guard).
+
+File boundaries protect against the mechanical conflict. The contract doc protects against the logical conflict. You need both.
+
+### Integration branch pattern for coupled work
+
+When workers consume each other's interfaces, don't have them each branch from `main`:
+
+```
+main → integration-branch → worker-A, worker-B (both branch from integration)
+worker-A merges back to integration
+worker-B merges back to integration  (or pre-merges A to validate combined compile)
+orchestrator does final glue commits on integration
+PR integration → main
+```
+
+The orchestrator-only steps (router flips, file deletion, cross-cutting renames) live on integration, never in worker branches. This makes worker PRs reviewable in isolation while the integration PR shows the whole picture.
+
+### Cross-peer review before the orchestrator reviews
+
+After both workers DM done, have each peer-review the other's branch against the shared contract. Two independent reads of the same contract catch more gaps than one reviewer — when both reviewers independently flag the same gap, that convergence is the signal you got the contract tight.
+
+Reviewers must cite `file:line` hunks in every finding. Ungrounded reviews produce hallucinated findings and waste an integration cycle.
+
+---
+
 ## Workflow
 
 ### 1. Create team

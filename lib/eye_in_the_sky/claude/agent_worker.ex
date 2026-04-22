@@ -476,9 +476,28 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   @impl true
-  def terminate(_reason, %__MODULE__{} = state) do
+  def terminate(reason, %__MODULE__{} = state) do
     SdkLifecycle.cancel_active_sdk(state)
+    maybe_mark_session_failed(reason, state)
     :ok
+  end
+
+  # Normal termination (:normal, :shutdown, {:shutdown, _}) means the worker
+  # completed cleanly — its callbacks already updated session status.
+  # Any other reason means the worker crashed and session is now a zombie.
+  defp maybe_mark_session_failed(:normal, _state), do: :ok
+  defp maybe_mark_session_failed(:shutdown, _state), do: :ok
+  defp maybe_mark_session_failed({:shutdown, _}, _state), do: :ok
+
+  defp maybe_mark_session_failed(reason, %__MODULE__{session_id: session_id, provider_conversation_id: pcid}) do
+    Logger.warning("AgentWorker terminating abnormally for session_id=#{session_id}: #{inspect(reason)}")
+
+    try do
+      EyeInTheSky.AgentWorkerEvents.on_session_failed(session_id, pcid)
+    rescue
+      e ->
+        Logger.error("Failed to mark session failed on abnormal terminate: #{inspect(e)}")
+    end
   end
 
   # --- Private ---

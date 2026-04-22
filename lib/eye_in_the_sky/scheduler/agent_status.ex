@@ -12,7 +12,8 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
   require Logger
 
-  alias EyeInTheSky.{Agents, Sessions, Tasks}
+  alias EyeInTheSky.{Agents, Events, Repo, Sessions, Tasks}
+  alias EyeInTheSky.Sessions.Session
 
   # 5 minutes in milliseconds
   @interval 5 * 60 * 1000
@@ -22,6 +23,11 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+  end
+
+  @doc false
+  def sweep_zombie_sessions_for_testing do
+    sweep_zombie_sessions()
   end
 
   @impl GenServer
@@ -34,6 +40,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   @impl GenServer
   def handle_info(:mark_stale, state) do
     mark_stale_agents()
+    sweep_zombie_sessions()
     archive_dead_idle_sessions()
     # Schedule the next run
     Process.send_after(self(), :mark_stale, @interval)
@@ -111,6 +118,53 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   rescue
     DBConnection.ConnectionError ->
       Logger.warning("archive_dead_idle_sessions: DB unavailable, skipping")
+  end
+
+  # Sessions stuck in 'working' with no heartbeat for >30 minutes are zombies.
+  # Their AgentWorker died without firing on_sdk_errored or on_session_failed.
+  # Sweep them to 'failed' so the UI reflects reality.
+  # Also mark the linked agent as failed to ensure UI status filters are correct.
+  defp sweep_zombie_sessions do
+    import Ecto.Query
+
+    cutoff = DateTime.utc_now() |> DateTime.add(-@thirty_minutes, :second)
+
+    zombies =
+      from(s in Session,
+        where: s.status == "working",
+        where:
+          (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
+            (is_nil(s.last_activity_at) and not is_nil(s.started_at) and s.started_at < ^cutoff),
+        select: s
+      )
+      |> Repo.all()
+
+    Enum.each(zombies, fn session ->
+      case Sessions.update_session(session, %{status: "failed", status_reason: "zombie_swept"}) do
+        {:ok, updated} ->
+          Logger.warning("Swept zombie session id=#{session.id} uuid=#{session.uuid} (stuck in working)")
+          Events.session_status(session.id, updated.status)
+
+          if session.agent_id do
+            case Agents.get_agent(session.agent_id) do
+              {:ok, agent} ->
+                Agents.update_agent(agent, %{status: "failed"})
+
+              {:error, :not_found} ->
+                :ok
+            end
+          end
+
+        {:error, reason} ->
+          Logger.warning("Failed to sweep zombie session id=#{session.id}: #{inspect(reason)}")
+      end
+    end)
+
+    if zombies != [] do
+      Logger.info("Zombie sweep: marked #{length(zombies)} sessions as failed")
+    end
+  rescue
+    DBConnection.ConnectionError -> Logger.warning("sweep_zombie_sessions: DB unavailable, skipping")
   end
 
   # Returns true when a session has no linked tasks, or all linked tasks are done/archived.

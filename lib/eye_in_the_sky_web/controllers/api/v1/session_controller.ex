@@ -166,39 +166,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   Query params: q, limit (default 20)
   """
   def index(conn, params) do
-    query = params["q"] || ""
-    limit = parse_int(params["limit"], 20)
-
-    opts = [search_query: query]
-
-    opts =
-      if params["project_id"],
-        do: Keyword.put(opts, :project_id, parse_int(params["project_id"], nil)),
-        else: opts
-
-    opts =
-      if params["status"], do: Keyword.put(opts, :status_filter, params["status"]), else: opts
-
-    opts =
-      if params["agent_id"] do
-        agent_int_id = resolve_agent_int_id(params["agent_id"])
-        if agent_int_id, do: Keyword.put(opts, :agent_id, agent_int_id), else: opts
-      else
-        opts
-      end
-
-    opts =
-      if params["include_archived"] in ["true", "1", true],
-        do: Keyword.put(opts, :include_archived, true),
-        else: opts
-
-    opts =
-      if params["name"] && params["name"] != "",
-        do: Keyword.put(opts, :name_filter, params["name"]),
-        else: opts
-
-    opts = Keyword.put(opts, :limit, limit)
-
+    opts = build_session_filter_opts(params)
     results = Sessions.list_sessions_filtered(opts)
 
     with_tasks = params["with_tasks"] in ["true", "1", true]
@@ -479,5 +447,40 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   end
 
   defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
+
+  defp build_session_filter_opts(params) do
+    query = params["q"] || ""
+    limit = parse_int(params["limit"], 20)
+
+    opts = [search_query: query]
+
+    opts =
+      if params["project_id"],
+        do: Keyword.put(opts, :project_id, parse_int(params["project_id"], nil)),
+        else: opts
+
+    opts =
+      if params["status"], do: Keyword.put(opts, :status_filter, params["status"]), else: opts
+
+    opts =
+      if params["agent_id"] do
+        agent_int_id = resolve_agent_int_id(params["agent_id"])
+        if agent_int_id, do: Keyword.put(opts, :agent_id, agent_int_id), else: opts
+      else
+        opts
+      end
+
+    opts =
+      if params["include_archived"] in ["true", "1", true],
+        do: Keyword.put(opts, :include_archived, true),
+        else: opts
+
+    opts =
+      if params["name"] && params["name"] != "",
+        do: Keyword.put(opts, :name_filter, params["name"]),
+        else: opts
+
+    Keyword.put(opts, :limit, limit)
+  end
 
 end

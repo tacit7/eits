@@ -6,13 +6,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
   setup do
     {:ok, agent} =
-      Agents.create_agent(%{name: "test-agent", status: "stopped", provider: "claude"})
+      Agents.create_agent(%{name: "test-agent", status: "idle", provider: "claude"})
 
     {:ok, session} =
       Sessions.create_session(%{
         uuid: Ecto.UUID.generate(),
         agent_id: agent.id,
-        status: "stopped",
+        status: "idle",
         provider: "claude",
         started_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })
@@ -141,6 +141,65 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
       assert user_msg.direction == "outbound"
       assert agent_msg.direction == "inbound"
+    end
+
+    test "skips existing_source_uuids fast-path (source_uuid already in DB)", %{session: session} do
+      source_uuid = Ecto.UUID.generate()
+
+      # First import: message with source_uuid is created
+      messages1 = [
+        %{uuid: source_uuid, role: "user", content: "Hello", timestamp: nil, usage: nil}
+      ]
+
+      count1 = BulkImporter.import_messages(messages1, session.id, provider: "codex")
+      assert count1 == 1
+
+      db_messages1 = Messages.list_messages_for_session(session.id)
+      assert length(db_messages1) == 1
+      assert hd(db_messages1).source_uuid == source_uuid
+
+      # Second import: same source_uuid should be skipped by fast-path
+      messages2 = [
+        %{uuid: source_uuid, role: "user", content: "Hello", timestamp: nil, usage: nil}
+      ]
+
+      count2 = BulkImporter.import_messages(messages2, session.id, provider: "codex")
+      assert count2 == 1  # counted as processed, but not inserted (fast-path returns true)
+
+      db_messages2 = Messages.list_messages_for_session(session.id)
+      assert length(db_messages2) == 1  # no duplicate created
+    end
+
+    test "skips dm_already_recorded? path (user msg matches recent inbound DM body)", %{
+      session: session
+    } do
+      # Create an inbound DM (agent role) with a specific body
+      {:ok, _inbound_dm} =
+        Messages.create_message(%{
+          uuid: Ecto.UUID.generate(),
+          session_id: session.id,
+          sender_role: "agent",
+          recipient_role: "user",
+          direction: "inbound",
+          body: "DM from agent",
+          status: "delivered",
+          provider: "codex"
+        })
+
+      # Now try to import a user-role message with the same body
+      # This should be skipped because dm_already_recorded? detects the inbound DM
+      source_uuid = Ecto.UUID.generate()
+
+      messages = [
+        %{uuid: source_uuid, role: "user", content: "DM from agent", timestamp: nil, usage: nil}
+      ]
+
+      count = BulkImporter.import_messages(messages, session.id, provider: "codex")
+      assert count == 1  # counted as processed, but skipped by dm_already_recorded?
+
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert length(db_messages) == 1  # only the inbound DM exists
+      assert hd(db_messages).sender_role == "agent"
     end
   end
 end

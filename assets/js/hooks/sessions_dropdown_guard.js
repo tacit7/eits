@@ -1,65 +1,51 @@
 /**
  * SessionsDropdownGuard
  *
- * Prevents DaisyUI dropdowns from closing when LiveView patches a stream
- * item (e.g., a PATCH /sessions/:uuid triggers stream_insert which replaces
- * the DOM row containing the open dropdown).
+ * Prevents <details> dropdowns from closing when LiveView stream_insert
+ * replaces a stream item row (remove old DOM node, insert new one).
  *
- * Why beforeUpdate/updated don't work here:
- * Those hook callbacks fire when the *element the hook is attached to* gets
- * a diff from the server. A phx-update="stream" container's attributes don't
- * change when children are inserted — so those callbacks never fire.
+ * phx-update="ignore" on the <details> itself does NOT help here — it only
+ * prevents morphdom from patching the element during a diff. When the parent
+ * stream item is removed and reinserted wholesale, the <details> is a brand
+ * new element with no open state.
  *
- * Correct approach:
- * 1. Track which stream item has focus via focusin/focusout listeners.
- * 2. On focusout, check e.target.isConnected — if the element was removed
- *    by a LiveView patch it will be disconnected, so we keep the item ID.
- *    If the user deliberately blurred, the element is still connected, so
- *    we clear the ID.
- * 3. A MutationObserver on the container fires (as a microtask) after the
- *    DOM batch completes. At that point the new element is in the DOM and
- *    we re-focus its dropdown button, restoring :focus-within.
+ * How this works:
+ * 1. A capture-phase "toggle" listener tracks which <details> is currently
+ *    open by ID. Capture phase ensures it fires before children handle it.
+ * 2. A MutationObserver on the stream container fires after each stream
+ *    mutation (direct childList only — rows are direct children).
+ * 3. On mutation: if _openDetailsId is still set, the user did not close the
+ *    dropdown — the DOM swap did. Find the new element by ID and set open=true.
  */
 export const SessionsDropdownGuard = {
   mounted() {
-    this._focusedItemId = null;
+    this._openDetailsId = null;
 
-    this._onFocusIn = (e) => {
-      const item = e.target.closest("[id^='si-']");
-      this._focusedItemId = item?.id ?? null;
-    };
-
-    this._onFocusOut = (e) => {
-      // If the element is still in the DOM, the user deliberately blurred — clear state.
-      // If it was disconnected (removed by a LiveView stream patch), keep the ID so
-      // the MutationObserver can refocus the replacement element.
-      if (e.target.isConnected) {
-        this._focusedItemId = null;
+    // Capture phase: fires before any bubbling listeners on children.
+    this._onToggle = (e) => {
+      const details = e.target.closest("details");
+      if (!details) return;
+      if (details.open) {
+        this._openDetailsId = details.id;
+      } else if (this._openDetailsId === details.id) {
+        this._openDetailsId = null;
       }
     };
 
-    this.el.addEventListener("focusin", this._onFocusIn);
-    this.el.addEventListener("focusout", this._onFocusOut);
+    this.el.addEventListener("toggle", this._onToggle, true);
 
     this._observer = new MutationObserver(() => {
-      if (!this._focusedItemId) return;
-
-      const item = document.getElementById(this._focusedItemId);
-      this._focusedItemId = null;
-
-      if (!item || item.contains(document.activeElement)) return;
-
-      const btn = item.querySelector(".dropdown [tabindex='0']");
-      if (btn) btn.focus();
+      if (!this._openDetailsId) return;
+      const details = document.getElementById(this._openDetailsId);
+      if (details && !details.open) details.open = true;
     });
 
-    // childList only — we only care about rows being added/removed, not attribute changes.
+    // childList only — stream inserts/removes are direct children of this el.
     this._observer.observe(this.el, { childList: true });
   },
 
   destroyed() {
     this._observer?.disconnect();
-    this.el.removeEventListener("focusin", this._onFocusIn);
-    this.el.removeEventListener("focusout", this._onFocusOut);
+    this.el.removeEventListener("toggle", this._onToggle, true);
   },
 };

@@ -144,7 +144,7 @@ Team members track two independent status fields:
 | Field | Values | Set By | Purpose |
 |-------|--------|--------|---------|
 | `member_status` | `active`, `done`, `spawn_failed`, `idle` | Team/Tasks APIs | Team membership state; **authoritative for orchestrators** |
-| `session_status` | `working`, `stopped`, `waiting`, `completed`, `failed` | Lifecycle hooks | Claude process lifecycle; may lag behind member_status |
+| `session_status` | `working`, `idle`, `waiting`, `completed`, `failed` | Lifecycle hooks | Claude process lifecycle; may lag behind member_status |
 
 **Key behavior:**
 - **`member_status: done`** fires immediately when `eits tasks complete` is called, not when the session ends
@@ -193,10 +193,10 @@ Session status is set by lifecycle hooks and reflects the CLI process state:
 | Status | Set By | Meaning |
 |---|---|---|
 | `working` | UserPromptSubmit hook | Claude Code is processing a message |
-| `stopped` | Stop hook | Session explicitly stopped; CLI stopped gracefully |
-| `waiting` | SessionEnd hook (sdk-cli) | Headless session ended; can be resumed |
-| `completed` | i-end-session skill | Interactive session finished (manually set) |
-| `failed` | SessionWorker on systemic error | Billing/auth/watchdog error; session persisted to DB, Teams cleanup fired |
+| `idle` | Stop hook or SessionEnd hook (sdk-cli) | Session stopped gracefully; can be resumed for sdk-cli |
+| `waiting` | Explicit POST /sessions/:id/waiting or on_session_failed | Session waiting for action/resume; blocked or temporarily paused |
+| `completed` | Explicit POST /sessions/:id/complete or i-end-session skill | Interactive session finished (manually set) |
+| `failed` | AgentWorker abnormal exit or zombie sweep | Billing/auth/watchdog error, agent crash, or zombie cleanup; session persisted to DB, Teams cleanup fired |
 
 ### Status Reason Field
 
@@ -212,19 +212,29 @@ attrs =
   end
 ```
 
+**Common values:**
+- `"session_ended"` — Set by eits-session-end.sh (sdk-cli SessionEnd hook) when transitioning to `waiting`
+- `"sdk_completed"` — Set when Codex agent completes (no longer parks in waiting; now transitions to `idle`)
+- `"zombie_swept"` — Set by zombie sweep scheduler when marking stuck sessions as failed
+- Custom reasons — Set explicitly via `/sessions/:id/waiting` endpoint
+
 **Example use cases:**
-- `waiting` + `status_reason: "awaiting resume signal"` — session paused, needs explicit resume
+- `waiting` + `status_reason: "session_ended"` — sdk-cli session paused; SessionEnd hook can be retried
+- `waiting` + `status_reason: "awaiting resume signal"` — custom pause state
 - Transitioning to `working` with no explicit reason clears the field automatically
 - Explicit `status_reason` in a transition (e.g., `status: "waiting"` + `status_reason: "custom reason"`) is preserved
 
-Set via `PATCH /api/v1/sessions/:uuid` with `status_reason` parameter.
+Set via `PATCH /api/v1/sessions/:uuid` with `status_reason` parameter, or use explicit endpoints:
+- `POST /api/v1/sessions/:uuid/waiting` — Set status to waiting with optional reason
+- `POST /api/v1/sessions/:uuid/complete` — Set status to completed and sync team member
 
 **Systemic Error Handling:**
-When SessionWorker encounters a systemic error (billing failure, auth error, or watchdog timeout), it calls `AgentWorkerEvents.on_session_failed/2`:
+When SessionWorker encounters a systemic error (billing failure, auth error, or watchdog timeout), or when AgentWorker terminates abnormally, the system calls `AgentWorkerEvents.on_session_failed/2`:
 1. Streams error event to session channel
 2. Overwrites session status in DB to `"failed"` (ensuring final status persists even if previous status was `"idle"`)
+3. Sets `status_reason` based on the error context
 
-Implementation in `on_session_failed/2` (after deduplication fix):
+Implementation in `on_session_failed/2`:
 ```elixir
 def on_session_failed(session_id, provider_conversation_id) do
   Events.stream_error(session_id, provider_conversation_id, "Systemic error — session failed")
@@ -233,22 +243,33 @@ def on_session_failed(session_id, provider_conversation_id) do
 end
 ```
 
-The function no longer fires duplicate `session_idle`/`agent_stopped` events. Previous implementation called both on successful DB update, causing broadcast storms when multiple systemic errors fired in sequence. Removed to simplify status finalization — status update alone is sufficient.
+**Zombie Session Sweep:**
+The AgentStatus scheduler includes a zombie sweep that marks sessions stuck in `working` status for >30 minutes with no heartbeat as `failed`:
+- Runs periodically to detect crashed workers that didn't clean up
+- Marks linked agent as `failed` (mirroring the archive path)
+- Sets `status_reason: "zombie_swept"` for visibility
+- Guards against fresh sessions with NULL `last_activity_at` by checking `started_at` is stale (>30min old)
+
+This handles production scenarios where AgentWorker crashes abnormally without calling terminate/2.
+
+**AgentWorker Abnormal Exit:**
+When AgentWorker terminates for abnormal reasons (not `:normal` or `:shutdown`), it immediately calls `on_session_failed/2` to mark the session failed and ensure Teams cleanup fires.
 
 This design ensures:
 - Systemic failures are distinguishable from graceful stops (UI shows red status)
+- Agent crashes are caught both via terminate/2 and via periodic zombie sweep
 - Status is written to DB (survives worker restart)
 - No duplicate broadcast events from status finalization
 
 **Status indicator styling:**
-- `stopped` → Yellow left border (warning color) on session card
+- `idle` → Neutral gray left border on session card
 - `working` → Blue left border
 - `failed` → Red left border
-- `waiting` → Yellow left border
+- `waiting` → Yellow left border (awaiting action/resume)
 
 **Auto-completion behavior:**
-- Stopped status is **not** auto-set on CLI exit
-- Completed status must be set **explicitly** via i-end-session skill
+- Status is **not** auto-set on CLI exit (Stop hook sets `idle`, not `completed`)
+- Completed status must be set **explicitly** via i-end-session skill or `POST /sessions/:id/complete`
 - This prevents incorrect status when sessions are retried or resumed
 
 ---
@@ -267,10 +288,20 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 - `PATCH /api/v1/sessions/:uuid` — Update session status (lifecycle hooks)
 - `POST /api/v1/sessions/:uuid/tool_event` — Record tool event
 - `POST /api/v1/sessions/:uuid/end` — End session with final status
+- `POST /api/v1/sessions/:uuid/complete` — Mark session completed and sync team member (NEW)
+- `POST /api/v1/sessions/:uuid/waiting` — Mark session waiting with optional status_reason and sync team member (NEW)
 - `GET /api/v1/sessions/:uuid/context` — Load session context
 - `POST /api/v1/sessions/:uuid/context` — Upsert context
 
 This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
+
+**Environment Variable: EITS_SESSION_ID**
+Spawned Claude processes set `EITS_SESSION_ID` to the **integer session ID**, not the UUID. This is critical for child agent spawning:
+- `EITS_SESSION_ID` = integer (e.g., `3185`) — used for `--parent-session-id` 
+- `EITS_SESSION_UUID` = UUID (e.g., `8803d56d-dbbd-4916-9ff0-155378a64a47`) — used for `--resume`
+- Provider conversation ID (Claude session UUID) is separate; stored in agents table for `--resume` handling
+
+Agents that spawn children read `EITS_SESSION_ID` and pass it as `--parent-session-id` to `eits agents spawn`. This integer is required for proper parent-child session linkage.
 
 **Integer Session ID Handling:**
 JSON decoding converts numeric `session_id` values to integers, but task linking functions only had clauses for nil and binary strings. Fixed by adding integer guards to `do_link_session/2` in `Tasks.Associations` and `maybe_link_session/2` in `TaskController`:
@@ -293,6 +324,55 @@ end
 ```
 
 This prevents `FunctionClauseError` when JSON payloads contain numeric session IDs.
+
+---
+
+## Explicit Session Completion Endpoints
+
+Two new endpoints provide explicit control over session status transitions with team member synchronization:
+
+### POST /api/v1/sessions/:id/complete
+
+Sets session status to `completed` and marks the team member as done (for the calling session only):
+
+```bash
+curl -X POST http://localhost:5001/api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47/complete
+```
+
+**Response:**
+```json
+{
+  "status": "completed",
+  "member_synced": true
+}
+```
+
+- Accepts integer ID or UUID
+- Returns `member_synced: true` if the session was part of a team
+- CLI: `eits sessions complete` defaults to `EITS_SESSION_UUID`
+
+### POST /api/v1/sessions/:id/waiting
+
+Sets session status to `waiting` and marks the team member as blocked:
+
+```bash
+curl -X POST http://localhost:5001/api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47/waiting \
+  -d '{"status_reason": "awaiting user input"}'
+```
+
+**Response:**
+```json
+{
+  "status": "waiting",
+  "status_reason": "awaiting user input",
+  "member_synced": true
+}
+```
+
+- Accepts integer ID or UUID
+- Optional `status_reason` param
+- Auto-clears `status_reason` if transitioning away from `waiting` without an explicit reason
+- CLI: `eits sessions waiting` defaults to `EITS_SESSION_UUID`
 
 ---
 
@@ -335,7 +415,10 @@ end
 
 **Atomicity guards:**
 - Task row is locked with `FOR UPDATE` until the transaction completes
-- Precondition checks: `:task_not_found`, `:already_claimed` (if state is already in-progress)
+- Precondition checks: 
+  - `:task_not_found` — task does not exist
+  - `:already_claimed` — task state is already in-progress (cannot claim twice)
+- Single `Repo.transaction` ensures no partial success — if any step fails, the entire claim is rolled back
 
 ### Created By Tracking
 

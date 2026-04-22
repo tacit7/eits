@@ -152,8 +152,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   # ---------------------------------------------------------------------------
 
   def navigate_dm(%{"id" => id}, socket) do
-    project_id = socket.assigns.project_id
-    {:noreply, push_navigate(socket, to: ~p"/dm/#{id}?from=project&project_id=#{project_id}")}
+    path =
+      case socket.assigns do
+        %{scope: :all} -> ~p"/dm/#{id}"
+        %{project_id: project_id} -> ~p"/dm/#{id}?from=project&project_id=#{project_id}"
+      end
+
+    {:noreply, push_navigate(socket, to: path)}
   end
 
   def rename_session(%{"session_id" => session_id}, socket) do

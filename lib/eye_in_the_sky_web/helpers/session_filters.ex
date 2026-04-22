@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
       "active" ->
         Enum.filter(
           sessions,
-          &(&1.status in ["working", "idle", "stopped", nil] and is_nil(&1.archived_at))
+          &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at))
         )
 
       "completed" ->

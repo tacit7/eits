@@ -459,7 +459,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
   defp trigger_status_side_effects(updated, status) do
     if status do
-      if status in ["completed", "failed", "waiting", "stopped"] do
+      if status in ["completed", "failed", "waiting", "idle"] do
         EyeInTheSky.Events.agent_stopped(updated)
       else
         EyeInTheSky.Events.agent_working(updated)

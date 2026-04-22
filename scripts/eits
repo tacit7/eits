@@ -549,8 +549,63 @@ cmd_tasks() {
       printf '%s\t%s\n' 3 "Done"
       printf '%s\t%s\n' 4 "In Review"
       ;;
+    bulk-update)
+      # eits tasks bulk-update --ids <id,id,...> [--state <id|name>] [--priority <p>] [--title <t>]
+      # Applies the same update to all specified task IDs.
+      # Example: eits tasks bulk-update --ids 101,102,103 --state 3
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'HELP'
+usage: eits tasks bulk-update --ids <id,...> [--state <id>] [--priority <p>] [--title <t>]
+
+Apply the same field update to multiple tasks at once.
+
+  --ids <id,...>     Comma-separated task IDs (required)
+  --state <id>       Workflow state: 1=To Do, 2=In Progress, 3=Done, 4=In Review
+  --priority <p>     Priority value
+  --title <t>        New title (applied to all — use with care)
+
+Examples:
+  eits tasks bulk-update --ids 101,102,103 --state 3
+  eits tasks bulk-update --ids 200,201 --state 1 --priority high
+HELP
+        return 0; }
+      local ids_raw="" updates="{}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --ids)
+            ids_raw="$2"; shift 2 ;;
+          --state)
+            if [[ "$2" =~ ^[0-9]+$ ]]; then
+              updates=$(echo "$updates" | jq --argjson v "$2" '. + {state_id: $v}')
+            else
+              updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}')
+            fi
+            shift 2 ;;
+          --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
+          --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$ids_raw" ]] || die "--ids is required"
+      [[ "$updates" != "{}" ]] || die "at least one field to update is required (--state, --priority, --title)"
+      local ok=0 fail=0
+      IFS=',' read -ra _ids <<< "$ids_raw"
+      for _id in "${_ids[@]}"; do
+        _id="${_id// /}"  # trim spaces
+        [[ -z "$_id" ]] && continue
+        if _curl -X PATCH -H "Content-Type: application/json" -d "$updates" "$BASE_URL/tasks/$_id" >/dev/null 2>&1; then
+          printf 'updated #%s\n' "$_id"
+          ok=$(( ok + 1 ))
+        else
+          printf 'failed  #%s\n' "$_id" >&2
+          fail=$(( fail + 1 ))
+        fi
+      done
+      printf '%d updated, %d failed\n' "$ok" "$fail"
+      [[ "$fail" -eq 0 ]]
+      ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag|states> [--mine|--assigned] [--created-by] [--title] [--quiet]"
+      echo "usage: eits tasks <list|get|create|update|bulk-update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag|states> [--mine|--assigned] [--created-by] [--title] [--quiet]"
       ;;
   esac
 }
@@ -1703,7 +1758,7 @@ Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 
 Commands:
   sessions      list|get|create|update|end|context
-  tasks         list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session
+  tasks         list|get|create|update|bulk-update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session
                 list --mine, update --title, begin --quiet
   notes         list|get|create|update|add
   projects      list|get|create

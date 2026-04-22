@@ -144,7 +144,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
              project_id: project_id,
              model_provider: "manual",
              model_name: "chat",
-             status: "stopped",
+             status: "idle",
              started_at: DateTime.utc_now()
            },
            {:session, {:ok, session}} <-

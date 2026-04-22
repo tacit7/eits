@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpers do
     # Update session status so stale agent_working PubSub events don't revive the UI
     case Sessions.get_session(session_id) do
       {:ok, session} ->
-        Sessions.update_session(session, %{status: "stopped"})
+        Sessions.update_session(session, %{status: "idle"})
         Events.agent_stopped(session)
 
       _ ->

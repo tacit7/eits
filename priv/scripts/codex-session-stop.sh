@@ -37,6 +37,6 @@ if [ "$in_progress" = "yes" ]; then
 fi
 # --- End Task Annotation Enforcement ---
 
-eits sessions update "$session_id" --status stopped >/dev/null 2>&1 &
+eits sessions update "$session_id" --status idle >/dev/null 2>&1 &
 
 exit 0

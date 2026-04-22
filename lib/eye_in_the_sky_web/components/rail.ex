@@ -8,6 +8,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, ScheduledJobs, Sessions, Tasks, Teams}
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
+  alias EyeInTheSkyWeb.Components.NewSessionModal
+  alias EyeInTheSkyWeb.AgentLive.IndexActions
 
   @section_map %{
     sessions: :sessions,
@@ -61,7 +63,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_filter_open: false,
         session_sort: :last_activity,
         session_name_filter: "",
-        flyout_jobs: []
+        flyout_jobs: [],
+        show_new_session_form: false
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
@@ -283,6 +286,15 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("set_bookmark", params, socket),
     do: ProjectActions.handle_set_bookmark(params, socket)
 
+  def handle_event("toggle_new_session_form", _params, socket),
+    do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
+
+  def handle_event("toggle_new_session_drawer", _params, socket),
+    do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
+
+  def handle_event("create_new_session", params, socket),
+    do: IndexActions.handle_create_new_session(params, socket)
+
   def handle_event("toggle_session_filter", _params, socket),
     do: {:noreply, assign(socket, :session_filter_open, !socket.assigns.session_filter_open)}
 
@@ -436,6 +448,16 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         notification_count={@notification_count}
         flyout_jobs={@flyout_jobs}
         myself={@myself}
+      />
+
+      <.live_component
+        module={NewSessionModal}
+        id="rail-new-session-modal"
+        show={@show_new_session_form}
+        projects={@projects}
+        current_project={@sidebar_project}
+        toggle_event="toggle_new_session_drawer"
+        submit_event="create_new_session"
       />
     </div>
     """

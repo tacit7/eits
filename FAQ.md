@@ -268,7 +268,7 @@ Three main LiveViews:
 |-------|--------|-------------|
 | `/` | `AgentLive.Index` | Agent list with status badges |
 | `/agents/:id` | `AgentLive.Show` | Agent detail with 3-column layout |
-| `/sessions` | `SessionLive.Index` | Session overview across agents |
+| `/sessions` | `ProjectLive.Sessions` (`:all` scope) | Cross-project session overview |
 
 ### AgentLive.Show Layout
 

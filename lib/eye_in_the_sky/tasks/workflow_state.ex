@@ -26,6 +26,7 @@ defmodule EyeInTheSky.Tasks.WorkflowState do
   @aliases %{
     "done" => "Done",
     "start" => "In Progress",
+    "progress" => "In Progress",
     "in-review" => "In Review",
     "review" => "In Review",
     "todo" => "To Do"

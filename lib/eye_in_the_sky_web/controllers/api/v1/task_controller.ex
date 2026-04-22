@@ -171,7 +171,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         {:error, :invalid_alias} ->
           {:error,
            {:bad_alias,
-            "Unknown state alias '#{params["state"]}'. Valid aliases: done, start, in-review, review, todo"}}
+            "Unknown state alias '#{params["state"]}'. Valid aliases: done, start, progress, in-review, review, todo"}}
       end
 
     case result do

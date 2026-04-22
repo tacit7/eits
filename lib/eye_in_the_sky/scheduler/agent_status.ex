@@ -132,7 +132,9 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     zombies =
       from(s in Session,
         where: s.status == "working",
-        where: is_nil(s.last_activity_at) or s.last_activity_at < ^cutoff,
+        where:
+          (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
+            (is_nil(s.last_activity_at) and not is_nil(s.started_at) and s.started_at < ^cutoff),
         select: s
       )
       |> Repo.all()

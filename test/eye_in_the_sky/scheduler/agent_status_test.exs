@@ -167,5 +167,58 @@ defmodule EyeInTheSky.Scheduler.AgentStatusTest do
       assert updated.status == "failed"
       assert updated.status_reason == "zombie_swept"
     end
+
+    test "sweep_zombie_sessions does NOT sweep fresh session with NULL last_activity_at" do
+      {:ok, agent} =
+        Agents.create_agent(%{
+          uuid: Ecto.UUID.generate(),
+          description: "Test agent",
+          source: "test",
+          status: "working"
+        })
+
+      # Fresh session: started now, never had activity yet
+      {:ok, session} =
+        Sessions.create_session(%{
+          agent_id: agent.id,
+          status: "working",
+          started_at: DateTime.utc_now(),
+          last_activity_at: nil,
+          provider: "claude"
+        })
+
+      AgentStatus.sweep_zombie_sessions_for_testing()
+
+      updated = Sessions.get_session!(session.id)
+      assert updated.status == "working"
+      refute updated.status_reason == "zombie_swept"
+    end
+
+    test "sweep_zombie_sessions DOES sweep old session with NULL last_activity_at when started_at is stale" do
+      {:ok, agent} =
+        Agents.create_agent(%{
+          uuid: Ecto.UUID.generate(),
+          description: "Test agent",
+          source: "test",
+          status: "working"
+        })
+
+      stale = DateTime.utc_now() |> DateTime.add(-31 * 60, :second)
+
+      {:ok, session} =
+        Sessions.create_session(%{
+          agent_id: agent.id,
+          status: "working",
+          started_at: stale,
+          last_activity_at: nil,
+          provider: "claude"
+        })
+
+      AgentStatus.sweep_zombie_sessions_for_testing()
+
+      updated = Sessions.get_session!(session.id)
+      assert updated.status == "failed"
+      assert updated.status_reason == "zombie_swept"
+    end
   end
 end

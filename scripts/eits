@@ -85,7 +85,7 @@ _project_id() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|archive|unarchive|context|tasks|notes>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"; return 0; }
   case "$sub" in
     list)
       # eits sessions list [--search <q>] [--name <partial>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>] [--mine] [--include-archived] [--with-tasks]
@@ -179,6 +179,18 @@ cmd_sessions() {
         _post "/sessions/$uuid/end" '{}'
       fi
       ;;
+    complete)
+      # eits sessions complete [<uuid>]  -- defaults to EITS_SESSION_UUID
+      local uuid="${1:-${EITS_SESSION_UUID:-}}"
+      [[ -n "$uuid" ]] || die "session UUID required (pass as argument or set EITS_SESSION_UUID)"
+      _post "/sessions/$uuid/complete" '{}'
+      ;;
+    waiting)
+      # eits sessions waiting [<uuid>]  -- defaults to EITS_SESSION_UUID
+      local uuid="${1:-${EITS_SESSION_UUID:-}}"
+      [[ -n "$uuid" ]] || die "session UUID required (pass as argument or set EITS_SESSION_UUID)"
+      _post "/sessions/$uuid/waiting" '{}'
+      ;;
     archive)
       # eits sessions archive <uuid>
       local uuid="${1:-}"; need uuid
@@ -217,7 +229,7 @@ cmd_sessions() {
       fi
       ;;
     *)
-      echo "usage: eits sessions <list|get|create|update|end|archive|unarchive|context|tasks|notes>"
+      echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"
       ;;
   esac
 }

@@ -263,6 +263,71 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     end
   end
 
+  @doc """
+  POST /api/v1/sessions/:id/complete - Mark session completed; syncs team member to "done".
+  Accepts integer session ID or UUID string.
+  """
+  def complete(conn, %{"uuid" => id_or_uuid}) do
+    with {:ok, session} <- resolve_session(id_or_uuid) do
+      attrs = %{status: "completed", ended_at: DateTime.utc_now()}
+
+      case Sessions.update_session(session, attrs) do
+        {:ok, updated} ->
+          EyeInTheSky.Events.agent_stopped(updated)
+          EyeInTheSky.Events.session_updated(updated)
+          member_synced = sync_member_status(updated.id, "done")
+
+          json(conn, %{
+            success: true,
+            session_id: updated.id,
+            session_status: updated.status,
+            member_synced: member_synced
+          })
+
+        {:error, _cs} ->
+          {:error, "Failed to complete session"}
+      end
+    else
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
+    end
+  end
+
+  @doc """
+  POST /api/v1/sessions/:id/waiting - Mark session waiting; syncs team member to "blocked".
+  Accepts integer session ID or UUID string.
+  """
+  def waiting(conn, %{"uuid" => id_or_uuid}) do
+    with {:ok, session} <- resolve_session(id_or_uuid) do
+      attrs = %{status: "waiting"}
+
+      case Sessions.update_session(session, attrs) do
+        {:ok, updated} ->
+          EyeInTheSky.Events.agent_stopped(updated)
+          EyeInTheSky.Events.session_updated(updated)
+          member_synced = sync_member_status(updated.id, "blocked")
+
+          json(conn, %{
+            success: true,
+            session_id: updated.id,
+            session_status: updated.status,
+            member_synced: member_synced
+          })
+
+        {:error, _cs} ->
+          {:error, "Failed to set session to waiting"}
+      end
+    else
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
+    end
+  end
+
+  defp sync_member_status(session_id, member_status) do
+    EyeInTheSky.Teams.mark_member_done_by_session(session_id, member_status)
+    true
+  rescue
+    _ -> false
+  end
+
   defp resolve_session(id_or_uuid), do: Sessions.resolve(id_or_uuid)
 
   @doc """

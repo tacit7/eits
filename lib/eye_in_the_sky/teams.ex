@@ -183,7 +183,7 @@ defmodule EyeInTheSky.Teams do
   Called when a session ends to keep member status in sync.
   """
   def mark_member_done_by_session(session_id, status \\ "done")
-      when status in ["done", "failed", "idle"] do
+      when status in ["done", "failed", "idle", "blocked"] do
     TeamMember
     |> where([m], m.session_id == ^session_id)
     |> Repo.all()

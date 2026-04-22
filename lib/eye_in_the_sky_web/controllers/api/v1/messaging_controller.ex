@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   @terminated_statuses ~w(completed failed)
   # Allowlist: only sessions actively processing or between turns can receive DMs.
   # Any status not in this list (waiting, completed, failed, archived, compacting, etc.) is non-receivable.
-  @receivable_statuses ~w(working stopped)
+  @receivable_statuses ~w(working idle)
 
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:from, {:ok, from_session}} <- {:from, resolve_session_target(%{raw: from_raw, kind: :from})},

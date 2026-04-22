@@ -20,6 +20,14 @@ command -v jq   &>/dev/null || { echo "error: jq is required" >&2; exit 1; }
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+_backoff() {
+  local _delay=$1
+  local _jitter=$(( (RANDOM % 41) - 20 ))
+  local _adjusted=$(( _delay + (_delay * _jitter / 100) ))
+  [[ $_adjusted -lt 1 ]] && _adjusted=1
+  echo $_adjusted
+}
+
 _curl() {
   local _body _status _attempt=0 _delay=2
   while [[ $_attempt -lt 4 ]]; do
@@ -29,9 +37,11 @@ _curl() {
     if [[ "$_status" == "429" ]]; then
       _attempt=$((_attempt + 1))
       if [[ $_attempt -lt 4 ]]; then
-        echo "rate limited, retrying in ${_delay}s..." >&2
-        sleep "$_delay"
+        local _sleep_time=$(_backoff "$_delay")
+        echo "rate limited, retrying in ${_sleep_time}s..." >&2
+        sleep "$_sleep_time"
         _delay=$((_delay * 2))
+        [[ $_delay -gt 30 ]] && _delay=30
         continue
       fi
     fi
@@ -384,9 +394,11 @@ cmd_tasks() {
         _ann_status="${_ann_body##*$'\n'}"
         _ann_body="${_ann_body%$'\n'*}"
         if [[ "$_ann_status" == "429" && $_ann_attempt -lt 3 ]]; then
-          echo "annotate rate limited, retrying in ${_ann_delay}s..." >&2
-          sleep "$_ann_delay"
+          local _sleep_time=$(_backoff "$_ann_delay")
+          echo "annotate rate limited, retrying in ${_sleep_time}s..." >&2
+          sleep "$_sleep_time"
           _ann_delay=$((_ann_delay * 2))
+          [[ $_ann_delay -gt 30 ]] && _ann_delay=30
           _ann_attempt=$((_ann_attempt + 1))
           continue
         fi
@@ -451,9 +463,11 @@ cmd_tasks() {
         _comp_status="${_comp_body##*$'\n'}"
         _comp_body="${_comp_body%$'\n'*}"
         if [[ "$_comp_status" == "429" && $_comp_attempt -lt 3 ]]; then
-          echo "complete rate limited, retrying in ${_comp_delay}s..." >&2
-          sleep "$_comp_delay"
+          local _sleep_time=$(_backoff "$_comp_delay")
+          echo "complete rate limited, retrying in ${_sleep_time}s..." >&2
+          sleep "$_sleep_time"
           _comp_delay=$((_comp_delay * 2))
+          [[ $_comp_delay -gt 30 ]] && _comp_delay=30
           _comp_attempt=$((_comp_attempt + 1))
           continue
         fi
@@ -879,9 +893,11 @@ USAGE
         _sp_status="${_sp_body##*$'\n'}"
         _sp_resp_body="${_sp_body%$'\n'*}"
         if [[ "$_sp_status" == "429" && $_sp_attempt -lt 3 ]]; then
-          echo "spawn rate limited, retrying in ${_sp_delay}s..." >&2
-          sleep "$_sp_delay"
+          local _sleep_time=$(_backoff "$_sp_delay")
+          echo "spawn rate limited, retrying in ${_sleep_time}s..." >&2
+          sleep "$_sleep_time"
           _sp_delay=$((_sp_delay * 2))
+          [[ $_sp_delay -gt 30 ]] && _sp_delay=30
           _sp_attempt=$((_sp_attempt + 1))
           continue
         fi
@@ -1515,7 +1531,7 @@ HELP
       }
 
       if [[ $wait -eq 1 ]]; then
-        local spawn_failed_count=0
+        local spawn_failed_count=0 _wait_delay=2
         while true; do
           local resp _wait_body _wait_status
           _wait_body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$BASE_URL/teams/$id")
@@ -1523,8 +1539,12 @@ HELP
           _wait_body="${_wait_body%$'\n'*}"
           # Only retry on rate-limit (429) or server errors (5xx) — all other 4xx are permanent.
           if [[ "$_wait_status" == "429" || "$_wait_status" -ge 500 ]]; then
-            printf 'teams status --wait: transient error (HTTP %s), retrying in 5s\n' "$_wait_status" >&2
-            sleep 5; continue
+            local _sleep_time=$(_backoff "$_wait_delay")
+            printf 'teams status --wait: transient error (HTTP %s), retrying in %ds\n' "$_wait_status" "$_sleep_time" >&2
+            sleep "$_sleep_time"
+            _wait_delay=$((_wait_delay * 2))
+            [[ $_wait_delay -gt 30 ]] && _wait_delay=30
+            continue
           fi
           if [[ "$_wait_status" -ge 400 ]]; then
             printf 'teams status --wait: permanent error (HTTP %s) — %s\n' "$_wait_status" "$_wait_body" >&2

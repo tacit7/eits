@@ -7,17 +7,20 @@ defmodule EyeInTheSky.Codex.SessionImporter do
   """
 
   alias EyeInTheSky.Codex.SessionReader
+  alias EyeInTheSky.Messages
   alias EyeInTheSky.Messages.BulkImporter
 
   @doc """
-  Reads all messages from the Codex session file and imports any that aren't
-  already in the DB (matched by source_uuid).
+  Reads messages from the Codex session file that come after the last imported message
+  and imports any that aren't already in the DB (matched by source_uuid).
 
   Returns {:ok, count} on success, {:error, reason} on file read failure.
   """
   @spec sync(String.t(), integer()) :: {:ok, integer()} | {:error, term()}
   def sync(thread_id, session_id) do
-    with {:ok, messages} <- SessionReader.read_messages(thread_id) do
+    last_uuid = Messages.get_last_source_uuid(session_id)
+
+    with {:ok, messages} <- SessionReader.read_messages_after_uuid(thread_id, last_uuid) do
       {:ok, import_messages(messages, session_id)}
     end
   end

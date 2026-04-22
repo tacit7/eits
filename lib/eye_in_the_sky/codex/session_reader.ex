@@ -46,6 +46,18 @@ defmodule EyeInTheSky.Codex.SessionReader do
   end
 
   @doc """
+  Reads Codex messages from the thread file whose UUIDs come after `after_uuid`.
+  If `after_uuid` is nil, reads all messages. If `after_uuid` is not found in the
+  file (e.g., file rotated), reads all messages. Used for incremental sync.
+  """
+  @spec read_messages_after_uuid(String.t(), String.t() | nil) :: {:ok, list(map())} | {:error, term()}
+  def read_messages_after_uuid(thread_id, after_uuid) do
+    with {:ok, messages} <- read_messages(thread_id) do
+      {:ok, drop_messages_before(messages, after_uuid)}
+    end
+  end
+
+  @doc """
   Reads total token usage from the last token_count event in the session file.
   Returns {:ok, total_tokens, cost_usd} — Codex does not expose cost, so cost is always 0.0.
   """
@@ -81,6 +93,15 @@ defmodule EyeInTheSky.Codex.SessionReader do
   # ---------------------------------------------------------------------------
   # Private
   # ---------------------------------------------------------------------------
+
+  defp drop_messages_before(messages, nil), do: messages
+
+  defp drop_messages_before(messages, after_uuid) do
+    case Enum.find_index(messages, fn msg -> msg.uuid == after_uuid end) do
+      nil -> messages
+      idx -> Enum.drop(messages, idx + 1)
+    end
+  end
 
   defp extract_message(line) do
     case Jason.decode(line) do

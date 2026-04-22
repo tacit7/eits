@@ -282,7 +282,7 @@ defmodule EyeInTheSkyWeb.SessionLive.Index do
                   <div
                     id={"session-actions-#{session.id}"}
                     phx-update="ignore"
-                    class="relative dropdown dropdown-end transition-all md:opacity-0 md:group-hover:opacity-100"
+                    class="relative dropdown dropdown-end md:opacity-0 md:group-hover:opacity-100"
                   >
                     <button
                       tabindex="0"

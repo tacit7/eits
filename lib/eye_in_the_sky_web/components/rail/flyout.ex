@@ -148,13 +148,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <div class="px-3 py-4 text-xs text-base-content/35 text-center">No sessions</div>
     <% end %>
 
-    <div class="px-3 pt-2 pb-1 border-t border-base-content/8 mt-1">
-      <.link
-        navigate={if @sidebar_project, do: "/projects/#{@sidebar_project.id}/sessions", else: "/"}
-        class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
-      >
-        View all &rarr;
-      </.link>
+    <div class="border-t border-base-content/8 mt-1">
+      <.simple_link href="/sessions" label="All Sessions" icon="hero-cpu-chip" />
+      <%= if @sidebar_project do %>
+        <.simple_link
+          href={"/projects/#{@sidebar_project.id}/sessions"}
+          label="List"
+          icon="hero-list-bullet"
+        />
+      <% end %>
     </div>
     """
   end

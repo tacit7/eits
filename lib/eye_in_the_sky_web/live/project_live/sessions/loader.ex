@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
   import Phoenix.LiveView, only: [stream: 4, stream_insert: 3]
   import EyeInTheSkyWeb.Helpers.SessionFilters
 
+  alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.ProjectLive.Sessions.State
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
@@ -16,23 +17,46 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
   @doc "Reload sessions from the database and rebuild the view."
   def load_agents(socket) do
-    project_id = socket.assigns.project_id
+    scope = Map.get(socket.assigns, :scope, socket.assigns.project_id)
     include_archived = socket.assigns.session_filter == "archived"
 
     {duration_us, all_agents} =
       :timer.tc(fn ->
-        Sessions.list_project_sessions_with_agent(project_id, include_archived: include_archived)
+        load_sessions_for_scope(scope, include_archived)
       end)
 
     :telemetry.execute(
       @telemetry_prefix ++ [:load_agents],
       %{duration_us: duration_us, count: length(all_agents)},
-      %{project_id: project_id, include_archived: include_archived}
+      %{scope: scope, include_archived: include_archived}
     )
 
     socket
     |> assign(:all_agents, all_agents)
     |> apply_agent_view(true)
+  end
+
+  defp load_sessions_for_scope(:all, include_archived) do
+    Sessions.list_sessions_with_agent(include_archived: include_archived)
+    |> attach_project_names()
+  end
+
+  defp load_sessions_for_scope(project_id, include_archived) when is_integer(project_id) do
+    Sessions.list_project_sessions_with_agent(project_id, include_archived: include_archived)
+  end
+
+  defp load_sessions_for_scope(_, _), do: []
+
+  defp attach_project_names([]), do: []
+
+  defp attach_project_names(sessions) do
+    names_by_id =
+      Projects.list_projects()
+      |> Map.new(&{&1.id, &1.name})
+
+    Enum.map(sessions, fn s ->
+      Map.put(s, :project_name, Map.get(names_by_id, s.project_id))
+    end)
   end
 
   @doc "Reapply filter/sort/pagination on the already-loaded agent list."

@@ -20,6 +20,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
   """
   def init(socket) do
     socket
+    |> assign(:scope, Map.get(socket.assigns, :scope) || socket.assigns[:project_id] || :all)
     |> assign(:search_query, "")
     |> assign(:sort_by, "last_message")
     |> assign(:session_filter, "all")

@@ -25,10 +25,29 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
         subscribe_agent_working()
       end
 
+      socket = assign(socket, :scope, socket.assigns.project_id)
       {:ok, State.init(socket)}
     else
       {:ok, socket}
     end
+  end
+
+  def mount(_params, _session, socket) do
+    if connected?(socket) do
+      subscribe_agents()
+      subscribe_agent_working()
+    end
+
+    socket =
+      socket
+      |> assign(:project, nil)
+      |> assign(:project_id, nil)
+      |> assign(:scope, :all)
+      |> assign(:page_title, "Sessions")
+      |> assign(:sidebar_tab, :sessions)
+      |> assign(:sidebar_project, nil)
+
+    {:ok, State.init(socket)}
   end
 
   # ---------------------------------------------------------------------------

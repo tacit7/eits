@@ -1,7 +1,7 @@
 # Editable File Tree Design
 
 **Date**: 2026-04-22  
-**Status**: Draft (Rev 3)  
+**Status**: Draft (Rev 4)  
 **Author**: Claude + Uriel
 
 ## Overview
@@ -142,6 +142,12 @@ UI Component (file_tree.ex)
 
 Tree events are split across owners. The file tree component receives explicit targets:
 
+```elixir
+# Component attrs
+attr :tree_target, :any, required: true
+attr :select_target, :any, required: true
+```
+
 ```heex
 <%!-- Folder expand/collapse target rail/shell --%>
 <button phx-click="expand_folder" phx-target={@tree_target} phx-value-path={node.path}>
@@ -154,9 +160,32 @@ Tree events are split across owners. The file tree component receives explicit t
 </button>
 ```
 
+**Recursive pass-through**: Child tree nodes must receive the same targets:
+
+```heex
+<.tree_node
+  node={child}
+  tree_target={@tree_target}
+  select_target={@select_target}
+  expanded_folders={@expanded_folders}
+  tree_nodes={@tree_nodes}
+/>
+```
+
 **MVP Simplification**: If Phoenix event targeting between rail/shell and `ProjectLive.Files` proves awkward, collapse ownership — have `ProjectLive.Files` own all tree state (expanded_folders, tree_nodes, loading_folders) as well as editor state. Cleaner than cross-LiveView event routing.
 
 **Rule**: File selection must be handled by the same process that owns dirty state.
+
+### Pre-Implementation Decision
+
+Before coding, verify Phoenix event targeting from rail/flyout to `ProjectLive.Files`.
+
+If not straightforward, use MVP simplification: `ProjectLive.Files` owns:
+- `expanded_folders`
+- `tree_nodes`
+- `loading_folders`
+- `folder_errors`
+- Editor workflow
 
 ### Server-to-Client Push Events
 
@@ -165,7 +194,8 @@ push_event(socket, "file_loaded", %{
   path: path,
   content: content,
   hash: hash,
-  language: language
+  language: language,
+  readonly: false        # true for symlinked files
 })
 
 push_event(socket, "file_saved", %{
@@ -224,6 +254,16 @@ end
 {:error, :permission_denied}       # cannot read directory
 ```
 
+### Empty File Path Rule
+
+`safe_path/2` may resolve the root path for directory listing.
+
+However:
+- `read_file/3` rejects empty relative paths with `{:error, :missing_file_path}`
+- `write_file/4` rejects empty relative paths with `{:error, :missing_file_path}`
+
+The project root may be listed but cannot be opened or saved as a file.
+
 ### Safe Path Resolution
 
 Prevents lexical path traversal:
@@ -252,23 +292,23 @@ end
 
 ### Symlink Validation
 
-For symlinked files, validate the resolved target stays inside project root:
+Use a tested symlink resolver. The resolver must:
+
+- Handle relative symlink targets
+- Resolve chained symlinks
+- Detect symlink loops
+- Detect broken symlinks
+- Verify the final resolved path remains under `root_path`
+
+**Possible errors:**
 
 ```elixir
-def safe_real_path(project_root, rel_path) do
-  # Pseudocode — actual implementation must use a tested symlink resolver:
-  # 1. Resolve lexical path using safe_path/2.
-  # 2. If path is a symlink, resolve its final target (follow all links).
-  # 3. Expand the resolved target to absolute path.
-  # 4. Verify the resolved target remains under project_root.
-  # 5. Return {:ok, resolved_path} or {:error, :symlink_escapes_project}.
-  #
-  # Note: File.read_link/1 exists but resolves one link only.
-  # Use :file.read_link_all/1 (Erlang) for recursive resolution.
-end
+{:error, :broken_symlink}
+{:error, :symlink_loop}
+{:error, :symlink_escapes_project}
 ```
 
-**Implementation detail**: Do not copy this sketch as final code. Use a tested helper for symlink resolution.
+**Implementation detail**: Do not rely on a pseudocode sketch as final implementation. Build and test the resolver independently.
 
 ### Write File API
 
@@ -288,18 +328,28 @@ write_file(root_path, rel_path, content, force?: true)
 - If `force?: true`, skip conflict check and overwrite
 - Always use atomic write
 
-### Save-Time Path Checks
+### Canonical Write Flow
 
-Before writing, re-validate the path (it may have changed externally):
+`write_file/4` performs checks in this order:
 
-```elixir
-# Before write:
-# - safe path resolution
-# - if path missing -> {:error, :file_deleted}
-# - if path is directory -> {:error, :path_is_directory}
-# - if path is symlink -> {:error, :symlink_not_saveable} (MVP)
-# - if unsupported type -> {:error, :unsupported_file_type}
-```
+1. Validate `root_path` from trusted server state
+2. Reject empty `rel_path` → `{:error, :missing_file_path}`
+3. Resolve safe lexical path
+4. Validate content is UTF-8 → `{:error, :invalid_utf8}`
+5. Stat target path
+6. If missing → `{:error, :file_deleted}`
+7. If directory → `{:error, :path_is_directory}`
+8. If symlink → `{:error, :symlink_not_saveable}` (MVP)
+9. If unsupported type → `{:error, :unsupported_file_type}`
+10. Read current disk content
+11. Hash current disk content
+12. If `force?` is false, compare disk hash with `original_hash`
+13. If hash mismatches → `{:error, :conflict}`
+14. Write temp file
+15. Preserve original file mode
+16. Rename temp file over original
+17. Compute new hash from saved content
+18. Return `{:ok, %{hash: new_hash}}`
 
 ### Atomic Write with Permission Preservation
 
@@ -332,6 +382,12 @@ defp maybe_chmod(path, mode), do: File.chmod(path, mode)
 ```
 
 **Note**: Use dotfile temp pattern (`.filename.tmp-xyz`) to hide from tree. Add `.*.tmp-*` to ignored patterns.
+
+### Directory Listing Rule
+
+`children/3` uses file metadata only. It must NOT read file contents.
+
+Tree rendering should not touch sensitive file contents. It only needs names, types, symlink flags, and size for metadata.
 
 ### Directory Sorting
 
@@ -395,15 +451,21 @@ hash = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
 - **Symlinked files**: Allow viewing/opening only if resolved target stays inside project root
 - **Validation**: Both `safe_path/2` (lexical) AND `safe_real_path/2` (resolved) must pass for symlinked files
 
-### Symlink Save Policy
+### Symlinked File UX
 
-**MVP does not save symlinked files.**
+**MVP treats symlinked files as preview-only.**
 
-Symlinked files may be visible and may be opened only if the resolved target stays inside the project root. Saving symlinked files is deferred because `File.rename/2` (atomic write) replaces the symlink itself instead of writing through to the target.
+Symlinked files may be opened only if their resolved target remains inside `root_path`.
 
-If symlink saving is added later, it must explicitly write to the resolved target and preserve the symlink.
+When opened:
+- CodeMirror is read-only
+- Save button is disabled
+- Cmd+S/Ctrl+S does not save
+- Editor shows: "Symlinked file, editing not supported."
 
-**Error**: "Saving symlinked files is not supported."
+Saving symlinked files is deferred because `File.rename/2` (atomic write) replaces the symlink itself instead of writing through to the target.
+
+**Error on save attempt**: "Saving symlinked files is not supported."
 
 ---
 
@@ -415,7 +477,23 @@ If symlink saving is added later, it must explicitly write to the resolved targe
   path: "lib/my_app_web/router.ex",  # relative path
   type: :file,           # :file | :directory | :warning
   symlink?: false,
-  expandable?: true      # false for symlinked directories
+  expandable?: true,     # false for symlinked directories
+  editable?: true,       # false for symlinked files
+  sensitive?: false      # true for .env, *.pem, etc.
+}
+```
+
+### Symlinked File Node
+
+```elixir
+%{
+  name: "linked_file.ex",
+  path: "linked_file.ex",
+  type: :file,
+  symlink?: true,
+  expandable?: false,
+  editable?: false,      # symlinked files are preview-only
+  sensitive?: false
 }
 ```
 
@@ -427,7 +505,9 @@ If symlink saving is added later, it must explicitly write to the resolved targe
   path: nil,
   type: :warning,
   symlink?: false,
-  expandable?: false
+  expandable?: false,
+  editable?: false,
+  sensitive?: false
 }
 ```
 
@@ -439,7 +519,9 @@ If symlink saving is added later, it must explicitly write to the resolved targe
   path: "linked_dir",
   type: :directory,
   symlink?: true,
-  expandable?: false  # symlinked directories do NOT expand
+  expandable?: false,  # symlinked directories do NOT expand
+  editable?: false,
+  sensitive?: false
 }
 ```
 
@@ -484,36 +566,45 @@ assign(socket,
   open_file: nil,
   file_error: nil,
   save_state: :clean,
-  pending_file_switch: nil
+  dirty_file_path: nil,       # guards against stale dirty/clean events
+  pending_navigation: nil     # {:file, path} | {:project, id} | nil
 )
 ```
+
+**Dirty state guard**: `editor_dirty(path)` sets `dirty_file_path = path` only if `path == open_file.path`. `editor_clean(path)` clears `dirty_file_path` only if `path == open_file.path`. `select_file` checks `dirty_file_path`, not just `save_state`.
 
 ### `open_file` Shape
 
 ```elixir
 %{
-  path: "lib/my_app_web/router.ex",
+  root_path: "/absolute/project/root",  # stored at load time, used on save
+  path: "lib/my_app_web/router.ex",     # relative path
   name: "router.ex",
-  content: "...",
   original_hash: "abc123...",
   size: 12345,
   language: :elixir,
-  sensitive?: false
+  sensitive?: false,
+  readonly?: false,
+  editable?: true
 }
 ```
 
 **Note**: `mtime` is for display/debug only. Use `original_hash` for conflict detection.
 
-**Note**: File content in socket assigns is acceptable for MVP with 1MB limit. Do not log socket assigns.
+**Content storage**: Do NOT store file content in socket assigns. Send content to CodeMirror via `push_event`. Receive content from CodeMirror only on save. This reduces memory use and prevents accidental content logging.
+
+**Save uses stored root_path**: `save_file` uses `open_file.root_path`, not the currently selected project path. This handles project switching correctly.
 
 ### `save_state` Values
 
 - `:clean` - No unsaved changes
 - `:dirty` - Editor has unsaved changes
 - `:saving` - Save in progress
-- `:saved` - Just saved successfully
+- `:saved` - Just saved successfully (transient)
 - `:error` - Save failed
 - `:conflict` - File changed on disk
+
+**`:saved` timing**: `:saved` is a transient UI state. After 2 seconds or the next `editor_dirty` event, return to `:clean`.
 
 ---
 
@@ -635,30 +726,37 @@ User switches project while editor is dirty
   -> Cancel: stay on current project
 ```
 
-### Pending File Switch Transitions
+### Pending Navigation Transitions
 
-When `pending_file_switch` is set (user tried to switch files while dirty):
+When `pending_navigation` is set (user tried to switch files or projects while dirty):
+
+Possible values:
+- `nil` - no pending navigation
+- `{:file, rel_path}` - pending file switch
+- `{:project, project_id}` - pending project switch
 
 **If save succeeds:**
 - Clear dirty state
-- Clear `pending_file_switch`
-- `push_patch` to pending path
+- Complete `pending_navigation`
+- Clear `pending_navigation`
 
 **If save fails:**
 - Keep dirty state
-- Keep `pending_file_switch`
+- Keep `pending_navigation`
 - Stay on current file
 - Show save error
 
 **If user discards:**
 - Clear dirty state
-- Clear `pending_file_switch`
-- `push_patch` to pending path
+- Complete `pending_navigation`
+- Clear `pending_navigation`
 
 **If user cancels:**
 - Keep dirty state
-- Clear `pending_file_switch`
+- Clear `pending_navigation`
 - Stay on current file
+
+**Project switch note**: When saving during pending project switch, save uses `open_file.root_path` (the original project's path), not the new project's path.
 
 ### Conflict Dialog Transitions
 
@@ -722,6 +820,11 @@ Add `hero-folder` icon to rail. Grey out when no project selected.
 - Show loading indicator when folder is in `loading_folders`
 - Show error inline when folder is in `folder_errors`
 - Unreadable folder should not break whole tree
+- Symlinked files/directories show visual marker
+- Sensitive files show badge before opening
+- Non-editable files (symlinks) show readonly indicator
+
+**Tree highlight rule**: `selected_file_path` may be set from route, but tree highlights only file nodes matching `open_file.path`. If load fails, no file node is highlighted.
 
 ### CodeMirror Editor
 
@@ -785,7 +888,10 @@ You have unsaved changes.
 | Path outside project | "This path is outside the project and cannot be opened." |
 | Absolute path | "Absolute paths are not allowed." |
 | Symlink escapes project | "This symlink points outside the project." |
+| Broken symlink | "This symlink is broken." |
+| Symlink loop | "This symlink creates a loop." |
 | Symlink not saveable | "Saving symlinked files is not supported." |
+| Missing file path | "No file path specified." |
 | Path is directory | "This path is a directory, not a file." |
 | File too large | "This file is too large to edit." |
 | Binary file | "Binary files cannot be edited." |
@@ -809,6 +915,24 @@ Mark these with a badge or warning (do not block in local MVP):
 - `credentials.json`
 - `config/prod.secret.exs`
 
+### Matching Semantics
+
+```elixir
+def sensitive?(rel_path) do
+  basename = Path.basename(rel_path)
+
+  # Basename matches
+  String.match?(basename, ~r/^\.env(\..*)?$/) or
+    String.ends_with?(basename, ".pem") or
+    String.ends_with?(basename, ".key") or
+    basename == "credentials.json" or
+    # Full relative path matches
+    rel_path == "config/prod.secret.exs"
+end
+```
+
+**Tree visibility**: Sensitive files are marked in the tree row before opening. The badge appears on the tree node, not just after opening.
+
 ### Logging Rules
 
 - Do NOT log file contents
@@ -826,13 +950,15 @@ Best-effort by file extension:
 | Extension | Language |
 |-----------|----------|
 | `.ex`, `.exs` | elixir |
-| `.heex` | html |
+| `.heex` | html (fallback) |
 | `.js` | javascript |
 | `.ts` | typescript |
 | `.svelte` | svelte |
 | `.md` | markdown |
 | `.json` | json |
 | (other) | plain text |
+
+**Note**: `.heex` uses HTML/plain fallback until a proper HEEx mode exists.
 
 Syntax highlighting failure must not prevent editing.
 
@@ -882,6 +1008,7 @@ write succeeds with force?: true
 write rejects outside project path
 atomic write cleans up temp file on failure
 atomic write preserves file permissions
+atomic write preserves executable bit
 atomic write replaces existing file content
 write rejects symlinked file (MVP)
 write rejects if path became directory
@@ -995,4 +1122,6 @@ Build and test before any UI work:
 - Partial-write corruption risk is reduced via temp-file + rename
 - Unsaved changes are not silently lost
 - One open file at a time
-- Symlinked files are viewable but not saveable
+- Symlinked files are preview-only (read-only CodeMirror, save disabled)
+- Sensitive files marked in tree before opening
+- `.env` file visible in tree and marked sensitive

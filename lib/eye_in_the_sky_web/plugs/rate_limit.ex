@@ -13,6 +13,13 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimit do
 
   When a `default` is set, any request not matching a specific rule falls back
   to the default limit keyed on `"api:<ip>"`.
+
+  ## Orchestrator bump
+
+  Requests that send the `x-eits-role: orchestrator` header get a 5× higher
+  burst ceiling on the default bucket (keyed separately as
+  `"api:orch:<ip>"` so orchestrator traffic does not consume the regular IP
+  bucket and vice versa). Specific rules (auth) are unaffected.
   """
 
   import Plug.Conn
@@ -24,13 +31,23 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimit do
     ["auth", "register", "complete"] => {5, :timer.hours(1)}
   }
 
+  @orchestrator_multiplier 5
+
   def init(opts), do: opts
 
   def call(conn, opts) do
     rule = Map.get(@rules, conn.path_info)
     default = Keyword.get(opts, :default)
+    orchestrator? = rule == nil and orchestrator?(conn)
 
-    case rule || default do
+    effective =
+      case rule || default do
+        nil -> nil
+        {limit, scale} when orchestrator? -> {limit * @orchestrator_multiplier, scale}
+        other -> other
+      end
+
+    case effective do
       nil ->
         conn
 
@@ -38,11 +55,16 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimit do
         ip = conn.remote_ip |> :inet.ntoa() |> to_string()
 
         key =
-          if rule do
-            action = List.last(conn.path_info)
-            "auth:#{action}:#{ip}"
-          else
-            "api:#{ip}"
+          cond do
+            rule ->
+              action = List.last(conn.path_info)
+              "auth:#{action}:#{ip}"
+
+            orchestrator? ->
+              "api:orch:#{ip}"
+
+            true ->
+              "api:#{ip}"
           end
 
         case EyeInTheSky.RateLimiter.hit(key, scale, limit) do
@@ -55,6 +77,13 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimit do
             |> send_resp(429, ~s({"error":"too many requests"}))
             |> halt()
         end
+    end
+  end
+
+  defp orchestrator?(conn) do
+    case get_req_header(conn, "x-eits-role") do
+      ["orchestrator" | _] -> true
+      _ -> false
     end
   end
 end

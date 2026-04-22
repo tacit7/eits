@@ -1733,6 +1733,96 @@ cmd_worktree() {
   esac
 }
 
+# ── queue (pending annotations) ───────────────────────────────────────────────
+#
+# `eits tasks annotate` queues to ~/.eits/pending-annotations.log on persistent
+# 429s. `eits queue status` shows what's pending; `eits queue flush` replays it.
+
+_pending_log() { printf '%s/.eits/pending-annotations.log' "$HOME"; }
+
+cmd_queue() {
+  local subcmd="${1:-}"; shift || true
+  [[ "${subcmd:-}" == "--help" || "${subcmd:-}" == "-h" ]] && {
+    cat <<EOF
+usage: eits queue <status|flush>
+
+  status   Print pending annotation count + per-task summary
+  flush    Replay pending annotations; drop successes, keep failures.
+           Exits non-zero if any entries remain or any POST fails.
+
+Queue file: ~/.eits/pending-annotations.log (JSONL)
+EOF
+    return 0
+  }
+  case "$subcmd" in
+    status)
+      local log; log="$(_pending_log)"
+      if [[ ! -s "$log" ]]; then
+        echo "queue empty"
+        return 0
+      fi
+      local total; total=$(wc -l < "$log" | tr -d ' ')
+      echo "pending annotations: $total"
+      echo "log: $log"
+      echo ""
+      echo "by task_id:"
+      # task_id is stored as a JSON string; -r drops quotes
+      jq -r '.task_id' "$log" | sort | uniq -c | sort -rn | awk '{printf "  %5s  task %s\n", $1, $2}'
+      ;;
+    flush)
+      local log; log="$(_pending_log)"
+      if [[ ! -s "$log" ]]; then
+        echo "queue empty"
+        return 0
+      fi
+      local tmp; tmp="$(mktemp)"
+      local ok=0 fail=0 line task_id body title status body_out
+      while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        task_id=$(printf '%s' "$line" | jq -r '.task_id // empty')
+        body=$(printf    '%s' "$line" | jq -r '.body    // empty')
+        title=$(printf   '%s' "$line" | jq -r '.title   // empty')
+        if [[ -z "$task_id" || -z "$body" ]]; then
+          echo "skip: malformed entry" >&2
+          printf '%s\n' "$line" >> "$tmp"
+          fail=$((fail + 1))
+          continue
+        fi
+        local payload; payload=$(json body "$body" title "$title")
+        body_out=$(curl -sk --write-out '\n%{http_code}' -X POST \
+          -H "Content-Type: application/json" \
+          "${AUTH_ARGS[@]}" \
+          -d "$payload" \
+          "$BASE_URL/tasks/$task_id/annotations" 2>/dev/null) || body_out=$'\n000'
+        status="${body_out##*$'\n'}"
+        body_out="${body_out%$'\n'*}"
+        if [[ "$status" =~ ^[0-9]+$ ]] && [[ "$status" -lt 400 ]] && [[ "$status" != "000" ]]; then
+          ok=$((ok + 1))
+          echo "ok:   task $task_id"
+        else
+          fail=$((fail + 1))
+          echo "fail: task $task_id (HTTP $status)" >&2
+          printf '%s\n' "$line" >> "$tmp"
+        fi
+      done < "$log"
+
+      if [[ -s "$tmp" ]]; then
+        mv "$tmp" "$log"
+      else
+        rm -f "$tmp" "$log"
+      fi
+
+      echo ""
+      echo "flushed: $ok ok, $fail remaining"
+      [[ $fail -eq 0 ]]
+      ;;
+    ""|*)
+      echo "usage: eits queue <status|flush>"
+      [[ -n "$subcmd" ]] && return 1 || return 0
+      ;;
+  esac
+}
+
 # ── me / whoami ───────────────────────────────────────────────────────────────
 
 cmd_me() {
@@ -1772,6 +1862,7 @@ Commands:
   teams         list|get|create|update|delete|members|join|status|update-member|leave|broadcast|my-teams
   timer         show|set|cancel   (default session: self / $EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
+  queue         status|flush    (drain ~/.eits/pending-annotations.log)
   me            Print current session/agent/project context and verify server-side
 
 Env vars (injected by EITS hooks):
@@ -1802,6 +1893,7 @@ case "$cmd" in
   teams)         cmd_teams         "$@" ;;
   timer)         cmd_timer         "$@" ;;
   worktree)      cmd_worktree      "$@" ;;
+  queue)         cmd_queue         "$@" ;;
   me|whoami)     cmd_me ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;

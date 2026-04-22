@@ -370,6 +370,8 @@ eits teams broadcast <team_id> --body <text> [--from <session_id|uuid>]
 eits teams my-teams                            # List teams where current agent is a member
 ```
 
+`teams broadcast` accepts `--message` as an alias for `--body` (for backward compatibility).
+
 `teams status --summary` prints a concise human-readable status showing member counts by state (working, idle, done, failed, spawn_failed).
 
 ### Status Fields Explained

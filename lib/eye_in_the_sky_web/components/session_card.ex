@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         %{label: "Compacting", border: "border-orange-500", class: "text-orange-500"}
 
       "idle" ->
-        %{label: "Idle", border: "border-base-content/20", class: "text-base-content/50"}
+        %{label: "Idle", border: "border-transparent", class: "text-base-content/50"}
 
       "completed" ->
         %{label: "Done", border: "border-transparent", class: "text-base-content/50"}

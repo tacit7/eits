@@ -1,7 +1,7 @@
 # Editable File Tree Design
 
 **Date**: 2026-04-22  
-**Status**: Draft  
+**Status**: Draft (Rev 2)  
 **Author**: Claude + Uriel
 
 ## Overview
@@ -37,6 +37,59 @@ This is a **user-facing project editor**, not a read-only inspection tool. Save 
 - Context menus
 - File icons by extension
 - Persisted workspace state
+- Full fsync durability
+- CRLF line ending preservation
+- Draft recovery after reconnect
+
+---
+
+## Ownership Model
+
+### Critical Boundaries
+
+```
+ProjectLive.Files
+  Owns editor workflow.
+  Owns selected file path (from route).
+  Owns open_file metadata.
+  Owns dirty state (coarse).
+  Owns save/conflict/reload/discard behavior.
+  Owns conflict dialogs.
+  Handles select_file event and guards dirty state before patching.
+
+FileTree service (EyeInTheSky.Projects.FileTree)
+  Owns all filesystem behavior.
+  Owns path safety (lexical and symlink).
+  Owns directory listing.
+  Owns file reads and writes.
+  Owns guards and conflict detection.
+
+FileTree component (rail/file_tree.ex)
+  Only renders tree nodes.
+  Emits expand/collapse/select events.
+  Does NOT read or write files.
+  Does NOT own tree state.
+
+CodeMirror hook (file_editor_hook.js)
+  Owns editor instance and unsaved client content.
+  Tracks dirty state locally.
+  Sends content only on save.
+  Handles beforeunload.
+  Guards against stale save responses.
+
+Persistent rail/shell (NavHook or equivalent)
+  Owns active rail section.
+  Owns tree expansion state (expanded_folders, tree_nodes, loading_folders).
+  Does NOT own file saves or editor workflow.
+  Does NOT handle CodeMirror events.
+```
+
+### Key Invariants
+
+- `open_file.path` must equal `selected_file_path` when a file is loaded
+- If file load fails, set `open_file = nil` and show `file_error`
+- Save must reject if payload path does not match `open_file.path`
+- MVP supports one open file at a time
 
 ---
 
@@ -46,11 +99,9 @@ This is a **user-facing project editor**, not a read-only inspection tool. Save 
 
 ```
 UI Component (file_tree.ex)
-  -> LiveView state/event owner
+  -> LiveView state/event owner (ProjectLive.Files + rail shell)
   -> Safe filesystem service (EyeInTheSky.Projects.FileTree)
 ```
-
-The UI layer renders and emits events. The LiveView handles events and updates socket assigns. The filesystem service owns all path resolution, directory listing, file reading, and writing.
 
 ### Files to Create
 
@@ -58,6 +109,7 @@ The UI layer renders and emits events. The LiveView handles events and updates s
 |------|---------|
 | `lib/eye_in_the_sky/projects/file_tree.ex` | Safe filesystem service |
 | `lib/eye_in_the_sky_web/components/rail/file_tree.ex` | Recursive tree rendering component |
+| `assets/js/hooks/file_editor_hook.js` | CodeMirror hook with save support |
 
 ### Files to Modify
 
@@ -65,9 +117,60 @@ The UI layer renders and emits events. The LiveView handles events and updates s
 |------|--------|
 | `lib/eye_in_the_sky_web/components/rail.ex` | Add `hero-folder` icon for `:files` section |
 | `lib/eye_in_the_sky_web/components/rail/flyout.ex` | Add `:files` case with `files_content/1` |
-| `lib/eye_in_the_sky_web/live/nav_hook.ex` | Handle expand/collapse/select/save events |
-| `lib/eye_in_the_sky_web/live/project_live/files.ex` | CodeMirror editor integration |
-| `assets/js/hooks/file_editor_hook.js` | CodeMirror hook with save support |
+| `lib/eye_in_the_sky_web/live/project_live/files.ex` | Editor workflow owner |
+
+**Note**: `nav_hook.ex` should NOT handle save/editor events. It may own tree expansion state only if rail shell is persistent.
+
+---
+
+## Event Ownership Table
+
+| Event | Owner | Notes |
+|-------|-------|-------|
+| `open_files_section` | Rail/Shell | Loads root tree if needed |
+| `expand_folder` | Rail/Shell | Calls `FileTree.children/3`, adds to `loading_folders` |
+| `collapse_folder` | Rail/Shell | Removes from `expanded_folders` |
+| `select_file` | ProjectLive.Files | Must check dirty state before patch |
+| `editor_dirty` | ProjectLive.Files | Sent from CodeMirror hook on first change |
+| `editor_clean` | ProjectLive.Files | Sent after save/discard/reload |
+| `save_file` | ProjectLive.Files | Calls `FileTree.write_file/4` |
+| `overwrite_file` | ProjectLive.Files | Calls `FileTree.write_file/4` with `force?: true` |
+| `reload_file` | ProjectLive.Files | Reloads selected file if confirmed |
+| `discard_changes` | ProjectLive.Files | Clears dirty state, applies pending switch |
+
+### Server-to-Client Push Events
+
+```elixir
+push_event(socket, "file_loaded", %{
+  path: path,
+  content: content,
+  hash: hash,
+  language: language
+})
+
+push_event(socket, "file_saved", %{
+  path: path,
+  hash: new_hash
+})
+
+push_event(socket, "file_save_failed", %{
+  path: path,
+  error: error
+})
+
+push_event(socket, "file_conflict", %{
+  path: path
+})
+```
+
+### JS Hook Listeners
+
+```javascript
+this.handleEvent("file_loaded", ...)
+this.handleEvent("file_saved", ...)
+this.handleEvent("file_save_failed", ...)
+this.handleEvent("file_conflict", ...)
+```
 
 ---
 
@@ -85,12 +188,13 @@ defmodule EyeInTheSky.Projects.FileTree do
   def read_file(project, rel_path, opts \\ [])
   def write_file(project, rel_path, content, opts \\ [])
   def safe_path(project_root, rel_path)
+  def safe_real_path(project_root, rel_path)  # resolves symlinks
 end
 ```
 
 ### Safe Path Resolution
 
-All file and directory access must be restricted to the project root.
+Prevents lexical path traversal:
 
 ```elixir
 def safe_path(project_root, rel_path) do
@@ -115,22 +219,104 @@ def safe_path(project_root, rel_path) do
 end
 ```
 
+### Symlink Validation
+
+For symlinked files, validate the resolved target stays inside project root:
+
+```elixir
+def safe_real_path(project_root, rel_path) do
+  with {:ok, abs_path} <- safe_path(project_root, rel_path) do
+    case File.read_link(abs_path) do
+      {:ok, _} ->
+        real_path = Path.expand(abs_path) |> File.read_link_all!()
+        root = Path.expand(project_root)
+        if String.starts_with?(real_path, root <> "/") do
+          {:ok, real_path}
+        else
+          {:error, :symlink_escapes_project}
+        end
+      {:error, :einval} ->
+        {:ok, abs_path}  # not a symlink
+    end
+  end
+end
+```
+
+### Write File API
+
+```elixir
+# Normal save with conflict detection
+write_file(project, rel_path, content, original_hash: hash)
+
+# Force overwrite (after user confirms)
+write_file(project, rel_path, content, force?: true)
+```
+
+**Rules:**
+- If `original_hash` is missing and `force?` is not true, return `{:error, :missing_original_hash}`
+- If `force?: true`, skip conflict check and overwrite
+- Always use atomic write
+
+### Atomic Write with Permission Preservation
+
+```elixir
+def atomic_write(path, content) do
+  dir = Path.dirname(path)
+  base = Path.basename(path)
+  random = Base.url_encode64(:crypto.strong_rand_bytes(8), padding: false)
+  tmp_path = Path.join(dir, ".#{base}.tmp-#{random}")
+
+  # Preserve original file mode if it exists
+  original_mode = case File.stat(path) do
+    {:ok, %{mode: mode}} -> mode
+    _ -> nil
+  end
+
+  with :ok <- File.write(tmp_path, content),
+       :ok <- maybe_chmod(tmp_path, original_mode),
+       :ok <- File.rename(tmp_path, path) do
+    :ok
+  else
+    error ->
+      File.rm(tmp_path)
+      error
+  end
+end
+
+defp maybe_chmod(_path, nil), do: :ok
+defp maybe_chmod(path, mode), do: File.chmod(path, mode)
+```
+
+**Note**: Use dotfile temp pattern (`.filename.tmp-xyz`) to hide from tree. Add `.*.tmp-*` to ignored patterns.
+
 ### Directory Sorting
 
 ```elixir
-Enum.sort_by(entries, fn node ->
+entries
+|> filter_ignored()
+|> Enum.sort_by(fn node ->
   {
     if(node.type == :directory, do: 0, else: 1),
     String.downcase(node.name)
   }
 end)
+|> Enum.take(@max_entries_per_directory)
 ```
 
-### Ignored Directories (Hidden by Default)
+**Important**: Filter and sort BEFORE applying entry limit.
+
+### Ignored Directories (Always Hidden)
 
 ```elixir
 @ignored_directories ~w(.git node_modules _build deps .elixir_ls coverage tmp)
+@ignored_patterns ~w(.*.tmp-*)
 ```
+
+### Hidden Files Policy (MVP)
+
+- Show normal dotfiles by default (`.formatter.exs`, `.gitignore`, etc.)
+- Always hide heavy directories (`.git`, `node_modules`, `_build`, `deps`)
+- No Show Hidden toggle in MVP
 
 ### Binary Detection
 
@@ -140,40 +326,21 @@ def binary_file?(content) do
 end
 ```
 
-### Atomic Write
-
-```elixir
-def atomic_write(path, content) do
-  tmp_path = path <> ".tmp-" <> Base.url_encode64(:crypto.strong_rand_bytes(8), padding: false)
-
-  with :ok <- File.write(tmp_path, content),
-       :ok <- File.rename(tmp_path, path) do
-    :ok
-  else
-    error ->
-      File.rm(tmp_path)
-      error
-  end
-end
-```
-
 ### Conflict Detection
 
-When opening a file, compute and store `original_hash`:
+Use content hash, not mtime:
 
 ```elixir
 hash = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
 ```
 
-When saving, read current disk content, hash it, compare to `original_hash`. If different, return `{:error, :conflict}`.
-
 ---
 
 ## Symlink Policy
 
-- **Symlinked directories**: Show with visual marker, do not expand
+- **Symlinked directories**: Show with visual marker, do NOT expand
 - **Symlinked files**: Allow only if resolved target stays inside project root
-- **Rationale**: Prevents escaping project root and infinite loops
+- **Validation**: Both `safe_path/2` (lexical) AND `safe_real_path/2` (resolved) must pass for symlinked files
 
 ---
 
@@ -182,23 +349,26 @@ When saving, read current disk content, hash it, compare to `original_hash`. If 
 ```elixir
 %{
   name: "router.ex",
-  path: "lib/my_app_web/router.ex",
+  path: "lib/my_app_web/router.ex",  # relative path
   type: :file,           # :file | :directory
   symlink?: false
 }
 ```
 
-### Tree State
+### Tree State (owned by rail/shell)
 
 ```elixir
 tree_nodes: %{
-  "" => [
-    %{name: "lib", path: "lib", type: :directory},
-    %{name: "mix.exs", path: "mix.exs", type: :file}
-  ],
-  "lib" => [
-    %{name: "my_app.ex", path: "lib/my_app.ex", type: :file}
-  ]
+  "" => [%{name: "lib", path: "lib", type: :directory}, ...],
+  "lib" => [%{name: "my_app.ex", path: "lib/my_app.ex", type: :file}, ...]
+}
+
+expanded_folders: MapSet.new(["lib", "lib/my_app_web"])
+
+loading_folders: MapSet.new()  # currently loading
+
+folder_errors: %{
+  "lib/private" => "permission denied"
 }
 ```
 
@@ -206,11 +376,22 @@ tree_nodes: %{
 
 ## Socket Assigns
 
+### Rail/Shell Assigns (tree state)
+
 ```elixir
 assign(socket,
   active_section: :files,
   expanded_folders: MapSet.new(),
   tree_nodes: %{},
+  loading_folders: MapSet.new(),
+  folder_errors: %{}
+)
+```
+
+### ProjectLive.Files Assigns (editor state)
+
+```elixir
+assign(socket,
   selected_file_path: nil,
   open_file: nil,
   file_error: nil,
@@ -227,12 +408,15 @@ assign(socket,
   name: "router.ex",
   content: "...",
   original_hash: "abc123...",
-  mtime: ~N[2026-04-22 00:00:00],
   size: 12345,
   language: :elixir,
   sensitive?: false
 }
 ```
+
+**Note**: `mtime` is for display/debug only. Use `original_hash` for conflict detection.
+
+**Note**: File content in socket assigns is acceptable for MVP with 1MB limit. Do not log socket assigns.
 
 ### `save_state` Values
 
@@ -252,30 +436,48 @@ assign(socket,
 ```
 User clicks folder rail icon
   -> active_section = :files
-  -> if project selected, load root directory
+  -> if project selected AND tree_nodes[""] is empty:
+       load root directory
   -> render tree
 ```
+
+Root loading is idempotent — do not reload if already loaded unless project changes.
 
 ### Expand Folder
 
 ```
 User clicks folder chevron
-  -> push event expand_folder(path)
+  -> if path in loading_folders: ignore (prevent duplicate loads)
+  -> add path to loading_folders
   -> safe path resolution
   -> list children
   -> filter ignored entries
   -> sort children
+  -> take first 500 (add warning node if truncated)
   -> update tree_nodes[path]
   -> add path to expanded_folders
+  -> remove path from loading_folders
+  -> on error: add to folder_errors, remove from loading_folders
 ```
 
-### Select File
+### Select File (dirty-state guarded)
 
+File tree row clicks use **events, not direct patch links**:
+
+```heex
+<button type="button" phx-click="select_file" phx-value-path={node.path}>
+  <%= node.name %>
+</button>
+```
+
+Flow:
 ```
 User clicks file
+  -> select_file event to ProjectLive.Files
   -> if current editor is clean:
        push_patch to /projects/:id/files?path=<rel_path>
-     if current editor is dirty:
+  -> if current editor is dirty:
+       set pending_file_switch = path
        show unsaved changes dialog
 ```
 
@@ -284,30 +486,84 @@ User clicks file
 ```
 Route has ?path=...
   -> safe path resolution
-  -> stat file
+  -> stat path
+  -> if directory -> {:error, :path_is_directory}
+  -> if not regular file -> {:error, :unsupported_file_type}
   -> check size (max 1MB)
   -> read file
   -> check binary
   -> check UTF-8
   -> hash content
+  -> detect language by extension (best-effort, fallback to plain text)
   -> assign open_file
-  -> CodeMirror receives content
+  -> push_event "file_loaded" to CodeMirror
 ```
 
 ### Save File
 
 ```
 User clicks Save or Cmd+S
-  -> CodeMirror sends path, content, original_hash
-  -> LiveView calls FileTree.write_file
-  -> safe path resolution
-  -> read current disk hash
-  -> if conflict, return {:error, :conflict}
-  -> else atomic write
-  -> return new hash
-  -> editor clears dirty state
+  -> CodeMirror sends { path, content }
+  -> LiveView validates path == open_file.path
+       (if mismatch: {:error, :stale_editor_state})
+  -> LiveView uses socket.assigns.open_file.original_hash (server-owned)
+  -> FileTree.write_file with original_hash
+  -> if conflict: push_event "file_conflict"
+  -> else: atomic write, compute new hash
+  -> push_event "file_saved" with new_hash
+  -> update open_file.original_hash
   -> save_state = :saved
 ```
+
+### Overwrite (after conflict)
+
+```
+User clicks Overwrite in conflict dialog
+  -> FileTree.write_file with force?: true
+  -> atomic write
+  -> compute new hash
+  -> update open_file.original_hash
+  -> save_state = :saved
+  -> clear conflict state
+```
+
+### Deleted File During Save
+
+```
+User saves file that was deleted externally
+  -> FileTree.write_file detects file missing
+  -> return {:error, :file_deleted}
+  -> show error: "This file no longer exists."
+  -> MVP does NOT recreate deleted files
+```
+
+### Project Switching
+
+```
+User switches project while editor is dirty
+  -> show unsaved changes dialog
+  -> Save: save then switch
+  -> Discard: clear tree state, clear editor state, switch
+  -> Cancel: stay on current project
+```
+
+---
+
+## Dirty-State Tracking
+
+### Communication Flow
+
+```
+CodeMirror tracks actual content dirty state locally.
+On first clean -> dirty transition: CodeMirror sends editor_dirty.
+After save/reload/discard: CodeMirror sends or receives editor_clean.
+LiveView tracks coarse dirty state for UI guards.
+LiveView does NOT receive every keystroke.
+```
+
+### Guard Rule
+
+If editor is dirty, routine LiveView updates must NOT replace CodeMirror content. Only explicit reload, discard, save success, or confirmed file switch may replace dirty content.
 
 ---
 
@@ -320,19 +576,29 @@ Add `hero-folder` icon to rail. Grey out when no project selected.
 ### Files Flyout Section
 
 - Header: "FILES" label
-- Optional controls: Refresh button, Show hidden toggle
 - Tree: Recursive `<.tree_node>` component
-- Empty state: "Select a project to browse files."
+- Empty states:
+  - No project: "Select a project to browse files."
+  - Invalid path: "This project does not have a valid path."
+  - Path missing: "Project path does not exist."
+
+### Tree Node
+
+- Show loading indicator when folder is in `loading_folders`
+- Show error inline when folder is in `folder_errors`
+- Unreadable folder should not break whole tree
 
 ### CodeMirror Editor
 
 Required features:
 - Display file content
 - Allow editing
-- Track dirty state
+- Track dirty state locally
 - Save via button and Cmd+S / Ctrl+S
-- Receive new content when selected file changes
-- Avoid overwriting dirty content accidentally
+- Receive new content via push_event
+- Guard against replacing dirty content
+- Track currentPath to ignore stale save responses
+- beforeunload warning when dirty
 
 ### Dirty State Indicator
 
@@ -370,48 +636,110 @@ You have unsaved changes.
 | No project selected | "Select a project to browse files." |
 | Project path missing | "This project does not have a valid path." |
 | Path outside project | "This path is outside the project and cannot be opened." |
+| Symlink escapes project | "This symlink points outside the project." |
+| Path is directory | "This path is a directory, not a file." |
 | File too large | "This file is too large to edit." |
 | Binary file | "Binary files cannot be edited." |
 | Invalid UTF-8 | "This file is not valid UTF-8." |
 | Permission denied | "Could not open file: permission denied." |
 | File no longer exists | "This file no longer exists." |
 | Save conflict | "This file changed on disk since you opened it." |
+| File deleted during save | "This file no longer exists." |
+| Stale editor state | "Editor state is stale. Please reload." |
 
 ---
 
 ## Sensitive Files
 
-Mark these with a badge or warning (do not block):
+Mark these with a badge or warning (do not block in local MVP):
 
 - `.env`, `.env.local`, `.env.production`
 - `*.pem`, `*.key`
 - `credentials.json`
 - `config/prod.secret.exs`
 
-Do not log file contents.
+### Logging Rules
+
+- Do NOT log file contents
+- Do NOT inspect socket assigns containing `open_file.content` in logs
+- Do NOT include file contents in telemetry metadata
+- Do NOT broadcast file contents via PubSub
+- Do NOT include file contents in audit/event payloads
+
+---
+
+## Language Detection
+
+Best-effort by file extension:
+
+| Extension | Language |
+|-----------|----------|
+| `.ex`, `.exs` | elixir |
+| `.heex` | html |
+| `.js` | javascript |
+| `.ts` | typescript |
+| `.svelte` | svelte |
+| `.md` | markdown |
+| `.json` | json |
+| (other) | plain text |
+
+Syntax highlighting failure must not prevent editing.
 
 ---
 
 ## Tests Required
+
+### Path Safety
 
 ```
 safe relative path resolves
 absolute path is rejected
 ../ traversal is rejected
 outside project path is rejected
-root directory lists
-directories sort before files
-heavy directories are filtered
+symlink to file inside project resolves
+symlink to file outside project is rejected
+symlink to directory does not expand
+```
+
+### File Guards
+
+```
 large file is blocked
 binary file is blocked
 invalid UTF-8 is blocked
+directory path cannot be opened as file
+```
+
+### File Operations
+
+```
 text file reads successfully
+directories sort before files alphabetically
+heavy directories are filtered
+entry limit applies after sort
+```
+
+### Write Operations
+
+```
 write saves content
 write uses conflict detection
+write rejects missing original_hash
 write rejects stale original hash
+write succeeds with force?: true
 write rejects outside project path
-symlink escaping root is blocked
 atomic write cleans up temp file on failure
+atomic write preserves file permissions
+```
+
+### Special Characters
+
+```
+filename with spaces resolves and opens
+filename with # resolves and opens
+filename with ? resolves and opens
+Unicode filename resolves and opens
+query-param encoded path opens correctly
 ```
 
 ---
@@ -423,10 +751,11 @@ atomic write cleans up temp file on failure
 Build and test before any UI work:
 
 - [ ] `EyeInTheSky.Projects.FileTree` module
-- [ ] `safe_path/2`
-- [ ] `children/3` with sorting and filtering
-- [ ] `read_file/3` with size/binary/UTF-8 guards
-- [ ] `write_file/4` with atomic write and conflict detection
+- [ ] `safe_path/2` and `safe_real_path/2`
+- [ ] `children/3` with sorting, filtering, limit
+- [ ] `read_file/3` with size/binary/UTF-8/directory guards
+- [ ] `write_file/4` with atomic write, permission preservation, conflict detection
+- [ ] `force?: true` overwrite option
 - [ ] Comprehensive tests
 
 ### Phase 2: Tree UI
@@ -434,28 +763,35 @@ Build and test before any UI work:
 - [ ] Rail folder icon in `rail.ex`
 - [ ] `:files` section in `flyout.ex`
 - [ ] `file_tree.ex` recursive component
+- [ ] Tree state in rail/shell (expanded_folders, tree_nodes, loading_folders, folder_errors)
 - [ ] Expand/collapse events
+- [ ] `select_file` event (button, not link)
 - [ ] File selection route `/projects/:id/files?path=<rel_path>`
 - [ ] Selected file highlighting
 - [ ] Empty/error states
+- [ ] Folder loading indicator
+- [ ] Per-folder error display
 
 ### Phase 3: Editor UI
 
 - [ ] CodeMirror hook with dirty state tracking
-- [ ] Load selected file into editor
-- [ ] Save button
+- [ ] Load selected file into editor via push_event
+- [ ] Dirty state indicator (asterisk)
+- [ ] Save button with states
 - [ ] Cmd+S / Ctrl+S save shortcut
-- [ ] Save event handling
+- [ ] Save event handling (server-owned original_hash)
+- [ ] Stale editor state rejection
 - [ ] Conflict dialog
-- [ ] Unsaved-switch warning
+- [ ] Unsaved-switch warning (before file switch AND project switch)
 - [ ] beforeunload warning
+- [ ] Guard against replacing dirty content
 
 ### Phase 4: Polish
 
-- [ ] Refresh button
+- [ ] Refresh button (reload expanded folders, preserve expansion)
 - [ ] Sensitive file badges
 - [ ] Better loading states
-- [ ] Extension-to-language mapping for syntax highlighting
+- [ ] Extension-to-language mapping
 
 ---
 
@@ -463,33 +799,39 @@ Build and test before any UI work:
 
 ### Phase 1 Complete When
 
-- All path safety tests pass
-- Read guards (size, binary, UTF-8) work
-- Atomic write works
+- All path safety tests pass (lexical AND symlink)
+- Read guards (size, binary, UTF-8, directory) work
+- Atomic write works and preserves permissions
 - Conflict detection works
+- force? overwrite works
 
 ### Phase 2 Complete When
 
 - Files rail icon visible and functional
-- Tree loads project root on section open
-- Folders expand/collapse
-- File click updates route and highlights selection
+- Tree loads project root on section open (idempotent)
+- Folders expand/collapse with loading indicator
+- Folder errors display inline without breaking tree
+- File click uses event, checks dirty state, then patches
 - Tree uses relative paths only
 
 ### Phase 3 Complete When
 
-- CodeMirror loads and edits files
+- CodeMirror loads and edits files via push_event
 - Save works via button and keyboard shortcut
+- Server owns original_hash, rejects stale saves
 - Dirty state shows asterisk
-- Conflict prompts user before overwriting
+- Conflict prompts user (Reload/Overwrite/Cancel)
 - Switching files with unsaved changes prompts user
+- Switching projects with unsaved changes prompts user
 - Browser beforeunload warns when dirty
+- Dirty content is not replaced by routine LiveView updates
 
 ### MVP Complete When
 
 - User can browse project files
 - User can open a text file in CodeMirror
 - User can edit and save
-- Path traversal attacks are blocked
+- Path traversal attacks are blocked (lexical and symlink)
 - File corruption is prevented via atomic write
 - Unsaved changes are not silently lost
+- One open file at a time

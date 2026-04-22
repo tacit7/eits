@@ -11,6 +11,7 @@ lib/eye_in_the_sky_web/components/rail/project_switcher.ex  # Project picker ove
 lib/eye_in_the_sky_web/components/rail/project_actions.ex   # Project CRUD + select event handlers
 lib/eye_in_the_sky_web/components/rail/helpers.ex           # Small utilities (project_initial, etc.)
 lib/eye_in_the_sky_web/components/layouts/app.html.heex     # Layout — mounts the rail with sidebar_tab + sidebar_project
+assets/js/hooks/rail_state.js                               # localStorage persistence for project selection
 ```
 
 ---
@@ -49,14 +50,114 @@ The rail maps `sidebar_tab` atoms (set by each LiveView) to `active_section` ato
 
 ## Sticky Sections
 
-Chat and Canvas lock the flyout open. Clicking their icon again does not collapse. Closing while on a sticky page restores that section.
+Chat and Canvas lock the flyout open. Clicking their icon again does not collapse. Closing while on a sticky page restores that section. All other sections collapse on click.
 
 ```elixir
 @sticky_sections [:chat, :canvas]
 defp sticky_section?(section), do: section in @sticky_sections
 ```
 
-Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline elsewhere.
+Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline elsewhere. This centralized attr makes future changes (e.g., adding `:notes` as sticky) trivial.
+
+---
+
+## Flyout Sections
+
+### Sessions Flyout
+
+**Lazy loader**: `load_flyout_sessions/3`
+
+**UI features**:
+- **Filter bar**: name input (300ms debounce) filters sessions server-side; sort popup (Last activity, Created, Name); sort icon highlights when non-default
+- **Flat list**: sessions displayed without active/stopped grouping; status indicated by status dot (color-coded)
+- **New agent form**: inline form to create a new session; fires `new_session` directly when project is selected via dropdown
+- **Nav links**: All Sessions, List view links at top
+
+**State preservation**: filter state (sort, name) preserved across project switches and flyout toggles via `session_filter` and `session_sort` assigns.
+
+**Project scope**: if `sidebar_project` is set, only shows sessions for that project. Otherwise shows all sessions globally.
+
+---
+
+### Tasks Flyout
+
+**Lazy loader**: `maybe_load_tasks/3`
+
+**UI features**:
+- **Nav links**: All, List, Kanban at top (direct links to /tasks, /tasks?view=list, /tasks?view=kanban)
+- **State filter**: popup with workflow states (To Do, In Progress, In Review, Done, Archived); filters tasks by selected state; Archived excluded by default
+- **Live search**: text input filters task names in real-time across visible list
+- **Explicit empty states**: "No tasks yet" when list is empty
+- **Kanban hint**: if Kanban view is available, "Try Kanban" hint shown
+
+**State preservation**: search and filter state preserved; last 50 tasks loaded per project.
+
+**Project scope**: tasks are always project-scoped. If no project selected, shows empty state.
+
+**Archived handling**: archived tasks excluded from query by default; state filter allows user to view them. Rail does not filter after the fact — all filtering happens in the context query.
+
+---
+
+### Teams Flyout
+
+**Lazy loader**: `maybe_load_teams/3`
+
+**UI features**:
+- Lists teams for the current project with member count (e.g. "Team Name (3 members)")
+- Direct links to team pages
+
+**Project scope**: if `sidebar_project` is set, shows only teams in that project. Otherwise empty state.
+
+---
+
+### Canvas Flyout
+
+**Lazy loader**: `maybe_load_canvases/2`
+
+**UI features**:
+- Lists each canvas with its sessions
+- Each session shows status dot + name, linking to that session's DM
+- Sessions listed under each canvas with live status indicators (color-coded dot)
+- Provider icon (pulsing and raised opacity when session is working) — click focuses the floating chat window for that session
+- Session name — click focuses the floating chat window
+- Session logo — click navigates to the session's DM page
+
+**Nav behavior**:
+- On non-canvas pages: canvas rail icon navigates to /canvases directly
+- On canvas pages: canvas rail icon opens the flyout (no collapse on click due to sticky section)
+
+**Cross-canvas focus**: Clicking a session name navigates to `/canvases/:id?focus=:session_id`. Canvas page reads the focus param in `handle_params` and dispatches `canvas:focus-session` after all windows are in DOM.
+
+---
+
+### Chat Flyout
+
+**Lazy loader**: `maybe_load_channels/3`
+
+**UI features**:
+- Lists channels for current project (or global channels if no project selected)
+- Direct navigation to channel pages
+
+**Nav behavior**: Chat rail icon opens-only (no collapse on click due to sticky section).
+
+---
+
+### Usage Section
+
+No lazy loader — section just displays a link to `/usage` ("Usage Dashboard").
+
+---
+
+### Jobs Section
+
+**Lazy loader**: `maybe_load_jobs/2` (loads up to 15 jobs)
+
+**UI features**:
+- Each job shows: enabled/disabled dot + name + schedule value list
+- Nav links: "All Jobs", optional "Project Jobs" link (if project selected)
+- "No jobs" empty state when none exist
+
+**Project scope**: if `sidebar_project` is set, shows project-specific job nav link.
 
 ---
 
@@ -64,14 +165,15 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 
 Data is only fetched when entering a section, not on every page render:
 
-| Section     | Loader                    |
-|-------------|---------------------------|
-| `:sessions` | `load_flyout_sessions/3`  |
-| `:tasks`    | `maybe_load_tasks/3`      |
-| `:chat`     | `maybe_load_channels/3`   |
-| `:teams`    | `maybe_load_teams/3`      |
-| `:canvas`   | `maybe_load_canvases/2`   |
-| `:jobs`     | `maybe_load_jobs/2`       |
+| Section     | Loader                    | Project-scoped |
+|-------------|---------------------------|----------------|
+| `:sessions` | `load_flyout_sessions/3`  | Yes            |
+| `:tasks`    | `maybe_load_tasks/3`      | Yes            |
+| `:chat`     | `maybe_load_channels/3`   | Yes            |
+| `:teams`    | `maybe_load_teams/3`      | Yes            |
+| `:canvas`   | `maybe_load_canvases/2`   | No             |
+| `:jobs`     | `maybe_load_jobs/2`       | Yes            |
+| `:usage`    | —                         | —              |
 
 Sessions are also re-fetched when `sidebar_project` changes (project switch triggers a reload).
 
@@ -81,7 +183,7 @@ Sessions are also re-fetched when `sidebar_project` changes (project switch trig
 
 ### How `sidebar_project` is set
 
-Project-scoped pages (`/projects/:id/*`) set `sidebar_project` to the project struct in `mount/3`. Global pages (`/usage`, `/jobs`, `/tasks`, etc.) historically set it to `nil`.
+Project-scoped pages (`/projects/:id/*`) set `sidebar_project` to the project struct in `mount/3`. Global pages (`/usage`, `/jobs`, `/tasks`, `/canvases`, etc.) set it to `nil`.
 
 The layout passes it directly to the rail:
 
@@ -97,7 +199,7 @@ The layout passes it directly to the rail:
 
 ### The Nil-Guard
 
-`update/2` contains a nil-guard to prevent parent re-renders from clearing the locally selected project:
+`update/2` contains a nil-guard to prevent parent re-renders from clearing the locally selected project within a single LiveView process:
 
 ```elixir
 sidebar_project =
@@ -107,34 +209,27 @@ sidebar_project =
   end
 ```
 
-**This guard works within the same LiveView process** (push_patch navigations). It does NOT survive cross-LiveView navigation because `mount/3` re-runs and resets `sidebar_project: nil` before `update/2` fires. When `update/2` then receives `nil` from the global page, the fallback is also `nil`.
+**This guard works within the same LiveView process** (push_patch navigations). Cross-LiveView navigation would normally reset `sidebar_project` to nil because `mount/3` re-runs and reinitializes to nil before `update/2` fires.
 
-### Project Switch
+### Project Persistence Across Cross-LiveView Navigation (Fixed)
 
-User clicks a project in the project picker → `handle_event("select_project")` → `ProjectActions.handle_select_project/2`. This sets `sidebar_project` only in the rail's local assigns. It does not navigate, broadcast, or persist anywhere. Clicking the same project again toggles it off (sets to nil).
+**Previously**: Cross-LiveView navigation lost project selection. When navigating from a project-scoped page (`/projects/:id/*`) to a global page (`/usage`, `/jobs`, `/tasks`), the rail would remount, reset `sidebar_project: nil`, and the nil-guard fallback would also be nil. Project was gone.
 
----
+**Now fixed** via localStorage + RailState hook:
 
-## Known Issue: Project Lost on Cross-LiveView Navigation
+**rail_state.js**:
+- On hook `mounted()`, reads `rail_project_id` from localStorage
+- Pushes `restore_project` event to LiveComponent with the saved project_id
+- On `save_project` event from server, writes/clears `rail_project_id` in localStorage
 
-**Symptom**: User selects Project 1, navigates to a global page (`/usage`, `/jobs`, `/tasks`), project is lost. All subsequent flyout content (sessions, tasks, teams) shows global unscoped results.
+**rail.ex**:
+- `handle_event("restore_project")`: if `sidebar_project` is nil (global page), loads the project by ID and assigns it
+- If the project no longer exists, pushes `save_project` with nil to clear stale localStorage entry
+- `handle_event("select_project")`: after setting project locally, pushes `save_project` with new project_id (or nil if toggled off) so localStorage stays in sync
 
-**Root cause**: Cross-LiveView navigation remounts the LiveComponent. `mount/3` initializes `sidebar_project: nil`. `update/2` receives `nil` from the global page — nil-guard falls back to the mount default (also `nil`). Project is gone.
+**Guard**: restore only runs when `sidebar_project` is nil. Project-scoped pages set a non-nil project first (via `update/2`), so the restore is a no-op on those pages — route-derived project is never overridden.
 
-**Why global pages set `sidebar_project: nil`**: No good reason. The convention signals "no project scope" but the nil-guard was added to make that safe. The real problem is the remount resets state before the nil-guard can protect it.
-
-**Fix (not yet implemented)**:
-
-Two parts:
-
-1. **Persist last-selected project_id via localStorage** using the existing `RailState` JS hook:
-   - On project select, write `last_project_id` to localStorage
-   - On hook `mounted`, push `last_project_id` back to the LiveComponent via `pushEvent("restore_project", %{project_id: id})`
-   - Rail handles `restore_project` event: if `sidebar_project` is nil, load and assign the project
-
-2. **Stop setting `sidebar_project: nil` on global pages** — it is redundant given the nil-guard and actively confusing.
-
-Until this is fixed, the project selection does not survive navigating away from a project-scoped page.
+Result: Project selection now persists across all page navigations.
 
 ---
 
@@ -142,13 +237,13 @@ Until this is fixed, the project selection does not survive navigating away from
 
 ```
 Rail owns:      UI interaction state — active_section, flyout_open, filter/search state,
-                locally selected sidebar_project fallback
+                sidebar_project fallback (via localStorage)
 Parents own:    Route-derived context — sidebar_tab, sidebar_project (for project-scoped routes)
-URL params own: Cross-route persistence when needed (currently only used for canvas)
+URL params own: Cross-route persistence when needed (e.g., ?focus= for canvas)
 Contexts own:   Data retrieval, authorization, filtering, persistence
 ```
 
-The rail must not become a source of truth for project authorization or durable project selection. It displays context; it does not decide access.
+The rail must not become a source of truth for project authorization or durable project selection beyond the localStorage fallback. It displays context; it does not decide access.
 
 ---
 
@@ -164,10 +259,12 @@ The rail must not become a source of truth for project authorization or durable 
 
 5. **nil project_id Ecto warning** — some queries emit a warning when `project_id: nil` is passed. Always guard: `if project, do: Keyword.put(opts, :project_id, project.id), else: opts`.
 
-6. **Canvas routes in :app live_session** — canvas pages mount inside the same `:app` live session, so the rail persists across canvas navigation. Canvas URLs do not carry `?project_id=X`; project context is not recovered from URL on canvas pages.
+6. **Canvas routes in :app live_session** — canvas pages mount inside the same `:app` live session, so the rail persists across canvas navigation. Canvas URLs do not carry `?project_id=X`; project context is not recovered from URL on canvas pages. Project selection is preserved via localStorage fallback.
 
-7. **`sidebar_project: nil` does not clear the rail's project (within same LV process)** — the nil-guard in `update/2` preserves the locally held project within a LiveView process. Across LiveView navigation it does not help. See the known issue above.
+7. **`sidebar_project: nil` does not clear the rail's project (within same LV process)** — the nil-guard in `update/2` preserves the locally held project within a LiveView process. Across LiveView navigation, persistence is now handled by localStorage (see Project Persistence section above).
 
-8. **Rail LiveComponent state is not route-durable** — LiveComponent state only survives within the current parent LiveView process. Cross-route persistence must be carried through URL params, localStorage, or another durable source.
+8. **Rail LiveComponent state is not route-durable** — LiveComponent state only survives within the current parent LiveView process. Cross-route persistence is handled via URL params (canvas focus), localStorage (project selection), or maintained in contexts.
 
 9. **`phx-change` on bare inputs is unreliable** — bare inputs (no form wrapper) only fire `phx-change` on blur. Use `phx-keyup` + `phx-debounce="300"` for real-time filtering. Applied to: session name filter, task search input.
+
+10. **Filter state preservation across toggles** — when user toggles the flyout closed and opens it again, filter/search state is preserved. This is intentional for UX but means clearing a search is a deliberate user action, not a side effect of navigation.

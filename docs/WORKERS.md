@@ -110,6 +110,67 @@ When AgentWorker encounters a systemic error (billing/auth failure, API limits),
 
 ---
 
+## AgentWorker Abnormal Exit Handling
+
+When an AgentWorker process terminates abnormally (crash, non-zero exit), it marks the associated session as `failed` and fires Teams cleanup events.
+
+**How it works:**
+1. `AgentWorker.terminate/2` is called with a reason (`:normal`, `:shutdown`, or crash reason)
+2. If reason is NOT `:normal` or `:shutdown` (abnormal termination), the worker:
+   - Calls `EyeInTheSky.AgentWorkerEvents.on_session_failed(session_id, pcid)`
+   - Wrapped in `try/rescue` to protect against DB connection failures during shutdown
+3. `on_session_failed/2` behavior (same as systemic error handler):
+   - Writes session status to `failed` in the database
+   - Fires `on_session_failed` PubSub event to notify Teams orchestrators
+   - Deduplicates cleanup events to prevent duplicate Teams member updates
+   - Logs error context for debugging
+
+**Why this matters:** If AgentWorker crashes without going through the normal error handler (e.g., OOM, unhandled exception), the session would otherwise remain in `working` status indefinitely. This handler ensures the UI reflects reality by immediately marking the session failed.
+
+**Error scenarios that trigger this:**
+- Worker process runs out of memory (OOM)
+- Unhandled exception in worker code
+- BEAM VM terminating the process
+- Explicit `exit/1` call (not `:normal`)
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — `terminate/2` clause
+- `lib/eye_in_the_sky/claude/agent_worker_events.ex` — `on_session_failed/2`
+
+**Commits:** 8af3b10a (abnormal exit cleanup on terminate)
+
+---
+
+## Zombie Session Sweeper
+
+A periodic scheduler detects and cleans up sessions stuck in `working` status with no heartbeat activity, marking them as failed when their AgentWorker has died.
+
+**Problem:** When AgentWorker crashes silently (e.g., connection lost before terminate/2 is called), the session remains in `working` status forever. The UI shows active agents that are actually dead.
+
+**Solution:** `AgentStatus` scheduler runs every 5 minutes and sweeps zombie sessions:
+
+1. Query for sessions in `working` status with no recent activity:
+   - `last_activity_at` is NULL and `started_at` > 30 minutes old, OR
+   - `last_activity_at` exists and < 30 minutes ago
+   - Excludes fresh NULL sessions (gate by `started_at`) to avoid false positives
+2. For each zombie:
+   - Marks session status as `failed` with `status_reason: "zombie_swept"`
+   - Fires `session_status/2` PubSub event (same as normal termination)
+   - Marks the linked agent (if present) as `failed` to keep UI filters consistent
+3. Logs warning per session and info summary
+
+**Example:** Session created 40 minutes ago, no heartbeat activity recorded (NULL `last_activity_at`), AgentWorker process is gone → marked `failed` with reason `zombie_swept`.
+
+**30-minute threshold:** Chosen to give long-running agents time to prove they're alive. Agents are expected to emit heartbeat activity more frequently.
+
+**Code locations:**
+- `lib/eye_in_the_sky/scheduler/agent_status.ex` — `sweep_zombie_sessions/0`
+- `lib/eye_in_the_sky/sessions/session.ex` — changeset allows `status_reason: "zombie_swept"`
+
+**Commits:** 8af3b10a (zombie sweeper + tests)
+
+---
+
 ## Spawn Failure Tracking
 
 When an agent spawn request fails, the error is logged to disk and recorded in the team membership table.

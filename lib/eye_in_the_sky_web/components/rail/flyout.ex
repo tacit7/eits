@@ -45,14 +45,26 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             {section_label(@active_section)}
           </span>
           <%= if @active_section == :sessions do %>
-            <button
-              phx-click="toggle_new_session_form"
-              phx-target={@myself}
-              title="New agent"
-              class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
-            >
-              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
-            </button>
+            <%= if @sidebar_project do %>
+              <button
+                phx-click="new_session"
+                phx-value-project_id={@sidebar_project.id}
+                phx-target={@myself}
+                title={"New session in #{@sidebar_project.name}"}
+                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+              >
+                <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+              </button>
+            <% else %>
+              <button
+                phx-click="toggle_new_session_form"
+                phx-target={@myself}
+                title="New agent"
+                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+              >
+                <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+              </button>
+            <% end %>
           <% end %>
         </div>
 

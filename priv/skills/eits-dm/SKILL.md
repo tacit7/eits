@@ -41,6 +41,8 @@ eits dm --to <session_uuid_or_integer_id> --message "text"
 
 `--to` accepts both UUID and integer session ID. Use `$EITS_SESSION_UUID` or `$EITS_SESSION_ID` — both work.
 
+**DM to waiting/idle/completed sessions returns HTTP 500.** The DM controller does not gate on session status — a 500 means the target session is in a non-active state, not a bug on your end. There is no workaround; the session is unreachable until it resumes. (Tracked: task 4968.)
+
 **Send DMs sequentially — never in parallel Bash calls.** One error cancels sibling calls:
 
 ```bash

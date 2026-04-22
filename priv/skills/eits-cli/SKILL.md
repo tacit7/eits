@@ -189,6 +189,8 @@ eits notifications mark-all-read
 4. **`dm --to` accepts both UUID and integer** — `$EITS_SESSION_ID` is integer; `$EITS_SESSION_UUID` is UUID. Either works.
 5. **Write hook blocks if no active task** — run `eits tasks begin` before editing files.
 6. **Agents commit to wrong branch** — always verify `git branch` before committing in a spawned agent.
+7. **`tasks begin` has no 429 auto-retry** — unlike `tasks annotate`, `begin` fails hard on rate limit. Retry manually with backoff if you hit 429.
+8. **DM to waiting/idle/completed session returns HTTP 500** — the DM controller doesn't gate on session status. Fall back to integer session ID if UUID fails; if both 500, the session is unreachable.
 
 ---
 

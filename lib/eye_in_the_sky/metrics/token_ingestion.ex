@@ -157,7 +157,7 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
   end
 
   defp lookup_session_by_uuid(uuid) do
-    result = Repo.query!("SELECT id, agent_id FROM sessions WHERE uuid = $1", [uuid])
+    result = Repo.query!("SELECT id, agent_id FROM sessions WHERE uuid = $1", [Ecto.UUID.dump!(uuid)])
 
     case result.rows do
       [[id, agent_id] | _] -> %{id: id, agent_id: agent_id}

@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
       |> maybe_opt(:plugin_dir, params["plugin_dir"])
       |> maybe_opt(:settings_file, params["settings_file"])
       |> maybe_opt(:agents_json, params["agents_json"])
-      |> maybe_opt(:agent_flag, params["agent_flag"])
+      |> maybe_opt(:agent, params["agent_flag"])
       |> maybe_opt(:system_prompt, params["system_prompt"])
       |> maybe_opt(:system_prompt_file, params["system_prompt_file"])
       |> maybe_opt(:append_system_prompt, params["append_system_prompt"])
@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
       |> maybe_opt(:no_session_persistence, if(params["no_session_persistence"] == "true", do: true))
       |> maybe_opt(:chrome, if(params["chrome"] == "true", do: true))
       |> maybe_opt(:sandbox, if(params["sandbox"] == "true", do: true))
-      |> maybe_opt(:dangerously_skip_permissions, if(params["dangerously_skip_permissions"] == "true", do: true))
+      |> maybe_opt(:skip_permissions, if(params["dangerously_skip_permissions"] == "true", do: true))
 
     base = [
       agent_type: params["agent_type"] || "claude",

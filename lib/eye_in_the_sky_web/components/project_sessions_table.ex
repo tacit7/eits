@@ -55,6 +55,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
   attr :search_query, :string, required: true
   attr :canvases, :list, default: []
   attr :show_new_canvas_for, :any, default: nil
+  attr :scope, :any, default: nil
 
   def session_list(assigns) do
     ~H"""
@@ -90,6 +91,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
               select_mode={@session_filter == "archived"}
               selected={MapSet.member?(@selected_ids, to_string(agent.id))}
               editing_session_id={@editing_session_id}
+              project_name={if @scope == :all, do: Map.get(agent, :project_name), else: nil}
             >
               <:actions>
                 <.session_row_menu

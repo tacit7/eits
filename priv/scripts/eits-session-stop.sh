@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hook: Set session status to "stopped" on Stop (Claude finished responding)
+# Hook: Set session status to "idle" on Stop (Claude finished responding)
 # Also enforces EITS task annotation when an in-progress task exists.
 # Fires after every Claude turn completion.
 # stop_hook_active guard prevents infinite loops.
@@ -147,6 +147,6 @@ except Exception:
 fi
 # --- End Task Annotation Enforcement ---
 
-eits sessions update "$session_id" --status stopped >/dev/null 2>&1 &
+eits sessions update "$session_id" --status idle >/dev/null 2>&1 &
 
 exit 0

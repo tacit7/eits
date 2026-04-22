@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex Stop hook: set session status to "stopped" and enforce task annotation.
+# Codex Stop hook: set session status to "idle" and enforce task annotation.
 # Codex does not expose transcript_path, so annotation enforcement is simplified:
 # blocks if an in-progress task exists with no annotation this turn.
 set -uo pipefail
@@ -37,6 +37,6 @@ if [ "$in_progress" = "yes" ]; then
 fi
 # --- End Task Annotation Enforcement ---
 
-eits sessions update "$session_id" --status stopped >/dev/null 2>&1 &
+eits sessions update "$session_id" --status idle >/dev/null 2>&1 &
 
 exit 0

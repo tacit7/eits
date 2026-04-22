@@ -117,7 +117,6 @@ defmodule EyeInTheSky.Sessions.Session do
       "working",
       "waiting",
       "compacting",
-      "stopped",
       "completed",
       "failed",
       "archived"

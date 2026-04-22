@@ -118,7 +118,7 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
   end
 
   defp sync_processing_from_status(socket, status)
-       when status in ["stopped", "idle", "waiting", "completed", "failed", "error"] do
+       when status in ["idle", "waiting", "completed", "failed", "error"] do
     socket |> assign(:compacting, false) |> assign(:processing, false)
   end
 

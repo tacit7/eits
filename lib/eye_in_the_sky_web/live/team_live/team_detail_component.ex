@@ -254,17 +254,17 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
   defp status_badge_class(_), do: "badge-neutral"
 
   defp member_status_dot("active"), do: "bg-success"
-  defp member_status_dot("idle"), do: "bg-warning"
+  defp member_status_dot("idle"), do: "bg-base-content/30"
   defp member_status_dot("done"), do: "bg-base-content/30"
   defp member_status_dot(_), do: "bg-base-content/20"
 
   defp member_status_text("active"), do: "text-success"
-  defp member_status_text("idle"), do: "text-warning"
+  defp member_status_text("idle"), do: "text-base-content/50"
   defp member_status_text("done"), do: "text-base-content/40"
   defp member_status_text(_), do: "text-base-content/30"
 
   defp member_avatar_class("active"), do: "bg-success/15 text-success"
-  defp member_avatar_class("idle"), do: "bg-warning/15 text-warning"
+  defp member_avatar_class("idle"), do: "bg-base-300 text-base-content/50"
   defp member_avatar_class("done"), do: "bg-base-300 text-base-content/40"
   defp member_avatar_class(_), do: "bg-base-300 text-base-content/30"
 

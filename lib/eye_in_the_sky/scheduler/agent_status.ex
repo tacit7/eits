@@ -123,6 +123,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   # Sessions stuck in 'working' with no heartbeat for >30 minutes are zombies.
   # Their AgentWorker died without firing on_sdk_errored or on_session_failed.
   # Sweep them to 'failed' so the UI reflects reality.
+  # Also mark the linked agent as failed to ensure UI status filters are correct.
   defp sweep_zombie_sessions do
     import Ecto.Query
 
@@ -142,12 +143,24 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
           Logger.warning("Swept zombie session id=#{session.id} uuid=#{session.uuid} (stuck in working)")
           Events.session_status(session.id, updated.status)
 
+          if session.agent_id do
+            case Agents.get_agent(session.agent_id) do
+              {:ok, agent} ->
+                Agents.update_agent(agent, %{status: "failed"})
+
+              {:error, :not_found} ->
+                :ok
+            end
+          end
+
         {:error, reason} ->
           Logger.warning("Failed to sweep zombie session id=#{session.id}: #{inspect(reason)}")
       end
     end)
 
-    if length(zombies) > 0, do: Logger.info("Zombie sweep: marked #{length(zombies)} sessions as failed")
+    if zombies != [] do
+      Logger.info("Zombie sweep: marked #{length(zombies)} sessions as failed")
+    end
   rescue
     DBConnection.ConnectionError -> Logger.warning("sweep_zombie_sessions: DB unavailable, skipping")
   end

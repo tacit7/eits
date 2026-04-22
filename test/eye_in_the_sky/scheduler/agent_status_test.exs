@@ -104,6 +104,39 @@ defmodule EyeInTheSky.Scheduler.AgentStatusTest do
       GenServer.stop(pid)
     end
 
+    test "sweep_zombie_sessions also updates linked agent status to failed" do
+      # Create an agent and session
+      {:ok, agent} =
+        Agents.create_agent(%{
+          uuid: Ecto.UUID.generate(),
+          description: "Test agent",
+          source: "test",
+          status: "working"
+        })
+
+      cutoff = DateTime.utc_now() |> DateTime.add(-31 * 60, :second)
+
+      {:ok, session} =
+        Sessions.create_session(%{
+          agent_id: agent.id,
+          status: "working",
+          started_at: cutoff,
+          last_activity_at: cutoff,
+          provider: "claude"
+        })
+
+      # Call the sweep
+      AgentStatus.sweep_zombie_sessions_for_testing()
+
+      # Assert both session and agent are now failed
+      updated_session = Sessions.get_session!(session.id)
+      assert updated_session.status == "failed"
+      assert updated_session.status_reason == "zombie_swept"
+
+      {:ok, updated_agent} = Agents.get_agent(agent.id)
+      assert updated_agent.status == "failed"
+    end
+
     test "sweep_zombie_sessions marks stuck working sessions as failed" do
       # Create an agent first (required for session)
       {:ok, agent} =

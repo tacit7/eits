@@ -491,7 +491,13 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   defp maybe_mark_session_failed(reason, %__MODULE__{session_id: session_id, provider_conversation_id: pcid}) do
     Logger.warning("AgentWorker terminating abnormally for session_id=#{session_id}: #{inspect(reason)}")
-    EyeInTheSky.AgentWorkerEvents.on_session_failed(session_id, pcid)
+
+    try do
+      EyeInTheSky.AgentWorkerEvents.on_session_failed(session_id, pcid)
+    rescue
+      e ->
+        Logger.error("Failed to mark session failed on abnormal terminate: #{inspect(e)}")
+    end
   end
 
   # --- Private ---

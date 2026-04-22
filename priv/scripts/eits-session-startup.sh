@@ -80,6 +80,8 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   [ -n "$EXISTING_AGENT_UUID" ]    && echo "export EITS_AGENT_UUID=$EXISTING_AGENT_UUID"    >> "$CLAUDE_ENV_FILE"
   [ -n "$EXISTING_AGENT_INT_ID" ] && echo "export EITS_AGENT_ID=$EXISTING_AGENT_INT_ID"   >> "$CLAUDE_ENV_FILE"
   [ -n "$PROJECT_ID" ]            && echo "export EITS_PROJECT_ID=$PROJECT_ID"             >> "$CLAUDE_ENV_FILE"
+  # Propagate EITS_API_KEY so subsequent hooks (PostCompact, etc.) can authenticate API calls.
+  [ -n "${EITS_API_KEY:-}" ]    && echo "export EITS_API_KEY=$EITS_API_KEY"             >> "$CLAUDE_ENV_FILE"
   _log "env vars written — agent_uuid=${EXISTING_AGENT_UUID:-none} agent_int_id=${EXISTING_AGENT_INT_ID:-none} project_id=${PROJECT_ID:-none}"
   echo "[EITS] startup: env written — agent_uuid=${EXISTING_AGENT_UUID:-none} agent_int_id=${EXISTING_AGENT_INT_ID:-none} project_id=${PROJECT_ID:-none}" >&2
 

@@ -27,7 +27,9 @@ if [ -n "$target_uuid" ] && [ "$target_uuid" != "unknown" ]; then
   cwd_val=$(printf %s "$input_json" | jq -r '.cwd // ""' 2>/dev/null)
   metadata=$(jq -n --arg src "post-compact" --arg trig "$trigger" --arg cwd "$cwd_val" --arg ts "$ts" \
     '{source: $src, trigger: $trig, cwd: $cwd, compacted_at: $ts}')
-  printf %s "$body" | eits sessions context "$target_uuid" --from-stdin --metadata "$metadata" >/dev/null 2>&1 || true
+  if ! printf %s "$body" | eits sessions context "$target_uuid" --from-stdin --metadata "$metadata" >/dev/null 2>&1; then
+    echo "[EITS] post-compact: failed to save context for session $target_uuid (check EITS_API_KEY is set)" >&2
+  fi
 fi
 
 exit 0

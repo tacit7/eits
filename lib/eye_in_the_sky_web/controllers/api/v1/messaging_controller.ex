@@ -85,12 +85,15 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @terminated_statuses ~w(completed failed)
+  @non_receivable_statuses ~w(waiting completed failed)
 
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:from, {:ok, from_session}} <- {:from, resolve_session_target(%{raw: from_raw, kind: :from})},
          {:from_active, false} <-
            {:from_active, from_session.status in @terminated_statuses},
-         {:to, {:ok, to_session}} <- {:to, resolve_session_target(%{raw: to_raw, kind: :to})} do
+         {:to, {:ok, to_session}} <- {:to, resolve_session_target(%{raw: to_raw, kind: :to})},
+         {:to_receivable, false} <-
+           {:to_receivable, to_session.status in @non_receivable_statuses} do
       response_required = params["response_required"] in [true, "true", "1", 1]
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
@@ -127,6 +130,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       {:to, {:error, :not_found}} ->
         {:error, :not_found, "Target session not found"}
+
+      {:to_receivable, true} ->
+        {:error, :unprocessable_entity,
+         "Target session is not active and cannot receive DMs"}
     end
   end
 

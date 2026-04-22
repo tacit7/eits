@@ -111,24 +111,36 @@ mount/3 (single with chain)
 
 ## Chat Interface
 
-**Display:** Message stream with agent context.
+**Display:** Message stream with agent context, bubble-style rendering.
 
 **Features:**
 - Chronological message view (newest at bottom)
-- Agent name + timestamp on each message
+- Bubble-style message rendering (right-aligned user, left-aligned agent)
+- Timestamps: hover-only at 9px via group-hover (desktop only, always visible on mobile)
 - Syntax highlighting for code blocks
 - Markdown rendering (via Marked.js)
 - Mention support (@agent mentions)
+
+**Message styling:**
+- **User messages**: right-aligned bubble with bg-base-200, rounded-2xl, 3px padding
+- **Agent messages**: left-aligned plain text, text-base-content/90
+- **Agent model/cost badges**: Inline below agent message body (restored commit a3f4c3a1)
+  - Model name in monospace badge (e.g., `claude-opus-4-6`)
+  - Cost in USD (e.g., `$0.0045`) when metadata present
+- **Tool events** (tool_result, tool_use): max-w-[70%] compact widget, no bubble, no timestamp
+- **DM indicator**: primary/20 border on user DM bubbles
+- **Spacing**: space-y-1 between messages (compact layout)
 
 **Message types:**
 - User messages (input)
 - Agent messages (responses, analysis)
 - System messages (task started, completed, etc.)
-- Tool use logs (if enabled)
+- Tool use logs and results (collapsible, details-closed by default)
 
 **Streaming:**
 - Messages streamed from agent worker via PubSub
 - Live update as agent sends chunks
+- Stream shows provider avatar (Claude or Codex) with thinking/tool indicators
 
 ---
 
@@ -460,23 +472,132 @@ The `Deduplicator` module guards DM and broadcast endpoints against duplicate de
 
 ## Tool Result Message UI
 
-**Commit:** `76d6d61e`
+**Commits:** `76d6d61e`, `677a0c78`
 
 Tool result messages in the DM chat have special UI treatment to reduce visual clutter.
 
 **Display rules:**
-- **Header hidden**: Sender name, timestamp, model, and cost badges are not shown
 - **Output closed by default**: `<details>` element renders without the `open` attribute, so tool output is collapsed
-- **Content alignment**: Tool result content is indented to align with message body text (padding-left: `pl-[26px]`)
-- **Minimal vertical spacing**: Padding reduced from `py-3` to `py-0.5` to keep tool results compact
+- **Empty output skipped**: When body is blank/whitespace, the widget is not rendered at all
+- **Max-width constraint**: Tool widgets limited to 70% of container width for mobile/desktop readability
+- **No timestamp**: Tool event messages don't show hover timestamps
 
 **UI behavior:**
-1. User sees a compact "Code Block" header with toggle arrow
+1. User sees a compact "Code Block" header with toggle arrow (when body is non-empty)
 2. Click header to expand and reveal tool output
 3. Expanded output shows full code or command result
 4. Collapse hides output again without dismissing the message
 
 **Implementation:** `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex`
+
+---
+
+## DM Message Bubble Format with Sender Chip
+
+**Commits:** `4e0b0f12`, `677a0c78`, `16b3a213`, `6edecd7e`
+
+Agent DMs now use a structured format with a sender chip that shows agent name and session ID.
+
+**Message format:**
+
+New format (bracketed header):
+```
+[DM from agent: <agent_name>]
+<message body>
+
+Reply: eits dm --to <session_id> --message ""
+```
+
+Legacy format (still supported):
+```
+DM from:<agent_name> (session:<uuid>) <message body>
+```
+
+**DM parsing and stripping:**
+- `strip_dm_prefix/1`: Removes the DM header and reply footer, returning just the body content
+  - Handles both new bracketed format and legacy "DM from:" format
+  - Regex tolerates no space after session UUID in legacy format
+  - Handles header-only DMs (body is empty)
+
+- `parse_dm_info/1`: Extracts sender name, status (done/failed), and URL from DM body
+  - Returns map with sender name, status, url, session_id, and format type
+  - Detects status keywords: done, completed, failed, error
+  - Extracts HTTP(S) URLs from message body
+
+**UI rendering:**
+- DM messages show a sender chip with hero-cpu-chip icon
+- Chip displays agent name and `#session_id` (integer ID when available)
+- Status pill shows done/failed state if present
+- Clickable URL chip if a status URL is detected
+- User DM bubbles have primary/20 border for visual distinction
+
+**Implementation files:**
+- `lib/eye_in_the_sky_web/components/dm_helpers.ex` — parsing functions
+- `lib/eye_in_the_sky_web/components/dm_message_components.ex` — chip rendering
+- `lib/eye_in_the_sky/agents/cmd_dispatcher/dm_handler.ex` — DM body construction
+
+---
+
+## Format Toolbar
+
+**Commit:** `fb46a50c`
+
+A markdown format toolbar (Aa button) in the DM composer enables inline text formatting.
+
+**Trigger:** Click the "Aa" button in the left toolbar to show/hide the format strip.
+
+**Format actions and shortcuts:**
+| Action | Marker | Keyboard |
+|--------|--------|----------|
+| Bold | `**text**` | Cmd+B |
+| Italic | `*text*` | Cmd+I |
+| Strikethrough | `~~text~~` | None |
+| Inline code | `` `text` `` | Cmd+E |
+| Code block | ``` `text` ``` | Cmd+Shift+E |
+| Link | `[text](url)` | None |
+
+**Behavior:**
+- Hidden by default; format bar slides in when Aa is clicked
+- Buttons wrap/unwrap selected text with markdown syntax
+- If selection is already wrapped, clicking the button removes the markers (toggle)
+- For links, the URL placeholder is auto-selected after insertion so user can type the URL
+- Correct cursor placement for empty selections (marker pair inserted and cursor centered)
+
+**Implementation:** 
+- `lib/eye_in_the_sky_web/components/dm_page/composer.ex` — HEEx format bar
+- `assets/js/hooks/dm_composer.js` — selection wrapping logic, keyboard handlers (Cmd+B/I/E, Cmd+Shift+E)
+
+---
+
+## DM Deduplication Fix
+
+**Commit:** `5b3ac3f2`
+
+Duplicate DM messages on send have been eliminated. Previously, `AgentManager.send_message` injected the DM body into the target session's Claude stdin, which triggered the `UserPromptSubmit` hook to persist the DM as a second `sender_role="user"` message. Combined with the direct `Messages.create_message` call, this produced two DB records that both rendered as DM chips.
+
+**Fix:**
+- Skip `AgentManager.send_message` entirely in the `send_dm` handler
+- Persist the DM record directly via `Messages.create_message`
+- Broadcast via `session_new_dm` PubSub topic to notify all subscribers
+
+**Result:** One DM record, one render; no duplicate messages in the chat.
+
+**Implementation file:** `lib/eye_in_the_sky/agents/cmd_dispatcher/dm_handler.ex`
+
+---
+
+## DM Sidebar Tab Default
+
+**Commit:** `81f211e4`
+
+The DM page now defaults to the **Sessions sidebar tab** instead of Chat.
+
+**Change:**
+- `DmLive.mount` assigns `:sidebar_tab` to `:sessions` on mount
+- Users see the sessions list immediately when opening the DM page
+- Chat tab is available if needed via tab navigation
+
+**File:** `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex`
 
 ---
 

@@ -504,7 +504,11 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     Logger.warning("AgentWorker terminating abnormally for session_id=#{session_id}: #{inspect(reason)}")
 
     try do
-      EyeInTheSky.AgentWorkerEvents.on_session_failed(session_id, pcid)
+      # Abnormal GenServer terminate — the crash reason is not one of our
+      # classified error tuples, so status_reason falls back to nil (UI renders
+      # generic 'Failed'). Explicit pass rather than default arg so future
+      # callers must think about which reason to record.
+      EyeInTheSky.AgentWorkerEvents.on_session_failed(session_id, pcid, reason)
     rescue
       e ->
         Logger.error("Failed to mark session failed on abnormal terminate: #{inspect(e)}")

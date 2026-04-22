@@ -27,8 +27,15 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
           | :retry_exhausted
           | :transient
 
+  # Rate-limit (429) is CATEGORIZED so the UI can surface a distinct badge, but
+  # NOT SYSTEMIC — the worker retries with exponential backoff (see
+  # RetryPolicy, commit 21bafe38 which tuned the 429 backoff ceiling + jitter).
+  # Failing fast on the first 429 would regress Max-plan users who routinely
+  # hit short-lived burst throttling.
+  @non_systemic_categories [:transient, :rate_limit_error]
+
   @spec systemic?(term()) :: boolean()
-  def systemic?(reason), do: classify(reason) != :transient
+  def systemic?(reason), do: classify(reason) not in @non_systemic_categories
 
   @doc """
   Map a reason term to a category atom. Unknown or retryable reasons return

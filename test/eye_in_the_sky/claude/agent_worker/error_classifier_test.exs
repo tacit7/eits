@@ -171,8 +171,11 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
       assert ErrorClassifier.classify(nil) == :transient
     end
 
-    test "rate_limit_error is now systemic (no infinite retry loop)" do
-      assert ErrorClassifier.systemic?({:rate_limit_error, "429"})
+    test "rate_limit_error is NOT systemic — retries with backoff are preserved" do
+      # 429s are transient by protocol (burst throttling clears in seconds).
+      # Categorized so the UI can distinguish but NOT systemic so RetryPolicy
+      # keeps its exponential-backoff retry loop.
+      refute ErrorClassifier.systemic?({:rate_limit_error, "429"})
     end
   end
 

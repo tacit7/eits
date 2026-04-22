@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
 
   alias EyeInTheSkyWeb.DmLive.SlashCommands
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ModelHelpers
 
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "opus"
@@ -261,14 +262,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               >
                 <%= if @provider == "codex" do %>
                   <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Codex</li>
-                  <%= for {model, desc, color} <- [
-                    {"gpt-5.4", "Latest frontier agentic coding", "text-warning"},
-                    {"gpt-5.3-codex", "Frontier Codex-optimized", "text-warning"},
-                    {"gpt-5.2-codex", "Frontier agentic coding", "text-info"},
-                    {"gpt-5.2", "Long-running agents", "text-info"},
-                    {"gpt-5.1-codex-max", "Deep and fast reasoning", "text-success"},
-                    {"gpt-5.1-codex-mini", "Cheaper and faster", "text-success"}
-                  ] do %>
+                  <%= for {model, label, desc, color} <- ModelHelpers.codex_models_with_meta() do %>
                     <li>
                       <a
                         phx-click="select_model"
@@ -278,7 +272,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                       >
                         <.icon name="hero-bolt" class={"w-4 h-4 #{color}"} />
                         <div>
-                          <div class="text-sm font-semibold text-base-content/80">{model}</div>
+                          <div class="text-sm font-semibold text-base-content/80">{label}</div>
                           <div class="text-[11px] text-base-content/40">{desc}</div>
                         </div>
                       </a>
@@ -286,15 +280,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                   <% end %>
                 <% else %>
                   <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
-                  <%= for {model, label, desc, color} <- [
-                    {"claude-opus-4-7", "Opus 4.7", "Most capable, latest", "text-warning"},
-                    {"claude-opus-4-6", "Opus 4.6", "Most capable", "text-warning"},
-                    {"claude-opus-4-5-20251101", "Opus 4.5", "Capable, extended context", "text-warning"},
-                    {"claude-opus-4-1-20250805", "Opus 4.1", "Capable", "text-warning"},
-                    {"claude-sonnet-4-6", "Sonnet 4.6", "Everyday tasks, latest", "text-info"},
-                    {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "Everyday tasks", "text-info"},
-                    {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fast answers", "text-success"}
-                  ] do %>
+                  <%= for {model, label, desc, color} <- ModelHelpers.claude_models_with_meta() do %>
                     <li>
                       <a
                         phx-click="select_model"

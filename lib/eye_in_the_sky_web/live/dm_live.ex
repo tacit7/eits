@@ -79,6 +79,9 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("toggle_effort_menu", _params, socket), do: handle_toggle_effort_menu(socket)
 
   @impl true
+  def handle_event("toggle_new_session_drawer", _params, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("toggle_new_task_drawer", _params, socket), do: toggle_active_overlay(socket, :task_drawer)
 
   @impl true

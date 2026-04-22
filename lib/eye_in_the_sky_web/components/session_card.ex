@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <% else %>
               <span class="text-[13px] font-medium text-base-content/85 truncate">
                 {@session.name ||
-                  truncate_text(if @session.agent, do: @session.agent.description) ||
+                  truncate_text(session_agent_description(@session)) ||
                   "Unnamed session"}
               </span>
             <% end %>
@@ -139,13 +139,22 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
   # Extracts the agent definition display name from a session, guarding against
   # unloaded associations and nil values.
   defp agent_display_name(session) do
-    with agent when not is_nil(agent) <- session.agent,
+    with agent when not is_nil(agent) <- Map.get(session, :agent),
+         false <- match?(%Ecto.Association.NotLoaded{}, agent),
          defn when is_map(defn) <- Map.get(agent, :agent_definition),
          false <- match?(%Ecto.Association.NotLoaded{}, defn),
          name when not is_nil(name) <- Map.get(defn, :display_name) do
       name
     else
       _ -> nil
+    end
+  end
+
+  defp session_agent_description(session) do
+    case Map.get(session, :agent) do
+      nil -> nil
+      %Ecto.Association.NotLoaded{} -> nil
+      agent -> Map.get(agent, :description)
     end
   end
 

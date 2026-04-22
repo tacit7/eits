@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Compile gate: blocks commits when lib/ or test/ changes are newer than the last mix compile run.
+# Skip with: git commit --no-verify
+
+MANIFEST="_build/dev/lib/eye_in_the_sky/.mix/compile.elixir"
+
+if [ ! -f "$MANIFEST" ]; then
+  echo "ERROR: _build not found. Run: mix compile --warnings-as-errors" >&2
+  exit 1
+fi
+
+# Find the newest source file mtime in lib/ and test/
+newest_src=$(find lib test -type f \( -name "*.ex" -o -name "*.exs" -o -name "*.heex" -o -name "*.eex" \) \
+  -exec stat -f "%m" {} \; 2>/dev/null \
+  | sort -rn \
+  | awk 'NR==1{print; exit}')
+
+if [ -z "$newest_src" ]; then
+  exit 0
+fi
+
+manifest_mtime=$(stat -f "%m" "$MANIFEST" 2>/dev/null)
+
+if [ -z "$manifest_mtime" ]; then
+  echo "ERROR: Could not read compile manifest. Run: mix compile --warnings-as-errors" >&2
+  exit 1
+fi
+
+if [ "$newest_src" -gt "$manifest_mtime" ]; then
+  echo "ERROR: Source files changed since last compile. Run: mix compile --warnings-as-errors" >&2
+  exit 1
+fi
+
+exit 0

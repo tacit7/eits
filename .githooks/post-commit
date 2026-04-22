@@ -1,1 +1,2 @@
-../priv/scripts/eits-post-commit.sh
+#!/usr/bin/env bash
+exec "$(git rev-parse --show-toplevel)/priv/scripts/eits-post-commit.sh" "$@"

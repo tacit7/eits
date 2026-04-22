@@ -127,7 +127,7 @@ eits tasks create --title "Fix login bug" --description "Details..." --project 1
 eits tasks update <task_id> --state 2
 
 # Move to Done
-eits tasks update <task_id> --state 4
+eits tasks update <task_id> --state 3
 
 # Archive
 eits tasks archive <task_id>

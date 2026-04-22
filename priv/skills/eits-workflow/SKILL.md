@@ -16,7 +16,7 @@ eits tasks begin --title "Task name"          # create + start in one shot (cano
 eits tasks complete <id> --message "Summary"  # annotate + done atomically (server transaction)
 eits tasks annotate <id> --body "..."
 eits tasks update <id> --state done           # named alias: done, start, in-review, review, todo
-eits tasks update <id> --state 4              # numeric state ID also works
+eits tasks update <id> --state 3              # numeric: 3=Done, 4=In Review
 
 # Commits
 eits commits create --hash <hash1> [--hash <hash2>]

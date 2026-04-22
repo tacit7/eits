@@ -80,7 +80,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
 
       eits tasks begin --title "<title>"
       eits tasks annotate <id> --body "..."
-      eits tasks update <id> --state 4
+      eits tasks update <id> --state 3
       eits dm --to <session_uuid> --message "<text>"
       eits commits create --hash <hash>
 

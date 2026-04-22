@@ -1212,6 +1212,6 @@ mix compile --warnings-as-errors
 
 ```bash
 eits tasks annotate 1203 --body "Settings redesign complete: tabbed layout (6 tabs), auth tab, workflow tab, editor tab, CodeMirror 6 hook + FileEditorComponent, REST endpoints (editor open + workflow status), unified workflow guard across 11 hook scripts"
-eits tasks update 1203 --state 4
+eits tasks update 1203 --state 3
 eits commits create --hash $(git rev-parse HEAD)
 ```

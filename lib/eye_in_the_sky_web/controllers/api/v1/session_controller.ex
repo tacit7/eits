@@ -273,7 +273,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
       case Sessions.update_session(session, attrs) do
         {:ok, updated} ->
-          EyeInTheSky.Events.agent_stopped(updated)
+          EyeInTheSky.Events.session_completed(updated)
           EyeInTheSky.Events.session_updated(updated)
           member_synced = sync_member_status(updated.id, "done")
 
@@ -322,8 +322,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   end
 
   defp sync_member_status(session_id, member_status) do
-    EyeInTheSky.Teams.mark_member_done_by_session(session_id, member_status)
-    true
+    EyeInTheSky.Teams.mark_member_done_by_session(session_id, member_status) > 0
   rescue
     _ -> false
   end

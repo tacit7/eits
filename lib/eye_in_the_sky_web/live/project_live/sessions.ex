@@ -192,6 +192,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
       project={@project}
       canvases={@canvases}
       show_new_canvas_for={@show_new_canvas_for}
+      scope={@scope}
+      projects={@projects}
     />
     """
   end

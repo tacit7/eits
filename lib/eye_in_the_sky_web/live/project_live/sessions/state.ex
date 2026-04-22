@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Canvases
+  alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
 
   @page_size 25
@@ -34,6 +35,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
     |> assign(:has_more, false)
     |> assign(:editing_session_id, nil)
     |> assign(:canvases, Canvases.list_canvases())
+    |> assign(:projects, Projects.list_projects())
     |> assign(:show_new_canvas_for, nil)
     |> Loader.load_agents()
   end

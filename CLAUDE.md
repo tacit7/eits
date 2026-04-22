@@ -91,7 +91,7 @@ Session status is driven by Claude Code hooks and explicit commands:
 | Status | Set by | Meaning |
 |--------|--------|---------|
 | `working` | `UserPromptSubmit` hook | Claude is processing a message |
-| `stopped` | `Stop` hook | Claude finished responding (resets to `working` on next message) |
+| `idle` | `Stop` hook | Claude finished responding (resets to `working` on next message) |
 | `waiting` | `SessionEnd` hook (`sdk-cli`) | Headless session ended; can be resumed |
 | `completed` | `SessionEnd` hook (`cli`) or `/i-end-session` | Interactive session finished; or manually closed |
 | `failed` | `SessionWorker` on non-zero exit | Process crashed |

@@ -1396,7 +1396,7 @@ print(json.dumps(d))
     status)
       # eits teams status <id> [--summary|-s] [--wait]
       # member_status: team membership state (active, done, spawn_failed, idle) — authoritative for orchestrators
-      # session_status: Claude process lifecycle (working, stopped, waiting, completed, failed)
+      # session_status: Claude process lifecycle (working, idle, waiting, completed, failed)
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
         cat <<'HELP'
 usage: eits teams status <id> [--summary|-s] [--wait]
@@ -1404,7 +1404,7 @@ usage: eits teams status <id> [--summary|-s] [--wait]
 Fields per member:
   member_status  — team membership state (active, done, spawn_failed, idle)
                    Use this to check if an agent is done with their work.
-  session_status — Claude process lifecycle (working, stopped, waiting, completed, failed)
+  session_status — Claude process lifecycle (working, idle, waiting, completed, failed)
                    Reflects the Claude Code process state, not task completion.
   session_uuid   — UUID for DM targeting; use with: eits dm --to <uuid> --message "..."
   session_id     — Numeric session ID (alternative DM target)
@@ -1434,7 +1434,7 @@ HELP
           (.members // []) as $members |
           ($members | length) as $total |
           ($members | map(select(.session_status == "working")) | length) as $working |
-          ($members | map(select(.session_status == "stopped" or .session_status == "waiting")) | length) as $idle |
+          ($members | map(select(.session_status == "idle" or .session_status == "waiting")) | length) as $idle |
           ($members | map(select(.member_status == "done" or .session_status == "completed")) | length) as $done |
           ($members | map(select(.session_status == "failed")) | length) as $failed |
           ($members | map(select(.member_status == "spawn_failed")) | length) as $spawn_failed |

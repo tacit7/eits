@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-03-17
-Last updated: 2026-04-20 (CSP nonce implementation, Postgres TLS verification, auth test coverage)
+Last updated: 2026-04-22 (IAM audit trail async implementation, EITS_API_KEY propagation with safe escaping, DM allowlist, teams status --wait fail-fast)
 
 ## Authentication
 
@@ -322,6 +322,19 @@ All secrets are loaded from environment variables via `.env` file (loaded by `do
 
 No secrets are committed to source code. The `.env` file is in `.gitignore`. `.env.example` contains placeholders and generation instructions.
 
+### Hook Script Environment Variables
+
+The `eits-session-startup.sh` hook propagates API credentials to subsequent hooks via `CLAUDE_ENV_FILE`:
+
+- **EITS_API_KEY**: If present, written to the env file using `printf %q` for safe shell escaping. This prevents metacharacters and special characters from corrupting the environment file.
+- **Purpose**: Subsequent hooks (`eits-post-compact.sh`, etc.) inherit authenticated credentials for API calls.
+- **Safe escaping**: `printf %q` quotes the value correctly, preventing injection or malformed syntax in the env file.
+
+Example from `eits-session-startup.sh`:
+```bash
+[ -n "${EITS_API_KEY:-}" ] && printf 'export EITS_API_KEY=%q\n' "$EITS_API_KEY" >> "$CLAUDE_ENV_FILE"
+```
+
 ### Key Rotation
 
 **VAPID keys**:
@@ -352,6 +365,14 @@ The app spawns Claude CLI processes as Erlang Ports:
 ### Webhook Agent Spawning
 
 The Gitea webhook controller spawns review agents with project path from config (not hardcoded). The `project_path` is configurable via `Application.get_env(:eye_in_the_sky_web, :project_path)`.
+
+### Hook Script Environment Propagation
+
+Hook scripts write environment variables to `CLAUDE_ENV_FILE` for downstream hooks to inherit. Special care is taken with sensitive values:
+
+- **API key escaping**: `eits-session-startup.sh` uses `printf %q` (POSIX shell quoting) when writing `EITS_API_KEY` to the env file. This prevents metacharacters, spaces, and special characters from corrupting the shell syntax or being interpreted as command separators.
+- **Error surfacing**: `eits-post-compact.sh` surfaces context-save failures to stderr instead of silently swallowing them. If API key is missing or invalid, the operator sees the error message: `"post-compact: failed to save context for session <uuid> (check EITS_API_KEY is set)"`
+- **Fail-fast on permanent errors**: `eits teams status --wait` (used for polling team member status) fails immediately on HTTP 404/401/403 instead of retrying forever. Transient errors (429, 5xx) still retry with 5-second backoff. This prevents blocking waits when a team no longer exists or credentials are invalid.
 
 ## Dev-Only Features
 
@@ -502,7 +523,21 @@ IAM converts policy decisions into JSON responses per the Claude Code hook proto
 
 **Policy schema** (`lib/eye_in_the_sky/iam/policy.ex`): Ecto schema with `create_changeset` and `update_changeset` for custom policies, plus `enforce_locked_fields/1` guard that prevents editing of locked fields on system policies. Validates `builtin_matcher` against the Registry at write time.
 
-**Audit trail**: Every decision is asynchronously written to `iam_decisions` table with decision_id, project scope, raw payload snapshot, and policy trace (for debugging).
+**Audit trail**: Every decision is asynchronously written to `iam_decisions` table via `IAM.record_audit/4`. The audit write is spawned as a task to avoid blocking the HTTP response:
+
+- **Function**: `IAM.record_audit(ctx, decision, raw_payload, duration_us)` in `lib/eye_in_the_sky/iam.ex`
+- **Async execution**: Spawned via `Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn -> ... end)` to execute in background
+- **Data captured**:
+  - `decision_id`: UUID of the decision
+  - `session_uuid`: Requester's session (binary, may be nil)
+  - `event`, `agent_type`, `project_id`, `project_path`, `tool`, `resource_path`: Context snapshot
+  - `permission`, `default`, `reason`: Permission decision details
+  - `winning_policy_*` (id, system_key, name): Policy that decided the outcome
+  - `instructions_snapshot`: Serialized policy instructions (id, system_key, name, message)
+  - `evaluated_count`: Number of policies evaluated
+  - `duration_us`: Evaluation latency in microseconds
+  - `raw_payload`: Full hook payload for debugging
+  - `inserted_at`: UTC timestamp
 
 ### Policy CRUD LiveView
 
@@ -516,7 +551,14 @@ System policies cannot be deleted via the UI (no button rendered for rows with `
 
 ### Message Security
 
-DMs from terminated sessions (status `completed` or `failed`) are rejected with `422 Unprocessable Entity`. This prevents zombie agent sessions from flooding the message queue after their work is complete.
+DM delivery enforces an allowlist of receivable session statuses:
+
+- **Receivable statuses**: `working` and `stopped` (sessions actively processing or between turns)
+- **Non-receivable statuses**: `waiting`, `completed`, `failed`, `archived`, `compacting`, and any other status
+- **Rejection**: DMs sent to non-receivable sessions are rejected with `422 Unprocessable Entity` and error message `"Target session is not active and cannot receive DMs"`
+- **Purpose**: Prevents zombie agent sessions from receiving messages after their work is complete and data cleanup begins
+
+The allowlist approach (vs. a blocklist) is more defensive: unknown future statuses are blocked by default rather than accidentally receivable.
 
 ## Known Gaps
 

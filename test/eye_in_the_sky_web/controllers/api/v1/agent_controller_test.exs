@@ -2,6 +2,17 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
   import EyeInTheSky.Factory
+  alias EyeInTheSky.Accounts.ApiKey
+
+  defp api_conn do
+    token = "test_api_key_#{System.unique_integer([:positive])}"
+    {:ok, _} = ApiKey.create(token, "test")
+    Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
+  end
+
+  setup do
+    {:ok, conn: api_conn()}
+  end
 
   # ---- GET /api/v1/agents ----
 
@@ -129,6 +140,20 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentControllerTest do
       assert resp["message"] =~ "parent_session_id"
     end
 
+    test "returns invalid_parameter when parent_session_id is a malformed string", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_session_id", "not-a-uuid"))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "invalid_parameter"
+      assert resp["message"] =~ "parent_session_id"
+    end
+
+    test "returns invalid_parameter when parent_agent_id is a UUID string", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_agent_id", Ecto.UUID.generate()))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "invalid_parameter"
+      assert resp["message"] =~ "parent_agent_id"
+    end
+
     test "succeeds with baseline params (no parent IDs)", %{conn: conn} do
       conn = post_spawn(conn, @valid_params)
       assert json_response(conn, 201)["success"] == true
@@ -152,6 +177,27 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentControllerTest do
       agent = create_agent()
       conn = post_spawn(conn, Map.put(@valid_params, "parent_agent_id", to_string(agent.id)))
       assert json_response(conn, 201)["success"] == true
+    end
+
+    test "accepts valid parent_session_id as integer string", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_session_id", to_string(session.id)))
+      assert json_response(conn, 201)["success"] == true
+    end
+
+    test "accepts valid parent_session_id as UUID string", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_session_id", session.uuid))
+      assert json_response(conn, 201)["success"] == true
+    end
+
+    test "returns parent_not_found when parent_session_id UUID does not exist", %{conn: conn} do
+      conn = post_spawn(conn, Map.put(@valid_params, "parent_session_id", Ecto.UUID.generate()))
+      resp = json_response(conn, 400)
+      assert resp["error_code"] == "parent_not_found"
+      assert resp["message"] =~ "parent_session_id"
     end
 
     test "returns team_not_found when team_name does not exist", %{conn: conn} do

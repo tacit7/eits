@@ -80,7 +80,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
             id={dom_id}
             class={
               if Map.get(@depths, agent.id, 0) > 0,
-                do: "ml-5 border-l-2 border-primary/20 pl-3",
+                do: "ml-5 border-l-2 pl-3",
                 else: ""
             }
           >
@@ -104,4 +104,5 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
     </div>
     """
   end
+
 end

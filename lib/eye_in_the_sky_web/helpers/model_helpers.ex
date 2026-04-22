@@ -92,4 +92,31 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   end
 
   def normalize_model_alias(nil), do: "claude-sonnet-4-6"
+
+  @doc """
+  Returns the default model slug for a provider.
+  """
+  def default_model_for("codex"), do: "gpt-5.4"
+  def default_model_for(_), do: "claude-opus-4-7"
+
+  @doc """
+  Returns a human-readable display name for any supported model slug,
+  including backward-compat short aliases. Falls back to the slug itself.
+  """
+  def model_display_name(slug) when is_binary(slug) do
+    case Enum.find(claude_models() ++ codex_models(), fn {val, _} -> val == slug end) do
+      {_, label} -> label
+      nil -> short_alias_display(slug)
+    end
+  end
+
+  def model_display_name(other), do: to_string(other)
+
+  defp short_alias_display("opus"), do: "Opus 4.7"
+  defp short_alias_display("opus[1m]"), do: "Opus 4.6 (1M)"
+  defp short_alias_display("sonnet"), do: "Sonnet 4.6"
+  defp short_alias_display("sonnet[1m]"), do: "Sonnet 4.5 (1M)"
+  defp short_alias_display("haiku"), do: "Haiku 4.5"
+  defp short_alias_display("claude-opus-4-6"), do: "Opus 4.6"
+  defp short_alias_display(other), do: other
 end

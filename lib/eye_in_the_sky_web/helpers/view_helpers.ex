@@ -128,16 +128,7 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   Return a short display name for a Claude model ID.
   """
   def short_model(nil), do: "—"
-
-  def short_model(name) do
-    case name do
-      "claude-opus-4-6" -> "Opus 4.6"
-      "claude-sonnet-4-6" -> "Sonnet 4.6"
-      "claude-sonnet-4-5-20250929" -> "Sonnet 4.5"
-      "claude-haiku-4-5-20251001" -> "Haiku 4.5"
-      other -> other
-    end
-  end
+  def short_model(name), do: EyeInTheSkyWeb.Helpers.ModelHelpers.model_display_name(name)
 
   defdelegate open_in_system(path), to: EyeInTheSkyWeb.Helpers.SystemHelpers
 end

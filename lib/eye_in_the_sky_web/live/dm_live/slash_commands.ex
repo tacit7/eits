@@ -33,19 +33,9 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
     {"effort", {:enum, ["low", "medium", "high", "max"]}, "Set effort level"},
     {"model",
      {:enum,
-      [
-        "opus",
-        "opus[1m]",
-        "sonnet",
-        "sonnet[1m]",
-        "haiku",
-        "gpt-5.4",
-        "gpt-5.3-codex",
-        "gpt-5.2-codex",
-        "gpt-5.2",
-        "gpt-5.1-codex-max",
-        "gpt-5.1-codex-mini"
-      ]}, "Set model"},
+      ["opus", "opus[1m]", "sonnet", "sonnet[1m]", "haiku"] ++
+        Enum.map(EyeInTheSkyWeb.Helpers.ModelHelpers.codex_models(), &elem(&1, 0))},
+     "Set model"},
     {"max-turns", :integer, "Limit agentic steps"},
     {"add-dir", :path, "Add extra working directory"},
     {"mcp", :path, "Load MCP config file"},

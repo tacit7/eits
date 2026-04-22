@@ -41,15 +41,12 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   defp coerce_parent_id("", _field), do: {:ok, nil}
   defp coerce_parent_id(val, _field) when is_integer(val), do: {:ok, val}
 
-  defp coerce_parent_id(val, field) when is_binary(val) do
-    case Integer.parse(val) do
-      {int, ""} -> {:ok, int}
-      _ -> {:error, "invalid_parameter", "#{field} must be an integer"}
-    end
+  defp coerce_parent_id(val, _field) when is_binary(val) do
+    {:ok, val}
   end
 
   defp coerce_parent_id(_val, field),
-    do: {:error, "invalid_parameter", "#{field} must be an integer"}
+    do: {:error, "invalid_parameter", "#{field} must be an integer or UUID"}
 
   defp validate_instructions(nil),
     do: {:error, "missing_required", "instructions is required"}
@@ -100,13 +97,13 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
 
   defp validate_parent_session(nil), do: {:ok, nil}
 
-  defp validate_parent_session(id) do
-    case Sessions.get_session(id) do
-      {:ok, _} ->
-        {:ok, id}
+  defp validate_parent_session(id_or_uuid) do
+    case Sessions.resolve(id_or_uuid) do
+      {:ok, session} ->
+        {:ok, session.id}
 
       {:error, :not_found} ->
-        {:error, "parent_not_found", "parent_session_id #{id} does not exist"}
+        {:error, "parent_not_found", "parent_session_id #{id_or_uuid} does not exist"}
     end
   end
 

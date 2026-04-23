@@ -53,8 +53,8 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.Teams.Subscriber,
           # Poll for external task changes from spawned agents
           EyeInTheSky.Tasks.Poller,
-          # Poll for external message writes from spawned agents
-          EyeInTheSky.Messages.Broadcaster,
+          # Listen for new message inserts via Postgres LISTEN/NOTIFY
+          EyeInTheSky.Messages.NotifyListener,
           # Rate limiter ETS backend for auth endpoint throttling
           EyeInTheSky.RateLimiter,
           # In-memory timer registry for orchestrator sessions

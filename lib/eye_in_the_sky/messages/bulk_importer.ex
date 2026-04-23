@@ -46,7 +46,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       now: now,
       provider: provider,
       metadata_fn: metadata_fn,
-      existing_source_uuids: existing
+      existing_source_uuids: existing,
+      import_opts: opts
     }
 
     # Separate messages into actions: updates (link existing), inserts (create new), skips
@@ -164,7 +165,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       now: now,
       provider: provider,
       metadata_fn: metadata_fn,
-      existing_source_uuids: existing_source_uuids
+      existing_source_uuids: existing_source_uuids,
+      import_opts: import_opts
     } = context
 
     cond do
@@ -180,7 +182,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       # second outbound/user row gets created with the same body, making the
       # DM render twice in the chat (once received, once "sent"). Skip the
       # import when a recent inbound DM with the same body already exists.
-      msg.role == "user" and dm_already_recorded?(session_id, msg.content) ->
+      msg.role == "user" and dm_already_recorded?(session_id, msg.content, import_opts) ->
         {upd_acc, ins_acc, skip_count + 1}
 
       true ->
@@ -224,8 +226,10 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       {upd_acc, ins_acc, skip_count + 1}
   end
 
-  defp dm_already_recorded?(session_id, body) do
-    case Messages.find_recent_dm(session_id, body, seconds: 86_400) do
+  defp dm_already_recorded?(session_id, body, opts) do
+    seconds = if Keyword.get(opts, :importing_from_file?, false), do: 86_400, else: 60
+
+    case Messages.find_recent_dm(session_id, body, seconds: seconds) do
       nil -> false
       _msg -> true
     end

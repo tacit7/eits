@@ -50,8 +50,8 @@ config :eye_in_the_sky,
 # Disable Oban queues in test (use Oban.Testing for manual testing)
 config :eye_in_the_sky, Oban, testing: :manual
 
-# Disable message broadcaster polling in test (tested manually via handle_info)
-config :eye_in_the_sky, EyeInTheSky.Messages.Broadcaster, enabled: false
+# Disable message notify listener in test (tested manually via handle_info)
+config :eye_in_the_sky, EyeInTheSky.Messages.NotifyListener, enabled: false
 
 # Disable API key auth in test (RequireAuth plug passes through when nil)
 config :eye_in_the_sky, :api_key, nil

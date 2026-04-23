@@ -3,6 +3,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
   alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Messages.BulkImporter
+  alias EyeInTheSky.Repo
 
   setup do
     {:ok, agent} =
@@ -200,6 +201,66 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1  # only the inbound DM exists
       assert hd(db_messages).sender_role == "agent"
+    end
+  end
+
+  describe "run_inserts/1 telemetry" do
+    test "emits :constraint_violation telemetry and returns 0 on FK violation" do
+      ref =
+        :telemetry_test.attach_event_handlers(self(), [
+          [:eits, :messages, :bulk_import, :constraint_violation]
+        ])
+
+      msgs = [
+        %{uuid: Ecto.UUID.generate(), role: "user", content: "hi", timestamp: nil, usage: nil}
+      ]
+
+      # session_id 999_999_999 does not exist — causes foreign_key_violation on INSERT
+      count = BulkImporter.import_messages(msgs, 999_999_999, provider: "test")
+
+      assert count == 0
+
+      assert_received {[:eits, :messages, :bulk_import, :constraint_violation], ^ref,
+                       %{batch_size: 1}, %{code: :foreign_key_violation, table: "messages"}}
+    end
+
+    test "emits :failed telemetry and reraises on systemic DB error", %{session: session} do
+      ref =
+        :telemetry_test.attach_event_handlers(self(), [
+          [:eits, :messages, :bulk_import, :failed]
+        ])
+
+      # Use a BEFORE INSERT trigger that raises a non-constraint Postgres error.
+      # DDL is transactional in Postgres — this is visible only to this connection's
+      # transaction and rolled back automatically at test cleanup.
+      # XX000 (internal_error) is not in @constraint_codes, so it routes to the systemic path.
+      suffix = :erlang.unique_integer([:positive])
+      fn_name = "test_raise_systemic_#{suffix}"
+      trig_name = "test_block_insert_#{suffix}"
+
+      Repo.query!("""
+      CREATE FUNCTION #{fn_name}() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        RAISE EXCEPTION 'Simulated systemic error' USING ERRCODE = 'XX000';
+      END;
+      $$
+      """)
+
+      Repo.query!("""
+      CREATE TRIGGER #{trig_name} BEFORE INSERT ON messages
+      FOR EACH ROW EXECUTE FUNCTION #{fn_name}()
+      """)
+
+      msgs = [
+        %{uuid: Ecto.UUID.generate(), role: "user", content: "hi", timestamp: nil, usage: nil}
+      ]
+
+      assert_raise Postgrex.Error, fn ->
+        BulkImporter.import_messages(msgs, session.id, provider: "test")
+      end
+
+      assert_received {[:eits, :messages, :bulk_import, :failed], ^ref, %{batch_size: 1},
+                       %{table: "messages"}}
     end
   end
 end

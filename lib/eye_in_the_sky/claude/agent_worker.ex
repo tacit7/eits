@@ -22,7 +22,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WatchdogTimer
   }
 
-  alias EyeInTheSky.Claude.{Job, Message, StreamAssembler}
+  alias EyeInTheSky.Claude.{Job, Message, SessionImporter, StreamAssembler}
   alias EyeInTheSky.Claude.StreamAssemblerProtocol
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.Messages
@@ -329,6 +329,13 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     Messages.mark_delivered(if state.current_job, do: state.current_job.context[:message_id])
 
+    # Sync the JSONL transcript into the DB now that the SDK has finished
+    # writing it. BulkImporter dedupes existing rows and broadcasts
+    # {:new_message, msg} per new insert, giving the DM page real-time
+    # updates without depending on the Stop hook firing. Async so we don't
+    # block the worker; failures are logged and do not affect the worker.
+    sync_jsonl_to_db_async(state)
+
     state = WatchdogTimer.cancel_watchdog(state)
     SdkLifecycle.demonitor_handler(state.handler_monitor)
 
@@ -547,6 +554,41 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       EyeInTheSky.Events.stream_event(state.session_id, event)
     end)
   end
+
+  # Run SessionImporter.sync in a Task so the worker can move on to the next
+  # job (or shut down) without waiting for what can be many DB roundtrips on
+  # a long session. Skips Codex (different importer) and skips when we don't
+  # have a project_path to resolve the JSONL location.
+  defp sync_jsonl_to_db_async(%__MODULE__{provider: "codex"}), do: :ok
+
+  defp sync_jsonl_to_db_async(%__MODULE__{project_path: nil}), do: :ok
+
+  defp sync_jsonl_to_db_async(%__MODULE__{
+         session_id: session_id,
+         eits_session_uuid: session_uuid,
+         project_path: project_path
+       })
+       when is_binary(session_uuid) and is_binary(project_path) do
+    Task.start(fn ->
+      try do
+        SessionImporter.sync(session_uuid, project_path, session_id)
+      rescue
+        e ->
+          Logger.warning(
+            "AgentWorker JSONL sync failed session=#{session_id}: #{Exception.message(e)}"
+          )
+      catch
+        :exit, reason ->
+          Logger.warning(
+            "AgentWorker JSONL sync exited session=#{session_id}: #{inspect(reason)}"
+          )
+      end
+    end)
+
+    :ok
+  end
+
+  defp sync_jsonl_to_db_async(_state), do: :ok
 
   defp maybe_dispatch_commands(%Message{type: :text, content: content} = msg, state)
        when is_binary(content) do

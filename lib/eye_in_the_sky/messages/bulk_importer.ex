@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   delegate here.
   """
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Messages
 
   require Logger
@@ -51,7 +52,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
           if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
 
         case Messages.update_message(existing, update_attrs) do
-          {:ok, _} ->
+          {:ok, linked} ->
+            broadcast_new_message(session_id, linked)
             true
 
           {:error, reason} ->
@@ -77,7 +79,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
                inserted_at: inserted_at,
                updated_at: now
              }) do
-          {:ok, _} ->
+          {:ok, created} ->
+            broadcast_new_message(session_id, created)
             true
 
           {:error, reason} ->
@@ -108,4 +111,16 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   end
 
   defp parse_timestamp(_timestamp, fallback), do: fallback
+
+  # Broadcast newly inserted/linked messages so DM page (and any other
+  # session subscriber) sees real-time updates without a refresh. Wrapped
+  # in try/rescue so a broken topic doesn't abort the import loop.
+  defp broadcast_new_message(session_id, message) do
+    Events.session_new_message(session_id, message)
+  rescue
+    e ->
+      Logger.error(
+        "BulkImporter: broadcast failed session=#{session_id} msg=#{message.id}: #{Exception.message(e)}"
+      )
+  end
 end

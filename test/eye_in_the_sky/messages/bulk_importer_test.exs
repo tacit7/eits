@@ -6,13 +6,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
   setup do
     {:ok, agent} =
-      Agents.create_agent(%{name: "test-agent", status: "stopped", provider: "claude"})
+      Agents.create_agent(%{name: "test-agent", status: "idle", provider: "claude"})
 
     {:ok, session} =
       Sessions.create_session(%{
         uuid: Ecto.UUID.generate(),
         agent_id: agent.id,
-        status: "stopped",
+        status: "idle",
         provider: "claude",
         started_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })
@@ -39,6 +39,26 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 2
       assert Enum.all?(db_messages, &(&1.provider == "codex"))
+    end
+
+    test "broadcasts {:new_message, msg} per imported message", %{session: session} do
+      EyeInTheSky.Events.subscribe_session(session.id)
+
+      messages = [
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "user",
+          content: "broadcast-me-please",
+          timestamp: nil,
+          usage: nil
+        }
+      ]
+
+      count = BulkImporter.import_messages(messages, session.id, provider: "claude")
+      assert count == 1
+
+      assert_receive {:new_message, %EyeInTheSky.Messages.Message{body: "broadcast-me-please"}},
+                     500
     end
 
     test "skips messages without uuid", %{session: session} do

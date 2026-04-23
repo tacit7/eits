@@ -257,7 +257,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       provider: state.provider,
       text: text,
       metadata: metadata,
-      channel_id: channel_id
+      channel_id: channel_id,
+      source_uuid: metadata[:uuid]
     })
 
     result_len = if(is_binary(text), do: String.length(text), else: 0)

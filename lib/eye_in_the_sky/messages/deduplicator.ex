@@ -64,33 +64,25 @@ defmodule EyeInTheSky.Messages.Deduplicator do
   end
 
   @doc """
-  Finds an existing message or creates a new one, handling all deduplication cases.
+  Finds an existing message by `source_uuid` or inserts a new one.
 
   Routing logic:
-    - `source_uuid` present and already stored → enrich metadata on the existing record
-    - `source_uuid` nil → look for a recent message with the same body; enrich if found, else insert
-    - `source_uuid` present but not yet stored → insert
+    - `source_uuid` already stored → enrich metadata on the existing record
+    - `source_uuid` not yet stored → insert
 
-  Returns `{:ok, message}` in all cases.
+  Returns `{:ok, message}` on success, or `{:error, :source_uuid_required}` when
+  `source_uuid` is absent or not a binary.
   """
-  @spec find_or_create(map(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
-  def find_or_create(attrs, metadata) do
-    source_uuid = Map.get(attrs, :source_uuid)
-
-    case source_uuid do
-      nil ->
-        case find_recent_message(Map.get(attrs, :session_id), Map.get(attrs, :body)) do
-          nil -> do_insert(attrs)
-          existing -> enrich_metadata_if_present(existing, metadata)
-        end
-
-      uuid ->
-        case Repo.get_by(Message, source_uuid: uuid) do
-          nil -> do_insert(attrs)
-          existing -> enrich_metadata_if_present(existing, metadata)
-        end
+  @spec find_or_create(map(), map()) ::
+          {:ok, Message.t()} | {:error, Ecto.Changeset.t()} | {:error, :source_uuid_required}
+  def find_or_create(%{source_uuid: uuid} = attrs, metadata) when is_binary(uuid) do
+    case Repo.get_by(Message, source_uuid: uuid) do
+      nil -> do_insert(attrs)
+      existing -> enrich_metadata_if_present(existing, metadata)
     end
   end
+
+  def find_or_create(_attrs, _metadata), do: {:error, :source_uuid_required}
 
   @doc """
   Enriches an existing message with metadata if metadata is provided and non-empty.

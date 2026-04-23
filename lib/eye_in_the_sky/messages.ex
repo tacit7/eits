@@ -213,7 +213,7 @@ defmodule EyeInTheSky.Messages do
   """
   def record_incoming_reply(session_id, provider, body, opts \\ []) do
     id = Keyword.get(opts, :id) || Ecto.UUID.generate()
-    source_uuid = Keyword.get(opts, :source_uuid)
+    source_uuid = Keyword.get(opts, :source_uuid) || Ecto.UUID.generate()
     metadata = Keyword.get(opts, :metadata, %{})
     channel_id = Keyword.get(opts, :channel_id)
 
@@ -381,11 +381,11 @@ defmodule EyeInTheSky.Messages do
 
   @doc """
   Finds an existing message with nil source_uuid matching session, role, and body.
-  Used to link messages created before sync (e.g. via send_message or save_result)
-  with their corresponding session file entry, preventing duplicates.
+  Used exclusively by BulkImporter to link session-file entries to pre-existing rows
+  that were written before a source_uuid was available.
   Returns {:ok, message} or :not_found.
   """
-  def find_unlinked_message(session_id, sender_role, body) do
+  def find_unlinked_import_candidate(session_id, sender_role, body) do
     case Deduplicator.find_recent_message(session_id, body,
            sender_role: sender_role,
            require_nil_source_uuid: true,

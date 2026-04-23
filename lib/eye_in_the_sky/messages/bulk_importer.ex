@@ -146,7 +146,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
         inserted_at = parse_timestamp(msg.timestamp, now)
         metadata = metadata_fn.(msg)
 
-        case Messages.find_unlinked_message(session_id, sender_role, msg.content) do
+        case Messages.find_unlinked_import_candidate(session_id, sender_role, msg.content) do
           {:ok, existing} ->
             # Message exists but has no source_uuid; link it
             update_attrs = %{source_uuid: msg.uuid, updated_at: now}

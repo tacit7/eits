@@ -133,7 +133,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       # Avoid double-rendering DMs. When a DM arrives, DMDelivery persists it
       # as sender_role: "agent" (inbound) and forwards it to the local CLI as
       # a user prompt; the session file then replays that prompt as
-      # role: "user". The find_unlinked_message lookup below only matches on
+      # role: "user". The find_unlinked_import_candidate lookup below only matches on
       # sender_role, so the inbound "agent" row is invisible to it and a
       # second outbound/user row gets created with the same body, making the
       # DM render twice in the chat (once received, once "sent"). Skip the

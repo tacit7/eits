@@ -122,9 +122,10 @@ JSON API at `/api/v1` for Claude Code hooks and external integrations. See [docs
 
 This app spawns Claude CLI processes to run agents. API key configuration:
 
-- **Max plan OAuth**: Spawned Claude processes authenticate via Max plan OAuth credentials stored in the macOS keychain — no API key needed.
-- **ANTHROPIC_API_KEY is blocked**: `build_env` in `claude/cli.ex` explicitly strips `ANTHROPIC_API_KEY` from the spawned process environment. This prevents a leaked API key in the server env from overriding Max plan OAuth and causing "Credit balance is too low" billing errors.
-- **No DB storage**: API keys are NOT stored in the database.
+- **Max plan OAuth (default)**: Spawned Claude processes authenticate via Max plan OAuth credentials stored in the macOS keychain — no API key needed.
+- **ANTHROPIC_API_KEY is stripped by default**: `EyeInTheSky.Claude.CLI.Env` strips `ANTHROPIC_API_KEY` from the spawned process environment unless the `use_anthropic_api_key` setting is `true`. This prevents a leaked API key in the server env from silently overriding Max plan OAuth and causing "Credit balance is too low" billing errors.
+- **Opt-in API key pass-through**: `/settings` → Auth tab has a "Pass key to spawned agents" toggle (global). When on, `ANTHROPIC_API_KEY` is forwarded to Claude CLI processes and billed per-token. Overrides Max plan OAuth. Default is off.
+- **No DB storage of the key**: Only the boolean toggle is stored (`settings.use_anthropic_api_key`). The key itself lives only in the server env (`.env` / shell).
 
 Common error when API key has insufficient credits:
 ```json

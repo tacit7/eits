@@ -6,6 +6,21 @@ import Dotenvy
 runtime_env = source!([".env", ".env.local", System.get_env()])
 get_env = fn key -> runtime_env[key] end
 
+# Push selected keys from the Dotenvy runtime env into the actual OS process
+# env so code paths that read via `System.get_env/1` see them. Without this,
+# `.env` values live only in `runtime_env` and `System.get_env/1` returns nil,
+# which breaks features that rely on propagating keys to spawned processes
+# (e.g. the ANTHROPIC_API_KEY pass-through toggle in /settings → Auth).
+#
+# We intentionally scope the push to explicitly-listed keys rather than dumping
+# every .env entry into the OS env.
+for key <- ~w[ANTHROPIC_API_KEY EITS_API_KEY] do
+  case runtime_env[key] do
+    val when is_binary(val) and val != "" -> System.put_env(key, val)
+    _ -> :ok
+  end
+end
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration

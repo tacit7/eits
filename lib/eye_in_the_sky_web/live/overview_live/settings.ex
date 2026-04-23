@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   alias EyeInTheSkyWeb.OverviewLive.Settings.{
     AuthTab,
@@ -80,6 +81,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("set_tab", %{"tab" => tab}, socket) do
     {:noreply, push_patch(socket, to: ~p"/settings?tab=#{tab}")}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("regenerate_api_key", _params, socket) do

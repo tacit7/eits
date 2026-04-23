@@ -69,10 +69,10 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
 
   defp resolve_project_path(session, agent) do
     cond do
-      session.git_worktree_path ->
+      live_dir?(session.git_worktree_path) ->
         {:ok, session.git_worktree_path}
 
-      agent.git_worktree_path ->
+      live_dir?(agent.git_worktree_path) ->
         {:ok, agent.git_worktree_path}
 
       agent.project && agent.project.path ->
@@ -95,6 +95,29 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
         {:error, :missing_project_path}
     end
   end
+
+  # Returns true only when the path is set AND points at a real directory.
+  # A non-nil but missing git_worktree_path (e.g. worktree was cleaned up after
+  # merge) would otherwise be returned here and cause Claude.CLI.spawn to fail
+  # with {:invalid_project_path, path}. Fall through to the next option instead.
+  defp live_dir?(nil), do: false
+  defp live_dir?(""), do: false
+
+  defp live_dir?(path) when is_binary(path) do
+    case File.dir?(path) do
+      true ->
+        true
+
+      false ->
+        Logger.warning(
+          "resolve_project_path: git_worktree_path #{inspect(path)} is set but directory is missing; falling through"
+        )
+
+        false
+    end
+  end
+
+  defp live_dir?(_), do: false
 
   defp lookup_project_path(project_id, source, session_id) do
     case Projects.get_project(project_id) do

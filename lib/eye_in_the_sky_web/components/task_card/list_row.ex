@@ -120,7 +120,6 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             phx-value-task_id={@task.uuid || to_string(@task.id)}
             aria-label="Delete task"
             class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-            onclick="event.stopPropagation();"
           >
             <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
           </button>

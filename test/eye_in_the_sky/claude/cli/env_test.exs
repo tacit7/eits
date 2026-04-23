@@ -42,7 +42,7 @@ defmodule EyeInTheSky.Claude.CLI.EnvTest do
       assert "HOME" in keys
     end
 
-    test "strips ANTHROPIC_API_KEY and CLAUDE_CODE_ENTRYPOINT" do
+    test "strips ANTHROPIC_API_KEY by default and CLAUDE_CODE_ENTRYPOINT" do
       env =
         Env.build_from_map(
           %{
@@ -56,6 +56,29 @@ defmodule EyeInTheSky.Claude.CLI.EnvTest do
       keys = env_keys(env)
       refute "ANTHROPIC_API_KEY" in keys
       refute "CLAUDE_CODE_ENTRYPOINT" in keys
+    end
+
+    test "passes ANTHROPIC_API_KEY through when allow_anthropic_api_key: true" do
+      env =
+        Env.build_from_map(
+          %{
+            "ANTHROPIC_API_KEY" => "sk-secret",
+            "HOME" => "/home/user"
+          },
+          allow_anthropic_api_key: true
+        )
+
+      assert env_get(env, "ANTHROPIC_API_KEY") == "sk-secret"
+    end
+
+    test "allow_anthropic_api_key: false still strips the key" do
+      env =
+        Env.build_from_map(
+          %{"ANTHROPIC_API_KEY" => "sk-secret"},
+          allow_anthropic_api_key: false
+        )
+
+      refute "ANTHROPIC_API_KEY" in env_keys(env)
     end
 
     test "strips CLAUDECODE" do

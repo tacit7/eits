@@ -15,7 +15,6 @@ defmodule EyeInTheSky.Claude.CLI.Env do
   @blocked_vars ~w[
     CLAUDECODE
     CLAUDE_CODE_ENTRYPOINT
-    ANTHROPIC_API_KEY
     BINDIR
     ROOTDIR
     EMU
@@ -26,19 +25,36 @@ defmodule EyeInTheSky.Claude.CLI.Env do
   @doc """
   Builds the environment variable list for a spawned Claude process.
   Delegates to `build_from_map/2` with `System.get_env()`.
+
+  Reads the `use_anthropic_api_key` setting and injects it into opts as
+  `:allow_anthropic_api_key` when the caller has not already supplied it.
   """
   @spec build(keyword()) :: [{charlist(), charlist()}]
-  def build(opts), do: build_from_map(System.get_env(), opts)
+  def build(opts) do
+    opts =
+      Keyword.put_new_lazy(opts, :allow_anthropic_api_key, fn ->
+        EyeInTheSky.Settings.get_boolean("use_anthropic_api_key")
+      end)
+
+    build_from_map(System.get_env(), opts)
+  end
 
   @doc """
   Testable variant. Accepts an explicit env map instead of `System.get_env()`.
+
+  Opts:
+    * `:allow_anthropic_api_key` (boolean, default `false`) — when `false`,
+      `ANTHROPIC_API_KEY` is stripped from the spawned env (preserves Max plan
+      OAuth). When `true`, the key is passed through to the spawned process.
   """
   @spec build_from_map(map(), keyword()) :: [{charlist(), charlist()}]
   def build_from_map(system_env, opts) do
+    allow_api_key? = Keyword.get(opts, :allow_anthropic_api_key, false)
+
     base_env =
       for {key, value} <- system_env,
           value != "",
-          not blocked_key?(key) do
+          not blocked_key?(key, allow_api_key?) do
         sanitized = sanitize_value(key, value)
         {String.to_charlist(key), String.to_charlist(sanitized)}
       end
@@ -51,7 +67,10 @@ defmodule EyeInTheSky.Claude.CLI.Env do
     maybe_add_env(env, "CLAUDE_CODE_EFFORT_LEVEL", opts[:effort_level])
   end
 
-  defp blocked_key?(key) do
+  defp blocked_key?("ANTHROPIC_API_KEY", true), do: false
+  defp blocked_key?("ANTHROPIC_API_KEY", false), do: true
+
+  defp blocked_key?(key, _allow_api_key?) do
     key in @blocked_vars or
       Enum.any?(@blocked_prefixes, &String.starts_with?(key, &1))
   end

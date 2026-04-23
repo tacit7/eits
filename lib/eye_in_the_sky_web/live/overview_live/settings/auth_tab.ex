@@ -13,19 +13,40 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.AuthTab do
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-0 divide-y divide-base-300">
             <%!-- Anthropic API Key --%>
-            <div class="flex items-center justify-between px-5 py-4">
-              <div>
-                <p class="text-sm font-medium text-base-content">Anthropic API Key</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
-                  Set via ANTHROPIC_API_KEY in your .env
-                </p>
+            <div class="px-5 py-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-base-content">Anthropic API Key</p>
+                  <p class="text-xs text-base-content/50 mt-0.5">
+                    Set via ANTHROPIC_API_KEY in your .env
+                  </p>
+                </div>
+                <%= case mask_env_var("ANTHROPIC_API_KEY") do %>
+                  <% {:set, masked} -> %>
+                    <span class="badge badge-success badge-sm font-mono">{masked}</span>
+                  <% {:not_set, _} -> %>
+                    <span class="text-xs text-warning">Not configured</span>
+                <% end %>
               </div>
-              <%= case mask_env_var("ANTHROPIC_API_KEY") do %>
-                <% {:set, masked} -> %>
-                  <span class="badge badge-success badge-sm font-mono">{masked}</span>
-                <% {:not_set, _} -> %>
-                  <span class="text-xs text-warning">Not configured</span>
-              <% end %>
+              <%!-- Pass-through toggle --%>
+              <div class="flex items-start justify-between mt-3 pt-3 border-t border-base-300">
+                <div class="pr-4">
+                  <p class="text-sm font-medium text-base-content">
+                    Pass key to spawned agents
+                  </p>
+                  <p class="text-xs text-base-content/50 mt-0.5">
+                    When on, ANTHROPIC_API_KEY is forwarded to Claude CLI processes.
+                    Overrides Max plan OAuth — you will be billed per-token.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-warning toggle-sm mt-0.5"
+                  checked={Map.get(@settings, "use_anthropic_api_key") == "true"}
+                  phx-click="toggle_setting"
+                  phx-value-key="use_anthropic_api_key"
+                />
+              </div>
             </div>
             <%!-- EITS REST API Key --%>
             <div class="px-5 py-4">

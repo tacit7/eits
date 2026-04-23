@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
 
   | Payload                                       | Broadcaster            | Meaning                  |
   |-----------------------------------------------|------------------------|--------------------------|
-  | `{:new_message, %Message{}}`                  | `Messages.Broadcaster` | New message polled from DB |
+  | `{:new_message, %Message{}}`                  | `Messages.NotifyListener` | New message via LISTEN/NOTIFY |
   | `{:claude_response, session_ref, parsed}`     | `AgentWorker`          | Claude CLI output chunk  |
   | `{:claude_complete, session_ref, exit_code}`  | `AgentWorker`          | Claude CLI process exited |
 
@@ -96,12 +96,12 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
 
   ### `"channel:<channel_id>:messages"`
 
-  New messages on a chat channel. Broadcast by `Messages.Broadcaster` (polling)
-  and by `ChatLive` when a user sends a message.
+  New messages on a chat channel. Broadcast by `Messages.NotifyListener`
+  (Postgres LISTEN/NOTIFY) and by `ChatLive` when a user sends a message.
 
-  | Payload                      | Broadcaster                        |
-  |------------------------------|------------------------------------|
-  | `{:new_message, %Message{}}` | `Messages.Broadcaster`, `ChatLive` |
+  | Payload                      | Broadcaster                           |
+  |------------------------------|---------------------------------------|
+  | `{:new_message, %Message{}}` | `Messages.NotifyListener`, `ChatLive` |
 
   Subscribers: `subscribe_channel_messages/1` — `ChatLive`.
 

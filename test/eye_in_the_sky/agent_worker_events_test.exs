@@ -125,14 +125,21 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
     end
   end
 
-  describe "on_session_failed/2" do
-    test "sets session DB status to failed" do
+  describe "on_session_failed/3" do
+    test "sets session DB status to failed and records reason" do
       {_agent, session} = create_session(%{status: "working"})
 
       AgentWorkerEvents.on_sdk_errored(session.id, session.uuid)
-      AgentWorkerEvents.on_session_failed(session.id, session.uuid)
 
-      assert reload_session(session).status == "failed"
+      AgentWorkerEvents.on_session_failed(
+        session.id,
+        session.uuid,
+        {:billing_error, "low balance"}
+      )
+
+      updated = reload_session(session)
+      assert updated.status == "failed"
+      assert updated.status_reason == "billing_error"
     end
 
     test "emits exactly one session_idle broadcast for the systemic-error sequence" do
@@ -140,7 +147,12 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
       Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session_lifecycle")
 
       AgentWorkerEvents.on_sdk_errored(session.id, session.uuid)
-      AgentWorkerEvents.on_session_failed(session.id, session.uuid)
+
+      AgentWorkerEvents.on_session_failed(
+        session.id,
+        session.uuid,
+        {:billing_error, "low balance"}
+      )
 
       session_id = session.id
       assert_receive {:session_idle, ^session_id}, 1_000

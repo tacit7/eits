@@ -37,9 +37,17 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     end
   end
 
-  @doc "SDK completed successfully."
-  def on_sdk_completed(session_id, provider_conversation_id, _provider \\ "claude") do
-    case update_session_status(session_id, "idle", nil) do
+  @doc """
+  SDK completed successfully.
+
+  Claude sessions transition to `idle` (ready for the next prompt). Codex
+  sessions transition to `waiting` — the headless run ended and the thread
+  is dormant until explicitly resumed. Both clear `status_reason`.
+  """
+  def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
+    status = completion_status_for(provider)
+
+    case update_session_status(session_id, status, nil) do
       {:ok, session} ->
         Events.agent_stopped(session)
         notify_agent_complete(session_id, provider_conversation_id)
@@ -48,6 +56,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         :ok
     end
   end
+
+  defp completion_status_for("codex"), do: "waiting"
+  defp completion_status_for(_), do: "idle"
 
   @doc "Codex thread.started received — confirm session is working."
   def on_codex_thread_started(session_id) do

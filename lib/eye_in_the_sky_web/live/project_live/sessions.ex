@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Actions
   alias EyeInTheSkyWeb.ProjectLive.Sessions.FilterHandlers
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
@@ -139,9 +140,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
     do: Actions.add_to_new_canvas(params, socket)
 
   @impl true
-  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, enabled in [true, "true", "on", 1, "1"])}
-  end
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   # ---------------------------------------------------------------------------
   # PubSub

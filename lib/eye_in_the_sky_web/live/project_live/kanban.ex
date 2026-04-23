@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.{Notes, Projects, Tasks}
-  alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, TasksHelpers}
+  alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, NotificationHelpers, TasksHelpers}
   alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, DatePickerHandlers, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -56,9 +56,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   end
 
   @impl true
-  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, enabled in [true, "true", "on", 1, "1"])}
-  end
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   # ---------------------------------------------------------------------------
   # Events: task CRUD (delegated to TasksHelpers)

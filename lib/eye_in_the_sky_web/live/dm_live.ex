@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.TaskHandlers
   alias EyeInTheSkyWeb.DmLive.TimerHandlers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
   import EyeInTheSkyWeb.Live.Shared.DmExportHelpers
@@ -109,9 +110,8 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
   @impl true
-  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, enabled in [true, "true", "on", 1, "1"])}
-  end
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   # ---------------------------------------------------------------------------
   # Task CRUD — delegates to TasksHelpers; overlay close handled here

@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
@@ -111,6 +112,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   @impl true
   def handle_event("create_new_task", params, socket),
     do: handle_create_new_task(params, socket, &load_tasks/1)
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_info(:tasks_changed, socket),

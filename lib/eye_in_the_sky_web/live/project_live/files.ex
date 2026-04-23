@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   require Logger
 
   alias EyeInTheSky.{Events, Projects}
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
   @tree_cache_ttl 300
@@ -279,7 +280,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
-  def handle_event("set_notify_on_stop", _params, socket), do: {:noreply, socket}
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_info({:editor_push, op, payload}, socket) do

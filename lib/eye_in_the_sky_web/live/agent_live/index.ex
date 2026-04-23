@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Components.SessionCard
   import EyeInTheSkyWeb.Components.AgentList
@@ -122,9 +123,8 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     do: IndexActions.handle_create_new_session(params, socket)
 
   @impl true
-  def handle_event("set_notify_on_stop", %{"enabled" => enabled}, socket) do
-    {:noreply, assign(socket, :notify_on_stop, enabled in [true, "true", "on", 1, "1"])}
-  end
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("noop", params, socket),

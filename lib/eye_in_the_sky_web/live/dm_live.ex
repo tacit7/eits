@@ -73,6 +73,36 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, socket}
   end
 
+  # ---------------------------------------------------------------------------
+  # DM Settings tab — scope toggle + field updates
+  # (Stub persistence: assigns only. JSONB columns + contexts not built yet.)
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("dm_setting_scope", %{"scope" => scope}, socket)
+      when scope in ["session", "agent"] do
+    {:noreply, assign(socket, :dm_settings_scope, scope)}
+  end
+
+  @impl true
+  def handle_event("dm_setting_subtab", %{"subtab" => subtab}, socket)
+      when subtab in ["general", "anthropic", "openai"] do
+    {:noreply, assign(socket, :dm_settings_subtab, subtab)}
+  end
+
+  @impl true
+  def handle_event("dm_setting_update", _params, socket) do
+    # Stub. Will write to sessions.settings or agents.settings JSONB based on
+    # socket.assigns.dm_settings_scope once persistence layer lands.
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("reset_dm_settings", _params, socket) do
+    # Stub. Will clear scoped settings and re-derive from merged agent/session values.
+    {:noreply, socket}
+  end
+
   @impl true
   def handle_event("toggle_model_menu", _params, socket), do: handle_toggle_model_menu(socket)
 
@@ -479,6 +509,8 @@ defmodule EyeInTheSkyWeb.DmLive do
         slash_items={@slash_items}
         session_context={@session_context}
         notify_on_stop={@notify_on_stop}
+        dm_settings_scope={@dm_settings_scope}
+        dm_settings_subtab={@dm_settings_subtab}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

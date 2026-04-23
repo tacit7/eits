@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
   alias EyeInTheSkyWeb.Components.DmPage.ActionMenu
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
+  alias EyeInTheSkyWeb.Components.DmPage.SettingsTab
   alias EyeInTheSkyWeb.Components.DmPage.Composer
   alias EyeInTheSkyWeb.Components.DmPage.ContextTab
   alias EyeInTheSkyWeb.Components.DmPage.MessagesTab
@@ -16,7 +17,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
     {"tasks", "hero-clipboard-document-list", "Tasks"},
     {"commits", "hero-code-bracket", "Commits"},
     {"notes", "hero-document-text", "Notes"},
-    {"context", "hero-document-magnifying-glass", "Context"}
+    {"context", "hero-document-magnifying-glass", "Context"},
+    {"settings", "hero-cog-6-tooth", "Settings"}
   ]
 
   attr :agent, :map, required: true
@@ -33,6 +35,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :session_context, :map, default: nil
   attr :agent_record, :map, default: nil
   attr :notify_on_stop, :boolean, default: false
+  attr :dm_settings_scope, :string, default: "session"
+  attr :dm_settings_subtab, :string, default: "general"
   # Grouped maps replacing 10 individual attrs
   attr :message_data, :map,
     default: %{
@@ -423,6 +427,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <NotesTab.notes_tab notes={@notes} />
           <% "context" -> %>
             <ContextTab.context_tab session_context={@session_context} />
+          <% "settings" -> %>
+            <SettingsTab.settings_tab
+              scope={@dm_settings_scope}
+              subtab={@dm_settings_subtab}
+              session={@agent}
+              agent={@agent_record}
+              session_state={@session_state}
+              notify_on_stop={@notify_on_stop}
+            />
           <% _ -> %>
             <MessagesTab.messages_tab
               messages={@message_data.messages}

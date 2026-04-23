@@ -107,6 +107,8 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:active_timer, nil)
     |> assign(:codex_raw_lines, [])
     |> assign(:notify_on_stop, false)
+    |> assign(:dm_settings_scope, "session")
+    |> assign(:dm_settings_subtab, "general")
   end
 
   defp assign_stream_defaults(socket) do

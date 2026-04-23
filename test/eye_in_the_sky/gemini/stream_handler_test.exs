@@ -176,6 +176,31 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
       assert_receive {:claude_complete, ^sdk_ref, "session-123"}, 1000
     end
 
+    test "registry entry is cleaned up when handler task terminates" do
+      test_pid = self()
+
+      stream = [
+        %Types.InitEvent{session_id: "cleanup-sess"},
+        %Types.MessageEvent{role: "assistant", content: "hi"},
+        %Types.ResultEvent{status: "ok"}
+      ]
+
+      {:ok, sdk_ref, handler_pid} =
+        StreamHandler.start("prompt", %{}, test_pid, stream_fn: fn -> stream end)
+
+      # Entry exists while task is alive (or just before it exits).
+      assert_receive {:claude_complete, ^sdk_ref, "cleanup-sess"}, 1000
+
+      # Wait for the handler task to terminate, which triggers :DOWN in Registry.
+      ref = Process.monitor(handler_pid)
+      assert_receive {:DOWN, ^ref, :process, ^handler_pid, _}, 1000
+
+      # Sync: :sys.get_state blocks until the Registry GenServer drains its
+      # mailbox, guaranteeing the :DOWN message has been processed.
+      _ = :sys.get_state(EyeInTheSky.Gemini.StreamHandler.Registry)
+      assert EyeInTheSky.Gemini.StreamHandler.Registry.lookup(sdk_ref) == nil
+    end
+
     test "result message carries accumulated assistant text" do
       test_pid = self()
 

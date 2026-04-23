@@ -45,6 +45,31 @@ ln -sf ../../../../assets/package.json package.json
 npx vitest run js/hooks/your.test.js
 ```
 
+**Running `mix phx.server` from a worktree (CSS/JS will not load otherwise):**
+
+A fresh worktree has no `assets/node_modules`, so Vite + Tailwind cannot resolve `daisyui`, `phoenix`, or any other dep — the page renders unstyled. Symlink from main's `assets/` before starting the server, and pick a port for both Phoenix and Vite that does not collide with the main dev server (5001/5173) or another worktree:
+
+```bash
+cd .claude/worktrees/<name>/assets
+ln -sf ../../../../assets/node_modules node_modules
+cd ..
+ln -s ../../../deps deps              # if not already done
+mix compile                            # build _build/ in the worktree itself
+
+# Spawn detached so the server outlives the shell that started it.
+# Use a unique PORT and VITE_PORT pair per worktree.
+nohup env VITE_PORT=5175 PORT=5003 DISABLE_AUTH=true mix phx.server \
+  > /tmp/<name>-server.log 2>&1 & disown
+```
+
+After starting, give Vite ~5–10 s on the **first** request to optimize deps before opening the page — the very first hit can return 404 for `/assets/css/app.css` while Vite is still compiling. Reload once Vite logs `optimized dependencies changed. reloading`.
+
+Suggested port allocation:
+- Main dev: `PORT=5001 VITE_PORT=5173`
+- Worktree A: `PORT=5002 VITE_PORT=5174`
+- Worktree B: `PORT=5003 VITE_PORT=5175`
+- ...etc through 5020.
+
 ## Build & Run
 
 ```bash

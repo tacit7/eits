@@ -135,13 +135,14 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         provider: provider,
         text: text,
         metadata: metadata,
-        channel_id: channel_id
+        channel_id: channel_id,
+        source_uuid: source_uuid
       })
       when is_binary(text) do
     if String.trim(text) in ["", "[NO_RESPONSE]"] do
       Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
     else
-      save_result(session_id, provider, text, metadata, channel_id)
+      save_result(session_id, provider, text, metadata, channel_id, source_uuid)
     end
 
     :ok
@@ -180,7 +181,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     Events.queue_updated(session_id, queue)
   end
 
-  defp save_result(session_id, provider, text, metadata, channel_id) do
+  defp save_result(session_id, provider, text, metadata, channel_id, source_uuid) do
     db_metadata = %{
       duration_ms: metadata[:duration_ms],
       total_cost_usd: metadata[:total_cost_usd],
@@ -192,6 +193,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
     opts = [metadata: db_metadata]
     opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
+    opts = if source_uuid, do: Keyword.put(opts, :source_uuid, source_uuid), else: opts
 
     case Messages.record_incoming_reply(session_id, provider, text, opts) do
       {:ok, _message} -> :ok

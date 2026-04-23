@@ -35,16 +35,37 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
         v -> String.trim(v)
       end
 
+    from_pr = parse_int(params["from_pr"])
+
     advanced_opts =
       []
       |> maybe_opt(:permission_mode, params["permission_mode"])
       |> maybe_opt(:max_turns, if(is_integer(max_turns) and max_turns > 0, do: max_turns))
+      |> maybe_opt(:fallback_model, params["fallback_model"])
+      |> maybe_opt(:from_pr, if(is_integer(from_pr) and from_pr > 0, do: from_pr))
+      |> maybe_opt(:output_format, params["output_format"])
+      |> maybe_opt(:input_format, params["input_format"])
+      |> maybe_opt(:json_schema, params["json_schema"])
+      |> maybe_opt(:allowed_tools, params["allowed_tools"])
+      |> maybe_opt(:permission_prompt_tool, params["permission_prompt_tool"])
       |> maybe_opt(:add_dir, params["add_dir"])
       |> maybe_opt(:mcp_config, params["mcp_config"])
       |> maybe_opt(:plugin_dir, params["plugin_dir"])
       |> maybe_opt(:settings_file, params["settings_file"])
+      |> maybe_opt(:agents_json, params["agents_json"])
+      |> maybe_opt(:agent, params["agent_flag"])
+      |> maybe_opt(:system_prompt, params["system_prompt"])
+      |> maybe_opt(:system_prompt_file, params["system_prompt_file"])
+      |> maybe_opt(:append_system_prompt, params["append_system_prompt"])
+      |> maybe_opt(:append_system_prompt_file, params["append_system_prompt_file"])
+      |> maybe_opt(:debug, params["debug"])
+      |> maybe_opt(:bare, if(params["bare"] == "true", do: true))
+      |> maybe_opt(:verbose, if(params["verbose"] == "true", do: true))
+      |> maybe_opt(:include_partial_messages, if(params["include_partial_messages"] == "true", do: true))
+      |> maybe_opt(:no_session_persistence, if(params["no_session_persistence"] == "true", do: true))
       |> maybe_opt(:chrome, if(params["chrome"] == "true", do: true))
       |> maybe_opt(:sandbox, if(params["sandbox"] == "true", do: true))
+      |> maybe_opt(:skip_permissions, if(params["dangerously_skip_permissions"] == "true", do: true))
 
     base = [
       agent_type: params["agent_type"] || "claude",

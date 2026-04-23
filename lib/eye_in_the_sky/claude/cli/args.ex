@@ -76,6 +76,17 @@ defmodule EyeInTheSky.Claude.CLI.Args do
     * `:name` - `--name <name>` (session display name)
     * `:sandbox` - `true` → `--sandbox`
     * `:chrome` - `true` → `--chrome`, `false` → `--no-chrome`
+    * `:fallback_model` - `--fallback-model <model>`
+    * `:from_pr` - `--from-pr <number>`
+    * `:json_schema` - `--json-schema <schema>`
+    * `:input_format` - `--input-format <fmt>` (overridden to "stream-json" when content blocks present)
+    * `:permission_prompt_tool` - `--permission-prompt-tool <tool>`
+    * `:agents_json` - `--agents <json>`
+    * `:system_prompt_file` - `--system-prompt-file <path>`
+    * `:append_system_prompt_file` - `--append-system-prompt-file <path>`
+    * `:debug` - `--debug <categories>`
+    * `:bare` - `true` → `--bare`
+    * `:no_session_persistence` - `true` → `--no-session-persistence`
 
   Unknown keys are silently ignored.
   """
@@ -124,6 +135,14 @@ defmodule EyeInTheSky.Claude.CLI.Args do
     args = maybe_flag(args, "--plugin-dir", opts[:plugin_dir])
     args = maybe_flag(args, "--settings", opts[:settings_file])
     args = maybe_flag(args, "--name", opts[:name])
+    args = maybe_flag(args, "--fallback-model", normalize_model_name(opts[:fallback_model]))
+    args = maybe_flag(args, "--from-pr", opts[:from_pr])
+    args = maybe_flag(args, "--json-schema", opts[:json_schema])
+    args = maybe_flag(args, "--permission-prompt-tool", opts[:permission_prompt_tool])
+    args = maybe_flag(args, "--agents", opts[:agents_json])
+    args = maybe_flag(args, "--system-prompt-file", opts[:system_prompt_file])
+    args = maybe_flag(args, "--append-system-prompt-file", opts[:append_system_prompt_file])
+    args = maybe_flag(args, "--debug", opts[:debug])
 
     # Boolean flags — stream-json requires --verbose for proper output parsing
     verbose = opts[:verbose] || opts[:output_format] == "stream-json"
@@ -136,13 +155,15 @@ defmodule EyeInTheSky.Claude.CLI.Args do
       |> maybe_bool_flag("--chrome", opts[:chrome] == true)
       |> maybe_bool_flag("--no-chrome", opts[:chrome] == false)
       |> maybe_bool_flag("--include-partial-messages", opts[:include_partial_messages])
+      |> maybe_bool_flag("--bare", opts[:bare])
+      |> maybe_bool_flag("--no-session-persistence", opts[:no_session_persistence])
 
-    # When multimodal content blocks are present, switch to stdin input mode.
+    # Content blocks require stream-json input; otherwise honour the caller's input_format.
     args =
-      if has_content_blocks?(opts) do
-        args ++ ["--input-format", "stream-json"]
-      else
-        args
+      cond do
+        has_content_blocks?(opts) -> args ++ ["--input-format", "stream-json"]
+        input_fmt = opts[:input_format] -> args ++ ["--input-format", to_string(input_fmt)]
+        true -> args
       end
 
     args

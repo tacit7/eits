@@ -122,45 +122,33 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.GeminiTest do
     end
   end
 
-  # Helper to mock the stream handler
+  # Helper to mock the stream handler via runtime Application env.
+  # Gemini strategy resolves the handler via Application.get_env at call time.
   defp with_mock_handler(test_fn) do
-    # Save original compile env value
     original = Application.get_env(:eye_in_the_sky, :gemini_stream_handler)
+    Application.put_env(:eye_in_the_sky, :gemini_stream_handler, create_mock_stream_handler())
 
     try do
-      # Create a mock module
-      mock_handler = create_mock_stream_handler()
-      Application.put_env(:eye_in_the_sky, :gemini_stream_handler, mock_handler)
-
-      # We need to reload the Gemini module to pick up the new compile_env
-      :code.delete(EyeInTheSky.Claude.ProviderStrategy.Gemini)
-      :code.load_file(EyeInTheSky.Claude.ProviderStrategy.Gemini)
-
-      mock_pid = self()
-      test_fn.(mock_pid)
+      test_fn.(self())
     after
-      # Restore original
       if original do
         Application.put_env(:eye_in_the_sky, :gemini_stream_handler, original)
       else
         Application.delete_env(:eye_in_the_sky, :gemini_stream_handler)
       end
-
-      :code.delete(EyeInTheSky.Claude.ProviderStrategy.Gemini)
-      :code.load_file(EyeInTheSky.Claude.ProviderStrategy.Gemini)
     end
   end
 
   defp with_mock_handler_cancel(test_fn) do
     original = Application.get_env(:eye_in_the_sky, :gemini_stream_handler)
 
+    Application.put_env(
+      :eye_in_the_sky,
+      :gemini_stream_handler,
+      create_mock_stream_handler_cancel()
+    )
+
     try do
-      mock_handler = create_mock_stream_handler_cancel()
-      Application.put_env(:eye_in_the_sky, :gemini_stream_handler, mock_handler)
-
-      :code.delete(EyeInTheSky.Claude.ProviderStrategy.Gemini)
-      :code.load_file(EyeInTheSky.Claude.ProviderStrategy.Gemini)
-
       test_fn.()
     after
       if original do
@@ -168,45 +156,21 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.GeminiTest do
       else
         Application.delete_env(:eye_in_the_sky, :gemini_stream_handler)
       end
-
-      :code.delete(EyeInTheSky.Claude.ProviderStrategy.Gemini)
-      :code.load_file(EyeInTheSky.Claude.ProviderStrategy.Gemini)
     end
   end
 
-  defp create_mock_stream_handler do
-    defmodule MockStreamHandler do
-      def start(_prompt, _opts, _caller) do
-        {:ok, make_ref(), self()}
-      end
-
-      def resume(_session_id, _prompt, _opts, _caller) do
-        {:ok, make_ref(), self()}
-      end
-
-      def cancel(_ref) do
-        :ok
-      end
-    end
-
-    MockStreamHandler
+  defmodule MockStreamHandler do
+    def start(_prompt, _opts, _caller), do: {:ok, make_ref(), self()}
+    def resume(_session_id, _prompt, _opts, _caller), do: {:ok, make_ref(), self()}
+    def cancel(_ref), do: :ok
   end
 
-  defp create_mock_stream_handler_cancel do
-    defmodule MockStreamHandlerCancel do
-      def start(_prompt, _opts, _caller) do
-        {:ok, make_ref(), self()}
-      end
-
-      def resume(_session_id, _prompt, _opts, _caller) do
-        {:ok, make_ref(), self()}
-      end
-
-      def cancel(_ref) do
-        :ok
-      end
-    end
-
-    MockStreamHandlerCancel
+  defmodule MockStreamHandlerCancel do
+    def start(_prompt, _opts, _caller), do: {:ok, make_ref(), self()}
+    def resume(_session_id, _prompt, _opts, _caller), do: {:ok, make_ref(), self()}
+    def cancel(_ref), do: :ok
   end
+
+  defp create_mock_stream_handler, do: MockStreamHandler
+  defp create_mock_stream_handler_cancel, do: MockStreamHandlerCancel
 end

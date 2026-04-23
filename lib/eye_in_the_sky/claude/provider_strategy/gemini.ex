@@ -10,11 +10,9 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Gemini do
 
   require Logger
 
-  @stream_handler Application.compile_env(
-                    :eye_in_the_sky,
-                    :gemini_stream_handler,
-                    EyeInTheSky.Gemini.StreamHandler
-                  )
+  defp stream_handler do
+    Application.get_env(:eye_in_the_sky, :gemini_stream_handler, EyeInTheSky.Gemini.StreamHandler)
+  end
 
   @impl true
   def format_content(%ContentBlock.Text{text: text}) do
@@ -41,19 +39,19 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Gemini do
   def start(state, job) do
     opts = build_opts(state, job.context)
     Logger.info("Starting new Gemini session #{state.provider_conversation_id}")
-    @stream_handler.start(job.message, opts, self())
+    stream_handler().start(job.message, opts, self())
   end
 
   @impl true
   def resume(state, job) do
     opts = build_opts(state, job.context, state.provider_conversation_id)
     Logger.info("Resuming Gemini session #{state.provider_conversation_id}")
-    @stream_handler.resume(state.provider_conversation_id, job.message, opts, self())
+    stream_handler().resume(state.provider_conversation_id, job.message, opts, self())
   end
 
   @impl true
   def cancel(ref) do
-    @stream_handler.cancel(ref)
+    stream_handler().cancel(ref)
   end
 
   defp build_opts(state, context, resume_id \\ nil) do

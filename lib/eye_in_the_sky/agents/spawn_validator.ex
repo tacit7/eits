@@ -14,9 +14,7 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   """
   def validate(params) do
     provider = params["provider"] || "claude"
-    model =
-      params["model"] ||
-        if(provider == "codex", do: ModelConfig.default_model("codex"), else: "haiku")
+    model = params["model"] || default_model_for_provider(provider)
 
     with {:ok, instructions} <- validate_instructions(params["instructions"]),
          {:ok, _} <- validate_provider_model(provider, model),
@@ -36,6 +34,10 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
        })}
     end
   end
+
+  defp default_model_for_provider("codex"), do: ModelConfig.default_model("codex")
+  defp default_model_for_provider("gemini"), do: ModelConfig.default_model("gemini")
+  defp default_model_for_provider(_), do: "haiku"
 
   defp coerce_int_id(nil, _field), do: {:ok, nil}
   defp coerce_int_id("", _field), do: {:ok, nil}

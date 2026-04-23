@@ -12,7 +12,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
   alias EyeInTheSky.Claude.AgentWorker
 
   @registry EyeInTheSky.Claude.AgentRegistry
-  @supported_providers ["claude", "codex"]
+  @supported_providers ["claude", "codex", "gemini"]
 
   @doc """
   Finds an existing AgentWorker in the registry or starts a new one.

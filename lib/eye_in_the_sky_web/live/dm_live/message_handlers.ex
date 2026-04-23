@@ -91,12 +91,10 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   end
 
   def sync_messages_from_session_file(socket) do
-    provider = socket.assigns.session.provider
-
-    if provider == "codex" do
-      sync_codex_session_file(socket)
-    else
-      sync_claude_session_file(socket)
+    case socket.assigns.session.provider do
+      "codex" -> sync_codex_session_file(socket)
+      "gemini" -> {:ok, socket, 0}
+      _ -> sync_claude_session_file(socket)
     end
   end
 
@@ -135,10 +133,10 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
       Task.start(fn ->
         result =
-          if session.provider == "codex" do
-            sync_codex_async(session_id, session_uuid)
-          else
-            sync_claude_async(session_id, session_uuid, session, agent)
+          case session.provider do
+            "codex" -> sync_codex_async(session_id, session_uuid)
+            "gemini" -> {:error, :no_file_sync}
+            _ -> sync_claude_async(session_id, session_uuid, session, agent)
           end
 
         case result do

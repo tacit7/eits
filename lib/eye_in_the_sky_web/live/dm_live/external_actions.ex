@@ -91,6 +91,10 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActions do
     {:ok, "claude --dangerously-skip-permissions -r #{shell_escape(session_id)}"}
   end
 
+  defp build_resume_command("gemini", session_id) do
+    {:ok, "gemini --resume #{shell_escape(session_id)}"}
+  end
+
   defp build_resume_command(provider, _session_id) do
     {:error, "Unsupported provider: #{provider}"}
   end

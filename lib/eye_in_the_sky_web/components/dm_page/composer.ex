@@ -260,42 +260,61 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                 class="dropdown-content menu z-[1] w-72 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
                 id="model-selector-menu"
               >
-                <%= if @provider == "codex" do %>
-                  <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Codex</li>
-                  <%= for {model, label, desc, color} <- ModelHelpers.codex_models_with_meta() do %>
-                    <li>
-                      <a
-                        phx-click="select_model"
-                        phx-value-model={model}
-                        phx-value-effort=""
-                        class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                      >
-                        <.icon name="hero-bolt" class={"w-4 h-4 #{color}"} />
-                        <div>
-                          <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                          <div class="text-[11px] text-base-content/40">{desc}</div>
-                        </div>
-                      </a>
-                    </li>
-                  <% end %>
-                <% else %>
-                  <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
-                  <%= for {model, label, desc, color} <- ModelHelpers.claude_models_with_meta() do %>
-                    <li>
-                      <a
-                        phx-click="select_model"
-                        phx-value-model={model}
-                        phx-value-effort=""
-                        class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                      >
-                        <.icon name="hero-bolt" class={"w-4 h-4 #{color}"} />
-                        <div>
-                          <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                          <div class="text-[11px] text-base-content/40">{desc}</div>
-                        </div>
-                      </a>
-                    </li>
-                  <% end %>
+                <%= cond do %>
+                  <% @provider == "codex" -> %>
+                    <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Codex</li>
+                    <%= for {model, label, desc, color} <- ModelHelpers.codex_models_with_meta() do %>
+                      <li>
+                        <a
+                          phx-click="select_model"
+                          phx-value-model={model}
+                          phx-value-effort=""
+                          class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                        >
+                          <.icon name="hero-bolt" class={"w-4 h-4 #{color}"} />
+                          <div>
+                            <div class="text-sm font-semibold text-base-content/80">{label}</div>
+                            <div class="text-[11px] text-base-content/40">{desc}</div>
+                          </div>
+                        </a>
+                      </li>
+                    <% end %>
+                  <% @provider == "gemini" -> %>
+                    <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Gemini</li>
+                    <%= for {model, label, desc, color} <- ModelHelpers.gemini_models_with_meta() do %>
+                      <li>
+                        <a
+                          phx-click="select_model"
+                          phx-value-model={model}
+                          phx-value-effort=""
+                          class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                        >
+                          <.icon name="hero-sparkles" class={"w-4 h-4 #{color}"} />
+                          <div>
+                            <div class="text-sm font-semibold text-base-content/80">{label}</div>
+                            <div class="text-[11px] text-base-content/40">{desc}</div>
+                          </div>
+                        </a>
+                      </li>
+                    <% end %>
+                  <% true -> %>
+                    <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
+                    <%= for {model, label, desc, color} <- ModelHelpers.claude_models_with_meta() do %>
+                      <li>
+                        <a
+                          phx-click="select_model"
+                          phx-value-model={model}
+                          phx-value-effort=""
+                          class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
+                        >
+                          <.icon name="hero-bolt" class={"w-4 h-4 #{color}"} />
+                          <div>
+                            <div class="text-sm font-semibold text-base-content/80">{label}</div>
+                            <div class="text-[11px] text-base-content/40">{desc}</div>
+                          </div>
+                        </a>
+                      </li>
+                    <% end %>
                 <% end %>
               </ul>
             <% end %>

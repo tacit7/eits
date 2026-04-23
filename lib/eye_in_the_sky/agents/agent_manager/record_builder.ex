@@ -40,14 +40,21 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
   end
 
   defp resolve_provider(opts) do
-    if opts[:agent_type] == "codex", do: "codex", else: "claude"
+    case opts[:agent_type] do
+      "codex" -> "codex"
+      "gemini" -> "gemini"
+      _ -> "claude"
+    end
   end
 
   defp resolve_session_uuid(provider, opts) do
-    # For codex sessions, leave uuid null — Codex thread_id arrives via thread.started event
-    # and gets synced to the session via maybe_sync_provider_conversation_id.
+    # For codex and gemini sessions, leave uuid null — the provider's native session_id
+    # arrives via InitEvent / thread.started and gets synced later via
+    # maybe_sync_provider_conversation_id.
     # For claude sessions, pre-generate so the worker can reference it immediately.
-    if provider == "codex", do: nil, else: opts[:session_uuid] || Ecto.UUID.generate()
+    if provider in ["codex", "gemini"],
+      do: nil,
+      else: opts[:session_uuid] || Ecto.UUID.generate()
   end
 
   defp resolve_description(opts) do

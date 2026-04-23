@@ -44,17 +44,30 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   end
 
   @doc """
-  Returns the default model slug for Codex.
+  Returns the list of Gemini model slugs.
+  """
+  def gemini_models do
+    [
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite"
+    ]
+  end
+
+  @doc """
+  Returns the default model slug for a provider (Codex and Gemini).
   Claude defaults remain in the caller (SpawnValidator) to preserve backward-compat
   API behavior — spawning a Claude agent with no model still resolves to "haiku".
   """
   def default_model("codex"), do: "gpt-5.4"
+  def default_model("gemini"), do: "gemini-2.5-flash"
 
   @doc """
   Returns a flat list of valid model slugs for the given provider.
   """
   def valid_model_slugs(provider)
   def valid_model_slugs("codex"), do: codex_models()
+  def valid_model_slugs("gemini"), do: gemini_models()
   def valid_model_slugs(_), do: claude_models()
 
   @doc """
@@ -63,7 +76,8 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   def valid_model_combos do
     %{
       "claude" => valid_model_slugs("claude"),
-      "codex" => valid_model_slugs("codex")
+      "codex" => valid_model_slugs("codex"),
+      "gemini" => valid_model_slugs("gemini")
     }
   end
 end

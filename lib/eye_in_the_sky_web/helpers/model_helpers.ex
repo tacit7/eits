@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   @moduledoc """
-  Helpers for Claude and Codex model selection in forms.
+  Helpers for Claude, Codex, and Gemini model selection in forms.
   """
 
   alias EyeInTheSky.Agents.ModelConfig
@@ -66,9 +66,32 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   end
 
   @doc """
+  Returns the list of Gemini model {value, label} tuples for select inputs.
+  """
+  def gemini_models do
+    [
+      {"gemini-2.5-pro", "Gemini 2.5 Pro"},
+      {"gemini-2.5-flash", "Gemini 2.5 Flash"},
+      {"gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite"}
+    ]
+  end
+
+  @doc """
+  Returns Gemini models with metadata {value, label, description, color} tuples for UI displays.
+  """
+  def gemini_models_with_meta do
+    [
+      {"gemini-2.5-pro", "Gemini 2.5 Pro", "Most capable Gemini · long context", "text-warning"},
+      {"gemini-2.5-flash", "Gemini 2.5 Flash", "Balanced speed and quality (default)", "text-info"},
+      {"gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite", "Cheapest and fastest", "text-success"}
+    ]
+  end
+
+  @doc """
   Returns {value, label} tuples for the given provider.
   """
   def models_for_provider("codex"), do: codex_models()
+  def models_for_provider("gemini"), do: gemini_models()
   def models_for_provider(_), do: claude_models()
 
   @doc """
@@ -97,6 +120,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   Returns the default model slug for a provider.
   """
   def default_model_for("codex"), do: "gpt-5.4"
+  def default_model_for("gemini"), do: "gemini-2.5-flash"
   def default_model_for(_), do: "claude-opus-4-7"
 
   @doc """
@@ -104,7 +128,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   including backward-compat short aliases. Falls back to the slug itself.
   """
   def model_display_name(slug) when is_binary(slug) do
-    case Enum.find(claude_models() ++ codex_models(), fn {val, _} -> val == slug end) do
+    case Enum.find(claude_models() ++ codex_models() ++ gemini_models(), fn {val, _} -> val == slug end) do
       {_, label} -> label
       nil -> short_alias_display(slug)
     end

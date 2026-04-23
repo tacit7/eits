@@ -8,7 +8,8 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   import EyeInTheSkyWeb.CoreComponents,
     only: [form_actions: 1, form_field: 1, icon: 1, modal_header: 1]
 
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [claude_models: 0, codex_models: 0]
+  import EyeInTheSkyWeb.Helpers.ViewHelpers,
+    only: [claude_models: 0, codex_models: 0, gemini_models: 0]
 
   @impl true
   def render(assigns) do
@@ -37,6 +38,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
               <select name="agent_type" class="select select-bordered" required>
                 <option value="claude">Claude</option>
                 <option value="codex">Codex</option>
+                <option value="gemini">Gemini</option>
               </select>
             </.form_field>
             
@@ -50,6 +52,11 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 </optgroup>
                 <optgroup label="Codex">
                   <%= for {value, label} <- codex_models() do %>
+                    <option value={value}>{label}</option>
+                  <% end %>
+                </optgroup>
+                <optgroup label="Gemini">
+                  <%= for {value, label} <- gemini_models() do %>
                     <option value={value}>{label}</option>
                   <% end %>
                 </optgroup>

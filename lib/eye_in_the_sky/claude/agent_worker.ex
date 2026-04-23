@@ -504,6 +504,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   # Provider-polymorphic stream assembler factory
   defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
+  defp stream_assembler_for("gemini"), do: StreamAssembler.new()
   defp stream_assembler_for(_provider), do: StreamAssembler.new()
 
   # Recover from :failed state before processing submit

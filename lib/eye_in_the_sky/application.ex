@@ -40,6 +40,8 @@ defmodule EyeInTheSky.Application do
           {Registry, keys: :unique, name: EyeInTheSky.Claude.ChatRegistry},
           # SDK registry for tracking running Claude CLI processes
           EyeInTheSky.Claude.SDK.Registry,
+          # ETS-backed registry for tracking running Gemini stream tasks
+          EyeInTheSky.Gemini.StreamHandler.Registry,
           # DynamicSupervisor for persistent agent workers
           {DynamicSupervisor,
            name: EyeInTheSky.Claude.AgentSupervisor, strategy: :one_for_one, max_children: 50},

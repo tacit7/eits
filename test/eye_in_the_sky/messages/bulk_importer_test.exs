@@ -202,6 +202,112 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       assert length(db_messages) == 1  # only the inbound DM exists
       assert hd(db_messages).sender_role == "agent"
     end
+
+    test "importing_from_file?: true uses 86400s window — dedupes a DM from 2 hours ago", %{
+      session: session
+    } do
+      two_hours_ago =
+        DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+      {:ok, _inbound_dm} =
+        Messages.create_message(%{
+          uuid: Ecto.UUID.generate(),
+          session_id: session.id,
+          sender_role: "agent",
+          recipient_role: "user",
+          direction: "inbound",
+          body: "old DM body",
+          status: "delivered",
+          provider: "codex",
+          inserted_at: two_hours_ago,
+          updated_at: two_hours_ago
+        })
+
+      messages = [
+        %{uuid: Ecto.UUID.generate(), role: "user", content: "old DM body", timestamp: nil, usage: nil}
+      ]
+
+      count =
+        BulkImporter.import_messages(messages, session.id,
+          provider: "codex",
+          importing_from_file?: true
+        )
+
+      # Deduped — only the original inbound DM exists
+      assert count == 1
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert length(db_messages) == 1
+      assert hd(db_messages).sender_role == "agent"
+    end
+
+    test "importing_from_file?: false uses 60s window — does NOT dedupe a DM from 2 hours ago", %{
+      session: session
+    } do
+      two_hours_ago =
+        DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+      {:ok, _inbound_dm} =
+        Messages.create_message(%{
+          uuid: Ecto.UUID.generate(),
+          session_id: session.id,
+          sender_role: "agent",
+          recipient_role: "user",
+          direction: "inbound",
+          body: "old DM body",
+          status: "delivered",
+          provider: "codex",
+          inserted_at: two_hours_ago,
+          updated_at: two_hours_ago
+        })
+
+      source_uuid = Ecto.UUID.generate()
+
+      messages = [
+        %{uuid: source_uuid, role: "user", content: "old DM body", timestamp: nil, usage: nil}
+      ]
+
+      count = BulkImporter.import_messages(messages, session.id, provider: "codex")
+
+      # NOT deduped — 60s window doesn't reach 2 hours ago, so the message is inserted
+      assert count == 1
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert length(db_messages) == 2
+      user_msg = Enum.find(db_messages, &(&1.sender_role == "user"))
+      assert user_msg.source_uuid == source_uuid
+    end
+
+    test "importing_from_file?: false uses 60s window — dedupes a DM from 10 seconds ago", %{
+      session: session
+    } do
+      ten_seconds_ago =
+        DateTime.utc_now() |> DateTime.add(-10, :second) |> DateTime.truncate(:second)
+
+      {:ok, _inbound_dm} =
+        Messages.create_message(%{
+          uuid: Ecto.UUID.generate(),
+          session_id: session.id,
+          sender_role: "agent",
+          recipient_role: "user",
+          direction: "inbound",
+          body: "recent DM body",
+          status: "delivered",
+          provider: "codex",
+          inserted_at: ten_seconds_ago,
+          updated_at: ten_seconds_ago
+        })
+
+      messages = [
+        %{uuid: Ecto.UUID.generate(), role: "user", content: "recent DM body", timestamp: nil, usage: nil}
+      ]
+
+      count = BulkImporter.import_messages(messages, session.id, provider: "codex")
+
+      # Deduped — 10s ago is within the 60s window
+      assert count == 1
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert length(db_messages) == 1
+      assert hd(db_messages).sender_role == "agent"
+    end
   end
 
   describe "run_inserts/1 telemetry" do

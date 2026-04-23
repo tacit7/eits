@@ -33,6 +33,6 @@ defmodule EyeInTheSky.Codex.SessionImporter do
   """
   @spec import_messages(list(map()), integer()) :: integer()
   def import_messages(messages, session_id) do
-    BulkImporter.import_messages(messages, session_id, provider: "codex")
+    BulkImporter.import_messages(messages, session_id, provider: "codex", importing_from_file?: true)
   end
 end

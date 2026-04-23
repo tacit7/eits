@@ -51,9 +51,12 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   @impl true
   def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
     default_model =
-      if provider == "codex",
-        do: EyeInTheSky.Agents.ModelConfig.default_model("codex"),
-        else: default_claude_model()
+      case provider do
+        "codex" -> EyeInTheSky.Agents.ModelConfig.default_model("codex")
+        "gemini" -> EyeInTheSky.Agents.ModelConfig.default_model("gemini")
+        _ -> default_claude_model()
+      end
+
     {:noreply, assign(socket, selected_provider: provider, selected_model: default_model)}
   end
 
@@ -140,6 +143,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       >
         <option value="claude" selected={@selected_provider == "claude"}>Claude</option>
         <option value="codex" selected={@selected_provider == "codex"}>Codex</option>
+        <option value="gemini" selected={@selected_provider == "gemini"}>Gemini</option>
       </select>
     </div>
     """

@@ -37,12 +37,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
   end
 
   def handle_reload_from_session_file(socket, load_messages_fn) do
-    provider = socket.assigns.session.provider
+    case socket.assigns.session.provider do
+      "codex" ->
+        reload_codex_session(socket, load_messages_fn)
 
-    if provider == "codex" do
-      reload_codex_session(socket, load_messages_fn)
-    else
-      reload_claude_session(socket, load_messages_fn)
+      "gemini" ->
+        {:noreply,
+         put_flash(socket, :info, "Gemini sessions are stored in the database; no file to reload")}
+
+      _ ->
+        reload_claude_session(socket, load_messages_fn)
     end
   end
 

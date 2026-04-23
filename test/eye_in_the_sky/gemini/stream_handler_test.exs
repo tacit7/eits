@@ -156,7 +156,7 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
       },
       1000
 
-      assert_receive {:claude_complete, ^sdk_ref, ""}, 1000
+      assert_receive {:claude_complete, ^sdk_ref, "session-123"}, 1000
     end
 
     test "sends result success event and completion" do
@@ -173,7 +173,27 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
         StreamHandler.start("test prompt", opts, test_pid, stream_fn: fn -> stream end)
 
       assert_receive {:codex_session_id, ^sdk_ref, _}, 1000
-      assert_receive {:claude_complete, ^sdk_ref, ""}, 1000
+      assert_receive {:claude_complete, ^sdk_ref, "session-123"}, 1000
+    end
+
+    test "result message carries accumulated assistant text" do
+      test_pid = self()
+
+      stream = [
+        %Types.InitEvent{session_id: "session-abc"},
+        %Types.MessageEvent{role: "assistant", content: "Hello, "},
+        %Types.MessageEvent{role: "assistant", content: "world!"},
+        %Types.ResultEvent{status: "ok"}
+      ]
+
+      {:ok, sdk_ref, _pid} =
+        StreamHandler.start("prompt", %{}, test_pid, stream_fn: fn -> stream end)
+
+      assert_receive {:claude_message, ^sdk_ref,
+                      %Message{type: :result, content: "Hello, world!"}},
+                     1000
+
+      assert_receive {:claude_complete, ^sdk_ref, "session-abc"}, 1000
     end
 
     test "sends error on result error event" do
@@ -288,7 +308,7 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
                      1000
       assert_receive {:claude_message, ^sdk_ref, %Message{type: :text, content: "Done"}}, 1000
       assert_receive {:claude_message, ^sdk_ref, %Message{type: :result}}, 1000
-      assert_receive {:claude_complete, ^sdk_ref, ""}, 1000
+      assert_receive {:claude_complete, ^sdk_ref, "session-full"}, 1000
     end
   end
 end

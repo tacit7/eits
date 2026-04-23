@@ -29,6 +29,23 @@ defmodule EyeInTheSky.Claude.JobTest do
     end
   end
 
+  describe "normalize_context/1" do
+    test "preserves allowed_tools" do
+      ctx = Job.normalize_context(%{allowed_tools: ["bash", "read_file"]})
+      assert ctx.allowed_tools == ["bash", "read_file"]
+    end
+
+    test "defaults allowed_tools to []" do
+      ctx = Job.normalize_context(%{})
+      assert ctx.allowed_tools == []
+    end
+
+    test "accepts keyword list input" do
+      ctx = Job.normalize_context(allowed_tools: ["bash"])
+      assert ctx.allowed_tools == ["bash"]
+    end
+  end
+
   describe "assign_id/1" do
     test "assigns a positive integer id" do
       job = Job.new("test", %{has_messages: false}) |> Job.assign_id()

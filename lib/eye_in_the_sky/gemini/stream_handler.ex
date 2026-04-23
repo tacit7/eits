@@ -134,55 +134,59 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
   end
 
   defp consume_stream(sdk_ref, stream, caller_pid) do
-    stream
-    |> Stream.each(&handle_event(sdk_ref, &1, caller_pid))
-    |> Stream.run()
+    # State carries the accumulated assistant text and the session_id from InitEvent
+    # so we can emit a non-empty result (enabling DB persistence) and a correct
+    # :claude_complete payload when the terminal ResultEvent arrives.
+    Enum.reduce(stream, %{text: "", session_id: nil}, fn event, state ->
+      handle_event(sdk_ref, event, caller_pid, state)
+    end)
   rescue
     e ->
       Logger.error("Stream error in Gemini handler: #{inspect(e)}")
       send(caller_pid, {:claude_error, sdk_ref, {:gemini_error, inspect(e)}})
   end
 
-  defp handle_event(sdk_ref, event, caller_pid) do
+  defp handle_event(sdk_ref, event, caller_pid, state) do
     case event do
       %Types.InitEvent{session_id: session_id} ->
         send(caller_pid, {:codex_session_id, sdk_ref, session_id})
+        %{state | session_id: session_id}
 
       %Types.MessageEvent{role: "assistant", content: content} when is_binary(content) ->
         msg = Message.text(content)
         send(caller_pid, {:claude_message, sdk_ref, msg})
+        %{state | text: state.text <> content}
 
       %Types.MessageEvent{role: "user"} ->
-        :ok
+        state
 
       %Types.ToolUseEvent{tool_name: name, parameters: params} ->
         msg = %Message{type: :tool_use, content: name, metadata: %{input: params}}
         send(caller_pid, {:claude_message, sdk_ref, msg})
+        state
 
       %Types.ToolResultEvent{tool_id: tool_id, output: output} ->
         msg = %Message{type: :tool_result, content: output, metadata: %{tool_id: tool_id}}
         send(caller_pid, {:claude_message, sdk_ref, msg})
+        state
 
-      %Types.ResultEvent{status: "ok", stats: stats} ->
+      %Types.ResultEvent{status: status, stats: stats} when status in ["ok", "success"] ->
         stats_map = stats_to_map(stats)
-        msg = %Message{type: :result, content: "", metadata: stats_map}
+        msg = %Message{type: :result, content: state.text, metadata: stats_map}
         send(caller_pid, {:claude_message, sdk_ref, msg})
-        send(caller_pid, {:claude_complete, sdk_ref, ""})
-
-      %Types.ResultEvent{status: "success", stats: stats} ->
-        stats_map = stats_to_map(stats)
-        msg = %Message{type: :result, content: "", metadata: stats_map}
-        send(caller_pid, {:claude_message, sdk_ref, msg})
-        send(caller_pid, {:claude_complete, sdk_ref, ""})
+        send(caller_pid, {:claude_complete, sdk_ref, state.session_id})
+        state
 
       %Types.ResultEvent{status: "error", error: error} ->
         send(caller_pid, {:claude_error, sdk_ref, {:gemini_error, error}})
+        state
 
       %Types.ErrorEvent{message: msg} ->
         send(caller_pid, {:claude_error, sdk_ref, {:gemini_error, msg}})
+        state
 
       _ ->
-        :ok
+        state
     end
   end
 

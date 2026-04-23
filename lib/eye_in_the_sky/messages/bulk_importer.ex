@@ -18,6 +18,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
 
   require Logger
 
+  @constraint_codes [:unique_violation, :foreign_key_violation, :check_violation]
+
   @doc """
   Imports a list of pre-parsed messages into the DB for the given session.
 
@@ -79,11 +81,31 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       count
     rescue
       e in Postgrex.Error ->
-        Logger.warning(
-          "BulkImporter: insert_all failed for batch of #{length(inserts)}: #{inspect(e)}"
-        )
+        if is_map(e.postgres) and e.postgres.code in @constraint_codes do
+          :telemetry.execute(
+            [:eits, :messages, :bulk_import, :constraint_violation],
+            %{batch_size: length(inserts)},
+            %{code: e.postgres.code, table: "messages"}
+          )
 
-        0
+          Logger.warning(
+            "BulkImporter: constraint violation on batch of #{length(inserts)}: #{inspect(e.postgres.code)}"
+          )
+
+          0
+        else
+          :telemetry.execute(
+            [:eits, :messages, :bulk_import, :failed],
+            %{batch_size: length(inserts)},
+            %{error: inspect(e), table: "messages"}
+          )
+
+          Logger.error(
+            "BulkImporter: systemic insert_all failure (batch=#{length(inserts)}): #{inspect(e)}"
+          )
+
+          reraise e, __STACKTRACE__
+        end
     end
   end
 
@@ -105,11 +127,31 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     end
   rescue
     e in Postgrex.Error ->
-      Logger.warning(
-        "BulkImporter: Postgrex error updating message #{existing.id}: #{inspect(e)}"
-      )
+      if is_map(e.postgres) and e.postgres.code in @constraint_codes do
+        :telemetry.execute(
+          [:eits, :messages, :bulk_import, :constraint_violation],
+          %{batch_size: 1},
+          %{code: e.postgres.code, table: "messages"}
+        )
 
-      false
+        Logger.warning(
+          "BulkImporter: constraint violation updating message #{existing.id}: #{inspect(e.postgres.code)}"
+        )
+
+        false
+      else
+        :telemetry.execute(
+          [:eits, :messages, :bulk_import, :update_failed],
+          %{batch_size: 1},
+          %{error: inspect(e), table: "messages"}
+        )
+
+        Logger.error(
+          "BulkImporter: systemic update failure for message #{existing.id}: #{inspect(e)}"
+        )
+
+        reraise e, __STACKTRACE__
+      end
   end
 
   # ---------------------------------------------------------------------------

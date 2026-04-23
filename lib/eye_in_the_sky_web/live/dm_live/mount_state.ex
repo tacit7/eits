@@ -6,11 +6,15 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Claude.JsonlWatcher
   alias EyeInTheSky.Events
   alias EyeInTheSky.{Projects, Tasks}
   alias EyeInTheSkyWeb.Helpers.PubSubHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
   alias EyeInTheSky.OrchestratorTimers
+  alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
+
+  require Logger
 
   @default_message_limit 50
 
@@ -154,6 +158,40 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:current_task, Tasks.get_current_task_for_session(session.id))
     |> assign(:queued_prompts, AgentWorker.get_queue(session.id))
     |> assign(:active_timer, OrchestratorTimers.get_timer(session.id))
+    |> start_jsonl_watcher(session)
+  end
+
+  # Start a JSONL file watcher so the DM page sees live updates from
+  # interactive Claude Code sessions without depending on the Stop hook.
+  # Only Claude-provider sessions have a JSONL transcript at the location
+  # we know how to find; Codex and other providers fall through.
+  defp start_jsonl_watcher(socket, %{provider: "codex"}) do
+    assign(socket, :jsonl_watcher_pid, nil)
+  end
+
+  defp start_jsonl_watcher(socket, session) do
+    agent = socket.assigns[:agent]
+
+    with {:ok, project_path} when is_binary(project_path) <-
+           SessionHelpers.resolve_project_path(session, agent),
+         {:ok, pid} <-
+           JsonlWatcher.start_link(
+             session_id: session.id,
+             session_uuid: session.uuid,
+             project_path: project_path
+           ) do
+      assign(socket, :jsonl_watcher_pid, pid)
+    else
+      :ignore ->
+        assign(socket, :jsonl_watcher_pid, nil)
+
+      {:error, reason} ->
+        Logger.debug(
+          "DmLive: skipping JsonlWatcher for session=#{session.id}: #{inspect(reason)}"
+        )
+
+        assign(socket, :jsonl_watcher_pid, nil)
+    end
   end
 
   # For definitively-ended sessions (interactive close, crash), never show the

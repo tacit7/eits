@@ -6,7 +6,11 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
   alias GeminiCliSdk.Types
 
   setup do
-    {:ok, _} = EyeInTheSky.Gemini.StreamHandler.Registry.start_link(nil)
+    case EyeInTheSky.Gemini.StreamHandler.Registry.start_link(nil) do
+      {:ok, _} -> :ok
+      {:error, {:already_started, _}} -> :ok
+    end
+
     :ok
   end
 

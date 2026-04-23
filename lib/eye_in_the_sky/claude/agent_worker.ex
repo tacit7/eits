@@ -26,6 +26,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   alias EyeInTheSky.Claude.StreamAssemblerProtocol
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.Messages
+  alias EyeInTheSky.Messages.Trace
 
   @registry EyeInTheSky.Claude.AgentRegistry
 
@@ -58,7 +59,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     status: :idle,
     queue: [],
     stream: nil,
-    retry_attempt: 0
+    retry_attempt: 0,
+    message_trace_id: nil
   ]
 
   # --- Client API ---
@@ -333,16 +335,24 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     state = WatchdogTimer.cancel_watchdog(state)
     SdkLifecycle.demonitor_handler(state.handler_monitor)
 
-    {:noreply,
-     QueueManager.process_next_job(%{
-       state
-       | status: :idle,
-         sdk_ref: nil,
-         handler_monitor: nil,
-         handler_pid: nil,
-         current_job: nil
-     })
-     |> IdleTimer.maybe_schedule()}
+    state = clear_job_trace(state)
+
+    next_state =
+      QueueManager.process_next_job(%{
+        state
+        | status: :idle,
+          sdk_ref: nil,
+          handler_monitor: nil,
+          handler_pid: nil,
+          current_job: nil
+      })
+
+    next_state =
+      if next_state.status == :running,
+        do: start_job_trace(next_state),
+        else: next_state
+
+    {:noreply, IdleTimer.maybe_schedule(next_state)}
   end
 
   # Stale Claude session — retry current job as a fresh start
@@ -537,15 +547,27 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     job = Job.new(message, context, context[:content_blocks] || [])
 
     if state.status == :idle do
-      QueueManager.admit_idle(state, job)
+      case QueueManager.admit_idle(state, job) do
+        {{:ok, :started}, new_state} ->
+          {{:ok, :started}, start_job_trace(new_state)}
+
+        other ->
+          other
+      end
     else
       QueueManager.admit_busy(state, job)
     end
   end
 
   defp broadcast_events(events, state) do
-    Enum.each(events, fn event ->
-      EyeInTheSky.Events.stream_event(state.session_id, event)
+    meta = Logger.metadata()
+
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      Logger.metadata(meta)
+
+      Enum.each(events, fn event ->
+        EyeInTheSky.Events.stream_event(state.session_id, event)
+      end)
     end)
   end
 
@@ -585,6 +607,22 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   defp emit(event, measurements, extra_meta, state) do
-    :telemetry.execute(event, measurements, Map.put(extra_meta, :session_id, state.session_id))
+    meta =
+      extra_meta
+      |> Map.put(:session_id, state.session_id)
+      |> Map.put(:message_trace_id, state.message_trace_id)
+
+    :telemetry.execute(event, measurements, meta)
+  end
+
+  defp start_job_trace(state) do
+    trace_id = Trace.new()
+    Trace.set_in_logger(trace_id)
+    %{state | message_trace_id: trace_id}
+  end
+
+  defp clear_job_trace(state) do
+    Logger.metadata(message_trace_id: nil)
+    %{state | message_trace_id: nil}
   end
 end

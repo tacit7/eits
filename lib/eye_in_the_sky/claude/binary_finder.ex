@@ -4,6 +4,10 @@ defmodule EyeInTheSky.Claude.BinaryFinder do
   and NVM-managed Node.js version directories.
 
   Results are cached via `:persistent_term` by `EyeInTheSky.CLI.Port.find_binary/2`.
+
+  Note: Gemini binary discovery is handled internally by `gemini_cli_sdk`
+  via `GeminiCliSdk.CLI.resolve/1`, which delegates to `CliSubprocessCore.ProviderCLI`.
+  No separate `find_gemini/0` function is needed.
   """
 
   @standard_paths [

@@ -478,10 +478,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp canvas_provider_icon("openai"), do: "/images/openai.svg"
   defp canvas_provider_icon("codex"), do: "/images/openai.svg"
+  defp canvas_provider_icon("gemini"), do: "/images/gemini.svg"
   defp canvas_provider_icon(_), do: "/images/claude.svg"
 
   defp canvas_provider_icon_class("openai"), do: "dark:invert"
   defp canvas_provider_icon_class("codex"), do: "dark:invert"
+  defp canvas_provider_icon_class("gemini"), do: ""
   defp canvas_provider_icon_class(_), do: ""
 
   # Generic nav links per section

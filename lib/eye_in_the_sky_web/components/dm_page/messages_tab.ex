@@ -189,6 +189,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   end
 
   defp normalize_provider("codex"), do: :codex
+  defp normalize_provider("gemini"), do: :gemini
   defp normalize_provider(_), do: :claude
 
   attr :session, :map, default: nil
@@ -198,24 +199,34 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     assigns = assign(assigns, :provider, normalize_provider(provider))
 
     ~H"""
-    <%= if @provider == :codex do %>
-      <img
-        src="/images/openai.svg"
-        class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
-        alt="Codex"
-        width="16"
-        height="16"
-        loading="lazy"
-      />
-    <% else %>
-      <img
-        src="/images/claude.svg"
-        class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
-        alt="Claude"
-        width="16"
-        height="16"
-        loading="lazy"
-      />
+    <%= cond do %>
+      <% @provider == :codex -> %>
+        <img
+          src="/images/openai.svg"
+          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          alt="Codex"
+          width="16"
+          height="16"
+          loading="lazy"
+        />
+      <% @provider == :gemini -> %>
+        <img
+          src="/images/gemini.svg"
+          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          alt="Gemini"
+          width="16"
+          height="16"
+          loading="lazy"
+        />
+      <% true -> %>
+        <img
+          src="/images/claude.svg"
+          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          alt="Claude"
+          width="16"
+          height="16"
+          loading="lazy"
+        />
     <% end %>
     """
   end
@@ -223,6 +234,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defp stream_provider_label(nil), do: "Agent"
   defp stream_provider_label(%{provider: "codex"}), do: "Codex"
   defp stream_provider_label(%{provider: "openai"}), do: "Codex"
+  defp stream_provider_label(%{provider: "gemini"}), do: "Gemini"
   defp stream_provider_label(_session), do: "Claude"
 
   defdelegate dm_message?(msg), to: DmHelpers

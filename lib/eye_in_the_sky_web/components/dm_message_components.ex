@@ -426,24 +426,34 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     assigns = assign(assigns, :provider, provider)
 
     ~H"""
-    <%= if @provider == "codex" do %>
-      <img
-        src="/images/openai.svg"
-        class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
-        alt="Codex"
-        width="16"
-        height="16"
-        loading="lazy"
-      />
-    <% else %>
-      <img
-        src="/images/claude.svg"
-        class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
-        alt="Claude"
-        width="16"
-        height="16"
-        loading="lazy"
-      />
+    <%= cond do %>
+      <% @provider == "codex" -> %>
+        <img
+          src="/images/openai.svg"
+          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          alt="Codex"
+          width="16"
+          height="16"
+          loading="lazy"
+        />
+      <% @provider == "gemini" -> %>
+        <img
+          src="/images/gemini.svg"
+          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          alt="Gemini"
+          width="16"
+          height="16"
+          loading="lazy"
+        />
+      <% true -> %>
+        <img
+          src="/images/claude.svg"
+          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          alt="Claude"
+          width="16"
+          height="16"
+          loading="lazy"
+        />
     <% end %>
     """
   end

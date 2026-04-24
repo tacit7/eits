@@ -221,6 +221,77 @@ mount/3 (single with chain)
 
 ---
 
+## Message Broadcasting via Postgres LISTEN/NOTIFY
+
+**Replacement of Broadcaster:** Commit 3017f438 replaced the 2-second polling `Broadcaster` with `NotifyListener`, a Postgres-based LISTEN/NOTIFY system that broadcasts messages in real-time without polling overhead.
+
+**Architecture:**
+1. **Database trigger:** A Postgres trigger fires `pg_notify('messages_inserted', message_id)` on every `messages` INSERT
+2. **NotifyListener GenServer:** Subscribes to the `messages_inserted` channel via `Postgrex.Notifications`
+3. **Message load and broadcast:** On notification, loads the message by ID from the database and broadcasts via `Events.session_new_message/2`
+
+**Configuration:**
+- Enabled by default; disable in test with `config :eye_in_the_sky, EyeInTheSky.Messages.NotifyListener, enabled: false`
+- Uses dedicated Postgrex connection (separate from the Repo pool) to avoid blocking the main connection pool
+
+**Broadcasts:**
+- `session_new_message(session_id, message)` — for session messages
+- `channel_message(channel_id, message)` — for channel messages (if applicable)
+
+---
+
+## BulkImporter Optimizations
+
+**Commits:** `55e2e5f5`, `8d04610f`, `e7c228a9`
+
+The `BulkImporter` module handles session file replay (Claude and Codex) with performance and atomicity improvements.
+
+**Optimizations:**
+1. **Batch inserts:** Uses `Repo.insert_all/3` instead of per-row `create_message/1` calls, reducing DB round-trips from O(N) to O(1)
+2. **Transaction isolation:** Wraps the entire import batch in `Repo.transaction/1` for atomicity (with per-row error rescue on updates)
+3. **Conflict resolution:** On-conflict clause with `conflict_target: :source_uuid` and `on_conflict: :nothing` handles race conditions gracefully
+
+**Processing pipeline:**
+- **Separate into actions:** Messages are categorized into three groups:
+  - Updates: Link existing unlinked rows (slow path, few rows)
+  - Inserts: Create new messages (fast path via `insert_all`)
+  - Skips: Fast-path matches or duplicate DMs (no DB work)
+- **Execute updates:** Per-row `update_message/2` with error rescue to avoid cascading failures
+- **Return count:** Sum of insert_count + update_count + skip_count
+
+**Dedup index (commit e7c228a9):**
+- Partial composite index on `(session_id, sender_role, inserted_at) WHERE source_uuid IS NULL`
+- Accelerates `find_unlinked_import_candidate/3` lookups for messages created before `source_uuid` was available
+- Does NOT include `body` in the key (removed in e7c228a9 to avoid Postgres 8191-byte page limit)
+
+**Result:** Large session replays are now efficient and atomic, with fast dedup paths for live DMs (60s window) and file imports (24h window)
+
+---
+
+## BulkImporter Health Telemetry
+
+**Commit:** `ae0c666a`
+
+Import failures are surfaced via telemetry metrics and the `IndexHealth` health check system.
+
+**Telemetry events:**
+- `[:eye_in_the_sky, :bulk_importer, :import]` — emitted on every import with metadata:
+  - `status: :ok | :error` — success or failure
+  - `reason` — error reason if status is :error
+  - `session_id` — the session being imported
+  - `provider` — "claude" or "codex"
+
+**IndexHealth module:**
+- Tracks recent import failures and stores them in the ETS health check table
+- Provides visibility into whether the dedup index is functioning correctly
+- Failures indicate potential issues with `source_uuid` conflicts or database constraints
+
+**Files:**
+- `lib/eye_in_the_sky/messages/bulk_importer.ex` — telemetry emission
+- `lib/eye_in_the_sky/messages/index_health.ex` — health check tracking
+
+---
+
 ## Real-Time Updates
 
 **PubSub subscriptions:**
@@ -231,6 +302,7 @@ mount/3 (single with chain)
 **Message broadcasting:**
 - On every message: `{:message_added, message}` to `session:<id>:status` topic
 - Includes full message object with tokens, type, content
+- Broadcast triggered by `NotifyListener` (Postgres LISTEN/NOTIFY) instead of polling
 
 **Handler:**
 ```elixir
@@ -456,17 +528,34 @@ PNG images with transparency are not converted to JPEG. If ImageMagick is unavai
 
 ## Message Deduplication
 
-**Commit:** `f5cc825f`
+**Primary dedup key:** `source_uuid` (commit 58e557e9)
 
-The `Deduplicator` module guards DM and broadcast endpoints against duplicate delivery, making retries safe to issue.
+The `Deduplicator` module and `BulkImporter` guard against duplicate delivery using a distributed `source_uuid` field that travels with every message through the import pipeline.
 
-**Behavior:**
-- 30-second idempotency window keyed by message hash (sender + target + body)
-- Secondary lookup scans the last 24 hours for matching unlinked messages missing a `link_id`
-- Endpoints return `409 Conflict` when a duplicate is detected inside the window
-- Callers can safely retry a failed DM/broadcast without producing double-delivery
+**Architecture:**
+- Every message gets a `source_uuid` when created (e.g., from agent metadata or generated via `Ecto.UUID.generate()`)
+- When importing session files, messages are linked by `source_uuid` to prevent creating duplicates
+- `Repo.insert_all` with `on_conflict: :nothing` and `conflict_target: :source_uuid` handles race conditions atomically
 
-**Use case:** Hook scripts and CLI commands that retry on transient network failures no longer risk posting the same message twice.
+**DM deduplication window split (commit 2dfddb77):**
+- **Live DM path:** 60-second window for `dm_already_recorded?/3`
+  - Prevents re-ingesting a DM that was forwarded to the local CLI and bounced back
+  - Uses `Messages.find_recent_dm/3` with a tight time window
+- **File import path:** 86400-second (24-hour) window when `importing_from_file?: true`
+  - Used by Claude and Codex `SessionImporter` to safely replay session history
+  - Avoids false deduplication on legitimate messages with the same content
+
+**Body-match fallback removed (commit 58e557e9):**
+- Previously, messages without a `source_uuid` would fall back to body matching for dedup
+- Now, only `source_uuid` is used for primary dedup; body matching is not a fallback
+- `find_unlinked_import_candidate/3` (renamed from `find_unlinked_message/3`) is used only by `BulkImporter` to retroactively link pre-existing rows that were created before a `source_uuid` was available
+
+**Callsites:**
+- **DM receive:** `Messages.record_incoming_reply/4` sets `source_uuid` on agent responses
+- **File import:** `BulkImporter.import_messages/3` uses source UUIDs from session files
+- **Dedup index:** Partial composite index on `(session_id, sender_role, body, inserted_at) WHERE source_uuid IS NULL` accelerates the unlinked-message lookup for older data
+
+**Use case:** End-to-end tracking via `source_uuid` makes message deduplication reliable across spawned agents, file replays, and CLI tools—retries are safe.
 
 ---
 
@@ -516,8 +605,8 @@ DM from:<agent_name> (session:<uuid>) <message body>
 **DM parsing and stripping:**
 - `strip_dm_prefix/1`: Removes the DM header and reply footer, returning just the body content
   - Handles both new bracketed format and legacy "DM from:" format
+  - Regex updated (commit 6edecd7e) to use `(.*)` capture to handle header-only DMs where the message body is empty
   - Regex tolerates no space after session UUID in legacy format
-  - Handles header-only DMs (body is empty)
 
 - `parse_dm_info/1`: Extracts sender name, status (done/failed), and URL from DM body
   - Returns map with sender name, status, url, session_id, and format type
@@ -633,6 +722,75 @@ DM messages and tool call/output blocks expose a clipboard icon on hover for one
 - `MarkdownMessage` hook injects the clipboard icon after markdown renders
 - A global capture-phase click listener intercepts the icon click before it reaches the surrounding `<details>` element, preventing accidental expand/collapse toggling
 - Copy uses the Clipboard API with a transient "copied" state on the icon
+
+---
+
+## Auto-Scroll Across LiveView Patches
+
+**Commit:** `08fdbac0`
+
+The `AutoScroll` hook preserves the auto-scroll behavior when the DM message list DOM is rebuilt during LiveView patches.
+
+**Problem solved:**
+- After commit 33405bb8 disabled native `overflow-anchor`, the `AutoScroll` hook became the sole mechanism keeping messages pinned to the bottom
+- On full message reloads (DOM rebuild), `scrollTop` briefly reset to 0 during the patch, causing the scroll listener to fire and flip `shouldAutoScroll = false`
+- This made newly arrived messages land off-screen instead of auto-scrolling into view
+
+**Solution:**
+- Added `beforeUpdate()` to lock `shouldAutoScroll` to its pre-patch geometry state computed before the DOM swap
+- Added `_updating` flag to ignore scroll events fired during the DOM patch
+- After the browser settles the DOM swap, `requestAnimationFrame` releases the flag so future scrolls work normally
+
+**Files:**
+- `assets/js/hooks/auto_scroll.js` — `beforeUpdate`, `updated`, and scroll listener logic
+
+---
+
+## DM Page Settings Tab
+
+**Commit:** `de1f085e`
+
+The DM page now has a sixth tab (Settings) with scope controls and provider-specific settings panels.
+
+**Tab structure:**
+- **General subtab:** Global DM settings
+- **Claude subtab:** Claude-specific configurations
+- **Codex subtab:** Codex-specific configurations
+
+**Scope toggle:**
+- **Session scope:** Settings apply to the current session only
+- **Agent scope:** Settings apply to all agents (persistent across sessions)
+
+**Current state (mockup):**
+- UI is fully rendered and styled
+- Event handlers (`dm_setting_scope`, `dm_setting_subtab`, `dm_setting_update`, `reset_dm_settings`) are stubbed
+- Changes write to socket assigns only; no persistence yet
+- JSONB persistence layer (schema + API) planned for future iteration
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — tab registration
+- `lib/eye_in_the_sky_web/components/dm_page/settings_tab.ex` — settings UI component
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — event handlers
+
+---
+
+## DM Receivable Statuses
+
+**Commit:** `eb55f37c`
+
+The `/api/v1/dm` endpoint now accepts messages from sessions in the `idle` status in addition to `working` and `waiting`.
+
+**Allowed statuses:**
+- `working` — agent actively processing
+- `idle` — agent waiting for input (newly added)
+- `waiting` — agent queued for resources
+
+**Rejected statuses:**
+- `completed` — session terminated; cannot send DMs
+- `failed` — session errored; cannot send DMs
+
+**File:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `do_dm/4` status allowlist
 
 ---
 

@@ -414,9 +414,8 @@ defmodule EyeInTheSkyWeb.Layouts do
   def flash_group(assigns) do
     ~H"""
     <div id={@id} aria-live="polite">
-      <.flash kind={:info} flash={@flash} />
-      <.flash kind={:error} flash={@flash} />
-
+      <%!-- Toast notifications (put_flash :info / :error) are disabled.
+           Connection-status banners below are kept. --%>
       <.flash
         id="client-error"
         kind={:error}

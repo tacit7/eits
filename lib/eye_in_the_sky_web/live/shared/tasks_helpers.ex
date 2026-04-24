@@ -107,8 +107,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
         {:noreply,
          socket
          |> assign(:selected_task, updated_task)
-         |> reload_fn.()
-         |> put_flash(:info, "Task updated")}
+         |> reload_fn.()}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to update task")}
@@ -124,8 +123,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
          socket
          |> assign(:show_task_detail_drawer, false)
          |> assign(:selected_task, nil)
-         |> reload_fn.()
-         |> put_flash(:info, "Task deleted")}
+         |> reload_fn.()}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to delete task")}
@@ -141,8 +139,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
          socket
          |> assign(:show_task_detail_drawer, false)
          |> assign(:selected_task, nil)
-         |> reload_fn.()
-         |> put_flash(:info, "Task archived")}
+         |> reload_fn.()}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to archive task")}
@@ -211,8 +208,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
          socket
          |> assign(:show_new_task_drawer, false)
          |> assign(:show_create_task_drawer, false)
-         |> reload_fn.()
-         |> put_flash(:info, "Task created")}
+         |> reload_fn.()}
 
       {:error, changeset} ->
         {:noreply,
@@ -272,12 +268,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
          }) do
       {:ok, new_task} ->
         if tag_names != [], do: Tasks.replace_task_tags(new_task.id, tag_names)
-        target = EyeInTheSky.Projects.get_project!(target_project_id)
 
         {:noreply,
          socket
-         |> assign(:show_task_detail_drawer, false)
-         |> put_flash(:info, "Task copied to #{target.name}")}
+         |> assign(:show_task_detail_drawer, false)}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to copy task")}

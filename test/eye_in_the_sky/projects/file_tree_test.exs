@@ -395,6 +395,29 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
 
       assert {:error, :symlink_escapes_project} = FileTree.read_file(root, "subdir/deep_link/secret.txt")
     end
+
+    test "symlink loop returns error instead of crashing", %{root: root} do
+      # Create a -> b -> a circular symlink chain
+      a = Path.join(root, "link_a")
+      b = Path.join(root, "link_b")
+      File.ln_s!(b, a)
+      File.ln_s!(a, b)
+
+      assert {:error, :symlink_loop} = FileTree.read_file(root, "link_a")
+      assert {:error, :symlink_loop} = FileTree.children(root, "link_a")
+    end
+
+    test "relative symlink pointing inside project is allowed", %{root: root} do
+      # project/subdir/file.ex exists, project/link -> subdir (relative, in-tree)
+      subdir = Path.join(root, "subdir")
+      File.mkdir_p!(subdir)
+      File.write!(Path.join(subdir, "file.ex"), "in-project content")
+      File.ln_s!("subdir/file.ex", Path.join(root, "in_project_link.ex"))
+
+      assert {:ok, result} = FileTree.read_file(root, "in_project_link.ex")
+      assert result.content == "in-project content"
+      assert result.symlink? == true
+    end
   end
 
   describe "root_path validation" do

@@ -40,7 +40,7 @@ defmodule EyeInTheSky.Projects.FileTree do
          :ok <- validate_file_path(rel_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
          {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path),
-         {:ok, symlink?} <- check_if_symlink(abs_path),
+         symlink? = abs_path != real_path,
          {:ok, stat} <- stat_file(real_path),
          :ok <- validate_file_type(stat),
          :ok <- validate_file_size(stat),
@@ -79,6 +79,9 @@ defmodule EyeInTheSky.Projects.FileTree do
          {:ok, abs_path} <- safe_path(root_path, rel_path),
          {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path),
          :ok <- validate_utf8(content),
+         # lstat abs_path (not real_path) so validate_write_target sees :symlink for symlink files.
+         # POSIX resolves directory components during lstat, so this works correctly even when
+         # abs_path traverses a symlinked directory.
          {:ok, stat} <- stat_for_write(abs_path),
          :ok <- validate_write_target(stat),
          :ok <- check_conflict(real_path, original_hash, force?) do
@@ -141,25 +144,11 @@ defmodule EyeInTheSky.Projects.FileTree do
     end
   end
 
-  # Resolves an existing path, or resolves its parent and appends the basename
-  # for paths that don't exist yet (e.g. new files being written).
-  defp resolve_candidate(abs_path) do
-    if File.exists?(abs_path) do
-      resolve_path_via_parent(abs_path)
-    else
-      parent = Path.dirname(abs_path)
-      basename = Path.basename(abs_path)
-
-      if File.exists?(parent) do
-        case resolve_path_via_parent(parent) do
-          {:ok, real_parent} -> {:ok, Path.join(real_parent, basename)}
-          error -> error
-        end
-      else
-        {:ok, abs_path}
-      end
-    end
-  end
+  # Resolves the real path for validation. resolve_path_via_parent/2 handles
+  # both existing and non-existing leaf components: for non-existent paths
+  # (new files being written), read_link returns :enoent and the function
+  # returns the unresolved-but-safe path. Circular symlinks produce :symlink_loop.
+  defp resolve_candidate(abs_path), do: resolve_path_via_parent(abs_path)
 
   # Resolves each path component in order, following symlinks at each level.
   # Uses a seen-set to detect symlink loops (same pattern as resolve_symlink_chain/2).
@@ -169,13 +158,18 @@ defmodule EyeInTheSky.Projects.FileTree do
     if MapSet.member?(seen, path) do
       {:error, :symlink_loop}
     else
+      # Mark this path as "in progress" before descending. This is key for macOS
+      # where /tmp and /private/tmp refer to the same directory: seen tracks
+      # the caller's path form, so the check fires when the same string recurs,
+      # regardless of whether intermediate resolution produced a different form.
+      seen = MapSet.put(seen, path)
       parent = Path.dirname(path)
       basename = Path.basename(path)
 
       if parent == path do
         {:ok, path}
       else
-        with {:ok, real_parent} <- resolve_path_via_parent(parent, MapSet.put(seen, path)) do
+        with {:ok, real_parent} <- resolve_path_via_parent(parent, seen) do
           full_path = Path.join(real_parent, basename)
 
           case File.read_link(full_path) do
@@ -200,16 +194,6 @@ defmodule EyeInTheSky.Projects.FileTree do
           end
         end
       end
-    end
-  end
-
-  defp check_if_symlink(abs_path) do
-    case File.lstat(abs_path) do
-      {:ok, %{type: :symlink}} -> {:ok, true}
-      {:ok, _} -> {:ok, false}
-      {:error, :enoent} -> {:error, :file_not_found}
-      {:error, :eacces} -> {:error, :permission_denied}
-      {:error, _} -> {:error, :file_not_found}
     end
   end
 

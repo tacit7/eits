@@ -109,10 +109,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.sessions_content
                 sessions={@flyout_sessions}
                 sidebar_project={@sidebar_project}
-                filter_open={@session_filter_open}
-                sort={@session_sort}
-                name_filter={@session_name_filter}
-                myself={@myself}
               />
             <% :tasks -> %>
               <.tasks_content
@@ -162,10 +158,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   # Sessions flyout: real data with status dots and filter bar
   attr :sessions, :list, required: true
   attr :sidebar_project, :any, default: nil
-  attr :filter_open, :boolean, default: false
-  attr :sort, :atom, default: :last_activity
-  attr :name_filter, :string, default: ""
-  attr :myself, :any, required: true
 
   defp sessions_content(assigns) do
     ~H"""

@@ -32,6 +32,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       |> assign(:timer_ref, nil)
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
+      |> assign(:top_bar_cta, %{label: "New Session", event: "toggle_new_session_drawer"})
       |> assign(:selected_ids, MapSet.new())
       |> assign(:show_delete_confirm, false)
       |> assign(:editing_session_id, nil)
@@ -244,7 +245,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           </div>
         </div>
 
-        <.search_bar search_query={@search_query} session_filter={@session_filter} />
         <.bulk_action_bar
           session_filter={@session_filter}
           agents={@agents}

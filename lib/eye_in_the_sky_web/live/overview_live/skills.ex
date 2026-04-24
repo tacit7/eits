@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
       |> assign(:page_title, "Skills")
       |> assign(:skills, skills)
       |> assign(:filtered_skills, skills)
-      |> assign(:search, "")
+      |> assign(:search_query, "")
       |> assign(:selected_skill, nil)
       |> assign(:sidebar_tab, :skills)
       |> assign(:sidebar_project, nil)
@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   end
 
   @impl true
-  def handle_event("search", %{"search" => query}, socket) do
+  def handle_event("search", %{"query" => query}, socket) do
     filtered =
       if query == "" do
         socket.assigns.skills
@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
 
     {:noreply,
      socket
-     |> assign(:search, query)
+     |> assign(:search_query, query)
      |> assign(:filtered_skills, filtered)}
   end
 
@@ -174,25 +174,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
         <%= if @skills != [] do %>
-          <!-- Search -->
-          <div class="mb-6">
-            <form phx-change="search" class="relative">
-              <input
-                type="text"
-                name="search"
-                value={@search}
-                placeholder="Filter skills..."
-                class="input input-bordered input-sm w-full max-w-xs text-base min-h-[44px]"
-                phx-debounce="150"
-              />
-              <%= if @search != "" do %>
-                <span class="text-xs text-base-content/50 ml-2">
-                  {@filtered_skills |> length()} of {@skills |> length()}
-                </span>
-              <% end %>
-            </form>
-          </div>
-
           <div class={if @selected_skill, do: "grid grid-cols-1 lg:grid-cols-2 gap-6", else: ""}>
             <!-- Left: skill cards -->
             <div>

@@ -37,6 +37,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
     |> assign(:canvases, Canvases.list_canvases())
     |> assign(:projects, Projects.list_projects())
     |> assign(:show_new_canvas_for, nil)
+    |> assign(:top_bar_cta, %{label: "New Agent", event: "toggle_new_session_drawer"})
     |> Loader.load_agents()
   end
 end

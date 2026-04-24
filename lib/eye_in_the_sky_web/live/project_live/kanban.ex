@@ -9,7 +9,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   import EyeInTheSkyWeb.Live.Shared.AgentHelpers, only: [handle_start_agent_for_task: 2]
   import EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
-  import EyeInTheSkyWeb.Components.KanbanToolbar, only: [kanban_toolbar: 1]
   import EyeInTheSkyWeb.Components.KanbanBulkBar, only: [kanban_bulk_bar: 1]
   import EyeInTheSkyWeb.Components.KanbanBoard, only: [kanban_board: 1]
 
@@ -53,6 +52,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   def handle_event("toggle_overlay", %{"key" => key}, socket) do
     atom = String.to_existing_atom(key)
     {:noreply, assign(socket, atom, !socket.assigns[atom])}
+  end
+
+  @impl true
+  def handle_event("toggle_new_task_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
   end
 
   @impl true
@@ -300,14 +304,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       phx-hook="KanbanKeyboard"
       class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col"
     >
-      <.kanban_toolbar
-        project_id={@project.id}
-        search_query={@search_query}
-        show_completed={@show_completed}
-        bulk_mode={@bulk_mode}
-        active_filter_count={@active_filter_count}
-      />
-
       <.kanban_bulk_bar
         bulk_mode={@bulk_mode}
         selected_tasks={@selected_tasks}
@@ -409,6 +405,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   defp init_assigns(socket) do
     socket
+    |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_new_task_drawer"})
     |> assign(:search_query, "")
     |> assign(:filter_priority, nil)
     |> assign(:filter_tags, MapSet.new())

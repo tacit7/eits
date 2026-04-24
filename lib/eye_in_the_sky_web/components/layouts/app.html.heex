@@ -64,6 +64,26 @@
       </button>
     </header>
 
+    <%!-- Desktop top bar — hidden on mobile --%>
+    <.top_bar
+      sidebar_tab={assigns[:sidebar_tab] || :sessions}
+      sidebar_project={assigns[:sidebar_project]}
+      top_bar_cta_label={assigns[:top_bar_cta] && assigns[:top_bar_cta].label}
+      top_bar_cta_href={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :href)}
+      top_bar_cta_event={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :event)}
+      search_query={assigns[:search_query]}
+      session_filter={assigns[:session_filter]}
+      filter_state_id={assigns[:filter_state_id]}
+      workflow_states={assigns[:workflow_states]}
+      sort_by={assigns[:sort_by]}
+      show_completed={assigns[:show_completed]}
+      bulk_mode={assigns[:bulk_mode]}
+      active_filter_count={assigns[:active_filter_count]}
+      dm_active_tab={assigns[:active_tab]}
+      dm_session_name={assigns[:page_title]}
+      dm_message_search_query={assigns[:message_search_query]}
+    />
+
     <main
       id="main-content"
       class="flex-1 overflow-auto flex flex-col min-w-0 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0"

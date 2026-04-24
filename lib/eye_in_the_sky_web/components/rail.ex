@@ -149,6 +149,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> maybe_load_teams(next_section, sidebar_project)
         |> maybe_load_tasks(next_section, sidebar_project)
         |> maybe_load_jobs(next_section)
+        |> maybe_load_files(next_section)
       else
         socket
       end

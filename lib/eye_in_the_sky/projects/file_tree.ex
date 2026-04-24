@@ -27,8 +27,9 @@ defmodule EyeInTheSky.Projects.FileTree do
   def children(root_path, rel_path, opts \\ []) do
     with :ok <- validate_root_path(root_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
-         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path) do
-      list_directory(real_path, root_path, opts)
+         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path),
+         {:ok, real_root} <- resolve_path_via_parent(Path.expand(root_path)) do
+      list_directory(real_path, real_root, opts)
     end
   end
 
@@ -199,17 +200,15 @@ defmodule EyeInTheSky.Projects.FileTree do
 
   # --- Directory Listing ---
 
-  defp list_directory(abs_path, root_path, _opts) do
+  defp list_directory(abs_path, real_root, _opts) do
     case File.ls(abs_path) do
       {:ok, entries} ->
-        root = Path.expand(root_path)
-
         nodes =
           entries
           |> Enum.reject(&ignored?/1)
           |> Enum.map(fn name ->
             entry_path = Path.join(abs_path, name)
-            rel_path = Path.relative_to(entry_path, root)
+            rel_path = Path.relative_to(entry_path, real_root)
             build_node(name, entry_path, rel_path)
           end)
           |> Enum.sort_by(fn node ->

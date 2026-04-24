@@ -345,9 +345,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("not_implemented", _params, socket),
     do: {:noreply, put_flash(socket, :info, "Not implemented yet")}
 
-  def handle_event("toggle_new_session_form", _params, socket),
-    do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
-
   def handle_event("toggle_new_session_drawer", _params, socket),
     do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
 

@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :notifications -> %>
               <.simple_link href="/notifications" label="Notifications" icon="hero-bell" />
             <% :usage -> %>
-              <.usage_content sidebar_project={@sidebar_project} />
+              <.usage_content />
             <% :jobs -> %>
               <.jobs_content jobs={@flyout_jobs} sidebar_project={@sidebar_project} />
             <% :files -> %>
@@ -285,7 +285,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp task_row(assigns) do
     ~H"""
     <.link
-      navigate="/tasks"
+      navigate={if @task.project_id, do: "/projects/#{@task.project_id}/tasks?task_id=#{@task.id}", else: "/projects"}
       class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
     >
       <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0 mt-px", task_state_dot(@task.state_id)]} />
@@ -466,8 +466,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   end
 
   # Usage flyout: links to the usage dashboard
-  attr :sidebar_project, :any, default: nil
-
   defp usage_content(assigns) do
     ~H"""
     <.simple_link href="/usage" label="Usage Dashboard" icon="hero-chart-bar" />

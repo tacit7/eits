@@ -286,6 +286,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("set_bookmark", params, socket),
     do: ProjectActions.handle_set_bookmark(params, socket)
 
+  def handle_event("not_implemented", _params, socket),
+    do: {:noreply, put_flash(socket, :info, "Not implemented yet")}
+
   def handle_event("toggle_new_session_form", _params, socket),
     do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
 

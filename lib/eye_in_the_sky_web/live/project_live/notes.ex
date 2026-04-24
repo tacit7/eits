@@ -139,6 +139,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   end
 
   @impl true
+  def handle_event("enter_select_mode_notes", _params, socket) do
+    {:noreply, assign(socket, :notes_select_mode, true)}
+  end
+
+  @impl true
   def handle_event("edit_note", %{"note_id" => note_id}, socket) do
     case parse_id(note_id) do
       nil -> {:noreply, socket}
@@ -243,7 +248,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         end
       end
 
-    assign(socket, :notes, notes)
+    socket
+    |> assign(:notes, notes)
+    |> assign(:selected_note_ids, MapSet.new())
+    |> assign(:notes_select_mode, false)
   end
 
   @impl true
@@ -268,6 +276,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
             >
               <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
             </.link>
+            <label
+              :if={!@notes_select_mode && @notes != []}
+              class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/40 hover:text-base-content/70 min-h-[44px] px-1 transition-colors"
+              phx-click="enter_select_mode_notes"
+            >
+              <input type="checkbox" class="checkbox checkbox-xs checkbox-primary pointer-events-none" />
+              Select
+            </label>
           </div>
         </div>
 

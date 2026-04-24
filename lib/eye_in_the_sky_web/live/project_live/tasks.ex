@@ -39,6 +39,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:total_tasks, 0)
       |> assign(:selected_task_ids, MapSet.new())
       |> assign(:tasks_select_mode, false)
+      |> assign(:loaded_task_ids, [])
       |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
 
     socket =
@@ -144,11 +145,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
   @impl true
   def handle_event("toggle_select_all_tasks", _params, socket) do
-    # Collect visible task IDs from the stream — use task_count check to avoid
-    # issues when stream hasn't fully loaded.
-    all_ids = MapSet.new(socket.assigns.streams.tasks, fn {_dom_id, task} ->
-      task.uuid || to_string(task.id)
-    end)
+    all_ids = MapSet.new(socket.assigns.loaded_task_ids)
 
     selected =
       if MapSet.equal?(socket.assigns.selected_task_ids, all_ids),
@@ -156,6 +153,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         else: all_ids
 
     {:noreply, assign(socket, :selected_task_ids, selected)}
+  end
+
+  @impl true
+  def handle_event("enter_select_mode_tasks", _params, socket) do
+    {:noreply, assign(socket, :tasks_select_mode, true)}
   end
 
   @impl true
@@ -252,6 +254,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       <div class="max-w-4xl mx-auto">
         <%!-- Mobile-only action bar --%>
         <div class="mb-4 flex md:hidden items-center justify-end gap-2">
+          <label
+            :if={!@tasks_select_mode && @task_count > 0}
+            class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/50 hover:text-base-content/70 h-11 px-1"
+            phx-click="enter_select_mode_tasks"
+          >
+            <input type="checkbox" class="checkbox checkbox-xs checkbox-primary pointer-events-none" />
+            Select
+          </label>
           <button
             phx-click="open_filter_sheet"
             aria-label="Open filters"

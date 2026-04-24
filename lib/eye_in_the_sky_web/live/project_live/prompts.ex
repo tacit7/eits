@@ -81,7 +81,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
           <!-- Prompts List -->
           <div class="space-y-4">
             <%= for prompt <- @prompts do %>
-              <a href={"/prompts/#{prompt.id}"} class="block">
+              <.link navigate={~p"/projects/#{@project.id}/prompts/#{prompt.uuid}"} class="block">
                 <div class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-md transition-all">
                   <div class="card-body">
                     <div class="flex items-start justify-between">
@@ -132,7 +132,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                     </div>
                   </div>
                 </div>
-              </a>
+              </.link>
             <% end %>
           </div>
         <% else %>

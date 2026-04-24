@@ -13,24 +13,33 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
 
   @impl true
   def handle_params(%{"prompt_id" => prompt_uuid} = _params, _url, socket) do
-    prompt = Prompts.get_prompt_by_uuid!(prompt_uuid)
-
     project = socket.assigns.project
 
-    if prompt.project_id && project && prompt.project_id != to_string(project.id) do
-      {:noreply,
-       socket
-       |> put_flash(:error, "Prompt not found in this project")
-       |> push_navigate(to: ~p"/projects/#{project.id}/prompts")}
-    else
-      socket =
-        socket
-        |> assign(:page_title, "Prompt: #{prompt.name}")
-        |> assign(:prompt, prompt)
-        |> assign(:editing, false)
-        |> assign(:form, to_form(Prompts.change_prompt(prompt)))
+    case Prompts.get_prompt_by_uuid(prompt_uuid) do
+      {:error, :not_found} ->
+        return_to = if project, do: ~p"/projects/#{project.id}/prompts", else: ~p"/"
 
-      {:noreply, socket}
+        {:noreply,
+         socket
+         |> put_flash(:error, "Prompt not found")
+         |> push_navigate(to: return_to)}
+
+      {:ok, prompt} ->
+        if prompt.project_id && project && prompt.project_id != to_string(project.id) do
+          {:noreply,
+           socket
+           |> put_flash(:error, "Prompt not found in this project")
+           |> push_navigate(to: ~p"/projects/#{project.id}/prompts")}
+        else
+          socket =
+            socket
+            |> assign(:page_title, "Prompt: #{prompt.name}")
+            |> assign(:prompt, prompt)
+            |> assign(:editing, false)
+            |> assign(:form, to_form(Prompts.change_prompt(prompt)))
+
+          {:noreply, socket}
+        end
     end
   end
 

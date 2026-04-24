@@ -252,7 +252,11 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   defp notify_agent_complete(session_id, provider_conversation_id) do
+    meta = Logger.metadata()
+
     Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      Logger.metadata(meta)
+
       title =
         case Sessions.get_session(session_id) do
           {:ok, session} when is_binary(session.name) and session.name != "" ->

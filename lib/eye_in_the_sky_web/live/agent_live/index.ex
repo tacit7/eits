@@ -245,7 +245,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           </div>
         </div>
 
-        <.search_bar search_query={@search_query} session_filter={@session_filter} />
         <.bulk_action_bar
           session_filter={@session_filter}
           agents={@agents}

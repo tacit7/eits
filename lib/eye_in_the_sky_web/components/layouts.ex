@@ -24,12 +24,14 @@ defmodule EyeInTheSkyWeb.Layouts do
   attr :sidebar_tab, :atom, default: :sessions
   attr :sidebar_project, :any, default: nil
   attr :top_bar_cta, :map, default: nil
+  attr :search_query, :string, default: nil
+  attr :session_filter, :string, default: nil
 
   def top_bar(assigns) do
     ~H"""
-    <div class="hidden md:flex h-9 flex-shrink-0 items-center border-b border-base-content/8 bg-base-100 pr-3">
+    <div class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 px-3">
       <%!-- Breadcrumb --%>
-      <div class="flex items-center px-3 flex-shrink-0">
+      <div class="flex items-center flex-shrink-0">
         <%= if @sidebar_project do %>
           <.link
             navigate={~p"/projects/#{@sidebar_project.id}"}
@@ -45,28 +47,67 @@ defmodule EyeInTheSkyWeb.Layouts do
         </span>
       </div>
 
-      <div class="flex-1" />
+      <%= if not is_nil(@session_filter) do %>
+        <%!-- Inline search input --%>
+        <form phx-change="search" class="flex-1 max-w-xs">
+          <label for="top-bar-search" class="sr-only">Search</label>
+          <div class="relative">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+              <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
+            </div>
+            <input
+              type="text"
+              name="query"
+              id="top-bar-search"
+              value={@search_query || ""}
+              phx-debounce="300"
+              placeholder="Search..."
+              autocomplete="off"
+              class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
+            />
+          </div>
+        </form>
 
-      <%!-- Search --%>
-      <button
-        phx-click={JS.dispatch("palette:open", to: "#command-palette")}
-        class="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
-        title="Search"
-        aria-label="Search"
-      >
-        <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5" />
-        Search
-        <kbd class="ml-0.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] bg-base-content/8 text-base-content/30 border border-base-content/10 font-sans leading-none">
-          ⌘K
-        </kbd>
-      </button>
+        <%!-- Filter tabs --%>
+        <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
+          <%= for {value, label} <- [{"all", "All"}, {"active", "Active"}, {"completed", "Completed"}, {"archived", "Archived"}] do %>
+            <button
+              phx-click="filter_session"
+              phx-value-filter={value}
+              class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
+                if(@session_filter == value,
+                  do: "bg-base-100 text-base-content shadow-sm",
+                  else: "text-base-content/45 hover:text-base-content/70"
+                )}
+            >
+              {label}
+            </button>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="flex-1" />
+
+        <%!-- Palette search button — shown when no inline search --%>
+        <button
+          phx-click={JS.dispatch("palette:open", to: "#command-palette")}
+          class="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
+          title="Search"
+          aria-label="Search"
+        >
+          <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5" />
+          Search
+          <kbd class="ml-0.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] bg-base-content/8 text-base-content/30 border border-base-content/10 font-sans leading-none">
+            ⌘K
+          </kbd>
+        </button>
+      <% end %>
 
       <%!-- Optional CTA — supports %{label, href} for navigate links or %{label, event} for phx-click --%>
       <%= if @top_bar_cta do %>
         <%= if Map.get(@top_bar_cta, :href) do %>
           <.link
             navigate={@top_bar_cta.href}
-            class="ml-1.5 flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+            class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
           >
             <.icon name="hero-plus" class="w-3 h-3" />
             {@top_bar_cta.label}
@@ -74,7 +115,7 @@ defmodule EyeInTheSkyWeb.Layouts do
         <% else %>
           <button
             phx-click={@top_bar_cta.event}
-            class="ml-1.5 flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+            class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
           >
             <.icon name="hero-plus" class="w-3 h-3" />
             {@top_bar_cta.label}

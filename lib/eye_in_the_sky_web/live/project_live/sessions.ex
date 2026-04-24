@@ -126,6 +126,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
     do: Actions.delete_selected(params, socket)
 
   @impl true
+  def handle_event("exit_select_mode", params, socket),
+    do: Actions.exit_select_mode(params, socket)
+
+  @impl true
   def handle_event("navigate_dm", params, socket), do: Actions.navigate_dm(params, socket)
 
   @impl true
@@ -202,6 +206,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
       show_filter_sheet={@show_filter_sheet}
       show_new_session_drawer={@show_new_session_drawer}
       selected_ids={@selected_ids}
+      select_mode={@select_mode}
       editing_session_id={@editing_session_id}
       project={@project}
       canvases={@canvases}

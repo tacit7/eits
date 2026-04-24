@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   attr :show_filter_sheet, :boolean, required: true
   attr :show_new_session_drawer, :boolean, required: true
   attr :selected_ids, :any, required: true
+  attr :select_mode, :boolean, default: false
   attr :editing_session_id, :any, required: true
   attr :project, :any, required: true
   attr :canvases, :list, default: []
@@ -59,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
         <% end %>
 
         <.selection_toolbar
-          session_filter={@session_filter}
+          select_mode={@select_mode}
           agents={@agents}
           selected_ids={@selected_ids}
         />
@@ -69,6 +70,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           streams={@streams}
           depths={@depths}
           session_filter={@session_filter}
+          select_mode={@select_mode}
           selected_ids={@selected_ids}
           editing_session_id={@editing_session_id}
           search_query={@search_query}

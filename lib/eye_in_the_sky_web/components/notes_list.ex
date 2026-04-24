@@ -13,8 +13,12 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
   attr :empty_id, :string, default: "notes-empty"
   attr :editing_note_id, :integer, default: nil
   attr :current_path, :string, default: "/notes"
+  attr :selected_ids, :any, default: nil
+  attr :select_mode, :boolean, default: false
 
   def notes_list(assigns) do
+    assigns = assign_new(assigns, :selected_ids, fn -> MapSet.new() end)
+
     ~H"""
     <%!-- Filter controls --%>
     <div class="mb-5 flex flex-wrap items-center gap-2">
@@ -62,17 +66,65 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
       </div>
     </div>
 
-    <%!-- Notes count --%>
-    <div class="mb-3">
-      <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-        {length(@notes)} notes
-      </span>
-    </div>
+    <%!-- Bulk-select toolbar --%>
+    <%= if @select_mode && @notes != [] do %>
+      <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
+        <input
+          type="checkbox"
+          checked={MapSet.size(@selected_ids) == length(@notes)}
+          phx-click="toggle_select_all_notes"
+          class="checkbox checkbox-xs checkbox-primary"
+          aria-label="Select all notes"
+        />
+        <%= if MapSet.size(@selected_ids) > 0 do %>
+          <span class="text-[11px] text-base-content/50 font-medium">
+            {MapSet.size(@selected_ids)} selected
+          </span>
+          <button
+            phx-click="delete_selected_notes"
+            data-confirm={"Delete #{MapSet.size(@selected_ids)} note#{if MapSet.size(@selected_ids) != 1, do: "s"}?"}
+            class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
+          >
+            <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+          </button>
+        <% else %>
+          <span class="text-[11px] text-base-content/30">{length(@notes)} notes</span>
+        <% end %>
+        <button
+          phx-click="exit_select_mode_notes"
+          class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+          aria-label="Exit select mode"
+        >
+          <.icon name="hero-x-mark" class="w-4 h-4" />
+        </button>
+      </div>
+    <% else %>
+      <%!-- Notes count --%>
+      <div class="mb-3">
+        <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+          {length(@notes)} notes
+        </span>
+      </div>
+    <% end %>
 
     <%= if @notes != [] do %>
       <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
           <div class="py-1 flex items-start gap-1 group">
+            <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
+            <div class={[
+              "flex-shrink-0 w-7 flex items-center justify-center pt-3.5",
+              if(@select_mode, do: "", else: "hidden group-hover:flex")
+            ]}>
+              <input
+                type="checkbox"
+                checked={MapSet.member?(@selected_ids, to_string(note.id))}
+                phx-click="toggle_select_note"
+                phx-value-note_id={note.id}
+                class="checkbox checkbox-xs checkbox-primary"
+                aria-label={"Select note #{note.id}"}
+              />
+            </div>
             <%!-- Collapse: chevron expands inline body --%>
             <div class="collapse flex-1 overflow-visible">
               <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />

@@ -37,6 +37,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:page, 1)
       |> assign(:has_more, false)
       |> assign(:total_tasks, 0)
+      |> assign(:selected_task_ids, MapSet.new())
+      |> assign(:tasks_select_mode, false)
       |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
 
     socket =
@@ -122,6 +124,73 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   @impl true
   def handle_event("delete_task", params, socket),
     do: handle_delete_task(params, socket, &load_tasks/1)
+
+  @impl true
+  def handle_event("toggle_select_task", %{"task_id" => task_id}, socket) do
+    task_id = to_string(task_id)
+
+    selected =
+      if MapSet.member?(socket.assigns.selected_task_ids, task_id),
+        do: MapSet.delete(socket.assigns.selected_task_ids, task_id),
+        else: MapSet.put(socket.assigns.selected_task_ids, task_id)
+
+    socket =
+      socket
+      |> assign(:selected_task_ids, selected)
+      |> assign(:tasks_select_mode, true)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_select_all_tasks", _params, socket) do
+    # Collect visible task IDs from the stream — use task_count check to avoid
+    # issues when stream hasn't fully loaded.
+    all_ids = MapSet.new(socket.assigns.streams.tasks, fn {_dom_id, task} ->
+      task.uuid || to_string(task.id)
+    end)
+
+    selected =
+      if MapSet.equal?(socket.assigns.selected_task_ids, all_ids),
+        do: MapSet.new(),
+        else: all_ids
+
+    {:noreply, assign(socket, :selected_task_ids, selected)}
+  end
+
+  @impl true
+  def handle_event("delete_selected_tasks", _params, socket) do
+    ids = socket.assigns.selected_task_ids
+
+    deleted =
+      Enum.count(ids, fn task_id ->
+        try do
+          task = Tasks.get_task_by_uuid_or_id!(task_id)
+          match?({:ok, _}, Tasks.delete_task_with_associations(task))
+        rescue
+          _ -> false
+        end
+      end)
+
+    socket =
+      socket
+      |> assign(:selected_task_ids, MapSet.new())
+      |> assign(:tasks_select_mode, false)
+      |> load_tasks()
+      |> put_flash(:info, "Deleted #{deleted} task#{if deleted != 1, do: "s"}")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("exit_select_mode_tasks", _params, socket) do
+    socket =
+      socket
+      |> assign(:tasks_select_mode, false)
+      |> assign(:selected_task_ids, MapSet.new())
+
+    {:noreply, socket}
+  end
 
   @impl true
   def handle_event("start_agent_for_task", _params, socket) do
@@ -215,6 +284,40 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         />
 
         <%= if @task_count > 0 do %>
+          <%!-- Bulk-select toolbar --%>
+          <%= if @tasks_select_mode do %>
+            <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
+              <input
+                type="checkbox"
+                checked={MapSet.size(@selected_task_ids) == @task_count}
+                phx-click="toggle_select_all_tasks"
+                class="checkbox checkbox-xs checkbox-primary"
+                aria-label="Select all tasks"
+              />
+              <%= if MapSet.size(@selected_task_ids) > 0 do %>
+                <span class="text-[11px] text-base-content/50 font-medium">
+                  {MapSet.size(@selected_task_ids)} selected
+                </span>
+                <button
+                  phx-click="delete_selected_tasks"
+                  data-confirm={"Delete #{MapSet.size(@selected_task_ids)} task#{if MapSet.size(@selected_task_ids) != 1, do: "s"}?"}
+                  class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
+                >
+                  <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+                </button>
+              <% else %>
+                <span class="text-[11px] text-base-content/30">{@task_count} tasks</span>
+              <% end %>
+              <button
+                phx-click="exit_select_mode_tasks"
+                class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+                aria-label="Exit select mode"
+              >
+                <.icon name="hero-x-mark" class="w-4 h-4" />
+              </button>
+            </div>
+          <% end %>
+
           <div
             id="project-tasks-list"
             phx-update="stream"
@@ -226,6 +329,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
                 variant="list"
                 on_click="open_task_detail"
                 on_delete="delete_task"
+                select_mode={@tasks_select_mode}
+                selected={MapSet.member?(@selected_task_ids, task.uuid || to_string(task.id))}
               />
             </div>
           </div>

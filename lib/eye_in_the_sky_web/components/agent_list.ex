@@ -59,10 +59,15 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     """
   end
 
+  attr :agents, :list, required: true
+  attr :selected_ids, :any, required: true
+  attr :select_mode, :boolean, default: false
+  attr :session_filter, :string, default: "all"
+
   def bulk_action_bar(assigns) do
     ~H"""
     <div
-      :if={@session_filter == "archived" && @agents != []}
+      :if={@select_mode && @agents != []}
       class="mt-2 flex items-center gap-3 px-2 py-1.5"
     >
       <input
@@ -70,6 +75,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         checked={MapSet.size(@selected_ids) == length(@agents)}
         phx-click="toggle_select_all"
         class="checkbox checkbox-xs checkbox-primary"
+        aria-label="Select all sessions"
       />
       <%= if MapSet.size(@selected_ids) > 0 do %>
         <span class="text-[11px] text-base-content/50 font-medium">
@@ -82,8 +88,15 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
         </button>
       <% else %>
-        <span class="text-[11px] text-base-content/30">{length(@agents)} archived</span>
+        <span class="text-[11px] text-base-content/30">{length(@agents)} sessions</span>
       <% end %>
+      <button
+        phx-click="exit_select_mode"
+        class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+        aria-label="Exit select mode"
+      >
+        <.icon name="hero-x-mark" class="w-4 h-4" />
+      </button>
     </div>
     """
   end

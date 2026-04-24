@@ -68,10 +68,13 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 **Lazy loader**: `load_flyout_sessions/3`
 
 **UI features**:
+- **Flyout header icons**: globe icon links to `/sessions` (all sessions globally); list-bullet icon links to `/projects/:id/sessions` when a project is selected
 - **Filter bar**: name input (300ms debounce) filters sessions server-side; sort popup (Last activity, Created, Name); sort icon highlights when non-default
 - **Flat list**: sessions displayed without active/stopped grouping; status indicated by status dot (color-coded)
-- **New agent form**: inline form to create a new session; fires `new_session` directly when project is selected via dropdown
-- **Nav links**: All Sessions, List view links at top
+- **New session button** (`+`): 
+  - When project selected: fires `new_session` event directly with `project_id` (instant creation, no modal)
+  - When no project: fires `toggle_new_session_form` (shows form with project picker)
+- **Sticky footer nav links**: "All Sessions" (links to `/sessions`); "List" (links to `/projects/:id/sessions`, project-scoped; only shown when project selected)
 
 **State preservation**: filter state (sort, name) preserved across project switches and flyout toggles via `session_filter` and `session_sort` assigns.
 
@@ -84,6 +87,7 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 **Lazy loader**: `maybe_load_tasks/3`
 
 **UI features**:
+- **Flyout header icons**: globe icon links to `/tasks` (all tasks globally); list-bullet icon links to `/projects/:id/tasks` when a project is selected
 - **Nav links**: All, List, Kanban at top (direct links to /tasks, /tasks?view=list, /tasks?view=kanban)
 - **State filter**: popup with workflow states (To Do, In Progress, In Review, Done, Archived); filters tasks by selected state; Archived excluded by default
 - **Live search**: text input filters task names in real-time across visible list
@@ -153,6 +157,7 @@ No lazy loader — section just displays a link to `/usage` ("Usage Dashboard").
 **Lazy loader**: `maybe_load_jobs/2` (loads up to 15 jobs)
 
 **UI features**:
+- **Flyout header icons**: globe icon links to `/jobs` (all jobs globally); list-bullet icon links to `/projects/:id/jobs` when a project is selected
 - Each job shows: enabled/disabled dot + name + schedule value list
 - Nav links: "All Jobs", optional "Project Jobs" link (if project selected)
 - "No jobs" empty state when none exist
@@ -176,6 +181,22 @@ Data is only fetched when entering a section, not on every page render:
 | `:usage`    | —                         | —              |
 
 Sessions are also re-fetched when `sidebar_project` changes (project switch triggers a reload).
+
+### Dual-Page Sections
+
+Sections with both a global and project-scoped page show dual icons in the flyout header:
+
+```elixir
+defp dual_page_section?(section),
+  do: section in [:sessions, :tasks, :prompts, :notes, :skills, :jobs]
+```
+
+**Globe icon** (`lucide-globe`, 13×13): navigates to the global route (e.g., `/sessions`, `/tasks`)
+**List-bullet icon** (`hero-list-bullet`): navigates to the project-scoped route (e.g., `/projects/:id/sessions`). Enabled only when `sidebar_project` is set and the route exists. If the route is not implemented, shows a disabled state and fires `not_implemented` event on click (displays a flash toast).
+
+Helper functions:
+- `global_route_for/1` — returns the global path for a section
+- `project_route_for/2` — returns the project-scoped path if available, or nil
 
 ---
 

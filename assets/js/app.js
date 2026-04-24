@@ -45,6 +45,7 @@ import {PushSetup} from "./push_notifications"
 import {SwipeRow} from "./hooks/swipe_row"
 import {ConfigChatGuide} from "./hooks/config_chat_guide"
 import {CodeMirrorHook} from "./hooks/codemirror"
+import {FileEditorPanelHook} from "./hooks/file_editor_panel"
 import {NoteEditorHook} from "./hooks/note_editor"
 import {NoteFullEditorHook} from "./hooks/note_full_editor"
 import {SortableKanban, SortableColumns} from "./hooks/sortable_kanban"
@@ -103,6 +104,7 @@ Hooks.FileAttach = FileAttach
 Hooks.SwipeRow = SwipeRow
 Hooks.ConfigChatGuide = ConfigChatGuide
 Hooks.CodeMirror = CodeMirrorHook
+Hooks.FileEditorPanel = FileEditorPanelHook
 Hooks.NoteEditor = NoteEditorHook
 Hooks.NoteFullEditor = NoteFullEditorHook
 Hooks.SortableKanban = SortableKanban

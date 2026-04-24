@@ -22,6 +22,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :session_name_filter, :string, default: ""
   attr :notification_count, :integer, default: 0
   attr :flyout_jobs, :list, default: []
+  attr :flyout_file_nodes, :list, default: []
+  attr :flyout_file_expanded, :any, default: nil
+  attr :flyout_file_children, :map, default: %{}
+  attr :flyout_file_error, :string, default: nil
   attr :myself, :any, required: true
 
   def flyout(assigns) do
@@ -149,6 +153,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.usage_content sidebar_project={@sidebar_project} />
             <% :jobs -> %>
               <.jobs_content jobs={@flyout_jobs} sidebar_project={@sidebar_project} />
+            <% :files -> %>
+              <.files_content
+                file_nodes={@flyout_file_nodes}
+                file_expanded={@flyout_file_expanded || MapSet.new()}
+                file_children={@flyout_file_children}
+                file_error={@flyout_file_error}
+                sidebar_project={@sidebar_project}
+                myself={@myself}
+              />
             <% _ -> %>
               <.nav_links project={@sidebar_project} section={:sessions} />
           <% end %>
@@ -643,6 +656,97 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
+  # Files flyout: expand/collapse tree backed by FileTree service
+  attr :file_nodes, :list, default: []
+  attr :file_expanded, :any, default: nil
+  attr :file_children, :map, default: %{}
+  attr :file_error, :string, default: nil
+  attr :sidebar_project, :any, default: nil
+  attr :myself, :any, required: true
+
+  defp files_content(assigns) do
+    assigns =
+      assign(assigns, :flat_rows,
+        flatten_file_tree(assigns.file_nodes, assigns.file_children, assigns.file_expanded || MapSet.new(), 0)
+      )
+
+    ~H"""
+    <%= if is_nil(@sidebar_project) || is_nil(@sidebar_project.path) do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No project path configured</div>
+    <% else %>
+      <%!-- Error state --%>
+      <%= if @file_error do %>
+        <div class="px-3 py-2 text-xs text-error/70">{@file_error}</div>
+      <% end %>
+
+      <%!-- Tree rows --%>
+      <%= for {node, depth} <- @flat_rows do %>
+        <% indent = depth * 12 %>
+        <%= case node.type do %>
+          <% :directory -> %>
+            <% expanded = MapSet.member?(@file_expanded, node.path) %>
+            <button
+              phx-click={if expanded, do: "file_collapse", else: "file_expand"}
+              phx-value-path={node.path}
+              phx-target={@myself}
+              class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-xs text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+              style={"padding-left: #{indent + 8}px"}
+            >
+              <.icon
+                name={if expanded, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
+                class="w-3 h-3 text-base-content/30 flex-shrink-0"
+              />
+              <.icon name={if expanded, do: "hero-folder-open-mini", else: "hero-folder-mini"} class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
+              <span class="truncate">{node.name}</span>
+            </button>
+          <% :file -> %>
+            <button
+              phx-click="file_open"
+              phx-value-path={node.path}
+              phx-target={@myself}
+              class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-xs text-base-content/55 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
+              style={"padding-left: #{indent + 20}px"}
+            >
+              <%= if node.sensitive? do %>
+                <.icon name="hero-lock-closed-mini" class="w-3.5 h-3.5 text-warning/50 flex-shrink-0" />
+              <% else %>
+                <.icon name="hero-document-mini" class="w-3.5 h-3.5 text-base-content/20 flex-shrink-0" />
+              <% end %>
+              <span class="truncate">{node.name}</span>
+            </button>
+          <% :warning -> %>
+            <div class="px-3 py-1 text-[10px] text-base-content/25 italic" style={"padding-left: #{indent + 8}px"}>{node.name}</div>
+          <% _ -> %>
+        <% end %>
+      <% end %>
+
+      <%= if @flat_rows == [] && is_nil(@file_error) do %>
+        <div class="px-3 py-4 text-xs text-base-content/35 text-center">Empty</div>
+      <% end %>
+
+      <%!-- Footer --%>
+      <div class="border-t border-base-content/8 mt-2">
+        <.simple_link
+          href={"/projects/#{@sidebar_project.id}/files"}
+          label="Open File Browser"
+          icon="hero-arrow-top-right-on-square"
+        />
+      </div>
+    <% end %>
+    """
+  end
+
+  defp flatten_file_tree(nodes, children_cache, expanded, depth) do
+    Enum.flat_map(nodes, fn node ->
+      if node.type == :directory && MapSet.member?(expanded, node.path) do
+        kids = Map.get(children_cache, node.path, [])
+        [{node, depth} | flatten_file_tree(kids, children_cache, expanded, depth + 1)]
+      else
+        [{node, depth}]
+      end
+    end)
+  end
+
   defp section_label(:sessions), do: "Sessions"
   defp section_label(:tasks), do: "Tasks"
   defp section_label(:prompts), do: "Prompts"
@@ -654,6 +758,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp section_label(:notifications), do: "Notifications"
   defp section_label(:usage), do: "Usage"
   defp section_label(:jobs), do: "Jobs"
+  defp section_label(:files), do: "Files"
   defp section_label(_), do: "Navigation"
 
   # Sections that have both a global page and a project-scoped page.

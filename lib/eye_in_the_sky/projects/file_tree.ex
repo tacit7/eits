@@ -27,8 +27,8 @@ defmodule EyeInTheSky.Projects.FileTree do
   def children(root_path, rel_path, opts \\ []) do
     with :ok <- validate_root_path(root_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
-         {:ok, _real_path} <- validate_real_path_inside_root(abs_path, root_path) do
-      list_directory(abs_path, root_path, opts)
+         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path) do
+      list_directory(real_path, root_path, opts)
     end
   end
 
@@ -39,13 +39,12 @@ defmodule EyeInTheSky.Projects.FileTree do
     with :ok <- validate_root_path(root_path),
          :ok <- validate_file_path(rel_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
-         {:ok, _real_path} <- validate_real_path_inside_root(abs_path, root_path),
+         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path),
          {:ok, symlink?} <- check_if_symlink(abs_path),
-         {:ok, abs_path} <- check_symlink_safety(abs_path, root_path),
-         {:ok, stat} <- stat_file(abs_path),
+         {:ok, stat} <- stat_file(real_path),
          :ok <- validate_file_type(stat),
          :ok <- validate_file_size(stat),
-         {:ok, content} <- File.read(abs_path),
+         {:ok, content} <- File.read(real_path),
          :ok <- validate_not_binary(content),
          :ok <- validate_utf8(content) do
       hash = hash_content(content)
@@ -78,12 +77,12 @@ defmodule EyeInTheSky.Projects.FileTree do
     with :ok <- validate_root_path(root_path),
          :ok <- validate_file_path(rel_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
-         {:ok, _real_path} <- validate_real_path_inside_root(abs_path, root_path),
+         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path),
          :ok <- validate_utf8(content),
          {:ok, stat} <- stat_for_write(abs_path),
          :ok <- validate_write_target(stat),
-         :ok <- check_conflict(abs_path, original_hash, force?) do
-      atomic_write(abs_path, content)
+         :ok <- check_conflict(real_path, original_hash, force?) do
+      atomic_write(real_path, content)
     end
   end
 
@@ -132,61 +131,53 @@ defmodule EyeInTheSky.Projects.FileTree do
   # and validates it stays inside the project root.
   # This catches symlinked ancestor directories that escape the project.
   defp validate_real_path_inside_root(abs_path, root_path) do
-    # Resolve the real root path (in case root itself contains symlinks like /var -> /private/var)
-    {:ok, real_root} = resolve_path_via_parent(Path.expand(root_path))
-
-    # For existing paths, resolve the real path
-    # For non-existing paths (new files), resolve parent directory
-    real_path =
-      case File.exists?(abs_path) do
-        true ->
-          resolve_path_via_parent(abs_path)
-
-        false ->
-          # Path doesn't exist - resolve parent and append basename
-          parent = Path.dirname(abs_path)
-          basename = Path.basename(abs_path)
-
-          case File.exists?(parent) do
-            true ->
-              case resolve_path_via_parent(parent) do
-                {:ok, real_parent} -> {:ok, Path.join(real_parent, basename)}
-                error -> error
-              end
-
-            false ->
-              # Parent doesn't exist either - use lexical path
-              {:ok, abs_path}
-          end
+    with {:ok, real_root} <- resolve_path_via_parent(Path.expand(root_path)),
+         {:ok, resolved} <- resolve_candidate(abs_path) do
+      if resolved == real_root or String.starts_with?(resolved, real_root <> "/") do
+        {:ok, resolved}
+      else
+        {:error, :symlink_escapes_project}
       end
-
-    case real_path do
-      {:ok, resolved} ->
-        if resolved == real_root or String.starts_with?(resolved, real_root <> "/") do
-          {:ok, resolved}
-        else
-          {:error, :symlink_escapes_project}
-        end
-
-      {:error, _} = error ->
-        error
     end
   end
 
-  # Resolve path by resolving each component, following symlinks at each level
-  defp resolve_path_via_parent(path) do
-    parent = Path.dirname(path)
-    basename = Path.basename(path)
-
-    if parent == path do
-      # Root directory
-      {:ok, path}
+  # Resolves an existing path, or resolves its parent and appends the basename
+  # for paths that don't exist yet (e.g. new files being written).
+  defp resolve_candidate(abs_path) do
+    if File.exists?(abs_path) do
+      resolve_path_via_parent(abs_path)
     else
-      case resolve_path_via_parent(parent) do
-        {:ok, real_parent} ->
+      parent = Path.dirname(abs_path)
+      basename = Path.basename(abs_path)
+
+      if File.exists?(parent) do
+        case resolve_path_via_parent(parent) do
+          {:ok, real_parent} -> {:ok, Path.join(real_parent, basename)}
+          error -> error
+        end
+      else
+        {:ok, abs_path}
+      end
+    end
+  end
+
+  # Resolves each path component in order, following symlinks at each level.
+  # Uses a seen-set to detect symlink loops (same pattern as resolve_symlink_chain/2).
+  defp resolve_path_via_parent(path), do: resolve_path_via_parent(path, MapSet.new())
+
+  defp resolve_path_via_parent(path, seen) do
+    if MapSet.member?(seen, path) do
+      {:error, :symlink_loop}
+    else
+      parent = Path.dirname(path)
+      basename = Path.basename(path)
+
+      if parent == path do
+        {:ok, path}
+      else
+        with {:ok, real_parent} <- resolve_path_via_parent(parent, MapSet.put(seen, path)) do
           full_path = Path.join(real_parent, basename)
 
-          # Check if this component is a symlink
           case File.read_link(full_path) do
             {:ok, target} ->
               resolved =
@@ -196,23 +187,18 @@ defmodule EyeInTheSky.Projects.FileTree do
                   Path.expand(target, real_parent)
                 end
 
-              # Recursively resolve the target
-              resolve_path_via_parent(resolved)
+              resolve_path_via_parent(resolved, MapSet.put(seen, full_path))
 
             {:error, :einval} ->
-              # Not a symlink
               {:ok, full_path}
 
             {:error, :enoent} ->
-              # Doesn't exist - return the path anyway
               {:ok, full_path}
 
-            {:error, _} ->
-              {:ok, full_path}
+            {:error, reason} ->
+              {:error, reason}
           end
-
-        error ->
-          error
+        end
       end
     end
   end
@@ -224,80 +210,6 @@ defmodule EyeInTheSky.Projects.FileTree do
       {:error, :enoent} -> {:error, :file_not_found}
       {:error, :eacces} -> {:error, :permission_denied}
       {:error, _} -> {:error, :file_not_found}
-    end
-  end
-
-  defp check_symlink_safety(abs_path, root_path) do
-    case File.lstat(abs_path) do
-      {:ok, %{type: :symlink}} ->
-        resolve_symlink(abs_path, root_path)
-
-      {:ok, _} ->
-        {:ok, abs_path}
-
-      {:error, :enoent} ->
-        {:error, :file_not_found}
-
-      {:error, :eacces} ->
-        {:error, :permission_denied}
-
-      {:error, _} ->
-        {:error, :file_not_found}
-    end
-  end
-
-  defp resolve_symlink(abs_path, root_path) do
-    case resolve_symlink_chain(abs_path, MapSet.new()) do
-      {:ok, resolved} ->
-        root = Path.expand(root_path)
-
-        if String.starts_with?(resolved, root <> "/") do
-          {:ok, resolved}
-        else
-          {:error, :symlink_escapes_project}
-        end
-
-      {:error, _} = error ->
-        error
-    end
-  end
-
-  defp resolve_symlink_chain(path, seen) do
-    if MapSet.member?(seen, path) do
-      {:error, :symlink_loop}
-    else
-      case File.read_link(path) do
-        {:ok, target} ->
-          resolved =
-            if Path.type(target) == :absolute do
-              target
-            else
-              Path.expand(target, Path.dirname(path))
-            end
-
-          case File.lstat(resolved) do
-            {:ok, %{type: :symlink}} ->
-              resolve_symlink_chain(resolved, MapSet.put(seen, path))
-
-            {:ok, _} ->
-              {:ok, resolved}
-
-            {:error, :enoent} ->
-              {:error, :broken_symlink}
-
-            {:error, _} ->
-              {:error, :broken_symlink}
-          end
-
-        {:error, :einval} ->
-          {:ok, path}
-
-        {:error, :enoent} ->
-          {:error, :broken_symlink}
-
-        {:error, _} ->
-          {:error, :broken_symlink}
-      end
     end
   end
 

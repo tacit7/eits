@@ -42,14 +42,21 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>
         <div class="px-2.5 py-2.5 border-b border-base-content/8 flex-shrink-0 flex items-center gap-1">
           <%= if dual_page_section?(@active_section) do %>
-            <%!-- List: navigate to project route when available, otherwise toast --%>
+            <%!-- Project route link: kanban icon for tasks, list icon for others --%>
             <%= if project_route_for(@active_section, @sidebar_project) do %>
               <.link
                 navigate={project_route_for(@active_section, @sidebar_project)}
                 title={"#{@sidebar_project.name} #{section_label(@active_section)}"}
                 class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
               >
-                <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+                <%= if @active_section == :tasks do %>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2"/>
+                    <path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>
+                  </svg>
+                <% else %>
+                  <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+                <% end %>
               </.link>
             <% else %>
               <button
@@ -58,7 +65,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 title="Not available"
                 class="w-5 h-5 flex items-center justify-center rounded text-base-content/20 hover:text-base-content/40 hover:bg-base-content/5 transition-colors flex-shrink-0"
               >
-                <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+                <%= if @active_section == :tasks do %>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2"/>
+                    <path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>
+                  </svg>
+                <% else %>
+                  <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+                <% end %>
               </button>
             <% end %>
           <% end %>

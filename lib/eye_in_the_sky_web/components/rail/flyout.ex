@@ -305,25 +305,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp tasks_content(assigns) do
     ~H"""
-    <div class="px-3 pt-2 pb-1.5 border-b border-base-content/8 flex items-center gap-3">
-      <.link navigate="/tasks" class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors">All</.link>
-      <.link
-        navigate={if @sidebar_project, do: "/projects/#{@sidebar_project.id}/tasks", else: "/tasks"}
-        class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors"
-      >List</.link>
-      <%= if @sidebar_project do %>
-        <.link
-          navigate={"/projects/#{@sidebar_project.id}/kanban"}
-          class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors"
-        >Kanban</.link>
-      <% else %>
-        <span
-          class="text-xs text-base-content/20 cursor-default"
-          title="Select a project to view Kanban"
-        >Kanban</span>
-      <% end %>
-    </div>
-
     <div class="px-3 py-2 border-b border-base-content/8 flex items-center gap-2">
       <input
         type="text"

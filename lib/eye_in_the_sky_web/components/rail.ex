@@ -435,25 +435,30 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("file_expand", %{"path" => path}, socket) do
     project = socket.assigns.sidebar_project
-    expanded = MapSet.put(socket.assigns.flyout_file_expanded, path)
-    children_cache = socket.assigns.flyout_file_children
 
-    socket =
-      if Map.has_key?(children_cache, path) do
-        assign(socket, :flyout_file_expanded, expanded)
-      else
-        case FileTree.children(project.path, path) do
-          {:ok, nodes} ->
-            socket
-            |> assign(:flyout_file_expanded, expanded)
-            |> assign(:flyout_file_children, Map.put(children_cache, path, nodes))
+    if project && project.path do
+      expanded = MapSet.put(socket.assigns.flyout_file_expanded, path)
+      children_cache = socket.assigns.flyout_file_children
 
-          {:error, _} ->
-            assign(socket, :flyout_file_expanded, expanded)
+      socket =
+        if Map.has_key?(children_cache, path) do
+          assign(socket, :flyout_file_expanded, expanded)
+        else
+          case FileTree.children(project.path, path) do
+            {:ok, nodes} ->
+              socket
+              |> assign(:flyout_file_expanded, expanded)
+              |> assign(:flyout_file_children, Map.put(children_cache, path, nodes))
+
+            {:error, _} ->
+              assign(socket, :flyout_file_expanded, expanded)
+          end
         end
-      end
 
-    {:noreply, socket}
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("file_collapse", %{"path" => path}, socket) do

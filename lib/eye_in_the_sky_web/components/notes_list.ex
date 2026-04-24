@@ -13,12 +13,10 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
   attr :empty_id, :string, default: "notes-empty"
   attr :editing_note_id, :integer, default: nil
   attr :current_path, :string, default: "/notes"
-  attr :selected_ids, :any, default: nil
+  attr :selected_ids, :any, default: %MapSet{}
   attr :select_mode, :boolean, default: false
 
   def notes_list(assigns) do
-    assigns = assign_new(assigns, :selected_ids, fn -> MapSet.new() end)
-
     ~H"""
     <%!-- Filter controls --%>
     <div class="mb-5 flex flex-wrap items-center gap-2">

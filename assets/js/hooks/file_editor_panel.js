@@ -119,8 +119,11 @@ export const FileEditorPanelHook = {
       }])
 
       const heightTheme = EditorView.theme({
-        "&": { height: "100%" },
+        "&": { height: "100%", backgroundColor: "oklch(var(--b1))" },
         ".cm-scroller": { overflow: "auto" },
+        ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))" },
+        ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))" },
+        ".cm-activeLine": { backgroundColor: "oklch(var(--b3) / 0.4)" },
       })
 
       const state = EditorState.create({

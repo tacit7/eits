@@ -2,6 +2,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
+  # Max tasks shown in flat list view.
+  @list_limit 20
+  # Max tasks shown per section in kanban view (4 sections × 10 = 40 total,
+  # matching the 40-row fetch limit in load_flyout_tasks/3).
+  @kanban_per_section 10
+
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
   # This prevents the 236px panel from compressing content on first load.
@@ -272,6 +278,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :myself, :any, required: true
 
   defp tasks_content(assigns) do
+    assigns = assign(assigns, :list_tasks, Enum.take(assigns.tasks, @list_limit))
+
     ~H"""
     <%= if @filter_open do %>
       <div class="px-2 py-2 border-b border-base-content/8 bg-base-200/40">
@@ -286,7 +294,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <% end %>
 
     <%= if @tasks_view == :list do %>
-      <.task_row :for={t <- Enum.take(@tasks, 20)} task={t} />
+      <.task_row :for={t <- @list_tasks} task={t} />
       <%= if @tasks == [] do %>
         <% filtering = @task_search != "" or not is_nil(@state_filter) %>
         <div class="px-3 py-4 text-xs text-base-content/35 text-center">
@@ -309,27 +317,37 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :tasks, :list, required: true
 
   defp tasks_kanban(assigns) do
-    assigns = assign(assigns, :sections, @kanban_sections)
+    grouped = Enum.group_by(assigns.tasks, & &1.state_id)
+
+    sections =
+      Enum.map(@kanban_sections, fn {state_id, label, dot_class} ->
+        {state_id, label, dot_class, grouped |> Map.get(state_id, []) |> Enum.take(@kanban_per_section)}
+      end)
+
+    assigns = assign(assigns, :sections, sections)
 
     ~H"""
-    <%= for {state_id, label, dot_class} <- @sections do %>
-      <% section_tasks = @tasks |> Enum.filter(&(&1.state_id == state_id)) |> Enum.take(10) %>
-      <div class="mt-1">
-        <div class="flex items-center gap-1.5 px-3 py-1">
-          <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", dot_class]} />
-          <span class="text-[9px] font-semibold uppercase tracking-widest text-base-content/40">
-            {label}
-          </span>
-          <span class="ml-auto text-[9px] text-base-content/25">
-            {length(section_tasks)}
-          </span>
+    <%= if @tasks == [] do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No tasks</div>
+    <% else %>
+      <%= for {_state_id, label, dot_class, section_tasks} <- @sections do %>
+        <div class="mt-1">
+          <div class="flex items-center gap-1.5 px-3 py-1">
+            <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", dot_class]} />
+            <span class="text-[9px] font-semibold uppercase tracking-widest text-base-content/40">
+              {label}
+            </span>
+            <span class="ml-auto text-[9px] text-base-content/25">
+              {length(section_tasks)}
+            </span>
+          </div>
+          <%= if section_tasks == [] do %>
+            <div class="px-3 py-1 text-[10px] text-base-content/25 italic">empty</div>
+          <% else %>
+            <.task_row :for={t <- section_tasks} task={t} />
+          <% end %>
         </div>
-        <%= if section_tasks == [] do %>
-          <div class="px-3 py-1 text-[10px] text-base-content/25 italic">empty</div>
-        <% else %>
-          <.task_row :for={t <- section_tasks} task={t} />
-        <% end %>
-      </div>
+      <% end %>
     <% end %>
     """
   end
@@ -341,7 +359,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp task_state_option(assigns) do
     ~H"""
-    <% active = (@value == "all" and is_nil(@current)) or to_string(@current) == @value %>
+    <% active =
+      case @value do
+        "all" -> is_nil(@current)
+        v -> @current == String.to_integer(v)
+      end %>
     <button
       phx-click="set_task_state_filter"
       phx-value-state={@value}

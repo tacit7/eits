@@ -18,6 +18,8 @@
 
   $: if (content !== value && content !== undefined) {
     value = content
+  }
+  $: if (hash !== currentHash && hash !== undefined) {
     currentHash = hash
   }
 
@@ -108,20 +110,9 @@
     return exts
   }
 
-  onMount(async () => {
-    const appTheme = document.documentElement.dataset.theme || 'dark'
-    const ds = document.documentElement.dataset
-    const initSize = parseInt(ds.cmTabSize || '2', 10)
-    const initFont = ds.cmFontSize || '14'
-    const initVim = ds.cmVim === 'true'
-
-    tabSize = initSize
-    ;[langExtension, themeExtension, settingsExtensions] = await Promise.all([
-      loadLang(lang),
-      loadTheme(appTheme),
-      buildSettingsExtensions(initSize, initFont, initVim),
-    ])
-
+  onMount(() => {
+    // onMount must be sync — async would return a Promise instead of a cleanup fn
+    // and Svelte would skip listener teardown, leaking handlers across remounts.
     const onTheme = async ({ detail }) => {
       themeExtension = await loadTheme(detail.theme)
     }
@@ -146,6 +137,23 @@
     window.addEventListener('phx:apply_theme', onTheme)
     window.addEventListener('phx:apply_cm_settings', onCmSettings)
     window.addEventListener('keydown', onKeydown)
+
+    // Async init runs in the background; cleanup is registered synchronously above.
+    ;(async () => {
+      const appTheme = document.documentElement.dataset.theme || 'dark'
+      const ds = document.documentElement.dataset
+      const initSize = parseInt(ds.cmTabSize || '2', 10)
+      const initFont = ds.cmFontSize || '14'
+      const initVim = ds.cmVim === 'true'
+
+      tabSize = initSize
+      ;[langExtension, themeExtension, settingsExtensions] = await Promise.all([
+        loadLang(lang),
+        loadTheme(appTheme),
+        buildSettingsExtensions(initSize, initFont, initVim),
+      ])
+    })()
+
     return () => {
       window.removeEventListener('phx:apply_theme', onTheme)
       window.removeEventListener('phx:apply_cm_settings', onCmSettings)

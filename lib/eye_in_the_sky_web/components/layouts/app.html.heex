@@ -95,7 +95,7 @@
     <% sidebar_project = assigns[:sidebar_project] %>
     <% mobile_nav_tab = assigns[:mobile_nav_tab] || :sessions %>
     <% notes_href =
-      if sidebar_project, do: ~p"/projects/#{sidebar_project.id}/notes", else: ~p"/notes" %>
+      if sidebar_project, do: ~p"/projects/#{sidebar_project.id}/notes", else: ~p"/" %>
     <% project_href =
       if sidebar_project, do: ~p"/projects/#{sidebar_project.id}", else: ~p"/" %>
     <nav
@@ -118,7 +118,7 @@
           <.icon name="hero-cpu-chip" class="w-5 h-5 mb-0.5" /> Sessions
         </.link>
         <.link
-          navigate={~p"/tasks"}
+          navigate={~p"/"}
           aria-label="Tasks"
           aria-current={if mobile_nav_tab == :tasks, do: "page"}
           class={[

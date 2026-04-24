@@ -81,10 +81,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
     do: ~p"/dm/#{id}"
 
   defp resource_link(%{resource_type: "job_run", resource_id: _id}),
-    do: ~p"/jobs"
+    do: ~p"/"
 
   defp resource_link(%{resource_type: "task", resource_id: id}) when is_binary(id),
-    do: ~p"/tasks"
+    do: ~p"/"
 
   defp resource_link(_), do: nil
 

@@ -1,23 +1,26 @@
-defmodule EyeInTheSkyWeb.TeamLive.Index do
+defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.{Notes, Tasks, Teams}
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(%{"id" => _} = params, _session, socket) do
     if connected?(socket) do
       EyeInTheSky.Events.subscribe_teams()
     end
 
+    socket = mount_project(socket, params, sidebar_tab: :teams, page_title_prefix: "Teams")
+
+    show_all = false
+
     {:ok,
      socket
-     |> assign(:page_title, "Teams")
-     |> assign(:sidebar_tab, :teams)
-     |> assign(:sidebar_project, nil)
      |> assign(:show_archived, false)
      |> assign(:search_query, "")
-     |> assign(:teams, if(connected?(socket), do: load_teams(false), else: []))
+     |> assign(:show_all, show_all)
+     |> assign(:teams, if(connected?(socket), do: load_teams(socket, false, show_all), else: []))
      |> assign(:selected_team_id, nil)
      |> assign(:selected_team, nil)
      |> assign(:mobile_view, :list)
@@ -25,11 +28,22 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
   end
 
   @impl true
+  def handle_params(%{"show_all" => "true"} = _params, _uri, socket) do
+    teams = load_teams(socket, socket.assigns.show_archived, true)
+    {:noreply, socket |> assign(:show_all, true) |> assign(:teams, teams)}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    teams = load_teams(socket, socket.assigns.show_archived, false)
+    {:noreply, socket |> assign(:show_all, false) |> assign(:teams, teams)}
+  end
+
+  @impl true
   def handle_info({event, _payload}, socket)
       when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left] do
     {:noreply,
      socket
-     |> assign(:teams, load_teams(socket.assigns.show_archived))
+     |> assign(:teams, load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all))
      |> maybe_refresh_selected_team()}
   end
 
@@ -49,7 +63,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
       socket =
         socket
-        |> assign(:teams, load_teams(socket.assigns.show_archived))
+        |> assign(:teams, load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all))
         |> maybe_close_if_deleted(team.id)
 
       {:noreply, socket}
@@ -104,7 +118,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
     {:noreply,
      socket
      |> assign(:show_archived, show_archived)
-     |> assign(:teams, load_teams(show_archived))}
+     |> assign(:teams, load_teams(socket, show_archived, socket.assigns.show_all))}
   end
 
   @impl true
@@ -136,19 +150,38 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
             <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
               {length(@filtered_teams)} teams
+              <%= if @show_all do %>
+                <span class="ml-1 text-primary">(all projects)</span>
+              <% end %>
             </span>
-            <button
-              phx-click="toggle_archived"
-              class={[
-                "text-xs font-medium px-2 py-1 rounded transition-colors min-h-[44px] inline-flex items-center",
-                if(@show_archived,
-                  do: "bg-base-content/10 text-base-content/60",
-                  else: "text-base-content/30 hover:text-base-content/50"
-                )
-              ]}
-            >
-              {if @show_archived, do: "Hide archived", else: "Show archived"}
-            </button>
+            <div class="flex items-center gap-2">
+              <%= if @project do %>
+                <.link
+                  navigate={~p"/projects/#{@project.id}/teams?show_all=true"}
+                  class={[
+                    "text-xs font-medium px-2 py-1 rounded transition-colors min-h-[44px] inline-flex items-center",
+                    if(@show_all,
+                      do: "bg-base-content/10 text-base-content/60",
+                      else: "text-base-content/30 hover:text-base-content/50"
+                    )
+                  ]}
+                >
+                  {if @show_all, do: "Showing all", else: "Show all projects"}
+                </.link>
+              <% end %>
+              <button
+                phx-click="toggle_archived"
+                class={[
+                  "text-xs font-medium px-2 py-1 rounded transition-colors min-h-[44px] inline-flex items-center",
+                  if(@show_archived,
+                    do: "bg-base-content/10 text-base-content/60",
+                    else: "text-base-content/30 hover:text-base-content/50"
+                  )
+                ]}
+              >
+                {if @show_archived, do: "Hide archived", else: "Show archived"}
+              </button>
+            </div>
           </div>
 
           <%!-- Teams list --%>
@@ -233,12 +266,18 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
     """
   end
 
-  defp load_teams(show_archived) do
-    if show_archived do
-      Teams.list_teams(status: "archived")
-    else
-      Teams.list_teams()
-    end
+  defp load_teams(socket, show_archived, show_all) do
+    project_id =
+      if show_all, do: nil, else: socket.assigns[:project_id]
+
+    opts =
+      if show_archived,
+        do: [status: "archived"],
+        else: []
+
+    opts = if project_id, do: Keyword.put(opts, :project_id, project_id), else: opts
+
+    Teams.list_teams(opts)
   end
 
   defp load_team_detail(team) do
@@ -248,7 +287,6 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
       Tasks.list_tasks_for_team_with_sessions(team.id)
       |> Notes.with_notes_count()
 
-    # Group tasks by which member session owns them
     member_session_ids = Enum.map(team.members, & &1.session_id) |> MapSet.new()
 
     tasks_by_session =

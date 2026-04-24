@@ -133,30 +133,26 @@ defmodule EyeInTheSkyWeb.Router do
       live "/canvases", CanvasLive, :index
       live "/canvases/:id", CanvasLive, :show
       live "/", AgentLive.Index, :index
-      live "/notes", OverviewLive.Notes, :index
-      live "/tasks", OverviewLive.Tasks, :index
       live "/usage", OverviewLive.Usage, :index
       live "/skills", OverviewLive.Skills, :index
       live "/config", OverviewLive.Config, :index
-      live "/jobs", OverviewLive.Jobs, :index
       live "/notifications", OverviewLive.Notifications, :index
       live "/settings", OverviewLive.Settings, :index
       live "/sessions", ProjectLive.Sessions, :index
-      live "/prompts", PromptLive.Index, :index
-      live "/prompts/new", PromptLive.New, :new
-      live "/prompts/:id", PromptLive.Show, :show
       live "/projects/:id", ProjectLive.Show, :show
       live "/projects/:id/sessions", ProjectLive.Sessions, :show
       live "/projects/:id/prompts", ProjectLive.Prompts, :show
+      live "/projects/:id/prompts/new", ProjectLive.PromptNew, :new
+      live "/projects/:id/prompts/:prompt_id", ProjectLive.PromptShow, :show
       live "/projects/:id/tasks", ProjectLive.Tasks, :show
       live "/projects/:id/kanban", ProjectLive.Kanban, :show
       live "/projects/:id/notes", ProjectLive.Notes, :show
       live "/projects/:id/files", ProjectLive.Files, :show
       live "/projects/:id/agents", ProjectLive.Agents, :show
       live "/projects/:id/jobs", ProjectLive.Jobs, :show
+      live "/projects/:id/teams", ProjectLive.Teams, :index
       live "/projects/:id/config", ProjectLive.Config, :show
       live "/mockup", MockupLive, :index
-      live "/teams", TeamLive.Index, :index
       live "/dm/:session_id", DmLive, :show
       live "/notes/new", NoteLive.New, :new
       live "/notes/:id/edit", NoteLive.Edit, :edit

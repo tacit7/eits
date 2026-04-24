@@ -261,6 +261,12 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                 label="Jobs"
                 active={@sidebar_tab == :jobs}
               />
+              <.panel_nav_item
+                href={~p"/projects/#{@sidebar_project.id}/teams"}
+                icon="hero-user-group"
+                label="Teams"
+                active={@sidebar_tab == :teams}
+              />
             </div>
           <% end %>
         </div>

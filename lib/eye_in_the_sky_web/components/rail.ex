@@ -774,15 +774,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         )
       ]}
     >
-      <%= if @icon == "lucide-robot" do %>
-        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 8V4H8"/>
-          <rect width="16" height="12" x="4" y="8" rx="2"/>
-          <path d="M2 14h2"/>
-          <path d="M20 14h2"/>
-          <path d="M15 13v2"/>
-          <path d="M9 13v2"/>
-        </svg>
+      <%= if String.starts_with?(@icon, "lucide-") do %>
+        <.custom_icon name={@icon} class="w-4 h-4" />
       <% else %>
         <.icon name={@icon} class="w-4 h-4" />
       <% end %>

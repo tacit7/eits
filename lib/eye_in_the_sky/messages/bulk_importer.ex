@@ -192,9 +192,10 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       # check misses, and find_unlinked_import_candidate requires
       # source_uuid IS NULL so it also misses, causing a second insert with
       # the JSONL UUID. Skip when a recent agent message with the same body
-      # already exists. Use a 120 s window — long enough to cover the
-      # AgentWorker → agent_stopped → BulkImporter race, short enough to
-      # never false-positive on legitimately repeated agent output.
+      # already exists. 30 s covers the AgentWorker → agent_stopped →
+      # BulkImporter pipeline (typically < 10 s) while keeping the false-
+      # positive window tight enough that repeated identical agent output
+      # in normal conversation is not dropped.
       msg.role != "user" and
           not Keyword.get(import_opts, :importing_from_file?, false) and
           agent_reply_already_recorded?(session_id, msg.content) ->
@@ -254,11 +255,11 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   # record_incoming_reply (AgentWorker on_result_received). That path stores
   # the SDK result UUID as source_uuid, which differs from the per-message
   # JSONL UUID that BulkImporter uses, so the fast-path UUID set check always
-  # misses. A 120 s window covers the AgentWorker → agent_stopped →
-  # BulkImporter pipeline without false-positiving on legitimately repeated
-  # agent output.
+  # misses. A 30 s window covers the AgentWorker → agent_stopped →
+  # BulkImporter pipeline (typically < 10 s) while keeping the false-positive
+  # surface small.
   defp agent_reply_already_recorded?(session_id, body) do
-    case Messages.find_recent_dm(session_id, body, seconds: 120) do
+    case Messages.find_recent_dm(session_id, body, seconds: 30) do
       nil -> false
       _msg -> true
     end

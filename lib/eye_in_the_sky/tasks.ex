@@ -309,9 +309,10 @@ defmodule EyeInTheSky.Tasks do
       ordered_uuids
       |> Enum.with_index(1)
       |> Enum.reduce({[], []}, fn {uuid, pos}, {phs, params} ->
-        base = 2 + length(params)
-        {phs ++ ["($#{base}, $#{base + 1})"], params ++ [uuid, pos]}
+        base = 2 * pos
+        {["($#{base}, $#{base + 1})" | phs], [uuid, pos | params]}
       end)
+      |> then(fn {phs, params} -> {Enum.reverse(phs), Enum.reverse(params)} end)
 
     sql = """
     UPDATE tasks

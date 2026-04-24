@@ -40,8 +40,51 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       ]}
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>
-        <div class="px-3.5 py-3 border-b border-base-content/8 flex-shrink-0 flex items-center justify-between">
-          <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40">
+        <div class="px-2.5 py-2.5 border-b border-base-content/8 flex-shrink-0 flex items-center gap-1">
+          <%= if dual_page_section?(@active_section) do %>
+            <%!-- Globe: navigate to global route --%>
+            <.link
+              navigate={global_route_for(@active_section)}
+              title={"All #{section_label(@active_section)}"}
+              class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+                <path d="M2 12h20" />
+              </svg>
+            </.link>
+            <%!-- List: navigate to project route when available, otherwise toast --%>
+            <%= if project_route_for(@active_section, @sidebar_project) do %>
+              <.link
+                navigate={project_route_for(@active_section, @sidebar_project)}
+                title={"#{@sidebar_project.name} #{section_label(@active_section)}"}
+                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+              >
+                <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+              </.link>
+            <% else %>
+              <button
+                phx-click="not_implemented"
+                phx-target={@myself}
+                title="Not available"
+                class="w-5 h-5 flex items-center justify-center rounded text-base-content/20 hover:text-base-content/40 hover:bg-base-content/5 transition-colors flex-shrink-0"
+              >
+                <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+              </button>
+            <% end %>
+          <% end %>
+          <span class="flex-1 text-[10px] font-semibold uppercase tracking-widest text-base-content/40 truncate">
             {section_label(@active_section)}
           </span>
           <%= if @active_section == :sessions do %>
@@ -51,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 phx-value-project_id={@sidebar_project.id}
                 phx-target={@myself}
                 title={"New session in #{@sidebar_project.name}"}
-                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
               >
                 <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
               </button>
@@ -60,7 +103,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 phx-click="toggle_new_session_form"
                 phx-target={@myself}
                 title="New agent"
-                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
               >
                 <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
               </button>
@@ -612,6 +655,28 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp section_label(:usage), do: "Usage"
   defp section_label(:jobs), do: "Jobs"
   defp section_label(_), do: "Navigation"
+
+  # Sections that have both a global page and a project-scoped page.
+  # These get the globe + list icon header treatment.
+  defp dual_page_section?(section),
+    do: section in [:sessions, :tasks, :prompts, :notes, :skills, :jobs]
+
+  defp global_route_for(:sessions), do: "/sessions"
+  defp global_route_for(:tasks), do: "/tasks"
+  defp global_route_for(:prompts), do: "/prompts"
+  defp global_route_for(:notes), do: "/notes"
+  defp global_route_for(:skills), do: "/skills"
+  defp global_route_for(:jobs), do: "/jobs"
+  defp global_route_for(_), do: "/"
+
+  # Returns the project-scoped route for a section, or nil if none exists
+  # or no project is selected.
+  defp project_route_for(:sessions, %{id: id}), do: "/projects/#{id}/sessions"
+  defp project_route_for(:tasks, %{id: id}), do: "/projects/#{id}/kanban"
+  defp project_route_for(:prompts, %{id: id}), do: "/projects/#{id}/prompts"
+  defp project_route_for(:notes, %{id: id}), do: "/projects/#{id}/notes"
+  defp project_route_for(:jobs, %{id: id}), do: "/projects/#{id}/jobs"
+  defp project_route_for(_, _), do: nil
 
   defp status_dot_class("working"), do: "bg-green-500"
   defp status_dot_class("waiting"), do: "bg-amber-400"

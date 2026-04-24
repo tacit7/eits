@@ -69,7 +69,7 @@ eits sessions tasks <uuid>     # List tasks linked to session
 eits sessions notes <uuid>     # List notes attached to session
 ```
 
-`--status` filters by session status: `working`, `stopped`, `waiting`, `completed`, `failed`.
+`--status` filters by session status: `working`, `idle`, `waiting`, `completed`, `failed`.
 
 `--mine` is mutually exclusive with `--agent`, `--search`, `--status`, `--project`.
 
@@ -102,8 +102,11 @@ eits tasks begin --title <t> [--description <d>] [--project <id>] \
   [--priority <p>] [--quiet|-q]
 
 # Update
-eits tasks update <id> [--state <id>|--state-name <done|start|in-progress|in-review|todo>] \
+eits tasks update <id> [--state <id>|--state-name <done|start|progress|in-progress|in-review|todo>] \
   [--priority <p>] [--title <t>] [--description <d>] [--due-at <ISO8601>]
+
+# Bulk update
+eits tasks bulk-update --ids <id,...> [--state <id>] [--priority <p>] [--title <t>]
 
 # State shorthands (canonical)
 eits tasks claim <id>          # → In Progress (state 2), transfers session ownership to claimer (preferred)
@@ -136,6 +139,9 @@ eits tasks sessions <id>
 
 # Tag a task
 eits tasks tag <task_id> <tag_id>
+
+# List workflow states
+eits tasks states
 ```
 
 ### Workflow states
@@ -151,6 +157,7 @@ eits tasks tag <task_id> <tag_id>
 
 ```bash
 # Pick up work (create + start in one shot)
+# Note: begin deduplicates — won't create duplicate in-progress tasks with the same title for this session
 eits tasks begin --title "Implement X"
 
 # Or start existing task
@@ -162,6 +169,19 @@ eits tasks update 42 --state-name in-review
 # Complete with summary
 eits tasks complete 42 "Implemented via migration + controller change"
 ```
+
+---
+
+## queue
+
+```bash
+eits queue status                 # Print pending annotation count + per-task summary
+
+eits queue flush                  # Replay ~/.eits/pending-annotations.log, drop successes, keep failures
+                                  # Exits non-zero if anything remains
+```
+
+When `eits tasks annotate` encounters persistent HTTP 429 (rate limited) errors, the annotation is queued to `~/.eits/pending-annotations.log` (JSONL format). Use `queue status` to see what's pending, and `queue flush` to retry all pending annotations.
 
 ---
 
@@ -215,7 +235,7 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
   [--stash-if-dirty] \
   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>] \
   [--team-name <name>] [--member-name <alias>] [--agent <name>] \
-  [--name <session-name>] [--yolo]
+  [--name <session-name>] [--yolo] [--dry-run]
 ```
 
 **Instructions**: `--instructions <text>` or `--instructions-file <path>` (required, mutually exclusive). `--instructions-file` reads instructions from a file — useful for large payloads that break shell escaping.
@@ -229,6 +249,8 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 **Sandbox**: `--yolo` bypasses sandbox restrictions. `--provider codex` defaults `bypass_sandbox` to true (can be overridden with explicit flags if needed).
 
 **Session linking**: `--parent-session-id` accepts integer session ID or UUID, linking the spawned agent's session to a parent.
+
+**Pre-flight validation**: `--dry-run` validates inputs without hitting the spawn endpoint. Validates team exists (if `--team-name` provided), parent session exists (if `--parent-session-id` provided), and instructions file is readable (if `--instructions-file` provided). Prints the fully-resolved curl command that would be sent. Exits 0 on success, 1 on any validation failure.
 
 ---
 
@@ -357,7 +379,7 @@ eits teams members <id>
 eits teams join <team_id> --name <alias> [--role <member|admin>] \
   [--session <uuid|id>] [--agent <uuid>]
 
-eits teams status <id> [--summary|-s]          # --summary prints human-readable summary
+eits teams status <id> [--summary|-s] [--wait]  # --wait blocks until all members done/spawn_failed
 
 eits teams update-member <team_id> <member_id> --status <s>
 
@@ -374,6 +396,8 @@ eits teams my-teams                            # List teams where current agent 
 
 `teams status --summary` prints a concise human-readable status showing member counts by state (working, idle, done, failed, spawn_failed).
 
+`--wait` blocks until all members reach a terminal state (done or spawn_failed), polling every 5 seconds. Exits 0 on success, 1 if any spawn_failed.
+
 ### Status Fields Explained
 
 Each team member has two status fields:
@@ -381,11 +405,15 @@ Each team member has two status fields:
 | Field | Description | Authoritative for |
 |-------|-------------|-------------------|
 | `member_status` | Team membership state: `active`, `done`, `spawn_failed`, `idle` | Orchestrators checking work completion |
-| `session_status` | Claude process lifecycle: `working`, `stopped`, `waiting`, `completed`, `failed` | Monitoring Claude Code process state |
+| `session_status` | Claude process lifecycle: `working`, `idle`, `waiting`, `completed`, `failed` | Monitoring Claude Code process state |
+| `session_uuid` | UUID of the agent's session (use with `eits dm --to`) | DM targeting |
+| `session_id` | Numeric session ID (alternative for `eits dm --to`) | DM targeting |
 
 **Orchestrators should check `member_status`** to know if an agent has finished its work. `session_status` reflects the Claude Code process and can lag behind — an agent that calls `eits tasks complete` will have `member_status: done` immediately, but `session_status` may still show `working` until the session ends.
 
 **`spawn_failed`** in `member_status` means the spawn API returned an error for that team member slot. The member record exists with no linked session or agent.
+
+**DM targeting**: Use `session_uuid` or `session_id` from `teams status --summary` output to send messages: `eits dm --to <uuid|id> --message "..."`. Both UUID and numeric ID are accepted by `dm --to`.
 
 ---
 

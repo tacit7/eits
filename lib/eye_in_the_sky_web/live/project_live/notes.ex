@@ -11,7 +11,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   def mount(%{"id" => _} = params, _session, socket) do
     socket =
       socket
-      |> mount_project(params, sidebar_tab: :notes, page_title_prefix: "Notes", preload: [:agents])
+      |> mount_project(params,
+        sidebar_tab: :notes,
+        page_title_prefix: "Notes",
+        preload: [:agents]
+      )
       |> assign(:search_query, "")
       |> assign(:starred_filter, false)
       |> assign(:notes_sort_by, "newest")
@@ -142,9 +146,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     notes =
       if show_all do
         if String.trim(query) != "" do
-          Notes.search_notes(query, [],
-            starred: socket.assigns.starred_filter
-          )
+          Notes.search_notes(query, [], starred: socket.assigns.starred_filter)
         else
           Notes.list_notes_filtered(
             starred: socket.assigns.starred_filter,
@@ -153,7 +155,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           )
         end
       else
-        agent_ids = if project && Map.has_key?(project, :agents), do: Enum.map(project.agents, & &1.id), else: []
+        agent_ids =
+          if project && Map.has_key?(project, :agents),
+            do: Enum.map(project.agents, & &1.id),
+            else: []
 
         if String.trim(query) != "" do
           Notes.search_notes(query, agent_ids,
@@ -180,12 +185,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="max-w-4xl mx-auto">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div>
-            <h1 class="text-lg font-semibold text-base-content/90">Notes</h1>
-            <p class="text-xs text-base-content/50 mt-0.5">
-              Notes captured by agents in this project
-            </p>
-          </div>
           <div class="flex items-center gap-2">
             <button
               type="button"

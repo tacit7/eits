@@ -31,13 +31,6 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       <div class="max-w-4xl mx-auto">
         <%!-- Toolbar --%>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
-          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-            <%= if @has_more do %>
-              {min(@visible_count, length(@agents))} of {length(@agents)} sessions
-            <% else %>
-              {length(@agents)} sessions
-            <% end %>
-          </span>
           <%!-- Mobile action bar (desktop uses top bar) --%>
           <div class="flex md:hidden items-center gap-2">
             <button

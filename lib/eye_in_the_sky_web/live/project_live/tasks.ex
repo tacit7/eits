@@ -214,17 +214,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           sort_by={@sort_by}
         />
 
-        <%!-- Task count --%>
-        <div class="mb-3">
-          <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-            <%= if @has_more do %>
-              {@task_count} of {@total_tasks} tasks
-            <% else %>
-              {@total_tasks} tasks
-            <% end %>
-          </span>
-        </div>
-
         <%= if @task_count > 0 do %>
           <div
             id="project-tasks-list"

@@ -71,7 +71,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           type="checkbox"
           checked={MapSet.size(@selected_ids) == length(@notes)}
           phx-click="toggle_select_all_notes"
-          class="checkbox checkbox-xs checkbox-primary"
+          class="checkbox checkbox-sm checkbox-primary"
           aria-label="Select all notes"
         />
         <%= if MapSet.size(@selected_ids) > 0 do %>
@@ -119,7 +119,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 checked={MapSet.member?(@selected_ids, to_string(note.id))}
                 phx-click="toggle_select_note"
                 phx-value-note_id={note.id}
-                class="checkbox checkbox-xs checkbox-primary"
+                class="checkbox checkbox-sm checkbox-primary"
                 aria-label={"Select note #{note.id}"}
               />
             </div>

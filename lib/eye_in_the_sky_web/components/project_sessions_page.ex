@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
               class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/40 hover:text-base-content/70 h-11 px-1 transition-colors"
               phx-click="enter_select_mode"
             >
-              <input type="checkbox" class="checkbox checkbox-xs checkbox-primary pointer-events-none" />
+              <input type="checkbox" class="checkbox checkbox-sm checkbox-primary pointer-events-none" />
               Select
             </label>
             <button

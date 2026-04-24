@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           checked={@selected}
           phx-click="toggle_select_task"
           phx-value-task_id={@task.uuid || to_string(@task.id)}
-          class="checkbox checkbox-xs checkbox-primary"
+          class="checkbox checkbox-sm checkbox-primary"
           aria-label={"Select task #{@task.title}"}
         />
       </div>

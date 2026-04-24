@@ -74,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         type="checkbox"
         checked={MapSet.size(@selected_ids) == length(@agents)}
         phx-click="toggle_select_all"
-        class="checkbox checkbox-xs checkbox-primary"
+        class="checkbox checkbox-sm checkbox-primary"
         aria-label="Select all sessions"
       />
       <%= if MapSet.size(@selected_ids) > 0 do %>

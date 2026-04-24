@@ -259,7 +259,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/50 hover:text-base-content/70 h-11 px-1"
             phx-click="enter_select_mode_tasks"
           >
-            <input type="checkbox" class="checkbox checkbox-xs checkbox-primary pointer-events-none" />
+            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary pointer-events-none" />
             Select
           </label>
           <button
@@ -301,7 +301,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
                 type="checkbox"
                 checked={MapSet.size(@selected_task_ids) == @task_count}
                 phx-click="toggle_select_all_tasks"
-                class="checkbox checkbox-xs checkbox-primary"
+                class="checkbox checkbox-sm checkbox-primary"
                 aria-label="Select all tasks"
               />
               <%= if MapSet.size(@selected_task_ids) > 0 do %>

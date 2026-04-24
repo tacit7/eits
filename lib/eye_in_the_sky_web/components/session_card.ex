@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             checked={@selected}
             phx-click="toggle_select"
             phx-value-id={@session.id}
-            class="checkbox checkbox-xs checkbox-primary"
+            class="checkbox checkbox-sm checkbox-primary"
             aria-label={"Select session #{@session.name || @session.id}"}
           />
         </div>

@@ -336,6 +336,7 @@ defmodule EyeInTheSkyWeb.Layouts do
   end
 
   defp top_bar_section_label(:dm), do: "Session"
+  defp top_bar_section_label(:agents), do: "Agents"
   defp top_bar_section_label(:sessions), do: "Sessions"
   defp top_bar_section_label(:overview), do: "Sessions"
   defp top_bar_section_label(:tasks), do: "Tasks"

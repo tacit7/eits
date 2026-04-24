@@ -24,6 +24,14 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <div class="mb-5 flex flex-wrap items-center gap-2">
       <div class="flex items-center gap-2">
         <button
+          :if={!@select_mode && @notes != []}
+          type="button"
+          phx-click="enter_select_mode_notes"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium min-h-[44px] text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40 transition-all duration-150"
+        >
+          <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" /> Select
+        </button>
+        <button
           type="button"
           phx-click="toggle_starred_filter"
           class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 min-h-[44px] min-w-[44px] " <>

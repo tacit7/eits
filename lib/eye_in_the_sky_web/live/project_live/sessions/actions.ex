@@ -123,6 +123,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     {:noreply, socket}
   end
 
+  def enter_select_mode(_params, socket) do
+    {:noreply, assign(socket, :select_mode, true)}
+  end
+
   def toggle_select_all(_params, socket) do
     all_ids = MapSet.new(socket.assigns.agents, &to_string(&1.id))
 

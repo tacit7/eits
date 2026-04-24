@@ -139,6 +139,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   end
 
   @impl true
+  def handle_event("enter_select_mode_notes", _params, socket) do
+    {:noreply, assign(socket, :notes_select_mode, true)}
+  end
+
+  @impl true
   def handle_event("edit_note", %{"note_id" => note_id}, socket) do
     case parse_id(note_id) do
       nil -> {:noreply, socket}
@@ -243,7 +248,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         end
       end
 
-    assign(socket, :notes, notes)
+    socket
+    |> assign(:notes, notes)
+    |> assign(:selected_note_ids, MapSet.new())
+    |> assign(:notes_select_mode, false)
   end
 
   @impl true

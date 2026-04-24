@@ -15,6 +15,7 @@
   let tabSize = 2
   let value = content
   let currentHash = hash
+  let loadError = null
 
   $: if (content !== value && content !== undefined) {
     value = content
@@ -114,7 +115,7 @@
     // onMount must be sync — async would return a Promise instead of a cleanup fn
     // and Svelte would skip listener teardown, leaking handlers across remounts.
     const onTheme = async ({ detail }) => {
-      themeExtension = await loadTheme(detail.theme)
+      try { themeExtension = await loadTheme(detail.theme) } catch (_) {}
     }
 
     const onCmSettings = async ({ detail }) => {
@@ -147,11 +148,20 @@
       const initVim = ds.cmVim === 'true'
 
       tabSize = initSize
-      ;[langExtension, themeExtension, settingsExtensions] = await Promise.all([
-        loadLang(lang),
-        loadTheme(appTheme),
-        buildSettingsExtensions(initSize, initFont, initVim),
-      ])
+      try {
+        ;[langExtension, themeExtension, settingsExtensions] = await Promise.all([
+          loadLang(lang),
+          loadTheme(appTheme),
+          buildSettingsExtensions(initSize, initFont, initVim),
+        ])
+      } catch (err) {
+        console.error('FileEditor: failed to load CodeMirror extensions:', err)
+        loadError = 'Editor failed to load. Try refreshing.'
+        // Attempt minimal fallback so the editor still renders
+        try { themeExtension = await loadTheme('dark') } catch (_) { themeExtension = null }
+        langExtension = null
+        settingsExtensions = []
+      }
     })()
 
     return () => {
@@ -173,7 +183,12 @@
   }
 </script>
 
-<div class="h-full overflow-hidden">
+<div class="h-full overflow-hidden flex flex-col">
+  {#if loadError}
+    <div class="text-xs text-error px-3 py-1 bg-base-200 border-b border-base-300 shrink-0">
+      {loadError}
+    </div>
+  {/if}
   {#if langExtension !== undefined && themeExtension !== undefined}
     <CodeMirror
       value={content}
@@ -185,7 +200,7 @@
       lineNumbers={true}
       useTab={true}
       styles={{
-        "&": { height: "100%", backgroundColor: "oklch(var(--b1))" },
+        "&": { height: "100%", flex: "1 1 0%", minHeight: "0", backgroundColor: "oklch(var(--b1))" },
         ".cm-scroller": { overflow: "auto" },
         ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))" },
         ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))" },

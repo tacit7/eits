@@ -11,21 +11,21 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
   import EyeInTheSkyWeb.Components.SessionCard
   import EyeInTheSkyWeb.Components.AgentList, only: [session_row_menu: 1]
 
-  @doc "Bulk-action toolbar shown in archived view."
-  attr :session_filter, :string, required: true
+  @doc "Bulk-action toolbar shown when select mode is active."
+  attr :select_mode, :boolean, required: true
   attr :agents, :list, required: true
   attr :selected_ids, :any, required: true
 
   def selection_toolbar(assigns) do
     ~H"""
-    <%= if @session_filter == "archived" && @agents != [] do %>
+    <%= if @select_mode && @agents != [] do %>
       <div class="mt-2 flex items-center gap-3 px-2 py-1.5">
         <input
           type="checkbox"
           checked={MapSet.size(@selected_ids) == length(@agents) && @agents != []}
           phx-click="toggle_select_all"
           class="checkbox checkbox-xs checkbox-primary"
-          aria-label="Select all archived sessions"
+          aria-label="Select all sessions"
         />
         <%= if MapSet.size(@selected_ids) > 0 do %>
           <span class="text-[11px] text-base-content/50 font-medium">
@@ -38,8 +38,15 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
             <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
           </button>
         <% else %>
-          <span class="text-[11px] text-base-content/30">{length(@agents)} archived</span>
+          <span class="text-[11px] text-base-content/30">{length(@agents)} sessions</span>
         <% end %>
+        <button
+          phx-click="exit_select_mode"
+          class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+          aria-label="Exit select mode"
+        >
+          <.icon name="hero-x-mark" class="w-4 h-4" />
+        </button>
       </div>
     <% end %>
     """
@@ -50,6 +57,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
   attr :streams, :any, required: true
   attr :depths, :map, required: true
   attr :session_filter, :string, required: true
+  attr :select_mode, :boolean, default: false
   attr :selected_ids, :any, required: true
   attr :editing_session_id, :any, required: true
   attr :search_query, :string, required: true
@@ -88,7 +96,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
           >
             <.session_row
               session={agent}
-              select_mode={@session_filter == "archived"}
+              select_mode={@select_mode}
               selected={MapSet.member?(@selected_ids, to_string(agent.id))}
               editing_session_id={@editing_session_id}
               project_name={if @scope == :all, do: Map.get(agent, :project_name), else: nil}

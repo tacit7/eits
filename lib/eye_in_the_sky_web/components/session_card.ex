@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
 
   ## Attrs
     * `:session` - Session struct with :agent preloaded
-    * `:select_mode` - Show checkbox instead of status dot (archive mode)
+    * `:select_mode` - Whether bulk-select mode is active (checkboxes always visible)
     * `:selected` - Whether this row is checked
   ## Slots
     * `:actions` - Action buttons rendered on the right side
@@ -46,27 +46,28 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       <%!-- Row content --%>
       <div
         class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer relative"
-        phx-click={if !@select_mode, do: @click_event}
+        phx-click={if @select_mode, do: "toggle_select", else: @click_event}
         phx-value-id={@session.id}
         role="button"
         tabindex="0"
-        phx-keyup={@click_event}
+        phx-keyup={if !@select_mode, do: @click_event}
         phx-key="Enter"
         aria-label={"Open session: #{@session.name || "Unnamed session"} - #{@status_label}"}
       >
-        <%!-- Select checkbox (archive mode only) --%>
-        <%= if @select_mode do %>
-          <div class="flex-shrink-0 w-6 flex justify-center">
-            <input
-              type="checkbox"
-              checked={@selected}
-              phx-click="toggle_select"
-              phx-value-id={@session.id}
-              class="checkbox checkbox-xs checkbox-primary"
-              aria-label={"Select session #{@session.name || @session.id}"}
-            />
-          </div>
-        <% end %>
+        <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
+        <div class={[
+          "flex-shrink-0 w-6 flex justify-center",
+          if(@select_mode, do: "", else: "hidden group-hover:flex")
+        ]}>
+          <input
+            type="checkbox"
+            checked={@selected}
+            phx-click="toggle_select"
+            phx-value-id={@session.id}
+            class="checkbox checkbox-xs checkbox-primary"
+            aria-label={"Select session #{@session.name || @session.id}"}
+          />
+        </div>
 
         <%!-- Main content --%>
         <div class="flex-1 min-w-0">

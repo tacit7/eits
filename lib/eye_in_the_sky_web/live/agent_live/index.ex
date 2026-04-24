@@ -34,6 +34,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
       |> assign(:sidebar_project, nil)
       |> assign(:top_bar_cta, %{label: "New Session", event: "toggle_new_session_drawer"})
       |> assign(:selected_ids, MapSet.new())
+      |> assign(:select_mode, false)
       |> assign(:show_delete_confirm, false)
       |> assign(:editing_session_id, nil)
       |> assign(:canvases, [])
@@ -98,6 +99,10 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   @impl true
   def handle_event("delete_selected", params, socket),
     do: IndexActions.handle_delete_selected(params, socket)
+
+  @impl true
+  def handle_event("exit_select_mode", params, socket),
+    do: IndexActions.handle_exit_select_mode(params, socket)
 
   @impl true
   def handle_event("navigate_dm", params, socket),
@@ -247,6 +252,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
         <.bulk_action_bar
           session_filter={@session_filter}
+          select_mode={@select_mode}
           agents={@agents}
           selected_ids={@selected_ids}
         />
@@ -262,7 +268,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
             <div :for={agent <- @agents}>
               <.session_row
                 session={agent}
-                select_mode={@session_filter == "archived"}
+                select_mode={@select_mode}
                 selected={MapSet.member?(@selected_ids, to_string(agent.id))}
                 project_name={agent.project_name}
                 editing_session_id={@editing_session_id}

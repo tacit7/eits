@@ -24,6 +24,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       |> assign(:show_quick_note_modal, false)
       |> assign(:type_filter, "all")
       |> assign(:show_all, false)
+      |> assign(:selected_note_ids, MapSet.new())
+      |> assign(:notes_select_mode, false)
 
     {:ok, socket}
   end
@@ -70,6 +72,71 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   @impl true
   def handle_event("delete_note", params, socket),
     do: handle_delete_note(params, socket, &load_notes/1)
+
+  @impl true
+  def handle_event("toggle_select_note", %{"note_id" => note_id}, socket) do
+    note_id = to_string(note_id)
+
+    selected =
+      if MapSet.member?(socket.assigns.selected_note_ids, note_id),
+        do: MapSet.delete(socket.assigns.selected_note_ids, note_id),
+        else: MapSet.put(socket.assigns.selected_note_ids, note_id)
+
+    socket =
+      socket
+      |> assign(:selected_note_ids, selected)
+      |> assign(:notes_select_mode, true)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_select_all_notes", _params, socket) do
+    all_ids = MapSet.new(socket.assigns.notes, &to_string(&1.id))
+
+    selected =
+      if MapSet.equal?(socket.assigns.selected_note_ids, all_ids),
+        do: MapSet.new(),
+        else: all_ids
+
+    {:noreply, assign(socket, :selected_note_ids, selected)}
+  end
+
+  @impl true
+  def handle_event("delete_selected_notes", _params, socket) do
+    ids = socket.assigns.selected_note_ids
+
+    deleted =
+      Enum.count(ids, fn id ->
+        case Integer.parse(id) do
+          {int_id, ""} ->
+            note = Notes.get_note!(int_id)
+            match?({:ok, _}, Notes.delete_note(note))
+
+          _ ->
+            false
+        end
+      end)
+
+    socket =
+      socket
+      |> assign(:selected_note_ids, MapSet.new())
+      |> assign(:notes_select_mode, false)
+      |> load_notes()
+      |> put_flash(:info, "Deleted #{deleted} note#{if deleted != 1, do: "s"}")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("exit_select_mode_notes", _params, socket) do
+    socket =
+      socket
+      |> assign(:notes_select_mode, false)
+      |> assign(:selected_note_ids, MapSet.new())
+
+    {:noreply, socket}
+  end
 
   @impl true
   def handle_event("edit_note", %{"note_id" => note_id}, socket) do
@@ -213,6 +280,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           empty_id="project-notes-empty"
           editing_note_id={@editing_note_id}
           current_path={~p"/projects/#{@project.id}/notes"}
+          selected_ids={@selected_note_ids}
+          select_mode={@notes_select_mode}
         />
       </div>
     </div>

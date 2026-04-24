@@ -19,6 +19,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
   attr :task, :map, required: true
   attr :on_click, :string, default: nil
   attr :on_delete, :string, default: nil
+  attr :select_mode, :boolean, default: false
+  attr :selected, :boolean, default: false
 
   def list_row(assigns) do
     dm_session =
@@ -35,16 +37,31 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
         "group flex items-center gap-3 py-3.5 cursor-pointer",
         @task.completed_at && "opacity-60"
       ]}
-      phx-click={@on_click}
-      phx-keyup={@on_click}
+      phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
+      phx-keyup={if !@select_mode, do: @on_click}
       phx-key="Enter"
       phx-value-task_id={@task.uuid || to_string(@task.id)}
       role="button"
       tabindex="0"
       aria-label={"Open task #{@task.title}"}
     >
-      <%!-- Completion indicator --%>
-      <div class="flex-shrink-0">
+      <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
+      <div class={[
+        "flex-shrink-0 w-5 flex justify-center",
+        if(@select_mode, do: "", else: "hidden group-hover:flex")
+      ]}>
+        <input
+          type="checkbox"
+          checked={@selected}
+          phx-click="toggle_select_task"
+          phx-value-task_id={@task.uuid || to_string(@task.id)}
+          class="checkbox checkbox-xs checkbox-primary"
+          aria-label={"Select task #{@task.title}"}
+        />
+      </div>
+
+      <%!-- Completion indicator — hidden in select mode --%>
+      <div class={["flex-shrink-0", @select_mode && "hidden"]}>
         <.icon
           name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
           class={

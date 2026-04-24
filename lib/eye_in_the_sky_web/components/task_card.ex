@@ -18,6 +18,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
   attr :variant, :string, default: "kanban", values: ["kanban", "grid", "list"]
   attr :on_click, :string, default: nil
   attr :on_delete, :string, default: nil
+  attr :select_mode, :boolean, default: false
+  attr :selected, :boolean, default: false
   attr :working_session_ids, :any, default: nil
   attr :waiting_session_ids, :any, default: nil
   attr :workflow_states, :list, default: []
@@ -27,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
     ~H"""
     <%= case @variant do %>
       <% "list" -> %>
-        <.list_row task={@task} on_click={@on_click} on_delete={@on_delete} />
+        <.list_row task={@task} on_click={@on_click} on_delete={@on_delete} select_mode={@select_mode} selected={@selected} />
       <% "grid" -> %>
         <.grid_card task={@task} on_click={@on_click} {@rest} />
       <% _ -> %>

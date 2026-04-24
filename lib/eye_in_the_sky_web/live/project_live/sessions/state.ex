@@ -28,6 +28,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
     |> assign(:show_new_session_drawer, false)
     |> assign(:show_filter_sheet, false)
     |> assign(:selected_ids, MapSet.new())
+    |> assign(:select_mode, false)
     |> assign(:all_agents, [])
     |> assign(:agents, [])
     |> assign(:depths, %{})

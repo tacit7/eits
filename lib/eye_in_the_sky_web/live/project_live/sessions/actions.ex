@@ -106,7 +106,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
         do: MapSet.delete(socket.assigns.selected_ids, id),
         else: MapSet.put(socket.assigns.selected_ids, id)
 
-    {:noreply, assign(socket, :selected_ids, selected)}
+    socket =
+      socket
+      |> assign(:selected_ids, selected)
+      |> assign(:select_mode, true)
+
+    {:noreply, socket}
+  end
+
+  def exit_select_mode(_params, socket) do
+    socket =
+      socket
+      |> assign(:select_mode, false)
+      |> assign(:selected_ids, MapSet.new())
+
+    {:noreply, socket}
   end
 
   def toggle_select_all(_params, socket) do

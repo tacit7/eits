@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   Expected keys in `params`:
   - `:sessions` - list of sessions
   - `:search_query` - string
-  - `:status_filter` - one of "all", "active", "completed", "stale", "discovered"
+  - `:status_filter` - one of "all", "working", "archived"
   - `:sort_by` - one of "recent"
   """
   def filter_and_sort_sessions(%{sessions: sessions} = params) when is_list(sessions) do
@@ -63,14 +63,20 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   @doc """
   Filters sessions by status/archive state.
 
-  Filters: "active", "completed", "archived", or any other value passes all through.
+  Filters:
+  - "working" — active sessions (working/idle/waiting/compacting); project sessions page
+  - "active"  — alias for "working"; AgentLive compatibility
+  - "completed" — completed non-archived sessions; AgentLive compatibility
+  - "archived" — archived sessions
+  - any other value passes all through
   """
   def filter_agents_by_status(sessions, filter) do
     case filter do
-      "active" ->
+      f when f in ["working", "active"] ->
         Enum.filter(
           sessions,
-          &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at))
+          &(&1.status in ["working", "idle", "waiting", "compacting", nil] and
+              is_nil(&1.archived_at))
         )
 
       "completed" ->
@@ -113,12 +119,23 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   end
 
   @doc """
-  Sorts sessions by "name", "status", "created", "last_message", or "recent" (default).
+  Sorts sessions by "name", "agent", "model", "status", "created", "last_message", or "recent" (default).
   """
   def sort_agents(sessions, sort_by) do
     case sort_by do
       "name" ->
         Enum.sort_by(sessions, fn s -> (s.name || "") |> String.downcase() end)
+
+      "agent" ->
+        Enum.sort_by(sessions, fn s ->
+          case s.agent do
+            nil -> ""
+            agent -> (agent.description || agent.project_name || "") |> String.downcase()
+          end
+        end)
+
+      "model" ->
+        Enum.sort_by(sessions, fn s -> (s.model_name || s.model || "") |> String.downcase() end)
 
       "status" ->
         Enum.sort_by(sessions, &session_status_rank/1)

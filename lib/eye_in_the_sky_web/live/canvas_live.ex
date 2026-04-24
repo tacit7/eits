@@ -560,8 +560,17 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   defp activate_canvas(socket, canvas_id) do
+    prev_canvas_id = socket.assigns.active_canvas_id
+
+    socket =
+      socket
+      |> assign(:active_canvas_id, canvas_id)
+      |> assign(:show_session_picker, false)
+      |> assign(:filtered_sessions, [])
+      |> assign(:session_search, "")
+
     if connected?(socket) do
-      if prev = socket.assigns.active_canvas_id, do: Events.unsubscribe_canvas(prev)
+      if prev_canvas_id, do: Events.unsubscribe_canvas(prev_canvas_id)
       unsubscribe_all(socket.assigns.subscribed_session_ids)
       sessions = Canvases.list_canvas_sessions(canvas_id)
       session_ids = Enum.map(sessions, & &1.session_id)
@@ -578,23 +587,15 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
       socket
       |> assign(:page_title, canvas_name <> " — Canvas")
-      |> assign(:active_canvas_id, canvas_id)
       |> assign(:canvas_sessions, sessions)
       |> assign(:subscribed_session_ids, session_ids)
       |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
-      |> assign(:show_session_picker, false)
-      |> assign(:filtered_sessions, [])
-      |> assign(:session_search, "")
     else
       socket
       |> assign(:page_title, "Canvas")
-      |> assign(:active_canvas_id, canvas_id)
       |> assign(:canvas_sessions, [])
       |> assign(:subscribed_session_ids, [])
       |> assign(:canvas_session_counts, %{})
-      |> assign(:show_session_picker, false)
-      |> assign(:filtered_sessions, [])
-      |> assign(:session_search, "")
     end
   end
 

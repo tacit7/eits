@@ -1,20 +1,15 @@
-defmodule EyeInTheSkyWeb.PromptLive.New do
+defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Prompts
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(%{"id" => _} = params, _session, socket) do
+    socket = mount_project(socket, params, sidebar_tab: :prompts, page_title_prefix: "New Prompt")
     changeset = Prompts.change_prompt(%Prompts.Prompt{})
 
-    socket =
-      socket
-      |> assign(:page_title, "New Prompt")
-      |> assign(:form, to_form(changeset))
-      |> assign(:sidebar_tab, :prompts)
-      |> assign(:sidebar_project, nil)
-
-    {:ok, socket}
+    {:ok, assign(socket, :form, to_form(changeset))}
   end
 
   @impl true
@@ -31,19 +26,31 @@ defmodule EyeInTheSkyWeb.PromptLive.New do
 
   @impl true
   def handle_event("save", %{"prompt" => prompt_params}, socket) do
+    project = socket.assigns.project
+    project_id_str = if project, do: Integer.to_string(project.id), else: nil
+
+    prompt_params =
+      if project_id_str,
+        do: Map.put(prompt_params, "project_id", project_id_str),
+        else: prompt_params
+
     case Prompts.create_prompt(prompt_params) do
       {:ok, prompt} ->
+        return_to =
+          if project,
+            do: ~p"/projects/#{project.id}/prompts/#{prompt.uuid}",
+            else: ~p"/"
+
         {:noreply,
          socket
          |> put_flash(:info, "Prompt created successfully")
-         |> push_navigate(to: ~p"/prompts/#{prompt.uuid}")}
+         |> push_navigate(to: return_to)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign(socket, :form, to_form(changeset))}
     end
   end
 
-  # Auto-generate slug from name if slug is empty
   defp maybe_generate_slug(%{"name" => name, "slug" => ""} = params) when byte_size(name) > 0 do
     slug =
       name
@@ -61,9 +68,11 @@ defmodule EyeInTheSkyWeb.PromptLive.New do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="mb-6">
-        <.link navigate={~p"/prompts"} class="btn btn-ghost btn-sm gap-2">
-          <.icon name="hero-arrow-left" class="h-4 w-4" /> Back to Prompts
-        </.link>
+        <%= if @project do %>
+          <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost btn-sm gap-2">
+            <.icon name="hero-arrow-left" class="h-4 w-4" /> Back to Prompts
+          </.link>
+        <% end %>
       </div>
 
       <div class="sm:flex sm:items-center mb-6">
@@ -73,6 +82,9 @@ defmodule EyeInTheSkyWeb.PromptLive.New do
           </h1>
           <p class="mt-2 text-sm text-base-content/70">
             Create a reusable prompt template for subagents
+            <%= if @project do %>
+              in <span class="font-medium">{@project.name}</span>
+            <% end %>
           </p>
         </div>
       </div>
@@ -134,9 +146,11 @@ defmodule EyeInTheSkyWeb.PromptLive.New do
           </div>
 
           <div class="card-actions justify-end mt-2">
-            <.link navigate={~p"/prompts"} class="btn btn-ghost">
-              Cancel
-            </.link>
+            <%= if @project do %>
+              <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost">
+                Cancel
+              </.link>
+            <% end %>
             <button type="submit" class="btn btn-primary">
               <.icon name="hero-check" class="h-4 w-4" /> Create Prompt
             </button>

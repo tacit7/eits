@@ -97,10 +97,7 @@ defmodule EyeInTheSky.Tasks do
       if int_id = ToolHelpers.parse_int(id_str) do
         Repo.get!(Task, int_id)
       else
-        case Repo.get_by(Task, uuid: id_str) do
-          nil -> raise Ecto.NoResultsError, queryable: Task
-          task -> task
-        end
+        Repo.get_by!(Task, uuid: id_str)
       end
 
     Repo.preload(task, @full_task_preloads)
@@ -391,10 +388,5 @@ defmodule EyeInTheSky.Tasks do
 
   defp broadcast_change({tag, task}) when tag in [:ok, :deleted, :updated] do
     EyeInTheSky.Events.task_updated(task)
-  end
-
-  defp broadcast_change(_) do
-    Logger.warning("task operation failed, skipping broadcast")
-    :ok
   end
 end

@@ -23,6 +23,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         preload: [:agents]
       )
       |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_new_task_drawer"})
+      |> assign(:show_all, false)
       |> assign(:search_query, "")
       |> assign(:filter_state_id, nil)
       |> assign(:sort_by, "created_desc")
@@ -40,14 +41,31 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
     socket =
       if connected?(socket) do
-        socket
-        |> assign(:workflow_states, Tasks.list_workflow_states())
-        |> then(fn s -> if s.assigns.project, do: load_tasks(s), else: s end)
+        assign(socket, :workflow_states, Tasks.list_workflow_states())
       else
         socket
       end
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_params(%{"show_all" => "true"} = _params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:show_all, true)
+      |> then(fn s -> if connected?(s), do: load_tasks(s), else: s end)
+
+    {:noreply, socket}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:show_all, false)
+      |> then(fn s -> if connected?(s), do: load_tasks(s), else: s end)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -123,22 +141,39 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: handle_tasks_changed(socket, &load_tasks/1)
 
   defp load_tasks(socket) do
+    show_all = Map.get(socket.assigns, :show_all, false)
     project_id = socket.assigns.project_id
 
-    TasksListHelpers.load_tasks(
-      socket,
-      fn query -> Tasks.search_tasks(query, project_id) end,
-      fn opts -> Tasks.list_tasks_for_project(project_id, opts) end,
-      fn opts -> Tasks.count_tasks_for_project(project_id, opts) end
-    )
+    if show_all do
+      TasksListHelpers.load_tasks(
+        socket,
+        fn query -> Tasks.search_tasks(query) end,
+        fn opts -> Tasks.list_tasks(opts) end,
+        fn opts -> Tasks.count_tasks(opts) end
+      )
+    else
+      TasksListHelpers.load_tasks(
+        socket,
+        fn query -> Tasks.search_tasks(query, project_id) end,
+        fn opts -> Tasks.list_tasks_for_project(project_id, opts) end,
+        fn opts -> Tasks.count_tasks_for_project(project_id, opts) end
+      )
+    end
   end
 
   defp load_tasks_page(socket, page) do
+    show_all = Map.get(socket.assigns, :show_all, false)
     project_id = socket.assigns.project_id
 
-    TasksListHelpers.load_tasks_page(socket, page, fn opts ->
-      Tasks.list_tasks_for_project(project_id, opts)
-    end)
+    if show_all do
+      TasksListHelpers.load_tasks_page(socket, page, fn opts ->
+        Tasks.list_tasks(opts)
+      end)
+    else
+      TasksListHelpers.load_tasks_page(socket, page, fn opts ->
+        Tasks.list_tasks_for_project(project_id, opts)
+      end)
+    end
   end
 
   @impl true

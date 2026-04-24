@@ -10,13 +10,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
       EyeInTheSky.Events.subscribe_scheduled_jobs()
     end
 
-    socket = mount_project(socket, params, sidebar_tab: :jobs, page_title_prefix: "Jobs")
+    socket =
+      socket
+      |> mount_project(params, sidebar_tab: :jobs, page_title_prefix: "Jobs")
+      |> assign(:show_all, false)
 
     if is_nil(socket.assigns.project) do
       {:ok, redirect(socket, to: "/projects")}
     else
       {:ok, socket}
     end
+  end
+
+  @impl true
+  def handle_params(%{"show_all" => "true"} = _params, _uri, socket) do
+    {:noreply, assign(socket, :show_all, true)}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    {:noreply, assign(socket, :show_all, false)}
   end
 
   @impl true

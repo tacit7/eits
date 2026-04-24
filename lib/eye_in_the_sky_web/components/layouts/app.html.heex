@@ -95,14 +95,14 @@
     <% sidebar_project = assigns[:sidebar_project] %>
     <% mobile_nav_tab = assigns[:mobile_nav_tab] || :sessions %>
     <% notes_href =
-      if sidebar_project, do: ~p"/projects/#{sidebar_project.id}/notes", else: ~p"/notes" %>
+      if sidebar_project, do: ~p"/projects/#{sidebar_project.id}/notes", else: ~p"/" %>
     <% project_href =
       if sidebar_project, do: ~p"/projects/#{sidebar_project.id}", else: ~p"/" %>
     <nav
       class="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-base-content/10 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/80 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]"
       aria-label="Main navigation"
     >
-      <div class="grid grid-cols-4 gap-1">
+      <div class={["grid gap-1", if(sidebar_project, do: "grid-cols-4", else: "grid-cols-2")]}>
         <.link
           navigate={~p"/"}
           aria-label="Sessions"
@@ -117,48 +117,65 @@
         >
           <.icon name="hero-cpu-chip" class="w-5 h-5 mb-0.5" /> Sessions
         </.link>
-        <.link
-          navigate={~p"/tasks"}
-          aria-label="Tasks"
-          aria-current={if mobile_nav_tab == :tasks, do: "page"}
-          class={[
-            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
-            if(mobile_nav_tab == :tasks,
-              do: "text-primary bg-primary/10",
-              else: "text-base-content/60"
-            )
-          ]}
-        >
-          <.icon name="hero-clipboard-document-list" class="w-5 h-5 mb-0.5" /> Tasks
-        </.link>
-        <.link
-          navigate={notes_href}
-          aria-label="Notes"
-          aria-current={if mobile_nav_tab == :notes, do: "page"}
-          class={[
-            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
-            if(mobile_nav_tab == :notes,
-              do: "text-primary bg-primary/10",
-              else: "text-base-content/60"
-            )
-          ]}
-        >
-          <.icon name="hero-document-text" class="w-5 h-5 mb-0.5" /> Notes
-        </.link>
-        <.link
-          navigate={project_href}
-          aria-label="Project"
-          aria-current={if mobile_nav_tab == :project, do: "page"}
-          class={[
-            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
-            if(mobile_nav_tab == :project,
-              do: "text-primary bg-primary/10",
-              else: "text-base-content/60"
-            )
-          ]}
-        >
-          <.icon name="hero-folder" class="w-5 h-5 mb-0.5" /> Project
-        </.link>
+        <%= if sidebar_project do %>
+          <.link
+            navigate={~p"/projects/#{sidebar_project.id}/tasks"}
+            aria-label="Tasks"
+            aria-current={if mobile_nav_tab == :tasks, do: "page"}
+            class={[
+              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+              if(mobile_nav_tab == :tasks,
+                do: "text-primary bg-primary/10",
+                else: "text-base-content/60"
+              )
+            ]}
+          >
+            <.icon name="hero-clipboard-document-list" class="w-5 h-5 mb-0.5" /> Tasks
+          </.link>
+          <.link
+            navigate={notes_href}
+            aria-label="Notes"
+            aria-current={if mobile_nav_tab == :notes, do: "page"}
+            class={[
+              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+              if(mobile_nav_tab == :notes,
+                do: "text-primary bg-primary/10",
+                else: "text-base-content/60"
+              )
+            ]}
+          >
+            <.icon name="hero-document-text" class="w-5 h-5 mb-0.5" /> Notes
+          </.link>
+          <.link
+            navigate={project_href}
+            aria-label="Project"
+            aria-current={if mobile_nav_tab == :project, do: "page"}
+            class={[
+              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+              if(mobile_nav_tab == :project,
+                do: "text-primary bg-primary/10",
+                else: "text-base-content/60"
+              )
+            ]}
+          >
+            <.icon name="hero-folder" class="w-5 h-5 mb-0.5" /> Project
+          </.link>
+        <% else %>
+          <.link
+            navigate={~p"/notifications"}
+            aria-label="Notifications"
+            aria-current={if mobile_nav_tab == :notifications, do: "page"}
+            class={[
+              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+              if(mobile_nav_tab == :notifications,
+                do: "text-primary bg-primary/10",
+                else: "text-base-content/60"
+              )
+            ]}
+          >
+            <.icon name="hero-bell" class="w-5 h-5 mb-0.5" /> Notifications
+          </.link>
+        <% end %>
       </div>
     </nav>
 

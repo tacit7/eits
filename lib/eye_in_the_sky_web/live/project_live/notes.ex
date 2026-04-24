@@ -2,54 +2,45 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Notes
-  alias EyeInTheSky.Projects
   import EyeInTheSkyWeb.Components.NotesList
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
   import EyeInTheSkyWeb.Live.Shared.NotesHelpers
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
-    project_id = parse_id(id)
-
+  def mount(%{"id" => _} = params, _session, socket) do
     socket =
-      if project_id do
-        project = Projects.get_project!(project_id)
-
-        socket =
-          socket
-          |> assign(:page_title, "Notes - #{project.name}")
-          |> assign(:project, project)
-          |> assign(:sidebar_tab, :notes)
-          |> assign(:sidebar_project, project)
-          |> assign(:search_query, "")
-          |> assign(:starred_filter, false)
-          |> assign(:notes_sort_by, "newest")
-          |> assign(:notes, [])
-          |> assign(:editing_note_id, nil)
-          |> assign(:show_quick_note_modal, false)
-          |> assign(:type_filter, "all")
-
-        if connected?(socket) do
-          project = Projects.get_project_with_agents!(project_id)
-
-          socket
-          |> assign(:project, project)
-          |> assign(:sidebar_project, project)
-          |> load_notes()
-        else
-          socket
-        end
-      else
-        socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:search_query, "")
-        |> assign(:notes, [])
-        |> assign(:editing_note_id, nil)
-        |> put_flash(:error, "Invalid project ID")
-      end
+      socket
+      |> mount_project(params, sidebar_tab: :notes, page_title_prefix: "Notes", preload: [:agents])
+      |> assign(:search_query, "")
+      |> assign(:starred_filter, false)
+      |> assign(:notes_sort_by, "newest")
+      |> assign(:notes, [])
+      |> assign(:editing_note_id, nil)
+      |> assign(:show_quick_note_modal, false)
+      |> assign(:type_filter, "all")
+      |> assign(:show_all, false)
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_params(%{"show_all" => "true"} = _params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:show_all, true)
+      |> then(fn s -> if connected?(s), do: load_notes(s), else: s end)
+
+    {:noreply, socket}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:show_all, false)
+      |> then(fn s -> if connected?(s) && s.assigns.project, do: load_notes(s), else: s end)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -144,24 +135,40 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   end
 
   defp load_notes(socket) do
+    show_all = Map.get(socket.assigns, :show_all, false)
     project = socket.assigns.project
-    agent_ids = Enum.map(project.agents, & &1.id)
     query = socket.assigns.search_query
 
     notes =
-      if query != "" and String.trim(query) != "" do
-        Notes.search_notes(query, agent_ids,
-          project_id: project.id,
-          starred: socket.assigns.starred_filter
-        )
+      if show_all do
+        if String.trim(query) != "" do
+          Notes.search_notes(query, [],
+            starred: socket.assigns.starred_filter
+          )
+        else
+          Notes.list_notes_filtered(
+            starred: socket.assigns.starred_filter,
+            sort: socket.assigns.notes_sort_by,
+            type_filter: socket.assigns.type_filter
+          )
+        end
       else
-        Notes.list_notes_filtered(
-          project_id: project.id,
-          agent_ids: agent_ids,
-          starred: socket.assigns.starred_filter,
-          sort: socket.assigns.notes_sort_by,
-          type_filter: socket.assigns.type_filter
-        )
+        agent_ids = if project && Map.has_key?(project, :agents), do: Enum.map(project.agents, & &1.id), else: []
+
+        if String.trim(query) != "" do
+          Notes.search_notes(query, agent_ids,
+            project_id: project && project.id,
+            starred: socket.assigns.starred_filter
+          )
+        else
+          Notes.list_notes_filtered(
+            project_id: project && project.id,
+            agent_ids: agent_ids,
+            starred: socket.assigns.starred_filter,
+            sort: socket.assigns.notes_sort_by,
+            type_filter: socket.assigns.type_filter
+          )
+        end
       end
 
     assign(socket, :notes, notes)

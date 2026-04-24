@@ -457,6 +457,35 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     """
   end
 
+  attr :name, :string, required: true
+  attr :class, :string, default: "w-4 h-4"
+
+  def custom_icon(%{name: "lucide-robot"} = assigns) do
+    ~H"""
+    <svg class={@class} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 8V4H8"/>
+      <rect width="16" height="12" x="4" y="8" rx="2"/>
+      <path d="M2 14h2"/>
+      <path d="M20 14h2"/>
+      <path d="M15 13v2"/>
+      <path d="M9 13v2"/>
+    </svg>
+    """
+  end
+
+  def custom_icon(%{name: "lucide-kanban"} = assigns) do
+    ~H"""
+    <svg class={@class} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect width="18" height="18" x="3" y="3" rx="2"/>
+      <path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>
+    </svg>
+    """
+  end
+
   attr :submit_text, :string, required: true
   attr :cancel_event, :any, required: true
   attr :submit_disabled, :boolean, default: false

@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             >
               <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
                 <%= if @active_section == :tasks do %>
-                  <.lucide_kanban />
+                  <.custom_icon name="lucide-kanban" class="w-3.5 h-3.5" />
                 <% else %>
                   <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
                 <% end %>
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <%= if dual_page_section?(@active_section) do %>
                 <span class="flex-shrink-0 flex items-center justify-center text-base-content/20">
                   <%= if @active_section == :tasks do %>
-                    <.lucide_kanban />
+                    <.custom_icon name="lucide-kanban" class="w-3.5 h-3.5" />
                   <% else %>
                     <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
                   <% end %>
@@ -635,24 +635,4 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp status_dot_class("waiting"), do: "bg-amber-400"
   defp status_dot_class(_), do: "bg-base-content/25"
 
-  # Lucide kanban icon — used in the tasks flyout header.
-  # Heroicons has no equivalent; inline SVG is an approved exception here.
-  defp lucide_kanban(assigns) do
-    ~H"""
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <rect width="18" height="18" x="3" y="3" rx="2" />
-      <path d="M8 7v7" /><path d="M12 7v4" /><path d="M16 7v9" />
-    </svg>
-    """
-  end
 end

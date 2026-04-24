@@ -35,7 +35,8 @@ defmodule EyeInTheSky.Settings do
     "eits_workflow_enabled" => "true",
     "theme" => "dark",
     "palette_shortcut" => "auto",
-    "use_anthropic_api_key" => "false"
+    "use_anthropic_api_key" => "false",
+    "rate_limit_per_session" => "false"
   }
 
   @doc "Get a single setting value, falling back to default."

@@ -1327,3 +1327,13 @@ These endpoints map to Claude Code hooks:
 | PostToolUse (i-commits) | POST /commits | After git commit tool use |
 | PostToolUse (i-note-add) | POST /notes | After note tool use |
 | PostToolUse (i-save-session-context) | POST /session-context | After context save |
+
+## Rate limiting
+
+All `/api/v1` requests pass through `EyeInTheSkyWeb.Plugs.RateLimit`.
+
+- Default bucket is IP-keyed (`api:<ip>`). Clients sending `x-eits-role: orchestrator` get a 5× burst on a separate key (`api:orch:<ip>`) — Phase 1.
+- **Phase 2** (feature-flagged): when `Settings.get_boolean("rate_limit_per_session")` is `true` and the request includes a valid `x-eits-session: <uuid>` header that matches an existing session row, the bucket becomes `api:sess:<uuid>` with a 60-req/10s burst so co-located agents don't starve each other. If the flag is off, the header is missing, or the UUID is unknown, the plug falls back to Phase 1.
+- The `eits` CLI always sends `x-eits-session` when `EITS_SESSION_UUID` is set; the header is safe to send when the flag is off.
+- Each evaluation emits a `[:eits, :rate_limit, :check]` telemetry event with `%{remaining, limit}` and `%{bucket, session_id, bucket_kind, status}` metadata.
+- Toggle the flag at `/settings` → **System** tab.

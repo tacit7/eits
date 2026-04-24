@@ -44,6 +44,22 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
             />
           </div>
 
+          <div class="flex items-center justify-between px-5 py-4">
+            <div>
+              <p class="text-sm font-medium text-base-content">Per-session Rate-Limit Bucket</p>
+              <p class="text-xs text-base-content/50 mt-0.5">
+                Per-session rate-limit bucket (Phase 2). Requires eits CLI with x-eits-session header support. Leaving off keeps the current IP-keyed bucket.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              checked={@settings["rate_limit_per_session"] == "true"}
+              phx-click="toggle_setting"
+              phx-value-key="rate_limit_per_session"
+            />
+          </div>
+
           <%!-- Database Info --%>
           <div class="px-5 py-4">
             <p class="text-sm font-medium text-base-content mb-3">Database</p>

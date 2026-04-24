@@ -263,16 +263,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                     phx-key="Enter"
                     class="text-base sm:text-lg font-bold text-base-content bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 placeholder:text-base-content/20 transition-colors"
                   />
-                  <button
-                    type="button"
-                    class="hidden sm:flex items-center gap-1 text-[11px] font-mono text-base-content/30 bg-base-content/5 px-2 py-0.5 rounded hover:text-base-content/50 hover:bg-base-content/8 transition-colors cursor-pointer flex-shrink-0"
-                    phx-hook="CopyToClipboard"
-                    id="copy-session-uuid"
-                    data-copy={@session_uuid}
-                  >
-                    {if @session_uuid, do: String.slice(@session_uuid, 0..7), else: "—"}
-                    <.icon name="hero-clipboard-document" class="w-3 h-3" />
-                  </button>
                 </div>
                 <input
                   type="text"
@@ -317,6 +307,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 active_timer={@overlay_data.active_timer}
                 cancel_btn_id="dm-cancel-timer-btn-desktop"
                 notify_on_stop={@notify_on_stop}
+                session_uuid={@session_uuid}
               />
             </div>
           </div>

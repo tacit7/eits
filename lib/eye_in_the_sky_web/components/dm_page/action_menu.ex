@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
   attr :schedule_btn_id, :string, default: nil
   attr :cancel_btn_id, :string, required: true
   attr :notify_on_stop, :boolean, default: false
+  attr :session_uuid, :string, default: nil
 
   def action_menu(assigns) do
     ~H"""
@@ -47,6 +48,20 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               </button>
             </li>
           <% end %>
+          <li><hr class="border-base-content/10 my-1" /></li>
+        <% end %>
+        <%= if @session_uuid do %>
+          <li>
+            <button
+              id={"copy-uuid-#{@wrapper_id || "menu"}"}
+              phx-hook="CopyToClipboard"
+              data-copy={@session_uuid}
+              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded font-mono text-[11px]"
+            >
+              <.icon name="hero-clipboard-document" class="w-3.5 h-3.5 flex-shrink-0" />
+              Copy {String.slice(@session_uuid, 0..7)}…
+            </button>
+          </li>
           <li><hr class="border-base-content/10 my-1" /></li>
         <% end %>
         <li>

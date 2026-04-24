@@ -26,8 +26,10 @@ defmodule EyeInTheSky.Projects.FileTree do
   """
   def children(root_path, rel_path, opts \\ []) do
     with :ok <- validate_root_path(root_path),
-         {:ok, abs_path} <- safe_path(root_path, rel_path) do
-      list_directory(abs_path, root_path, opts)
+         {:ok, abs_path} <- safe_path(root_path, rel_path),
+         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path),
+         {:ok, real_root} <- resolve_path_via_parent(Path.expand(root_path)) do
+      list_directory(real_path, real_root, opts)
     end
   end
 
@@ -38,12 +40,12 @@ defmodule EyeInTheSky.Projects.FileTree do
     with :ok <- validate_root_path(root_path),
          :ok <- validate_file_path(rel_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
-         {:ok, symlink?} <- check_if_symlink(abs_path),
-         {:ok, abs_path} <- check_symlink_safety(abs_path, root_path),
-         {:ok, stat} <- stat_file(abs_path),
+         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path),
+         symlink? = abs_path != real_path,
+         {:ok, stat} <- stat_file(real_path),
          :ok <- validate_file_type(stat),
          :ok <- validate_file_size(stat),
-         {:ok, content} <- File.read(abs_path),
+         {:ok, content} <- File.read(real_path),
          :ok <- validate_not_binary(content),
          :ok <- validate_utf8(content) do
       hash = hash_content(content)
@@ -76,11 +78,15 @@ defmodule EyeInTheSky.Projects.FileTree do
     with :ok <- validate_root_path(root_path),
          :ok <- validate_file_path(rel_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
+         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path),
          :ok <- validate_utf8(content),
+         # lstat abs_path (not real_path) so validate_write_target sees :symlink for symlink files.
+         # POSIX resolves directory components during lstat, so this works correctly even when
+         # abs_path traverses a symlinked directory.
          {:ok, stat} <- stat_for_write(abs_path),
          :ok <- validate_write_target(stat),
-         :ok <- check_conflict(abs_path, original_hash, force?) do
-      atomic_write(abs_path, content)
+         :ok <- check_conflict(real_path, original_hash, force?) do
+      atomic_write(real_path, content)
     end
   end
 
@@ -125,103 +131,84 @@ defmodule EyeInTheSky.Projects.FileTree do
 
   # --- Symlink Safety ---
 
-  defp check_if_symlink(abs_path) do
-    case File.lstat(abs_path) do
-      {:ok, %{type: :symlink}} -> {:ok, true}
-      {:ok, _} -> {:ok, false}
-      {:error, :enoent} -> {:error, :file_not_found}
-      {:error, :eacces} -> {:error, :permission_denied}
-      {:error, _} -> {:error, :file_not_found}
+  # Resolves the full real path (following all symlinks in the path chain)
+  # and validates it stays inside the project root.
+  # This catches symlinked ancestor directories that escape the project.
+  defp validate_real_path_inside_root(abs_path, root_path) do
+    with {:ok, real_root} <- resolve_path_via_parent(Path.expand(root_path)),
+         {:ok, resolved} <- resolve_candidate(abs_path) do
+      if resolved == real_root or String.starts_with?(resolved, real_root <> "/") do
+        {:ok, resolved}
+      else
+        {:error, :symlink_escapes_project}
+      end
     end
   end
 
-  defp check_symlink_safety(abs_path, root_path) do
-    case File.lstat(abs_path) do
-      {:ok, %{type: :symlink}} ->
-        resolve_symlink(abs_path, root_path)
+  # Resolves the real path for validation. resolve_path_via_parent/2 handles
+  # both existing and non-existing leaf components: for non-existent paths
+  # (new files being written), read_link returns :enoent and the function
+  # returns the unresolved-but-safe path. Circular symlinks produce :symlink_loop.
+  defp resolve_candidate(abs_path), do: resolve_path_via_parent(abs_path)
 
-      {:ok, _} ->
-        {:ok, abs_path}
+  # Resolves each path component in order, following symlinks at each level.
+  # Uses a seen-set to detect symlink loops (same pattern as resolve_symlink_chain/2).
+  defp resolve_path_via_parent(path), do: resolve_path_via_parent(path, MapSet.new())
 
-      {:error, :enoent} ->
-        {:error, :file_not_found}
-
-      {:error, :eacces} ->
-        {:error, :permission_denied}
-
-      {:error, _} ->
-        {:error, :file_not_found}
-    end
-  end
-
-  defp resolve_symlink(abs_path, root_path) do
-    case resolve_symlink_chain(abs_path, MapSet.new()) do
-      {:ok, resolved} ->
-        root = Path.expand(root_path)
-
-        if String.starts_with?(resolved, root <> "/") do
-          {:ok, resolved}
-        else
-          {:error, :symlink_escapes_project}
-        end
-
-      {:error, _} = error ->
-        error
-    end
-  end
-
-  defp resolve_symlink_chain(path, seen) do
+  defp resolve_path_via_parent(path, seen) do
     if MapSet.member?(seen, path) do
       {:error, :symlink_loop}
     else
-      case File.read_link(path) do
-        {:ok, target} ->
-          resolved =
-            if Path.type(target) == :absolute do
-              target
-            else
-              Path.expand(target, Path.dirname(path))
-            end
+      # Mark this path as "in progress" before descending. This is key for macOS
+      # where /tmp and /private/tmp refer to the same directory: seen tracks
+      # the caller's path form, so the check fires when the same string recurs,
+      # regardless of whether intermediate resolution produced a different form.
+      seen = MapSet.put(seen, path)
+      parent = Path.dirname(path)
+      basename = Path.basename(path)
 
-          case File.lstat(resolved) do
-            {:ok, %{type: :symlink}} ->
-              resolve_symlink_chain(resolved, MapSet.put(seen, path))
+      if parent == path do
+        {:ok, path}
+      else
+        with {:ok, real_parent} <- resolve_path_via_parent(parent, seen) do
+          full_path = Path.join(real_parent, basename)
 
-            {:ok, _} ->
-              {:ok, resolved}
+          case File.read_link(full_path) do
+            {:ok, target} ->
+              resolved =
+                if Path.type(target) == :absolute do
+                  target
+                else
+                  Path.expand(target, real_parent)
+                end
+
+              resolve_path_via_parent(resolved, MapSet.put(seen, full_path))
+
+            {:error, :einval} ->
+              {:ok, full_path}
 
             {:error, :enoent} ->
-              {:error, :broken_symlink}
+              {:ok, full_path}
 
-            {:error, _} ->
-              {:error, :broken_symlink}
+            {:error, reason} ->
+              {:error, reason}
           end
-
-        {:error, :einval} ->
-          {:ok, path}
-
-        {:error, :enoent} ->
-          {:error, :broken_symlink}
-
-        {:error, _} ->
-          {:error, :broken_symlink}
+        end
       end
     end
   end
 
   # --- Directory Listing ---
 
-  defp list_directory(abs_path, root_path, _opts) do
+  defp list_directory(abs_path, real_root, _opts) do
     case File.ls(abs_path) do
       {:ok, entries} ->
-        root = Path.expand(root_path)
-
         nodes =
           entries
           |> Enum.reject(&ignored?/1)
           |> Enum.map(fn name ->
             entry_path = Path.join(abs_path, name)
-            rel_path = Path.relative_to(entry_path, root)
+            rel_path = Path.relative_to(entry_path, real_root)
             build_node(name, entry_path, rel_path)
           end)
           |> Enum.sort_by(fn node ->

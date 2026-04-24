@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
 
   alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, ScheduledJobs, Sessions, Tasks, Teams}
+  alias EyeInTheSky.Projects.FileTree
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
   alias EyeInTheSkyWeb.Components.NewSessionModal
   alias EyeInTheSkyWeb.AgentLive.IndexActions
@@ -29,11 +30,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     jobs: :jobs,
     settings: :sessions,
     agents: :sessions,
-    files: :sessions,
+    files: :files,
     bookmarks: :sessions
   }
 
-  @valid_sections ~w(sessions tasks prompts chat notes skills teams canvas notifications usage jobs)
+  @valid_sections ~w(sessions tasks prompts chat notes skills teams canvas notifications usage jobs files)
   @sticky_sections [:chat, :canvas]
 
   @impl true
@@ -64,6 +65,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_sort: :last_activity,
         session_name_filter: "",
         flyout_jobs: [],
+        flyout_file_nodes: [],
+        flyout_file_expanded: MapSet.new(),
+        flyout_file_children: %{},
+        flyout_file_error: nil,
+        file_tabs: [],
+        active_tab_path: nil,
         show_new_session_form: false
       )
 
@@ -120,7 +127,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     # fire a Sessions.list_sessions_filtered query on each page.
     socket =
       if sidebar_project != previous_project do
-        assign(socket, :flyout_sessions, load_flyout_sessions(sidebar_project, socket.assigns.session_sort, socket.assigns.session_name_filter))
+        socket
+        |> assign(:flyout_sessions, load_flyout_sessions(sidebar_project, socket.assigns.session_sort, socket.assigns.session_name_filter))
+        |> assign(:flyout_file_expanded, MapSet.new())
+        |> assign(:flyout_file_children, %{})
+        |> maybe_load_files(socket.assigns.active_section)
       else
         socket
       end
@@ -138,6 +149,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> maybe_load_teams(next_section, sidebar_project)
         |> maybe_load_tasks(next_section, sidebar_project)
         |> maybe_load_jobs(next_section)
+        |> maybe_load_files(next_section)
       else
         socket
       end
@@ -174,7 +186,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> maybe_load_canvases(section)
        |> maybe_load_teams(section, socket.assigns.sidebar_project)
        |> maybe_load_tasks(section, socket.assigns.sidebar_project)
-       |> maybe_load_jobs(section)}
+       |> maybe_load_jobs(section)
+       |> maybe_load_files(section)}
     end
   end
 
@@ -240,7 +253,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
     socket3 =
       if new_project != previous_project do
-        assign(socket2, :flyout_sessions, load_flyout_sessions(new_project, socket2.assigns.session_sort, socket2.assigns.session_name_filter))
+        socket2
+        |> assign(:flyout_sessions, load_flyout_sessions(new_project, socket2.assigns.session_sort, socket2.assigns.session_name_filter))
+        |> assign(:flyout_file_expanded, MapSet.new())
+        |> assign(:flyout_file_children, %{})
+        |> maybe_load_files(socket2.assigns.active_section)
       else
         socket2
       end
@@ -326,6 +343,130 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     {:noreply, socket |> assign(:task_state_filter, state_id) |> assign(:flyout_tasks, tasks)}
   end
 
+  def handle_event("file_open", %{"path" => path}, socket) do
+    project = socket.assigns.sidebar_project
+
+    if project && project.path do
+      case FileTree.read_file(project.path, path) do
+        {:ok, %{content: content, language: language, hash: hash}} ->
+          name = Path.basename(path)
+          lang_str = to_string(language)
+
+          existing = Enum.find(socket.assigns.file_tabs, &(&1.path == path))
+
+          tabs =
+            if existing do
+              socket.assigns.file_tabs
+            else
+              socket.assigns.file_tabs ++
+                [%{path: path, name: name, content: content, language: lang_str, hash: hash}]
+            end
+
+          was_empty = socket.assigns.file_tabs == []
+          socket2 = socket |> assign(:file_tabs, tabs) |> assign(:active_tab_path, path)
+          socket2 = if was_empty, do: push_event(socket2, "file-editor-open", %{}), else: socket2
+          {:noreply, socket2}
+
+        {:error, :binary_file} ->
+          {:noreply, put_flash(socket, :info, "Binary file — cannot open")}
+
+        {:error, :file_too_large} ->
+          {:noreply, put_flash(socket, :info, "File too large to open (over 1 MB)")}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Cannot open file")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("file_switch_tab", %{"path" => path}, socket) do
+    {:noreply, assign(socket, :active_tab_path, path)}
+  end
+
+  def handle_event("file_close_tab", %{"path" => path}, socket) do
+    tabs = Enum.reject(socket.assigns.file_tabs, &(&1.path == path))
+
+    active =
+      cond do
+        tabs == [] ->
+          nil
+
+        socket.assigns.active_tab_path == path ->
+          List.last(tabs).path
+
+        true ->
+          socket.assigns.active_tab_path
+      end
+
+    socket2 = socket |> assign(:file_tabs, tabs) |> assign(:active_tab_path, active)
+    socket2 = if tabs == [], do: push_event(socket2, "file-editor-close", %{}), else: socket2
+    {:noreply, socket2}
+  end
+
+  def handle_event("file_save", %{"path" => path, "content" => content, "original_hash" => hash}, socket) do
+    project = socket.assigns.sidebar_project
+
+    if project && project.path do
+      case FileTree.write_file(project.path, path, content, original_hash: hash) do
+        {:ok, %{hash: new_hash}} ->
+          tabs =
+            Enum.map(socket.assigns.file_tabs, fn tab ->
+              if tab.path == path,
+                do: %{tab | content: content, hash: new_hash},
+                else: tab
+            end)
+
+          {:noreply, assign(socket, :file_tabs, tabs)}
+
+        {:error, :conflict} ->
+          {:noreply, put_flash(socket, :error, "Save conflict — file changed on disk")}
+
+        {:error, :symlink_not_saveable} ->
+          {:noreply, put_flash(socket, :error, "Cannot save symlinked files")}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Save failed")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("file_expand", %{"path" => path}, socket) do
+    project = socket.assigns.sidebar_project
+
+    if project && project.path do
+      expanded = MapSet.put(socket.assigns.flyout_file_expanded, path)
+      children_cache = socket.assigns.flyout_file_children
+
+      socket =
+        if Map.has_key?(children_cache, path) do
+          assign(socket, :flyout_file_expanded, expanded)
+        else
+          case FileTree.children(project.path, path) do
+            {:ok, nodes} ->
+              socket
+              |> assign(:flyout_file_expanded, expanded)
+              |> assign(:flyout_file_children, Map.put(children_cache, path, nodes))
+
+            {:error, _} ->
+              assign(socket, :flyout_file_expanded, expanded)
+          end
+        end
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("file_collapse", %{"path" => path}, socket) do
+    expanded = MapSet.delete(socket.assigns.flyout_file_expanded, path)
+    {:noreply, assign(socket, :flyout_file_expanded, expanded)}
+  end
+
   @impl true
   def handle_async(:pick_folder, {:ok, result}, socket),
     do: ProjectActions.handle_pick_folder(result, socket)
@@ -401,6 +542,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
         <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
         <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
+        <.rail_item section={:files} active_section={@active_section} flyout_open={@flyout_open} icon="hero-folder" label="Files" myself={@myself} />
         <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
         <.rail_item section={:jobs} active_section={@active_section} flyout_open={@flyout_open} icon="hero-clock" label="Jobs" myself={@myself} />
 
@@ -450,8 +592,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_name_filter={@session_name_filter}
         notification_count={@notification_count}
         flyout_jobs={@flyout_jobs}
+        flyout_file_nodes={@flyout_file_nodes}
+        flyout_file_expanded={@flyout_file_expanded}
+        flyout_file_children={@flyout_file_children}
+        flyout_file_error={@flyout_file_error}
         myself={@myself}
       />
+
+      <.file_panel file_tabs={@file_tabs} active_tab_path={@active_tab_path} myself={@myself} socket={@socket} />
 
       <.live_component
         module={NewSessionModal}
@@ -462,6 +610,85 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         toggle_event="toggle_new_session_drawer"
         submit_event="create_new_session"
       />
+    </div>
+    """
+  end
+
+  attr :file_tabs, :list, required: true
+  attr :active_tab_path, :any, required: true
+  attr :myself, :any, required: true
+  attr :socket, :any, required: true
+
+  defp file_panel(%{file_tabs: []} = assigns) do
+    ~H""
+  end
+
+  defp file_panel(assigns) do
+    active_tab = Enum.find(assigns.file_tabs, &(&1.path == assigns.active_tab_path))
+    assigns = assign(assigns, :active_tab, active_tab)
+
+    ~H"""
+    <div class="flex-1 min-w-0 flex flex-col border-l border-base-content/8 bg-base-100 overflow-hidden">
+      <%!-- Tab strip --%>
+      <div class="flex items-center border-b border-base-content/8 bg-base-200/40 overflow-x-auto flex-shrink-0 min-h-[32px]">
+        <%= for tab <- @file_tabs do %>
+          <% active = tab.path == @active_tab_path %>
+          <div class={[
+            "flex items-center border-r border-base-content/8 flex-shrink-0",
+            if(active, do: "bg-base-100", else: "bg-transparent")
+          ]}>
+            <button
+              phx-click="file_switch_tab"
+              phx-value-path={tab.path}
+              phx-target={@myself}
+              class={[
+                "px-3 py-1.5 text-xs truncate max-w-[160px]",
+                if(active, do: "text-base-content/90 font-medium", else: "text-base-content/45 hover:text-base-content/70")
+              ]}
+              title={tab.path}
+            >
+              {tab.name}
+            </button>
+            <button
+              phx-click="file_close_tab"
+              phx-value-path={tab.path}
+              phx-target={@myself}
+              class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
+              title="Close"
+            >
+              <.icon name="hero-x-mark-mini" class="w-3 h-3" />
+            </button>
+          </div>
+        <% end %>
+      </div>
+
+      <%!-- Editor area --%>
+      <%= if @active_tab do %>
+        <div id="file-editor-relay" phx-hook="FileEditorRelay" class="hidden" />
+        <%!--
+          [&>div]:h-full punches height into the LiveSvelte wrapper div, which is
+          auto-height by default. Without it the editor collapses to 0 height since
+          the Svelte root's h-full has no anchor. LiveSvelte does not expose a
+          wrapperClass prop, so this Tailwind arbitrary selector is the cleanest fix.
+        --%>
+        <div
+          id={"file-editor-#{Base.url_encode64(@active_tab.path, padding: false)}"}
+          phx-update="ignore"
+          class="flex-1 overflow-hidden [&>div]:h-full"
+        >
+          <.svelte
+            name="FileEditor"
+            ssr={false}
+            props={%{
+              content: @active_tab.content,
+              lang: @active_tab.language,
+              path: @active_tab.path,
+              hash: @active_tab.hash
+            }}
+            socket={@socket}
+          />
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -554,6 +781,37 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   defp maybe_load_jobs(socket, _section), do: socket
+
+  defp maybe_load_files(socket, :files) do
+    project = socket.assigns.sidebar_project
+
+    if project && project.path do
+      case FileTree.root(project.path) do
+        {:ok, nodes} ->
+          socket
+          |> assign(:flyout_file_nodes, nodes)
+          |> assign(:flyout_file_error, nil)
+
+        {:error, reason} ->
+          socket
+          |> assign(:flyout_file_nodes, [])
+          |> assign(:flyout_file_error, file_error_message(reason))
+      end
+    else
+      socket
+      |> assign(:flyout_file_nodes, [])
+      |> assign(:flyout_file_error, "No project path configured")
+    end
+  end
+
+  defp maybe_load_files(socket, _section), do: socket
+
+  defp file_error_message(:root_path_not_found), do: "Project directory not found"
+  defp file_error_message(:root_path_not_directory), do: "Project path is not a directory"
+  defp file_error_message(:permission_denied), do: "Permission denied"
+  defp file_error_message(:path_not_found), do: "Directory not found"
+  defp file_error_message(:symlink_escapes_project), do: "Path escapes project root"
+  defp file_error_message(_), do: "Cannot read directory"
 
   defp load_flyout_tasks(project, search, state_id) do
     project_id = project && project.id

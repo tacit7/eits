@@ -333,6 +333,93 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
     end
   end
 
+  describe "symlinked ancestor directory escape prevention" do
+    @describetag :tmp_dir
+
+    setup %{tmp_dir: tmp_dir} do
+      # Create an "outside" directory that should not be accessible
+      outside_dir = Path.join(tmp_dir, "outside")
+      File.mkdir_p!(outside_dir)
+      File.write!(Path.join(outside_dir, "secret.txt"), "secret data")
+      File.write!(Path.join(outside_dir, "passwd"), "root:x:0:0")
+
+      # Create project directory
+      project_dir = Path.join(tmp_dir, "project")
+      File.mkdir_p!(project_dir)
+      File.write!(Path.join(project_dir, "legit.ex"), "legit content")
+
+      # Create symlinked directory inside project pointing outside
+      linked_dir = Path.join(project_dir, "linked_dir")
+      File.ln_s!(outside_dir, linked_dir)
+
+      %{root: project_dir, outside_dir: outside_dir}
+    end
+
+    test "read_file rejects access through symlinked ancestor directory", %{root: root} do
+      # Try to read /project/linked_dir/secret.txt which resolves to /outside/secret.txt
+      assert {:error, :symlink_escapes_project} = FileTree.read_file(root, "linked_dir/secret.txt")
+    end
+
+    test "read_file rejects passwd through symlinked directory", %{root: root} do
+      assert {:error, :symlink_escapes_project} = FileTree.read_file(root, "linked_dir/passwd")
+    end
+
+    test "write_file rejects write through symlinked ancestor directory", %{root: root, outside_dir: outside_dir} do
+      # Try to write through the symlinked directory
+      assert {:error, :symlink_escapes_project} =
+               FileTree.write_file(root, "linked_dir/secret.txt", "pwned", force?: true)
+
+      # Verify the original file was NOT modified
+      assert File.read!(Path.join(outside_dir, "secret.txt")) == "secret data"
+    end
+
+    test "write_file rejects new file creation through symlinked ancestor", %{root: root, outside_dir: outside_dir} do
+      # Try to create a new file through the symlinked directory
+      assert {:error, :symlink_escapes_project} =
+               FileTree.write_file(root, "linked_dir/newfile.txt", "malicious", force?: true)
+
+      # Verify file was NOT created
+      refute File.exists?(Path.join(outside_dir, "newfile.txt"))
+    end
+
+    test "children rejects listing through symlinked ancestor directory", %{root: root} do
+      # Even though UI marks symlinked dirs as non-expandable, the API should also block
+      assert {:error, :symlink_escapes_project} = FileTree.children(root, "linked_dir")
+    end
+
+    test "nested symlinked directory escape is blocked", %{root: root, outside_dir: outside_dir} do
+      # Create nested structure: project/subdir/deep_link -> outside
+      subdir = Path.join(root, "subdir")
+      File.mkdir_p!(subdir)
+      File.ln_s!(outside_dir, Path.join(subdir, "deep_link"))
+
+      assert {:error, :symlink_escapes_project} = FileTree.read_file(root, "subdir/deep_link/secret.txt")
+    end
+
+    test "symlink loop returns error instead of crashing", %{root: root} do
+      # Create a -> b -> a circular symlink chain
+      a = Path.join(root, "link_a")
+      b = Path.join(root, "link_b")
+      File.ln_s!(b, a)
+      File.ln_s!(a, b)
+
+      assert {:error, :symlink_loop} = FileTree.read_file(root, "link_a")
+      assert {:error, :symlink_loop} = FileTree.children(root, "link_a")
+    end
+
+    test "relative symlink pointing inside project is allowed", %{root: root} do
+      # project/subdir/file.ex exists, project/link -> subdir (relative, in-tree)
+      subdir = Path.join(root, "subdir")
+      File.mkdir_p!(subdir)
+      File.write!(Path.join(subdir, "file.ex"), "in-project content")
+      File.ln_s!("subdir/file.ex", Path.join(root, "in_project_link.ex"))
+
+      assert {:ok, result} = FileTree.read_file(root, "in_project_link.ex")
+      assert result.content == "in-project content"
+      assert result.symlink? == true
+    end
+  end
+
   describe "root_path validation" do
     test "rejects nil root_path" do
       assert {:error, :missing_root_path} = FileTree.children(nil, "")

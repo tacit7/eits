@@ -45,6 +45,17 @@ import {PushSetup} from "./push_notifications"
 import {SwipeRow} from "./hooks/swipe_row"
 import {ConfigChatGuide} from "./hooks/config_chat_guide"
 import {CodeMirrorHook} from "./hooks/codemirror"
+const FileEditorRelay = {
+  mounted() {
+    this._handler = (e) => {
+      this.pushEventTo("#app-rail", "file_save", e.detail)
+    }
+    window.addEventListener("file:save", this._handler)
+  },
+  destroyed() {
+    window.removeEventListener("file:save", this._handler)
+  },
+}
 import {NoteEditorHook} from "./hooks/note_editor"
 import {NoteFullEditorHook} from "./hooks/note_full_editor"
 import {SortableKanban, SortableColumns} from "./hooks/sortable_kanban"
@@ -103,6 +114,7 @@ Hooks.FileAttach = FileAttach
 Hooks.SwipeRow = SwipeRow
 Hooks.ConfigChatGuide = ConfigChatGuide
 Hooks.CodeMirror = CodeMirrorHook
+Hooks.FileEditorRelay = FileEditorRelay
 Hooks.NoteEditor = NoteEditorHook
 Hooks.NoteFullEditor = NoteFullEditorHook
 Hooks.SortableKanban = SortableKanban
@@ -149,6 +161,16 @@ const liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+
+window.addEventListener("phx:file-editor-open", () => {
+  document.getElementById("app-rail")?.classList.add("flex-1")
+  document.getElementById("main-content-wrapper")?.classList.add("hidden")
+})
+
+window.addEventListener("phx:file-editor-close", () => {
+  document.getElementById("app-rail")?.classList.remove("flex-1")
+  document.getElementById("main-content-wrapper")?.classList.remove("hidden")
+})
 
 window.addEventListener("phx:copy_to_clipboard", (e) => {
   const { text, format, error } = e.detail

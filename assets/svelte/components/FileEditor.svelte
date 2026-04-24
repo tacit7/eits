@@ -4,15 +4,25 @@
 
   export let live
   export let content = ''
-  export let lang = 'text'
-  export let filePath = ''
+  export let lang = ''
+  export let path = ''
+  export let hash = ''
   export let readonly = false
 
   let langExtension = null
   let themeExtension = null
+  let settingsExtensions = []
+  let tabSize = 2
   let value = content
-  let dirty = false
-  let saving = false
+  let currentHash = hash
+  let loadError = null
+
+  $: if (content !== value && content !== undefined) {
+    value = content
+  }
+  $: if (hash !== currentHash && hash !== undefined) {
+    currentHash = hash
+  }
 
   async function loadLang(l) {
     switch (l) {
@@ -20,19 +30,21 @@
         const { elixir } = await import('codemirror-lang-elixir')
         return elixir()
       }
-      case 'javascript': case 'js': case 'ts': {
+      case 'javascript':
+      case 'typescript': {
         const { javascript } = await import('@codemirror/lang-javascript')
-        return javascript()
+        return javascript({ typescript: l === 'typescript' })
       }
       case 'css': {
         const { css } = await import('@codemirror/lang-css')
         return css()
       }
-      case 'html': case 'heex': {
+      case 'html':
+      case 'heex': {
         const { html } = await import('@codemirror/lang-html')
         return html()
       }
-      case 'markdown': case 'md': {
+      case 'markdown': {
         const { markdown } = await import('@codemirror/lang-markdown')
         return markdown()
       }
@@ -40,14 +52,16 @@
         const { json } = await import('@codemirror/lang-json')
         return json()
       }
-      case 'shell': case 'sh': case 'bash': {
+      case 'shell':
+      case 'bash': {
         const [{ StreamLanguage }, { shell }] = await Promise.all([
           import('@codemirror/language'),
           import('@codemirror/legacy-modes/mode/shell'),
         ])
         return StreamLanguage.define(shell)
       }
-      default: return null
+      default:
+        return null
     }
   }
 
@@ -70,84 +84,129 @@
         return bespin
       }
       default: {
-        // dark
         const { oneDark } = await import('@codemirror/theme-one-dark')
         return oneDark
       }
     }
   }
 
-  onMount(async () => {
-    const appTheme = document.documentElement.dataset.theme || 'dark'
-    ;[langExtension, themeExtension] = await Promise.all([
-      loadLang(lang),
-      loadTheme(appTheme),
+  async function buildSettingsExtensions(size, fontSize, vimEnabled) {
+    const [{ EditorView }, { EditorState }, { indentUnit }] = await Promise.all([
+      import('@codemirror/view'),
+      import('@codemirror/state'),
+      import('@codemirror/language'),
     ])
+    const exts = [
+      EditorState.tabSize.of(size),
+      indentUnit.of(' '.repeat(size)),
+      EditorView.theme({
+        "&": { fontSize: fontSize + 'px' },
+        ".cm-scroller": { fontFamily: 'monospace' },
+      }),
+    ]
+    if (vimEnabled) {
+      const { vim } = await import('@replit/codemirror-vim')
+      exts.push(vim())
+    }
+    return exts
+  }
 
-    window.addEventListener('phx:apply_theme', handleThemeChange)
-    window.addEventListener('keydown', handleKeydown)
+  onMount(() => {
+    // onMount must be sync — async would return a Promise instead of a cleanup fn
+    // and Svelte would skip listener teardown, leaking handlers across remounts.
+    const onTheme = async ({ detail }) => {
+      try { themeExtension = await loadTheme(detail.theme) } catch (_) {}
+    }
+
+    const onCmSettings = async ({ detail }) => {
+      const size = parseInt(detail.cm_tab_size || document.documentElement.dataset.cmTabSize || '2', 10)
+      const fontSize = detail.cm_font_size || document.documentElement.dataset.cmFontSize || '14'
+      const vimEnabled = detail.cm_vim !== undefined
+        ? detail.cm_vim === 'true'
+        : document.documentElement.dataset.cmVim === 'true'
+      tabSize = size
+      settingsExtensions = await buildSettingsExtensions(size, fontSize, vimEnabled)
+    }
+
+    const onKeydown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        save()
+      }
+    }
+
+    window.addEventListener('phx:apply_theme', onTheme)
+    window.addEventListener('phx:apply_cm_settings', onCmSettings)
+    window.addEventListener('keydown', onKeydown)
+
+    // Async init runs in the background; cleanup is registered synchronously above.
+    ;(async () => {
+      const appTheme = document.documentElement.dataset.theme || 'dark'
+      const ds = document.documentElement.dataset
+      const initSize = parseInt(ds.cmTabSize || '2', 10)
+      const initFont = ds.cmFontSize || '14'
+      const initVim = ds.cmVim === 'true'
+
+      tabSize = initSize
+      try {
+        ;[langExtension, themeExtension, settingsExtensions] = await Promise.all([
+          loadLang(lang),
+          loadTheme(appTheme),
+          buildSettingsExtensions(initSize, initFont, initVim),
+        ])
+      } catch (err) {
+        console.error('FileEditor: failed to load CodeMirror extensions:', err)
+        loadError = 'Editor failed to load. Try refreshing.'
+        // Attempt minimal fallback so the editor still renders
+        try { themeExtension = await loadTheme('dark') } catch (_) { themeExtension = null }
+        langExtension = null
+        settingsExtensions = []
+      }
+    })()
+
     return () => {
-      window.removeEventListener('phx:apply_theme', handleThemeChange)
-      window.removeEventListener('keydown', handleKeydown)
+      window.removeEventListener('phx:apply_theme', onTheme)
+      window.removeEventListener('phx:apply_cm_settings', onCmSettings)
+      window.removeEventListener('keydown', onKeydown)
     }
   })
 
-  async function handleThemeChange({ detail }) {
-    themeExtension = await loadTheme(detail.theme)
-  }
-
-  function handleKeydown(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-      e.preventDefault()
-      save()
-    }
-  }
-
   function handleChange(newValue) {
     value = newValue
-    dirty = value !== content
   }
 
   function save() {
-    if (readonly || saving || !dirty) return
-    saving = true
-    live.pushEvent('file_save', { content: value }, (reply) => {
-      saving = false
-      if (reply && reply.ok) {
-        dirty = false
-        content = value
-      }
-    })
+    if (readonly) return
+    window.dispatchEvent(new CustomEvent('file:save', {
+      detail: { path, content: value, original_hash: currentHash }
+    }))
   }
 </script>
 
-<div class="flex flex-col h-full">
-  <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 shrink-0 bg-base-100">
-    <span class="text-xs text-base-content/50 font-mono">{filePath}</span>
-    {#if !readonly}
-      <button
-        class="btn btn-xs btn-primary"
-        disabled={!dirty || saving}
-        on:click={save}
-      >
-        {saving ? 'Saving…' : 'Save'}
-      </button>
-    {/if}
-  </div>
-
-  <div class="flex-1 min-h-0 overflow-hidden">
-    {#if langExtension !== undefined && themeExtension !== undefined}
-      <CodeMirror
-        value={content}
-        lang={langExtension}
-        theme={themeExtension}
-        {readonly}
-        lineNumbers={true}
-        useTab={true}
-        tabSize={2}
-        styles={{ "&": { height: "100%" }, ".cm-scroller": { overflow: "auto" } }}
-        onchange={handleChange}
-      />
-    {/if}
-  </div>
+<div class="h-full overflow-hidden flex flex-col">
+  {#if loadError}
+    <div class="text-xs text-error px-3 py-1 bg-base-200 border-b border-base-300 shrink-0">
+      {loadError}
+    </div>
+  {/if}
+  {#if langExtension !== undefined && themeExtension !== undefined}
+    <CodeMirror
+      value={content}
+      lang={langExtension}
+      theme={themeExtension}
+      extensions={settingsExtensions}
+      {tabSize}
+      {readonly}
+      lineNumbers={true}
+      useTab={true}
+      styles={{
+        "&": { height: "100%", flex: "1 1 0%", minHeight: "0", backgroundColor: "oklch(var(--b1))" },
+        ".cm-scroller": { overflow: "auto" },
+        ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))" },
+        ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))" },
+        ".cm-activeLine": { backgroundColor: "oklch(var(--b3) / 0.4)" },
+      }}
+      on:change={(e) => handleChange(e.detail)}
+    />
+  {/if}
 </div>

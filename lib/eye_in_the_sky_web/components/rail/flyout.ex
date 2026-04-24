@@ -436,53 +436,41 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp nav_links(%{section: :tasks} = assigns) do
     ~H"""
-    <.simple_link href="/tasks" label="All Tasks" icon="hero-clipboard-document-list" />
-    <%= if @project do %>
       <.simple_link
         href={"/projects/#{@project.id}/kanban"}
         label={"#{@project.name} Board"}
         icon="hero-squares-2x2"
       />
-    <% end %>
     """
   end
 
   defp nav_links(%{section: :prompts} = assigns) do
     ~H"""
-    <.simple_link href="/prompts" label="All Prompts" icon="hero-chat-bubble-left-right" />
-    <%= if @project do %>
       <.simple_link
         href={"/projects/#{@project.id}/prompts"}
         label={"#{@project.name} Prompts"}
         icon="hero-folder"
       />
-    <% end %>
     """
   end
 
   defp nav_links(%{section: :notes} = assigns) do
     ~H"""
-    <.simple_link href="/notes" label="All Notes" icon="hero-document-text" />
-    <%= if @project do %>
       <.simple_link
         href={"/projects/#{@project.id}/notes"}
         label={"#{@project.name} Notes"}
         icon="hero-folder"
       />
-    <% end %>
     """
   end
 
   defp nav_links(%{section: :sessions} = assigns) do
     ~H"""
-    <.simple_link href="/sessions" label="All Sessions" icon="hero-cpu-chip" />
-    <%= if @project do %>
-      <.simple_link
-        href={"/projects/#{@project.id}/sessions"}
-        label="List"
-        icon="hero-list-bullet"
-      />
-    <% end %>
+    <.simple_link
+      href={"/projects/#{@project.id}/sessions"}
+      label="List"
+      icon="hero-list-bullet"
+    />
     """
   end
 

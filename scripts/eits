@@ -13,6 +13,10 @@ set -euo pipefail
 BASE_URL="${EITS_URL:-http://localhost:5001/api/v1}"
 AUTH_ARGS=()
 [[ -n "${EITS_API_KEY:-}" ]] && AUTH_ARGS=(-H "Authorization: Bearer ${EITS_API_KEY}")
+# Any call with a session UUID is treated as orchestrator traffic for rate-limit bucketing.
+# Phase 2 will switch to per-session bucketing; this header is the Phase 1 stopgap.
+ROLE_ARGS=()
+[[ -n "${EITS_SESSION_UUID:-}" ]] && ROLE_ARGS=(-H "x-eits-role: orchestrator")
 
 # Check deps
 command -v curl &>/dev/null || { echo "error: curl is required" >&2; exit 1; }
@@ -31,7 +35,7 @@ _backoff() {
 _curl() {
   local _body _status _attempt=0 _delay=2
   while [[ $_attempt -lt 4 ]]; do
-    _body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$@")
+    _body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" "$@")
     _status="${_body##*$'\n'}"
     _body="${_body%$'\n'*}"
     if [[ "$_status" == "429" ]]; then
@@ -388,7 +392,7 @@ cmd_tasks() {
         local _ann_body _ann_status
         _ann_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
           -H "Content-Type: application/json" \
-          "${AUTH_ARGS[@]}" \
+          "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" \
           -d "$_ann_payload" \
           "$BASE_URL/tasks/$id/annotations")
         _ann_status="${_ann_body##*$'\n'}"
@@ -457,7 +461,7 @@ cmd_tasks() {
         local _comp_body _comp_status
         _comp_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
           -H "Content-Type: application/json" \
-          "${AUTH_ARGS[@]}" \
+          "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" \
           -d "$_comp_payload" \
           "$BASE_URL/tasks/$id/complete")
         _comp_status="${_comp_body##*$'\n'}"
@@ -935,7 +939,7 @@ USAGE
       while [[ $_sp_attempt -le 3 ]]; do
         _sp_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
           -H "Content-Type: application/json" \
-          "${AUTH_ARGS[@]}" \
+          "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" \
           -d "$payload" \
           "$BASE_URL/agents")
         _sp_status="${_sp_body##*$'\n'}"
@@ -1582,7 +1586,7 @@ HELP
         local spawn_failed_count=0 _wait_delay=2
         while true; do
           local resp _wait_body _wait_status
-          _wait_body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "$BASE_URL/teams/$id")
+          _wait_body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" "$BASE_URL/teams/$id")
           _wait_status="${_wait_body##*$'\n'}"
           _wait_body="${_wait_body%$'\n'*}"
           # Only retry on rate-limit (429) or server errors (5xx) — all other 4xx are permanent.
@@ -1859,7 +1863,7 @@ EOF
         local payload; payload=$(json body "$body" title "$title")
         body_out=$(curl -sk --write-out '\n%{http_code}' -X POST \
           -H "Content-Type: application/json" \
-          "${AUTH_ARGS[@]}" \
+          "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" \
           -d "$payload" \
           "$BASE_URL/tasks/$task_id/annotations" 2>/dev/null) || body_out=$'\n000'
         status="${body_out##*$'\n'}"

@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   alias EyeInTheSky.{
     Canvases,
     Channels,
+    Notes,
     Notifications,
     Projects,
     ScheduledJobs,
@@ -75,6 +76,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_filter_open: false,
         session_sort: :last_activity,
         session_name_filter: "",
+        flyout_notes: [],
         flyout_jobs: [],
         flyout_file_nodes: [],
         flyout_file_expanded: MapSet.new(),
@@ -168,6 +170,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> maybe_load_teams(next_section, sidebar_project)
         |> maybe_load_tasks(next_section, sidebar_project)
         |> maybe_load_jobs(next_section)
+        |> maybe_load_notes(next_section)
         |> maybe_load_files(next_section)
       else
         socket
@@ -213,6 +216,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> maybe_load_teams(section, socket.assigns.sidebar_project)
        |> maybe_load_tasks(section, socket.assigns.sidebar_project)
        |> maybe_load_jobs(section)
+       |> maybe_load_notes(section)
        |> maybe_load_files(section)}
     end
   end
@@ -342,6 +346,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("set_bookmark", params, socket),
     do: ProjectActions.handle_set_bookmark(params, socket)
+
+  def handle_event("new_note", _params, socket),
+    do: {:noreply, push_navigate(socket, to: "/notes/new")}
 
   def handle_event("not_implemented", _params, socket),
     do: {:noreply, put_flash(socket, :info, "Not implemented yet")}
@@ -537,6 +544,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
         notification_count={@notification_count}
+        flyout_notes={@flyout_notes}
         flyout_jobs={@flyout_jobs}
         flyout_file_nodes={@flyout_file_nodes}
         flyout_file_expanded={@flyout_file_expanded}
@@ -726,6 +734,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   defp maybe_load_jobs(socket, _section), do: socket
+
+  defp maybe_load_notes(socket, :notes) do
+    notes = Notes.list_notes_filtered(limit: 20)
+    assign(socket, :flyout_notes, notes)
+  end
+
+  defp maybe_load_notes(socket, _section), do: socket
 
   defp maybe_load_files(socket, :files) do
     project = socket.assigns.sidebar_project

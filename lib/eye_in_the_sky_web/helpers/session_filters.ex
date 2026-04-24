@@ -63,18 +63,16 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   @doc """
   Filters sessions by status/archive state.
 
-  Filters: "active", "completed", "archived", or any other value passes all through.
+  Filters: "working", "archived", or any other value passes all through.
   """
   def filter_agents_by_status(sessions, filter) do
     case filter do
-      "active" ->
+      "working" ->
         Enum.filter(
           sessions,
-          &(&1.status in ["working", "idle", nil] and is_nil(&1.archived_at))
+          &(&1.status in ["working", "idle", "waiting", "compacting", nil] and
+              is_nil(&1.archived_at))
         )
-
-      "completed" ->
-        Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
 
       "archived" ->
         Enum.filter(sessions, &(not is_nil(&1.archived_at)))
@@ -113,12 +111,20 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   end
 
   @doc """
-  Sorts sessions by "name", "status", "created", "last_message", or "recent" (default).
+  Sorts sessions by "name", "agent", "model", "status", "created", "last_message", or "recent" (default).
   """
   def sort_agents(sessions, sort_by) do
     case sort_by do
       "name" ->
         Enum.sort_by(sessions, fn s -> (s.name || "") |> String.downcase() end)
+
+      "agent" ->
+        Enum.sort_by(sessions, fn s ->
+          (s.agent && (s.agent.description || s.agent.project_name) || "") |> String.downcase()
+        end)
+
+      "model" ->
+        Enum.sort_by(sessions, fn s -> (s.model_name || s.model || "") |> String.downcase() end)
 
       "status" ->
         Enum.sort_by(sessions, &session_status_rank/1)

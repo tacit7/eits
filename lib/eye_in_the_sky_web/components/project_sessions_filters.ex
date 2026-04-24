@@ -35,8 +35,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
           <%= for {label, filter, active_class} <- [
             {"All", "all", "bg-base-100 text-base-content shadow-sm"},
-            {"Active", "active", "bg-base-100 text-success shadow-sm"},
-            {"Completed", "completed", "bg-base-100 text-base-content shadow-sm"},
+            {"Working", "working", "bg-base-100 text-success shadow-sm"},
             {"Archived", "archived", "bg-base-100 text-warning shadow-sm"}
           ] do %>
             <button
@@ -58,8 +57,9 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
           <%= for {label, sort} <- [
             {"Last msg", "last_message"},
-            {"Created", "created"},
-            {"Name", "name"}
+            {"Name", "name"},
+            {"Agent", "agent"},
+            {"Model", "model"}
           ] do %>
             <button
               phx-click="sort"
@@ -140,8 +140,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
           <div class="flex flex-wrap gap-2">
             <%= for {label, filter} <- [
               {"All", "all"},
-              {"Active", "active"},
-              {"Completed", "completed"},
+              {"Working", "working"},
               {"Archived", "archived"}
             ] do %>
               <button
@@ -165,7 +164,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
             Sort by
           </legend>
           <div class="flex flex-wrap gap-2">
-            <%= for {label, sort} <- [{"Last Message", "last_message"}, {"Created", "created"}, {"Name", "name"}, {"Status", "status"}] do %>
+            <%= for {label, sort} <- [{"Last Message", "last_message"}, {"Name", "name"}, {"Agent", "agent"}, {"Model", "model"}] do %>
               <button
                 phx-click="sort"
                 phx-value-by={sort}

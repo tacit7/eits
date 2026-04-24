@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
   attr :notification_count, :integer, default: 0
+  attr :flyout_notes, :list, default: []
   attr :flyout_jobs, :list, default: []
   attr :flyout_file_nodes, :list, default: []
   attr :flyout_file_expanded, :any, default: nil
@@ -79,6 +80,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               </span>
             </div>
           <% end %>
+          <%= if @active_section == :notes do %>
+            <button
+              phx-click="new_note"
+              phx-target={@myself}
+              title="New note"
+              class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+            >
+              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+            </button>
+          <% end %>
           <%= if @active_section == :sessions do %>
             <%= if @sidebar_project do %>
               <button
@@ -124,7 +135,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :chat -> %>
               <.chat_content channels={@flyout_channels} active_channel_id={@active_channel_id} myself={@myself} />
             <% :notes -> %>
-              <.nav_links project={@sidebar_project} section={:notes} />
+              <.notes_content notes={@flyout_notes} myself={@myself} />
             <% :skills -> %>
               <.simple_link href="/skills" label="All Skills" icon="hero-bolt" />
             <% :teams -> %>
@@ -299,6 +310,32 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp task_state_dot(3), do: "bg-green-500"
   defp task_state_dot(4), do: "bg-amber-400"
   defp task_state_dot(_), do: "bg-base-content/20"
+
+  # Notes flyout: last 20 notes with body preview
+  attr :notes, :list, default: []
+  attr :myself, :any, required: true
+
+  defp notes_content(assigns) do
+    ~H"""
+    <%= for note <- @notes do %>
+      <.link
+        navigate={"/notes/#{note.id}/edit"}
+        class="flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+      >
+        <%= if note.title && note.title != "" do %>
+          <span class="truncate font-medium text-base-content/80">{note.title}</span>
+          <span class="truncate text-base-content/40">{note.body}</span>
+        <% else %>
+          <span class="truncate">{note.body}</span>
+        <% end %>
+        <span class="text-[10px] text-base-content/30 uppercase tracking-wide">{note.parent_type}</span>
+      </.link>
+    <% end %>
+    <%= if @notes == [] do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No notes</div>
+    <% end %>
+    """
+  end
 
   # Teams flyout: list teams for the current project
   attr :teams, :list, default: []

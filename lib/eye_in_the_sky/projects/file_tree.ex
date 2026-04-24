@@ -26,7 +26,8 @@ defmodule EyeInTheSky.Projects.FileTree do
   """
   def children(root_path, rel_path, opts \\ []) do
     with :ok <- validate_root_path(root_path),
-         {:ok, abs_path} <- safe_path(root_path, rel_path) do
+         {:ok, abs_path} <- safe_path(root_path, rel_path),
+         {:ok, _real_path} <- validate_real_path_inside_root(abs_path, root_path) do
       list_directory(abs_path, root_path, opts)
     end
   end
@@ -38,6 +39,7 @@ defmodule EyeInTheSky.Projects.FileTree do
     with :ok <- validate_root_path(root_path),
          :ok <- validate_file_path(rel_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
+         {:ok, _real_path} <- validate_real_path_inside_root(abs_path, root_path),
          {:ok, symlink?} <- check_if_symlink(abs_path),
          {:ok, abs_path} <- check_symlink_safety(abs_path, root_path),
          {:ok, stat} <- stat_file(abs_path),
@@ -76,6 +78,7 @@ defmodule EyeInTheSky.Projects.FileTree do
     with :ok <- validate_root_path(root_path),
          :ok <- validate_file_path(rel_path),
          {:ok, abs_path} <- safe_path(root_path, rel_path),
+         {:ok, _real_path} <- validate_real_path_inside_root(abs_path, root_path),
          :ok <- validate_utf8(content),
          {:ok, stat} <- stat_for_write(abs_path),
          :ok <- validate_write_target(stat),
@@ -124,6 +127,95 @@ defmodule EyeInTheSky.Projects.FileTree do
   defp validate_file_path(_), do: :ok
 
   # --- Symlink Safety ---
+
+  # Resolves the full real path (following all symlinks in the path chain)
+  # and validates it stays inside the project root.
+  # This catches symlinked ancestor directories that escape the project.
+  defp validate_real_path_inside_root(abs_path, root_path) do
+    # Resolve the real root path (in case root itself contains symlinks like /var -> /private/var)
+    {:ok, real_root} = resolve_path_via_parent(Path.expand(root_path))
+
+    # For existing paths, resolve the real path
+    # For non-existing paths (new files), resolve parent directory
+    real_path =
+      case File.exists?(abs_path) do
+        true ->
+          resolve_path_via_parent(abs_path)
+
+        false ->
+          # Path doesn't exist - resolve parent and append basename
+          parent = Path.dirname(abs_path)
+          basename = Path.basename(abs_path)
+
+          case File.exists?(parent) do
+            true ->
+              case resolve_path_via_parent(parent) do
+                {:ok, real_parent} -> {:ok, Path.join(real_parent, basename)}
+                error -> error
+              end
+
+            false ->
+              # Parent doesn't exist either - use lexical path
+              {:ok, abs_path}
+          end
+      end
+
+    case real_path do
+      {:ok, resolved} ->
+        if resolved == real_root or String.starts_with?(resolved, real_root <> "/") do
+          {:ok, resolved}
+        else
+          {:error, :symlink_escapes_project}
+        end
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  # Resolve path by resolving each component, following symlinks at each level
+  defp resolve_path_via_parent(path) do
+    parent = Path.dirname(path)
+    basename = Path.basename(path)
+
+    if parent == path do
+      # Root directory
+      {:ok, path}
+    else
+      case resolve_path_via_parent(parent) do
+        {:ok, real_parent} ->
+          full_path = Path.join(real_parent, basename)
+
+          # Check if this component is a symlink
+          case File.read_link(full_path) do
+            {:ok, target} ->
+              resolved =
+                if Path.type(target) == :absolute do
+                  target
+                else
+                  Path.expand(target, real_parent)
+                end
+
+              # Recursively resolve the target
+              resolve_path_via_parent(resolved)
+
+            {:error, :einval} ->
+              # Not a symlink
+              {:ok, full_path}
+
+            {:error, :enoent} ->
+              # Doesn't exist - return the path anyway
+              {:ok, full_path}
+
+            {:error, _} ->
+              {:ok, full_path}
+          end
+
+        error ->
+          error
+      end
+    end
+  end
 
   defp check_if_symlink(abs_path) do
     case File.lstat(abs_path) do

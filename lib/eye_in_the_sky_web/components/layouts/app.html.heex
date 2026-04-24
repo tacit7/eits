@@ -68,7 +68,9 @@
     <.top_bar
       sidebar_tab={assigns[:sidebar_tab] || :sessions}
       sidebar_project={assigns[:sidebar_project]}
-      top_bar_cta={assigns[:top_bar_cta]}
+      top_bar_cta_label={assigns[:top_bar_cta] && assigns[:top_bar_cta].label}
+      top_bar_cta_href={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :href)}
+      top_bar_cta_event={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :event)}
       search_query={assigns[:search_query]}
       session_filter={assigns[:session_filter]}
       filter_state_id={assigns[:filter_state_id]}

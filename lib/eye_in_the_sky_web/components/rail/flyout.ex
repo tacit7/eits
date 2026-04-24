@@ -50,10 +50,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
               >
                 <%= if @active_section == :tasks do %>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect width="18" height="18" x="3" y="3" rx="2"/>
-                    <path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>
-                  </svg>
+                  <.lucide_kanban />
                 <% else %>
                   <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
                 <% end %>
@@ -66,10 +63,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 class="w-5 h-5 flex items-center justify-center rounded text-base-content/20 hover:text-base-content/40 hover:bg-base-content/5 transition-colors flex-shrink-0"
               >
                 <%= if @active_section == :tasks do %>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect width="18" height="18" x="3" y="3" rx="2"/>
-                    <path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>
-                  </svg>
+                  <.lucide_kanban />
                 <% else %>
                   <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
                 <% end %>
@@ -646,5 +640,26 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp status_dot_class("working"), do: "bg-green-500"
   defp status_dot_class("waiting"), do: "bg-amber-400"
   defp status_dot_class(_), do: "bg-base-content/25"
+
+  # Lucide kanban icon — used in the tasks flyout header.
+  # Heroicons has no equivalent; inline SVG is an approved exception here.
+  defp lucide_kanban(assigns) do
+    ~H"""
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M8 7v7" /><path d="M12 7v4" /><path d="M16 7v9" />
+    </svg>
+    """
+  end
 
 end

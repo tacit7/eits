@@ -45,38 +45,40 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>
         <div class="px-2.5 py-2.5 border-b border-base-content/8 flex-shrink-0 flex items-center gap-1">
-          <%= if dual_page_section?(@active_section) do %>
-            <%!-- Project route link: kanban icon for tasks, list icon for others --%>
-            <%= if project_route_for(@active_section, @sidebar_project) do %>
-              <.link
-                navigate={project_route_for(@active_section, @sidebar_project)}
-                title={"#{@sidebar_project.name} #{section_label(@active_section)}"}
-                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
-              >
+          <%!-- Icon + label: single link when a page route exists, plain div otherwise --%>
+          <%= if dual_page_section?(@active_section) && project_route_for(@active_section, @sidebar_project) do %>
+            <.link
+              navigate={project_route_for(@active_section, @sidebar_project)}
+              title={"#{@sidebar_project.name} #{section_label(@active_section)}"}
+              class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
+            >
+              <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
                 <%= if @active_section == :tasks do %>
                   <.lucide_kanban />
                 <% else %>
                   <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
                 <% end %>
-              </.link>
-            <% else %>
-              <button
-                phx-click="not_implemented"
-                phx-target={@myself}
-                title="Not available"
-                class="w-5 h-5 flex items-center justify-center rounded text-base-content/20 hover:text-base-content/40 hover:bg-base-content/5 transition-colors flex-shrink-0"
-              >
-                <%= if @active_section == :tasks do %>
-                  <.lucide_kanban />
-                <% else %>
-                  <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
-                <% end %>
-              </button>
-            <% end %>
+              </span>
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+                {section_label(@active_section)}
+              </span>
+            </.link>
+          <% else %>
+            <div class="flex-1 min-w-0 flex items-center gap-1.5">
+              <%= if dual_page_section?(@active_section) do %>
+                <span class="flex-shrink-0 flex items-center justify-center text-base-content/20">
+                  <%= if @active_section == :tasks do %>
+                    <.lucide_kanban />
+                  <% else %>
+                    <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+                  <% end %>
+                </span>
+              <% end %>
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40 truncate">
+                {section_label(@active_section)}
+              </span>
+            </div>
           <% end %>
-          <span class="flex-1 text-[10px] font-semibold uppercase tracking-widest text-base-content/40 truncate">
-            {section_label(@active_section)}
-          </span>
           <%= if @active_section == :sessions do %>
             <%= if @sidebar_project do %>
               <button

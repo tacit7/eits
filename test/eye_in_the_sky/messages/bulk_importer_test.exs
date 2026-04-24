@@ -385,7 +385,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       assert new_msg != nil
     end
 
-    test "importing_from_file?: true bypasses agent_reply_already_recorded? guard", %{
+    test "agent reply within 30s is skipped even when importing_from_file?: true", %{
       session: session
     } do
       sdk_uuid = Ecto.UUID.generate()
@@ -409,7 +409,44 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
         %{uuid: jsonl_uuid, role: "assistant", content: "Some agent output.", timestamp: nil, usage: nil}
       ]
 
-      # File import — guard must NOT fire; JSONL replay should attempt insert normally
+      count =
+        BulkImporter.import_messages(messages, session.id,
+          provider: "claude",
+          importing_from_file?: true
+        )
+
+      # Guard fires regardless of importing_from_file? — deduped to the existing record
+      assert count == 1
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert length(db_messages) == 1
+      assert hd(db_messages).source_uuid == sdk_uuid
+    end
+
+    test "regression: record_incoming_reply + BulkImporter with importing_from_file?: true yields one row",
+         %{session: session} do
+      sdk_uuid = Ecto.UUID.generate()
+
+      # Simulate AgentWorker calling record_incoming_reply (SDK result UUID as source_uuid)
+      {:ok, _sdk_row} =
+        Messages.create_message(%{
+          uuid: Ecto.UUID.generate(),
+          source_uuid: sdk_uuid,
+          session_id: session.id,
+          sender_role: "agent",
+          recipient_role: "user",
+          direction: "inbound",
+          body: "Hello from agent.",
+          status: "delivered",
+          provider: "claude"
+        })
+
+      # BulkImporter runs from session file sync — different (JSONL) uuid, same body
+      jsonl_uuid = Ecto.UUID.generate()
+
+      messages = [
+        %{uuid: jsonl_uuid, role: "assistant", content: "Hello from agent.", timestamp: nil, usage: nil}
+      ]
+
       count =
         BulkImporter.import_messages(messages, session.id,
           provider: "claude",
@@ -418,9 +455,8 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
       assert count == 1
       db_messages = Messages.list_messages_for_session(session.id)
-      # The find_unlinked_import_candidate path links the existing record (no new insert)
-      # OR a second row is inserted — either way the guard itself did NOT block it
-      assert length(db_messages) >= 1
+      assert length(db_messages) == 1
+      assert hd(db_messages).source_uuid == sdk_uuid
     end
   end
 

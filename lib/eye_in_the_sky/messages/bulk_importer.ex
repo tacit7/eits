@@ -192,12 +192,11 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       # check misses, and find_unlinked_import_candidate requires
       # source_uuid IS NULL so it also misses, causing a second insert with
       # the JSONL UUID. Skip when a recent agent message with the same body
-      # already exists. 30 s covers the AgentWorker → agent_stopped →
-      # BulkImporter pipeline (typically < 10 s) while keeping the false-
-      # positive window tight enough that repeated identical agent output
-      # in normal conversation is not dropped.
+      # already exists. The 30 s window is narrow enough that an old file
+      # backfill cannot false-positive against now() — the guard only skips
+      # when record_incoming_reply just wrote a matching row, which is the
+      # exact race we are closing.
       msg.role != "user" and
-          not Keyword.get(import_opts, :importing_from_file?, false) and
           agent_reply_already_recorded?(session_id, msg.content) ->
         {upd_acc, ins_acc, skip_count + 1}
 

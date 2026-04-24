@@ -52,6 +52,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   end
 
   # ---------------------------------------------------------------------------
+  # Params — show_all toggle
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_params(%{"show_all" => "true"} = _params, _uri, socket) do
+    {:noreply, assign(socket, :scope, :all)}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    project_id = socket.assigns[:project_id]
+    {:noreply, assign(socket, :scope, project_id || :all)}
+  end
+
+  # ---------------------------------------------------------------------------
   # Events — filter/search/pagination
   # ---------------------------------------------------------------------------
 

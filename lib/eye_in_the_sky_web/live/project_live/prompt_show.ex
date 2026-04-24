@@ -15,14 +15,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
   def handle_params(%{"prompt_id" => prompt_uuid} = _params, _url, socket) do
     prompt = Prompts.get_prompt_by_uuid!(prompt_uuid)
 
-    socket =
-      socket
-      |> assign(:page_title, "Prompt: #{prompt.name}")
-      |> assign(:prompt, prompt)
-      |> assign(:editing, false)
-      |> assign(:form, to_form(Prompts.change_prompt(prompt)))
+    project = socket.assigns.project
 
-    {:noreply, socket}
+    if prompt.project_id && project && prompt.project_id != to_string(project.id) do
+      {:noreply,
+       socket
+       |> put_flash(:error, "Prompt not found in this project")
+       |> push_navigate(to: ~p"/projects/#{project.id}/prompts")}
+    else
+      socket =
+        socket
+        |> assign(:page_title, "Prompt: #{prompt.name}")
+        |> assign(:prompt, prompt)
+        |> assign(:editing, false)
+        |> assign(:form, to_form(Prompts.change_prompt(prompt)))
+
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -242,7 +251,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
           </div>
         <% end %>
 
-        <%= if not is_nil(@prompt.tags) || not is_nil(@prompt.created_by) || not is_nil(@prompt.project_id) do %>
+        <%= if @prompt.tags || @prompt.created_by || @prompt.project_id do %>
           <div class="card bg-base-100 shadow-xl mt-6">
             <div class="card-body">
               <h2 class="card-title text-lg">Additional Information</h2>

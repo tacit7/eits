@@ -29,12 +29,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
   @impl true
   def handle_params(%{"show_all" => "true"} = _params, _uri, socket) do
-    teams = load_teams(socket, socket.assigns.show_archived, true)
+    teams =
+      if connected?(socket),
+        do: load_teams(socket, socket.assigns.show_archived, true),
+        else: []
+
     {:noreply, socket |> assign(:show_all, true) |> assign(:teams, teams)}
   end
 
   def handle_params(_params, _uri, socket) do
-    teams = load_teams(socket, socket.assigns.show_archived, false)
+    teams =
+      if connected?(socket),
+        do: load_teams(socket, socket.assigns.show_archived, false),
+        else: []
+
     {:noreply, socket |> assign(:show_all, false) |> assign(:teams, teams)}
   end
 

@@ -1,42 +1,38 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   use EyeInTheSkyWeb, :live_view
 
-  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
-
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Prompts
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
-    project_id = parse_int(id)
-
+  def mount(%{"id" => _} = params, _session, socket) do
     socket =
-      if project_id do
-        project =
-          Projects.get_project!(project_id)
-
-        socket =
-          socket
-          |> assign(:page_title, "Prompts - #{project.name}")
-          |> assign(:project, project)
-          |> assign(:sidebar_tab, :prompts)
-          |> assign(:sidebar_project, project)
-          |> assign(:project_id, project_id)
-          |> assign(:search_query, "")
-          |> assign(:prompts, [])
-
-        if connected?(socket), do: load_prompts(socket), else: socket
-      else
-        socket
-        |> assign(:page_title, "Project Not Found")
-        |> assign(:project, nil)
-        |> assign(:project_id, nil)
-        |> assign(:search_query, "")
-        |> assign(:prompts, [])
-        |> put_flash(:error, "Invalid project ID")
-      end
+      socket
+      |> mount_project(params, sidebar_tab: :prompts, page_title_prefix: "Prompts")
+      |> assign(:search_query, "")
+      |> assign(:show_all, false)
+      |> assign(:prompts, [])
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_params(%{"show_all" => "true"} = _params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:show_all, true)
+      |> then(fn s -> if connected?(s), do: load_prompts(s), else: s end)
+
+    {:noreply, socket}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:show_all, false)
+      |> then(fn s -> if connected?(s), do: load_prompts(s), else: s end)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -52,14 +48,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   end
 
   defp load_prompts(socket) do
-    project_id_str = Integer.to_string(socket.assigns.project_id)
+    show_all = Map.get(socket.assigns, :show_all, false)
     query = socket.assigns.search_query
 
     prompts =
-      if query != "" and String.trim(query) != "" do
-        Prompts.search_prompts(query, project_id_str)
+      if show_all do
+        if String.trim(query) != "" do
+          Prompts.search_prompts(query)
+        else
+          Prompts.list_prompts()
+        end
       else
-        Prompts.list_project_prompts(project_id_str)
+        project_id_str =
+          socket.assigns.project_id && Integer.to_string(socket.assigns.project_id)
+
+        if String.trim(query) != "" do
+          Prompts.search_prompts(query, project_id_str)
+        else
+          Prompts.list_project_prompts(project_id_str)
+        end
       end
 
     assign(socket, :prompts, prompts)

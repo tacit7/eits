@@ -664,8 +664,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       <%!-- Editor area --%>
       <%= if @active_tab do %>
         <div id="file-editor-relay" phx-hook="FileEditorRelay" class="hidden" />
+        <%!--
+          [&>div]:h-full punches height into the LiveSvelte wrapper div, which is
+          auto-height by default. Without it the editor collapses to 0 height since
+          the Svelte root's h-full has no anchor. LiveSvelte does not expose a
+          wrapperClass prop, so this Tailwind arbitrary selector is the cleanest fix.
+        --%>
         <div
-          id={"file-editor-#{:erlang.phash2(@active_tab.path)}"}
+          id={"file-editor-#{Base.url_encode64(@active_tab.path, padding: false)}"}
           phx-update="ignore"
           class="flex-1 overflow-hidden [&>div]:h-full"
         >

@@ -49,19 +49,19 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     case parse_int(project_id_str) do
       nil ->
         socket
-        |> assign(:sidebar_tab, :sessions)
+        |> assign(:sidebar_tab, :dm)
         |> assign(:sidebar_project, nil)
 
       pid ->
         socket
-        |> assign(:sidebar_tab, :sessions)
+        |> assign(:sidebar_tab, :dm)
         |> assign(:sidebar_project, Projects.get_project!(pid))
     end
   end
 
   def assign_sidebar_context(socket, _params) do
     socket
-    |> assign(:sidebar_tab, :sessions)
+    |> assign(:sidebar_tab, :dm)
     |> assign(:sidebar_project, nil)
   end
 

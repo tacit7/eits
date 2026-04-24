@@ -35,6 +35,10 @@ defmodule EyeInTheSkyWeb.Layouts do
   attr :show_completed, :boolean, default: nil
   attr :bulk_mode, :boolean, default: nil
   attr :active_filter_count, :integer, default: nil
+  # DM toolbar
+  attr :dm_active_tab, :string, default: nil
+  attr :dm_session_name, :string, default: nil
+  attr :dm_message_search_query, :string, default: nil
 
   def top_bar(assigns) do
     ~H"""
@@ -52,11 +56,57 @@ defmodule EyeInTheSkyWeb.Layouts do
           <span class="text-base-content/20 text-sm mx-1 select-none">/</span>
         <% end %>
         <span class="text-[12px] font-semibold text-base-content/75 px-1">
-          {top_bar_section_label(@sidebar_tab)}
+          <%= if @sidebar_tab == :dm && @dm_session_name do %>
+            {@dm_session_name}
+          <% else %>
+            {top_bar_section_label(@sidebar_tab)}
+          <% end %>
         </span>
       </div>
 
       <%= cond do %>
+        <% @sidebar_tab == :dm && not is_nil(@dm_active_tab) -> %>
+          <%!-- DM: tab navigation pills + optional message search --%>
+          <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+            <%= for {tab, label} <- [
+              {"messages", "Messages"},
+              {"tasks", "Tasks"},
+              {"commits", "Commits"},
+              {"notes", "Notes"}
+            ] do %>
+              <button
+                phx-click="change_tab"
+                phx-value-tab={tab}
+                class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
+                  if(@dm_active_tab == tab,
+                    do: "bg-base-100 text-base-content shadow-sm",
+                    else: "text-base-content/45 hover:text-base-content/70"
+                  )}
+              >
+                {label}
+              </button>
+            <% end %>
+          </div>
+          <%= if @dm_active_tab in ["messages", nil] && not is_nil(@dm_message_search_query) do %>
+            <form phx-change="search_messages" phx-submit="search_messages" class="ml-2 w-48">
+              <div class="relative">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                  <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
+                </div>
+                <input
+                  type="text"
+                  name="query"
+                  value={@dm_message_search_query}
+                  placeholder="Search messages..."
+                  autocomplete="off"
+                  phx-debounce="300"
+                  class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
+                />
+              </div>
+            </form>
+          <% end %>
+          <div class="flex-1" />
+
         <% @sidebar_tab == :sessions && not is_nil(@session_filter) -> %>
           <%!-- Sessions: inline search + filter tabs --%>
           <form phx-change="search" class="flex-1 max-w-xs">
@@ -285,6 +335,7 @@ defmodule EyeInTheSkyWeb.Layouts do
     """
   end
 
+  defp top_bar_section_label(:dm), do: "Session"
   defp top_bar_section_label(:sessions), do: "Sessions"
   defp top_bar_section_label(:overview), do: "Sessions"
   defp top_bar_section_label(:tasks), do: "Tasks"

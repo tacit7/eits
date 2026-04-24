@@ -657,7 +657,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div
           id={"file-editor-#{:erlang.phash2(@active_tab.path)}"}
           phx-update="ignore"
-          class="flex-1 overflow-hidden"
+          class="flex-1 overflow-hidden [&>div]:h-full"
         >
           <.svelte
             name="FileEditor"

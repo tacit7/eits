@@ -120,6 +120,26 @@ Order is safe: `update/2` runs before hook `mounted()` fires, so project-scoped 
 - Nav: "All Jobs" → `/jobs`; "Project Jobs" → `/projects/:id/jobs` when sidebar_project set
 - Empty state: "No jobs"
 
+## Dual-Page Section Header (globe + list icons)
+
+Merged in PR #273. Sections with both a global and project-scoped page show two icon buttons in the flyout header bar, left of the section label:
+
+- **Globe (Lucide inline SVG, 13×13)** → global route
+- **List (hero-list-bullet)** → project route when `sidebar_project` is set AND route exists; otherwise fires `not_implemented` event (flash toast "Not implemented yet")
+
+**Sections covered**: `:sessions`, `:tasks`, `:prompts`, `:notes`, `:skills`, `:jobs`
+
+**Helpers in `flyout.ex`**:
+- `dual_page_section?/1` — returns true for the above atoms
+- `global_route_for/1` — maps section atom → global path string
+- `project_route_for/2` — maps (section, project) → project-scoped path or nil (nil when no project or route not built)
+
+**`handle_event("not_implemented")` in `rail.ex`** — `put_flash(socket, :info, "Not implemented yet")`
+
+**Unimplemented project routes** (list icon always toasts): `:skills` → task #5225, agents (maps to :sessions) → task #5226.
+
+**Icon library note**: Globe uses Lucide inline SVG by explicit user preference — do NOT replace with `hero-globe-alt`. Lucide not installed as a package; inline the SVG directly in HEEx.
+
 ## Known Gotchas
 
 1. `transition-all` inside stream items causes flicker on reinsert — don't use it

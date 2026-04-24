@@ -204,12 +204,10 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   """
   def show(conn, %{"uuid" => id_or_uuid}) do
     with {:ok, session} <- resolve_session(id_or_uuid) do
-      agent_uuid = Helpers.resolve_agent_uuid(session.agent_id)
-
-      is_spawned =
+      {agent_uuid, is_spawned} =
         case Agents.get_agent(session.agent_id) do
-          {:ok, agent} -> not is_nil(agent.parent_agent_id)
-          _ -> false
+          {:ok, agent} -> {agent.uuid, not is_nil(agent.parent_agent_id)}
+          _ -> {nil, false}
         end
 
       tasks = Tasks.list_tasks_for_session(session.id)

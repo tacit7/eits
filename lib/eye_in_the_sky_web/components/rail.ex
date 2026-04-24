@@ -6,7 +6,17 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
 
-  alias EyeInTheSky.{Canvases, Channels, Notifications, Projects, ScheduledJobs, Sessions, Tasks, Teams}
+  alias EyeInTheSky.{
+    Canvases,
+    Channels,
+    Notifications,
+    Projects,
+    ScheduledJobs,
+    Sessions,
+    Tasks,
+    Teams
+  }
+
   alias EyeInTheSky.Projects.FileTree
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
   alias EyeInTheSkyWeb.Components.NewSessionModal
@@ -108,6 +118,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         %{sidebar_project: p} when not is_nil(p) -> p
         _ -> socket.assigns[:sidebar_project]
       end
+
     sidebar_tab = Map.get(assigns, :sidebar_tab, socket.assigns[:sidebar_tab] || :sessions)
     active_channel_id = Map.get(assigns, :active_channel_id, socket.assigns[:active_channel_id])
 
@@ -128,7 +139,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     socket =
       if sidebar_project != previous_project do
         socket
-        |> assign(:flyout_sessions, load_flyout_sessions(sidebar_project, socket.assigns.session_sort, socket.assigns.session_name_filter))
+        |> assign(
+          :flyout_sessions,
+          load_flyout_sessions(
+            sidebar_project,
+            socket.assigns.session_sort,
+            socket.assigns.session_name_filter
+          )
+        )
         |> assign(:flyout_file_expanded, MapSet.new())
         |> assign(:flyout_file_children, %{})
         |> maybe_load_files(socket.assigns.active_section)
@@ -181,7 +199,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> assign(:flyout_open, true)
        |> assign(:mobile_open, true)
        |> assign(:proj_picker_open, false)
-       |> assign(:flyout_sessions, load_flyout_sessions(socket.assigns.sidebar_project, socket.assigns.session_sort, socket.assigns.session_name_filter))
+       |> assign(
+         :flyout_sessions,
+         load_flyout_sessions(
+           socket.assigns.sidebar_project,
+           socket.assigns.session_sort,
+           socket.assigns.session_name_filter
+         )
+       )
        |> maybe_load_channels(section, socket.assigns.sidebar_project)
        |> maybe_load_canvases(section)
        |> maybe_load_teams(section, socket.assigns.sidebar_project)
@@ -224,7 +249,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
             socket =
               socket
               |> assign(:sidebar_project, project)
-              |> assign(:flyout_sessions, load_flyout_sessions(project, socket.assigns.session_sort, socket.assigns.session_name_filter))
+              |> assign(
+                :flyout_sessions,
+                load_flyout_sessions(
+                  project,
+                  socket.assigns.session_sort,
+                  socket.assigns.session_name_filter
+                )
+              )
 
             {:noreply, socket}
 
@@ -254,7 +286,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     socket3 =
       if new_project != previous_project do
         socket2
-        |> assign(:flyout_sessions, load_flyout_sessions(new_project, socket2.assigns.session_sort, socket2.assigns.session_name_filter))
+        |> assign(
+          :flyout_sessions,
+          load_flyout_sessions(
+            new_project,
+            socket2.assigns.session_sort,
+            socket2.assigns.session_name_filter
+          )
+        )
         |> assign(:flyout_file_expanded, MapSet.new())
         |> assign(:flyout_file_children, %{})
         |> maybe_load_files(socket2.assigns.active_section)
@@ -320,26 +359,41 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("set_session_sort", %{"sort" => sort_str}, socket) do
     sort = parse_session_sort(sort_str)
-    sessions = load_flyout_sessions(socket.assigns.sidebar_project, sort, socket.assigns.session_name_filter)
+
+    sessions =
+      load_flyout_sessions(
+        socket.assigns.sidebar_project,
+        sort,
+        socket.assigns.session_name_filter
+      )
+
     {:noreply, socket |> assign(:session_sort, sort) |> assign(:flyout_sessions, sessions)}
   end
 
   def handle_event("update_session_name_filter", %{"value" => value}, socket) do
-    sessions = load_flyout_sessions(socket.assigns.sidebar_project, socket.assigns.session_sort, value)
-    {:noreply, socket |> assign(:session_name_filter, value) |> assign(:flyout_sessions, sessions)}
+    sessions =
+      load_flyout_sessions(socket.assigns.sidebar_project, socket.assigns.session_sort, value)
+
+    {:noreply,
+     socket |> assign(:session_name_filter, value) |> assign(:flyout_sessions, sessions)}
   end
 
   def handle_event("toggle_task_filter", _params, socket),
     do: {:noreply, assign(socket, :task_filter_open, !socket.assigns.task_filter_open)}
 
   def handle_event("update_task_search", %{"value" => value}, socket) do
-    tasks = load_flyout_tasks(socket.assigns.sidebar_project, value, socket.assigns.task_state_filter)
+    tasks =
+      load_flyout_tasks(socket.assigns.sidebar_project, value, socket.assigns.task_state_filter)
+
     {:noreply, socket |> assign(:task_search, value) |> assign(:flyout_tasks, tasks)}
   end
 
   def handle_event("set_task_state_filter", %{"state" => state_str}, socket) do
     state_id = parse_task_state(state_str)
-    tasks = load_flyout_tasks(socket.assigns.sidebar_project, socket.assigns.task_search, state_id)
+
+    tasks =
+      load_flyout_tasks(socket.assigns.sidebar_project, socket.assigns.task_search, state_id)
+
     {:noreply, socket |> assign(:task_state_filter, state_id) |> assign(:flyout_tasks, tasks)}
   end
 
@@ -405,7 +459,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     {:noreply, socket2}
   end
 
-  def handle_event("file_save", %{"path" => path, "content" => content, "original_hash" => hash}, socket) do
+  def handle_event(
+        "file_save",
+        %{"path" => path, "content" => content, "original_hash" => hash},
+        socket
+      ) do
     project = socket.assigns.sidebar_project
 
     if project && project.path do
@@ -534,17 +592,17 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           {project_initial(@sidebar_project)}
         </button>
 
+        <.rail_item section={:files} active_section={@active_section} flyout_open={@flyout_open} icon="hero-folder" label="Files" myself={@myself} />
         <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-robot" label="Sessions" myself={@myself} />
         <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-check-circle" label="Tasks" myself={@myself} />
-        <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Prompts" myself={@myself} />
-        <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
         <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-pencil-square" label="Notes" myself={@myself} />
         <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
+        <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Prompts" myself={@myself} />
         <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
-        <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
-        <.rail_item section={:files} active_section={@active_section} flyout_open={@flyout_open} icon="hero-folder" label="Files" myself={@myself} />
-        <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
         <.rail_item section={:jobs} active_section={@active_section} flyout_open={@flyout_open} icon="hero-clock" label="Jobs" myself={@myself} />
+        <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
+        <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
+        <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
 
         <div class="flex-1" />
 
@@ -738,7 +796,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
     session_ids =
       canvases
-      |> Enum.flat_map(& Enum.map(&1.canvas_sessions, fn cs -> cs.session_id end))
+      |> Enum.flat_map(&Enum.map(&1.canvas_sessions, fn cs -> cs.session_id end))
       |> Enum.uniq()
 
     sessions_by_id =
@@ -769,7 +827,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   defp maybe_load_teams(socket, _section, _project), do: socket
 
   defp maybe_load_tasks(socket, :tasks, project) do
-    tasks = load_flyout_tasks(project, socket.assigns[:task_search] || "", socket.assigns[:task_state_filter])
+    tasks =
+      load_flyout_tasks(
+        project,
+        socket.assigns[:task_search] || "",
+        socket.assigns[:task_state_filter]
+      )
+
     assign(socket, :flyout_tasks, tasks)
   end
 
@@ -822,7 +886,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         Tasks.search_tasks(search, project_id, [limit: 50] ++ state_opts)
 
       project_id ->
-        Tasks.list_tasks_for_project(project_id, [limit: 50, sort_by: "created_desc"] ++ state_opts)
+        Tasks.list_tasks_for_project(
+          project_id,
+          [limit: 50, sort_by: "created_desc"] ++ state_opts
+        )
 
       true ->
         Tasks.list_tasks([limit: 50, sort_by: "created_desc"] ++ state_opts)
@@ -838,14 +905,15 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   # Load channels only when navigating to the :chat section — avoids a DB query on every page.
   defp maybe_load_channels(socket, :chat, project) do
     project_id = project && project.id
+
     channels =
       case Channels.list_channels_for_project(project_id) do
         list when is_list(list) -> list
         _ -> []
       end
+
     assign(socket, :flyout_channels, channels)
   end
 
   defp maybe_load_channels(socket, _section, _project), do: socket
-
 end

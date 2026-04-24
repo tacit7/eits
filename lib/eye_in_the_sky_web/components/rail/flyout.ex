@@ -152,20 +152,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.nav_links project={@sidebar_project} section={:sessions} />
           <% end %>
         </div>
-
-        <%!-- Sticky nav footer — visible only in sessions section --%>
-        <%= if @active_section == :sessions do %>
-          <div class="border-t border-base-content/8 flex-shrink-0">
-            <.simple_link href="/sessions" label="All Sessions" icon="hero-cpu-chip" />
-            <%= if @sidebar_project do %>
-              <.simple_link
-                href={"/projects/#{@sidebar_project.id}/sessions"}
-                label="List"
-                icon="hero-list-bullet"
-              />
-            <% end %>
-          </div>
-        <% end %>
       </div>
     </div>
     """
@@ -181,45 +167,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp sessions_content(assigns) do
     ~H"""
-    <%!-- Filter toggle bar --%>
-    <div class="px-3 py-2 border-b border-base-content/8 flex items-center gap-2">
-      <input
-        type="text"
-        name="value"
-        value={@name_filter}
-        placeholder="Filter by name…"
-        phx-keyup="update_session_name_filter"
-        phx-target={@myself}
-        phx-debounce="300"
-        class="flex-1 bg-base-200 text-xs text-base-content/80 placeholder-base-content/30 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary/40 min-w-0"
-      />
-      <button
-        phx-click="toggle_session_filter"
-        phx-target={@myself}
-        title="Sort options"
-        class={[
-          "w-6 h-6 flex items-center justify-center rounded transition-colors flex-shrink-0",
-          if(@filter_open or @sort != :last_activity,
-            do: "text-primary bg-primary/10",
-            else: "text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8"
-          )
-        ]}
-      >
-        <.icon name="hero-bars-arrow-down-mini" class="w-3.5 h-3.5" />
-      </button>
-    </div>
-
-    <%!-- Sort popup --%>
-    <%= if @filter_open do %>
-      <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
-        <div class="text-[9px] font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">Sort by</div>
-        <div class="flex flex-col gap-0.5">
-          <.sort_option label="Created" value="created" current={@sort} myself={@myself} />
-          <.sort_option label="Name" value="name" current={@sort} myself={@myself} />
-        </div>
-      </div>
-    <% end %>
-
     <.session_row :for={s <- @sessions} session={s} />
 
     <%= if @sessions == [] do %>
@@ -312,32 +259,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp tasks_content(assigns) do
     ~H"""
-    <div class="px-3 py-2 border-b border-base-content/8 flex items-center gap-2">
-      <input
-        type="text"
-        name="value"
-        value={@task_search}
-        placeholder="Search tasks…"
-        phx-keyup="update_task_search"
-        phx-target={@myself}
-        phx-debounce="300"
-        class="flex-1 bg-base-200 text-xs text-base-content/80 placeholder-base-content/30 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary/40 min-w-0"
-      />
-      <button
-        phx-click="toggle_task_filter"
-        phx-target={@myself}
-        title="Filter by state"
-        class={[
-          "w-6 h-6 flex items-center justify-center rounded transition-colors flex-shrink-0",
-          if(@filter_open or not is_nil(@state_filter),
-            do: "text-primary bg-primary/10",
-            else: "text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8"
-          )
-        ]}
-      >
-        <.icon name="hero-funnel-mini" class="w-3.5 h-3.5" />
-      </button>
-    </div>
 
     <%= if @filter_open do %>
       <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
@@ -633,8 +554,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp files_content(assigns) do
     assigns =
-      assign(assigns, :flat_rows,
-        flatten_file_tree(assigns.file_nodes, assigns.file_children, assigns.file_expanded || MapSet.new(), 0)
+      assign(
+        assigns,
+        :flat_rows,
+        flatten_file_tree(
+          assigns.file_nodes,
+          assigns.file_children,
+          assigns.file_expanded || MapSet.new(),
+          0
+        )
       )
 
     ~H"""
@@ -766,5 +694,4 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     </svg>
     """
   end
-
 end

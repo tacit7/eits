@@ -25,7 +25,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
          |> push_navigate(to: return_to)}
 
       {:ok, prompt} ->
-        if prompt.project_id && project && prompt.project_id != to_string(project.id) do
+        if prompt.project_id && project && prompt.project_id != project.id do
           {:noreply,
            socket
            |> put_flash(:error, "Prompt not found in this project")

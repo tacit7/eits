@@ -361,7 +361,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
                 [%{path: path, name: name, content: content, language: lang_str, hash: hash}]
             end
 
-          {:noreply, socket |> assign(:file_tabs, tabs) |> assign(:active_tab_path, path)}
+          was_empty = socket.assigns.file_tabs == []
+          socket2 = socket |> assign(:file_tabs, tabs) |> assign(:active_tab_path, path)
+          socket2 = if was_empty, do: push_event(socket2, "file-editor-open", %{}), else: socket2
+          {:noreply, socket2}
 
         {:error, :binary_file} ->
           {:noreply, put_flash(socket, :info, "Binary file — cannot open")}
@@ -396,7 +399,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           socket.assigns.active_tab_path
       end
 
-    {:noreply, socket |> assign(:file_tabs, tabs) |> assign(:active_tab_path, active)}
+    socket2 = socket |> assign(:file_tabs, tabs) |> assign(:active_tab_path, active)
+    socket2 = if tabs == [], do: push_event(socket2, "file-editor-close", %{}), else: socket2
+    {:noreply, socket2}
   end
 
   def handle_event("file_save", %{"path" => path, "content" => content, "original_hash" => hash}, socket) do

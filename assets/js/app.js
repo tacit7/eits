@@ -162,6 +162,16 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+window.addEventListener("phx:file-editor-open", () => {
+  document.getElementById("app-rail")?.classList.add("flex-1")
+  document.getElementById("main-content-wrapper")?.classList.add("hidden")
+})
+
+window.addEventListener("phx:file-editor-close", () => {
+  document.getElementById("app-rail")?.classList.remove("flex-1")
+  document.getElementById("main-content-wrapper")?.classList.remove("hidden")
+})
+
 window.addEventListener("phx:copy_to_clipboard", (e) => {
   const { text, format, error } = e.detail
 

@@ -71,6 +71,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         task_search: "",
         task_state_filter: nil,
         task_filter_open: false,
+        tasks_view: :list,
         session_filter_open: false,
         session_sort: :last_activity,
         session_name_filter: "",
@@ -381,6 +382,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("toggle_task_filter", _params, socket),
     do: {:noreply, assign(socket, :task_filter_open, !socket.assigns.task_filter_open)}
 
+  def handle_event("toggle_tasks_view", _params, socket) do
+    next_view = if socket.assigns.tasks_view == :list, do: :kanban, else: :list
+    {:noreply, assign(socket, :tasks_view, next_view)}
+  end
+
   def handle_event("update_task_search", %{"value" => value}, socket) do
     tasks =
       load_flyout_tasks(socket.assigns.sidebar_project, value, socket.assigns.task_state_filter)
@@ -645,6 +651,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         task_search={@task_search}
         task_state_filter={@task_state_filter}
         task_filter_open={@task_filter_open}
+        tasks_view={@tasks_view}
         session_filter_open={@session_filter_open}
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
@@ -883,16 +890,16 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
     cond do
       search != "" ->
-        Tasks.search_tasks(search, project_id, [limit: 50] ++ state_opts)
+        Tasks.search_tasks(search, project_id, [limit: 40] ++ state_opts)
 
       project_id ->
         Tasks.list_tasks_for_project(
           project_id,
-          [limit: 50, sort_by: "created_desc"] ++ state_opts
+          [limit: 40, sort_by: "created_desc"] ++ state_opts
         )
 
       true ->
-        Tasks.list_tasks([limit: 50, sort_by: "created_desc"] ++ state_opts)
+        Tasks.list_tasks([limit: 40, sort_by: "created_desc"] ++ state_opts)
     end
   end
 

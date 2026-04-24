@@ -267,6 +267,102 @@ Codex raw output lines are now broadcast directly from the SDK MessageHandler, e
 
 ---
 
+## Messages.NotifyListener: Postgres LISTEN/NOTIFY Message Listener
+
+Replaces the polling Broadcaster with an event-driven GenServer that listens for message inserts via Postgres LISTEN/NOTIFY.
+
+**Problem solved:** The old Broadcaster polled the messages table every 2 seconds, wasting CPU and database queries on empty checks.
+
+**Solution:** NotifyListener uses Postgrex.Notifications to subscribe to a Postgres trigger:
+
+1. Database trigger: fires `pg_notify('messages_inserted', message_id)` on every `INSERT` to `messages` table
+2. GenServer: subscribes via `Postgrex.Notifications` on a dedicated connection (separate from the Repo pool)
+3. On notification: loads the row by ID and immediately broadcasts via `Events.session_new_message/2` or `Events.channel_message/2`
+4. Per-message dedup: fires only once per insert, no polling overhead
+
+**Configuration:**
+- Controlled by app config: `:eye_in_the_sky, :Messages.NotifyListener, enabled: true`
+- Defaults to enabled; can be disabled for testing or low-message-volume environments
+
+**How it differs from Broadcaster:**
+- **Broadcaster:** Polling, 2-second delay, CPU waste on empty checks
+- **NotifyListener:** Event-driven, near-instant, zero polling overhead
+
+**Code locations:**
+- `lib/eye_in_the_sky/messages/notify_listener.ex` — GenServer, `start_notifications/0`, Postgrex trigger subscription
+- Database migration: triggers on messages table INSERT
+
+**Commits:** 3017f438 (replace polling Broadcaster with NotifyListener)
+
+---
+
+## Messages.BulkImporter: Optimized Batch Message Insertion
+
+BulkImporter now uses `Repo.insert_all` for efficient batch message inserts with atomic transaction semantics and deduplication.
+
+**Workflow:**
+1. Provider (Claude, Codex) calls `BulkImporter.run/3` with a list of messages to import
+2. Messages are separated into three actions:
+   - **Updates:** messages with matching sender_role + body (unlinked) → add source_uuid via `update_message/2`
+   - **Inserts:** new messages (no matching unlinked) → batch insert via `Repo.insert_all`
+   - **Skips:** already known (source_uuid exists) or duplicate DMs (avoid double-render)
+3. Wrapped in `Repo.transaction` for atomicity — all updates and inserts succeed or fail together
+4. Per-row update errors are rescued and logged; transaction does not roll back on per-row failures
+5. Return value: total count = insert_count + update_count + skip_count
+
+**Deduplication Index:**
+- Partial composite index: `(session_id, sender_role, inserted_at) WHERE source_uuid IS NULL`
+- Accelerates the `find_unlinked_message/3` query for linking existing rows
+- Excludes `body` column to prevent exceeding Postgres 8191-byte page limit on long messages
+- Built with `CREATE INDEX CONCURRENTLY` and `@disable_ddl_transaction` to avoid blocking INSERTs
+
+**Before (deprecated):**
+- Per-row `Messages.create_message/1` call — O(N) DB roundtrips, no batch atomicity
+- Single per-row rescue loop — one DB error crashed the entire import
+
+**After (current):**
+- `Repo.insert_all/3` with `on_conflict: :nothing` — O(1) roundtrip for all inserts
+- Per-row updates wrapped in try/rescue — one update error doesn't crash the transaction
+- Atomic: all updates and inserts commit together or fail together
+
+**Error Handling:**
+- Insert conflict (source_uuid duplicate): silently skipped via `on_conflict: :nothing`
+- Update failures: logged as debug; transaction continues; count reflects only successful updates
+- Transaction failure: entire batch returns 0; error logged as warning
+
+**Code locations:**
+- `lib/eye_in_the_sky/messages/bulk_importer.ex` — `run/3`, `process_message/5`, Repo.transaction logic
+- `lib/eye_in_the_sky/messages.ex` — `create_message/1`, `update_message/2`, `find_unlinked_message/3`
+- Database migration: dedup index creation
+
+**Commits:** 55e2e5f5 (Repo.insert_all + dedup index), 8d04610f (concurrent index + drop transaction), e7c228a9 (drop body from index)
+
+---
+
+## Messages.IndexHealth: Monitor Message Index Status
+
+IndexHealth provides query access to Postgres index validity for the messages table, surfacing BulkImporter health issues.
+
+**Motivation:** When the dedup index build fails or becomes invalid (e.g., due to a botched migration), BulkImporter performance degrades silently. IndexHealth exposes this via telemetry.
+
+**API:**
+- `list_message_indexes()` — returns `{:ok, [index_row]}` or `{:error, reason}`
+  - Each row: `%{name: "index_name", valid: true|false, ready: true|false}`
+  - Queries `pg_index` and `pg_class` to inspect index metadata
+- `invalid_indexes()` — returns list of indexes where `valid == false` or `ready == false`
+  - Used for health checks; empty list = all healthy
+
+**Integration with BulkImporter:**
+- Can be called before/after imports to verify dedup index is ready
+- Telemetry handler can emit alerts if indexes become invalid
+
+**Code locations:**
+- `lib/eye_in_the_sky/messages/index_health.ex` — `list_message_indexes/0`, `invalid_indexes/0`
+
+**Commits:** ae0c666a (surface BulkImporter failures via telemetry + IndexHealth)
+
+---
+
 ## DailyDigestWorker
 
 Generates and sends daily digest notifications.
@@ -315,6 +411,60 @@ case Tasks.get_task_safe(task_id) do
   {:error, reason} -> log_error(reason)
 end
 ```
+
+---
+
+## Queue Commands: `eits queue status` and `eits queue flush`
+
+Two new CLI commands for managing the local annotation queue in headless/spawned agent workflows.
+
+**`eits queue status`**
+- Prints pending annotation count from `~/.eits/pending-annotations.log`
+- Shows per-task summary: which tasks are awaiting annotation
+- Useful for diagnosing orchestrator backlog or stalled agents
+- Exit code: 0 if queue is empty, 1 if pending items exist
+
+**`eits queue flush`**
+- Replays pending annotations from `~/.eits/pending-annotations.log` to the EITS backend
+- Drops successfully delivered entries (removes from log)
+- Keeps failed entries (appends failure reason to log for debugging)
+- Exit code: 0 if all entries were successfully flushed, 1 if any remain after retry
+
+**Context:**
+- Annotations are buffered locally by `eits tasks annotate` when the backend is unavailable
+- Flush is typically called at agent shutdown to ensure all work is recorded
+- Status can be polled to prevent orchestrator from waiting on stalled agents
+
+**Code locations:**
+- `scripts/eits` — `queue status` and `queue flush` subcommand implementations
+
+**Commits:** 017b0a3e (add eits queue status/flush + orchestrator rate-limit bump)
+
+---
+
+## Orchestrator Rate Limiting
+
+The RateLimit plug now recognizes orchestrator traffic and applies a separate, higher rate-limit ceiling.
+
+**Why:** Orchestrators spawn many agents in parallel and coordinate teams across multiple concurrent spawns. Generic per-IP rate limits would starve orchestrator traffic while other users consume the same bucket.
+
+**How it works:**
+1. Request carries `x-eits-role: orchestrator` header (set by orchestrator CLI or server)
+2. RateLimit plug checks for this header and uses a separate bucket keyed on the role
+3. Orchestrator bucket: 5x default burst ceiling, same refill rate
+4. Regular user traffic: uses the standard per-IP bucket (unchanged)
+5. Buckets are independent — orchestrator traffic doesn't consume the user IP's quota
+
+**Bucket configuration:**
+- Default burst: `default_burst` from config (e.g., 100 req/sec)
+- Orchestrator burst: `5 * default_burst` (e.g., 500 req/sec)
+- Refill rate: same as default (refill throttle is unchanged)
+
+**Code locations:**
+- `lib/eye_in_the_sky_web/plugs/rate_limit.ex` — header detection, separate bucket keying, 5x burst ceiling
+- Tests: `test/eye_in_the_sky_web/plugs/rate_limit_test.exs`
+
+**Commits:** 017b0a3e (add eits queue status/flush + orchestrator rate-limit bump)
 
 ---
 

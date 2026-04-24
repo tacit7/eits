@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   Expected keys in `params`:
   - `:sessions` - list of sessions
   - `:search_query` - string
-  - `:status_filter` - one of "all", "active", "completed", "stale", "discovered"
+  - `:status_filter` - one of "all", "working", "archived"
   - `:sort_by` - one of "recent"
   """
   def filter_and_sort_sessions(%{sessions: sessions} = params) when is_list(sessions) do
@@ -120,7 +120,10 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
 
       "agent" ->
         Enum.sort_by(sessions, fn s ->
-          (s.agent && (s.agent.description || s.agent.project_name) || "") |> String.downcase()
+          case s.agent do
+            nil -> ""
+            agent -> (agent.description || agent.project_name || "") |> String.downcase()
+          end
         end)
 
       "model" ->

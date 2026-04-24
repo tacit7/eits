@@ -63,16 +63,24 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   @doc """
   Filters sessions by status/archive state.
 
-  Filters: "working", "archived", or any other value passes all through.
+  Filters:
+  - "working" — active sessions (working/idle/waiting/compacting); project sessions page
+  - "active"  — alias for "working"; AgentLive compatibility
+  - "completed" — completed non-archived sessions; AgentLive compatibility
+  - "archived" — archived sessions
+  - any other value passes all through
   """
   def filter_agents_by_status(sessions, filter) do
     case filter do
-      "working" ->
+      f when f in ["working", "active"] ->
         Enum.filter(
           sessions,
           &(&1.status in ["working", "idle", "waiting", "compacting", nil] and
               is_nil(&1.archived_at))
         )
+
+      "completed" ->
+        Enum.filter(sessions, &(&1.status == "completed" and is_nil(&1.archived_at)))
 
       "archived" ->
         Enum.filter(sessions, &(not is_nil(&1.archived_at)))

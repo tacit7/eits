@@ -109,10 +109,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.sessions_content
                 sessions={@flyout_sessions}
                 sidebar_project={@sidebar_project}
-                filter_open={@session_filter_open}
-                sort={@session_sort}
-                name_filter={@session_name_filter}
-                myself={@myself}
               />
             <% :tasks -> %>
               <.tasks_content
@@ -162,10 +158,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   # Sessions flyout: real data with status dots and filter bar
   attr :sessions, :list, required: true
   attr :sidebar_project, :any, default: nil
-  attr :filter_open, :boolean, default: false
-  attr :sort, :atom, default: :last_activity
-  attr :name_filter, :string, default: ""
-  attr :myself, :any, required: true
 
   defp sessions_content(assigns) do
     ~H"""
@@ -175,31 +167,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <div class="px-3 py-4 text-xs text-base-content/35 text-center">No sessions</div>
     <% end %>
 
-    """
-  end
-
-  attr :label, :string, required: true
-  attr :value, :string, required: true
-  attr :current, :atom, required: true
-  attr :myself, :any, required: true
-
-  defp sort_option(assigns) do
-    ~H"""
-    <button
-      phx-click="set_session_sort"
-      phx-value-sort={@value}
-      phx-target={@myself}
-      class={[
-        "flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded transition-colors",
-        if(to_string(@current) == @value,
-          do: "text-primary bg-primary/10 font-medium",
-          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/8"
-        )
-      ]}
-    >
-      <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", if(to_string(@current) == @value, do: "bg-primary", else: "bg-transparent")]} />
-      {@label}
-    </button>
     """
   end
 

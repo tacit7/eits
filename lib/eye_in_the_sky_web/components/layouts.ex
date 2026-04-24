@@ -24,8 +24,17 @@ defmodule EyeInTheSkyWeb.Layouts do
   attr :sidebar_tab, :atom, default: :sessions
   attr :sidebar_project, :any, default: nil
   attr :top_bar_cta, :map, default: nil
+  # Sessions toolbar
   attr :search_query, :string, default: nil
   attr :session_filter, :string, default: nil
+  # Tasks toolbar
+  attr :filter_state_id, :any, default: nil
+  attr :workflow_states, :list, default: nil
+  attr :sort_by, :string, default: nil
+  # Kanban toolbar
+  attr :show_completed, :boolean, default: nil
+  attr :bulk_mode, :boolean, default: nil
+  attr :active_filter_count, :integer, default: nil
 
   def top_bar(assigns) do
     ~H"""
@@ -47,59 +56,188 @@ defmodule EyeInTheSkyWeb.Layouts do
         </span>
       </div>
 
-      <%= if not is_nil(@session_filter) do %>
-        <%!-- Inline search input --%>
-        <form phx-change="search" class="flex-1 max-w-xs">
-          <label for="top-bar-search" class="sr-only">Search</label>
-          <div class="relative">
-            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-              <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
+      <%= cond do %>
+        <% @sidebar_tab == :sessions && not is_nil(@session_filter) -> %>
+          <%!-- Sessions: inline search + filter tabs --%>
+          <form phx-change="search" class="flex-1 max-w-xs">
+            <label for="top-bar-search" class="sr-only">Search</label>
+            <div class="relative">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
+              </div>
+              <input
+                type="text"
+                name="query"
+                id="top-bar-search"
+                value={@search_query || ""}
+                phx-debounce="300"
+                placeholder="Search..."
+                autocomplete="off"
+                class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
+              />
             </div>
-            <input
-              type="text"
-              name="query"
-              id="top-bar-search"
-              value={@search_query || ""}
-              phx-debounce="300"
-              placeholder="Search..."
-              autocomplete="off"
-              class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
-            />
+          </form>
+          <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
+            <%= for {value, label} <- [{"all", "All"}, {"active", "Active"}, {"completed", "Completed"}, {"archived", "Archived"}] do %>
+              <button
+                phx-click="filter_session"
+                phx-value-filter={value}
+                class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
+                  if(@session_filter == value,
+                    do: "bg-base-100 text-base-content shadow-sm",
+                    else: "text-base-content/45 hover:text-base-content/70"
+                  )}
+              >
+                {label}
+              </button>
+            <% end %>
           </div>
-        </form>
 
-        <%!-- Filter tabs --%>
-        <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
-          <%= for {value, label} <- [{"all", "All"}, {"active", "Active"}, {"completed", "Completed"}, {"archived", "Archived"}] do %>
+        <% @sidebar_tab == :tasks && not is_nil(@workflow_states) -> %>
+          <%!-- Tasks: search + state filter pills + sort --%>
+          <form phx-change="search" class="flex-1 max-w-xs">
+            <label for="top-bar-tasks-search" class="sr-only">Search tasks</label>
+            <div class="relative">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
+              </div>
+              <input
+                type="text"
+                name="query"
+                id="top-bar-tasks-search"
+                value={@search_query || ""}
+                phx-debounce="300"
+                placeholder="Search tasks..."
+                autocomplete="off"
+                class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
+              />
+            </div>
+          </form>
+          <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
             <button
-              phx-click="filter_session"
-              phx-value-filter={value}
+              phx-click="filter_status"
+              phx-value-state_id=""
               class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
-                if(@session_filter == value,
+                if(is_nil(@filter_state_id),
                   do: "bg-base-100 text-base-content shadow-sm",
                   else: "text-base-content/45 hover:text-base-content/70"
                 )}
             >
-              {label}
+              All
             </button>
-          <% end %>
-        </div>
-      <% else %>
-        <div class="flex-1" />
+            <%= for state <- @workflow_states do %>
+              <button
+                phx-click="filter_status"
+                phx-value-state_id={state.id}
+                class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
+                  if(@filter_state_id == state.id,
+                    do: "bg-base-100 text-base-content shadow-sm",
+                    else: "text-base-content/45 hover:text-base-content/70"
+                  )}
+              >
+                {state.name}
+              </button>
+            <% end %>
+          </div>
+          <form phx-change="sort_by">
+            <label for="top-bar-tasks-sort" class="sr-only">Sort tasks</label>
+            <select
+              name="value"
+              id="top-bar-tasks-sort"
+              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/60 min-h-0 h-7 text-[11px]"
+            >
+              <option value="created_desc" selected={@sort_by == "created_desc"}>Newest</option>
+              <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest</option>
+              <option value="priority" selected={@sort_by == "priority"}>Priority</option>
+            </select>
+          </form>
 
-        <%!-- Palette search button — shown when no inline search --%>
-        <button
-          phx-click={JS.dispatch("palette:open", to: "#command-palette")}
-          class="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
-          title="Search"
-          aria-label="Search"
-        >
-          <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5" />
-          Search
-          <kbd class="ml-0.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] bg-base-content/8 text-base-content/30 border border-base-content/10 font-sans leading-none">
-            ⌘K
-          </kbd>
-        </button>
+        <% @sidebar_tab == :kanban && not is_nil(@show_completed) -> %>
+          <%!-- Kanban: search + action buttons --%>
+          <form phx-change="search" class="flex-1 max-w-xs">
+            <label for="top-bar-kanban-search" class="sr-only">Search tasks</label>
+            <div class="relative">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
+              </div>
+              <input
+                type="text"
+                name="query"
+                id="top-bar-kanban-search"
+                value={@search_query || ""}
+                phx-debounce="300"
+                placeholder="Search tasks..."
+                autocomplete="off"
+                class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
+              />
+            </div>
+          </form>
+          <div class="flex items-center gap-1">
+            <button
+              phx-click="toggle_show_completed"
+              class={"flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium transition-colors " <>
+                if(@show_completed,
+                  do: "bg-base-content/10 text-base-content",
+                  else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6"
+                )}
+              title="Show completed tasks"
+            >
+              <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" /> Done
+            </button>
+            <button
+              phx-click="toggle_bulk_mode"
+              class={"flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium transition-colors " <>
+                if(@bulk_mode,
+                  do: "bg-base-content/10 text-base-content",
+                  else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6"
+                )}
+              title="Bulk select"
+            >
+              <.icon name="hero-check-mini" class="w-3.5 h-3.5" /> Select
+            </button>
+            <button
+              phx-click="toggle_filter_drawer"
+              class={"flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium transition-colors " <>
+                if(@active_filter_count && @active_filter_count > 0,
+                  do: "bg-base-content/10 text-base-content",
+                  else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6"
+                )}
+              title="Filter"
+            >
+              <.icon name="hero-funnel-mini" class="w-3.5 h-3.5" />
+              Filter
+              <%= if @active_filter_count && @active_filter_count > 0 do %>
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-content text-[9px] font-bold">
+                  {@active_filter_count}
+                </span>
+              <% end %>
+            </button>
+            <%= if @sidebar_project do %>
+              <.link
+                navigate={~p"/projects/#{@sidebar_project.id}/tasks"}
+                class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
+                title="List view"
+              >
+                <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" /> List
+              </.link>
+            <% end %>
+          </div>
+
+        <% true -> %>
+          <%!-- Default: spacer + palette search button --%>
+          <div class="flex-1" />
+          <button
+            phx-click={JS.dispatch("palette:open", to: "#command-palette")}
+            class="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
+            title="Search"
+            aria-label="Search"
+          >
+            <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5" />
+            Search
+            <kbd class="ml-0.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] bg-base-content/8 text-base-content/30 border border-base-content/10 font-sans leading-none">
+              ⌘K
+            </kbd>
+          </button>
       <% end %>
 
       <%!-- Optional CTA — supports %{label, href} for navigate links or %{label, event} for phx-click --%>

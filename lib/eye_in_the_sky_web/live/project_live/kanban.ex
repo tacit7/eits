@@ -56,6 +56,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   end
 
   @impl true
+  def handle_event("toggle_new_task_drawer", _params, socket) do
+    {:noreply, assign(socket, :show_new_task_drawer, !socket.assigns.show_new_task_drawer)}
+  end
+
+  @impl true
   def handle_event("set_notify_on_stop", params, socket),
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
@@ -300,13 +305,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       phx-hook="KanbanKeyboard"
       class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col"
     >
-      <.kanban_toolbar
-        project_id={@project.id}
-        search_query={@search_query}
-        show_completed={@show_completed}
-        bulk_mode={@bulk_mode}
-        active_filter_count={@active_filter_count}
-      />
+      <%!-- Mobile-only toolbar (desktop toolbar is in the top bar) --%>
+      <div class="md:hidden mb-4">
+        <.kanban_toolbar
+          project_id={@project.id}
+          search_query={@search_query}
+          show_completed={@show_completed}
+          bulk_mode={@bulk_mode}
+          active_filter_count={@active_filter_count}
+        />
+      </div>
 
       <.kanban_bulk_bar
         bulk_mode={@bulk_mode}
@@ -409,6 +417,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   defp init_assigns(socket) do
     socket
+    |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_new_task_drawer"})
     |> assign(:search_query, "")
     |> assign(:filter_priority, nil)
     |> assign(:filter_tags, MapSet.new())

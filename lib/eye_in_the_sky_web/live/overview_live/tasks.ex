@@ -134,92 +134,25 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="max-w-4xl mx-auto">
-        <%!-- Search + State filters --%>
-        <div class="mb-5 flex items-center gap-3">
-          <form phx-change="search" class="flex-1 sm:max-w-sm">
-            <div class="relative">
-              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
-              </div>
-              <label for="overview-tasks-search" class="sr-only">Search tasks</label>
-              <input
-                type="text"
-                name="query"
-                id="overview-tasks-search"
-                value={@search_query}
-                placeholder="Search tasks..."
-                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
-                autocomplete="off"
-              />
-            </div>
-          </form>
-
+        <%!-- Mobile controls: filter + new task (desktop equivalents are in the top bar) --%>
+        <div class="flex sm:hidden items-center gap-2 mb-4">
           <button
             phx-click="toggle_create_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 h-11 sm:h-8 sm:min-h-0 text-xs"
+            class="btn btn-sm btn-primary gap-1.5 h-11 text-xs"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
           </button>
-
-          <%!-- Mobile filter button --%>
           <button
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="sm:hidden relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
+            class="relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
             <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
-              <span
-                class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
-                aria-hidden="true"
-              >
-              </span>
+              <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true"></span>
             <% end %>
           </button>
-
-          <%!-- Desktop filter pills --%>
-          <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
-            <button
-              phx-click="filter_status"
-              phx-value-state_id=""
-              aria-pressed={is_nil(@filter_state_id)}
-              class={"px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 " <>
-                if(is_nil(@filter_state_id),
-                  do: "bg-base-100 text-base-content shadow-sm",
-                  else: "text-base-content/60 hover:text-base-content/85"
-                )}
-            >
-              All
-            </button>
-            <button
-              :for={state <- @workflow_states}
-              phx-click="filter_status"
-              phx-value-state_id={state.id}
-              aria-pressed={@filter_state_id == state.id}
-              class={"px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 " <>
-                if(@filter_state_id == state.id,
-                  do: "bg-base-100 text-base-content shadow-sm",
-                  else: "text-base-content/60 hover:text-base-content/85"
-                )}
-            >
-              {state.name}
-            </button>
-          </div>
-
-          <%!-- Desktop sort dropdown --%>
-          <form phx-change="sort_by" class="hidden sm:block">
-            <label for="overview-tasks-sort" class="sr-only">Sort tasks</label>
-            <select
-              name="value"
-              id="overview-tasks-sort"
-              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-0 h-8 text-xs"
-            >
-              <option value="created_desc" selected={@sort_by == "created_desc"}>Newest first</option>
-              <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest first</option>
-              <option value="priority" selected={@sort_by == "priority"}>Priority</option>
-            </select>
-          </form>
         </div>
 
         <%!-- Mobile filter bottom sheet --%>

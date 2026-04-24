@@ -151,23 +151,6 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
             </button>
           </div>
 
-          <%!-- Search (mobile only — desktop uses top bar) --%>
-          <div class="relative mb-3 md:hidden">
-            <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-              <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5 text-base-content/30" />
-            </div>
-            <form phx-change="search" phx-submit="search">
-              <input
-                type="text"
-                name="query"
-                value={@search_query}
-                placeholder="Search teams..."
-                class="w-full bg-base-100 border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
-                phx-debounce="150"
-              />
-            </form>
-          </div>
-
           <%!-- Teams list --%>
           <div class="rounded-xl shadow-sm">
             <%= if @filtered_teams == [] do %>

@@ -9,7 +9,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   import EyeInTheSkyWeb.Live.Shared.AgentHelpers, only: [handle_start_agent_for_task: 2]
   import EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
-  import EyeInTheSkyWeb.Components.KanbanToolbar, only: [kanban_toolbar: 1]
   import EyeInTheSkyWeb.Components.KanbanBulkBar, only: [kanban_bulk_bar: 1]
   import EyeInTheSkyWeb.Components.KanbanBoard, only: [kanban_board: 1]
 
@@ -305,17 +304,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       phx-hook="KanbanKeyboard"
       class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col"
     >
-      <%!-- Mobile-only toolbar (desktop toolbar is in the top bar) --%>
-      <div class="md:hidden mb-4">
-        <.kanban_toolbar
-          project_id={@project.id}
-          search_query={@search_query}
-          show_completed={@show_completed}
-          bulk_mode={@bulk_mode}
-          active_filter_count={@active_filter_count}
-        />
-      </div>
-
       <.kanban_bulk_bar
         bulk_mode={@bulk_mode}
         selected_tasks={@selected_tasks}

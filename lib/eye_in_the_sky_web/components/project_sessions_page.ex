@@ -38,20 +38,27 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
               {length(@agents)} sessions
             <% end %>
           </span>
-          <button
-            phx-click="toggle_new_session_drawer"
-            class="md:hidden btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs w-full sm:w-auto"
-          >
-            <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
-          </button>
-        </div>
-
-        <div class="md:hidden">
-          <.filter_bar
-            search_query={@search_query}
-            session_filter={@session_filter}
-            sort_by={@sort_by}
-          />
+          <%!-- Mobile action bar (desktop uses top bar) --%>
+          <div class="flex md:hidden items-center gap-2">
+            <button
+              phx-click="open_filter_sheet"
+              aria-label="Open filters"
+              aria-haspopup="dialog"
+              class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
+            >
+              <.icon name="hero-funnel-mini" class="w-4 h-4" />
+              <%= if @session_filter != "all" || @sort_by != "last_message" do %>
+                <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true">
+                </span>
+              <% end %>
+            </button>
+            <button
+              phx-click="toggle_new_session_drawer"
+              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
+            >
+              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
+            </button>
+          </div>
         </div>
 
         <%= if @show_filter_sheet do %>

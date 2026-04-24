@@ -70,20 +70,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
-        <!-- Search Input (mobile only — desktop uses top bar) -->
-        <div class="mb-6 md:hidden">
-          <form phx-change="search" class="w-full">
-            <input
-              type="text"
-              name="query"
-              value={@search_query}
-              placeholder="Search prompts by name, description, or content..."
-              class="input input-bordered w-full text-base"
-              autocomplete="off"
-            />
-          </form>
-        </div>
-
         <%= if @prompts != [] do %>
           <!-- Prompts List -->
           <div class="space-y-4">

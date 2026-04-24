@@ -174,25 +174,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
         <%= if @skills != [] do %>
-          <!-- Search (mobile only — desktop uses top bar) -->
-          <div class="mb-6 md:hidden">
-            <form phx-change="search" class="relative">
-              <input
-                type="text"
-                name="query"
-                value={@search_query}
-                placeholder="Filter skills..."
-                class="input input-bordered input-sm w-full max-w-xs text-base min-h-[44px]"
-                phx-debounce="150"
-              />
-              <%= if @search_query != "" do %>
-                <span class="text-xs text-base-content/50 ml-2">
-                  {@filtered_skills |> length()} of {@skills |> length()}
-                </span>
-              <% end %>
-            </form>
-          </div>
-
           <div class={if @selected_skill, do: "grid grid-cols-1 lg:grid-cols-2 gap-6", else: ""}>
             <!-- Left: skill cards -->
             <div>

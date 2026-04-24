@@ -146,25 +146,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6" phx-hook="GlobalKeydown" id="project-tasks-page">
       <div class="max-w-4xl mx-auto">
-        <%!-- Mobile-only: search + filter + actions --%>
-        <div class="mb-4 flex md:hidden items-center gap-2">
-          <form phx-change="search" class="flex-1">
-            <div class="relative">
-              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
-              </div>
-              <label for="project-tasks-search" class="sr-only">Search tasks</label>
-              <input
-                type="text"
-                name="query"
-                id="project-tasks-search"
-                value={@search_query}
-                placeholder="Search tasks..."
-                class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
-                autocomplete="off"
-              />
-            </div>
-          </form>
+        <%!-- Mobile-only action bar --%>
+        <div class="mb-4 flex md:hidden items-center justify-end gap-2">
           <button
             phx-click="open_filter_sheet"
             aria-label="Open filters"

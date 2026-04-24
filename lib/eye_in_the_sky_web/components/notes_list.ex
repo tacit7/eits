@@ -16,25 +16,8 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
 
   def notes_list(assigns) do
     ~H"""
-    <%!-- Search + Filter --%>
-    <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-      <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm md:hidden">
-        <div class="relative">
-          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
-          </div>
-          <label for={"#{@empty_id}-search"} class="sr-only">Search notes</label>
-          <input
-            type="text"
-            name="query"
-            id={"#{@empty_id}-search"}
-            value={@search_query}
-            placeholder="Search notes..."
-            class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
-            autocomplete="off"
-          />
-        </div>
-      </form>
+    <%!-- Filter controls --%>
+    <div class="mb-5 flex flex-wrap items-center gap-2">
       <div class="flex items-center gap-2">
         <button
           type="button"

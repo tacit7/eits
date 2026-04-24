@@ -164,7 +164,7 @@ defmodule EyeInTheSkyWeb.Layouts do
 
   defp sessions_toolbar(assigns) do
     ~H"""
-    <%!-- Sessions: inline search + filter tabs --%>
+    <%!-- Sessions: inline search + filter tabs + sort --%>
     <form phx-change="search" class="flex-1 max-w-xs">
       <label for="top-bar-search" class="sr-only">Search</label>
       <div class="relative">
@@ -184,12 +184,27 @@ defmodule EyeInTheSkyWeb.Layouts do
       </div>
     </form>
     <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
-      <%= for {value, label} <- [{"all", "All"}, {"active", "Active"}, {"completed", "Completed"}, {"archived", "Archived"}] do %>
+      <%= for {value, label} <- [{"all", "All"}, {"working", "Working"}, {"archived", "Archived"}] do %>
         <button
           phx-click="filter_session"
           phx-value-filter={value}
           class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
             if(@session_filter == value,
+              do: "bg-base-100 text-base-content shadow-sm",
+              else: "text-base-content/45 hover:text-base-content/70"
+            )}
+        >
+          {label}
+        </button>
+      <% end %>
+    </div>
+    <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
+      <%= for {value, label} <- [{"last_message", "Last msg"}, {"name", "Name"}, {"agent", "Agent"}, {"model", "Model"}] do %>
+        <button
+          phx-click="sort"
+          phx-value-by={value}
+          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
+            if(@sort_by == value,
               do: "bg-base-100 text-base-content shadow-sm",
               else: "text-base-content/45 hover:text-base-content/70"
             )}

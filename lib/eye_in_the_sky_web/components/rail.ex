@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> maybe_load_teams(next_section, sidebar_project)
         |> maybe_load_tasks(next_section, sidebar_project)
         |> maybe_load_jobs(next_section)
-        |> maybe_load_notes(next_section)
+        |> maybe_load_notes(next_section, sidebar_project)
         |> maybe_load_files(next_section)
       else
         socket
@@ -216,7 +216,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> maybe_load_teams(section, socket.assigns.sidebar_project)
        |> maybe_load_tasks(section, socket.assigns.sidebar_project)
        |> maybe_load_jobs(section)
-       |> maybe_load_notes(section)
+       |> maybe_load_notes(section, socket.assigns.sidebar_project)
        |> maybe_load_files(section)}
     end
   end
@@ -735,12 +735,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp maybe_load_jobs(socket, _section), do: socket
 
-  defp maybe_load_notes(socket, :notes) do
-    notes = Notes.list_notes_filtered(limit: 20)
-    assign(socket, :flyout_notes, notes)
+  defp maybe_load_notes(socket, :notes, project) do
+    opts = [limit: 20]
+    opts = if project, do: Keyword.put(opts, :project_id, project.id), else: opts
+    assign(socket, :flyout_notes, Notes.list_notes_filtered(opts))
   end
 
-  defp maybe_load_notes(socket, _section), do: socket
+  defp maybe_load_notes(socket, _section, _project), do: socket
 
   defp maybe_load_files(socket, :files) do
     project = socket.assigns.sidebar_project

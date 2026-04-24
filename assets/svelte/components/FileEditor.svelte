@@ -11,6 +11,8 @@
 
   let langExtension = null
   let themeExtension = null
+  let settingsExtensions = []
+  let tabSize = 2
   let value = content
   let currentHash = hash
 
@@ -85,14 +87,55 @@
     }
   }
 
+  async function buildSettingsExtensions(size, fontSize, vimEnabled) {
+    const [{ EditorView }, { EditorState }, { indentUnit }] = await Promise.all([
+      import('@codemirror/view'),
+      import('@codemirror/state'),
+      import('@codemirror/language'),
+    ])
+    const exts = [
+      EditorState.tabSize.of(size),
+      indentUnit.of(' '.repeat(size)),
+      EditorView.theme({
+        "&": { fontSize: fontSize + 'px' },
+        ".cm-scroller": { fontFamily: 'monospace' },
+      }),
+    ]
+    if (vimEnabled) {
+      const { vim } = await import('@replit/codemirror-vim')
+      exts.push(vim())
+    }
+    return exts
+  }
+
   onMount(async () => {
     const appTheme = document.documentElement.dataset.theme || 'dark'
-    ;[langExtension, themeExtension] = await Promise.all([
+    const ds = document.documentElement.dataset
+    const initSize = parseInt(ds.cmTabSize || '2', 10)
+    const initFont = ds.cmFontSize || '14'
+    const initVim = ds.cmVim === 'true'
+
+    tabSize = initSize
+    ;[langExtension, themeExtension, settingsExtensions] = await Promise.all([
       loadLang(lang),
       loadTheme(appTheme),
+      buildSettingsExtensions(initSize, initFont, initVim),
     ])
 
-    const onTheme = async ({ detail }) => { themeExtension = await loadTheme(detail.theme) }
+    const onTheme = async ({ detail }) => {
+      themeExtension = await loadTheme(detail.theme)
+    }
+
+    const onCmSettings = async ({ detail }) => {
+      const size = parseInt(detail.cm_tab_size || document.documentElement.dataset.cmTabSize || '2', 10)
+      const fontSize = detail.cm_font_size || document.documentElement.dataset.cmFontSize || '14'
+      const vimEnabled = detail.cm_vim !== undefined
+        ? detail.cm_vim === 'true'
+        : document.documentElement.dataset.cmVim === 'true'
+      tabSize = size
+      settingsExtensions = await buildSettingsExtensions(size, fontSize, vimEnabled)
+    }
+
     const onKeydown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
@@ -101,9 +144,11 @@
     }
 
     window.addEventListener('phx:apply_theme', onTheme)
+    window.addEventListener('phx:apply_cm_settings', onCmSettings)
     window.addEventListener('keydown', onKeydown)
     return () => {
       window.removeEventListener('phx:apply_theme', onTheme)
+      window.removeEventListener('phx:apply_cm_settings', onCmSettings)
       window.removeEventListener('keydown', onKeydown)
     }
   })
@@ -126,10 +171,11 @@
       value={content}
       lang={langExtension}
       theme={themeExtension}
+      extensions={settingsExtensions}
+      {tabSize}
       {readonly}
       lineNumbers={true}
       useTab={true}
-      tabSize={2}
       styles={{
         "&": { height: "100%", backgroundColor: "oklch(var(--b1))" },
         ".cm-scroller": { overflow: "auto" },

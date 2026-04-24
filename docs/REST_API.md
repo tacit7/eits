@@ -103,7 +103,7 @@ Accepts integer session ID or UUID string. Sets `status=completed`, `ended_at=no
 |-------|------|-------------|
 | `id` | string or integer | Session ID (UUID or integer) |
 
-**Response:** `201 Created`
+**Response:** `200 OK`
 
 ```json
 {
@@ -138,13 +138,7 @@ Accepts integer session ID or UUID string. Sets `status=waiting` and syncs the s
 |-------|------|-------------|
 | `id` | string or integer | Session ID (UUID or integer) |
 
-**Request body:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `reason` | string | no | Optional reason (e.g., `"waiting_for_approval"`, `"blocked_by_dependency"`) |
-
-**Response:** `201 Created`
+**Response:** `200 OK`
 
 ```json
 {
@@ -159,8 +153,10 @@ Accepts integer session ID or UUID string. Sets `status=waiting` and syncs the s
 
 ```bash
 curl -X POST localhost:5001/api/v1/sessions/42/waiting \
-  -H 'Content-Type: application/json' \
-  -d '{"reason": "waiting_for_approval"}'
+  -H 'Content-Type: application/json'
+
+curl -X POST localhost:5001/api/v1/sessions/abc-123/waiting \
+  -H 'Content-Type: application/json'
 ```
 
 ---
@@ -250,8 +246,8 @@ Spawn a new Claude Code agent. Creates an Agent + Session, starts an AgentWorker
 | `project_path` | string | no | Working directory for the Claude process |
 | `worktree` | string | no | Git worktree branch name. Appends push+PR instructions to prompt |
 | `effort_level` | string | no | Passed to Claude CLI as effort level |
-| `parent_agent_id` | integer\|string | no | Integer ID of the parent agent |
-| `parent_session_id` | integer\|string | no | Integer ID of the parent session |
+| `parent_agent_id` | integer | no | Integer ID of the parent agent (integer only; UUID strings rejected) |
+| `parent_session_id` | integer\|string | no | Parent session ID — accepts integer ID or UUID string |
 | `agent` | string | no | Named agent persona passed to Claude CLI via `--agent` |
 | `team_name` | string | no | Join this team on spawn. Team must exist |
 | `member_name` | string | no | Alias within the team. Defaults to agent UUID |
@@ -592,6 +588,7 @@ No new row is written and no PubSub event is re-broadcast on duplicate hits. The
 **Rate limiting:**
 
 - 30 requests per minute per `from_session_id`
+- Orchestrator role grants 5x burst ceiling: send `x-eits-role: orchestrator` header for a separate 150 req/min bucket
 - Exceeding limit returns `429 Too Many Requests`:
 
 ```json
@@ -600,6 +597,8 @@ No new row is written and no PubSub event is re-broadcast on duplicate hits. The
   "retry_after": 5
 }
 ```
+
+Orchestrator bursts bypass the regular per-IP limit and use a separate bucket to avoid DM flooding starving orchestrator queue operations.
 
 **Example (current format):**
 

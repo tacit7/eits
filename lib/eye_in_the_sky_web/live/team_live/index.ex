@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
      |> assign(:sidebar_tab, :teams)
      |> assign(:sidebar_project, nil)
      |> assign(:show_archived, false)
-     |> assign(:search, "")
+     |> assign(:search_query, "")
      |> assign(:teams, if(connected?(socket), do: load_teams(false), else: []))
      |> assign(:selected_team_id, nil)
      |> assign(:selected_team, nil)
@@ -37,8 +37,8 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
   def handle_info({:new_message, _message}, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("search", %{"search" => query}, socket) do
-    {:noreply, assign(socket, :search, query)}
+  def handle_event("search", %{"query" => query}, socket) do
+    {:noreply, assign(socket, :search_query, query)}
   end
 
   @impl true
@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
 
   @impl true
   def render(assigns) do
-    assigns = assign(assigns, :filtered_teams, filter_teams(assigns.teams, assigns.search))
+    assigns = assign(assigns, :filtered_teams, filter_teams(assigns.teams, assigns.search_query))
 
     ~H"""
     <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
@@ -151,16 +151,16 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
             </button>
           </div>
 
-          <%!-- Search --%>
-          <div class="relative mb-3">
+          <%!-- Search (mobile only — desktop uses top bar) --%>
+          <div class="relative mb-3 md:hidden">
             <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
               <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5 text-base-content/30" />
             </div>
             <form phx-change="search" phx-submit="search">
               <input
                 type="text"
-                name="search"
-                value={@search}
+                name="query"
+                value={@search_query}
                 placeholder="Search teams..."
                 class="w-full bg-base-100 border-0 rounded-xl py-2.5 pl-9 pr-4 text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:ring-1 focus:ring-primary/30"
                 phx-debounce="150"
@@ -176,7 +176,7 @@ defmodule EyeInTheSkyWeb.TeamLive.Index do
                   <.icon name="hero-user-group" class="w-5 h-5 text-base-content/30" />
                 </div>
                 <p class="text-xs text-base-content/30">
-                  {if @search != "", do: "No teams match your search", else: "No active teams"}
+                  {if @search_query != "", do: "No teams match your search", else: "No active teams"}
                 </p>
               </div>
             <% else %>

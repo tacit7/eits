@@ -70,8 +70,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-6xl mx-auto">
-        <!-- Search Input -->
-        <div class="mb-6">
+        <!-- Search Input (mobile only — desktop uses top bar) -->
+        <div class="mb-6 md:hidden">
           <form phx-change="search" class="w-full">
             <input
               type="text"

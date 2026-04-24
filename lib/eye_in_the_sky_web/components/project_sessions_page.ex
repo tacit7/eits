@@ -40,17 +40,19 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           </span>
           <button
             phx-click="toggle_new_session_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs w-full sm:w-auto"
+            class="md:hidden btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs w-full sm:w-auto"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
           </button>
         </div>
 
-        <.filter_bar
-          search_query={@search_query}
-          session_filter={@session_filter}
-          sort_by={@sort_by}
-        />
+        <div class="md:hidden">
+          <.filter_bar
+            search_query={@search_query}
+            session_filter={@session_filter}
+            sort_by={@sort_by}
+          />
+        </div>
 
         <%= if @show_filter_sheet do %>
           <.filter_sheet session_filter={@session_filter} sort_by={@sort_by} />

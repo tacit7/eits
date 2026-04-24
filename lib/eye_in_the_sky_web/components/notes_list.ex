@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     ~H"""
     <%!-- Search + Filter --%>
     <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-      <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm">
+      <form phx-change="search" class="w-full sm:flex-1 sm:max-w-sm md:hidden">
         <div class="relative">
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />

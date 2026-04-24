@@ -22,6 +22,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         page_title_prefix: "Tasks",
         preload: [:agents]
       )
+      |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_new_task_drawer"})
       |> assign(:search_query, "")
       |> assign(:filter_state_id, nil)
       |> assign(:sort_by, "created_desc")
@@ -145,9 +146,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6" phx-hook="GlobalKeydown" id="project-tasks-page">
       <div class="max-w-4xl mx-auto">
-        <%!-- Search and New Task --%>
-        <div class="mb-4 flex items-center gap-2 sm:gap-3">
-          <form phx-change="search" class="flex-1 sm:max-w-sm">
+        <%!-- Mobile-only: search + filter + actions --%>
+        <div class="mb-4 flex md:hidden items-center gap-2">
+          <form phx-change="search" class="flex-1">
             <div class="relative">
               <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
@@ -164,86 +165,24 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
               />
             </div>
           </form>
-
-          <%!-- Mobile filter button --%>
           <button
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="sm:hidden relative btn btn-ghost btn-sm btn-square h-11 w-11"
+            class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
           >
             <.icon name="hero-funnel-mini" class="w-4 h-4" />
             <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
-              <span
-                class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
-                aria-hidden="true"
-              >
+              <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true">
               </span>
             <% end %>
           </button>
-
-          <.link
-            navigate={~p"/projects/#{@project.id}/kanban"}
-            class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 min-h-0 h-11 sm:h-7"
-            title="Kanban board"
-          >
-            <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" />
-            <span class="hidden sm:inline">Kanban</span>
-          </.link>
           <button
             phx-click="toggle_new_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
           >
             <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
           </button>
-        </div>
-
-        <%!-- Desktop Filters (hidden on mobile) --%>
-        <div class="mb-4 hidden sm:flex items-center gap-2 flex-wrap">
-          <%!-- Status filter pills --%>
-          <button
-            phx-click="filter_status"
-            phx-value-state_id=""
-            aria-pressed={is_nil(@filter_state_id)}
-            class={[
-              "btn btn-xs gap-1 h-11 sm:h-8 sm:min-h-0",
-              if(is_nil(@filter_state_id), do: "btn-neutral", else: "btn-ghost text-base-content/50")
-            ]}
-          >
-            All
-          </button>
-          <%= for state <- @workflow_states do %>
-            <button
-              phx-click="filter_status"
-              phx-value-state_id={state.id}
-              aria-pressed={@filter_state_id == state.id}
-              class={[
-                "btn btn-xs gap-1 h-11 sm:h-8 sm:min-h-0",
-                if(@filter_state_id == state.id,
-                  do: "btn-neutral",
-                  else: "btn-ghost text-base-content/50"
-                )
-              ]}
-            >
-              {state.name}
-            </button>
-          <% end %>
-
-          <div class="flex-1" />
-
-          <%!-- Sort dropdown --%>
-          <form phx-change="sort_by">
-            <label for="project-tasks-sort" class="sr-only">Sort tasks</label>
-            <select
-              name="value"
-              id="project-tasks-sort"
-              class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 h-11 sm:h-8 sm:min-h-0 text-xs"
-            >
-              <option value="created_desc" selected={@sort_by == "created_desc"}>Newest first</option>
-              <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest first</option>
-              <option value="priority" selected={@sort_by == "priority"}>Priority</option>
-            </select>
-          </form>
         </div>
 
         <%!-- Mobile filter bottom sheet --%>

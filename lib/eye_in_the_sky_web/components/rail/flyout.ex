@@ -178,31 +178,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
-  attr :label, :string, required: true
-  attr :value, :string, required: true
-  attr :current, :atom, required: true
-  attr :myself, :any, required: true
-
-  defp sort_option(assigns) do
-    ~H"""
-    <button
-      phx-click="set_session_sort"
-      phx-value-sort={@value}
-      phx-target={@myself}
-      class={[
-        "flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded transition-colors",
-        if(to_string(@current) == @value,
-          do: "text-primary bg-primary/10 font-medium",
-          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/8"
-        )
-      ]}
-    >
-      <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", if(to_string(@current) == @value, do: "bg-primary", else: "bg-transparent")]} />
-      {@label}
-    </button>
-    """
-  end
-
   attr :session, :map, required: true
 
   defp session_row(assigns) do

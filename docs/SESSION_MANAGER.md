@@ -193,9 +193,9 @@ Session status is set by lifecycle hooks and reflects the CLI process state:
 | Status | Set By | Meaning |
 |---|---|---|
 | `working` | UserPromptSubmit hook | Claude Code is processing a message |
-| `idle` | Stop hook or SessionEnd hook (sdk-cli) | Session stopped gracefully; can be resumed for sdk-cli |
-| `waiting` | Explicit POST /sessions/:id/waiting or on_session_failed | Session waiting for action/resume; blocked or temporarily paused |
-| `completed` | Explicit POST /sessions/:id/complete or i-end-session skill | Interactive session finished (manually set) |
+| `idle` | Stop hook, SessionEnd hook (cli), or SessionEnd hook (sdk-cli) | Session stopped gracefully; sdk-cli can be resumed |
+| `waiting` | Explicit POST /sessions/:id/waiting | Session waiting for action/resume; blocked or temporarily paused |
+| `completed` | Explicit POST /sessions/:id/complete or i-end-session skill | Session finished (manually set) |
 | `failed` | AgentWorker abnormal exit or zombie sweep | Billing/auth/watchdog error, agent crash, or zombie cleanup; session persisted to DB, Teams cleanup fired |
 
 ### Status Reason Field
@@ -213,14 +213,14 @@ attrs =
 ```
 
 **Common values:**
-- `"session_ended"` — Set by eits-session-end.sh (sdk-cli SessionEnd hook) when transitioning to `waiting`
+- `"session_ended"` — Set by eits-session-end.sh (sdk-cli SessionEnd hook) when transitioning to `idle`
 - `"sdk_completed"` — Set when Codex agent completes (no longer parks in waiting; now transitions to `idle`)
 - `"zombie_swept"` — Set by zombie sweep scheduler when marking stuck sessions as failed
 - Custom reasons — Set explicitly via `/sessions/:id/waiting` endpoint
 
 **Example use cases:**
-- `waiting` + `status_reason: "session_ended"` — sdk-cli session paused; SessionEnd hook can be retried
-- `waiting` + `status_reason: "awaiting resume signal"` — custom pause state
+- `idle` + `status_reason: "session_ended"` — sdk-cli session paused; can be resumed with --resume
+- `waiting` + `status_reason: "awaiting resume signal"` — custom pause state (explicit, not automatic)
 - Transitioning to `working` with no explicit reason clears the field automatically
 - Explicit `status_reason` in a transition (e.g., `status: "waiting"` + `status_reason: "custom reason"`) is preserved
 
@@ -253,12 +253,20 @@ The AgentStatus scheduler includes a zombie sweep that marks sessions stuck in `
 This handles production scenarios where AgentWorker crashes abnormally without calling terminate/2.
 
 **AgentWorker Abnormal Exit:**
-When AgentWorker terminates for abnormal reasons (not `:normal` or `:shutdown`), it immediately calls `on_session_failed/2` to mark the session failed and ensure Teams cleanup fires.
+When AgentWorker terminates for abnormal reasons (not `:normal` or `:shutdown`), the worker's `terminate/2` callback calls `on_session_failed/2` to:
+1. Mark the session status as `failed` in the database
+2. Stream an error event to the session channel
+3. Sync the linked team member (if any) to `failed` status
+4. Set `status_reason` appropriately for visibility
 
-This design ensures:
+The system catches agent crashes via two mechanisms:
+1. **Synchronous**: AgentWorker terminate/2 on abnormal exit (non-zero exit code)
+2. **Async**: Periodic zombie sweep marks sessions stuck in `working` >30 minutes with no heartbeat as `failed`
+
+This dual approach ensures:
 - Systemic failures are distinguishable from graceful stops (UI shows red status)
-- Agent crashes are caught both via terminate/2 and via periodic zombie sweep
-- Status is written to DB (survives worker restart)
+- Crashed workers are caught immediately, or eventually by the sweep
+- Status is written to DB (survives process restart)
 - No duplicate broadcast events from status finalization
 
 **Status indicator styling:**
@@ -296,12 +304,14 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
 
 **Environment Variable: EITS_SESSION_ID**
-Spawned Claude processes set `EITS_SESSION_ID` to the **integer session ID**, not the UUID. This is critical for child agent spawning:
-- `EITS_SESSION_ID` = integer (e.g., `3185`) — used for `--parent-session-id` 
-- `EITS_SESSION_UUID` = UUID (e.g., `8803d56d-dbbd-4916-9ff0-155378a64a47`) — used for `--resume`
+Spawned Claude processes set `EITS_SESSION_ID` to the **integer EITS session record ID**, not the UUID. This is critical for child agent spawning:
+- `EITS_SESSION_ID` = integer (e.g., `3185`) — set by provider (Claude/Codex) during agent startup; used for `--parent-session-id` 
+- `EITS_SESSION_UUID` = UUID (e.g., `8803d56d-dbbd-4916-9ff0-155378a64a47`) — set by provider; used for `--resume`
 - Provider conversation ID (Claude session UUID) is separate; stored in agents table for `--resume` handling
 
-Agents that spawn children read `EITS_SESSION_ID` and pass it as `--parent-session-id` to `eits agents spawn`. This integer is required for proper parent-child session linkage.
+**Critical fix (commit 3445c4b2):** The env var was incorrectly set to the UUID instead of the integer, causing spawn failures with jq parse errors when agents tried to spawn children. Now correctly set to `state.session_id` (integer).
+
+Agents that spawn children read `EITS_SESSION_ID` and pass it as `--parent-session-id` to `eits agents spawn`. The `--parent-session-id` parameter now accepts both integer and UUID formats (commit da967107).
 
 **Integer Session ID Handling:**
 JSON decoding converts numeric `session_id` values to integers, but task linking functions only had clauses for nil and binary strings. Fixed by adding integer guards to `do_link_session/2` in `Tasks.Associations` and `maybe_link_session/2` in `TaskController`:
@@ -324,6 +334,13 @@ end
 ```
 
 This prevents `FunctionClauseError` when JSON payloads contain numeric session IDs.
+
+**Parent Session ID Flexible Format:**
+The `eits agents spawn --parent-session-id` parameter now accepts both formats for convenience:
+- Integer: `eits agents spawn --parent-session-id 3185 ...`
+- UUID: `eits agents spawn --parent-session-id 8803d56d-dbbd-4916-9ff0-155378a64a47 ...`
+
+This unifies the parent/child spawn pattern with other CLI commands like `eits dm --to` which already accept both integer and UUID formats. The server-side `SpawnValidator` uses `Ecto.UUID.cast` to validate UUID format, rejecting malformed strings before they reach the database (which would raise `Ecto.Query.CastError`).
 
 ---
 
@@ -415,6 +432,7 @@ end
 
 **Atomicity guards:**
 - Task row is locked with `FOR UPDATE` until the transaction completes
+- Nil-guard in `transfer_session_ownership/2` ensures the task exists before proceeding
 - Precondition checks: 
   - `:task_not_found` — task does not exist
   - `:already_claimed` — task state is already in-progress (cannot claim twice)
@@ -436,17 +454,14 @@ eits tasks list --mine --assigned   # Tasks currently assigned to the current se
 
 ### Task Completion & Member Status
 
-When `eits tasks complete` is called, it marks the member as done **for the calling session only**:
+When `eits tasks complete` is called, it marks the team member as done **for the calling session only** (commit b3a98e8f):
 
-**Old behavior:**
-- `mark_member_done_by_session` was called for all sessions linked to the completed task
-- Could mark unrelated team members (e.g., the orchestrator) as done
-- Scope was too broad
+**Problem:** Previously `mark_member_done_by_session` was called for all sessions linked to the completed task, which could mark unrelated team members (e.g., the orchestrator) as done.
 
-**New behavior:**
+**Solution:**
 - CLI passes `EITS_SESSION_UUID` (or `EITS_SESSION_ID`) as `session_id` parameter
-- Controller only marks that single session's member done
-- Other sessions remain unaffected
+- Controller only marks that single session's member done via `maybe_mark_member_done`
+- Other sessions linked to the same task remain unaffected
 
 **Implementation** in `TaskController.complete`:
 ```elixir
@@ -460,6 +475,8 @@ defp maybe_mark_member_done(session_id) do
   end
 end
 ```
+
+The `mark_member_done_by_session/2` function now returns a count of updated members for accuracy (commit 5d4205a2), allowing `member_synced` to report true/false based on whether any members were actually synced.
 
 ### Annotation Retry & Persistence
 
@@ -481,6 +498,26 @@ Task annotations (`eits tasks annotate`) now retry on rate-limit (429) errors an
 ```
 
 This prevents losing annotations when the API is temporarily rate-limited or unavailable.
+
+---
+
+## Stop Hook Task-Gate Enforcement
+
+The Stop hook (`eits-task-gate.sh`) enforces that agents must close their in-progress task before stopping. However, this enforcement is skipped for orchestrator turns that only spawn sub-agents and run coordination calls without mutating files (commit c2fc82da).
+
+**Spawn-Only Turn Detection:**
+The hook parses the transcript JSONL to detect whether file edits occurred since the last user message:
+1. Find the index of the most recent `user` type entry
+2. Scan all `assistant` entries after it for file-editing tool_uses (Edit, Write, MultiEdit, NotebookEdit)
+3. If no file edits found, exit 0 (skip enforcement)
+
+**Rationale:**
+An orchestrator that only spawns sub-agents via the `Agent` tool and runs Bash/eits coordination calls shouldn't be forced to close its task every turn. It's still coordinating. Only block Stop when the turn actually mutated files (Edit, Write, etc.). If no edits happened, the turn was coordination-only and the task should remain open for the next turn.
+
+**Edge cases:**
+- Multi-turn orchestration: task remains open across turns that don't edit files
+- Mixed turns: first turn only spawns (skips enforcement) → second turn edits files (enforces)
+- Agent spawns on last turn: skips enforcement since no edit occurred
 
 ---
 

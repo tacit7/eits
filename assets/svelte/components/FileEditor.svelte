@@ -4,15 +4,20 @@
 
   export let live
   export let content = ''
-  export let lang = 'text'
-  export let filePath = ''
+  export let lang = ''
+  export let path = ''
+  export let hash = ''
   export let readonly = false
 
   let langExtension = null
   let themeExtension = null
   let value = content
-  let dirty = false
-  let saving = false
+  let currentHash = hash
+
+  $: if (content !== value && content !== undefined) {
+    value = content
+    currentHash = hash
+  }
 
   async function loadLang(l) {
     switch (l) {
@@ -20,19 +25,21 @@
         const { elixir } = await import('codemirror-lang-elixir')
         return elixir()
       }
-      case 'javascript': case 'js': case 'ts': {
+      case 'javascript':
+      case 'typescript': {
         const { javascript } = await import('@codemirror/lang-javascript')
-        return javascript()
+        return javascript({ typescript: l === 'typescript' })
       }
       case 'css': {
         const { css } = await import('@codemirror/lang-css')
         return css()
       }
-      case 'html': case 'heex': {
+      case 'html':
+      case 'heex': {
         const { html } = await import('@codemirror/lang-html')
         return html()
       }
-      case 'markdown': case 'md': {
+      case 'markdown': {
         const { markdown } = await import('@codemirror/lang-markdown')
         return markdown()
       }
@@ -40,14 +47,16 @@
         const { json } = await import('@codemirror/lang-json')
         return json()
       }
-      case 'shell': case 'sh': case 'bash': {
+      case 'shell':
+      case 'bash': {
         const [{ StreamLanguage }, { shell }] = await Promise.all([
           import('@codemirror/language'),
           import('@codemirror/legacy-modes/mode/shell'),
         ])
         return StreamLanguage.define(shell)
       }
-      default: return null
+      default:
+        return null
     }
   }
 
@@ -70,7 +79,6 @@
         return bespin
       }
       default: {
-        // dark
         const { oneDark } = await import('@codemirror/theme-one-dark')
         return oneDark
       }
@@ -84,70 +92,52 @@
       loadTheme(appTheme),
     ])
 
-    window.addEventListener('phx:apply_theme', handleThemeChange)
-    window.addEventListener('keydown', handleKeydown)
+    const onTheme = async ({ detail }) => { themeExtension = await loadTheme(detail.theme) }
+    const onKeydown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        save()
+      }
+    }
+
+    window.addEventListener('phx:apply_theme', onTheme)
+    window.addEventListener('keydown', onKeydown)
     return () => {
-      window.removeEventListener('phx:apply_theme', handleThemeChange)
-      window.removeEventListener('keydown', handleKeydown)
+      window.removeEventListener('phx:apply_theme', onTheme)
+      window.removeEventListener('keydown', onKeydown)
     }
   })
 
-  async function handleThemeChange({ detail }) {
-    themeExtension = await loadTheme(detail.theme)
-  }
-
-  function handleKeydown(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-      e.preventDefault()
-      save()
-    }
-  }
-
   function handleChange(newValue) {
     value = newValue
-    dirty = value !== content
   }
 
   function save() {
-    if (readonly || saving || !dirty) return
-    saving = true
-    live.pushEvent('file_save', { content: value }, (reply) => {
-      saving = false
-      if (reply && reply.ok) {
-        dirty = false
-        content = value
-      }
-    })
+    if (readonly) return
+    window.dispatchEvent(new CustomEvent('file:save', {
+      detail: { path, content: value, original_hash: currentHash }
+    }))
   }
 </script>
 
-<div class="flex flex-col h-full">
-  <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 shrink-0 bg-base-100">
-    <span class="text-xs text-base-content/50 font-mono">{filePath}</span>
-    {#if !readonly}
-      <button
-        class="btn btn-xs btn-primary"
-        disabled={!dirty || saving}
-        on:click={save}
-      >
-        {saving ? 'Saving…' : 'Save'}
-      </button>
-    {/if}
-  </div>
-
-  <div class="flex-1 min-h-0 overflow-hidden">
-    {#if langExtension !== undefined && themeExtension !== undefined}
-      <CodeMirror
-        value={content}
-        lang={langExtension}
-        theme={themeExtension}
-        {readonly}
-        lineNumbers={true}
-        useTab={true}
-        tabSize={2}
-        styles={{ "&": { height: "100%" }, ".cm-scroller": { overflow: "auto" } }}
-        onchange={handleChange}
-      />
-    {/if}
-  </div>
+<div class="flex-1 min-h-0 overflow-hidden h-full">
+  {#if langExtension !== undefined && themeExtension !== undefined}
+    <CodeMirror
+      value={content}
+      lang={langExtension}
+      theme={themeExtension}
+      {readonly}
+      lineNumbers={true}
+      useTab={true}
+      tabSize={2}
+      styles={{
+        "&": { height: "100%", backgroundColor: "oklch(var(--b1))" },
+        ".cm-scroller": { overflow: "auto" },
+        ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))" },
+        ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))" },
+        ".cm-activeLine": { backgroundColor: "oklch(var(--b3) / 0.4)" },
+      }}
+      on:change={(e) => handleChange(e.detail)}
+    />
+  {/if}
 </div>

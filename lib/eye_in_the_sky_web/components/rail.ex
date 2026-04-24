@@ -588,7 +588,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         myself={@myself}
       />
 
-      <.file_panel file_tabs={@file_tabs} active_tab_path={@active_tab_path} myself={@myself} />
+      <.file_panel file_tabs={@file_tabs} active_tab_path={@active_tab_path} myself={@myself} socket={@socket} />
 
       <.live_component
         module={NewSessionModal}
@@ -606,6 +606,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   attr :file_tabs, :list, required: true
   attr :active_tab_path, :any, required: true
   attr :myself, :any, required: true
+  attr :socket, :any, required: true
 
   defp file_panel(%{file_tabs: []} = assigns) do
     ~H""
@@ -652,15 +653,20 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
       <%!-- Editor area --%>
       <%= if @active_tab do %>
-        <div
-          id="file-editor-panel"
-          phx-hook="FileEditorPanel"
-          data-path={@active_tab.path}
-          data-content={Base.encode64(@active_tab.content)}
-          data-lang={@active_tab.language}
-          data-hash={@active_tab.hash}
-          class="flex-1 overflow-hidden"
-        />
+        <div id="file-editor-relay" phx-hook="FileEditorRelay" class="hidden" />
+        <div class="flex-1 overflow-hidden">
+          <.svelte
+            name="FileEditor"
+            ssr={false}
+            props={%{
+              content: @active_tab.content,
+              lang: @active_tab.language,
+              path: @active_tab.path,
+              hash: @active_tab.hash
+            }}
+            socket={@socket}
+          />
+        </div>
       <% end %>
     </div>
     """

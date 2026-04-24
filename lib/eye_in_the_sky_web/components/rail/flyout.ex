@@ -135,7 +135,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :chat -> %>
               <.chat_content channels={@flyout_channels} active_channel_id={@active_channel_id} myself={@myself} />
             <% :notes -> %>
-              <.notes_content notes={@flyout_notes} myself={@myself} />
+              <.notes_content notes={@flyout_notes} />
             <% :skills -> %>
               <.simple_link href="/skills" label="All Skills" icon="hero-bolt" />
             <% :teams -> %>
@@ -313,21 +313,20 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   # Notes flyout: last 20 notes with body preview
   attr :notes, :list, default: []
-  attr :myself, :any, required: true
 
   defp notes_content(assigns) do
     ~H"""
     <%= for note <- @notes do %>
+      <% label = note.title || String.slice(note.body || "", 0, 60) %>
+      <% preview = if note.title && note.title != "", do: note.body %>
       <.link
         navigate={"/notes/#{note.id}/edit"}
         class="flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
-        <%= if note.title && note.title != "" do %>
-          <span class="truncate font-medium text-base-content/80">{note.title}</span>
-          <span class="truncate text-base-content/40">{note.body}</span>
-        <% else %>
-          <span class="truncate">{note.body}</span>
-        <% end %>
+        <span class={["truncate", if(note.title && note.title != "", do: "font-medium text-base-content/80")]}>
+          {if label == "", do: "(empty)", else: label}
+        </span>
+        <span :if={preview && preview != ""} class="truncate text-base-content/40">{preview}</span>
         <span class="text-[10px] text-base-content/30 uppercase tracking-wide">{note.parent_type}</span>
       </.link>
     <% end %>

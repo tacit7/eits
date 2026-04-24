@@ -237,9 +237,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         />
       </div>
 
-      <%!-- Header card (desktop + mobile) --%>
+      <%!-- Header card (desktop only) --%>
       <div
-        class="max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
+        class="hidden md:block max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">
@@ -355,8 +355,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           </div>
         <% end %>
 
-        <%!-- Pill tabs (mobile only — desktop tabs live in the top bar) --%>
-        <div class="md:hidden px-5 pb-3 flex items-center gap-3" id="dm-tabs">
+        <%!-- Pill tabs --%>
+        <div class="px-5 pb-3 flex items-center gap-3" id="dm-tabs">
           <div class="flex items-center gap-1 bg-base-content/[0.03] rounded-lg p-0.5 min-w-max">
             <%= for {tab, icon, label} <- @tabs do %>
               <button
@@ -367,7 +367,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 ]}
                 phx-click="change_tab"
                 phx-value-tab={tab}
-                id={"dm-tab-mobile-#{tab}"}
+                id={"dm-tab-#{tab}"}
               >
                 <.icon name={icon} class="w-3.5 h-3.5" />
                 {label}
@@ -375,7 +375,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <% end %>
           </div>
           <%= if @active_tab in ["messages", nil] do %>
-            <div class="ml-auto w-40">
+            <div class="ml-auto w-48">
               <form phx-change="search_messages" phx-submit="search_messages" class="relative">
                 <.icon
                   name="hero-magnifying-glass"
@@ -385,10 +385,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   type="text"
                   name="query"
                   value={@message_data.message_search_query}
-                  placeholder="Search..."
+                  placeholder="Search messages..."
                   autocomplete="off"
                   phx-debounce="300"
-                  class="w-full pl-8 pr-7 py-1.5 text-sm rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
+                  class="w-full pl-8 pr-7 py-1.5 text-base rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
                 />
                 <%= if @message_data.message_search_query != "" do %>
                   <button

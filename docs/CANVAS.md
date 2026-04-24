@@ -24,15 +24,14 @@ The Canvas page is a dedicated LiveView interface for managing multiple collabor
 
 ```elixir
 # lib/eye_in_the_sky_web/router.ex
-scope "/", EyeInTheSkyWeb do
-  pipe_through :browser
-
-  live "/canvases", CanvasLive, :index      # List/default canvas view
-  live "/canvases/:id", CanvasLive, :show   # View specific canvas with sessions
-end
+# Canvas routes are in the :app live_session (includes rail layout)
+live "/canvases", CanvasLive, :index      # List/default canvas view
+live "/canvases/:id", CanvasLive, :show   # View specific canvas with sessions
 ```
 
 The router defines two action atoms (`:index` and `:show`) but the `CanvasLive` module uses `handle_params/3` to branch logic based on the `:id` parameter presence rather than action-based callbacks.
+
+**Route placement:** Canvas routes are in the `:app` live_session (not `:canvas`) so they receive the rail layout by default, consistent with other app pages like chat.
 
 ## CanvasLive Module
 
@@ -190,13 +189,14 @@ When events arrive, the handler calls `refresh_window/2` which calls `send_updat
 - **Props:** `canvas_session` (struct with pos_x, pos_y, width, height, session_id), `focus_session_id` (for cross-canvas focus highlighting)
 - **Events:** Emits `window_moved`, `window_resized`, `remove_window`, `raise_window` to parent `CanvasLive`
 - **Updates:** Receives `send_update` calls from PubSub event handlers (`:session_status`, `:agent_working`, `:agent_stopped`, `:new_message`) to re-render with latest message
+- **Data attributes:** Window root has `data-session-id` attribute for session matching in focus events
 - **Message rendering:** Uses iMessage-style bubble layout with provider icons, timestamps, and markdown via MarkdownMessage hook.
-  - **User messages:** Right-aligned with primary-color bubbles and base-200 background text
-  - **Agent messages:** Left-aligned with base-200 bubbles and base-content text
+  - **User messages:** Right-aligned with base-200 background bubble and base-content text
+  - **Agent messages:** Left-aligned, plain (no bubble) with base-content text
   - **Tool call messages:** Full-width, no bubble, centered; detected via body segment parsing (messages where all segments are tool_call types); capped at 85% max-width
   - **Tool result messages:** Centered, muted styling (base-300/40 background, base-content/40 text), capped at 90% max-width
   - **Regular DM-style messages:** Standard bubble layout with optional left-border styling for explicit DMs
-- **Status indicator:** Session status dot uses `status_dot_class` with classes for all states: working (animated with `animate-pulse`), completed, failed, and idle. Provider icon in chat message body animates with `animate-pulse` when session is working.
+- **Status indicator:** Provider logo (replaced status dot) displays in window header and animates with `animate-pulse` when session is working. Logo also appears in chat message body and pulses during working state.
 - **Focus ring:** Active window shows visible focus ring to indicate interaction target.
 - **Scroll behavior:** ChatWindowHook owns all scroll behavior. Auto-scroll enabled by default; disabled when user scrolls up and shows unread message count pill. Clicking pill re-enables auto-scroll and jumps to bottom. Automatically scrolls to bottom when user sends new message. Scroll-to-bottom is deferred by one rAF to allow DOM layout to stabilize before scrolling.
 
@@ -207,10 +207,21 @@ When events arrive, the handler calls `refresh_window/2` which calls `send_updat
   - "Add to New Canvas" — Creates canvas and adds session in one action
 - **Navigation:** Both trigger `push_navigate` to `/canvases/:id` after adding session
 
+### Rail Menu Canvas Integration
+- **File:** `lib/eye_in_the_sky_web/components/rail.ex` and `lib/eye_in_the_sky_web/components/rail/flyout.ex`
+- **Canvas Section:** Rail includes a canvas section with an icon that navigates to `/canvases` when not on a canvas page
+- **Flyout behavior:** When already on a canvas or chat page, the flyout locks open and displays:
+  - List of all canvases with their nested sessions
+  - Each session shows status indicator (dot with working animation) and session name
+  - Session name click navigates to `/canvases/:id?focus=:session_id` to focus that window (raise to front and un-minimize)
+  - Provider logo button dispatches `canvas:focus-session` event instead of navigating, enabling in-place focus within current canvas
+  - DM button navigates to `/dm/:session_id` for direct messaging with that session
+- **Navigation:** Clicking canvas icon on canvas/chat pages displays the flyout; clicking away closes it (unless locked). On other pages, canvas icon navigates directly to `/canvases`.
+- **Sidebar Tab:** When viewing canvas, `:sidebar_tab` is set to `:canvas` to highlight active section
+
 ### AllProjectsSection Integration
 - **File:** `lib/eye_in_the_sky_web/components/sidebar/all_projects_section.ex`
 - **Canvas Tab:** Sidebar includes a "Canvas" tab that routes to `/canvases`
-- **Sidebar Tab:** When viewing canvas, `:sidebar_tab` is set to `:canvas` to highlight active section
 
 ## Canvas Handlers Module
 
@@ -304,16 +315,22 @@ In addition to database persistence, window layout and z-index are persisted to 
 
 ### Focus Parameter
 
-The `?focus=` query parameter enables cross-canvas window focusing and is passed to ChatWindowComponent for visual feedback:
-- **Rail navigation:** Clicking a session name in the canvas rail flyout navigates to `/canvases/:id?focus=:session_id` instead of dispatching JS directly
+The `?focus=` query parameter enables cross-canvas window focusing via a deferred focus event:
+- **Rail navigation:** Clicking a session name in the canvas rail flyout navigates to `/canvases/:id?focus=:session_id`
 - **CanvasLive handling:** `handle_params/3` parses the `focus` param and assigns it as `:focus_session_id`
 - **Deferred focus event:** Renders a hidden span with `phx-mounted` attribute that dispatches `canvas:focus-session` event with `{sessionId: @focus_session_id}` after all windows are rendered in DOM
-- **ChatWindowHook listener:** Listens for `canvas:focus-session` event and raises the matching window to z-index `"20"`, persisting the z-index to localStorage
+- **ChatWindowHook listener:** Listens for `canvas:focus-session` event, matches the window via `data-session-id` attribute, and raises the matching window to z-index `"20"`, un-minimizes it, and persists the z-index to localStorage
 - **Component prop:** The `:focus_session_id` is also passed to ChatWindowComponent for potential visual highlighting or focus ring indication
 
 ### Canvas-to-Agent Navigation
 
-While canvas page is standalone, chat windows display session messages. Clicking a session name or message link should route back to `/agents/:id` (AgentLive) for full session context (code history, status details, etc.). The canvas rail also provides a logo button (distinct from the session name link) that navigates directly to `/dm/:session_id` to open direct messaging with that session.
+While canvas page is standalone, chat windows display session messages. The canvas rail provides two distinct interactions on each session:
+
+- **Session name click**: Navigates to `/canvases/:id?focus=:session_id` to focus (bring to front and un-minimize) that window within the canvas, or navigates to `/canvases/:id` if clicking from another canvas
+- **Provider logo click** (in rail): Dispatches `canvas:focus-session` event when already on a canvas page, raising the window to z-index 20 and un-minimizing without navigation. On non-canvas pages, the logo navigates to the canvas page.
+- **DM button click**: Navigates directly to `/dm/:session_id` to open direct messaging with that session
+
+Clicking a session name or message link within the canvas should route back to `/agents/:id` (AgentLive) for full session context (code history, status details, etc.).
 
 ## Key Architectural Patterns
 
@@ -352,12 +369,18 @@ While canvas page is standalone, chat windows display session messages. Clicking
 
 ## Related Files
 
-- **Routes:** `lib/eye_in_the_sky_web/router.ex` (lines 157-158)
-- **LiveView:** `lib/eye_in_the_sky_web/live/canvas_live.ex` (264 lines)
+- **Routes:** `lib/eye_in_the_sky_web/router.ex` (canvas routes in `:app` live_session)
+- **LiveView:** `lib/eye_in_the_sky_web/live/canvas_live.ex`
 - **Handlers:** `lib/eye_in_the_sky_web/live/agent_live/canvas_handlers.ex`
 - **Components:**
   - `lib/eye_in_the_sky_web/components/chat_window_component.ex`
+  - `lib/eye_in_the_sky_web/components/rail.ex` and `lib/eye_in_the_sky_web/components/rail/flyout.ex` (canvas rail section)
   - `lib/eye_in_the_sky_web/components/agent_list.ex` (canvas buttons)
   - `lib/eye_in_the_sky_web/components/sidebar/all_projects_section.ex` (canvas tab)
+- **JavaScript Hooks:**
+  - `assets/js/hooks/canvas_layout_hook.js` (layout presets)
+  - `assets/js/hooks/chat_window_hook.js` (window drag/resize, focus, scroll)
+  - `assets/js/hooks/canvas_tab_hook.js` (keyboard shortcuts)
+  - `assets/js/hooks/global_keydown.js` (centralized keyboard handling)
 - **Schema:** `lib/eye_in_the_sky/canvases/canvas.ex` and related Ecto context
 - **PubSub:** `lib/eye_in_the_sky/events.ex` (subscription logic)

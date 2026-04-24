@@ -12,6 +12,99 @@ defmodule EyeInTheSkyWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
+  Desktop-only top bar rendered above `@inner_content`.
+
+  Reads from layout assigns:
+  - `sidebar_tab` — atom, drives the section label
+  - `sidebar_project` — Project struct or nil, drives the breadcrumb
+  - `top_bar_cta` — optional `%{label: string, href: string}` for a primary action button
+
+  Hidden on mobile (the mobile header handles that instead).
+  """
+  attr :sidebar_tab, :atom, default: :sessions
+  attr :sidebar_project, :any, default: nil
+  attr :top_bar_cta, :map, default: nil
+
+  def top_bar(assigns) do
+    ~H"""
+    <div class="hidden md:flex h-9 flex-shrink-0 items-center border-b border-base-content/8 bg-base-100 pr-3">
+      <%!-- Breadcrumb --%>
+      <div class="flex items-center px-3 flex-shrink-0">
+        <%= if @sidebar_project do %>
+          <.link
+            navigate={~p"/projects/#{@sidebar_project.id}"}
+            class="flex items-center gap-1.5 text-[12px] font-medium text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5 px-1.5 py-1 rounded-md transition-colors"
+          >
+            <.icon name="hero-folder" class="w-3 h-3" />
+            {@sidebar_project.name}
+          </.link>
+          <span class="text-base-content/20 text-sm mx-1 select-none">/</span>
+        <% end %>
+        <span class="text-[12px] font-semibold text-base-content/75 px-1">
+          {top_bar_section_label(@sidebar_tab)}
+        </span>
+      </div>
+
+      <div class="flex-1" />
+
+      <%!-- Search --%>
+      <button
+        phx-click={JS.dispatch("palette:open", to: "#command-palette")}
+        class="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
+        title="Search"
+        aria-label="Search"
+      >
+        <.icon name="hero-magnifying-glass" class="w-3.5 h-3.5" />
+        Search
+        <kbd class="ml-0.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] bg-base-content/8 text-base-content/30 border border-base-content/10 font-sans leading-none">
+          ⌘K
+        </kbd>
+      </button>
+
+      <%!-- Optional CTA — supports %{label, href} for navigate links or %{label, event} for phx-click --%>
+      <%= if @top_bar_cta do %>
+        <%= if Map.get(@top_bar_cta, :href) do %>
+          <.link
+            navigate={@top_bar_cta.href}
+            class="ml-1.5 flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+          >
+            <.icon name="hero-plus" class="w-3 h-3" />
+            {@top_bar_cta.label}
+          </.link>
+        <% else %>
+          <button
+            phx-click={@top_bar_cta.event}
+            class="ml-1.5 flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+          >
+            <.icon name="hero-plus" class="w-3 h-3" />
+            {@top_bar_cta.label}
+          </button>
+        <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp top_bar_section_label(:sessions), do: "Sessions"
+  defp top_bar_section_label(:overview), do: "Sessions"
+  defp top_bar_section_label(:tasks), do: "Tasks"
+  defp top_bar_section_label(:kanban), do: "Tasks"
+  defp top_bar_section_label(:prompts), do: "Prompts"
+  defp top_bar_section_label(:notes), do: "Notes"
+  defp top_bar_section_label(:skills), do: "Skills"
+  defp top_bar_section_label(:teams), do: "Teams"
+  defp top_bar_section_label(:canvas), do: "Canvas"
+  defp top_bar_section_label(:chat), do: "Chat"
+  defp top_bar_section_label(:notifications), do: "Notifications"
+  defp top_bar_section_label(:usage), do: "Usage"
+  defp top_bar_section_label(:jobs), do: "Jobs"
+  defp top_bar_section_label(:config), do: "Config"
+  defp top_bar_section_label(:settings), do: "Settings"
+  defp top_bar_section_label(:files), do: "Files"
+  defp top_bar_section_label(:iam), do: "IAM"
+  defp top_bar_section_label(_), do: ""
+
+  @doc """
   Shows the flash group with standard titles and content.
 
   ## Examples

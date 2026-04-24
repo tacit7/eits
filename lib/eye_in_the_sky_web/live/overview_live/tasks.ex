@@ -29,6 +29,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Tasks do
       |> assign(:has_more, false)
       |> assign(:total_tasks, 0)
       |> assign(:sidebar_tab, :tasks)
+      |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_create_task_drawer"})
       |> stream(:tasks, [], dom_id: fn t -> "ot-#{t.id}" end)
       |> assign(:sidebar_project, nil)
       |> assign(:show_filter_sheet, false)

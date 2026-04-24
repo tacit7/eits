@@ -64,6 +64,13 @@
       </button>
     </header>
 
+    <%!-- Desktop top bar — hidden on mobile --%>
+    <.top_bar
+      sidebar_tab={assigns[:sidebar_tab] || :sessions}
+      sidebar_project={assigns[:sidebar_project]}
+      top_bar_cta={assigns[:top_bar_cta]}
+    />
+
     <main
       id="main-content"
       class="flex-1 overflow-auto flex flex-col min-w-0 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0"

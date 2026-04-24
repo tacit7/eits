@@ -1,6 +1,16 @@
-# Codex Integration
+# Multi-Provider SDK Integration
 
-How EITS creates, runs, streams, and resumes Codex (OpenAI) sessions.
+How EITS creates, runs, streams, and resumes sessions across multiple providers: Codex (OpenAI), Gemini (Google), and Claude (Anthropic).
+
+## Provider Overview
+
+| Provider | Binary | SDK | Stream Handler | Assembler | Status on Completion |
+|----------|--------|-----|-----------------|-----------|----------------------|
+| Claude | `claude` | `Claude.SDK` | Direct SSE | `StreamAssembler` | `idle` |
+| Codex | `codex` | `Codex.SDK` | JSONL via `MessageHandler` | `CodexStreamAssembler` | `idle` |
+| Gemini | `gemini` | `gemini_cli_sdk` | ETS-based `StreamHandler` | `StreamAssembler` (default) | `idle` |
+
+This document focuses on Codex and Gemini integration patterns. For Claude-specific details, see `AGENT_WORKER_QUEUE.md`.
 
 ## Architecture
 
@@ -97,11 +107,121 @@ The watermark is stored by tracking the `source_uuid` of the last successfully i
 - If the watermark UUID is not found in the file (e.g., file rotated), all messages are returned as a fallback
 - Each message imported updates the watermark, enabling resumable, incremental sync
 
+## Gemini Integration
+
+Gemini sessions use the `gemini_cli_sdk ~> 0.2.0` package and are integrated similarly to Codex, but with a dedicated event translation layer.
+
+### StreamHandler Architecture
+
+Unlike Codex (which emits JSONL lines) and Claude (which uses SSE), Gemini streams events through a supervised `StreamHandler` task that translates GeminiCliSdk events to a canonical Claude message format:
+
+```elixir
+# lib/eye_in_the_sky/gemini/stream_handler.ex
+def start(session_id, thread_id, opts) do
+  StreamSupervisor.start_child(__MODULE__, session_id, thread_id, opts)
+end
+
+def resume(session_id, thread_id, opts) do
+  StreamSupervisor.start_child(__MODULE__, session_id, thread_id, opts)
+end
+```
+
+The `StreamHandler`:
+- **Spawns a supervised task** to consume Gemini events
+- **Translates GeminiCliSdk event types** (InitEvent, MessageEvent, ToolUseEvent, ToolResultEvent, ResultEvent, ErrorEvent) to Claude message tuples
+- **Maintains an ETS registry** mapping `{sdk_ref, pid}` for session lifecycle tracking
+- **Auto-unregisters on termination** via process monitoring (`:DOWN` trap)
+
+### Event Translation
+
+Gemini events are mapped to the standard message format:
+
+| GeminiCliSdk Event | Translation |
+|-------------------|-------------|
+| `InitEvent` | Session initialization, sets up context |
+| `MessageEvent` | Text content block, emitted as `{:message, content}` |
+| `ToolUseEvent` | Tool invocation, emitted as `{:tool_use, name, input}` |
+| `ToolResultEvent` | Tool result, emitted as `{:tool_result, tool_use_id, result}` |
+| `ResultEvent` | Turn completion, emitted as `{:done}` |
+| `ErrorEvent` | Turn error, emitted as `{:error, reason}` |
+
+### Registry Lifecycle Management
+
+The StreamHandler maintains an ETS registry to track active sessions and prevent resource leaks:
+
+```elixir
+# Start: register on task spawn
+Registry.register(:gemini_streams, sdk_ref, pid)
+# Monitor the task for termination
+ref = Process.monitor(pid)
+# On :DOWN (any reason): unregister both entries
+Process.send_after(self(), {:cleanup, sdk_ref, ref}, 0)
+```
+
+The registry uses a dual-entry pattern:
+1. **Primary**: `{sdk_ref, pid}` — lookup by SDK reference to find the handler process
+2. **Secondary**: `{monitor_ref, sdk_ref}` — reverse lookup to clean up on `:DOWN`
+
+On handler termination (normal, error, cancel, or crash), the GenServer automatically deletes both entries, preventing stale `{sdk_ref, pid}` tuples in the registry.
+
+### Provider Routing
+
+Gemini routing is wired into the polymorphic dispatch system:
+
+```elixir
+# lib/eye_in_the_sky/claude/provider_strategy.ex
+defmodule ProviderStrategy do
+  def for_provider("gemini"), do: ProviderStrategy.Gemini
+  def for_provider("codex"), do: ProviderStrategy.Codex
+  def for_provider(_), do: ProviderStrategy.Claude
+end
+
+# lib/eye_in_the_sky/claude/agent_worker.ex
+defp stream_assembler_for("gemini"), do: StreamAssembler.new()
+defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
+defp stream_assembler_for(_provider), do: StreamAssembler.new()
+```
+
+Gemini reuses the default `StreamAssembler` (same as Claude) since the event stream is normalized by `StreamHandler` before reaching the worker.
+
+### Binary Discovery
+
+Gemini binary discovery is delegated to the `gemini_cli_sdk` package. The `BinaryFinder` documents this:
+
+```elixir
+# lib/eye_in_the_sky/claude/binary_finder.ex
+# Gemini binary location is determined by gemini_cli_sdk itself
+# No explicit discovery needed in EITS
+```
+
+## Dependencies
+
+Gemini provider requires the following Hex package:
+
+```elixir
+# mix.exs
+defp deps do
+  [
+    {:gemini_cli_sdk, "~> 0.2.0"},
+    ...
+  ]
+end
+```
+
+The `gemini_cli_sdk` package provides:
+- GeminiCliSdk binary discovery and management
+- Event stream parsing (InitEvent, MessageEvent, ToolUseEvent, etc.)
+- Session lifecycle APIs (start, resume, cancel)
+
+Codex and Claude dependencies are already present. Gemini is the new addition for multi-provider support.
+
 ## Streaming Pipeline
 
 ### Provider-Polymorphic Dispatch
 
-AgentWorker uses struct-based dispatch to route stream events to the correct assembler module. The `stream` field in the worker state holds either a `%StreamAssembler{}` (Claude) or `%CodexStreamAssembler{}` (Codex):
+AgentWorker uses struct-based dispatch to route stream events to the correct assembler module. The `stream` field in the worker state holds either:
+- `%StreamAssembler{}` — Claude (default) and Gemini (events pre-normalized by StreamHandler)
+- `%CodexStreamAssembler{}` — Codex (handles complete items)
 
 ```elixir
 # AgentWorker.init/1
@@ -109,13 +229,14 @@ stream: stream_assembler_for(provider)
 
 # Dispatch helpers pattern-match on struct type
 defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
+defp stream_assembler_for("gemini"), do: StreamAssembler.new()
 defp stream_assembler_for(_provider), do: StreamAssembler.new()
 
 defp stream_handle_message(%CodexStreamAssembler{} = s, msg), do: CodexStreamAssembler.handle_message(s, msg)
 defp stream_handle_message(%StreamAssembler{} = s, msg), do: StreamAssembler.handle_message(s, msg)
 ```
 
-All message handlers in AgentWorker call these dispatch helpers instead of any assembler module directly.
+All message handlers in AgentWorker call these dispatch helpers instead of any assembler module directly. Gemini and Claude share the same assembler since Gemini's `StreamHandler` normalizes events upstream.
 
 ### Codex.StreamAssembler
 
@@ -284,6 +405,7 @@ This centralizes the CLI reference, ensuring all Codex sessions receive identica
 
 ## Key Modules
 
+### Codex
 | Module | File | Role |
 |--------|------|------|
 | `Codex.CLI` | `lib/eye_in_the_sky/codex/cli.ex` | Port spawning, arg building, env setup; defaults `bypass_sandbox` to `true` |
@@ -292,11 +414,24 @@ This centralizes the CLI reference, ensuring all Codex sessions receive identica
 | `Codex.Parser` | `lib/eye_in_the_sky/codex/parser.ex` | JSONL line -> Message struct |
 | `Codex.StreamAssembler` | `lib/eye_in_the_sky/codex/stream_assembler.ex` | Stream state for Codex PubSub events |
 | `Codex.ReviewInstructions` | `lib/eye_in_the_sky/codex/review_instructions.ex` | Build review prompt for GitHub PRs |
-| `Claude.StreamAssembler` | `lib/eye_in_the_sky/claude/stream_assembler.ex` | Stream state for Claude PubSub events |
-| `AgentWorker` | `lib/eye_in_the_sky/claude/agent_worker.ex` | Provider-polymorphic worker |
+| `Codex.SessionImporter` | `lib/eye_in_the_sky/codex/session_importer.ex` | Incremental sync with watermark to avoid re-scanning history |
+| `Codex.SessionReader` | `lib/eye_in_the_sky/codex/session_reader.ex` | Read Codex session messages from disk |
+
+### Gemini
+| Module | File | Role |
+|--------|------|------|
+| `Gemini.StreamHandler` | `lib/eye_in_the_sky/gemini/stream_handler.ex` | Consume GeminiCliSdk event streams, translate to Claude message tuples, ETS registry for lifecycle |
+| `ProviderStrategy.Gemini` | `lib/eye_in_the_sky/claude/provider_strategy/gemini.ex` | Gemini-specific provider logic, routing |
+
+### Shared
+| Module | File | Role |
+|--------|------|------|
+| `Claude.StreamAssembler` | `lib/eye_in_the_sky/claude/stream_assembler.ex` | Stream state for Claude and Gemini PubSub events |
+| `AgentWorker` | `lib/eye_in_the_sky/claude/agent_worker.ex` | Provider-polymorphic worker, struct-based dispatch for stream handling |
 | `AgentManager` | `lib/eye_in_the_sky/claude/agent_manager.ex` | Session creation, worker lifecycle |
 | `MessageHandler` | `lib/eye_in_the_sky/sdk/message_handler.ex` | JSONL parsing, raw Codex broadcasts when `forward_raw_lines: true` |
 | `WorkerEvents` | `lib/eye_in_the_sky/agent_worker_events.ex` | DB persistence, PubSub broadcasts |
+
 
 ## Session Status Lifecycle
 
@@ -316,20 +451,19 @@ Codex session status transitions are driven by JSONL events emitted by `codex ex
 
 ## Streaming vs Claude
 
-| Aspect | Claude | Codex |
-|--------|--------|-------|
-| Output format | SSE (Server-Sent Events) | JSONL (one JSON object per line) |
-| Text delivery | Character-by-character deltas | Complete blocks per item |
-| Stream assembler | `Claude.StreamAssembler` | `Codex.StreamAssembler` |
-| Text event | `{:stream_delta, :text, delta}` | `{:stream_replace, :text, text}` |
-| Thinking event | `{:stream_delta, :thinking, delta}` | `{:stream_replace, :thinking, text}` |
-| Tool deltas | Accumulates JSON fragments | No-op (items arrive complete) |
-| Session ID source | First API response | `thread.started` event |
-| Resume command | `claude --resume <uuid>` | `codex exec resume <thread_id>` |
-| Local persistence | `~/.claude/sessions/` | `$CODEX_HOME/sessions/` (30 days) |
-| Binary | `claude` (Node.js) | `codex` (Rust) |
-| Auth env var | `ANTHROPIC_API_KEY` | `OPENAI_API_KEY` |
-| Completion status | `"idle"` | `"idle"` |
+| Aspect | Claude | Codex | Gemini |
+|--------|--------|-------|--------|
+| Text delivery | Character-by-character deltas | Complete blocks per item | Normalized by StreamHandler |
+| Stream assembler | `Claude.StreamAssembler` | `Codex.StreamAssembler` | `StreamAssembler` (normalized) |
+| Text event | `{:stream_delta, :text, delta}` | `{:stream_replace, :text, text}` | `{:message, content}` (normalized) |
+| Thinking event | `{:stream_delta, :thinking, delta}` | `{:stream_replace, :thinking, text}` | Via MessageEvent (normalized) |
+| Tool deltas | Accumulates JSON fragments | No-op (items arrive complete) | Via ToolUseEvent (complete) |
+| Session ID source | First API response | `thread.started` event | InitEvent |
+| Resume command | `claude --resume <uuid>` | `codex exec resume <thread_id>` | `gemini resume <session>` |
+| Local persistence | `~/.claude/sessions/` | `$CODEX_HOME/sessions/` (30 days) | Via gemini_cli_sdk |
+| Binary | `claude` (Node.js) | `codex` (Rust) | `gemini` (Rust via SDK) |
+| Auth env var | `ANTHROPIC_API_KEY` | `OPENAI_API_KEY` | `GEMINI_API_KEY` |
+| Completion status | `"idle"` | `"idle"` | `"idle"` |
 
 ## Known Issues and Gotchas
 

@@ -5,7 +5,6 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Components.ProjectSessionsFilters
   import EyeInTheSkyWeb.Components.ProjectSessionsTable
-  import EyeInTheSkyWeb.Components.AgentList, only: [archive_confirm_modal: 1]
 
   @doc "Full sessions page layout. Pass `{assigns}` from the LiveView render."
   attr :has_more, :boolean, required: true
@@ -20,9 +19,6 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   attr :show_new_session_drawer, :boolean, required: true
   attr :selected_ids, :any, required: true
   attr :select_mode, :boolean, default: false
-  attr :off_screen_selected_count, :integer, default: 0
-  attr :indeterminate_ids, :any, default: MapSet.new()
-  attr :show_archive_confirm, :boolean, default: false
   attr :editing_session_id, :any, required: true
   attr :project, :any, required: true
   attr :canvases, :list, default: []
@@ -40,10 +36,11 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           <div class="flex md:hidden items-center gap-2">
             <button
               :if={!@select_mode && @agents != []}
+              class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 h-11 px-1 transition-colors"
               phx-click="enter_select_mode"
-              class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/40 hover:text-base-content/70"
             >
-              <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" /> Select
+              <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
+              Select
             </button>
             <button
               phx-click="open_filter_sheet"
@@ -74,7 +71,6 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           select_mode={@select_mode}
           agents={@agents}
           selected_ids={@selected_ids}
-          off_screen_selected_count={@off_screen_selected_count}
         />
 
         <.session_list
@@ -84,7 +80,6 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           session_filter={@session_filter}
           select_mode={@select_mode}
           selected_ids={@selected_ids}
-          indeterminate_ids={@indeterminate_ids}
           editing_session_id={@editing_session_id}
           search_query={@search_query}
           canvases={@canvases}
@@ -114,10 +109,6 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       current_project={if @scope == :all, do: nil, else: @project}
       toggle_event="toggle_new_session_drawer"
       submit_event="create_new_session"
-    />
-    <.archive_confirm_modal
-      show_archive_confirm={@show_archive_confirm}
-      selected_ids={@selected_ids}
     />
     """
   end

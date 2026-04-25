@@ -20,7 +20,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   alias EyeInTheSkyWeb.ControllerHelpers
   import EyeInTheSkyWeb.Helpers.AgentCreationHelpers, only: [build_opts: 2]
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
-  alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
 
   # ---------------------------------------------------------------------------
   # Session lifecycle
@@ -110,48 +109,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   # Bulk selection
   # ---------------------------------------------------------------------------
 
-  def toggle_select(%{"id" => raw_id}, socket) do
-    id = Selection.normalize_id(raw_id)
-    prev_indeterminate = socket.assigns.indeterminate_ids
-
+  def toggle_select(%{"id" => id}, socket) do
     selected =
       if MapSet.member?(socket.assigns.selected_ids, id),
         do: MapSet.delete(socket.assigns.selected_ids, id),
         else: MapSet.put(socket.assigns.selected_ids, id)
 
-    new_indeterminate = Selection.compute_indeterminate_ids(selected, socket.assigns.agents)
-
     socket =
       socket
       |> assign(:selected_ids, selected)
-      |> assign(:select_mode, MapSet.size(selected) > 0)
-      |> assign(:indeterminate_ids, new_indeterminate)
-      |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
-
-    # Stream-insert the toggled row so its selected class re-renders immediately.
-    # Also re-insert any rows whose indeterminate state changed (parent rows).
-    # Guard: only insert agents within the visible slice — off-screen inserts break pagination.
-    changed_ids = MapSet.union(
-      MapSet.symmetric_difference(prev_indeterminate, new_indeterminate),
-      MapSet.new([id])
-    )
-
-    visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
-
-    socket =
-      Enum.reduce(visible_agents, socket, fn agent, acc ->
-        if MapSet.member?(changed_ids, Selection.normalize_id(agent.id)) do
-          stream_insert(acc, :session_list, agent)
-        else
-          acc
-        end
-      end)
+      |> assign(:select_mode, true)
 
     {:noreply, socket}
   end
 
   def exit_select_mode(_params, socket) do
-    {:noreply, Selection.clear_selection(socket)}
+    socket =
+      socket
+      |> assign(:select_mode, false)
+      |> assign(:selected_ids, MapSet.new())
+
+    {:noreply, socket}
   end
 
   def enter_select_mode(_params, socket) do
@@ -159,133 +137,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   end
 
   def toggle_select_all(_params, socket) do
-    selected = Selection.select_all_visible(socket.assigns.selected_ids, socket.assigns.agents)
+    all_ids = MapSet.new(socket.assigns.agents, &to_string(&1.id))
 
-    socket =
-      socket
-      |> assign(:selected_ids, selected)
-      |> assign(:select_mode, MapSet.size(selected) > 0)
-      |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, socket.assigns.agents))
-      |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
+    selected =
+      if MapSet.equal?(socket.assigns.selected_ids, all_ids),
+        do: MapSet.new(),
+        else: all_ids
 
-    # Stream-insert all visible rows so checkboxes reflect the new selected state.
-    # Streams exclude children from assign diffs — explicit inserts are required.
-    visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
-
-    socket =
-      Enum.reduce(visible_agents, socket, fn agent, acc ->
-        stream_insert(acc, :session_list, agent)
-      end)
-
-    {:noreply, socket}
-  end
-
-  def select_range(
-        %{"anchor_id" => anchor_id, "target_id" => target_id, "ordered_ids" => raw_ordered_ids},
-        socket
-      ) do
-    # Filter client-provided IDs against visible agents to prevent scope leakage
-    visible_ids = Selection.ids_from_agents(socket.assigns.agents)
-
-    ordered_ids =
-      raw_ordered_ids
-      |> Enum.map(&Selection.normalize_id/1)
-      |> Enum.filter(&MapSet.member?(visible_ids, &1))
-
-    anchor = Selection.normalize_id(anchor_id)
-    target = Selection.normalize_id(target_id)
-
-    anchor_idx = Enum.find_index(ordered_ids, &(&1 == anchor))
-    target_idx = Enum.find_index(ordered_ids, &(&1 == target))
-
-    # If anchor or target are not in visible rows (invalid/stale), do nothing
-    if is_nil(anchor_idx) or is_nil(target_idx) do
-      {:noreply, socket}
-    else
-      range_ids =
-        ordered_ids
-        |> Enum.slice(min(anchor_idx, target_idx)..max(anchor_idx, target_idx))
-        |> MapSet.new()
-
-      selected = MapSet.union(socket.assigns.selected_ids, range_ids)
-
-      socket =
-        socket
-        |> assign(:selected_ids, selected)
-        |> assign(:select_mode, MapSet.size(selected) > 0)
-        |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, socket.assigns.agents))
-        |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
-
-      {:noreply, socket}
-    end
-  end
-
-  def confirm_archive_selected(_params, socket) do
-    {:noreply, assign(socket, :show_archive_confirm, true)}
-  end
-
-  def cancel_archive_selected(_params, socket) do
-    {:noreply, assign(socket, :show_archive_confirm, false)}
-  end
-
-  def archive_selected(_params, socket) do
-    if MapSet.size(socket.assigns.selected_ids) == 0 do
-      {:noreply, assign(socket, :show_archive_confirm, false)}
-    else
-      project_id = socket.assigns.project.id
-
-      results =
-        Enum.map(socket.assigns.selected_ids, fn id ->
-          with {:ok, session} <- fetch_project_session(project_id, id),
-               :ok <- archive_project_session(session) do
-            :ok
-          else
-            {:error, :not_found} -> :error
-            {:error, reason} ->
-              Logger.warning("bulk archive: failed for session #{id}: #{inspect(reason)}")
-              :error
-          end
-        end)
-
-      archived = Enum.count(results, &(&1 == :ok))
-      failed = length(results) - archived
-
-      {flash_level, flash_msg} =
-        cond do
-          archived > 0 and failed > 0 ->
-            {:info, "Archived #{archived} #{pluralize_session(archived)}; #{failed} could not be archived"}
-          archived > 0 ->
-            {:info, "Archived #{archived} #{pluralize_session(archived)}"}
-          true ->
-            {:error, "Could not archive #{failed} #{pluralize_session(failed)}"}
-        end
-
-      socket =
-        socket
-        |> assign(:show_archive_confirm, false)
-        |> Selection.clear_selection()
-        |> Loader.load_agents()
-        |> put_flash(flash_level, flash_msg)
-
-      {:noreply, socket}
-    end
-  end
-
-  defp pluralize_session(count), do: if(count == 1, do: "session", else: "sessions")
-
-  defp fetch_project_session(project_id, raw_id) do
-    id = Selection.normalize_id(raw_id)
-
-    with {:ok, session} <- Sessions.get_session(id) do
-      if session.project_id == project_id, do: {:ok, session}, else: {:error, :not_found}
-    end
-  end
-
-  defp archive_project_session(session) do
-    case Sessions.archive_session(session) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
+    {:noreply, assign(socket, :selected_ids, selected)}
   end
 
   def delete_selected(_params, socket) do
@@ -345,23 +204,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   def save_session_name(%{"session_id" => session_id, "name" => name}, socket) do
     name = String.trim(name)
 
-    socket =
-      if name != "" do
-        case Sessions.get_session(session_id) do
-          {:ok, session} ->
-            case Sessions.update_session(session, %{name: name}) do
-              {:ok, _} -> socket
-              {:error, reason} ->
-                Logger.warning("Failed to rename session #{session_id}: #{inspect(reason)}")
-                put_flash(socket, :error, "Failed to rename session")
-            end
-
-          {:error, _} ->
-            socket
-        end
-      else
-        socket
+    if name != "" do
+      case Sessions.get_session(session_id) do
+        {:ok, session} -> Sessions.update_session(session, %{name: name})
+        _ -> :noop
       end
+    end
 
     {:noreply, assign(socket, :editing_session_id, nil) |> Loader.load_agents()}
   end

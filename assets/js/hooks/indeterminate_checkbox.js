@@ -1,23 +1,23 @@
 /**
  * IndeterminateCheckbox
  *
- * Keeps the native `input.indeterminate` DOM property in sync with the
- * `data-indeterminate` attribute rendered by the server. The indeterminate
- * state cannot be set via HTML attributes — it requires a JS property set.
+ * Sets the native `indeterminate` property on a checkbox input based on a
+ * `data-indeterminate` attribute. The indeterminate state cannot be set via
+ * HTML alone — it requires JavaScript.
  *
- * Usage: attach to a checkbox input with an id, e.g.:
- *   <input id="my-cb" type="checkbox" data-indeterminate="true" phx-hook="IndeterminateCheckbox" />
+ * Usage:
+ *   <input type="checkbox"
+ *          phx-hook="IndeterminateCheckbox"
+ *          data-indeterminate={some_partial_selection_bool} />
  */
 export const IndeterminateCheckbox = {
   mounted() {
-    this._sync()
+    this.sync()
   },
-
   updated() {
-    this._sync()
+    this.sync()
   },
-
-  _sync() {
+  sync() {
     this.el.indeterminate = this.el.dataset.indeterminate === "true"
-  },
+  }
 }

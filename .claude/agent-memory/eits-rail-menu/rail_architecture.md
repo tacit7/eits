@@ -11,6 +11,7 @@ type: project
 - `lib/eye_in_the_sky_web/components/rail/helpers.ex` — `project_initial/1` and minor utils
 - `lib/eye_in_the_sky_web/components/rail/project_switcher.ex` — project picker dropdown
 - `lib/eye_in_the_sky_web/components/rail/project_actions.ex` — project CRUD + select event handlers
+- `lib/eye_in_the_sky_web/components/rail/file_actions.ex` — file open/save/expand/collapse event handlers (extracted in PR #287)
 - `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — renders `<.live_component module={Rail} id="app-rail" sidebar_project={assigns[:sidebar_project]} ...>`
 - `assets/js/hooks/rail_state.js` — RailState hook: localStorage persistence, mobile swipe, section restore
 - `docs/RAIL_MENU.md` — full architecture doc (canonical reference)
@@ -31,7 +32,7 @@ type: project
   usage: :usage,      # was :sessions before — fixed
   jobs: :jobs,        # was :sessions before — fixed
   config: :sessions, settings: :sessions, agents: :sessions,
-  files: :sessions, bookmarks: :sessions
+  files: :files, bookmarks: :sessions
 }
 ```
 
@@ -81,6 +82,8 @@ Always use `sticky_section?/1`. Never hardcode `[:chat, :canvas]` inline.
 | :teams | `maybe_load_teams/3` |
 | :canvas | `maybe_load_canvases/2` |
 | :jobs | `maybe_load_jobs/2` (EyeInTheSky.ScheduledJobs.list_jobs()) |
+| :notes | `maybe_load_notes/3` (Notes.list_notes_filtered; scoped to project_id when set) |
+| :files | `maybe_load_files/2` (FileTree.root) |
 
 Sessions also reload when `sidebar_project` changes.
 
@@ -112,6 +115,15 @@ Order is safe: `update/2` runs before hook `mounted()` fires, so project-scoped 
 - Empty state: "No matching tasks" when search or state filter active; "No tasks" otherwise
 - Kanban nav: always visible — live link when sidebar_project present, grayed-out span with tooltip when nil
 - State filter popup: To Do (1) / In Progress (2) / In Review (4) / Done (3)
+
+## Notes Flyout (PR #291)
+
+- Lazy-loaded via `maybe_load_notes/3` — passes `project_id` when `sidebar_project` is set, global last 20 otherwise
+- Content: `notes_content/1` private component — title + body preview per row, parent_type badge, links to `/notes/:id/edit`
+- Nil-safe label: `note.title || String.slice(note.body || "", 0, 60)` — blank notes render `"(empty)"`
+- `+` button in flyout header fires `new_note` event → `push_navigate` to `/notes/new`
+- No `attr :myself` on `notes_content/1` — it uses only `<.link navigate>`, no phx-target needed
+- assign: `flyout_notes: []` (initialized in mount)
 
 ## Jobs Flyout
 

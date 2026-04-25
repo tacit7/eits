@@ -36,10 +36,19 @@ defmodule EyeInTheSky.DataCase do
 
   @doc """
   Sets up the sandbox based on the test tags.
+
+  Also provisions a test user so a default workspace exists for any test that
+  calls `Projects.create_project` without explicitly passing `workspace_id`.
   """
   def setup_sandbox(tags) do
     pid = Sandbox.start_owner!(EyeInTheSky.Repo, shared: not tags[:async])
     on_exit(fn -> Sandbox.stop_owner(pid) end)
+
+    # Ensure at least one workspace exists within this test's transaction.
+    # Projects.create_project falls back to the first available workspace when
+    # workspace_id is not supplied, so this prevents null constraint violations
+    # in tests that were written before workspace_id was required.
+    EyeInTheSky.Accounts.get_or_create_user("__test_seed_#{System.unique_integer([:positive])}__")
   end
 
   @doc """

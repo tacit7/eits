@@ -24,7 +24,10 @@ defmodule EyeInTheSky.Repo.Migrations.AddWorkspaceIdToProjects do
     )
     """)
 
-    # Step 4: Enforce non-null now that all rows are filled
+    # Step 4: Delete orphaned projects that have no workspace (test DBs with stale data)
+    execute("DELETE FROM projects WHERE workspace_id IS NULL")
+
+    # Step 5: Enforce non-null now that all rows are filled
     alter table(:projects) do
       modify :workspace_id, :bigint, null: false
     end

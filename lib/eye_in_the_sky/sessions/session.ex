@@ -74,6 +74,11 @@ defmodule EyeInTheSky.Sessions.Session do
       foreign_key: :agent_id,
       type: :integer
 
+    belongs_to :project, EyeInTheSky.Projects.Project,
+      define_field: false,
+      foreign_key: :project_id,
+      type: :integer
+
     has_many :logs, EyeInTheSky.Logs.SessionLog, foreign_key: :session_id
     has_many :commits, EyeInTheSky.Commits.Commit, foreign_key: :session_id
     has_many :pull_requests, EyeInTheSky.PullRequests.PullRequest, foreign_key: :session_id

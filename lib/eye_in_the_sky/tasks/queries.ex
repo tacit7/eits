@@ -256,6 +256,52 @@ defmodule EyeInTheSky.Tasks.Queries do
     |> QueryBuilder.maybe_where(opts, :state_id)
   end
 
+  # --- Scope-aware queries ---
+
+  @doc """
+  Lists tasks for a given `EyeInTheSky.Scope`.
+
+  - Project scope: delegates to `list_tasks_for_project/2`.
+  - Workspace scope: returns tasks across all projects in the workspace,
+    preloads :project so callers can show the project label.
+
+  Accepts the same opts as `list_tasks_for_project/2`:
+  `sort_by`, `include_archived`, `state_id`, `limit`, `offset`.
+  """
+  def list_tasks_for_scope(scope, opts \\ [])
+
+  def list_tasks_for_scope(%EyeInTheSky.Scope{type: :project, project_id: pid}, opts) do
+    list_tasks_for_project(pid, opts)
+  end
+
+  def list_tasks_for_scope(%EyeInTheSky.Scope{type: :workspace, workspace_id: wid}, opts) do
+    sort_by = Keyword.get(opts, :sort_by, "created_desc")
+    include_archived = Keyword.get(opts, :include_archived, false)
+
+    order =
+      case sort_by do
+        "created_asc" -> [asc: :created_at]
+        "priority" -> [desc: :priority, asc: :position]
+        _ -> [asc: :position, desc: :created_at]
+      end
+
+    query =
+      from t in Task,
+        join: p in EyeInTheSky.Projects.Project,
+        on: t.project_id == p.id and p.workspace_id == ^wid,
+        preload: [project: p]
+
+    query = if include_archived, do: query, else: where(query, [t], t.archived == false)
+    query = QueryBuilder.maybe_where(query, opts, :state_id)
+
+    query
+    |> order_by(^order)
+    |> QueryBuilder.maybe_limit(opts)
+    |> QueryBuilder.maybe_offset(opts)
+    |> preload(^@full_task_preloads)
+    |> Repo.all()
+  end
+
   defp base_project_tasks_query(project_id, opts) do
     include_archived = Keyword.get(opts, :include_archived, false)
 

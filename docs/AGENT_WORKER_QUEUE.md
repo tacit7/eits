@@ -124,14 +124,42 @@ ORDER BY inserted_at;
 
 See commit `b137f1f8`.
 
+## Streaming Isolation via Task.Supervisor
+
+`broadcast_events/2` spawns event broadcasts under `EyeInTheSky.TaskSupervisor`, ensuring PubSub subscribers can never block the `AgentWorker` GenServer event loop.
+
+**Message Trace Correlation:** Each job carries a `message_trace_id` generated at start time. The new `EyeInTheSky.Messages.Trace` module generates short url-safe trace IDs via `Trace.new/0`. Trace IDs are attached to Logger metadata via `Trace.set_in_logger/1` and propagated into Task children via Logger.metadata snapshot — all log lines and telemetry events for a single message share the same trace ID.
+
+**Lifecycle:** `message_trace_id` is:
+- Generated when a job starts (in `admit_idle/2` or `process_next_job/1`)
+- Cleared at `:claude_complete` message
+- Included in every telemetry event metadata map via `emit/4`
+- Also set on notify-agent-complete Task so completion events inherit the trace
+
+**Benefit:** Decouples subscriber latency from worker responsiveness. A slow PubSub subscriber (e.g., dashboard sync) cannot delay the next job start.
+
+## BulkImporter Agent Reply Deduplication
+
+When `on_sdk_completed/3` persists the assistant reply via `record_incoming_reply`, and `agent_stopped` fires shortly after, `BulkImporter` syncs the same JSONL file. The SDK result has a different `source_uuid` than the per-message JSONL UUID, causing a race where the same reply is inserted twice (once from the SDK result, once from the JSONL import).
+
+**Guard:** `agent_reply_already_recorded?/2` performs a 30-second body-match window check. If a message with matching body and sender was recorded within the past 30 seconds, the import is skipped.
+
+**Why 30 seconds:** The AgentWorker→agent_stopped→BulkImporter pipeline completes in < 10 seconds, so 30 seconds provides safety margin while avoiding false positives from repeated output within normal conversation flows.
+
+**Scope:** The guard fires on all non-user messages (agent/assistant replies). User messages bypass the check. When `importing_from_file?: true` (e.g., bulk historical imports via SessionImporter), the guard is skipped entirely — the race cannot occur during file imports since the agent is not running concurrently.
+
+**Result:** Eliminates the double-render bug where the final assistant message appeared twice in the chat history.
+
 ## Code Locations
 
 | File | Responsibility |
 |------|---------------|
-| `lib/eye_in_the_sky/claude/agent_worker.ex` | Queue logic, `normalize_context/1`, `admit_idle/2`, `handle_transient_error/1`, `handle_systemic_error/2` |
+| `lib/eye_in_the_sky/claude/agent_worker.ex` | Queue logic, `normalize_context/1`, `admit_idle/2`, `handle_transient_error/1`, `handle_systemic_error/2`, message trace-id generation and propagation |
 | `lib/eye_in_the_sky/claude/agent_worker/retry_policy.ex` | Retry scheduling, queue drain on exhaustion |
-| `lib/eye_in_the_sky/agent_worker_events.ex` | `on_queue_drained/4`, `on_current_job_failed/2`, `classify_failure_reason/1` |
+| `lib/eye_in_the_sky/agent_worker_events.ex` | `on_queue_drained/4`, `on_current_job_failed/2`, `classify_failure_reason/1`, broadcast isolation via TaskSupervisor |
 | `lib/eye_in_the_sky/messages.ex` | `mark_processing/1`, `mark_delivered/1`, `mark_failed/2` |
+| `lib/eye_in_the_sky/messages/trace.ex` | `Trace.new/0` generates url-safe trace IDs, `Trace.set_in_logger/1` attaches to Logger metadata |
+| `lib/eye_in_the_sky/messages/bulk_importer.ex` | Imports messages from JSONL, `agent_reply_already_recorded?/2` dedup guard (30s body-match window) |
 | `lib/eye_in_the_sky/agents/runtime_context.ex` | Builds context map; `message_id` must appear in `@known_keys` |
 | `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex` | Passes `message_id: message.id` to `continue_session` |
 | `test/eye_in_the_sky/messages_test.exs` | Lifecycle transition tests |

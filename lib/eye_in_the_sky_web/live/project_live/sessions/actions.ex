@@ -104,6 +104,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   def toggle_select(%{"id" => raw_id}, socket) do
     id = Selection.normalize_id(raw_id)
     prev_indeterminate = socket.assigns.indeterminate_ids
+    # Capture BEFORE socket is rebound below — otherwise both sides read the new value.
+    prev_select_mode = MapSet.size(socket.assigns.selected_ids) > 0
 
     selected =
       if MapSet.member?(socket.assigns.selected_ids, id),
@@ -129,7 +131,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     )
 
     visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
-    prev_select_mode = MapSet.size(socket.assigns.selected_ids) > 0
     new_select_mode = MapSet.size(selected) > 0
     select_mode_changed? = prev_select_mode != new_select_mode
 

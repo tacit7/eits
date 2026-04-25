@@ -366,11 +366,18 @@ end
 
 ## Mobile Optimizations (DM Page)
 
-**Top bar (Claude-style minimal design):**
-- Simplified header with session name only
+**Desktop/Mobile layout split (commits d6c5ae2e, ef000cd3):**
+- **Desktop:** Top bar with breadcrumb, message search, and tab pills (`md:flex`)
+- **Mobile:** DM page header card visible (`md:block`) with mobile-optimized controls
+- **Header card:** Displays only on mobile; hidden on desktop (md:block)
+- **Tab pills and search:** Desktop views in top bar; mobile views in card header (md:hidden)
+
+**Mobile header card (visible md:block):**
+- Simplified header with session name
 - Removed unlimited placeholder and token counter display
-- Tab navigation in mobile overflow menu for additional features
-- Agent status indicator in top bar
+- Includes tab pills for navigation (Messages, Info, Agents, etc.)
+- Message search box for filtering
+- Action menu for session UUID copy and timer controls
 
 **Tab navigation (mobile):**
 - Moved secondary features to a tab-based overflow menu
@@ -771,6 +778,70 @@ The DM page now has a sixth tab (Settings) with scope controls and provider-spec
 - `lib/eye_in_the_sky_web/components/dm_page.ex` — tab registration
 - `lib/eye_in_the_sky_web/components/dm_page/settings_tab.ex` — settings UI component
 - `lib/eye_in_the_sky_web/live/dm_live.ex` — event handlers
+
+---
+
+## Desktop Top Bar
+
+**Commits:** `d6c5ae2e`, `ef000cd3`
+
+A desktop-only top bar appears above the main content area on the DM page, providing breadcrumb navigation, search access, and tab controls.
+
+**Layout:**
+- **Desktop:** Top bar displays with breadcrumb (project + section), search button, and DM tabs/search
+- **Mobile:** Top bar is hidden (`md:flex`); mobile-only layout takes over
+- **Position:** Rendered above `@inner_content` in `app.html.heex`
+
+**DM-specific toolbar:**
+- **Session breadcrumb:** Shows current project and "DM" section label
+- **Message search:** Quick-search box for filtering messages in conversation
+- **Tab pills:** Session tabs (Messages, Info, Agents, etc.) — desktop-only
+- **No inline header card:** The DM page header card is now hidden on desktop (`md:block`)
+
+**Breadcrumb generation:**
+- Section label derived from `sidebar_tab` atom (`:dm` → "DM")
+- Breadcrumb follows pattern: `Project › Section`
+
+**Top bar attributes passed by DmLive:**
+- `dm_active_tab` — current tab identifier
+- `dm_session_name` — session name for breadcrumb
+- `dm_message_search_query` — search filter text
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/layouts.ex` — top_bar component with dm_toolbar private component
+- `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — top bar integration
+
+---
+
+## DM Action Menu
+
+**Commits:** `d6c5ae2e`, `ef000cd3`
+
+The DM page overlay (timer controls, task detail) now includes an action menu button that exposes additional session-specific operations.
+
+**Component:** `lib/eye_in_the_sky_web/components/dm_page/action_menu.ex`
+
+**Menu items:**
+1. **Copy Session UUID** — Displays first 8 characters of the session UUID and copies the full UUID to clipboard on click
+2. **Pause/Resume timer** — Control timer state (if overlay_data.active_timer is set)
+3. **Schedule task** — (if applicable)
+4. **Reload check modal** — Explicitly trigger reload confirmation dialog
+
+**Attributes:**
+- `session_uuid` — optional; if present, adds the "Copy UUID" menu item
+- `wrapper_id` — menu wrapper identifier (used in button ID generation)
+- `cancel_btn_id` — required; ID of the cancel button for closing
+- `active_timer` — timer state object
+- `overlay_data` — overlay context
+- `notify_on_stop` — whether to emit notification on timer stop
+
+**Copy to Clipboard behavior:**
+- Menu item shows: `Copy 1a2b3c4f…` (first 8 chars of UUID)
+- Click copies full UUID to system clipboard
+- Uses the `CopyToClipboard` LiveView hook
+
+**File:**
+- `lib/eye_in_the_sky_web/components/dm_page/action_menu.ex` — menu component
 
 ---
 

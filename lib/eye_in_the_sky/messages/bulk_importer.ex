@@ -51,9 +51,11 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     }
 
     # Separate messages into actions: updates (link existing), inserts (create new), skips
-    {updates, inserts, skip_count} =
-      Enum.reduce(messages_with_uuid, {[], [], 0}, fn msg, {upd_acc, ins_acc, skip_count} ->
-        process_message(msg, context, upd_acc, ins_acc, skip_count)
+    # seen_agent_bodies tracks non-user message bodies already queued in this batch,
+    # catching in-batch duplicates before they hit the DB (MapSet check is cheap-first).
+    {updates, inserts, skip_count, _seen_agent_bodies} =
+      Enum.reduce(messages_with_uuid, {[], [], 0, MapSet.new()}, fn msg, acc ->
+        process_message(msg, context, acc)
       end)
 
     # Execute writes WITHOUT an enclosing transaction so one bad row does not
@@ -159,7 +161,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   # Private
   # ---------------------------------------------------------------------------
 
-  defp process_message(msg, context, upd_acc, ins_acc, skip_count) do
+  defp process_message(msg, context, {upd_acc, ins_acc, skip_count, seen_agent_bodies}) do
     %{
       session_id: session_id,
       now: now,
@@ -172,7 +174,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     cond do
       # Fast-path: if this source_uuid is already in the DB, skip the expensive body scan.
       MapSet.member?(existing_source_uuids, msg.uuid) ->
-        {upd_acc, ins_acc, skip_count + 1}
+        {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
 
       # Avoid double-rendering DMs. When a DM arrives, DMDelivery persists it
       # as sender_role: "agent" (inbound) and forwards it to the local CLI as
@@ -183,27 +185,28 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       # DM render twice in the chat (once received, once "sent"). Skip the
       # import when a recent inbound DM with the same body already exists.
       msg.role == "user" and dm_already_recorded?(session_id, msg.content, import_opts) ->
-        {upd_acc, ins_acc, skip_count + 1}
+        {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
 
-      # Avoid double-rendering the final agent message. AgentWorker persists
-      # the assistant reply via record_incoming_reply using the SDK result UUID
-      # as source_uuid. BulkImporter later runs for the same JSONL file and
-      # sees the per-message JSONL UUID — a different value. The fast-path UUID
-      # check misses, and find_unlinked_import_candidate requires
-      # source_uuid IS NULL so it also misses, causing a second insert with
-      # the JSONL UUID. Skip when a recent agent message with the same body
-      # already exists. The 30 s window is narrow enough that an old file
-      # backfill cannot false-positive against now() — the guard only skips
-      # when record_incoming_reply just wrote a matching row, which is the
-      # exact race we are closing.
+      # Avoid double-rendering the final agent message. MapSet check (cheap) fires first
+      # to catch in-batch duplicates before hitting the DB. DB check (agent_reply_already_recorded?)
+      # catches the cross-process race where record_incoming_reply committed before this reduce.
+      # User messages are intentionally excluded — repeated user turns are legitimate.
       msg.role != "user" and
-          agent_reply_already_recorded?(session_id, msg.content) ->
-        {upd_acc, ins_acc, skip_count + 1}
+          (MapSet.member?(seen_agent_bodies, msg.content) or
+             agent_reply_already_recorded?(session_id, msg.content)) ->
+        {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
 
       true ->
         {sender_role, recipient_role, direction} = message_roles(msg.role)
         inserted_at = parse_timestamp(msg.timestamp, now)
         metadata = metadata_fn.(msg)
+
+        # Track non-user bodies queued in this batch so subsequent messages
+        # with the same body are caught by the MapSet check above (in-batch dedup).
+        new_seen =
+          if msg.role != "user",
+            do: MapSet.put(seen_agent_bodies, msg.content),
+            else: seen_agent_bodies
 
         case Messages.find_unlinked_import_candidate(session_id, sender_role, msg.content) do
           {:ok, existing} ->
@@ -213,7 +216,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
             update_attrs =
               if metadata, do: Map.put(update_attrs, :metadata, metadata), else: update_attrs
 
-            {[{existing, update_attrs} | upd_acc], ins_acc, skip_count}
+            {[{existing, update_attrs} | upd_acc], ins_acc, skip_count, new_seen}
 
           :not_found ->
             # New message; prepare for batch insert
@@ -232,13 +235,13 @@ defmodule EyeInTheSky.Messages.BulkImporter do
               updated_at: now
             }
 
-            {upd_acc, [new_message | ins_acc], skip_count}
+            {upd_acc, [new_message | ins_acc], skip_count, new_seen}
         end
     end
   rescue
     e in Postgrex.Error ->
       Logger.warning("BulkImporter: Postgrex error processing message: #{inspect(e)}")
-      {upd_acc, ins_acc, skip_count + 1}
+      {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
   end
 
   defp dm_already_recorded?(session_id, body, opts) do

@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
 
   def selection_toolbar(assigns) do
     ~H"""
-    <%= if (@select_mode || MapSet.size(@selected_ids) > 0) && @agents != [] do %>
+    <%= if @select_mode && @agents != [] do %>
       <div class="mt-2 flex items-center gap-3 px-2 py-1.5">
         <.square_checkbox
           checked={MapSet.size(@selected_ids) == length(@agents) && @agents != []}

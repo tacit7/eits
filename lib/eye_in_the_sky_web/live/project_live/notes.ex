@@ -82,7 +82,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         do: MapSet.delete(socket.assigns.selected_note_ids, note_id),
         else: MapSet.put(socket.assigns.selected_note_ids, note_id)
 
-    {:noreply, assign(socket, :selected_note_ids, selected)}
+    socket =
+      socket
+      |> assign(:selected_note_ids, selected)
+      |> assign(:notes_select_mode, true)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -272,7 +277,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
             </.link>
             <button
-              :if={!@notes_select_mode && MapSet.size(@selected_note_ids) == 0 && @notes != []}
+              :if={!@notes_select_mode && @notes != []}
               class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 min-h-[44px] px-1 transition-colors"
               phx-click="enter_select_mode_notes"
             >

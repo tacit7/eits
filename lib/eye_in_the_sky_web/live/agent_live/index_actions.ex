@@ -117,6 +117,7 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
     socket =
       socket
       |> assign(:selected_ids, selected)
+      |> assign(:select_mode, true)
 
     {:noreply, socket}
   end

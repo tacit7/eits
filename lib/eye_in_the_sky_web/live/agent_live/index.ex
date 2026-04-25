@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           </span>
           <div class="flex items-center gap-2">
             <button
-              :if={!@select_mode && MapSet.size(@selected_ids) == 0 && @agents != []}
+              :if={!@select_mode && @agents != []}
               class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 min-h-[44px] sm:min-h-0 px-1 transition-colors"
               phx-click="enter_select_mode"
             >

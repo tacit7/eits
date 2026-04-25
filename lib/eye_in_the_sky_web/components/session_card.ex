@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       <div class={[
         "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 transition duration-100",
         "left-4 sm:left-[-0.875rem]",
-        if(@select_mode || @selected,
+        if(@select_mode,
           do: "opacity-100 scale-100",
           else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
         )
@@ -64,13 +64,13 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       <div
         class={[
           "flex items-center gap-4 py-3 pr-2 -mx-2 rounded-lg cursor-pointer relative",
-          if(@select_mode || @selected, do: "pl-10 sm:pl-2", else: "pl-2")
+          if(@select_mode, do: "pl-10 sm:pl-2", else: "pl-2")
         ]}
-        phx-click={if(@select_mode || @selected, do: "toggle_select", else: @click_event)}
+        phx-click={if @select_mode, do: "toggle_select", else: @click_event}
         phx-value-id={@session.id}
         role="button"
         tabindex="0"
-        phx-keyup={if(!@select_mode && !@selected, do: @click_event)}
+        phx-keyup={if !@select_mode, do: @click_event}
         phx-key="Enter"
         aria-label={"Open session: #{@session.name || "Unnamed session"} - #{@status_label}"}
       >

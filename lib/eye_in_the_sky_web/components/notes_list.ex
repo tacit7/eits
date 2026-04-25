@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     </div>
 
     <%!-- Bulk-select toolbar --%>
-    <%= if (@select_mode || MapSet.size(@selected_ids) > 0) && @notes != [] do %>
+    <%= if @select_mode && @notes != [] do %>
       <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
         <.square_checkbox
           checked={MapSet.size(@selected_ids) == length(@notes)}
@@ -108,13 +108,13 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
         <%= for note <- @notes do %>
           <div class={[
             "relative group/row py-1 flex items-start gap-1",
-            if(@select_mode || MapSet.member?(@selected_ids, to_string(note.id)), do: "pl-7 sm:pl-0", else: "pl-0")
+            if(@select_mode, do: "pl-7 sm:pl-0", else: "pl-0")
           ]}>
             <%!-- Select checkbox — absolutely positioned, never pushes content --%>
             <div class={[
               "p-1 absolute z-10 top-4 -translate-x-1/2 transition duration-100",
               "left-3 sm:left-[-0.75rem]",
-              if(@select_mode || MapSet.member?(@selected_ids, to_string(note.id)),
+              if(@select_mode,
                 do: "opacity-100 scale-100",
                 else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
               )

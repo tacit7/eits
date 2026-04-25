@@ -135,7 +135,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         do: MapSet.delete(socket.assigns.selected_task_ids, task_id),
         else: MapSet.put(socket.assigns.selected_task_ids, task_id)
 
-    {:noreply, assign(socket, :selected_task_ids, selected)}
+    socket =
+      socket
+      |> assign(:selected_task_ids, selected)
+      |> assign(:tasks_select_mode, true)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -250,7 +255,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         <%!-- Mobile-only action bar --%>
         <div class="mb-4 flex md:hidden items-center justify-end gap-2">
           <button
-            :if={!@tasks_select_mode && MapSet.size(@selected_task_ids) == 0 && @task_count > 0}
+            :if={!@tasks_select_mode && @task_count > 0}
             class="flex items-center gap-1.5 text-xs text-base-content/50 hover:text-base-content/70 h-11 px-1"
             phx-click="enter_select_mode_tasks"
           >
@@ -290,7 +295,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
         <%= if @task_count > 0 do %>
           <%!-- Bulk-select toolbar --%>
-          <%= if @tasks_select_mode || MapSet.size(@selected_task_ids) > 0 do %>
+          <%= if @tasks_select_mode do %>
             <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
               <.square_checkbox
                 checked={MapSet.size(@selected_task_ids) == @task_count}

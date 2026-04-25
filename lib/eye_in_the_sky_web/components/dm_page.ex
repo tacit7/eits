@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
     ~H"""
     <div
-      class="flex flex-col h-[calc(100dvh-4.25rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative"
+      class="flex flex-col h-[calc(100dvh-4.25rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2.5rem)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"

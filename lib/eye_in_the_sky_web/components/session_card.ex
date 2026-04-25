@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
 
   ## Attrs
     * `:session` - Session struct with :agent preloaded
-    * `:select_mode` - Whether bulk-select mode is active (all checkboxes forced visible)
+    * `:select_mode` - Whether bulk-select mode is active (checkboxes always visible)
     * `:selected` - Whether this row is checked
   ## Slots
     * `:actions` - Action buttons rendered on the right side
@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
   attr :session, :map, required: true
   attr :select_mode, :boolean, default: false
   attr :selected, :boolean, default: false
+  attr :indeterminate, :boolean, default: false
   attr :click_event, :string, default: "navigate_dm"
   attr :project_name, :string, default: nil
   attr :editing_session_id, :any, default: nil
@@ -39,46 +40,17 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       |> assign(:status_class, status_class)
 
     ~H"""
-    <%!--
-      Outer wrapper owns `group` so both the animated checkbox and the
-      three-dot menu (md:group-hover:opacity-100) respond to the same hover area.
-    --%>
     <div
       id={"session-row-#{@session.id}"}
-      class={"relative group/row bg-base-100 border-l-2 pl-2 " <> @status_border}
+      class={[
+        "relative border-l-2 pl-2",
+        if(@selected, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg", else: "bg-base-100"),
+        @status_border
+      ]}
     >
-      <%!--
-        Animated checkbox — absolutely positioned, never pushes content.
-        Hidden state: pointer-events-none prevents invisible element from eating clicks.
-        select_mode: forced visible without transition (avoids reinsert flicker).
-      --%>
-      <div
-        class={[
-          "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2",
-          "left-4 sm:left-[-0.875rem]",
-          if(@select_mode,
-            do: "opacity-100 scale-100 pointer-events-auto",
-            else:
-              "opacity-0 scale-75 pointer-events-none group-hover/row:opacity-100 group-hover/row:scale-100 group-hover/row:pointer-events-auto transition duration-100"
-          )
-        ]}
-        aria-hidden={to_string(!@select_mode)}
-      >
-        <.square_checkbox
-          checked={@selected}
-          phx-click="toggle_select"
-          phx-value-id={@session.id}
-          onclick="event.stopPropagation()"
-          aria-label={"Select session #{@session.name || @session.id}"}
-        />
-      </div>
-
       <%!-- Row content --%>
       <div
-        class={[
-          "flex items-center gap-4 py-3 pr-2 -mx-2 rounded-lg cursor-pointer relative",
-          if(@select_mode, do: "pl-10 sm:pl-2", else: "pl-2")
-        ]}
+        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer relative"
         phx-click={if @select_mode, do: "toggle_select", else: @click_event}
         phx-value-id={@session.id}
         role="button"
@@ -87,6 +59,23 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         phx-key="Enter"
         aria-label={"Open session: #{@session.name || "Unnamed session"} - #{@status_label}"}
       >
+        <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
+        <div class={[
+          "flex-shrink-0 w-6 flex justify-center",
+          if(@select_mode, do: "", else: "hidden group-hover:flex")
+        ]}>
+          <.square_checkbox
+            id={"session-checkbox-#{@session.id}"}
+            checked={@selected}
+            indeterminate={@indeterminate}
+            checkbox_area={true}
+            phx-click="toggle_select"
+            phx-value-id={@session.id}
+            onclick="event.stopPropagation()"
+            aria-label={"Select session #{@session.name || @session.id}"}
+          />
+        </div>
+
         <%!-- Main content --%>
         <div class="flex-1 min-w-0">
           <div class="flex items-baseline gap-2">

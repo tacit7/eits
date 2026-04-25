@@ -82,6 +82,69 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
+  Renders a custom square checkbox with optional indeterminate state.
+
+  When `id` is provided, attaches the `IndeterminateCheckbox` hook to keep
+  the native `.indeterminate` DOM property in sync with `data-indeterminate`.
+  When `id` is nil, renders a plain checkbox without a hook.
+
+  The `checkbox_area` attr adds `data-checkbox-area="true"` to the outer label —
+  used by the `ShiftSelect` hook to detect checkbox clicks for range selection.
+  """
+  attr :id, :string, default: nil
+  attr :checked, :boolean, required: true
+  attr :indeterminate, :boolean, default: false
+  attr :checkbox_area, :boolean, default: false
+  attr :class, :string, default: ""
+  attr :rest, :global
+
+  def square_checkbox(assigns) do
+    ~H"""
+    <label
+      data-checkbox-area={if @checkbox_area, do: "true", else: nil}
+      class={"select-none flex items-center cursor-pointer " <> @class}
+    >
+      <%!-- With id: attach IndeterminateCheckbox hook to sync native .indeterminate property --%>
+      <input
+        :if={@id}
+        id={@id}
+        type="checkbox"
+        class="sr-only"
+        checked={@checked}
+        data-indeterminate={to_string(@indeterminate)}
+        phx-hook="IndeterminateCheckbox"
+        {@rest}
+      />
+      <%!-- Without id: plain checkbox, no hook --%>
+      <input
+        :if={!@id}
+        type="checkbox"
+        class="sr-only"
+        checked={@checked}
+        data-indeterminate={to_string(@indeterminate)}
+        {@rest}
+      />
+      <div class={[
+        "shrink-0 w-4 h-4 flex items-center justify-center border rounded transition-colors duration-100",
+        cond do
+          @indeterminate -> "bg-primary/30 border-primary/60"
+          @checked -> "bg-primary border-primary"
+          true -> "bg-base-100 border-base-content/20 hover:border-primary/40"
+        end
+      ]}>
+        <%= cond do %>
+          <% @indeterminate -> %>
+            <div class="w-2 h-0.5 bg-primary rounded-full"></div>
+          <% @checked -> %>
+            <.icon name="hero-check-mini" class="w-2.5 h-2.5 text-primary-content" />
+          <% true -> %>
+        <% end %>
+      </div>
+    </label>
+    """
+  end
+
+  @doc """
   Renders a button with navigation support.
 
   ## Examples
@@ -690,32 +753,4 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defdelegate priority_badge(assigns), to: EyeInTheSkyWeb.TaskBadges
   defdelegate state_badge(assigns), to: EyeInTheSkyWeb.TaskBadges
 
-  @doc """
-  A square checkbox styled after Claude Code's selection UI.
-  Uses a hidden native input (for accessibility + phx-click wiring) and a custom
-  visual div so DaisyUI's border-radius doesn't make it look circular.
-
-  All extra attrs (phx-click, phx-value-*, aria-label, etc.) are forwarded to
-  the hidden input via :global rest.
-  """
-  attr :checked, :boolean, required: true
-  attr :class, :string, default: ""
-  attr :rest, :global
-
-  def square_checkbox(assigns) do
-    ~H"""
-    <label class={"select-none flex items-center cursor-pointer " <> @class}>
-      <input type="checkbox" class="sr-only" checked={@checked} {@rest} />
-      <div class={[
-        "shrink-0 w-4 h-4 flex items-center justify-center border rounded transition-colors duration-100",
-        if(@checked,
-          do: "bg-primary border-primary",
-          else: "bg-base-100 border-base-content/20 hover:border-primary/40"
-        )
-      ]}>
-        <.icon :if={@checked} name="hero-check-mini" class="w-2.5 h-2.5 text-primary-content" />
-      </div>
-    </label>
-    """
-  end
 end

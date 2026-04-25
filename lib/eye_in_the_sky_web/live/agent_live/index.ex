@@ -242,11 +242,10 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           <div class="flex items-center gap-2">
             <button
               :if={!@select_mode && @agents != []}
-              class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 min-h-[44px] sm:min-h-0 px-1 transition-colors"
               phx-click="enter_select_mode"
+              class="btn btn-ghost btn-xs gap-1 min-h-[44px] sm:min-h-0 text-xs text-base-content/40 hover:text-base-content/70"
             >
-              <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
-              Select
+              <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" /> Select
             </button>
             <button
               phx-click="toggle_new_session_drawer"

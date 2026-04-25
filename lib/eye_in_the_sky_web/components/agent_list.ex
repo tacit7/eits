@@ -70,9 +70,11 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
       :if={@select_mode && @agents != []}
       class="mt-2 flex items-center gap-3 px-2 py-1.5"
     >
-      <.square_checkbox
+      <input
+        type="checkbox"
         checked={MapSet.size(@selected_ids) == length(@agents)}
         phx-click="toggle_select_all"
+        class="checkbox checkbox-xs checkbox-primary"
         aria-label="Select all sessions"
       />
       <%= if MapSet.size(@selected_ids) > 0 do %>
@@ -288,6 +290,38 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         </ul>
       </details>
     </li>
+    """
+  end
+
+  attr :show_archive_confirm, :boolean, required: true
+  attr :selected_ids, :any, required: true
+
+  def archive_confirm_modal(assigns) do
+    ~H"""
+    <dialog
+      id="archive-confirm-modal"
+      class={"modal modal-bottom sm:modal-middle " <> if(@show_archive_confirm, do: "modal-open", else: "")}
+    >
+      <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+        <h3 class="text-lg font-bold">Archive sessions</h3>
+        <p class="py-4 text-sm text-base-content/70">
+          <% count = MapSet.size(@selected_ids) %>
+          Archive {count} selected session{if count == 1, do: "", else: "s"}?
+          Archived sessions can be unarchived later.
+        </p>
+        <div class="modal-action">
+          <button phx-click="cancel_archive_selected" class="btn btn-sm btn-ghost min-h-[44px]">
+            Cancel
+          </button>
+          <button phx-click="archive_selected" class="btn btn-sm btn-warning min-h-[44px]">
+            Archive
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button phx-click="cancel_archive_selected">close</button>
+      </form>
+    </dialog>
     """
   end
 end

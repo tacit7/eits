@@ -634,6 +634,77 @@ Without this guard, accessing project files after the project was deleted or pro
 
 ---
 
+## Session Filtering & Sorting
+
+Session listing and filtering is handled by `EyeInTheSkyWeb.Helpers.SessionFilters` and is shared between the project sessions page and AgentLive's agent list.
+
+### Filter Options
+
+The `filter_agents_by_status/2` function supports the following filters:
+
+| Filter | Meaning | Use Case |
+|--------|---------|----------|
+| `"working"` | Active sessions (status: working/idle/waiting/compacting), non-archived | Project sessions page default |
+| `"active"` | Alias for "working"; backward compatibility | AgentLive agent list (deprecated filter name) |
+| `"completed"` | Completed sessions, non-archived | AgentLive agent list (backward compatibility) |
+| `"archived"` | Archived sessions | Project sessions page "Archived" tab |
+| Any other value | Returns all sessions | Fallback; passes through |
+
+**Backward Compatibility:**
+- `"active"` is aliased to `"working"` via guard clause to maintain AgentLive compatibility
+- `"completed"` branch is restored and functional for AgentLive sessions (even though project sessions page uses only "working"/"archived")
+- The function is shared across both pages, so both filter names must be supported
+
+### Sort Options
+
+The `sort_agents/2` function supports sorting by:
+
+| Sort Key | Meaning |
+|----------|---------|
+| `"recent"` (default) | Most recent message first (last_message_at descending) |
+| `"name"` | Session name (case-insensitive alphabetical) |
+| `"agent"` | Agent name (agent.description or agent.project_name; case-insensitive) |
+| `"model"` | Model name (model_name or model field; case-insensitive) |
+| `"status"` | Session status (working → idle → completed → archived) |
+| `"created"` | Session creation date (created_at) |
+| Any other value | Defaults to "recent" |
+
+---
+
+## Routing Architecture
+
+The application consolidates route handling into project-scoped LiveView modules. Previously, some resources had both global and project-scoped routes; global routes have been removed in favor of consistent project-scoped namespacing.
+
+### Routing Consolidation
+
+**Removed Global Routes** (commit d4fff39d):
+| Removed Route | Was Handled By | Migration |
+|---|---|---|
+| `/notes` | `OverviewLive.Notes` | → `/projects/:id/notes` → `ProjectLive.Notes` |
+| `/tasks` | `OverviewLive.Tasks` | → `/projects/:id/tasks` → `ProjectLive.Tasks` |
+| `/jobs` | `OverviewLive.Jobs` | → `/projects/:id/jobs` → `ProjectLive.Jobs` |
+| `/teams` | `TeamLive.Index` | → `/projects/:id/teams` → `ProjectLive.Teams` |
+| `/prompts` | `PromptLive.Index` | → `/projects/:id/prompts` → `ProjectLive.Prompts` |
+| `/prompts/new` | `PromptLive.New` | → `/projects/:id/prompts/new` → `ProjectLive.PromptNew` |
+| `/prompts/:id` | `PromptLive.Show` | → `/projects/:id/prompts/:prompt_id` → `ProjectLive.PromptShow` |
+
+**New Project-Scoped Routes:**
+```
+/projects/:id/teams          → ProjectLive.Teams (:index)
+/projects/:id/prompts/new    → ProjectLive.PromptNew (:new)
+/projects/:id/prompts/:prompt_id → ProjectLive.PromptShow (:show)
+```
+
+### Context-Aware Filtering
+
+Project-scoped routes use `mount_project/2` helper and `handle_params/3` guards to ensure:
+- LiveViews are project-context aware
+- Nil project redirects to home (ProjectLive.Files safety guard pattern)
+- Authorization checks (e.g., prompt.project_id matches current project)
+- Dead-render DB calls are guarded with `connected?(socket)`
+
+---
+
 ## IEx Debugging
 
 ```elixir

@@ -121,13 +121,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
     # Stream-insert the toggled row so its selected class re-renders immediately.
     # Also re-insert any rows whose indeterminate state changed (parent rows).
+    # Guard: only insert agents within the visible slice — off-screen inserts break pagination.
     changed_ids = MapSet.union(
       MapSet.symmetric_difference(prev_indeterminate, new_indeterminate),
       MapSet.new([id])
     )
 
+    visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
+
     socket =
-      Enum.reduce(socket.assigns.agents, socket, fn agent, acc ->
+      Enum.reduce(visible_agents, socket, fn agent, acc ->
         if MapSet.member?(changed_ids, Selection.normalize_id(agent.id)) do
           stream_insert(acc, :session_list, agent)
         else

@@ -22,17 +22,18 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
   def selection_toolbar(assigns) do
     ~H"""
     <%= if MapSet.size(@selected_ids) > 0 do %>
-      <div class="mt-2 flex items-center gap-3 px-2 py-1.5">
+      <div class="mt-2 flex items-center gap-3 pl-4 sm:pl-0 py-1.5">
         <%
           {all_checked, some_checked} = Selection.select_all_checkbox_state(@selected_ids, @agents)
         %>
-        <.square_checkbox
-          id="sessions-select-all-checkbox"
-          checked={all_checked}
-          indeterminate={some_checked}
-          phx-click="toggle_select_all"
-          aria-label="Select all sessions"
-        />
+        <div phx-click="toggle_select_all" class="cursor-pointer sm:-ml-5">
+          <.square_checkbox
+            id="sessions-select-all-checkbox"
+            checked={all_checked}
+            indeterminate={some_checked}
+            aria-label="Select all sessions"
+          />
+        </div>
         <span
           data-role="selection-count"
           data-selected-count={MapSet.size(@selected_ids)}

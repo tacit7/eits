@@ -69,15 +69,14 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           )
         ]}
         aria-hidden={to_string(!@select_mode)}
+        phx-click="toggle_select"
+        phx-value-id={@session.id}
       >
         <.square_checkbox
           id={"session-checkbox-#{@session.id}"}
           checked={@selected}
           indeterminate={@indeterminate}
           checkbox_area={true}
-          phx-click="toggle_select"
-          phx-value-id={@session.id}
-          onclick="event.stopPropagation()"
           aria-label={"Select session #{@session.name || @session.id}"}
         />
       </div>

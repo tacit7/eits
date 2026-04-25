@@ -119,19 +119,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       |> assign(:indeterminate_ids, new_indeterminate)
       |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
 
-    # Stream-insert the toggled row so its selected class re-renders immediately.
-    # Also re-insert any rows whose indeterminate state changed (parent rows).
-    # Guard: only insert agents within the visible slice — off-screen inserts break pagination.
+    # Stream-insert changed rows so selected state and phx-click re-render.
+    # When select_mode changes (entering OR exiting), re-insert ALL visible rows so their
+    # phx-click and checkbox visibility classes stay in sync with the new mode.
+    # Otherwise only re-insert rows whose selection or indeterminate state changed.
     changed_ids = MapSet.union(
       MapSet.symmetric_difference(prev_indeterminate, new_indeterminate),
       MapSet.new([id])
     )
 
     visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
+    prev_select_mode = MapSet.size(socket.assigns.selected_ids) > 0
+    new_select_mode = MapSet.size(selected) > 0
+    select_mode_changed? = prev_select_mode != new_select_mode
 
     socket =
       Enum.reduce(visible_agents, socket, fn agent, acc ->
-        if MapSet.member?(changed_ids, Selection.normalize_id(agent.id)) do
+        if select_mode_changed? or MapSet.member?(changed_ids, Selection.normalize_id(agent.id)) do
           stream_insert(acc, :session_list, agent)
         else
           acc
@@ -206,6 +210,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
         |> assign(:select_mode, MapSet.size(selected) > 0)
         |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, socket.assigns.agents))
         |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
+
+      # Re-insert all visible rows so their selected state and phx-click reflect the range.
+      # select_mode may have just flipped true (was empty before), so all rows need updating.
+      visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
+
+      socket =
+        Enum.reduce(visible_agents, socket, fn agent, acc ->
+          stream_insert(acc, :session_list, agent)
+        end)
 
       {:noreply, socket}
     end

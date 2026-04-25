@@ -1,5 +1,28 @@
 # Full-Text Search
 
+## CLI Quick Reference
+
+```bash
+# Tasks — full-text search on title + description
+eits tasks search "auth bug"
+eits tasks search "auth bug" --project 1
+eits tasks search "auth bug" --state 2          # state 2 = In Progress
+eits tasks search "auth bug" --limit 20
+eits tasks list --q "auth bug"                  # same, via list flag
+
+# Notes — full-text search on title + body
+eits notes search "deploy steps"
+eits notes list --q "deploy steps"              # same, via list flag
+
+# Sessions — full-text search on name + description
+eits sessions list --search "login refactor"
+eits sessions list --search "login refactor" --status working
+```
+
+No top-level `eits search` command. Each resource has its own `search` subcommand or `--search`/`--q` flag on `list`.
+
+---
+
 All search in EITS goes through `EyeInTheSkyWeb.Search.PgSearch` (`lib/eye_in_the_sky_web/search/pg_search.ex`). It uses PostgreSQL `tsvector`/`tsquery` with an ILIKE fallback.
 
 ## How it works in PostgreSQL

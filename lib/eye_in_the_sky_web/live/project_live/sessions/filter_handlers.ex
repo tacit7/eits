@@ -25,8 +25,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.FilterHandlers do
     socket =
       socket
       |> assign(:session_filter, filter)
-      |> assign(:selected_ids, MapSet.new())
-      |> assign(:select_mode, false)
       |> Loader.load_agents()
 
     {:noreply, socket}

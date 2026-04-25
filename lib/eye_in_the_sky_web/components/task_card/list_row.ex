@@ -34,9 +34,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     ~H"""
     <div
       class={[
-        "relative group/row flex items-center gap-3 py-3.5 cursor-pointer",
-        @task.completed_at && "opacity-60",
-        if(@select_mode, do: "pl-8 sm:pl-0", else: "pl-0")
+        "group flex items-center gap-3 py-3.5 cursor-pointer",
+        @task.completed_at && "opacity-60"
       ]}
       phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
       phx-keyup={if !@select_mode, do: @on_click}
@@ -46,19 +45,17 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       tabindex="0"
       aria-label={"Open task #{@task.title}"}
     >
-      <%!-- Select checkbox — absolutely positioned, never pushes content --%>
+      <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
       <div class={[
-        "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 transition duration-100",
-        "left-4 sm:left-[-0.875rem]",
-        if(@select_mode,
-          do: "opacity-100 scale-100",
-          else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
-        )
+        "flex-shrink-0 w-5 flex justify-center",
+        if(@select_mode, do: "", else: "hidden group-hover:flex")
       ]}>
-        <.square_checkbox
+        <input
+          type="checkbox"
           checked={@selected}
           phx-click="toggle_select_task"
           phx-value-task_id={@task.uuid || to_string(@task.id)}
+          class="checkbox checkbox-xs checkbox-primary"
           aria-label={"Select task #{@task.title}"}
         />
       </div>

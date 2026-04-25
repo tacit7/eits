@@ -10,9 +10,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksListHelpers do
   # search_fn/1 receives the query string.
   # list_fn/1 receives a keyword list of options (limit, offset, state_id, sort_by).
   # count_fn/1 receives a keyword list of options (state_id).
-  # Resets to page 1 and replaces the task list.
-  # Also resets bulk-selection state and rebuilds loaded_task_ids from the
-  # freshly-loaded list — safe for server-side select-all enumeration.
+  # Side effects: resets selected_task_ids + tasks_select_mode + loaded_task_ids.
   def load_tasks(socket, search_fn, list_fn, count_fn) do
     query = socket.assigns.search_query
     filter_state_id = socket.assigns.filter_state_id
@@ -51,7 +49,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksListHelpers do
     end
   end
 
-  # Appends the next page to the existing task list and extends loaded_task_ids.
+  # Appends the next page to the existing task list.
+  # list_fn/1 receives a keyword list of options (limit, offset, state_id, sort_by).
   def load_tasks_page(socket, page, list_fn) do
     filter_state_id = socket.assigns.filter_state_id
     sort_by = socket.assigns.sort_by
@@ -75,6 +74,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksListHelpers do
     end)
   end
 
-  # Stable string ID for selection: prefer UUID, fall back to integer ID.
+  # Returns the stable string ID used for selection tracking.
+  # Prefers UUID when available (tasks created via eits CLI have UUIDs),
+  # falls back to integer ID as a string.
   defp task_id(task), do: task.uuid || to_string(task.id)
 end

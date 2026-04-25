@@ -103,26 +103,37 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
   def toggle_select(%{"id" => raw_id}, socket) do
     id = Selection.normalize_id(raw_id)
+    prev_indeterminate = socket.assigns.indeterminate_ids
 
     selected =
       if MapSet.member?(socket.assigns.selected_ids, id),
         do: MapSet.delete(socket.assigns.selected_ids, id),
         else: MapSet.put(socket.assigns.selected_ids, id)
 
+    new_indeterminate = Selection.compute_indeterminate_ids(selected, socket.assigns.agents)
+
     socket =
       socket
       |> assign(:selected_ids, selected)
       |> assign(:select_mode, MapSet.size(selected) > 0)
-      |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, socket.assigns.agents))
+      |> assign(:indeterminate_ids, new_indeterminate)
       |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
 
-    # Stream-insert the toggled row so its class re-renders immediately.
-    # Without this, phx-update="stream" items do not reflect assign changes.
+    # Stream-insert the toggled row so its selected class re-renders immediately.
+    # Also re-insert any rows whose indeterminate state changed (parent rows).
+    changed_ids = MapSet.union(
+      MapSet.symmetric_difference(prev_indeterminate, new_indeterminate),
+      MapSet.new([id])
+    )
+
     socket =
-      case Enum.find(socket.assigns.agents, &(Selection.normalize_id(&1.id) == id)) do
-        nil -> socket
-        agent -> stream_insert(socket, :session_list, agent)
-      end
+      Enum.reduce(socket.assigns.agents, socket, fn agent, acc ->
+        if MapSet.member?(changed_ids, Selection.normalize_id(agent.id)) do
+          stream_insert(acc, :session_list, agent)
+        else
+          acc
+        end
+      end)
 
     {:noreply, socket}
   end
@@ -146,6 +157,46 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
 
     {:noreply, socket}
+  end
+
+  def select_range(
+        %{"anchor_id" => anchor_id, "target_id" => target_id, "ordered_ids" => raw_ordered_ids},
+        socket
+      ) do
+    # Filter client-provided IDs against visible agents to prevent scope leakage
+    visible_ids = Selection.ids_from_agents(socket.assigns.agents)
+
+    ordered_ids =
+      raw_ordered_ids
+      |> Enum.map(&Selection.normalize_id/1)
+      |> Enum.filter(&MapSet.member?(visible_ids, &1))
+
+    anchor = Selection.normalize_id(anchor_id)
+    target = Selection.normalize_id(target_id)
+
+    anchor_idx = Enum.find_index(ordered_ids, &(&1 == anchor))
+    target_idx = Enum.find_index(ordered_ids, &(&1 == target))
+
+    # If anchor or target are not in visible rows (invalid/stale), do nothing
+    if is_nil(anchor_idx) or is_nil(target_idx) do
+      {:noreply, socket}
+    else
+      range_ids =
+        ordered_ids
+        |> Enum.slice(min(anchor_idx, target_idx)..max(anchor_idx, target_idx))
+        |> MapSet.new()
+
+      selected = MapSet.union(socket.assigns.selected_ids, range_ids)
+
+      socket =
+        socket
+        |> assign(:selected_ids, selected)
+        |> assign(:select_mode, MapSet.size(selected) > 0)
+        |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, socket.assigns.agents))
+        |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
+
+      {:noreply, socket}
+    end
   end
 
   def confirm_archive_selected(_params, socket) do

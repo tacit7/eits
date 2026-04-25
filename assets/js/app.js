@@ -81,6 +81,8 @@ import {TimerCountdown} from "./hooks/timer_countdown"
 import {SessionsDropdownGuard} from "./hooks/sessions_dropdown_guard"
 import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
+import {IndeterminateCheckbox} from "./hooks/indeterminate_checkbox"
+import {ShiftSelect} from "./hooks/shift_select"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -150,6 +152,8 @@ Hooks.TimerCountdown = TimerCountdown
 Hooks.SessionsDropdownGuard = SessionsDropdownGuard
 Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
+Hooks.IndeterminateCheckbox = IndeterminateCheckbox
+Hooks.ShiftSelect = ShiftSelect
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

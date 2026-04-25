@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
   attr :session, :map, required: true
   attr :select_mode, :boolean, default: false
   attr :selected, :boolean, default: false
+  attr :indeterminate, :boolean, default: false
   attr :click_event, :string, default: "navigate_dm"
   attr :project_name, :string, default: nil
   attr :editing_session_id, :any, default: nil
@@ -63,12 +64,14 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           "flex-shrink-0 w-6 flex justify-center",
           if(@select_mode, do: "", else: "hidden group-hover:flex")
         ]}>
-          <input
-            type="checkbox"
+          <.square_checkbox
+            id={"session-checkbox-#{@session.id}"}
             checked={@selected}
+            indeterminate={@indeterminate}
+            checkbox_area={true}
             phx-click="toggle_select"
             phx-value-id={@session.id}
-            class="checkbox checkbox-xs checkbox-primary"
+            onclick="event.stopPropagation()"
             aria-label={"Select session #{@session.name || @session.id}"}
           />
         </div>

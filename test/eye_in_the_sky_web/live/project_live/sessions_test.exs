@@ -393,4 +393,75 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
       refute has_element?(view, "[data-role='selection-count']")
     end
   end
+
+  describe "Bulk selection — indeterminate state" do
+    @tag :bulk_select
+    @tag :bulk_select_parent_indeterminate
+    test "parent checkbox has data-indeterminate=true when some children selected", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      parent = Factory.create_session(agent, %{name: "Parent", status: "idle", project_id: project.id})
+      child1 = Factory.create_session(agent, %{name: "Child 1", status: "idle", project_id: project.id, parent_session_id: parent.id})
+      _child2 = Factory.create_session(agent, %{name: "Child 2", status: "idle", project_id: project.id, parent_session_id: parent.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(child1.id)})
+
+      html = render(view)
+      assert html =~ ~r/id="session-checkbox-#{parent.id}"[^>]*data-indeterminate="true"/
+    end
+
+    @tag :bulk_select
+    @tag :bulk_select_all_indeterminate
+    test "select-all checkbox is indeterminate when some visible sessions are selected", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      s1 = Factory.create_session(agent, %{name: "A", status: "idle", project_id: project.id})
+      _s2 = Factory.create_session(agent, %{name: "B", status: "idle", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(s1.id)})
+
+      html = render(view)
+      assert html =~ ~r/id="sessions-select-all-checkbox"[^>]*data-indeterminate="true"/
+    end
+  end
+
+  describe "Bulk selection — shift-click range" do
+    @tag :bulk_select
+    @tag :bulk_select_range
+    test "select_range selects all IDs between anchor and target", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      sessions =
+        for n <- 1..5 do
+          Factory.create_session(agent, %{name: "S#{n}", status: "idle", project_id: project.id})
+        end
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      ids = Enum.map(sessions, &to_string(&1.id))
+
+      view
+      |> render_hook("select_range", %{
+        "anchor_id" => Enum.at(ids, 0),
+        "target_id" => Enum.at(ids, 2),
+        "ordered_ids" => ids
+      })
+
+      assert has_element?(view, "[data-role='selection-count'][data-selected-count='3']")
+    end
+
+    @tag :bulk_select
+    @tag :bulk_select_range_dom_wiring
+    test "shift-select DOM hooks and data attrs are present", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      session = Factory.create_session(agent, %{name: "X", status: "idle", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      assert has_element?(view, "#ps-list-shift-wrapper[phx-hook='ShiftSelect']")
+      assert has_element?(view, "[data-row-id='#{session.id}']")
+      assert has_element?(view, "[data-checkbox-area='true']")
+    end
+  end
 end

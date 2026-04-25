@@ -118,6 +118,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   def handle_event("toggle_select", params, socket), do: Actions.toggle_select(params, socket)
 
   @impl true
+  def handle_event("select_range", params, socket), do: Actions.select_range(params, socket)
+
+  @impl true
   def handle_event("toggle_select_all", params, socket),
     do: Actions.toggle_select_all(params, socket)
 

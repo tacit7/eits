@@ -84,6 +84,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           session_filter={@session_filter}
           select_mode={@select_mode}
           selected_ids={@selected_ids}
+          indeterminate_ids={@indeterminate_ids}
           editing_session_id={@editing_session_id}
           search_query={@search_query}
           canvases={@canvases}

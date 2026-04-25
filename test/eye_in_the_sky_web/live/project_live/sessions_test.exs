@@ -245,6 +245,61 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     end
   end
 
+  defp assert_archived(session_id) do
+    session = EyeInTheSky.Sessions.get_session!(session_id)
+    assert session.archived_at != nil
+  end
+
+  describe "Bulk selection — archive" do
+    @tag :bulk_select
+    @tag :bulk_select_archive_basic
+    test "archive_selected archives all selected sessions", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      s1 = Factory.create_session(agent, %{name: "A", status: "idle", project_id: project.id})
+      s2 = Factory.create_session(agent, %{name: "B", status: "idle", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(s1.id)})
+      view |> render_click("toggle_select", %{"id" => to_string(s2.id)})
+      view |> render_click("confirm_archive_selected", %{})
+      render_click(view, "archive_selected", %{})
+
+      assert_archived(s1.id)
+      assert_archived(s2.id)
+      refute has_element?(view, "[data-role='selection-count']")
+    end
+
+    @tag :bulk_select
+    @tag :bulk_select_archive_offscreen
+    test "archive_selected archives off-screen selected sessions", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      completed = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(completed.id)})
+      view |> render_click("filter_session", %{"filter" => "active"})
+      view |> render_click("confirm_archive_selected", %{})
+      render_click(view, "archive_selected", %{})
+
+      assert_archived(completed.id)
+    end
+
+    @tag :bulk_select
+    @tag :bulk_select_archive_button
+    test "archive button is visible in bulk action bar when sessions are selected", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      session = Factory.create_session(agent, %{name: "T", status: "idle", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(session.id)})
+
+      assert has_element?(view, "button[phx-click='confirm_archive_selected']", "Archive")
+    end
+  end
+
   describe "Bulk selection — filter resilience" do
     # Note: "active" filter includes status "idle", "working", "waiting", "compacting".
     # To create an off-screen session (hidden by "active" filter), use status "completed".

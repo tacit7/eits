@@ -148,6 +148,75 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     {:noreply, socket}
   end
 
+  def confirm_archive_selected(_params, socket) do
+    {:noreply, assign(socket, :show_archive_confirm, true)}
+  end
+
+  def cancel_archive_selected(_params, socket) do
+    {:noreply, assign(socket, :show_archive_confirm, false)}
+  end
+
+  def archive_selected(_params, socket) do
+    if MapSet.size(socket.assigns.selected_ids) == 0 do
+      {:noreply, assign(socket, :show_archive_confirm, false)}
+    else
+      project_id = socket.assigns.project.id
+
+      results =
+        Enum.map(socket.assigns.selected_ids, fn id ->
+          with {:ok, session} <- fetch_project_session(project_id, id),
+               :ok <- archive_project_session(session) do
+            :ok
+          else
+            {:error, :not_found} -> :error
+            {:error, reason} ->
+              Logger.warning("bulk archive: failed for session #{id}: #{inspect(reason)}")
+              :error
+          end
+        end)
+
+      archived = Enum.count(results, &(&1 == :ok))
+      failed = length(results) - archived
+
+      {flash_level, flash_msg} =
+        cond do
+          archived > 0 and failed > 0 ->
+            {:info, "Archived #{archived} #{pluralize_session(archived)}; #{failed} could not be archived"}
+          archived > 0 ->
+            {:info, "Archived #{archived} #{pluralize_session(archived)}"}
+          true ->
+            {:error, "Could not archive #{failed} #{pluralize_session(failed)}"}
+        end
+
+      socket =
+        socket
+        |> assign(:show_archive_confirm, false)
+        |> Selection.clear_selection()
+        |> Loader.load_agents()
+        |> put_flash(flash_level, flash_msg)
+
+      {:noreply, socket}
+    end
+  end
+
+  defp pluralize_session(count), do: if(count == 1, do: "session", else: "sessions")
+
+  defp fetch_project_session(project_id, raw_id) do
+    id = Selection.normalize_id(raw_id)
+
+    with {:ok, session} <- Sessions.get_session(id) do
+      if session.project_id == project_id, do: {:ok, session}, else: {:error, :not_found}
+    end
+  end
+
+  defp archive_project_session(session) do
+    case Sessions.archive_session(session) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+      _ -> :ok
+    end
+  end
+
   def delete_selected(_params, socket) do
     results =
       Enum.map(socket.assigns.selected_ids, fn id ->

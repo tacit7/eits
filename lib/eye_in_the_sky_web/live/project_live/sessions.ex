@@ -126,6 +126,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
     do: Actions.delete_selected(params, socket)
 
   @impl true
+  def handle_event("confirm_archive_selected", params, socket),
+    do: Actions.confirm_archive_selected(params, socket)
+
+  @impl true
+  def handle_event("cancel_archive_selected", params, socket),
+    do: Actions.cancel_archive_selected(params, socket)
+
+  @impl true
+  def handle_event("archive_selected", params, socket),
+    do: Actions.archive_selected(params, socket)
+
+  @impl true
   def handle_event("exit_select_mode", params, socket),
     do: Actions.exit_select_mode(params, socket)
 
@@ -213,6 +225,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
       select_mode={@select_mode}
       off_screen_selected_count={@off_screen_selected_count}
       indeterminate_ids={@indeterminate_ids}
+      show_archive_confirm={@show_archive_confirm}
       editing_session_id={@editing_session_id}
       project={@project}
       canvases={@canvases}

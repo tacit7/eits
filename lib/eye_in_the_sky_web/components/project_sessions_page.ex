@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Components.ProjectSessionsFilters
   import EyeInTheSkyWeb.Components.ProjectSessionsTable
+  import EyeInTheSkyWeb.Components.AgentList, only: [archive_confirm_modal: 1]
 
   @doc "Full sessions page layout. Pass `{assigns}` from the LiveView render."
   attr :has_more, :boolean, required: true
@@ -21,6 +22,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   attr :select_mode, :boolean, default: false
   attr :off_screen_selected_count, :integer, default: 0
   attr :indeterminate_ids, :any, default: MapSet.new()
+  attr :show_archive_confirm, :boolean, default: false
   attr :editing_session_id, :any, required: true
   attr :project, :any, required: true
   attr :canvases, :list, default: []
@@ -111,6 +113,10 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       current_project={if @scope == :all, do: nil, else: @project}
       toggle_event="toggle_new_session_drawer"
       submit_event="create_new_session"
+    />
+    <.archive_confirm_modal
+      show_archive_confirm={@show_archive_confirm}
+      selected_ids={@selected_ids}
     />
     """
   end

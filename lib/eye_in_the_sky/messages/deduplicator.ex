@@ -33,6 +33,10 @@ defmodule EyeInTheSky.Messages.Deduplicator do
     * `:sender_role` - filter by sender role (default `"agent"`)
     * `:require_nil_source_uuid` - when `true`, only matches messages where
       `source_uuid` is nil (default `false`)
+    * `:channel_id` - scopes the body match by channel. Pass an integer to match
+      that specific channel, `nil` to match rows where `channel_id IS NULL` (i.e.
+      non-channel messages), or omit the key (default `:any`) to skip channel
+      scoping entirely
 
   Returns the matching `%Message{}` or `nil`.
   """
@@ -41,6 +45,7 @@ defmodule EyeInTheSky.Messages.Deduplicator do
     sender_role = Keyword.get(opts, :sender_role, "agent")
     require_nil_source_uuid = Keyword.get(opts, :require_nil_source_uuid, false)
     max_age_seconds = Keyword.get(opts, :max_age_seconds, 60)
+    channel_id = Keyword.get(opts, :channel_id, :any)
 
     cutoff =
       DateTime.utc_now()
@@ -57,6 +62,13 @@ defmodule EyeInTheSky.Messages.Deduplicator do
     )
     |> then(fn query ->
       if require_nil_source_uuid, do: where(query, [m], is_nil(m.source_uuid)), else: query
+    end)
+    |> then(fn query ->
+      case channel_id do
+        :any -> query
+        nil -> where(query, [m], is_nil(m.channel_id))
+        cid -> where(query, [m], m.channel_id == ^cid)
+      end
     end)
     |> order_by([m], desc: m.inserted_at)
     |> limit(1)

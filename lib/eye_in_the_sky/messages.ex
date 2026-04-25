@@ -235,7 +235,17 @@ defmodule EyeInTheSky.Messages do
       |> then(fn a -> if channel_id, do: Map.put(a, :channel_id, channel_id), else: a end)
       |> message_defaults()
 
-    Deduplicator.find_or_create(attrs, metadata)
+    case Deduplicator.find_recent_message(session_id, body,
+           channel_id: channel_id,
+           max_age_seconds: 30
+         ) do
+      nil ->
+        Deduplicator.find_or_create(attrs, metadata)
+
+      existing ->
+        merged = Map.merge(existing.metadata || %{}, metadata)
+        update_message(existing, %{metadata: merged})
+    end
     |> broadcast_and_return()
   end
 

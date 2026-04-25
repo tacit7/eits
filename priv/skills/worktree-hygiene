@@ -1,0 +1,114 @@
+---
+name: worktree-hygiene
+description: Use when creating a worktree, merging a branch, or when worktrees have accumulated and need pruning. Covers naming, cleanup on merge, and stale detection for the EITS project.
+---
+
+# Worktree Hygiene
+
+## Core Rule
+
+**Create → work → merge/discard → remove. Same session.**
+
+Never leave a worktree alive after its branch is gone from origin.
+
+## Naming Convention
+
+Always prefix with date:
+
+```
+YYYY-MM-DD-<feature>
+```
+
+```bash
+# Good
+git worktree add .claude/worktrees/2026-04-25-bulk-select -b feat/bulk-select
+
+# Bad — no way to tell age at a glance
+git worktree add .claude/worktrees/bulk-select -b feat/bulk-select
+```
+
+## Setup (EITS-specific)
+
+```bash
+cd .claude/worktrees/<name>
+ln -s ../../../deps deps       # symlink deps only — NEVER _build
+mix compile                    # isolated _build in the worktree
+```
+
+**CRITICAL: `rm` is aliased to `rm-trash` — it follows symlinks and trashes the target.**
+Always use `unlink` to remove symlinks:
+
+```bash
+unlink deps
+unlink _build   # if it somehow exists
+```
+
+## Cleanup on Merge (Required)
+
+After every PR merge — same session, before moving on:
+
+```bash
+# Remove worktree
+git worktree remove --force .claude/worktrees/<name>
+
+# Delete remote branch
+git push origin --delete <branch-name>
+
+# Prune stale refs
+git worktree prune
+git fetch --prune
+```
+
+## Stale Detection
+
+Find worktrees whose remote branch no longer exists:
+
+```bash
+git worktree list --porcelain \
+  | grep "^worktree" \
+  | awk '{print $2}' \
+  | grep "\.claude/worktrees/" \
+  | while read wt; do
+      branch=$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null)
+      git ls-remote --heads origin "$branch" | grep -q "$branch" \
+        || echo "STALE: $wt  ($branch)"
+    done
+```
+
+## Bulk Cleanup
+
+Remove everything under `.claude/worktrees/` when doing a full reset:
+
+```bash
+# Unlock any locked worktrees first
+git worktree list --porcelain \
+  | grep -A2 "locked" \
+  | grep "^worktree" \
+  | awk '{print $2}' \
+  | xargs -I{} git worktree unlock {}
+
+# Remove all project worktrees
+git worktree list | grep "\.claude/worktrees" | awk '{print $1}' | while read wt; do
+  git worktree remove --force "$wt"
+done
+
+git worktree prune
+```
+
+## Quick Reference
+
+| Situation | Action |
+|-----------|--------|
+| Creating worktree | Use `YYYY-MM-DD-<feature>` name |
+| Setting up deps | `ln -s ../../../deps deps` + `mix compile` |
+| Removing symlinks | `unlink deps` (never `rm`) |
+| After PR merged | `worktree remove` + `push --delete branch` + `prune` |
+| Stale worktrees piling up | Run stale detection, then remove + prune |
+| Locked worktree | `git worktree unlock <path>` first |
+
+## Red Flags
+
+- Worktrees named without a date prefix
+- Worktree still alive a day after the PR merged
+- `_build` symlinked to main project (corrupts main's beam files — `unlink _build` immediately)
+- More than ~5 active worktrees at once

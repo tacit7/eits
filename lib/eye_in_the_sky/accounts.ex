@@ -24,9 +24,19 @@ defmodule EyeInTheSky.Accounts do
   def get_or_create_user(username) do
     case get_user_by_username(username) do
       {:error, :not_found} ->
-        %User{}
-        |> User.changeset(%{username: username, display_name: username})
-        |> Repo.insert()
+        result =
+          %User{}
+          |> User.changeset(%{username: username, display_name: username})
+          |> Repo.insert()
+
+        case result do
+          {:ok, user} ->
+            EyeInTheSky.Workspaces.create_default_workspace_for_user(user)
+            {:ok, user}
+
+          error ->
+            error
+        end
 
       {:ok, user} ->
         {:ok, user}

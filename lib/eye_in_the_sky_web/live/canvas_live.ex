@@ -191,7 +191,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   def handle_event("open_session_picker", _params, socket) do
     canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
-    all = Sessions.list_sessions()
+    all = Sessions.list_sessions_filtered(limit: 100)
     filtered = Enum.reject(all, &(&1.id in canvas_session_ids))
 
     {:noreply,
@@ -210,7 +210,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     q_down = String.downcase(q)
 
     filtered =
-      Sessions.list_sessions()
+      Sessions.list_sessions_filtered(limit: 50)
       |> Enum.reject(&(&1.id in canvas_session_ids))
       |> Enum.filter(&String.contains?(String.downcase(&1.name || ""), q_down))
 

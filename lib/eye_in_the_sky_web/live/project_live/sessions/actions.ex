@@ -264,7 +264,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     case Sessions.archive_session(session) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
-      _ -> :ok
     end
   end
 
@@ -325,12 +324,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   def save_session_name(%{"session_id" => session_id, "name" => name}, socket) do
     name = String.trim(name)
 
-    if name != "" do
-      case Sessions.get_session(session_id) do
-        {:ok, session} -> Sessions.update_session(session, %{name: name})
-        _ -> :noop
+    socket =
+      if name != "" do
+        case Sessions.get_session(session_id) do
+          {:ok, session} ->
+            case Sessions.update_session(session, %{name: name}) do
+              {:ok, _} -> socket
+              {:error, reason} ->
+                Logger.warning("Failed to rename session #{session_id}: #{inspect(reason)}")
+                put_flash(socket, :error, "Failed to rename session")
+            end
+
+          _ ->
+            socket
+        end
+      else
+        socket
       end
-    end
 
     {:noreply, assign(socket, :editing_session_id, nil) |> Loader.load_agents()}
   end

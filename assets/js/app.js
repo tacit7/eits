@@ -80,10 +80,9 @@ import {CanvasPanHook} from "./hooks/canvas_pan_hook"
 import {TimerCountdown} from "./hooks/timer_countdown"
 import {SessionsDropdownGuard} from "./hooks/sessions_dropdown_guard"
 import {IndeterminateCheckbox} from "./hooks/indeterminate_checkbox"
+import {ShiftSelect} from "./hooks/shift_select"
 import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
-import {IndeterminateCheckbox} from "./hooks/indeterminate_checkbox"
-import {ShiftSelect} from "./hooks/shift_select"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -152,10 +151,9 @@ Hooks.CanvasPanHook = CanvasPanHook
 Hooks.TimerCountdown = TimerCountdown
 Hooks.SessionsDropdownGuard = SessionsDropdownGuard
 Hooks.IndeterminateCheckbox = IndeterminateCheckbox
+Hooks.ShiftSelect = ShiftSelect
 Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
-Hooks.IndeterminateCheckbox = IndeterminateCheckbox
-Hooks.ShiftSelect = ShiftSelect
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

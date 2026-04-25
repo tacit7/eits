@@ -44,11 +44,14 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       {:ok, updated} ->
         EyeInTheSky.Events.session_updated(updated)
 
+        agent_uuid = Helpers.resolve_agent_uuid(updated.agent_id)
+
         json(conn, %{
           id: updated.id,
           uuid: updated.uuid,
-          agent_id: nil,
-          agent_uuid: nil,
+          agent_id: updated.agent_id,
+          agent_uuid: agent_uuid,
+          project_id: updated.project_id,
           status: updated.status
         })
 

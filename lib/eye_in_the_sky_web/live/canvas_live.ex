@@ -142,34 +142,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
       canvas_id ->
         case Canvases.delete_canvas(canvas_id) do
-          {:ok, _} ->
-            canvases = Enum.reject(socket.assigns.canvases, &(&1.id == canvas_id))
-            socket = assign(socket, :canvases, canvases)
-
-            socket =
-              if socket.assigns.active_canvas_id == canvas_id do
-                case canvases do
-                  [] ->
-                    unsubscribe_all(socket.assigns.subscribed_session_ids)
-
-                    socket
-                    |> assign(:page_title, "Canvas")
-                    |> assign(:active_canvas_id, nil)
-                    |> assign(:canvas_sessions, [])
-                    |> assign(:subscribed_session_ids, [])
-                    |> push_patch(to: ~p"/canvases")
-
-                  _ ->
-                    redirect_to_first_or_stay(socket)
-                end
-              else
-                socket
-              end
-
-            {:noreply, socket}
-
-          {:error, _} ->
-            {:noreply, socket}
+          {:ok, _} -> {:noreply, handle_canvas_deleted(socket, canvas_id)}
+          {:error, _} -> {:noreply, socket}
         end
     end
   end
@@ -191,7 +165,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   def handle_event("open_session_picker", _params, socket) do
     canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
-    all = Sessions.list_sessions()
+    all = Sessions.list_sessions_filtered(limit: 100)
     filtered = Enum.reject(all, &(&1.id in canvas_session_ids))
 
     {:noreply,
@@ -210,7 +184,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     q_down = String.downcase(q)
 
     filtered =
-      Sessions.list_sessions()
+      Sessions.list_sessions_filtered(limit: 50)
       |> Enum.reject(&(&1.id in canvas_session_ids))
       |> Enum.filter(&String.contains?(String.downcase(&1.name || ""), q_down))
 
@@ -234,6 +208,30 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   def handle_event(event, _params, socket) do
     Logger.warning("CanvasLive: unhandled event #{inspect(event)}")
     {:noreply, socket}
+  end
+
+  defp handle_canvas_deleted(socket, canvas_id) do
+    canvases = Enum.reject(socket.assigns.canvases, &(&1.id == canvas_id))
+    socket = assign(socket, :canvases, canvases)
+
+    if socket.assigns.active_canvas_id == canvas_id do
+      case canvases do
+        [] ->
+          unsubscribe_all(socket.assigns.subscribed_session_ids)
+
+          socket
+          |> assign(:page_title, "Canvas")
+          |> assign(:active_canvas_id, nil)
+          |> assign(:canvas_sessions, [])
+          |> assign(:subscribed_session_ids, [])
+          |> push_patch(to: ~p"/canvases")
+
+        _ ->
+          redirect_to_first_or_stay(socket)
+      end
+    else
+      socket
+    end
   end
 
   @impl true

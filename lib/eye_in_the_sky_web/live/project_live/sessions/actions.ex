@@ -165,14 +165,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
     # Stream-insert all visible rows so checkboxes reflect the new selected state.
     # Streams exclude children from assign diffs — explicit inserts are required.
-    visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
-
-    socket =
-      Enum.reduce(visible_agents, socket, fn agent, acc ->
-        stream_insert(acc, :session_list, agent)
-      end)
-
-    {:noreply, socket}
+    {:noreply, reinsert_visible_rows(socket)}
   end
 
   def select_range(
@@ -213,14 +206,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
       # Re-insert all visible rows so their selected state and phx-click reflect the range.
       # select_mode may have just flipped true (was empty before), so all rows need updating.
-      visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
-
-      socket =
-        Enum.reduce(visible_agents, socket, fn agent, acc ->
-          stream_insert(acc, :session_list, agent)
-        end)
-
-      {:noreply, socket}
+      {:noreply, reinsert_visible_rows(socket)}
     end
   end
 
@@ -273,6 +259,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
       {:noreply, socket}
     end
+  end
+
+  # Re-inserts all currently visible rows into the session_list stream.
+  # Required after any assign change that affects row appearance (selected state,
+  # select_mode, indeterminate) — streams don't re-render rows on assign diffs alone.
+  defp reinsert_visible_rows(socket) do
+    Enum.take(socket.assigns.agents, socket.assigns.visible_count)
+    |> Enum.reduce(socket, fn agent, acc ->
+      stream_insert(acc, :session_list, agent)
+    end)
   end
 
   defp pluralize_session(count), do: if(count == 1, do: "session", else: "sessions")

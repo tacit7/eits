@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
 
   ## Attrs
     * `:session` - Session struct with :agent preloaded
-    * `:select_mode` - Whether bulk-select mode is active (checkboxes always visible)
+    * `:select_mode` - Whether bulk-select mode is active (all checkboxes forced visible)
     * `:selected` - Whether this row is checked
   ## Slots
     * `:actions` - Action buttons rendered on the right side
@@ -39,23 +39,36 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       |> assign(:status_class, status_class)
 
     ~H"""
+    <%!--
+      Outer wrapper owns `group` so both the animated checkbox and the
+      three-dot menu (md:group-hover:opacity-100) respond to the same hover area.
+    --%>
     <div
       id={"session-row-#{@session.id}"}
       class={"relative group/row bg-base-100 border-l-2 pl-2 " <> @status_border}
     >
-      <%!-- Select checkbox — absolutely positioned, never pushes content --%>
-      <div class={[
-        "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 transition duration-100",
-        "left-4 sm:left-[-0.875rem]",
-        if(@select_mode,
-          do: "opacity-100 scale-100",
-          else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
-        )
-      ]}>
+      <%!--
+        Animated checkbox — absolutely positioned, never pushes content.
+        Hidden state: pointer-events-none prevents invisible element from eating clicks.
+        select_mode: forced visible without transition (avoids reinsert flicker).
+      --%>
+      <div
+        class={[
+          "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2",
+          "left-4 sm:left-[-0.875rem]",
+          if(@select_mode,
+            do: "opacity-100 scale-100 pointer-events-auto",
+            else:
+              "opacity-0 scale-75 pointer-events-none group-hover/row:opacity-100 group-hover/row:scale-100 group-hover/row:pointer-events-auto transition duration-100"
+          )
+        ]}
+        aria-hidden={to_string(!@select_mode)}
+      >
         <.square_checkbox
           checked={@selected}
           phx-click="toggle_select"
           phx-value-id={@session.id}
+          onclick="event.stopPropagation()"
           aria-label={"Select session #{@session.name || @session.id}"}
         />
       </div>

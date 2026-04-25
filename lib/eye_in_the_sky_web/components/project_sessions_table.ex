@@ -20,9 +20,19 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
     ~H"""
     <%= if @select_mode && @agents != [] do %>
       <div class="mt-2 flex items-center gap-3 px-2 py-1.5">
-        <.square_checkbox
+        <input
+          id="select-all-checkbox"
+          type="checkbox"
           checked={MapSet.size(@selected_ids) == length(@agents) && @agents != []}
+          data-indeterminate={
+            to_string(
+              MapSet.size(@selected_ids) > 0 &&
+                MapSet.size(@selected_ids) < length(@agents)
+            )
+          }
           phx-click="toggle_select_all"
+          phx-hook="IndeterminateCheckbox"
+          class="checkbox checkbox-xs checkbox-primary"
           aria-label="Select all sessions"
         />
         <%= if MapSet.size(@selected_ids) > 0 do %>

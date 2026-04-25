@@ -105,6 +105,10 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     do: IndexActions.handle_exit_select_mode(params, socket)
 
   @impl true
+  def handle_event("enter_select_mode", params, socket),
+    do: IndexActions.handle_enter_select_mode(params, socket)
+
+  @impl true
   def handle_event("navigate_dm", params, socket),
     do: IndexActions.handle_navigate_dm(params, socket)
 
@@ -236,6 +240,14 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
             {length(@agents)} agents
           </span>
           <div class="flex items-center gap-2">
+            <button
+              :if={!@select_mode && @agents != []}
+              class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 min-h-[44px] sm:min-h-0 px-1 transition-colors"
+              phx-click="enter_select_mode"
+            >
+              <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
+              Select
+            </button>
             <button
               phx-click="toggle_new_session_drawer"
               class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs"

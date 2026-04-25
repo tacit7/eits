@@ -35,6 +35,14 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           <%!-- Mobile action bar (desktop uses top bar) --%>
           <div class="flex md:hidden items-center gap-2">
             <button
+              :if={!@select_mode && @agents != []}
+              class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 h-11 px-1 transition-colors"
+              phx-click="enter_select_mode"
+            >
+              <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
+              Select
+            </button>
+            <button
               phx-click="open_filter_sheet"
               aria-label="Open filters"
               aria-haspopup="dialog"

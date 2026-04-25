@@ -41,11 +41,31 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     ~H"""
     <div
       id={"session-row-#{@session.id}"}
-      class={"relative bg-base-100 border-l-2 pl-2 " <> @status_border}
+      class={"relative group/row bg-base-100 border-l-2 pl-2 " <> @status_border}
     >
+      <%!-- Select checkbox — absolutely positioned, never pushes content --%>
+      <div class={[
+        "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 transition duration-100",
+        "left-4 sm:left-[-0.875rem]",
+        if(@select_mode,
+          do: "opacity-100 scale-100",
+          else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
+        )
+      ]}>
+        <.square_checkbox
+          checked={@selected}
+          phx-click="toggle_select"
+          phx-value-id={@session.id}
+          aria-label={"Select session #{@session.name || @session.id}"}
+        />
+      </div>
+
       <%!-- Row content --%>
       <div
-        class="group flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg cursor-pointer relative"
+        class={[
+          "flex items-center gap-4 py-3 pr-2 -mx-2 rounded-lg cursor-pointer relative",
+          if(@select_mode, do: "pl-10 sm:pl-2", else: "pl-2")
+        ]}
         phx-click={if @select_mode, do: "toggle_select", else: @click_event}
         phx-value-id={@session.id}
         role="button"
@@ -54,21 +74,6 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         phx-key="Enter"
         aria-label={"Open session: #{@session.name || "Unnamed session"} - #{@status_label}"}
       >
-        <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
-        <div class={[
-          "flex-shrink-0 w-6 flex justify-center",
-          if(@select_mode, do: "", else: "hidden group-hover:flex")
-        ]}>
-          <input
-            type="checkbox"
-            checked={@selected}
-            phx-click="toggle_select"
-            phx-value-id={@session.id}
-            class="checkbox checkbox-xs checkbox-primary"
-            aria-label={"Select session #{@session.name || @session.id}"}
-          />
-        </div>
-
         <%!-- Main content --%>
         <div class="flex-1 min-w-0">
           <div class="flex items-baseline gap-2">

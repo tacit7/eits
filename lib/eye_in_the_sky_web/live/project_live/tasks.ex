@@ -39,6 +39,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:total_tasks, 0)
       |> assign(:selected_task_ids, MapSet.new())
       |> assign(:tasks_select_mode, false)
+      |> assign(:loaded_task_ids, [])
       |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
 
     socket =
@@ -144,11 +145,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
   @impl true
   def handle_event("toggle_select_all_tasks", _params, socket) do
-    # Collect visible task IDs from the stream — use task_count check to avoid
-    # issues when stream hasn't fully loaded.
-    all_ids = MapSet.new(socket.assigns.streams.tasks, fn {_dom_id, task} ->
-      task.uuid || to_string(task.id)
-    end)
+    all_ids = MapSet.new(socket.assigns.loaded_task_ids)
 
     selected =
       if MapSet.equal?(socket.assigns.selected_task_ids, all_ids),
@@ -156,6 +153,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         else: all_ids
 
     {:noreply, assign(socket, :selected_task_ids, selected)}
+  end
+
+  @impl true
+  def handle_event("enter_select_mode_tasks", _params, socket) do
+    {:noreply, assign(socket, :tasks_select_mode, true)}
   end
 
   @impl true
@@ -253,6 +255,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         <%!-- Mobile-only action bar --%>
         <div class="mb-4 flex md:hidden items-center justify-end gap-2">
           <button
+            :if={!@tasks_select_mode && @task_count > 0}
+            class="flex items-center gap-1.5 text-xs text-base-content/50 hover:text-base-content/70 h-11 px-1"
+            phx-click="enter_select_mode_tasks"
+          >
+            <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
+            Select
+          </button>
+          <button
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
@@ -287,11 +297,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           <%!-- Bulk-select toolbar --%>
           <%= if @tasks_select_mode do %>
             <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
-              <input
-                type="checkbox"
+              <.square_checkbox
                 checked={MapSet.size(@selected_task_ids) == @task_count}
                 phx-click="toggle_select_all_tasks"
-                class="checkbox checkbox-xs checkbox-primary"
                 aria-label="Select all tasks"
               />
               <%= if MapSet.size(@selected_task_ids) > 0 do %>

@@ -131,6 +131,10 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
     {:noreply, socket}
   end
 
+  def handle_enter_select_mode(_params, socket) do
+    {:noreply, assign(socket, :select_mode, true)}
+  end
+
   def handle_toggle_select_all(_params, socket) do
     all_ids = MapSet.new(socket.assigns.agents, &to_string(&1.id))
 

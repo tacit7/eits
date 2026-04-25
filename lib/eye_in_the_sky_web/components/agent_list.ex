@@ -70,11 +70,9 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
       :if={@select_mode && @agents != []}
       class="mt-2 flex items-center gap-3 px-2 py-1.5"
     >
-      <input
-        type="checkbox"
+      <.square_checkbox
         checked={MapSet.size(@selected_ids) == length(@agents)}
         phx-click="toggle_select_all"
-        class="checkbox checkbox-sm checkbox-primary"
         aria-label="Select all sessions"
       />
       <%= if MapSet.size(@selected_ids) > 0 do %>

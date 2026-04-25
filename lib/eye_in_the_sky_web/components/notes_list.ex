@@ -67,11 +67,9 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <%!-- Bulk-select toolbar --%>
     <%= if @select_mode && @notes != [] do %>
       <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
-        <input
-          type="checkbox"
+        <.square_checkbox
           checked={MapSet.size(@selected_ids) == length(@notes)}
           phx-click="toggle_select_all_notes"
-          class="checkbox checkbox-sm checkbox-primary"
           aria-label="Select all notes"
         />
         <%= if MapSet.size(@selected_ids) > 0 do %>
@@ -108,18 +106,23 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <%= if @notes != [] do %>
       <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
-          <div class="py-1 flex items-start gap-1 group">
-            <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
+          <div class={[
+            "relative group/row py-1 flex items-start gap-1",
+            if(@select_mode, do: "pl-7 sm:pl-0", else: "pl-0")
+          ]}>
+            <%!-- Select checkbox — absolutely positioned, never pushes content --%>
             <div class={[
-              "flex-shrink-0 w-7 flex items-center justify-center pt-3.5",
-              if(@select_mode, do: "", else: "hidden group-hover:flex")
+              "p-1 absolute z-10 top-4 -translate-x-1/2 transition duration-100",
+              "left-3 sm:left-[-0.75rem]",
+              if(@select_mode,
+                do: "opacity-100 scale-100",
+                else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
+              )
             ]}>
-              <input
-                type="checkbox"
+              <.square_checkbox
                 checked={MapSet.member?(@selected_ids, to_string(note.id))}
                 phx-click="toggle_select_note"
                 phx-value-note_id={note.id}
-                class="checkbox checkbox-sm checkbox-primary"
                 aria-label={"Select note #{note.id}"}
               />
             </div>

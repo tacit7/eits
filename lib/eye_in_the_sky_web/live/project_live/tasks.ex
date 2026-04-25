@@ -254,14 +254,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       <div class="max-w-4xl mx-auto">
         <%!-- Mobile-only action bar --%>
         <div class="mb-4 flex md:hidden items-center justify-end gap-2">
-          <label
+          <button
             :if={!@tasks_select_mode && @task_count > 0}
-            class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/50 hover:text-base-content/70 h-11 px-1"
+            class="flex items-center gap-1.5 text-xs text-base-content/50 hover:text-base-content/70 h-11 px-1"
             phx-click="enter_select_mode_tasks"
           >
-            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary pointer-events-none" />
+            <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
             Select
-          </label>
+          </button>
           <button
             phx-click="open_filter_sheet"
             aria-label="Open filters"
@@ -297,11 +297,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           <%!-- Bulk-select toolbar --%>
           <%= if @tasks_select_mode do %>
             <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
-              <input
-                type="checkbox"
+              <.square_checkbox
                 checked={MapSet.size(@selected_task_ids) == @task_count}
                 phx-click="toggle_select_all_tasks"
-                class="checkbox checkbox-sm checkbox-primary"
                 aria-label="Select all tasks"
               />
               <%= if MapSet.size(@selected_task_ids) > 0 do %>

@@ -689,4 +689,33 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   # Badge components extracted to EyeInTheSkyWeb.TaskBadges
   defdelegate priority_badge(assigns), to: EyeInTheSkyWeb.TaskBadges
   defdelegate state_badge(assigns), to: EyeInTheSkyWeb.TaskBadges
+
+  @doc """
+  A square checkbox styled after Claude Code's selection UI.
+  Uses a hidden native input (for accessibility + phx-click wiring) and a custom
+  visual div so DaisyUI's border-radius doesn't make it look circular.
+
+  All extra attrs (phx-click, phx-value-*, aria-label, etc.) are forwarded to
+  the hidden input via :global rest.
+  """
+  attr :checked, :boolean, required: true
+  attr :class, :string, default: ""
+  attr :rest, :global
+
+  def square_checkbox(assigns) do
+    ~H"""
+    <label class={"select-none flex items-center cursor-pointer " <> @class}>
+      <input type="checkbox" class="sr-only" checked={@checked} {@rest} />
+      <div class={[
+        "shrink-0 w-4 h-4 flex items-center justify-center border rounded transition-colors duration-100",
+        if(@checked,
+          do: "bg-primary border-primary",
+          else: "bg-base-100 border-base-content/20 hover:border-primary/40"
+        )
+      ]}>
+        <.icon :if={@checked} name="hero-check-mini" class="w-2.5 h-2.5 text-primary-content" />
+      </div>
+    </label>
+    """
+  end
 end

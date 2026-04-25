@@ -276,14 +276,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
             >
               <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
             </.link>
-            <label
+            <button
               :if={!@notes_select_mode && @notes != []}
-              class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/40 hover:text-base-content/70 min-h-[44px] px-1 transition-colors"
+              class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 min-h-[44px] px-1 transition-colors"
               phx-click="enter_select_mode_notes"
             >
-              <input type="checkbox" class="checkbox checkbox-sm checkbox-primary pointer-events-none" />
+              <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
               Select
-            </label>
+            </button>
           </div>
         </div>
 

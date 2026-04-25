@@ -34,14 +34,14 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
           <%!-- Mobile action bar (desktop uses top bar) --%>
           <div class="flex md:hidden items-center gap-2">
-            <label
+            <button
               :if={!@select_mode && @agents != []}
-              class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/40 hover:text-base-content/70 h-11 px-1 transition-colors"
+              class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 h-11 px-1 transition-colors"
               phx-click="enter_select_mode"
             >
-              <input type="checkbox" class="checkbox checkbox-sm checkbox-primary pointer-events-none" />
+              <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
               Select
-            </label>
+            </button>
             <button
               phx-click="open_filter_sheet"
               aria-label="Open filters"

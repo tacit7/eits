@@ -159,6 +159,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, socket.assigns.agents))
       |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
 
+    # Stream-insert all visible rows so checkboxes reflect the new selected state.
+    # Streams exclude children from assign diffs — explicit inserts are required.
+    visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
+
+    socket =
+      Enum.reduce(visible_agents, socket, fn agent, acc ->
+        stream_insert(acc, :session_list, agent)
+      end)
+
     {:noreply, socket}
   end
 

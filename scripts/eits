@@ -655,6 +655,7 @@ cmd_notes() {
       _curl "$BASE_URL/notes?${qs#&}" | jq .
       ;;
     get)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits notes get <id>"; return 0; }
       local id="${1:-}"; need id
       _get "/notes/$id"
       ;;
@@ -675,14 +676,17 @@ cmd_notes() {
       _post "/notes" "$(json parent_type "$parent_type" parent_id "$parent_id" body "$body" title "$title" starred "$starred")"
       ;;
     update)
-      # eits notes update <id> [--body <text>] [--title <t>] [--starred]
+      # eits notes update <id> [--body <text>] [--title <t>] [--starred] [--parent-type <type>] [--parent-id <id>]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits notes update <id> [--body <text>] [--title <t>] [--starred] [--parent-type <session|task|agent|project>] [--parent-id <id>]"; return 0; }
       local id="${1:-}"; need id; shift
       local updates="{}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --body)    updates=$(echo "$updates" | jq --arg v "$2" '. + {body: $v}');    shift 2 ;;
-          --title)   updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');   shift 2 ;;
-          --starred) updates=$(echo "$updates" | jq '. + {starred: 1}');                   shift ;;
+          --body)        updates=$(echo "$updates" | jq --arg v "$2" '. + {body: $v}');        shift 2 ;;
+          --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
+          --starred)     updates=$(echo "$updates" | jq '. + {starred: 1}');                    shift ;;
+          --parent-type) updates=$(echo "$updates" | jq --arg v "$2" '. + {parent_type: $v}'); shift 2 ;;
+          --parent-id)   updates=$(echo "$updates" | jq --arg v "$2" '. + {parent_id: $v}');   shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -690,6 +694,7 @@ cmd_notes() {
       ;;
     search)
       # eits notes search <query>
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits notes search <query>"; return 0; }
       local query="${1:-}"; need query
       _curl "$BASE_URL/notes?q=$(printf '%s' "$query" | jq -Rr @uri)" | jq .
       ;;

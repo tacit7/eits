@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   end
 
   @doc """
-  PATCH /api/v1/notes/:id - Update a note (body, title, starred).
+  PATCH /api/v1/notes/:id - Update a note (body, title, starred, parent_type, parent_id).
   """
   def update(conn, %{"id" => note_id} = params) do
     case Notes.get_note(note_id) do
@@ -104,6 +104,8 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
           %{}
           |> Helpers.maybe_put(:body, trim_param(params["body"]))
           |> Helpers.maybe_put(:title, trim_param(params["title"]))
+          |> Helpers.maybe_put(:parent_type, normalize_parent_type(params["parent_type"]))
+          |> Helpers.maybe_put(:parent_id, trim_param(params["parent_id"]))
 
         attrs =
           case parse_starred(params["starred"]) do

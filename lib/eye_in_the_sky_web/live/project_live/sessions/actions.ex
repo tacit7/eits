@@ -338,7 +338,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
                 put_flash(socket, :error, "Failed to rename session")
             end
 
-          _ ->
+          {:error, _} ->
             socket
         end
       else

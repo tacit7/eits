@@ -130,6 +130,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
     do: Actions.exit_select_mode(params, socket)
 
   @impl true
+  def handle_event("enter_select_mode", params, socket),
+    do: Actions.enter_select_mode(params, socket)
+
+  @impl true
   def handle_event("navigate_dm", params, socket), do: Actions.navigate_dm(params, socket)
 
   @impl true

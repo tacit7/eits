@@ -5,6 +5,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
+  require Logger
+
   alias EyeInTheSky.{Agents, Commits, Contexts, Notes, Projects, Sessions, Tasks}
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -295,7 +297,9 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   defp sync_member_status(session_id, member_status) do
     EyeInTheSky.Teams.mark_member_done_by_session(session_id, member_status) > 0
   rescue
-    _ -> false
+    e ->
+      Logger.warning("sync_member_status failed for session #{session_id}: #{inspect(e)}")
+      false
   end
 
   defp resolve_session(id_or_uuid), do: Sessions.resolve(id_or_uuid)

@@ -422,6 +422,77 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       assert hd(db_messages).source_uuid == sdk_uuid
     end
 
+    # ---------------------------------------------------------------------------
+    # In-batch dedup — MapSet guard catches duplicates within the same reduce
+    # ---------------------------------------------------------------------------
+
+    test "in-batch dedup: 3 assistant messages with same body and different uuids → 1 row",
+         %{session: session} do
+      body = "Batch duplicate body"
+
+      messages = [
+        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil},
+        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil},
+        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil}
+      ]
+
+      count = BulkImporter.import_messages(messages, session.id, provider: "claude")
+
+      # Only the first is inserted; the other two are caught by the MapSet.
+      assert count == 3
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert length(db_messages) == 1
+    end
+
+    test "mixed dedup: existing DB row + 2 in-batch messages with same body → 1 row",
+         %{session: session} do
+      body = "Mixed dedup body"
+      sdk_uuid = Ecto.UUID.generate()
+
+      {:ok, _existing} =
+        Messages.create_message(%{
+          uuid: Ecto.UUID.generate(),
+          source_uuid: sdk_uuid,
+          session_id: session.id,
+          sender_role: "agent",
+          recipient_role: "user",
+          direction: "inbound",
+          body: body,
+          status: "delivered",
+          provider: "claude"
+        })
+
+      messages = [
+        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil},
+        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil}
+      ]
+
+      count = BulkImporter.import_messages(messages, session.id, provider: "claude")
+
+      assert count == 2
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert length(db_messages) == 1
+      assert hd(db_messages).source_uuid == sdk_uuid
+    end
+
+    test "user messages with same body in same batch are NOT deduped (both persist)", %{
+      session: session
+    } do
+      body = "Same user question"
+
+      messages = [
+        %{uuid: Ecto.UUID.generate(), role: "user", content: body, timestamp: nil, usage: nil},
+        %{uuid: Ecto.UUID.generate(), role: "user", content: body, timestamp: nil, usage: nil}
+      ]
+
+      count = BulkImporter.import_messages(messages, session.id, provider: "claude")
+
+      assert count == 2
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert length(db_messages) == 2
+      assert Enum.all?(db_messages, &(&1.sender_role == "user"))
+    end
+
     test "regression: record_incoming_reply + BulkImporter with importing_from_file?: true yields one row",
          %{session: session} do
       sdk_uuid = Ecto.UUID.generate()

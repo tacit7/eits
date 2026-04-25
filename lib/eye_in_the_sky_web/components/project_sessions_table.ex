@@ -15,10 +15,11 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
   attr :select_mode, :boolean, required: true
   attr :agents, :list, required: true
   attr :selected_ids, :any, required: true
+  attr :off_screen_selected_count, :integer, default: 0
 
   def selection_toolbar(assigns) do
     ~H"""
-    <%= if @select_mode && @agents != [] do %>
+    <%= if MapSet.size(@selected_ids) > 0 do %>
       <div class="mt-2 flex items-center gap-3 px-2 py-1.5">
         <input
           type="checkbox"
@@ -27,19 +28,29 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
           class="checkbox checkbox-xs checkbox-primary"
           aria-label="Select all sessions"
         />
-        <%= if MapSet.size(@selected_ids) > 0 do %>
-          <span class="text-[11px] text-base-content/50 font-medium">
-            {MapSet.size(@selected_ids)} selected
-          </span>
-          <button
-            phx-click="delete_selected"
-            class="btn btn-ghost btn-sm min-h-[44px] text-error/70 hover:text-error hover:bg-error/10 gap-1"
-          >
-            <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
-          </button>
-        <% else %>
-          <span class="text-[11px] text-base-content/30">{length(@agents)} sessions</span>
-        <% end %>
+        <span
+          data-role="selection-count"
+          data-selected-count={MapSet.size(@selected_ids)}
+          data-offscreen-count={@off_screen_selected_count}
+          class="text-[11px] text-base-content/50 font-medium"
+        >
+          {MapSet.size(@selected_ids)} selected
+          <%= if @off_screen_selected_count > 0 do %>
+            <span class="text-base-content/30">({@off_screen_selected_count} not visible)</span>
+          <% end %>
+        </span>
+        <button
+          phx-click="confirm_archive_selected"
+          class="btn btn-ghost btn-xs text-warning/70 hover:text-warning hover:bg-warning/10 gap-1 min-h-[44px] min-w-[44px]"
+        >
+          <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" /> Archive
+        </button>
+        <button
+          phx-click="delete_selected"
+          class="btn btn-ghost btn-sm min-h-[44px] text-error/70 hover:text-error hover:bg-error/10 gap-1"
+        >
+          <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+        </button>
         <button
           phx-click="exit_select_mode"
           class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"

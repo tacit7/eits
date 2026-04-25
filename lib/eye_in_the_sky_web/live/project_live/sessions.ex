@@ -211,6 +211,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
       show_new_session_drawer={@show_new_session_drawer}
       selected_ids={@selected_ids}
       select_mode={@select_mode}
+      off_screen_selected_count={@off_screen_selected_count}
+      indeterminate_ids={@indeterminate_ids}
       editing_session_id={@editing_session_id}
       project={@project}
       canvases={@canvases}

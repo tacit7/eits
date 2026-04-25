@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
+  alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
   alias EyeInTheSkyWeb.ProjectLive.Sessions.State
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
 
@@ -89,6 +90,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
       |> assign(:depths, depths)
       |> assign(:visible_count, visible_count)
       |> assign(:has_more, length(ordered_agents) > visible_count)
+      |> recompute_selection_metadata()
 
     visible_agents = Enum.take(ordered_agents, visible_count)
 
@@ -99,6 +101,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
         stream_insert(acc, :session_list, agent)
       end)
     end
+  end
+
+  defp recompute_selection_metadata(socket) do
+    # Guard against missing assigns on first mount before State.init runs
+    selected = Map.get(socket.assigns, :selected_ids, MapSet.new())
+    agents = Map.get(socket.assigns, :agents, [])
+
+    socket
+    |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, agents))
+    |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, agents))
   end
 
   @doc "Update a single session's status in-memory and re-render only that row."

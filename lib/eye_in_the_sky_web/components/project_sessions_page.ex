@@ -19,6 +19,8 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   attr :show_new_session_drawer, :boolean, required: true
   attr :selected_ids, :any, required: true
   attr :select_mode, :boolean, default: false
+  attr :off_screen_selected_count, :integer, default: 0
+  attr :indeterminate_ids, :any, default: MapSet.new()
   attr :editing_session_id, :any, required: true
   attr :project, :any, required: true
   attr :canvases, :list, default: []
@@ -70,6 +72,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           select_mode={@select_mode}
           agents={@agents}
           selected_ids={@selected_ids}
+          off_screen_selected_count={@off_screen_selected_count}
         />
 
         <.session_list

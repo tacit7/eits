@@ -244,4 +244,98 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
       assert html =~ ~r/id="session-row-#{session.id}"[^>]*bg-primary\/5/
     end
   end
+
+  describe "Bulk selection — filter resilience" do
+    # Note: "active" filter includes status "idle", "working", "waiting", "compacting".
+    # To create an off-screen session (hidden by "active" filter), use status "completed".
+
+    @tag :bulk_select
+    @tag :bulk_select_filter_resilience
+    test "selection survives a filter change", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      # "completed" sessions are excluded by the "active" filter
+      s1 = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(s1.id)})
+      assert has_element?(view, "[data-role='selection-count'][data-selected-count='1']")
+
+      view |> render_click("filter_session", %{"filter" => "active"})
+
+      assert has_element?(view, "[data-role='selection-count'][data-selected-count='1']")
+      assert has_element?(view, "[data-role='selection-count'][data-offscreen-count='1']")
+    end
+
+    @tag :bulk_select
+    @tag :bulk_select_select_all_visible
+    test "select_all_visible preserves off-screen selected sessions", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      # "completed" is off-screen when filtered to "active"
+      completed = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+      _active = Factory.create_session(agent, %{name: "Active", status: "working", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(completed.id)})
+      view |> render_click("filter_session", %{"filter" => "active"})
+      view |> render_click("toggle_select_all", %{})
+
+      assert has_element?(view, "[data-role='selection-count'][data-selected-count='2']")
+      assert has_element?(view, "[data-role='selection-count'][data-offscreen-count='1']")
+    end
+
+    @tag :bulk_select
+    @tag :bulk_select_toggle_all_deselect
+    test "select_all_visible toggles off visible sessions on second call", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      _s1 = Factory.create_session(agent, %{name: "A", status: "idle", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select_all", %{})
+      view |> render_click("toggle_select_all", %{})
+
+      refute has_element?(view, "[data-role='selection-count']")
+    end
+
+    @tag :bulk_select
+    @tag :bulk_select_toggle_all_preserves_offscreen
+    test "select_all_visible toggled again removes only visible sessions, preserves off-screen", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      # "completed" is off-screen when filtered to "active"
+      completed = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+      _active = Factory.create_session(agent, %{name: "Active", status: "working", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      # Select completed (off-screen after filter), filter to active
+      view |> render_click("toggle_select", %{"id" => to_string(completed.id)})
+      view |> render_click("filter_session", %{"filter" => "active"})
+
+      # Select-all adds the active session; total 2 selected
+      view |> render_click("toggle_select_all", %{})
+      assert has_element?(view, "[data-role='selection-count'][data-selected-count='2']")
+
+      # Select-all again removes only visible (active); completed off-screen survives
+      view |> render_click("toggle_select_all", %{})
+      assert has_element?(view, "[data-role='selection-count'][data-selected-count='1']")
+      assert has_element?(view, "[data-role='selection-count'][data-offscreen-count='1']")
+    end
+
+    @tag :bulk_select
+    @tag :bulk_select_exit_clears
+    test "exit_select_mode clears all selected sessions including off-screen", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      session = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(session.id)})
+      view |> render_click("filter_session", %{"filter" => "active"})
+      view |> render_click("exit_select_mode", %{})
+
+      refute has_element?(view, "[data-role='selection-count']")
+    end
+  end
 end

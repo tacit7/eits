@@ -20,6 +20,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   alias EyeInTheSkyWeb.ControllerHelpers
   import EyeInTheSkyWeb.Helpers.AgentCreationHelpers, only: [build_opts: 2]
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
+  alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
 
   # ---------------------------------------------------------------------------
   # Session lifecycle
@@ -101,7 +102,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   # ---------------------------------------------------------------------------
 
   def toggle_select(%{"id" => raw_id}, socket) do
-    id = to_string(raw_id)
+    id = Selection.normalize_id(raw_id)
 
     selected =
       if MapSet.member?(socket.assigns.selected_ids, id),
@@ -112,11 +113,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       socket
       |> assign(:selected_ids, selected)
       |> assign(:select_mode, MapSet.size(selected) > 0)
+      |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, socket.assigns.agents))
+      |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
 
     # Stream-insert the toggled row so its class re-renders immediately.
     # Without this, phx-update="stream" items do not reflect assign changes.
     socket =
-      case Enum.find(socket.assigns.agents, &(to_string(&1.id) == id)) do
+      case Enum.find(socket.assigns.agents, &(Selection.normalize_id(&1.id) == id)) do
         nil -> socket
         agent -> stream_insert(socket, :session_list, agent)
       end
@@ -125,12 +128,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   end
 
   def exit_select_mode(_params, socket) do
-    socket =
-      socket
-      |> assign(:select_mode, false)
-      |> assign(:selected_ids, MapSet.new())
-
-    {:noreply, socket}
+    {:noreply, Selection.clear_selection(socket)}
   end
 
   def enter_select_mode(_params, socket) do
@@ -138,14 +136,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   end
 
   def toggle_select_all(_params, socket) do
-    all_ids = MapSet.new(socket.assigns.agents, &to_string(&1.id))
+    selected = Selection.select_all_visible(socket.assigns.selected_ids, socket.assigns.agents)
 
-    selected =
-      if MapSet.equal?(socket.assigns.selected_ids, all_ids),
-        do: MapSet.new(),
-        else: all_ids
+    socket =
+      socket
+      |> assign(:selected_ids, selected)
+      |> assign(:select_mode, MapSet.size(selected) > 0)
+      |> assign(:indeterminate_ids, Selection.compute_indeterminate_ids(selected, socket.assigns.agents))
+      |> assign(:off_screen_selected_count, Selection.off_screen_count(selected, socket.assigns.agents))
 
-    {:noreply, assign(socket, :selected_ids, selected)}
+    {:noreply, socket}
   end
 
   def delete_selected(_params, socket) do

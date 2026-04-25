@@ -9,8 +9,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
-  @terminated_statuses ~w(completed failed)
-
   # GET /api/v1/teams
   def index(conn, params) do
     opts =
@@ -263,7 +261,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
     with {:ok, from_session} <- resolve_broadcast_sender(from_raw),
          {:from_active, false} <-
-           {:from_active, from_session.status in @terminated_statuses},
+           {:from_active, from_session.status in Sessions.terminated_statuses()},
          {:member, true} <-
            {:member, Enum.any?(members, &(&1.session_id == from_session.id))} do
       targets =
@@ -271,7 +269,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           not is_nil(m.session_id) and
             m.session_id != from_session.id and
             not is_nil(m.session) and
-            m.session.status not in @terminated_statuses
+            m.session.status not in Sessions.terminated_statuses()
         end)
 
       sender_name = from_session.name || "agent"

@@ -752,4 +752,5 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   # Badge components extracted to EyeInTheSkyWeb.TaskBadges
   defdelegate priority_badge(assigns), to: EyeInTheSkyWeb.TaskBadges
   defdelegate state_badge(assigns), to: EyeInTheSkyWeb.TaskBadges
+
 end

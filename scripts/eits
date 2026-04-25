@@ -109,7 +109,7 @@ _project_id() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"; echo "  list --search <q>   full-text search sessions by name/description"; return 0; }
   case "$sub" in
     list)
       # eits sessions list [--search <q>] [--name <partial>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>] [--mine] [--include-archived] [--with-tasks]
@@ -253,7 +253,7 @@ cmd_sessions() {
       fi
       ;;
     *)
-      echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"
+      echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"; echo "  list --search <q>   full-text search sessions by name/description"
       ;;
   esac
 }
@@ -1924,10 +1924,10 @@ eits — Eye in the Sky CLI
 Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 
 Commands:
-  sessions      list|get|create|update|end|context
-  tasks         list|get|create|update|bulk-update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session
-                list --mine, update --title, begin --quiet
-  notes         list|get|create|update|add
+  sessions      list|get|create|update|end|context   (list --search <q> for full-text)
+  tasks         list|get|create|update|bulk-update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search
+                list --mine, update --title, begin --quiet, search <query> [--project <id>] [--state <id>] [--limit <n>]
+  notes         list|get|create|update|add|search   (search <query> for full-text)
   projects      list|get|create
   agents        list|get|spawn
   commits       list|create

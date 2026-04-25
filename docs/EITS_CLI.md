@@ -38,6 +38,12 @@ rate limited, retrying in 2s...
 
 If all 3 attempts fail, the command exits with HTTP 429 error.
 
+**Phase 1 — Orchestrator bump**: When `EITS_SESSION_UUID` is set, the script sends the `x-eits-role: orchestrator` header to get a 5× higher rate-limit burst ceiling (keyed separately as `api:orch:<ip>` so orchestrator traffic doesn't consume the regular IP bucket).
+
+**Phase 2 — Per-session bucket**: When `EITS_SESSION_UUID` is set, the script sends `x-eits-session: $EITS_SESSION_UUID` at all curl sites. If the server's `rate_limit_per_session` setting is enabled AND the header matches an existing session, the request uses a per-session bucket (`api:sess:<uuid>`) with a 60-req/10s burst limit so co-located agents don't starve each other. This header is safe to send; the server ignores it when the flag is off or the session UUID is unknown, falling back to Phase 1 behavior.
+
+Each rate-limit evaluation emits a `[:eits, :rate_limit, :check]` telemetry event with `{remaining, limit}` measurements and `{bucket, bucket_kind, session_id, status}` metadata.
+
 ---
 
 ## sessions

@@ -1332,8 +1332,16 @@ These endpoints map to Claude Code hooks:
 
 All `/api/v1` requests pass through `EyeInTheSkyWeb.Plugs.RateLimit`.
 
-- Default bucket is IP-keyed (`api:<ip>`). Clients sending `x-eits-role: orchestrator` get a 5× burst on a separate key (`api:orch:<ip>`) — Phase 1.
-- **Phase 2** (feature-flagged): when `Settings.get_boolean("rate_limit_per_session")` is `true` and the request includes a valid `x-eits-session: <uuid>` header that matches an existing session row, the bucket becomes `api:sess:<uuid>` with a 60-req/10s burst so co-located agents don't starve each other. If the flag is off, the header is missing, or the UUID is unknown, the plug falls back to Phase 1.
-- The `eits` CLI always sends `x-eits-session` when `EITS_SESSION_UUID` is set; the header is safe to send when the flag is off.
-- Each evaluation emits a `[:eits, :rate_limit, :check]` telemetry event with `%{remaining, limit}` and `%{bucket, session_id, bucket_kind, status}` metadata.
-- Toggle the flag at `/settings` → **System** tab.
+**Phase 1:** IP-keyed buckets with orchestrator bypass.
+- Default bucket is IP-keyed (`api:<ip>`).
+- When `EITS_SESSION_UUID` is set, the `eits` CLI sends `x-eits-role: orchestrator` header to all curl requests, granting a 5× burst on a separate orchestrator bucket (`api:orch:<ip>`).
+- This header is safe to send even when Phase 2 is disabled — the server ignores it if the per-session flag is off.
+
+**Phase 2** (feature-flagged): Per-session bucketing. When `Settings.get_boolean("rate_limit_per_session")` is `true`:
+- If the request includes a valid `x-eits-session: <uuid>` header that matches an existing session row, the bucket becomes `api:sess:<uuid>` with a 60-req/10s burst so co-located agents don't starve each other.
+- If the flag is off, the header is missing, or the UUID is unknown, the plug falls back to Phase 1.
+- The `eits` CLI always sends `x-eits-session` when `EITS_SESSION_UUID` is set.
+
+**Telemetry:** Each rate-limit evaluation emits a `[:eits, :rate_limit, :check]` telemetry event with `%{remaining, limit}` and `%{bucket, session_id, bucket_kind, status}` metadata.
+
+**Configuration:** Toggle the Phase 2 flag at `/settings` → **System** tab.

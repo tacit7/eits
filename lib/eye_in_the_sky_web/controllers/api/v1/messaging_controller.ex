@@ -84,7 +84,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       else: Sessions.get_session_by_uuid(raw)
   end
 
-  @terminated_statuses ~w(completed failed)
   # Allowlist: only sessions actively processing or between turns can receive DMs.
   # Any status not in this list (waiting, completed, failed, archived, compacting, etc.) is non-receivable.
   @receivable_statuses ~w(working idle)
@@ -92,7 +91,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:from, {:ok, from_session}} <- {:from, resolve_session_target(%{raw: from_raw, kind: :from})},
          {:from_active, false} <-
-           {:from_active, from_session.status in @terminated_statuses},
+           {:from_active, from_session.status in Sessions.terminated_statuses()},
          {:to, {:ok, to_session}} <- {:to, resolve_session_target(%{raw: to_raw, kind: :to})},
          {:to_receivable, true} <-
            {:to_receivable, to_session.status in @receivable_statuses} do
@@ -359,7 +358,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
               m.session_id &&
                 m.session_id != sender_session_id &&
                 m.session &&
-                m.session.status not in @terminated_statuses
+                m.session.status not in Sessions.terminated_statuses()
             end)
             |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
           else

@@ -289,6 +289,11 @@ defmodule EyeInTheSky.Sessions do
   defdelegate get_session_counts(session_id), to: Loader
 
   @doc """
+  Returns statuses that indicate a session can no longer send or receive messages.
+  """
+  def terminated_statuses, do: ~w(completed failed)
+
+  @doc """
   Extracts and validates model information from a nested model object.
 
   Delegates to ModelInfo.extract_model_info/1.

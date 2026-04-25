@@ -23,6 +23,31 @@ export const AutoScroll = {
 
     this.el.addEventListener("scroll", this._onScroll, { passive: true })
     this.scrollToBottom()
+
+    // Watch for content growth from non-LiveView sources (LocalTime hooks
+    // formatting times, phx-mounted transitions, late-arriving stream
+    // patches, image loads). Without this the initial scrollToBottom can
+    // fire before all content has expanded, leaving the view stuck partway
+    // up. While shouldAutoScroll is true, keep snapping to the bottom as
+    // the container grows.
+    if (typeof ResizeObserver !== "undefined") {
+      this._lastScrollHeight = this.el.scrollHeight
+      this._resizeObserver = new ResizeObserver(() => {
+        if (this.el.scrollHeight === this._lastScrollHeight) return
+        this._lastScrollHeight = this.el.scrollHeight
+        if (this.shouldAutoScroll) this.scrollToBottom()
+      })
+      this._resizeObserver.observe(this.el)
+      // Also observe each direct child — ResizeObserver on the container
+      // alone fires only when the container's own size changes, not when
+      // children grow inside an overflow:auto parent.
+      for (const child of this.el.children) {
+        this._resizeObserver.observe(child)
+      }
+    }
+
+    // Mark ready on the next frame so the load-more guard doesn't fire
+    // from the initial scroll-to-bottom.
     requestAnimationFrame(() => { this._mounted = true })
 
     this.handleEvent("new_message", () => {
@@ -52,6 +77,15 @@ export const AutoScroll = {
         this.el.scrollTop = this._prevScrollTop + heightDiff
       }
     }
+    // Re-observe children — LiveView patches may have replaced them.
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect()
+      this._resizeObserver.observe(this.el)
+      for (const child of this.el.children) {
+        this._resizeObserver.observe(child)
+      }
+      this._lastScrollHeight = this.el.scrollHeight
+    }
     // Reset load guard after DOM update so next scroll triggers work
     this._loadingMore = false
     // Release the scroll listener after the browser has settled the swap
@@ -60,6 +94,10 @@ export const AutoScroll = {
 
   destroyed() {
     this.el.removeEventListener("scroll", this._onScroll)
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect()
+      this._resizeObserver = null
+    }
   },
 
   scrollToBottom() {

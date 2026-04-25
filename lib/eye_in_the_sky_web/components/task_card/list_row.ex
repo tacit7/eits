@@ -36,10 +36,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       class={[
         "relative group/row flex items-center gap-3 py-3.5 cursor-pointer",
         @task.completed_at && "opacity-60",
-        if(@select_mode, do: "pl-8 sm:pl-0", else: "pl-0")
+        if(@select_mode || @selected, do: "pl-8 sm:pl-0", else: "pl-0")
       ]}
-      phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
-      phx-keyup={if !@select_mode, do: @on_click}
+      phx-click={if(@select_mode || @selected, do: "toggle_select_task", else: @on_click)}
+      phx-keyup={if(!@select_mode && !@selected, do: @on_click)}
       phx-key="Enter"
       phx-value-task_id={@task.uuid || to_string(@task.id)}
       role="button"
@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       <div class={[
         "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 transition duration-100",
         "left-4 sm:left-[-0.875rem]",
-        if(@select_mode,
+        if(@select_mode || @selected,
           do: "opacity-100 scale-100",
           else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
         )
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       </div>
 
       <%!-- Completion indicator — hidden in select mode --%>
-      <div class={["flex-shrink-0", @select_mode && "hidden"]}>
+      <div class={["flex-shrink-0", (@select_mode || @selected) && "hidden"]}>
         <.icon
           name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
           class={

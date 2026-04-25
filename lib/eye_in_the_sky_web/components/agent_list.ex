@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
   def bulk_action_bar(assigns) do
     ~H"""
     <div
-      :if={@select_mode && @agents != []}
+      :if={(@select_mode || MapSet.size(@selected_ids) > 0) && @agents != []}
       class="mt-2 flex items-center gap-3 px-2 py-1.5"
     >
       <.square_checkbox

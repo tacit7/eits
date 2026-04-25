@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           <%!-- Mobile action bar (desktop uses top bar) --%>
           <div class="flex md:hidden items-center gap-2">
             <button
-              :if={!@select_mode && @agents != []}
+              :if={!@select_mode && MapSet.size(@selected_ids) == 0 && @agents != []}
               class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 h-11 px-1 transition-colors"
               phx-click="enter_select_mode"
             >

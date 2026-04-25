@@ -41,7 +41,11 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     ~H"""
     <div
       id={"session-row-#{@session.id}"}
-      class={"relative bg-base-100 border-l-2 pl-2 " <> @status_border}
+      class={[
+        "relative border-l-2 pl-2",
+        if(@selected, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg", else: "bg-base-100"),
+        @status_border
+      ]}
     >
       <%!-- Row content --%>
       <div

@@ -100,7 +100,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   # Bulk selection
   # ---------------------------------------------------------------------------
 
-  def toggle_select(%{"id" => id}, socket) do
+  def toggle_select(%{"id" => raw_id}, socket) do
+    id = to_string(raw_id)
+
     selected =
       if MapSet.member?(socket.assigns.selected_ids, id),
         do: MapSet.delete(socket.assigns.selected_ids, id),
@@ -109,7 +111,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     socket =
       socket
       |> assign(:selected_ids, selected)
-      |> assign(:select_mode, true)
+      |> assign(:select_mode, MapSet.size(selected) > 0)
+
+    # Stream-insert the toggled row so its class re-renders immediately.
+    # Without this, phx-update="stream" items do not reflect assign changes.
+    socket =
+      case Enum.find(socket.assigns.agents, &(to_string(&1.id) == id)) do
+        nil -> socket
+        agent -> stream_insert(socket, :session_list, agent)
+      end
 
     {:noreply, socket}
   end

@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
   import Phoenix.LiveViewTest
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Factory
 
   setup do
     # Create a test project
@@ -225,6 +226,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
       # After reset, the active indicator dot should be gone
       refute has_element?(view, ~s|button[aria-label="Open filters"] span.bg-primary|)
+    end
+  end
+
+  describe "Bulk selection — row highlight" do
+    @tag :bulk_select
+    @tag :bulk_select_row_highlight
+    test "selected session row has bg-primary/5 on the row element", %{conn: conn, project: project} do
+      agent = Factory.create_agent(%{project_id: project.id})
+      session = Factory.create_session(agent, %{name: "Highlight test", status: "idle", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      view |> render_click("toggle_select", %{"id" => to_string(session.id)})
+
+      html = render(view)
+      assert html =~ ~r/id="session-row-#{session.id}"[^>]*bg-primary\/5/
     end
   end
 end

@@ -9,7 +9,9 @@ lib/eye_in_the_sky_web/components/rail.ex                   # Main LiveComponent
 lib/eye_in_the_sky_web/components/rail/flyout.ex            # Flyout panel rendering (all sections)
 lib/eye_in_the_sky_web/components/rail/project_switcher.ex  # Project picker overlay
 lib/eye_in_the_sky_web/components/rail/project_actions.ex   # Project CRUD + select event handlers
+lib/eye_in_the_sky_web/components/rail/file_actions.ex      # File event handlers (extracted from rail.ex)
 lib/eye_in_the_sky_web/components/rail/helpers.ex           # Small utilities (project_initial, etc.)
+lib/eye_in_the_sky_web/components/core_components.ex        # Core components, including custom_icon/1
 lib/eye_in_the_sky_web/components/layouts/app.html.heex     # Layout — mounts the rail with sidebar_tab + sidebar_project
 assets/js/hooks/rail_state.js                               # localStorage persistence for project selection
 ```
@@ -79,6 +81,26 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 **State preservation**: filter state (sort, name) preserved across project switches and flyout toggles via `session_filter` and `session_sort` assigns.
 
 **Project scope**: if `sidebar_project` is set, only shows sessions for that project. Otherwise shows all sessions globally.
+
+---
+
+### Notes Flyout
+
+**Lazy loader**: `maybe_load_notes/3`
+
+**UI features**:
+- **Flyout header icons**: globe icon links to `/notes` (all notes globally); list-bullet icon links to `/projects/:id/notes` when a project is selected
+- **Add button** (`+`): navigates to `/notes/new` to create a new note
+- **Note list**: displays the last 20 notes (by creation order) for the project or globally (depending on `sidebar_project`)
+- **Note preview**: each row shows title + body preview (first 60 chars); link navigates to `/notes/:id/edit`
+- **Parent type**: displays the parent_type (e.g., "session") as a lowercase label
+- **Empty state**: "No notes" when none exist
+
+**State preservation**: none — notes list is reloaded when the notes section is opened.
+
+**Project scope**: if `sidebar_project` is set, loads only notes for that project (via `:project_id` filter). Otherwise loads all notes globally.
+
+**Note structure**: each note has optional `title` and `body` fields. If title is empty, the first 60 chars of body is used as the label. If both are empty, shows "(empty)".
 
 ---
 
@@ -177,25 +199,38 @@ Data is only fetched when entering a section, not on every page render:
 | `:chat`     | `maybe_load_channels/3`   | Yes            |
 | `:teams`    | `maybe_load_teams/3`      | Yes            |
 | `:canvas`   | `maybe_load_canvases/2`   | No             |
+| `:notes`    | `maybe_load_notes/3`      | Yes            |
 | `:jobs`     | `maybe_load_jobs/2`       | Yes            |
 | `:usage`    | —                         | —              |
 
-Sessions are also re-fetched when `sidebar_project` changes (project switch triggers a reload).
+Sessions and notes are also re-fetched when `sidebar_project` changes (project switch triggers a reload).
 
 ### Dual-Page Sections
 
-Sections with both a global and project-scoped page show dual icons in the flyout header:
+Sections with both a global and project-scoped page show a single clickable header combining icon + label in the flyout header. When no route exists, the header is rendered as a plain div:
 
 ```elixir
 defp dual_page_section?(section),
   do: section in [:sessions, :tasks, :prompts, :notes, :skills, :jobs]
 ```
 
-**Globe icon** (`lucide-globe`, 13×13): navigates to the global route (e.g., `/sessions`, `/tasks`)
-**List-bullet icon** (`hero-list-bullet`): navigates to the project-scoped route (e.g., `/projects/:id/sessions`). Enabled only when `sidebar_project` is set and the route exists. If the route is not implemented, shows a disabled state and fires `not_implemented` event on click (displays a flash toast).
+**Header behavior**:
+- When a project route exists: icon + label wrapped in a single `<.link>` that navigates to the project-scoped route (e.g., `/projects/:id/sessions`, `/projects/:id/notes`)
+- When no project route exists: rendered as a plain `<div>` (icon + label not clickable)
+- Route-specific icons:
+  - **Tasks**: kanban icon (`lucide-kanban`)
+  - **Other sections**: list-bullet icon (`hero-list-bullet`)
+
+Route mappings:
+- Sessions: `/projects/:id/sessions`
+- Tasks: `/projects/:id/kanban`
+- Prompts: `/projects/:id/prompts`
+- Notes: `/projects/:id/notes`
+- Skills: `/projects/:id/skills`
+- Jobs: `/projects/:id/jobs`
 
 Helper functions:
-- `global_route_for/1` — returns the global path for a section
+- `dual_page_section?/1` — determines if a section has both global and project-scoped pages
 - `project_route_for/2` — returns the project-scoped path if available, or nil
 
 ---
@@ -268,6 +303,35 @@ The rail must not become a source of truth for project authorization or durable 
 
 ---
 
+## UI Patterns
+
+### Icon Consolidation
+
+All icons in the rail and flyout use **custom_icon/1 or the standard `.icon` component** (from core_components.ex):
+
+- **Lucide icons** (e.g., `kanban`, `globe`): use `.custom_icon` — these are consolidated inline SVGs to reduce imports
+- **Heroicons** (e.g., `hero-list-bullet`, `hero-plus-mini`): use `.icon` — standard Heroicons fallback
+
+Do NOT use raw inline SVGs elsewhere. Add new icons to `custom_icon/1` in core_components.ex.
+
+### Bulk-Select UX (Sessions, Notes, Tasks)
+
+Hover-reveal checkbox pattern used across list views:
+
+- **Checkbox visibility**: hidden by default; appears on hover (`group-hover:flex`) and when select mode is active
+- **Select mode activation**: clicking any checkbox enters select mode; subsequent clicks toggle selection for that row
+- **Select-all**: indeterminate checkbox at top selects/deselects all visible rows
+- **Row behavior in select mode**: clicking a row toggles its checkbox instead of navigating (prevented by event handler)
+- **Exit select mode**: X button in bulk toolbar exits and clears selection
+- **Bulk toolbar**: shown only when select_mode is true and rows are selected; includes select count and delete action
+
+Related components:
+- `NotesList` (`notes_list.ex`) — bulk delete for notes, with toolbar
+- `ProjectSessionsTable` — bulk delete for sessions
+- `TaskCardListRow` — individual row handling for task selection
+
+---
+
 ## Known Gotchas
 
 1. **`transition-all` flicker** — do not put `transition-all` inside stream items. CSS transitions replay from initial state (e.g. opacity-0) on stream reinsert, causing visible flicker.
@@ -289,3 +353,7 @@ The rail must not become a source of truth for project authorization or durable 
 9. **`phx-change` on bare inputs is unreliable** — bare inputs (no form wrapper) only fire `phx-change` on blur. Use `phx-keyup` + `phx-debounce="300"` for real-time filtering. Applied to: session name filter, task search input.
 
 10. **Filter state preservation across toggles** — when user toggles the flyout closed and opens it again, filter/search state is preserved. This is intentional for UX but means clearing a search is a deliberate user action, not a side effect of navigation.
+
+11. **FileActions module** — file event handlers (`handle_event` for file operations) were extracted to `lib/eye_in_the_sky_web/components/rail/file_actions.ex`. Rail.ex delegates file events to this module to keep the main component lean. Import and use the module as needed.
+
+12. **Icon consolidation via custom_icon/1** — inline SVGs for Lucide icons are consolidated in the `custom_icon/1` component (core_components.ex). Always use `.custom_icon` for new Lucide icons instead of raw SVG. Use `.icon` for Heroicons.

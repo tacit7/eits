@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
   """
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [stream: 4, stream_insert: 3]
+  import Phoenix.LiveView, only: [stream: 4, stream_insert: 3, stream_delete_by_dom_id: 3]
   import EyeInTheSkyWeb.Helpers.SessionFilters
 
   alias EyeInTheSky.Projects
@@ -140,6 +140,34 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
       nil -> socket
       changed_agent -> stream_insert(socket, :session_list, changed_agent)
     end
+  end
+
+  @doc """
+  Remove a session from the in-memory list and stream-delete its row.
+
+  Used by archive/unarchive/delete handlers so the page doesn't jump from
+  a full `stream(..., reset: true)` rebuild. Only the affected row is
+  removed from the DOM; surrounding rows keep their identity and the
+  user's scroll position is preserved.
+  """
+  def remove_agent_from_list(socket, session_id) do
+    updated = Enum.reject(socket.assigns.all_agents, &(&1.id == session_id))
+
+    {ordered_agents, depths} =
+      updated
+      |> filter_agents_by_status(socket.assigns.session_filter)
+      |> filter_agents_by_search(socket.assigns.search_query)
+      |> sort_agents(socket.assigns.sort_by)
+      |> build_tree_order()
+
+    visible_count = socket.assigns.visible_count
+
+    socket
+    |> assign(:all_agents, updated)
+    |> assign(:agents, ordered_agents)
+    |> assign(:depths, depths)
+    |> assign(:has_more, length(ordered_agents) > visible_count)
+    |> stream_delete_by_dom_id(:session_list, "ps-#{session_id}")
   end
 
   # ---------------------------------------------------------------------------

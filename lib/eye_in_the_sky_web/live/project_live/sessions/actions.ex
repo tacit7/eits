@@ -57,7 +57,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   def archive_session(%{"session_id" => session_id}, socket) do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, _} <- Sessions.archive_session(session) do
-      {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session archived")}
+      {:noreply,
+       socket
+       |> Loader.remove_agent_from_list(session.id)
+       |> put_flash(:info, "Session archived")}
     else
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Session not found")}
@@ -71,7 +74,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   def unarchive_session(%{"session_id" => session_id}, socket) do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, _} <- Sessions.unarchive_session(session) do
-      {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session unarchived")}
+      {:noreply,
+       socket
+       |> Loader.remove_agent_from_list(session.id)
+       |> put_flash(:info, "Session unarchived")}
     else
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Session not found")}
@@ -85,7 +91,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   def delete_session(%{"session_id" => session_id}, socket) do
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, _} <- Sessions.delete_session(session) do
-      {:noreply, socket |> Loader.load_agents() |> put_flash(:info, "Session deleted")}
+      {:noreply,
+       socket
+       |> Loader.remove_agent_from_list(session.id)
+       |> put_flash(:info, "Session deleted")}
     else
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Session not found")}

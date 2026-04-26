@@ -734,22 +734,28 @@ DM messages and tool call/output blocks expose a clipboard icon on hover for one
 
 ## Auto-Scroll Across LiveView Patches
 
-**Commit:** `08fdbac0`
+**Commits:** `08fdbac0`, `fd56f6fd`
 
-The `AutoScroll` hook preserves the auto-scroll behavior when the DM message list DOM is rebuilt during LiveView patches.
+The `AutoScroll` hook preserves the auto-scroll behavior when the DM message list DOM is rebuilt during LiveView patches and handles content growth after mount.
 
-**Problem solved:**
+**Problem solved (08fdbac0):**
 - After commit 33405bb8 disabled native `overflow-anchor`, the `AutoScroll` hook became the sole mechanism keeping messages pinned to the bottom
 - On full message reloads (DOM rebuild), `scrollTop` briefly reset to 0 during the patch, causing the scroll listener to fire and flip `shouldAutoScroll = false`
 - This made newly arrived messages land off-screen instead of auto-scrolling into view
 
-**Solution:**
+**Solution (08fdbac0):**
 - Added `beforeUpdate()` to lock `shouldAutoScroll` to its pre-patch geometry state computed before the DOM swap
 - Added `_updating` flag to ignore scroll events fired during the DOM patch
 - After the browser settles the DOM swap, `requestAnimationFrame` releases the flag so future scrolls work normally
 
+**Post-mount content growth (fd56f6fd):**
+- Message rows expand AFTER mount due to LocalTime hooks filling empty `<time>` tags, phx-mounted transitions, and late-arriving stream patches
+- The container scrollHeight can grow by 600–1100px after initial scroll, leaving the view stuck partway up
+- Solution: Added a `ResizeObserver` on the container and its children. While `shouldAutoScroll` is true, the observer snaps to bottom whenever scrollHeight changes
+- User scroll-up still wins — observer only acts when `shouldAutoScroll` is already true
+
 **Files:**
-- `assets/js/hooks/auto_scroll.js` — `beforeUpdate`, `updated`, and scroll listener logic
+- `assets/js/hooks/auto_scroll.js` — `beforeUpdate`, `updated`, scroll listener, and `ResizeObserver` logic
 
 ---
 
@@ -783,7 +789,7 @@ The DM page now has a sixth tab (Settings) with scope controls and provider-spec
 
 ## Desktop Top Bar
 
-**Commits:** `d6c5ae2e`, `ef000cd3`
+**Commits:** `d6c5ae2e`, `ef000cd3`, `b58104ad`
 
 A desktop-only top bar appears above the main content area on the DM page, providing breadcrumb navigation, search access, and tab controls.
 
@@ -807,9 +813,16 @@ A desktop-only top bar appears above the main content area on the DM page, provi
 - `dm_session_name` — session name for breadcrumb
 - `dm_message_search_query` — search filter text
 
+**Height calculation fix (b58104ad):**
+- The top bar consumes `h-10` (2.5rem) of the main flex column
+- The DM page height is now calculated as `md:h-[calc(100dvh-2.5rem)]` to match the parent container size
+- Previously, the page height was computed as `100dvh - 2rem`, which caused an 8px overflow into the parent container
+- With overflow-auto on main, this overflow made the main container scrollable, causing messages to be clipped and auto-scroll to land 8px short of the visual bottom
+
 **Files:**
 - `lib/eye_in_the_sky_web/components/layouts.ex` — top_bar component with dm_toolbar private component
 - `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — top bar integration
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — DM page height calculation
 
 ---
 

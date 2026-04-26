@@ -298,17 +298,31 @@ Replaces the polling Broadcaster with an event-driven GenServer that listens for
 
 ## Messages.BulkImporter: Optimized Batch Message Insertion
 
-BulkImporter now uses `Repo.insert_all` for efficient batch message inserts with atomic transaction semantics and deduplication.
+BulkImporter now uses `Repo.insert_all` for efficient batch message inserts with atomic transaction semantics and in-batch deduplication.
 
 **Workflow:**
 1. Provider (Claude, Codex) calls `BulkImporter.run/3` with a list of messages to import
-2. Messages are separated into three actions:
+2. Messages are separated into three actions via `Enum.reduce`:
    - **Updates:** messages with matching sender_role + body (unlinked) → add source_uuid via `update_message/2`
    - **Inserts:** new messages (no matching unlinked) → batch insert via `Repo.insert_all`
-   - **Skips:** already known (source_uuid exists) or duplicate DMs (avoid double-render)
+   - **Skips:** already known (source_uuid exists), duplicate DMs (avoid double-render), or in-batch duplicates
 3. Wrapped in `Repo.transaction` for atomicity — all updates and inserts succeed or fail together
 4. Per-row update errors are rescued and logged; transaction does not roll back on per-row failures
 5. Return value: total count = insert_count + update_count + skip_count
+
+**In-Batch Agent Message Deduplication:**
+A `MapSet` (seen_agent_bodies) is threaded through the `Enum.reduce` accumulator to catch duplicate agent messages within the same batch before they hit the database. This closes a race window where the same agent message body could be inserted twice.
+
+- **Mechanism:** For each non-user message, the cond clause checks `MapSet.member?(seen_agent_bodies, msg.content)` first (cheap, no DB call) before calling `agent_reply_already_recorded?` (DB round-trip).
+- **User messages excluded:** User messages are intentionally NOT added to the MapSet, allowing repeated user turns (legitimate distinct prompts) to persist independently within a batch.
+- **Two-layer check:** MapSet catches in-batch duplicates fast; `agent_reply_already_recorded?` catches cross-process races where `record_incoming_reply` committed before this reduce started.
+- **Body tracking:** Non-user message bodies are added to the MapSet on both insert and update paths so subsequent in-batch messages with the same body are caught.
+
+**Example scenario:** A JSONL file with three assistant messages containing identical body text:
+- First message: MapSet miss on `body`, passed to DB → inserts
+- Second message: MapSet hit, skipped (avoid double-render)
+- Third message: MapSet hit, skipped (avoid double-render)
+- Result: 1 row inserted instead of 3
 
 **Deduplication Index:**
 - Partial composite index: `(session_id, sender_role, inserted_at) WHERE source_uuid IS NULL`
@@ -319,23 +333,31 @@ BulkImporter now uses `Repo.insert_all` for efficient batch message inserts with
 **Before (deprecated):**
 - Per-row `Messages.create_message/1` call — O(N) DB roundtrips, no batch atomicity
 - Single per-row rescue loop — one DB error crashed the entire import
+- No in-batch dedup — identical agent messages in one JSONL file could both insert
 
 **After (current):**
 - `Repo.insert_all/3` with `on_conflict: :nothing` — O(1) roundtrip for all inserts
 - Per-row updates wrapped in try/rescue — one update error doesn't crash the transaction
 - Atomic: all updates and inserts commit together or fail together
+- In-batch MapSet dedup — identical agent messages within one batch skip the second and subsequent inserts
 
 **Error Handling:**
 - Insert conflict (source_uuid duplicate): silently skipped via `on_conflict: :nothing`
 - Update failures: logged as debug; transaction continues; count reflects only successful updates
 - Transaction failure: entire batch returns 0; error logged as warning
+- In-batch duplicate: skipped without DB round-trip
 
 **Code locations:**
-- `lib/eye_in_the_sky/messages/bulk_importer.ex` — `run/3`, `process_message/5`, Repo.transaction logic
+- `lib/eye_in_the_sky/messages/bulk_importer.ex` — `run/3`, `process_message/4`, Repo.transaction logic, MapSet threading
 - `lib/eye_in_the_sky/messages.ex` — `create_message/1`, `update_message/2`, `find_unlinked_message/3`
 - Database migration: dedup index creation
 
-**Commits:** 55e2e5f5 (Repo.insert_all + dedup index), 8d04610f (concurrent index + drop transaction), e7c228a9 (drop body from index)
+**Tests:** Three new test cases validate dedup behavior:
+- `in-batch dedup: 3 assistant messages with same body and different uuids → 1 row`
+- `mixed dedup: existing DB row + 2 in-batch messages with same body → 1 row`
+- `user messages with same body in same batch are NOT deduped (both persist)`
+
+**Commits:** 55e2e5f5 (Repo.insert_all + dedup index), 8d04610f (concurrent index + drop transaction), e7c228a9 (drop body from index), 7db631d5 (in-batch agent dedup via MapSet)
 
 ---
 

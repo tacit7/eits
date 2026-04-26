@@ -57,7 +57,12 @@ _curl() {
     break
   done
   if [[ "$_status" -ge 400 ]]; then
-    printf 'HTTP %s: %s\n' "$_status" "$_body" >&2
+    # Normalize HTML error pages to a plain JSON error so agents don't get raw HTML
+    local _display_body="$_body"
+    if echo "$_body" | grep -qi '<!DOCTYPE\|<html'; then
+      _display_body="{\"error\":\"server_error\",\"status\":$_status,\"hint\":\"server returned HTML — check server logs\"}"
+    fi
+    printf 'HTTP %s: %s\n' "$_status" "$_display_body" >&2
     return 1
   fi
   printf '%s\n' "$_body"
@@ -326,6 +331,8 @@ cmd_tasks() {
       ;;
     update)
       # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>] [--due-at <ISO8601>]
+      # State IDs: 1=To Do, 2=In Progress, 3=Done, 4=In Review
+      # Prefer: eits tasks complete <id> (sets Done + annotates in one shot)
       local id="${1:-}"; need id; shift
       local updates="{}"
       while [[ $# -gt 0 ]]; do
@@ -567,10 +574,12 @@ cmd_tasks() {
       _post "/tasks/$task_id/tags" "$(json tag_id "$tag_id")"
       ;;
     states)
-      printf '%s\t%s\n' 1 "To Do"
-      printf '%s\t%s\n' 2 "In Progress"
-      printf '%s\t%s\n' 3 "Done"
-      printf '%s\t%s\n' 4 "In Review"
+      printf '%-4s %-12s %s\n' "ID" "Name" "Notes"
+      printf '%-4s %-12s %s\n' 1 "To Do"       ""
+      printf '%-4s %-12s %s\n' 2 "In Progress" "(set by tasks begin / tasks claim)"
+      printf '%-4s %-12s %s\n' 3 "Done"        "(set by tasks complete)"
+      printf '%-4s %-12s %s\n' 4 "In Review"   ""
+      printf '\nUsage: eits tasks update <id> --state <id>    e.g. --state 3 for Done\n'
       ;;
     bulk-update)
       # eits tasks bulk-update --ids <id,id,...> [--state <id|name>] [--priority <p>] [--title <t>]
@@ -825,6 +834,18 @@ Valid models (--provider codex):
 Valid models (--provider gemini):
   gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 
+NOTES:
+  - --worktree requires a clean git tree. If the working directory has uncommitted
+    changes, spawn will fail. Use --stash-if-dirty to auto-stash before the worktree
+    is created, or commit your changes first.
+  - --provider and --model are validated locally before hitting the API. Passing an
+    invalid combo exits immediately with a clear error message.
+  - Provider/model pairs are not cross-compatible. --provider codex --model sonnet
+    is invalid; use --model gpt-5.4 for Codex.
+  - $EITS_PROJECT_ID is used as the default --project-id. In spawned agents it must
+    be set explicitly in the instructions string — it is not injected as an OS env var
+    for Claude sessions (Codex injects it via cli.ex automatically).
+
 Examples:
   eits agents spawn --instructions "Review PR #42" --parent-session-id $EITS_SESSION_ID
   eits agents spawn --instructions-file /tmp/agent.txt --worktree fix/my-bug --stash-if-dirty
@@ -863,6 +884,35 @@ USAGE
       done
       # Mutual exclusion: --instructions and --instructions-file cannot both be set
       [[ $instructions_set -eq 1 && -n "$instructions_file" ]] && die "--instructions and --instructions-file are mutually exclusive"
+
+      # Validate provider/model combos locally before hitting the API
+      if [[ -n "$provider" || -n "$model" ]]; then
+        local _eff_provider="${provider:-claude}"
+        case "$_eff_provider" in
+          claude)
+            if [[ -n "$model" ]]; then
+              case "$model" in
+                claude-opus-4-7|claude-opus-4-6|claude-sonnet-4-6|claude-sonnet-4-5-20250929|claude-haiku-4-5-20251001|opus|"opus[1m]"|sonnet|"sonnet[1m]"|haiku) ;;
+                *) die "invalid model '$model' for provider 'claude'. Valid: claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001, opus, opus[1m], sonnet, sonnet[1m], haiku" ;;
+              esac
+            fi ;;
+          codex)
+            if [[ -n "$model" ]]; then
+              case "$model" in
+                gpt-5.4|gpt-5.2-codex|gpt-5.1-codex-max|gpt-5.4-mini|gpt-5.3-codex|gpt-5.2) ;;
+                *) die "invalid model '$model' for provider 'codex'. Valid: gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2" ;;
+              esac
+            fi ;;
+          gemini)
+            if [[ -n "$model" ]]; then
+              case "$model" in
+                gemini-2.5-pro|gemini-2.5-flash|gemini-2.5-flash-lite) ;;
+                *) die "invalid model '$model' for provider 'gemini'. Valid: gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite" ;;
+              esac
+            fi ;;
+          *) die "unknown provider '$provider'. Valid: claude, codex, gemini" ;;
+        esac
+      fi
       # Load from file if provided
       if [[ -n "$instructions_file" ]]; then
         [[ -f "$instructions_file" ]] || die "--instructions-file: file not found: $instructions_file"
@@ -1546,7 +1596,19 @@ cmd_teams() {
       _get "/teams/$id/members"
       ;;
     join)
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits teams join <team_id> --name <alias> [--role member|admin] [--session <uuid|id>] [--agent <uuid>]"; return 0; }
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'HELP'
+usage: eits teams join <team_id> --name <alias> [--role member|admin] [--session <uuid|id>] [--agent <uuid>]
+
+  --session  Session UUID or integer ID to join as. Defaults to:
+             $EITS_SESSION_UUID (UUID) → $EITS_SESSION_ID (integer) → empty
+  --agent    Agent UUID. Defaults to $EITS_AGENT_UUID.
+
+NOTES:
+  - Accepts both UUID and integer session/agent identifiers.
+  - If EITS_SESSION_UUID is not set in a spawned agent, EITS_SESSION_ID is tried next.
+HELP
+        return 0; }
       local team_id="${1:-}"; need team_id; shift
       local name="" role="" session_id="" agent_id=""
       while [[ $# -gt 0 ]]; do
@@ -1983,10 +2045,15 @@ Commands:
   me            Print current session/agent/project context and verify server-side
 
 Env vars (injected by EITS hooks):
-  EITS_SESSION_UUID  current session UUID (default --session / --from)
+  EITS_SESSION_UUID  current session UUID (default --session / --from / --mine)
+  EITS_SESSION_ID    current session integer ID (fallback when UUID unavailable, e.g. Codex spawns)
   EITS_AGENT_UUID    current agent UUID   (default --agent)
-  EITS_PROJECT_ID    current project ID   (default --project)
+  EITS_PROJECT_ID    current project ID   (default --project / tasks begin / agents spawn)
   EITS_URL           API base URL         (default: http://localhost:5001/api/v1)
+
+Fallback order for session identity:
+  UUID preferred; integer ID used when UUID is empty (tasks, teams join, --mine, dm --from)
+  Run: eits me   — to verify which env vars are set in the current shell
 
 Requires: curl, jq
 EOF

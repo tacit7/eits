@@ -5,6 +5,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.RetryPolicyTest do
   @moduletag :capture_log
 
   alias EyeInTheSky.Claude.AgentWorker.RetryPolicy
+  alias EyeInTheSky.Claude.Job
 
   # session_id must be an integer (sessions table PK). Use a large non-existent ID
   # so Sessions.get_session returns {:error, :not_found} gracefully instead of raising.
@@ -79,7 +80,8 @@ defmodule EyeInTheSky.Claude.AgentWorker.RetryPolicyTest do
     end
 
     test "clears the queue" do
-      state = %{base_state() | retry_attempt: RetryPolicy.max_retries(), queue: [:job1, :job2]}
+      jobs = [%Job{message: "a", context: %{}}, %Job{message: "b", context: %{}}]
+      state = %{base_state() | retry_attempt: RetryPolicy.max_retries(), queue: jobs}
       result = RetryPolicy.schedule_retry_start(state)
       assert result.queue == []
     end

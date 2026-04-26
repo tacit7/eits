@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
       <ul class="dropdown-content menu bg-base-100 border border-base-300 rounded-box shadow-sm w-56 z-50 p-1">
         <li class="menu-title text-xs text-base-content/40 px-2 pt-1">WORKSPACE</li>
         <li>
-          <.link href="/workspace/sessions" class="gap-2 text-sm">
+          <.link navigate={~p"/workspace/sessions"} class="gap-2 text-sm">
             <.icon name="hero-squares-2x2" class="w-4 h-4" />
             <span>
               {@scope.workspace.name}
@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
         </li>
         <li class="menu-title text-xs text-base-content/40 px-2 pt-2">PROJECTS</li>
         <li :for={project <- @projects}>
-          <.link href={"/projects/#{project.id}/sessions"} class={["gap-2 text-sm", Scope.project?(@scope) && @scope.project_id == project.id && "active"]}>
+          <.link navigate={~p"/projects/#{project.id}/sessions"} class={["gap-2 text-sm", Scope.project?(@scope) && @scope.project_id == project.id && "active"]}>
             <.icon name="hero-folder" class="w-4 h-4" />
             {project.name}
           </.link>

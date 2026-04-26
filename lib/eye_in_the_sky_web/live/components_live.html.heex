@@ -388,13 +388,14 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
         <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Session Row</h2>
         <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
           <div class="text-xs text-base-content/50 mb-2 space-y-1">
-            <p>Four zones: <span class="text-base-content/70 font-medium">1</span> status stripe (border-l-2) &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">2</span> hover-reveal checkbox &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">3</span> content area &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">4</span> hover-reveal action menu</p>
+            <p>Four zones: <span class="text-base-content/70 font-medium">1</span> status dot &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">2</span> hover-reveal checkbox &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">3</span> content area &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">4</span> hover-reveal action menu</p>
           </div>
 
           <%!-- Working row --%>
           <div>
-            <p class="text-xs text-base-content/40 mb-1">working — border-warning</p>
-            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-warning rounded-r">
+            <p class="text-xs text-base-content/40 mb-1">working — status_dot :working</p>
+            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
+              <.status_dot status={:working} size="sm" />
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
                 <.square_checkbox checked={false} />
               </div>
@@ -413,8 +414,9 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
 
           <%!-- Idle row --%>
           <div>
-            <p class="text-xs text-base-content/40 mb-1">idle — border-base-content/20</p>
-            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-base-content/20 rounded-r">
+            <p class="text-xs text-base-content/40 mb-1">idle — status_dot :idle</p>
+            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
+              <.status_dot status={:idle} size="sm" />
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
                 <.square_checkbox checked={false} />
               </div>
@@ -433,8 +435,9 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
 
           <%!-- Failed row --%>
           <div>
-            <p class="text-xs text-base-content/40 mb-1">failed — border-error</p>
-            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-error rounded-r">
+            <p class="text-xs text-base-content/40 mb-1">failed — status_dot :failed</p>
+            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
+              <.status_dot status={:failed} size="sm" />
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
                 <.square_checkbox checked={false} />
               </div>
@@ -452,7 +455,7 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
           </div>
 
           <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code>group/row + group-hover/row: — named group required for nested hover reveal
-border-l-2 border-warning|border-base-content/20|border-error — status stripe
+&lt;.status_dot status={:working} size="sm" /&gt;  ← :idle :failed :waiting :completed
 md:opacity-0 md:group-hover/row:opacity-100 — hover-reveal pattern</code></pre>
         </div>
       </section>

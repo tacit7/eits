@@ -188,7 +188,9 @@ export const VimNav = {
 
   currentProjectPath(): string | null {
     const m = window.location.pathname.match(/^(\/projects\/\d+)/)
-    return m ? m[1] : null
+    if (m) return m[1]
+    const railId = (document.getElementById("app-rail") as HTMLElement | null)?.dataset.projectId
+    return railId ? `/projects/${railId}` : null
   },
 
   buildPath(path: string, relative?: boolean): string | null {

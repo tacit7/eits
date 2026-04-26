@@ -480,6 +480,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       id="app-rail"
       phx-hook="RailState"
       phx-target={@myself}
+      data-project-id={@sidebar_project && @sidebar_project.id}
       class="flex flex-row h-full min-w-0 relative"
     >
       <div

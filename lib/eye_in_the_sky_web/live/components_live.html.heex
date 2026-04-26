@@ -1,0 +1,586 @@
+<div class="flex h-screen overflow-hidden bg-base-100">
+  <%!-- Left nav --%>
+  <aside class="w-44 shrink-0 border-r border-base-content/10 flex flex-col py-4 px-2 gap-1 overflow-y-auto">
+    <div class="px-3 py-1.5 mb-2">
+      <span class="text-sm font-semibold text-base-content">Component Library</span>
+      <span class="badge badge-xs badge-ghost ml-1.5">v1</span>
+    </div>
+    <button
+      :for={{id, label} <- @sections}
+      phx-click="set_section"
+      phx-value-section={id}
+      class={[
+        "text-sm px-3 py-1.5 rounded-md text-left w-full",
+        if(@active_section == id,
+          do: "bg-primary/15 text-primary font-medium",
+          else: "text-base-content/70 hover:bg-base-200/60"
+        )
+      ]}
+    >
+      {label}
+    </button>
+  </aside>
+
+  <%!-- Right content area --%>
+  <main class="flex-1 overflow-y-auto p-6 space-y-10">
+
+    <%!-- ================================================ --%>
+    <%!-- FOUNDATION SECTION --%>
+    <%!-- ================================================ --%>
+    <div :if={@active_section == "foundation"} class="space-y-10">
+
+      <%!-- Buttons --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Buttons</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
+          <div>
+            <p class="text-xs text-base-content/40 mb-2">Variants</p>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn btn-sm btn-primary">Primary</button>
+              <button class="btn btn-sm btn-ghost">Ghost</button>
+              <button class="btn btn-sm btn-outline">Outline</button>
+              <button class="btn btn-sm btn-error">Error</button>
+              <button class="btn btn-xs btn-ghost btn-square">
+                <.icon name="hero-ellipsis-horizontal" class="size-4" />
+              </button>
+              <button class="btn btn-sm btn-primary btn-disabled" disabled>Disabled</button>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs text-base-content/40 mb-1">Code note</p>
+            <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code>btn btn-sm btn-primary
+btn btn-sm btn-ghost
+btn btn-sm btn-outline
+btn btn-sm btn-error
+btn btn-xs btn-ghost btn-square   ← icon-only
+btn btn-sm btn-primary btn-disabled</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <%!-- Badges --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Badges</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge badge-sm badge-error">failed</span>
+            <span class="badge badge-sm badge-warning">working</span>
+            <span class="badge badge-sm badge-info">pending</span>
+            <span class="badge badge-sm badge-ghost">idle</span>
+            <span class="badge badge-sm badge-success">completed</span>
+            <span class="badge badge-xs badge-warning">xs size</span>
+          </div>
+          <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code>badge badge-sm badge-error     → failed
+badge badge-sm badge-warning   → working
+badge badge-sm badge-info      → pending
+badge badge-sm badge-ghost     → idle
+badge badge-sm badge-success   → completed
+badge badge-xs badge-warning   → xs size</code></pre>
+        </div>
+      </section>
+
+      <%!-- Icons --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Icons</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
+          <div class="grid grid-cols-6 gap-4 mb-4">
+            <%= for {icon, label} <- [
+              {"hero-magnifying-glass-mini", "search"},
+              {"hero-ellipsis-horizontal", "ellipsis"},
+              {"hero-plus-mini", "plus"},
+              {"hero-pencil-square", "pencil-sq"},
+              {"hero-trash", "trash"},
+              {"hero-x-mark", "x-mark"},
+              {"hero-check", "check"},
+              {"hero-chevron-right", "chevron-r"},
+              {"hero-document-text", "doc-text"},
+              {"hero-folder", "folder"},
+              {"hero-user", "user"},
+              {"hero-arrow-right", "arrow-r"}
+            ] do %>
+              <div class="flex flex-col items-center gap-1.5">
+                <div class="flex items-center gap-1.5">
+                  <.icon name={icon} class="size-3 text-base-content/60" />
+                  <.icon name={icon} class="size-4 text-base-content/70" />
+                  <.icon name={icon} class="size-5 text-base-content" />
+                </div>
+                <span class="text-[10px] text-base-content/40 text-center leading-tight">{label}</span>
+              </div>
+            <% end %>
+          </div>
+          <p class="text-xs text-base-content/40">Sizes shown: size-3, size-4, size-5 left to right</p>
+        </div>
+      </section>
+
+      <%!-- Typography --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Typography</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
+          <div class="space-y-3">
+            <div>
+              <p class="text-[10px] text-base-content/40 mb-0.5">text-lg font-semibold</p>
+              <p class="text-lg font-semibold">Page heading</p>
+            </div>
+            <div>
+              <p class="text-[10px] text-base-content/40 mb-0.5">text-xl font-semibold</p>
+              <p class="text-xl font-semibold">Modal heading</p>
+            </div>
+            <div>
+              <p class="text-[10px] text-base-content/40 mb-0.5">text-base</p>
+              <p class="text-base">Body text — DM Sans 17px base</p>
+            </div>
+            <div>
+              <p class="text-[10px] text-base-content/40 mb-0.5">text-sm</p>
+              <p class="text-sm">Secondary body</p>
+            </div>
+            <div>
+              <p class="text-[10px] text-base-content/40 mb-0.5">text-xs text-base-content/60</p>
+              <p class="text-xs text-base-content/60">Metadata / secondary label</p>
+            </div>
+            <div>
+              <p class="text-[10px] text-base-content/40 mb-0.5">text-[11px] font-medium uppercase tracking-wider text-base-content/60</p>
+              <p class="text-[11px] font-medium uppercase tracking-wider text-base-content/60">EYEBROW LABEL</p>
+            </div>
+            <div>
+              <p class="text-[10px] text-base-content/40 mb-0.5">font-mono tabular-nums text-sm</p>
+              <p class="font-mono tabular-nums text-sm">1,234 monospace metrics</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <%!-- Color / Spacing Tokens --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Spacing / Color Tokens</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
+          <div class="flex flex-wrap gap-4">
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-20 h-8 rounded border border-base-content/8"></div>
+              <span class="text-[10px] text-base-content/40">border/8</span>
+              <span class="text-[10px] text-base-content/30">Subtle separator</span>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-20 h-8 rounded border border-base-content/10"></div>
+              <span class="text-[10px] text-base-content/40">border/10</span>
+              <span class="text-[10px] text-base-content/30">Medium border</span>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-20 h-8 rounded bg-base-content/[0.04]"></div>
+              <span class="text-[10px] text-base-content/40">bg/0.04</span>
+              <span class="text-[10px] text-base-content/30">Chip background</span>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-20 h-8 rounded bg-primary/15"></div>
+              <span class="text-[10px] text-base-content/40">primary/15</span>
+              <span class="text-[10px] text-base-content/30">Active nav item</span>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-20 h-8 rounded bg-base-200/40"></div>
+              <span class="text-[10px] text-base-content/40">base-200/40</span>
+              <span class="text-[10px] text-base-content/30">Tab pill container</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <%!-- Form Inputs --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Form Inputs</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
+          <.form for={%{}} as={:demo} phx-change="noop" phx-submit="noop">
+            <div class="grid grid-cols-2 gap-4">
+              <.input name="demo[text]" label="Text input" placeholder="Type something…" />
+              <.input
+                name="demo[select]"
+                type="select"
+                label="Select"
+                options={["Option A", "Option B", "Option C"]}
+                value=""
+              />
+              <.input
+                name="demo[textarea]"
+                type="textarea"
+                label="Textarea"
+                placeholder="Long form text…"
+              />
+              <.input name="demo[checkbox]" type="checkbox" label="Checkbox" value="false" />
+            </div>
+          </.form>
+        </div>
+      </section>
+
+      <%!-- Empty / Loading / Error States --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Empty / Loading / Error States</h2>
+
+        <div class="space-y-4">
+          <%!-- Empty state --%>
+          <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
+            <p class="text-xs text-base-content/40 mb-3">Empty state</p>
+            <.empty_state
+              icon="hero-inbox"
+              title="Nothing here"
+              subtitle="Items will appear when they're created."
+            />
+          </div>
+
+          <%!-- Spinners --%>
+          <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
+            <p class="text-xs text-base-content/40 mb-3">Loading spinners</p>
+            <div class="flex items-center gap-6">
+              <div class="flex flex-col items-center gap-1.5">
+                <span class="loading loading-spinner loading-xs"></span>
+                <span class="text-[10px] text-base-content/40">xs</span>
+              </div>
+              <div class="flex flex-col items-center gap-1.5">
+                <span class="loading loading-spinner loading-sm"></span>
+                <span class="text-[10px] text-base-content/40">sm</span>
+              </div>
+              <div class="flex flex-col items-center gap-1.5">
+                <span class="loading loading-spinner loading-md"></span>
+                <span class="text-[10px] text-base-content/40">md</span>
+              </div>
+            </div>
+          </div>
+
+          <%!-- Skeleton --%>
+          <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
+            <p class="text-xs text-base-content/40 mb-3">Skeleton loader</p>
+            <div class="space-y-2 max-w-sm">
+              <div class="skeleton h-4 w-full rounded"></div>
+              <div class="skeleton h-4 w-4/5 rounded"></div>
+              <div class="skeleton h-4 w-3/5 rounded"></div>
+              <div class="skeleton h-4 w-2/3 rounded"></div>
+            </div>
+          </div>
+
+          <%!-- Flash --%>
+          <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
+            <p class="text-xs text-base-content/40 mb-3">Flash (inline preview — not toast position)</p>
+            <div class="space-y-2">
+              <div class="alert alert-info w-full sm:w-96">
+                <.icon name="hero-information-circle" class="size-5 shrink-0" />
+                <div>
+                  <p class="font-semibold">Info flash</p>
+                  <p>This is an informational message.</p>
+                </div>
+              </div>
+              <div class="alert alert-error w-full sm:w-96">
+                <.icon name="hero-exclamation-circle" class="size-5 shrink-0" />
+                <div>
+                  <p class="font-semibold">Error flash</p>
+                  <p>Something went wrong.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <%!-- ================================================ --%>
+    <%!-- NAVIGATION SECTION --%>
+    <%!-- ================================================ --%>
+    <div :if={@active_section == "navigation"} class="space-y-10">
+
+      <%!-- Tab Pills --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Tab Pills</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
+          <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5 w-fit">
+            <button class="px-3 py-1 rounded-md text-sm font-medium bg-base-100 text-base-content shadow-sm">
+              Messages
+            </button>
+            <button class="px-3 py-1 rounded-md text-sm font-medium text-base-content/60 hover:bg-base-200/60">
+              Tasks
+            </button>
+            <button class="px-3 py-1 rounded-md text-sm font-medium text-base-content/60 hover:bg-base-200/60">
+              Notes
+            </button>
+          </div>
+          <div class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto">
+            <p class="text-warning mb-1 not-italic font-sans text-[11px] uppercase tracking-wider">Note: Never use DaisyUI `tabs`. This bespoke pattern is canonical.</p>
+            <pre><code>bg-base-200/40 rounded-lg p-0.5       ← container
+bg-base-100 shadow-sm                  ← active tab
+text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <%!-- Dropdowns --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Dropdowns</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
+          <div class="flex items-start gap-4">
+            <details phx-update="ignore" id="demo-dropdown" class="dropdown dropdown-end">
+              <summary class="btn btn-ghost btn-sm btn-square">
+                <.icon name="hero-ellipsis-horizontal" class="size-4" />
+              </summary>
+              <ul class="dropdown-content menu bg-base-100 border border-base-content/10 rounded-lg shadow-lg w-48 z-50">
+                <li><button>Edit</button></li>
+                <li><button>Duplicate</button></li>
+                <li class="text-error"><button>Delete</button></li>
+              </ul>
+            </details>
+            <div class="text-sm text-base-content/60">Click the ellipsis to open the dropdown.</div>
+          </div>
+          <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code><.icon name="hero-information-circle" class="size-3 inline" /> Always &lt;details&gt; + phx-update="ignore". Never JS-toggled.
+
+&lt;details phx-update="ignore" id="demo-dropdown" class="dropdown dropdown-end"&gt;
+  &lt;summary class="btn btn-ghost btn-sm btn-square"&gt;...&lt;/summary&gt;
+  &lt;ul class="dropdown-content menu bg-base-100 border border-base-content/10
+             rounded-lg shadow-lg w-48 z-50"&gt;
+    &lt;li&gt;&lt;button&gt;Edit&lt;/button&gt;&lt;/li&gt;
+    ...
+  &lt;/ul&gt;
+&lt;/details&gt;</code></pre>
+        </div>
+      </section>
+
+      <%!-- Modals --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Modals</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
+          <button
+            class="btn btn-sm btn-outline"
+            onclick="document.getElementById('demo-modal').showModal()"
+          >
+            Open demo modal
+          </button>
+
+          <dialog id="demo-modal" class="modal modal-bottom sm:modal-middle">
+            <div class="modal-box">
+              <h3 class="text-xl font-semibold mb-1">Demo Modal</h3>
+              <p class="text-sm text-base-content/60 mb-4">
+                This is the canonical EITS modal using <code class="font-mono bg-base-content/[0.07] px-1 rounded">modal modal-bottom sm:modal-middle</code>. On mobile it slides up from the bottom; on sm+ it centers.
+              </p>
+              <p class="text-sm mb-4">
+                Always use a native <code class="font-mono bg-base-content/[0.07] px-1 rounded">&lt;dialog&gt;</code> element with DaisyUI <code class="font-mono bg-base-content/[0.07] px-1 rounded">modal</code> classes. Call <code class="font-mono bg-base-content/[0.07] px-1 rounded">showModal()</code> via JS.
+              </p>
+              <div class="modal-action">
+                <form method="dialog">
+                  <button class="btn btn-sm btn-ghost">Close</button>
+                </form>
+              </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+              <button>close</button>
+            </form>
+          </dialog>
+
+          <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code>&lt;dialog id="my-modal" class="modal modal-bottom sm:modal-middle"&gt;
+  &lt;div class="modal-box"&gt;
+    &lt;h3 class="text-xl font-semibold"&gt;Title&lt;/h3&gt;
+    ...content...
+    &lt;div class="modal-action"&gt;
+      &lt;form method="dialog"&gt;
+        &lt;button class="btn btn-sm btn-ghost"&gt;Close&lt;/button&gt;
+      &lt;/form&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;form method="dialog" class="modal-backdrop"&gt;
+    &lt;button&gt;close&lt;/button&gt;
+  &lt;/form&gt;
+&lt;/dialog&gt;</code></pre>
+        </div>
+      </section>
+    </div>
+
+    <%!-- ================================================ --%>
+    <%!-- ROWS SECTION --%>
+    <%!-- ================================================ --%>
+    <div :if={@active_section == "rows"} class="space-y-10">
+
+      <%!-- Session Row anatomy --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Session Row</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
+          <div class="text-xs text-base-content/50 mb-2 space-y-1">
+            <p>Four zones: <span class="text-base-content/70 font-medium">1</span> status stripe (border-l-2) &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">2</span> hover-reveal checkbox &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">3</span> content area &nbsp;|&nbsp; <span class="text-base-content/70 font-medium">4</span> hover-reveal action menu</p>
+          </div>
+
+          <%!-- Working row --%>
+          <div>
+            <p class="text-xs text-base-content/40 mb-1">working — border-warning</p>
+            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-warning rounded-r">
+              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">fix login bug</p>
+                <p class="text-xs text-base-content/50">working · 2m ago</p>
+              </div>
+              <span class="badge badge-sm badge-warning">working</span>
+              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                <button class="btn btn-ghost btn-xs btn-square">
+                  <.icon name="hero-ellipsis-horizontal" class="size-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <%!-- Idle row --%>
+          <div>
+            <p class="text-xs text-base-content/40 mb-1">idle — border-base-content/20</p>
+            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-base-content/20 rounded-r">
+              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">refactor auth module</p>
+                <p class="text-xs text-base-content/50">idle · 14m ago</p>
+              </div>
+              <span class="badge badge-sm badge-ghost">idle</span>
+              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                <button class="btn btn-ghost btn-xs btn-square">
+                  <.icon name="hero-ellipsis-horizontal" class="size-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <%!-- Failed row --%>
+          <div>
+            <p class="text-xs text-base-content/40 mb-1">failed — border-error</p>
+            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-error rounded-r">
+              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">deploy to production</p>
+                <p class="text-xs text-base-content/50">failed · 1h ago</p>
+              </div>
+              <span class="badge badge-sm badge-error">failed</span>
+              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                <button class="btn btn-ghost btn-xs btn-square">
+                  <.icon name="hero-ellipsis-horizontal" class="size-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code>group/row + group-hover/row: — named group required for nested hover reveal
+border-l-2 border-warning|border-base-content/20|border-error — status stripe
+md:opacity-0 md:group-hover/row:opacity-100 — hover-reveal pattern</code></pre>
+        </div>
+      </section>
+
+      <%!-- Task Cards --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Task Cards</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-6">
+
+          <%!-- List row --%>
+          <div>
+            <p class="text-xs text-base-content/40 mb-2">List row (full-width)</p>
+            <div class="flex items-center gap-3 px-3 py-2 hover:bg-base-200/40 rounded cursor-pointer border border-base-content/5 group/row">
+              <input type="checkbox" class="checkbox checkbox-sm checkbox-primary md:opacity-0 md:group-hover/row:opacity-100" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">Implement search debounce</p>
+              </div>
+              <span class="badge badge-sm badge-info">pending</span>
+              <span class="text-xs text-base-content/40">Apr 25</span>
+            </div>
+          </div>
+
+          <%!-- Grid card --%>
+          <div>
+            <p class="text-xs text-base-content/40 mb-2">Grid card (fixed width)</p>
+            <div class="w-56 p-3 border border-base-content/10 rounded-lg bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-start justify-between mb-2">
+                <span class="badge badge-xs badge-warning">In Progress</span>
+                <button class="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100">
+                  <.icon name="hero-ellipsis-horizontal" class="size-3" />
+                </button>
+              </div>
+              <p class="text-sm font-medium leading-snug mb-1">Add dark mode toggle</p>
+              <p class="text-xs text-base-content/40">2 subtasks</p>
+            </div>
+          </div>
+
+          <%!-- Kanban card --%>
+          <div>
+            <p class="text-xs text-base-content/40 mb-2">Kanban card (fixed width, more detail)</p>
+            <div class="w-64 p-3 border border-base-content/10 rounded-lg bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <div class="flex items-center justify-between mb-2">
+                <span class="badge badge-xs badge-success">Done</span>
+                <span class="text-xs text-base-content/40">Apr 24</span>
+              </div>
+              <p class="text-sm font-medium leading-snug mb-2">Fix session expiry edge case</p>
+              <p class="text-xs text-base-content/50 mb-3 line-clamp-2">Sessions were not expiring correctly when the user had multiple tabs open simultaneously.</p>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1 text-xs text-base-content/40">
+                  <.icon name="hero-document-text" class="size-3" />
+                  <span>3 notes</span>
+                </div>
+                <div class="flex -space-x-1">
+                  <div class="w-5 h-5 rounded-full bg-primary/30 border border-base-100 flex items-center justify-center">
+                    <span class="text-[9px] text-primary font-bold">U</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <%!-- ================================================ --%>
+    <%!-- LAYOUT SECTION --%>
+    <%!-- ================================================ --%>
+    <div :if={@active_section == "layout"} class="space-y-10">
+
+      <%!-- Modal pattern --%>
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Modals</h2>
+        <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
+          <button
+            class="btn btn-sm btn-outline"
+            onclick="document.getElementById('layout-demo-modal').showModal()"
+          >
+            Open layout demo modal
+          </button>
+
+          <dialog id="layout-demo-modal" class="modal modal-bottom sm:modal-middle">
+            <div class="modal-box max-w-lg">
+              <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold">New Item</h2>
+                <form method="dialog">
+                  <button class="btn btn-ghost btn-sm btn-circle">
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
+                </form>
+              </div>
+              <p class="text-sm text-base-content/60 mb-4">
+                Form content goes here. Uses <code class="font-mono bg-base-content/[0.07] px-1 rounded">modal-box max-w-lg</code> with a <code class="font-mono bg-base-content/[0.07] px-1 rounded">modal_header</code>-style close button.
+              </p>
+              <div class="space-y-3">
+                <div class="fieldset mb-2">
+                  <label>
+                    <span class="label mb-1">Name</span>
+                    <input type="text" class="w-full input text-base" placeholder="Enter a name…" />
+                  </label>
+                </div>
+              </div>
+              <div class="modal-action">
+                <form method="dialog" class="flex gap-2">
+                  <button class="btn btn-ghost btn-sm">Cancel</button>
+                  <button class="btn btn-primary btn-sm">Create</button>
+                </form>
+              </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+              <button>close</button>
+            </form>
+          </dialog>
+
+          <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code>modal modal-bottom sm:modal-middle   ← responsive: bottom sheet on mobile, centered on sm+
+modal-box max-w-lg                   ← constrained width
+modal-backdrop form[method=dialog]   ← click-outside to close
+modal-action                         ← right-aligned action buttons</code></pre>
+        </div>
+      </section>
+    </div>
+
+  </main>
+</div>

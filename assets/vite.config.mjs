@@ -17,6 +17,19 @@ export default defineConfig({
       "phoenix",
       "phoenix_html",
       "phoenix_live_view",
+      // CM6 core — must be in the same pre-bundled chunk as svelte-codemirror-editor
+      // to avoid duplicate @codemirror/state instances (breaks instanceof checks)
+      "@codemirror/state",
+      "@codemirror/view",
+      "@codemirror/language",
+      // Language packages — pre-bundle so dynamic imports resolve to the same instance
+      "@codemirror/lang-javascript",
+      "@codemirror/lang-css",
+      "@codemirror/lang-html",
+      "@codemirror/lang-json",
+      "@codemirror/lang-markdown",
+      "codemirror-lang-elixir",
+      // Theme packages
       "@codemirror/theme-one-dark",
       "@uiw/codemirror-theme-dracula",
       "@uiw/codemirror-theme-tokyo-night",
@@ -57,6 +70,9 @@ export default defineConfig({
       "@": ".",
       "phoenix-colocated": `${process.env.MIX_BUILD_PATH}/phoenix-colocated`,
     },
+    // Force single instance of CM6 core packages — prevents duplicate @codemirror/state
+    // which breaks instanceof checks when language/theme extensions are loaded dynamically.
+    dedupe: ["@codemirror/state", "@codemirror/view", "@codemirror/language"],
   },
   assetsInclude: [],
   plugins: [

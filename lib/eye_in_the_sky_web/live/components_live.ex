@@ -14,7 +14,8 @@ defmodule EyeInTheSkyWeb.ComponentsLive do
      assign(socket,
        active_section: "foundation",
        page_title: "Component Library",
-       sections: @sections
+       sections: @sections,
+       form: Phoenix.Component.to_form(%{}, as: :demo)
      )}
   end
 

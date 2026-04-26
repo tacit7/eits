@@ -40,7 +40,7 @@
               <button class="btn btn-sm btn-ghost">Ghost</button>
               <button class="btn btn-sm btn-outline">Outline</button>
               <button class="btn btn-sm btn-error">Error</button>
-              <button class="btn btn-xs btn-ghost btn-square">
+              <button aria-label="Actions menu" class="btn btn-xs btn-ghost btn-square">
                 <.icon name="hero-ellipsis-horizontal" class="size-4" />
               </button>
               <button class="btn btn-sm btn-primary btn-disabled" disabled>Disabled</button>
@@ -187,23 +187,22 @@ badge badge-xs badge-warning   → xs size</code></pre>
       <section>
         <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Form Inputs</h2>
         <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
-          <.form for={%{}} as={:demo} phx-change="noop" phx-submit="noop">
+          <.form for={@form} id="demo-form" phx-change="noop" phx-submit="noop">
             <div class="grid grid-cols-2 gap-4">
-              <.input name="demo[text]" label="Text input" placeholder="Type something…" />
+              <.input field={@form[:text]} label="Text input" placeholder="Type something…" />
               <.input
-                name="demo[select]"
+                field={@form[:select]}
                 type="select"
                 label="Select"
                 options={["Option A", "Option B", "Option C"]}
-                value=""
               />
               <.input
-                name="demo[textarea]"
+                field={@form[:textarea]}
                 type="textarea"
                 label="Textarea"
                 placeholder="Long form text…"
               />
-              <.input name="demo[checkbox]" type="checkbox" label="Checkbox" value="false" />
+              <.input field={@form[:checkbox]} type="checkbox" label="Checkbox" />
             </div>
           </.form>
         </div>
@@ -313,7 +312,7 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
         <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
           <div class="flex items-start gap-4">
             <details phx-update="ignore" id="demo-dropdown" class="dropdown dropdown-end">
-              <summary class="btn btn-ghost btn-sm btn-square">
+              <summary aria-label="Open menu" class="btn btn-ghost btn-sm btn-square">
                 <.icon name="hero-ellipsis-horizontal" class="size-4" />
               </summary>
               <ul class="dropdown-content menu bg-base-100 border border-base-content/10 rounded-lg shadow-lg w-48 z-50">
@@ -412,7 +411,7 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
               </div>
               <span class="badge badge-sm badge-warning">working</span>
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <button class="btn btn-ghost btn-xs btn-square">
+                <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
                   <.icon name="hero-ellipsis-horizontal" class="size-4" />
                 </button>
               </div>
@@ -432,7 +431,7 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
               </div>
               <span class="badge badge-sm badge-ghost">idle</span>
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <button class="btn btn-ghost btn-xs btn-square">
+                <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
                   <.icon name="hero-ellipsis-horizontal" class="size-4" />
                 </button>
               </div>
@@ -452,7 +451,7 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
               </div>
               <span class="badge badge-sm badge-error">failed</span>
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <button class="btn btn-ghost btn-xs btn-square">
+                <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
                   <.icon name="hero-ellipsis-horizontal" class="size-4" />
                 </button>
               </div>
@@ -486,10 +485,10 @@ md:opacity-0 md:group-hover/row:opacity-100 — hover-reveal pattern</code></pre
           <%!-- Grid card --%>
           <div>
             <p class="text-xs text-base-content/40 mb-2">Grid card (fixed width)</p>
-            <div class="w-56 p-3 border border-base-content/10 rounded-lg bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+            <div class="group w-56 p-3 border border-base-content/10 rounded-lg bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
               <div class="flex items-start justify-between mb-2">
                 <span class="badge badge-xs badge-warning">In Progress</span>
-                <button class="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100">
+                <button aria-label="Card actions" class="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100">
                   <.icon name="hero-ellipsis-horizontal" class="size-3" />
                 </button>
               </div>
@@ -546,7 +545,7 @@ md:opacity-0 md:group-hover/row:opacity-100 — hover-reveal pattern</code></pre
               <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-semibold">New Item</h2>
                 <form method="dialog">
-                  <button class="btn btn-ghost btn-sm btn-circle">
+                  <button aria-label="Close modal" class="btn btn-ghost btn-sm btn-circle">
                     <.icon name="hero-x-mark" class="size-4" />
                   </button>
                 </form>

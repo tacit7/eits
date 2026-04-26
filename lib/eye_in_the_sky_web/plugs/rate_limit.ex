@@ -169,7 +169,7 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimit do
       _ -> :error
     end
   rescue
-    _ -> :error
+    DBConnection.ConnectionError -> :error
   end
 
   defp ip_string(conn) do

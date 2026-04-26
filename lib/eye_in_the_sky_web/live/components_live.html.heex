@@ -403,7 +403,7 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
             <p class="text-xs text-base-content/40 mb-1">working — border-warning</p>
             <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-warning rounded-r">
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" />
+                <.square_checkbox checked={false} />
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">fix login bug</p>
@@ -423,7 +423,7 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
             <p class="text-xs text-base-content/40 mb-1">idle — border-base-content/20</p>
             <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-base-content/20 rounded-r">
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" />
+                <.square_checkbox checked={false} />
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">refactor auth module</p>
@@ -443,7 +443,7 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
             <p class="text-xs text-base-content/40 mb-1">failed — border-error</p>
             <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer border-l-2 border-error rounded-r">
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" />
+                <.square_checkbox checked={false} />
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">deploy to production</p>
@@ -473,7 +473,7 @@ md:opacity-0 md:group-hover/row:opacity-100 — hover-reveal pattern</code></pre
           <div>
             <p class="text-xs text-base-content/40 mb-2">List row (full-width)</p>
             <div class="flex items-center gap-3 px-3 py-2 hover:bg-base-200/40 rounded cursor-pointer border border-base-content/5 group/row">
-              <input type="checkbox" class="checkbox checkbox-sm checkbox-primary md:opacity-0 md:group-hover/row:opacity-100" />
+              <.square_checkbox checked={false} class="md:opacity-0 md:group-hover/row:opacity-100" />
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">Implement search debounce</p>
               </div>

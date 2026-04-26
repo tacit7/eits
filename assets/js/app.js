@@ -83,6 +83,7 @@ import {IndeterminateCheckbox} from "./hooks/indeterminate_checkbox"
 import {ShiftSelect} from "./hooks/shift_select"
 import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
+import {VimNav} from "./hooks/vim_nav"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -154,6 +155,7 @@ Hooks.IndeterminateCheckbox = IndeterminateCheckbox
 Hooks.ShiftSelect = ShiftSelect
 Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
+Hooks.VimNav = VimNav
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {

@@ -1,6 +1,10 @@
 <div
+  id="app-shell"
   class="flex h-[var(--app-viewport-height)] bg-base-100"
   data-palette-shortcut={@palette_shortcut}
+  data-vim-nav-enabled={EyeInTheSky.Settings.get_boolean("vim_nav_enabled")}
+  data-vim-project-path={assigns[:sidebar_project] && "/projects/#{assigns[:sidebar_project].id}"}
+  phx-hook="VimNav"
 >
   <a
     href="#main-content"

@@ -103,7 +103,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
 
     test "normalizes empty theme to dark on mount", %{conn: conn} do
       EyeInTheSky.Settings.put("theme", "")
-      {:ok, _lv, html} = live(auth_conn(conn), ~p"/settings")
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings")
+      # render/1 flushes pending handle_info(:set_default_theme) before asserting persistence
+      html = render(lv)
       assert EyeInTheSky.Settings.get("theme") == "dark"
       assert html =~ "Appearance"
     end

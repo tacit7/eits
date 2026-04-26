@@ -186,22 +186,13 @@ export const VimNav = {
     this.sequenceTimer = setTimeout(() => this.clearSequence(), 1000)
   },
 
-  // Top-level routes that have a /workspace/<segment> equivalent for the no-project fallback.
-  // /workspace/agents does NOT exist (router has no such route), so "agents" is project-only.
-  WORKSPACE_FALLBACK_SEGMENTS: new Set(["sessions", "tasks", "notes"]),
-
   buildPath(path: string, relative?: boolean): string | null {
     if (!relative) return path
     const projectPath = (this.el as HTMLElement).dataset.vimProjectPath
+    if (!projectPath) return null
+    const base = projectPath.replace(/\/$/, "")
     const segment = path.replace(/^\//, "")
-    if (projectPath) {
-      const base = projectPath.replace(/\/$/, "")
-      return `${base}/${segment}`
-    }
-    if (this.WORKSPACE_FALLBACK_SEGMENTS.has(segment)) {
-      return `/workspace/${segment}`
-    }
-    return null
+    return `${base}/${segment}`
   },
 
   executeCommand(cmd: Command) {

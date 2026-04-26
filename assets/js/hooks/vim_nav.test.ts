@@ -112,16 +112,12 @@ describe("VimNav.buildPath", () => {
     expect(h.buildPath("/tasks", true)).toBe("/projects/42/tasks")
   })
 
-  it("falls back to /workspace/<segment> for known workspace routes", () => {
+  it("returns null for all relative paths when no project context", () => {
     const h = makeHook()
-    expect(h.buildPath("tasks", true)).toBe("/workspace/tasks")
-    expect(h.buildPath("notes", true)).toBe("/workspace/notes")
-    expect(h.buildPath("sessions", true)).toBe("/workspace/sessions")
-  })
-
-  it("returns null for relative agents with no project (no /workspace/agents route)", () => {
-    const h = makeHook()
+    expect(h.buildPath("tasks", true)).toBeNull()
+    expect(h.buildPath("notes", true)).toBeNull()
     expect(h.buildPath("agents", true)).toBeNull()
+    expect(h.buildPath("sessions", true)).toBeNull()
   })
 })
 

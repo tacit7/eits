@@ -1,5 +1,6 @@
 defmodule EyeInTheSky.Accounts do
   @moduledoc false
+  require Logger
   import Ecto.Query
 
   alias EyeInTheSky.Accounts.{Passkey, RegistrationToken, User, UserSession}
@@ -24,9 +25,31 @@ defmodule EyeInTheSky.Accounts do
   def get_or_create_user(username) do
     case get_user_by_username(username) do
       {:error, :not_found} ->
-        %User{}
-        |> User.changeset(%{username: username, display_name: username})
-        |> Repo.insert()
+        result =
+          %User{}
+          |> User.changeset(%{username: username, display_name: username})
+          |> Repo.insert()
+
+        case result do
+          {:ok, user} ->
+            case EyeInTheSky.Workspaces.create_default_workspace_for_user(user) do
+              {:ok, _workspace} ->
+                {:ok, user}
+
+              {:error, reason} ->
+                Logger.error(
+                  "accounts: failed to create default workspace for user #{user.id}: #{inspect(reason)}"
+                )
+
+                # User creation succeeded; workspace creation failing is not a reason
+                # to roll back the user. The user can still log in; workspace setup
+                # can be retried on first project creation.
+                {:ok, user}
+            end
+
+          error ->
+            error
+        end
 
       {:ok, user} ->
         {:ok, user}

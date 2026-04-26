@@ -14,6 +14,8 @@ defmodule EyeInTheSky.Projects.Project do
     field :active, :boolean, default: true
     field :bookmarked, :boolean, default: false
 
+    belongs_to :workspace, EyeInTheSky.Workspaces.Workspace
+
     has_many :agents, EyeInTheSky.Agents.Agent
     has_many :sessions, EyeInTheSky.Sessions.Session
     # Note: commits now use session_id as primary key (session-centric model)
@@ -35,9 +37,10 @@ defmodule EyeInTheSky.Projects.Project do
       :repo_url,
       :branch,
       :active,
-      :bookmarked
+      :bookmarked,
+      :workspace_id
     ])
-    |> validate_required([:name])
+    |> validate_required([:name, :workspace_id])
     |> unique_constraint(:path)
   end
 end

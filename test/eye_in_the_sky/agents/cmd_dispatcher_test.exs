@@ -217,10 +217,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
     test "accepts a numeric session id target" do
       sender = new_session()
       receiver = new_session()
+      receiver_id = receiver.id
 
-      dispatch(~s(EITS-CMD: dm --to #{receiver.id} --message "hello by id"), sender.id)
+      dispatch(~s(EITS-CMD: dm --to #{receiver_id} --message "hello by id"), sender.id)
 
-      assert_receive {:session_new_dm, ^receiver.id, msg}, 500
+      assert_receive {:session_new_dm, ^receiver_id, msg}, 500
       assert msg.to_session_id == receiver.id
       assert msg.from_session_id == sender.id
       assert String.contains?(msg.body, "hello by id")
@@ -229,10 +230,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
     test "accepts a session uuid target" do
       sender = new_session()
       receiver = new_session()
+      receiver_id = receiver.id
 
       dispatch(~s(EITS-CMD: dm --to #{receiver.uuid} --message "hello by uuid"), sender.id)
 
-      assert_receive {:session_new_dm, ^receiver.id, msg}, 500
+      assert_receive {:session_new_dm, ^receiver_id, msg}, 500
       assert msg.to_session_id == receiver.id
       assert msg.from_session_id == sender.id
       assert String.contains?(msg.body, "hello by uuid")

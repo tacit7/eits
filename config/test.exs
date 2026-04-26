@@ -55,3 +55,8 @@ config :eye_in_the_sky, EyeInTheSky.Messages.NotifyListener, enabled: false
 
 # Disable API key auth in test (RequireAuth plug passes through when nil)
 config :eye_in_the_sky, :api_key, nil
+
+# Skip IAM seed task in test — sandbox is :manual; the task has no checked-out
+# connection and crashes, eventually hitting the supervisor restart limit and
+# tearing down the Repo before any test runs.
+config :eye_in_the_sky, :run_iam_seeds, false

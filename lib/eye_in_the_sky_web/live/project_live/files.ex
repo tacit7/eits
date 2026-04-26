@@ -355,7 +355,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       props={%{
         content: @file_content,
         lang: language_class(@file_type),
-        filePath: @file_path || "",
+        path: @file_path || "",
         readonly: false
       }}
       class="h-full"

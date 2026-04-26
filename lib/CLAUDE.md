@@ -7,6 +7,10 @@
 - `lib/eye_in_the_sky/search/pg_search.ex` - Full-text search (`EyeInTheSky.Search.PgSearch`)
 - `lib/eye_in_the_sky/sessions/queries.ex` - SessionQueries (Ecto-based session operations)
 
+## Workspace Scope
+
+Workspace-level LiveViews use a `Scope` struct injected by `WorkspaceLive.Hooks` on_mount. See [`docs/WORKSPACE_SCOPE.md`](../docs/WORKSPACE_SCOPE.md) for the full contract: Scope struct fields, cross-workspace ownership validation patterns (pin match in actions, MapSet guard in components), and canonical query functions.
+
 ## Schema Conventions
 
 ### Timestamp Types

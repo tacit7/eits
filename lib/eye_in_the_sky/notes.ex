@@ -290,6 +290,42 @@ defmodule EyeInTheSky.Notes do
     |> Enum.map(&to_string/1)
   end
 
+  # --- Scope-aware queries ---
+
+  @doc """
+  Lists project-parented notes for a given `EyeInTheSky.Scope`.
+
+  - Project scope: returns notes where parent_type = "project" and parent_id matches.
+  - Workspace scope: returns project notes across all projects in the workspace.
+    Joins to projects via a type-cast since parent_id is stored as a string.
+
+  Options: `:limit` (default 200), `:sort` ("newest" | "oldest").
+  """
+  def list_notes_for_scope(scope, opts \\ [])
+
+  def list_notes_for_scope(%EyeInTheSky.Scope{type: :project, project_id: pid}, opts) do
+    list_notes_for_project(pid, opts)
+  end
+
+  def list_notes_for_scope(%EyeInTheSky.Scope{type: :workspace, workspace_id: wid}, opts) do
+    limit_val = Keyword.get(opts, :limit, 200)
+    sort = Keyword.get(opts, :sort, "newest")
+    order = if sort == "oldest", do: [asc: :created_at], else: [desc: :created_at]
+
+    # Filter parent_type in a WHERE clause BEFORE the fragment cast so Postgres
+    # never attempts to cast non-numeric parent_ids (session notes, task notes, etc.)
+    # to bigint. The join then only touches rows already known to be project notes.
+    project_ids =
+      from(p in EyeInTheSky.Projects.Project, where: p.workspace_id == ^wid, select: p.id)
+
+    Note
+    |> where([n], n.parent_type == "project")
+    |> where([n], fragment("?::bigint", n.parent_id) in subquery(project_ids))
+    |> order_by(^order)
+    |> limit(^limit_val)
+    |> Repo.all()
+  end
+
   # Resolves a task identifier (integer ID or UUID string) via the Tasks context.
   # Returns {integer_id, uuid_string} or nil if the task does not exist.
   defp resolve_task_ids(task_id) do

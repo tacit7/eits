@@ -243,6 +243,7 @@ defmodule EyeInTheSkyWeb.Router do
     get "/agents/:id", AgentController, :show
 
     # Messaging
+    get "/dm", MessagingController, :list_dms
     post "/dm", MessagingController, :dm
     get "/channels", MessagingController, :list_channels
     post "/channels", MessagingController, :create_channel

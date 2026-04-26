@@ -807,24 +807,36 @@ Options:
   --effort-level <level>       Effort level hint
   --parent-session-id <n>      Parent session integer ID (links spawned session)
   --parent-agent-id <n>        Parent agent ID
-  --team-name <name>           Join this team on spawn
+  --team-name <name>           Join this team on spawn (by name)
+  --team-id <id>               Join this team on spawn (by integer ID; resolved to name)
   --member-name <alias>        Team member display name
   --agent <name>               Agent definition name
   --name <n>                   Session name
   --yolo                       Bypass sandbox restrictions
   --dry-run                    Validate inputs without hitting spawn endpoint; print the curl command
 
+Valid models (--provider claude, default):
+  claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5-20250929,
+  claude-haiku-4-5-20251001, opus, opus[1m], sonnet, sonnet[1m], haiku
+
+Valid models (--provider codex):
+  gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
+
+Valid models (--provider gemini):
+  gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+
 Examples:
   eits agents spawn --instructions "Review PR #42" --parent-session-id $EITS_SESSION_ID
   eits agents spawn --instructions-file /tmp/agent.txt --worktree fix/my-bug --stash-if-dirty
   eits agents spawn --instructions "Fix bug" --worktree fix/my-bug --team-name "audit"
+  eits agents spawn --instructions "Fix bug" --team-id 5
   eits agents spawn --instructions-file /tmp/agent.txt --interpolate-env
   eits agents spawn --instructions "Deploy" --team-name test --dry-run
 USAGE
         return 0; }
       local instructions="" instructions_set=0 instructions_file="" interpolate_env="false" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" stash_if_dirty="false" effort_level="" parent_session_id="" parent_agent_id=""
-      local team_name="" member_name="" agent_name="" session_name="" bypass_sandbox="false" dry_run="false"
+      local team_name="" team_id="" member_name="" agent_name="" session_name="" bypass_sandbox="false" dry_run="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --instructions)      instructions="$2"; instructions_set=1; shift 2 ;;
@@ -840,6 +852,7 @@ USAGE
           --parent-session-id) parent_session_id="$2";  shift 2 ;;
           --parent-agent-id)   parent_agent_id="$2";    shift 2 ;;
           --team-name)         team_name="$2";          shift 2 ;;
+          --team-id)           team_id="$2";            shift 2 ;;
           --member-name)       member_name="$2";        shift 2 ;;
           --agent)             agent_name="$2";         shift 2 ;;
           --name)              session_name="$2";       shift 2 ;;
@@ -857,6 +870,17 @@ USAGE
         instructions="$(cat "$instructions_file")"
       fi
       need instructions
+
+      # Resolve --team-id to team name (mutually exclusive with --team-name)
+      if [[ -n "$team_id" && -n "$team_name" ]]; then
+        die "--team-id and --team-name are mutually exclusive"
+      fi
+      if [[ -n "$team_id" ]]; then
+        local _team_info
+        _team_info=$(_curl "$BASE_URL/teams/$team_id" 2>/dev/null || true)
+        team_name=$(echo "$_team_info" | jq -r '.name // empty' 2>/dev/null || true)
+        [[ -n "$team_name" ]] || die "--team-id $team_id: team not found"
+      fi
 
       # Dry-run validations
       if [[ "$dry_run" == "true" ]]; then
@@ -1006,7 +1030,7 @@ cmd_commits() {
       ;;
     create)
       # eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] ...
-      # --agent defaults to $EITS_AGENT_UUID
+      # --agent defaults to $EITS_AGENT_UUID; falls back to session lookup when unset
       local agent_id="${EITS_AGENT_UUID:-}" hashes=() messages=()
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -1016,6 +1040,9 @@ cmd_commits() {
           *) die "unknown flag: $1" ;;
         esac
       done
+      if [[ -z "$agent_id" && -n "${EITS_SESSION_UUID:-}" ]]; then
+        agent_id=$(_curl "$BASE_URL/sessions/${EITS_SESSION_UUID}" 2>/dev/null | jq -r '.agent_id // empty' 2>/dev/null || true)
+      fi
       [[ -n "$agent_id" ]] || die "agent_id is required (or set EITS_AGENT_UUID)"
       if [[ ${#hashes[@]} -eq 0 ]]; then
         local auto_hash
@@ -1131,6 +1158,22 @@ cmd_jobs() {
 # ── dm ────────────────────────────────────────────────────────────────────────
 
 cmd_dm() {
+  # eits dm list [--session <uuid|id>] [--limit <n>]
+  if [[ "${1:-}" == "list" || "${1:-}" == "--list" ]]; then
+    shift || true
+    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --session|-s) session="$2"; shift 2 ;;
+        --limit|-n)   limit="$2";   shift 2 ;;
+        *) die "unknown flag: $1" ;;
+      esac
+    done
+    need session
+    _get "/dm?session=${session}&limit=${limit}"
+    return
+  fi
+
   # eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   # --from defaults to $EITS_SESSION_UUID or $EITS_SESSION_ID when omitted
   local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" to="" message="" response_required="false"
@@ -1937,6 +1980,7 @@ Commands:
   agents        list|get|spawn
   commits       list|create
   jobs          list|get|create|update|run|delete
+  dm            list [--session <uuid|id>] [--limit <n>]
   dm            [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   channels      list|send|messages
   notifications create

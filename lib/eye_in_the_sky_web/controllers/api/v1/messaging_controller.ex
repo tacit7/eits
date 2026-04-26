@@ -12,6 +12,46 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
+  GET /api/v1/dm - List inbound DMs for a session.
+  Query params:
+    - session (required): integer session ID or UUID
+    - limit (optional): max messages to return, default 20
+  """
+  def list_dms(conn, params) do
+    session_raw = params["session"] || params["session_id"]
+    limit = min(String.to_integer(params["limit"] || "20"), 100)
+
+    if is_nil(session_raw) or session_raw == "" do
+      {:error, :bad_request, "session is required"}
+    else
+      case Sessions.resolve(session_raw) do
+        {:ok, session} ->
+          messages = Messages.list_inbound_dms(session.id, limit)
+
+          json(conn, %{
+            session_id: session.id,
+            session_uuid: session.uuid,
+            count: length(messages),
+            messages:
+              Enum.map(messages, fn msg ->
+                %{
+                  id: msg.id,
+                  uuid: msg.uuid,
+                  body: msg.body,
+                  from_session_id: msg.from_session_id,
+                  to_session_id: msg.to_session_id,
+                  inserted_at: msg.inserted_at
+                }
+              end)
+          })
+
+        {:error, :not_found} ->
+          {:error, :not_found, "session not found"}
+      end
+    end
+  end
+
+  @doc """
   POST /api/v1/dm - Send a direct message to an agent session.
   Body:
     - from_session_id (required): integer session ID or UUID of the sending session

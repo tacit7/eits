@@ -67,9 +67,10 @@
         "&": { fontSize: fontSize + 'px' },
         ".cm-scroller": { fontFamily: 'monospace' },
       }),
-      // Prec.highest ensures this is injected last in the stylesheet, beating
-      // any theme package that sets .cm-gutters or .cm-gutterElement color.
-      Prec.highest(EditorView.theme({
+      // Prec.lowest → sorted to the end of the resolved extension list →
+      // StyleModule mounted last → CSS rules appear last in the stylesheet →
+      // wins over same-specificity rules from theme packages (oneDark, dracula, etc).
+      Prec.lowest(EditorView.theme({
         ".cm-gutters": { color: "oklch(var(--bc))" },
         ".cm-gutterElement": { color: "oklch(var(--bc))" },
         ".cm-activeLineGutter": { color: "oklch(var(--bc))" },

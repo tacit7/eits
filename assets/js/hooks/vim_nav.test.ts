@@ -223,19 +223,15 @@ describe("VimNav.executeCommand shell routing", () => {
     expect(h.pushEvent).not.toHaveBeenCalled()
   })
 
-  it("n a toggles checkbox via instanceof HTMLInputElement", () => {
-    const cb = document.createElement("input")
-    cb.type = "checkbox"
-    cb.id = "new-agent-drawer"
-    cb.checked = false
-    document.body.appendChild(cb)
+  it("n a dispatches palette:create-agent window event", () => {
+    const listener = vi.fn()
+    window.addEventListener("palette:create-agent", listener)
     const h = makeHook()
     h.pushEventToShell = vi.fn()
     const cmd = COMMANDS.find(c => c.id === "create.agent")!
     h.executeCommand(cmd)
-    expect(cb.checked).toBe(true)
-    h.executeCommand(cmd)
-    expect(cb.checked).toBe(false)
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener("palette:create-agent", listener)
   })
 
   it("command_palette dispatches palette:open event", () => {

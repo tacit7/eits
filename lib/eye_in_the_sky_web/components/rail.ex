@@ -480,7 +480,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       id="app-rail"
       phx-hook="RailState"
       phx-target={@myself}
-      class="flex flex-row h-full relative"
+      class="flex flex-row h-full min-w-0 relative"
     >
       <div
         :if={@mobile_open && @flyout_open}
@@ -647,7 +647,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div
           id={"file-editor-#{Base.url_encode64(@active_tab.path, padding: false)}"}
           phx-update="ignore"
-          class="flex-1 overflow-hidden [&>div]:h-full"
+          class="flex-1 min-w-0 overflow-hidden [&>div]:h-full"
         >
           <.svelte
             name="FileEditor"

@@ -110,7 +110,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       case Messages.find_recent_dm(to_session.id, dm_body, seconds: 30) do
         nil ->
-          case deliver_and_persist_dm(to_session.id, from_session.id, dm_body, metadata) do
+          case DMDelivery.deliver_and_persist(to_session.id, from_session.id, dm_body, metadata) do
             {:ok, msg} ->
               success_response(conn, to_session, msg)
 
@@ -312,7 +312,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       for member <- members do
         dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
 
-        case deliver_and_persist_dm(
+        case DMDelivery.deliver_and_persist(
                member.session_id,
                sender_session_id,
                dm_body,
@@ -360,7 +360,22 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
                 m.session &&
                 m.session.status not in Sessions.terminated_statuses()
             end)
-            |> Enum.each(&deliver_team_dm(&1.session_id, sender_session_id, dm_body, channel_id))
+            |> Enum.each(fn member ->
+              case DMDelivery.deliver_and_persist(
+                     member.session_id,
+                     sender_session_id,
+                     dm_body,
+                     %{channel_id: channel_id, broadcast: true}
+                   ) do
+                {:ok, _} ->
+                  :ok
+
+                {:error, reason} ->
+                  Logger.warning(
+                    "team broadcast failed for session #{member.session_id}: #{inspect(reason)}"
+                  )
+              end
+            end)
           else
             Logger.warning(
               "broadcast_to_team: session #{sender_session_id} is not a member of team #{team_id}, skipping"
@@ -371,23 +386,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
           Logger.warning("broadcast_to_team: team #{team_id} not found, skipping fanout")
       end
     end)
-  end
-
-  defp deliver_team_dm(target_session_id, from_session_id, dm_body, channel_id) do
-    case deliver_and_persist_dm(
-           target_session_id,
-           from_session_id,
-           dm_body,
-           %{channel_id: channel_id, broadcast: true}
-         ) do
-      {:ok, _} ->
-        :ok
-
-      {:error, reason} ->
-        Logger.warning(
-          "team broadcast failed for session #{target_session_id}: #{inspect(reason)}"
-        )
-    end
   end
 
   @doc """
@@ -459,7 +457,4 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     })
   end
 
-  defp deliver_and_persist_dm(to_session_id, from_session_id, dm_body, metadata) do
-    DMDelivery.deliver_and_persist(to_session_id, from_session_id, dm_body, metadata)
-  end
 end

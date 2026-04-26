@@ -28,4 +28,9 @@ defmodule EyeInTheSkyWeb.ComponentsLive do
   def handle_event("noop", _params, socket) do
     {:noreply, socket}
   end
+
+  @impl true
+  def handle_event(_event, _params, socket) do
+    {:noreply, socket}
+  end
 end

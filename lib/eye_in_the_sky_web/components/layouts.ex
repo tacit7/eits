@@ -25,7 +25,7 @@ defmodule EyeInTheSkyWeb.Layouts do
   - Sessions: `search_query`, `session_filter`
   - Tasks: `search_query`, `filter_state_id`, `workflow_states`, `sort_by`
   - Kanban: `search_query`, `show_completed`, `bulk_mode`, `active_filter_count`, `sidebar_project`
-  - DM: `dm_active_tab`, `dm_session_name`, `dm_message_search_query`
+  - DM: `dm_active_tab`, `dm_session_name`, `dm_message_search_query`, `dm_active_timer`
   - Generic: `search_query`
 
   Hidden on mobile (the mobile header handles that instead).
@@ -51,6 +51,7 @@ defmodule EyeInTheSkyWeb.Layouts do
   attr :dm_active_tab, :string, default: nil
   attr :dm_session_name, :string, default: nil
   attr :dm_message_search_query, :string, default: nil
+  attr :dm_active_timer, :map, default: nil
 
   def top_bar(assigns) do
     ~H"""
@@ -143,7 +144,9 @@ defmodule EyeInTheSkyWeb.Layouts do
         {"messages", "Messages"},
         {"tasks", "Tasks"},
         {"commits", "Commits"},
-        {"notes", "Notes"}
+        {"notes", "Notes"},
+        {"context", "Context"},
+        {"settings", "Settings"}
       ] do %>
         <button
           phx-click="change_tab"
@@ -159,6 +162,56 @@ defmodule EyeInTheSkyWeb.Layouts do
       <% end %>
     </div>
     <div class="flex-1" />
+    <%!-- ... menu --%>
+    <div class="dropdown dropdown-end">
+      <button
+        tabindex="0"
+        class="btn btn-ghost btn-square w-7 h-7 text-base-content/50 hover:text-base-content/75"
+        aria-label="More options"
+      >
+        <.icon name="hero-ellipsis-horizontal" class="w-4 h-4" />
+      </button>
+      <ul
+        tabindex="0"
+        class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-xs"
+      >
+        <li>
+          <button
+            phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+          >
+            <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload
+          </button>
+        </li>
+        <li>
+          <button
+            phx-click="export_markdown"
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+          >
+            <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
+          </button>
+        </li>
+        <li><div class="divider my-0"></div></li>
+        <li>
+          <button
+            phx-click="open_schedule_timer"
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+          >
+            <.icon name="hero-clock" class="w-3.5 h-3.5" /> Schedule Message
+          </button>
+        </li>
+        <%= if @dm_active_timer do %>
+          <li>
+            <button
+              phx-click="cancel_timer"
+              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded"
+            >
+              <.icon name="hero-x-circle" class="w-3.5 h-3.5" /> Cancel Schedule
+            </button>
+          </li>
+        <% end %>
+      </ul>
+    </div>
     """
   end
 

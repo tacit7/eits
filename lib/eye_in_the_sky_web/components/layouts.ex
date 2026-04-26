@@ -227,12 +227,14 @@ defmodule EyeInTheSkyWeb.Layouts do
     ~H"""
     <%!-- Notes: search + quick note + starred + type + sort --%>
     <form phx-change="search" class="w-44">
+      <label for="notes-top-bar-search" class="sr-only">Search notes</label>
       <div class="relative">
         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
           <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
         </div>
         <input
           type="text"
+          id="notes-top-bar-search"
           name="query"
           value={@search_query || ""}
           phx-debounce="300"
@@ -251,6 +253,7 @@ defmodule EyeInTheSkyWeb.Layouts do
     <div class="w-px h-4 bg-base-content/10 mx-0.5" />
     <button
       phx-click="toggle_starred_filter"
+      aria-label={if @notes_starred_filter, do: "Remove starred filter", else: "Filter by starred"}
       class={"flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium transition-colors " <>
         if(@notes_starred_filter,
           do: "bg-warning/10 text-warning",
@@ -263,7 +266,9 @@ defmodule EyeInTheSkyWeb.Layouts do
       />
     </button>
     <form phx-change="filter_type">
+      <label for="notes-type-filter" class="sr-only">Filter by type</label>
       <select
+        id="notes-type-filter"
         name="value"
         class="select select-xs h-7 min-h-0 bg-base-200/50 border-base-content/8 text-base-content/70 text-[11px] pr-6"
       >
@@ -276,7 +281,9 @@ defmodule EyeInTheSkyWeb.Layouts do
       </select>
     </form>
     <form phx-change="sort_notes">
+      <label for="notes-sort" class="sr-only">Sort notes</label>
       <select
+        id="notes-sort"
         name="value"
         class="select select-xs h-7 min-h-0 bg-base-200/50 border-base-content/8 text-base-content/70 text-[11px] pr-6"
       >

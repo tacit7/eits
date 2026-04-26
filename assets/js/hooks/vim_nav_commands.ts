@@ -3,7 +3,7 @@
 export type NavigateAction = {
   kind: "navigate"
   path: string
-  relative?: boolean  // if true, prepend data-vim-project-path from shell el
+  relative?: boolean  // if true, resolve against current project path
 }
 
 export type PushEventAction = {
@@ -34,7 +34,7 @@ export interface Command {
 export const COMMANDS: Command[] = [
   // g — page navigation
   { id: "nav.sessions", label: "Go to Sessions", keys: ["g", "s"], group: "navigation",
-    action: { kind: "navigate", path: "/sessions" } },
+    action: { kind: "navigate", path: "sessions", relative: true } },
   { id: "nav.tasks",    label: "Go to Tasks",    keys: ["g", "t"], group: "navigation",
     action: { kind: "navigate", path: "tasks", relative: true } },
   { id: "nav.notes",    label: "Go to Notes",    keys: ["g", "n"], group: "navigation",

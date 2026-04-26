@@ -14,7 +14,11 @@ defmodule EyeInTheSky.Repo.Migrations.AddWorkspaceIdToProjects do
       add :workspace_id, references(:workspaces, on_delete: :delete_all), null: true
     end
 
-    # Step 3: Backfill all projects to the workspace of the lowest-id user (primary user)
+    # Step 3: Backfill all projects to the workspace owned by the lowest-id user.
+    # EITS is a single-user application — there is exactly one human user in the DB
+    # (plus synthetic test-seed accounts). Assigning all projects to that user's
+    # workspace is correct. If multi-user support is added in the future, this
+    # migration will need a project-to-user join instead.
     execute("""
     UPDATE projects
     SET workspace_id = (

@@ -40,7 +40,7 @@ defmodule EyeInTheSky.Projects.Project do
       :bookmarked,
       :workspace_id
     ])
-    |> validate_required([:name])
+    |> validate_required([:name, :workspace_id])
     |> unique_constraint(:path)
   end
 end

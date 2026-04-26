@@ -34,6 +34,7 @@
     "codemirror": "^6.0.2",
     "codemirror-lang-diff": "^1.0.0",
     "codemirror-lang-elixir": "^4.0.1",
+    "dompurify": "^3.4.1",
     "highlight.js": "^11.11.1",
     "live_svelte": "file:../deps/live_svelte",
     "marked": "^17.0.1",

@@ -1,5 +1,5 @@
 // assets/js/hooks/vim_nav.ts
-import { COMMANDS, type Command } from "./vim_nav_commands"
+import { COMMANDS, PREFIXES, type Command } from "./vim_nav_commands"
 
 const EDITABLE_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"])
 
@@ -76,15 +76,19 @@ export const VimNav = {
   // Phoenix provides no official TS types for hook lifecycle properties.
   el: null as unknown as LiveViewHook["el"],
   pushEvent: null as unknown as LiveViewHook["pushEvent"],
+  pushEventToShell: null as ((event: string, payload: object) => void) | null,
   mode: "normal" as Mode,
   buffer: [] as string[],
   sequenceTimer: null as ReturnType<typeof setTimeout> | null,
   statusbarEl: null as HTMLElement | null,
   helpOverlayEl: null as HTMLElement | null,
+  whichKeyEl: null as HTMLElement | null,
+  whichKeyTimer: null as ReturnType<typeof setTimeout> | null,
   _onKeydown: null as ((e: KeyboardEvent) => void) | null,
   _onFocusin: null as ((e: FocusEvent) => void) | null,
   _onFocusout: null as ((e: FocusEvent) => void) | null,
   _onHelpClose: null as ((e: KeyboardEvent) => void) | null,
+  _onWhichKeyClose: null as ((e: KeyboardEvent) => void) | null,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -116,6 +120,7 @@ export const VimNav = {
     if (this._onFocusout) document.removeEventListener("focusout", this._onFocusout)
     if (this.sequenceTimer) clearTimeout(this.sequenceTimer)
     this.hideHelp()
+    this.hideWhichKey()
     this.statusbarEl?.remove()
     this.statusbarEl = null
     this._onKeydown = null
@@ -163,6 +168,11 @@ export const VimNav = {
 
     event.preventDefault()
     this.buffer.push(key)
+    if (this.buffer.length === 1 && PREFIXES.has(key)) {
+      this.showWhichKey(key)
+    } else {
+      this.hideWhichKey()
+    }
     this.resetSequenceTimer()
 
     const cmd = COMMANDS.find(c =>
@@ -179,6 +189,7 @@ export const VimNav = {
   clearSequence() {
     this.buffer = []
     if (this.sequenceTimer) { clearTimeout(this.sequenceTimer); this.sequenceTimer = null }
+    this.hideWhichKey()
   },
 
   resetSequenceTimer() {
@@ -209,15 +220,23 @@ export const VimNav = {
       return
     }
     if (action.kind === "push_event") {
-      if (typeof this.pushEvent === "function") {
-        this.pushEvent(action.event, action.payload ?? {})
-      }
+      const fn = action.target === "shell" ? this.pushEventToShell : this.pushEvent
+      if (typeof fn === "function") fn(action.event, action.payload ?? {})
       return
     }
     if (action.kind === "client") {
       if (action.name === "help") { this.showHelp(); return }
       if (action.name === "history_back") { history.back(); return }
       if (action.name === "history_forward") { history.forward(); return }
+      if (action.name === "command_palette") {
+        document.getElementById("command-palette")?.dispatchEvent(new CustomEvent("palette:open"))
+        return
+      }
+      if (action.name === "new_agent_drawer") {
+        const cb = document.getElementById("new-agent-drawer") as HTMLInputElement | null
+        if (cb) cb.checked = !cb.checked
+        return
+      }
     }
   },
 
@@ -282,5 +301,76 @@ export const VimNav = {
     }
     this.helpOverlayEl?.remove()
     this.helpOverlayEl = null
+  },
+
+  showWhichKey(prefix: string) {
+    if (this.whichKeyTimer) clearTimeout(this.whichKeyTimer)
+    this.whichKeyTimer = setTimeout(() => this._renderWhichKey(prefix), 300)
+  },
+
+  _renderWhichKey(prefix: string) {
+    this.whichKeyTimer = null
+    // Remove any existing which-key overlay
+    this.whichKeyEl?.remove()
+    this.whichKeyEl = null
+
+    const prefixCmds = COMMANDS.filter(cmd => cmd.keys.length > 1 && cmd.keys[0] === prefix)
+    if (prefixCmds.length === 0) return
+
+    const overlay = document.createElement("div")
+    overlay.id = "vim-nav-which-key"
+    overlay.setAttribute("aria-hidden", "true")
+    overlay.style.cssText = [
+      "position:fixed",
+      "bottom:48px",
+      "left:50%",
+      "transform:translateX(-50%)",
+      "z-index:9999",
+      "font-family:monospace",
+      "font-size:12px",
+      "background:var(--b2,#1f2937)",
+      "border:1px solid var(--b3,#374151)",
+      "border-radius:6px",
+      "padding:8px 12px",
+      "display:flex",
+      "flex-direction:column",
+      "gap:4px",
+      "pointer-events:none",
+      "color:var(--bc,#e5e7eb)",
+      "min-width:200px",
+    ].join(";")
+
+    const header = document.createElement("div")
+    header.style.cssText = "font-size:10px;color:rgba(156,163,175,.6);margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em"
+    header.textContent = `${prefix} →`
+    overlay.appendChild(header)
+
+    for (const cmd of prefixCmds) {
+      const row = document.createElement("div")
+      row.style.cssText = "display:flex;align-items:center;gap:8px"
+      const key = cmd.keys[1] ?? ""
+      row.innerHTML = `<kbd style="display:inline-block;padding:1px 5px;border:1px solid rgba(156,163,175,.4);border-radius:3px;font-size:11px;background:rgba(255,255,255,.05);min-width:18px;text-align:center">${escapeHtml(key)}</kbd><span style="color:rgba(229,231,235,.8)">${escapeHtml(cmd.label)}</span>`
+      overlay.appendChild(row)
+    }
+
+    this._onWhichKeyClose = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (["Shift", "Control", "Meta", "Alt"].includes(e.key)) return
+      // Don't preventDefault — let the key continue to handleKey
+      this.hideWhichKey()
+    }
+    document.addEventListener("keydown", this._onWhichKeyClose, { capture: true })
+    document.body.appendChild(overlay)
+    this.whichKeyEl = overlay
+  },
+
+  hideWhichKey() {
+    if (this.whichKeyTimer) { clearTimeout(this.whichKeyTimer); this.whichKeyTimer = null }
+    if (this._onWhichKeyClose) {
+      document.removeEventListener("keydown", this._onWhichKeyClose, { capture: true } as EventListenerOptions)
+      this._onWhichKeyClose = null
+    }
+    this.whichKeyEl?.remove()
+    this.whichKeyEl = null
   },
 }

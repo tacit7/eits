@@ -15,7 +15,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "new_agent_drawer"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -45,9 +45,47 @@ export const COMMANDS: Command[] = [
     action: { kind: "navigate", path: "agents", relative: true } },
   { id: "nav.settings", label: "Go to Settings", keys: ["g", ","], group: "navigation",
     action: { kind: "navigate", path: "/settings" } },
+  // t — toggle rail sections
+  { id: "toggle.sessions",    label: "Toggle Sessions",        keys: ["t", "s"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "sessions" }, target: "shell" } },
+  { id: "toggle.tasks",       label: "Toggle Tasks",           keys: ["t", "t"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "tasks" }, target: "shell" } },
+  { id: "toggle.notes",       label: "Toggle Notes",           keys: ["t", "n"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "notes" }, target: "shell" } },
+  { id: "toggle.files",       label: "Toggle Files",           keys: ["t", "f"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "files" }, target: "shell" } },
+  { id: "toggle.canvas",      label: "Toggle Canvas",          keys: ["t", "w"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "canvas" }, target: "shell" } },
+  { id: "toggle.chat",        label: "Toggle Chat",            keys: ["t", "c"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "chat" }, target: "shell" } },
+  { id: "toggle.skills",      label: "Toggle Skills",          keys: ["t", "k"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "skills" }, target: "shell" } },
+  { id: "toggle.teams",       label: "Toggle Teams",           keys: ["t", "m"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "teams" }, target: "shell" } },
+  { id: "toggle.jobs",        label: "Toggle Jobs",            keys: ["t", "j"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "jobs" }, target: "shell" } },
+  { id: "toggle.proj_picker", label: "Toggle Project Picker",  keys: ["t", "p"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_proj_picker", payload: {}, target: "shell" } },
+
+  // n — create actions
+  { id: "create.session", label: "New Session", keys: ["n", "s"], group: "create",
+    action: { kind: "push_event", event: "toggle_new_session_drawer", payload: {}, target: "shell" } },
+  { id: "create.task",    label: "New Task",    keys: ["n", "t"], group: "create",
+    action: { kind: "push_event", event: "toggle_new_task_drawer", payload: {}, target: "shell" } },
+  { id: "create.note",    label: "New Note",    keys: ["n", "n"], group: "create",
+    action: { kind: "push_event", event: "open_quick_note_modal", payload: {}, target: "shell" } },
+  { id: "create.agent",   label: "New Agent",   keys: ["n", "a"], group: "create",
+    action: { kind: "client", name: "new_agent_drawer" } },
+
   // global
-  { id: "global.help",  label: "Keybinding Help", keys: ["?"], group: "global",
+  { id: "global.help",    label: "Keybinding Help",  keys: ["?"], group: "global",
     action: { kind: "client", name: "help" } },
+  { id: "global.palette", label: "Command Palette",  keys: [":"], group: "global",
+    action: { kind: "client", name: "command_palette" } },
+  { id: "global.back",    label: "Go Back",          keys: ["["], group: "global",
+    action: { kind: "client", name: "history_back" } },
+  { id: "global.forward", label: "Go Forward",       keys: ["]"], group: "global",
+    action: { kind: "client", name: "history_forward" } },
 ]
 
 // All valid first keys in multi-key sequences

@@ -5,9 +5,9 @@
   },
   "devDependencies": {
     "@catppuccin/daisyui": "^2.1.1",
-    "heroicons": "^2.2.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "daisyui": "^5.5.8",
+    "heroicons": "^2.2.0",
     "jsdom": "^29.0.1",
     "phoenix_vite": "file:../deps/phoenix_vite",
     "shadcn-svelte": "^1.0.11",
@@ -41,6 +41,7 @@
     "phoenix": "file:../deps/phoenix",
     "phoenix_html": "file:../deps/phoenix_html",
     "phoenix_live_view": "file:../deps/phoenix_live_view",
-    "sortablejs": "^1.15.7"
+    "sortablejs": "^1.15.7",
+    "svelte-codemirror-editor": "^2.1.0"
   }
 }

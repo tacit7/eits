@@ -40,7 +40,7 @@ _backoff() {
 _curl() {
   local _body _status _attempt=0 _delay=2
   while [[ $_attempt -lt 4 ]]; do
-    _body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" "${SESSION_ARGS[@]}" "$@")
+    _body=$(curl -sk --write-out '\n%{http_code}' ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} ${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"} "$@")
     _status="${_body##*$'\n'}"
     _body="${_body%$'\n'*}"
     if [[ "$_status" == "429" ]]; then

@@ -149,6 +149,7 @@
   {/if}
   {#if langExtension !== undefined && themeExtension !== undefined}
     <CodeMirror
+      class="flex-1 min-h-0 overflow-hidden"
       value={content}
       lang={langExtension}
       theme={themeExtension}
@@ -158,7 +159,7 @@
       lineNumbers={true}
       useTab={true}
       styles={{
-        "&": { height: "100%", flex: "1 1 0%", minHeight: "0", backgroundColor: "oklch(var(--b1))" },
+        "&": { height: "100%", backgroundColor: "oklch(var(--b1))" },
         ".cm-scroller": { overflow: "auto" },
         ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))" },
         ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))" },

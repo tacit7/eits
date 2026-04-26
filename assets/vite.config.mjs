@@ -13,7 +13,16 @@ export default defineConfig({
     cors: true,
   },
   optimizeDeps: {
-    include: ["phoenix", "phoenix_html", "phoenix_live_view"],
+    include: [
+      "phoenix",
+      "phoenix_html",
+      "phoenix_live_view",
+      "@codemirror/theme-one-dark",
+      "@uiw/codemirror-theme-dracula",
+      "@uiw/codemirror-theme-tokyo-night",
+      "@uiw/codemirror-theme-eclipse",
+      "@uiw/codemirror-theme-bespin",
+    ],
   },
   build: isSSR
     ? {

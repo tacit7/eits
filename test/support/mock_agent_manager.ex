@@ -14,7 +14,7 @@ defmodule EyeInTheSky.Agents.MockAgentManager do
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Sessions
 
-  def send_message(session_id, _message, _opts \\ []) do
+  def send_message(_session_id, _message, _opts \\ []) do
     case Process.get(:mock_send_message_response, {:error, :no_worker}) do
       {:ok, _} = ok -> ok
       {:error, _} = err -> err

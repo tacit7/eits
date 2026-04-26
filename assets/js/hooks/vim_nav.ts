@@ -238,6 +238,14 @@ export const VimNav = {
         if (cb instanceof HTMLInputElement) cb.checked = !cb.checked
         return
       }
+      if (action.name === "quick_create_note") {
+        window.dispatchEvent(new Event("palette:create-note"))
+        return
+      }
+      if (action.name === "quick_create_task") {
+        window.dispatchEvent(new Event("palette:create-task"))
+        return
+      }
     }
   },
 

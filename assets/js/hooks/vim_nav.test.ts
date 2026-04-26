@@ -255,6 +255,28 @@ describe("VimNav.executeCommand shell routing", () => {
     expect(listener).toHaveBeenCalledTimes(1)
     window.removeEventListener("palette:create-chat", listener)
   })
+
+  it("n n dispatches palette:create-note window event", () => {
+    const listener = vi.fn()
+    window.addEventListener("palette:create-note", listener)
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "create.note")!
+    h.executeCommand(cmd)
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener("palette:create-note", listener)
+  })
+
+  it("n t dispatches palette:create-task window event", () => {
+    const listener = vi.fn()
+    window.addEventListener("palette:create-task", listener)
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "create.task")!
+    h.executeCommand(cmd)
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener("palette:create-task", listener)
+  })
 })
 
 describe("VimNav which-key overlay", () => {

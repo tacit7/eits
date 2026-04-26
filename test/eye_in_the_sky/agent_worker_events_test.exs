@@ -75,12 +75,12 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
       assert reload_session(session).status == "idle"
     end
 
-    test "sets status to waiting for codex provider" do
+    test "sets status to idle for codex provider (no longer parks in waiting)" do
       {_agent, session} = create_session(%{status: "working", provider: "codex"})
 
       AgentWorkerEvents.on_sdk_completed(session.id, session.uuid, "codex")
 
-      assert reload_session(session).status == "waiting"
+      assert reload_session(session).status == "idle"
     end
 
     test "sets last_activity_at when transitioning to idle" do
@@ -221,7 +221,8 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
         provider: "claude",
         text: "hello world",
         metadata: metadata,
-        channel_id: nil
+        channel_id: nil,
+        source_uuid: nil
       })
 
       # Task.Supervisor async — allow it to complete
@@ -238,7 +239,8 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
         provider: "claude",
         text: "   ",
         metadata: %{},
-        channel_id: nil
+        channel_id: nil,
+        source_uuid: nil
       })
 
       Process.sleep(100)
@@ -254,7 +256,8 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
         provider: "claude",
         text: "[NO_RESPONSE]",
         metadata: %{},
-        channel_id: nil
+        channel_id: nil,
+        source_uuid: nil
       })
 
       Process.sleep(100)

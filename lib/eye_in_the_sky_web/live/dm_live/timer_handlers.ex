@@ -37,6 +37,8 @@ defmodule EyeInTheSkyWeb.DmLive.TimerHandlers do
 
   def handle_cancel_timer(socket) do
     OrchestratorTimers.cancel(socket.assigns.session_id)
-    {:noreply, socket}
+    # Clear immediately; the PubSub :timer_cancelled handle_info will also fire
+    # but setting nil twice is idempotent.
+    {:noreply, assign(socket, :active_timer, nil)}
   end
 end

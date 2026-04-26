@@ -18,7 +18,7 @@ config :eye_in_the_sky, EyeInTheSky.Repo,
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: 4002],
+  http: [ip: {127, 0, 0, 1}, port: 4005],
   secret_key_base: "nkJhfq4VPfLzvgOOJSPVSc2C8F1X1/VWumsFBiDAmTZDbJHzcF4i0aYV0DIyFUfG",
   server: false
 
@@ -45,7 +45,7 @@ config :eye_in_the_sky,
   agent_manager_module: EyeInTheSky.Agents.MockAgentManager,
   # Core-layer config keys — keeps core modules free of EyeInTheSkyWeb.Endpoint atom references
   secret_key_base: "nkJhfq4VPfLzvgOOJSPVSc2C8F1X1/VWumsFBiDAmTZDbJHzcF4i0aYV0DIyFUfG",
-  server_base_url: "http://localhost:4002"
+  server_base_url: "http://localhost:4005"
 
 # Disable Oban queues in test (use Oban.Testing for manual testing)
 config :eye_in_the_sky, Oban, testing: :manual

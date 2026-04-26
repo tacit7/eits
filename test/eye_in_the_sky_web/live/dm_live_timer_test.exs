@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.DmLive.TimerTest do
     assert render(view) =~ "Schedule Message"
 
     view
-    |> form("#schedule-timer-form", %{mode: "once", preset: "5m"})
+    |> form("#schedule-timer-form", %{mode: "once", preset: "15m"})
     |> render_submit()
 
     html = render(view)

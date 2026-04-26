@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   alias EyeInTheSky.Repo
 
   import Ecto.Query
+  import EyeInTheSky.Factory
 
   defp api_conn do
     token = "test_iam_key_#{System.unique_integer([:positive])}"
@@ -43,10 +44,15 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
 
   # ── basic routing + auth ────────────────────────────────────────────────────
 
-  test "rejects unauthenticated requests", %{conn: _conn} do
+  # The IAM decide endpoint is intentionally unauthenticated — it is called by Claude CLI
+  # hooks which run without user sessions (see router.ex :accepts_json pipeline).
+  # This test previously asserted a 401, but the endpoint is designed to be open.
+  test "IAM decide endpoint is accessible without auth (intentionally unauthenticated)", %{
+    conn: _conn
+  } do
     conn = Phoenix.ConnTest.build_conn()
     conn = post(conn, "/api/v1/iam/decide", bash_pre_tool_use_payload())
-    assert conn.status == 401
+    assert conn.status == 200
   end
 
   # ── allow decision (no policies → fallback allow) ───────────────────────────
@@ -66,12 +72,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   # ── deny decision ────────────────────────────────────────────────────────────
 
   test "returns deny permissionDecision when a deny policy matches", %{conn: conn} do
-    {:ok, project} =
-      Repo.insert(%EyeInTheSky.Projects.Project{
-        id: System.unique_integer([:positive, :monotonic]),
-        name: "iam-test-project-#{System.unique_integer()}",
-        path: "/tmp/iam-test-#{System.unique_integer()}"
-      })
+    project = project_fixture(%{name: "iam-test-project-#{System.unique_integer()}", path: "/tmp/iam-test-#{System.unique_integer()}"})
 
     {:ok, _policy} =
       Repo.insert(%EyeInTheSky.IAM.Policy{
@@ -256,12 +257,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   end
 
   test "returns continue: false (stopReason) for Stop deny", %{conn: conn} do
-    {:ok, project} =
-      Repo.insert(%EyeInTheSky.Projects.Project{
-        id: System.unique_integer([:positive, :monotonic]),
-        name: "iam-test-stop-#{System.unique_integer()}",
-        path: "/tmp/iam-test-stop-#{System.unique_integer()}"
-      })
+    project = project_fixture(%{name: "iam-test-stop-#{System.unique_integer()}", path: "/tmp/iam-test-stop-#{System.unique_integer()}"})
 
     {:ok, _policy} =
       Repo.insert(%EyeInTheSky.IAM.Policy{
@@ -292,12 +288,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   end
 
   test "returns additionalContext for Stop instruct", %{conn: conn} do
-    {:ok, project} =
-      Repo.insert(%EyeInTheSky.Projects.Project{
-        id: System.unique_integer([:positive, :monotonic]),
-        name: "iam-test-instruct-#{System.unique_integer()}",
-        path: "/tmp/iam-test-instruct-#{System.unique_integer()}"
-      })
+    project = project_fixture(%{name: "iam-test-instruct-#{System.unique_integer()}", path: "/tmp/iam-test-instruct-#{System.unique_integer()}"})
 
     {:ok, _policy} =
       Repo.insert(%EyeInTheSky.IAM.Policy{

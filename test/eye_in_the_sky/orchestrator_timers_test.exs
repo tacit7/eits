@@ -48,12 +48,12 @@ defmodule EyeInTheSky.OrchestratorTimersTest do
   describe "cancel/1" do
     test "removes the timer from state", %{server: pid} do
       GenServer.call(pid, {:schedule_once, 999, 60_000, "test"})
-      assert :ok = GenServer.call(pid, {:cancel, 999})
+      assert {:ok, :cancelled} = GenServer.call(pid, {:cancel, 999})
       assert nil == GenServer.call(pid, {:get_timer, 999})
     end
 
     test "is a no-op when no timer active", %{server: pid} do
-      assert :ok = GenServer.call(pid, {:cancel, 999})
+      assert {:ok, :noop} = GenServer.call(pid, {:cancel, 999})
     end
   end
 

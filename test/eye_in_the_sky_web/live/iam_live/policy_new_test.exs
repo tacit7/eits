@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNewTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import EyeInTheSky.Factory
 
   alias EyeInTheSky.IAM
 
@@ -88,7 +89,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNewTest do
     end
 
     test "project scope persists project_id and leaves project_path wildcard", %{conn: conn} do
-      project = EyeInTheSky.Repo.insert!(%EyeInTheSky.Projects.Project{name: "scope-test", active: true})
+      project = project_fixture(%{name: "scope-test"})
 
       {:ok, view, _html} = live(conn, ~p"/iam/policies/new")
 

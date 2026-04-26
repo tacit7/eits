@@ -123,7 +123,9 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
   defp do_fire(session_id, %Timer{} = record, state) do
     Logger.info("[OrchestratorTimers] timer fired session=#{session_id} mode=#{record.mode}")
 
-    case AgentManager.send_message(session_id, record.message, []) do
+    agent_manager = Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
+
+    case agent_manager.send_message(session_id, record.message, []) do
       {:ok, _} ->
         Logger.debug("[OrchestratorTimers] delivery succeeded session=#{session_id}")
 

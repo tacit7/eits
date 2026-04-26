@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectsSectionTest do
   end
 
   describe "flat list with no project selected" do
-    test "renders project rows as links" do
+    test "renders project rows as buttons with correct project ids" do
       p1 = build_project("alpha")
       p2 = build_project("beta")
 
@@ -41,8 +41,8 @@ defmodule EyeInTheSkyWeb.Components.ProjectsSectionTest do
 
       assert html =~ "alpha"
       assert html =~ "beta"
-      assert html =~ ~r/href="\/projects\/#{p1.id}"/
-      assert html =~ ~r/href="\/projects\/#{p2.id}"/
+      assert html =~ ~r/phx-value-project_id="#{p1.id}"/
+      assert html =~ ~r/phx-value-project_id="#{p2.id}"/
     end
 
     test "does not render any docked panel when sidebar_project is nil" do
@@ -108,7 +108,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectsSectionTest do
 
       assert html =~ ~r/href="\/projects\/#{p.id}"/
       assert html =~ ~r/href="\/projects\/#{p.id}\/sessions"/
-      assert html =~ ~r/href="\/projects\/#{p.id}\/tasks"/
+      assert html =~ ~r/href="\/projects\/#{p.id}\/kanban"/
       assert html =~ ~r/href="\/projects\/#{p.id}\/prompts"/
       assert html =~ ~r/href="\/projects\/#{p.id}\/notes"/
       assert html =~ ~r/href="\/projects\/#{p.id}\/files"/
@@ -136,8 +136,8 @@ defmodule EyeInTheSkyWeb.Components.ProjectsSectionTest do
       other = build_project("other")
       html = render_section(%{projects: [selected, other], sidebar_project: selected})
 
-      # Only one panel header with the selected project name
-      assert [_] = Regex.scan(~r/text-\[11px\] font-medium text-primary/, html)
+      # Only one docked panel container renders — unique bg-primary/[0.03] class
+      assert [_] = Regex.scan(~r/bg-primary\/\[0\.03\]/, html)
     end
   end
 

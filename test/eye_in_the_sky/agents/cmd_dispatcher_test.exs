@@ -217,11 +217,15 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
     test "accepts a numeric session id target" do
       sender = new_session()
       receiver = new_session()
-      receiver_id = receiver.id
 
-      dispatch(~s(EITS-CMD: dm --to #{receiver_id} --message "hello by id"), sender.id)
+      # Subscribe before dispatch so we receive the PubSub event
+      EyeInTheSky.Events.subscribe_session(receiver.id)
+      # Allow MockAgentManager to succeed for DM delivery
+      Process.put(:mock_send_message_response, {:ok, :sent})
 
-      assert_receive {:session_new_dm, ^receiver_id, msg}, 500
+      dispatch(~s(EITS-CMD: dm --to #{receiver.id} --message "hello by id"), sender.id)
+
+      assert_receive {:new_dm, msg}, 1_000
       assert msg.to_session_id == receiver.id
       assert msg.from_session_id == sender.id
       assert String.contains?(msg.body, "hello by id")
@@ -230,11 +234,15 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
     test "accepts a session uuid target" do
       sender = new_session()
       receiver = new_session()
-      receiver_id = receiver.id
+
+      # Subscribe before dispatch so we receive the PubSub event
+      EyeInTheSky.Events.subscribe_session(receiver.id)
+      # Allow MockAgentManager to succeed for DM delivery
+      Process.put(:mock_send_message_response, {:ok, :sent})
 
       dispatch(~s(EITS-CMD: dm --to #{receiver.uuid} --message "hello by uuid"), sender.id)
 
-      assert_receive {:session_new_dm, ^receiver_id, msg}, 500
+      assert_receive {:new_dm, msg}, 1_000
       assert msg.to_session_id == receiver.id
       assert msg.from_session_id == sender.id
       assert String.contains?(msg.body, "hello by uuid")

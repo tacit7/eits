@@ -45,8 +45,12 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
     result =
       if int_id = parse_int(id), do: Agents.get_agent(int_id), else: Agents.get_agent_by_uuid(id)
 
-    with {:ok, agent} <- result do
-      json(conn, %{success: true, agent: ApiPresenter.present_agent(agent)})
+    case result do
+      {:ok, agent} ->
+        json(conn, %{success: true, agent: ApiPresenter.present_agent(agent)})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Agent not found"})
     end
   end
 

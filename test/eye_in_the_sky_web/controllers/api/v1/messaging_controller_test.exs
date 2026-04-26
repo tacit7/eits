@@ -47,7 +47,9 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
         EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManager
       )
 
-      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :agent_manager_module) end)
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, EyeInTheSky.Agents.MockAgentManager)
+      end)
 
       agent = create_agent()
       sender_agent = create_agent()
@@ -112,6 +114,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
     end
 
     test "returns 500 when agent manager fails to route the message", %{conn: conn} do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
       Application.put_env(
         :eye_in_the_sky,
         :agent_manager_module,
@@ -119,7 +123,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       )
 
       on_exit(fn ->
-        Application.delete_env(:eye_in_the_sky, :agent_manager_module)
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
       end)
 
       agent = create_agent()

@@ -33,6 +33,7 @@ Register a new session. Creates a ChatAgent (chat identity) and Agent (execution
   "uuid": "session-uuid",
   "agent_id": "agent-uuid",
   "agent_uuid": "agent-uuid",
+  "project_id": 1,
   "status": "working"
 }
 ```
@@ -363,6 +364,54 @@ Parent type plurals are normalized automatically: `"sessions"` -> `"session"`, `
 curl -X POST localhost:5001/api/v1/notes \
   -H 'Content-Type: application/json' \
   -d '{"parent_type":"sessions","parent_id":"42","body":"found the root cause"}'
+```
+
+---
+
+### PATCH /api/v1/notes/:id
+
+Update an existing note (body, title, starred, parent_type, parent_id).
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Note ID |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `body` | string | no | Note content (markdown) |
+| `title` | string | no | Note title |
+| `starred` | integer | no | `0` or `1` |
+| `parent_type` | string | no | `session`, `agent`, or `task` (plurals normalized) |
+| `parent_id` | string | no | ID of the parent entity |
+
+**Response:** `200 OK`
+
+```json
+{
+  "id": 10,
+  "parent_type": "session",
+  "parent_id": "42",
+  "title": "Updated title",
+  "body": "updated content",
+  "starred": 1
+}
+```
+
+**Example:**
+
+```bash
+curl -X PATCH localhost:5001/api/v1/notes/10 \
+  -H 'Content-Type: application/json' \
+  -d '{"body":"updated finding","title":"New title","starred":1}'
+
+# Reparent a note
+curl -X PATCH localhost:5001/api/v1/notes/10 \
+  -H 'Content-Type: application/json' \
+  -d '{"parent_type":"task","parent_id":"42"}'
 ```
 
 ---

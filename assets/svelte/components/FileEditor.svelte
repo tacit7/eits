@@ -14,13 +14,17 @@
   let themeExtension = null
   let settingsExtensions = []
   let tabSize = 2
-  let value = content
+  // editorValue tracks what is currently in the CM6 editor for save operations.
+  // content (from LiveView) is passed directly to <CodeMirror value={content}> so
+  // svelte-codemirror-editor calls setState when the server pushes a new version.
+  // The old pattern of syncing value=content via a reactive reset editorValue on
+  // every keystroke because Svelte 4 reactive statements depend on all referenced
+  // variables — including value itself — so typing → value=newValue → reactive fires
+  // → value=content (reset). That would mean save() always sent stale content.
+  let editorValue = content
   let currentHash = hash
   let loadError = null
 
-  $: if (content !== value && content !== undefined) {
-    value = content
-  }
   $: if (hash !== currentHash && hash !== undefined) {
     currentHash = hash
   }
@@ -132,12 +136,12 @@
   })
 
   function handleChange(newValue) {
-    value = newValue
+    editorValue = newValue
   }
 
   function save() {
     if (readonly) return
-    live.pushEvent('file_save', { content: value, path: path, original_hash: currentHash })
+    live.pushEvent('file_save', { content: editorValue, path: path, original_hash: currentHash })
   }
 </script>
 
@@ -149,7 +153,7 @@
   {/if}
   {#if langExtension !== undefined && themeExtension !== undefined}
     <CodeMirror
-      class="flex-1 min-h-0 overflow-hidden"
+      class="flex-1 min-h-0"
       value={content}
       lang={langExtension}
       theme={themeExtension}

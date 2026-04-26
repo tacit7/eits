@@ -166,11 +166,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
     deleted =
       Enum.count(ids, fn task_id ->
-        try do
-          task = Tasks.get_task_by_uuid_or_id!(task_id)
-          match?({:ok, _}, Tasks.delete_task_with_associations(task))
-        rescue
-          _ -> false
+        case Tasks.get_task_by_uuid_or_id(task_id) do
+          {:ok, task} -> match?({:ok, _}, Tasks.delete_task_with_associations(task))
+          {:error, :not_found} -> false
         end
       end)
 

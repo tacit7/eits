@@ -233,10 +233,6 @@ export const VimNav = {
         document.getElementById("command-palette")?.dispatchEvent(new CustomEvent("palette:open"))
         return
       }
-      if (action.name === "quick_create_agent") {
-        window.dispatchEvent(new Event("palette:create-agent"))
-        return
-      }
       if (action.name === "quick_create_note") {
         window.dispatchEvent(new Event("palette:create-note"))
         return

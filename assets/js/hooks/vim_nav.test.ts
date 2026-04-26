@@ -223,15 +223,13 @@ describe("VimNav.executeCommand shell routing", () => {
     expect(h.pushEvent).not.toHaveBeenCalled()
   })
 
-  it("n a dispatches palette:create-agent window event", () => {
-    const listener = vi.fn()
-    window.addEventListener("palette:create-agent", listener)
+  it("n a calls pushEventToShell with toggle_new_session_drawer", () => {
     const h = makeHook()
     h.pushEventToShell = vi.fn()
     const cmd = COMMANDS.find(c => c.id === "create.agent")!
     h.executeCommand(cmd)
-    expect(listener).toHaveBeenCalledTimes(1)
-    window.removeEventListener("palette:create-agent", listener)
+    expect(h.pushEventToShell).toHaveBeenCalledWith("toggle_new_session_drawer", {})
+    expect(h.pushEvent).not.toHaveBeenCalled()
   })
 
   it("command_palette dispatches palette:open event", () => {

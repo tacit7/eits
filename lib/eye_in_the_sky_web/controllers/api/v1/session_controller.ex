@@ -135,7 +135,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         attrs
       end
 
-    if status in ["completed", "failed"] do
+    if status in Sessions.terminated_statuses() do
       Map.put(attrs, :ended_at, params["ended_at"] || DateTime.utc_now())
     else
       attrs
@@ -308,7 +308,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       status = params["final_status"] || "completed"
 
       attrs =
-        if status in ["completed", "failed"] do
+        if status in Sessions.terminated_statuses() do
           %{status: status, ended_at: DateTime.utc_now()}
         else
           %{status: status}
@@ -439,7 +439,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
     EyeInTheSky.Events.session_updated(updated)
 
-    if status in ["completed", "failed"] do
+    if status in Sessions.terminated_statuses() do
       handle_terminal_status(updated, status)
     end
   end

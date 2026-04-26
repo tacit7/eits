@@ -65,8 +65,7 @@ jobs:
         working-directory: assets
 
       - name: Build assets
-        run: npm run build
-        working-directory: assets
+        run: mix assets.build
 
       - name: Compile
         run: mix compile --warnings-as-errors

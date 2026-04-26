@@ -244,6 +244,17 @@ describe("VimNav.executeCommand shell routing", () => {
     h.executeCommand(cmd)
     expect(listener).toHaveBeenCalledTimes(1)
   })
+
+  it("n c dispatches palette:create-chat window event", () => {
+    const listener = vi.fn()
+    window.addEventListener("palette:create-chat", listener)
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "create.chat")!
+    h.executeCommand(cmd)
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener("palette:create-chat", listener)
+  })
 })
 
 describe("VimNav which-key overlay", () => {

@@ -241,6 +241,10 @@ export const VimNav = {
         window.dispatchEvent(new Event("palette:create-task"))
         return
       }
+      if (action.name === "quick_create_chat") {
+        window.dispatchEvent(new Event("palette:create-chat"))
+        return
+      }
     }
   },
 

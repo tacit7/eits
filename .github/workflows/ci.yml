@@ -36,6 +36,13 @@ jobs:
           elixir-version: "1.19"
           otp-version: "28"
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: assets/package-lock.json
+
       - name: Cache deps
         uses: actions/cache@v4
         with:
@@ -50,8 +57,16 @@ jobs:
           key: ${{ runner.os }}-build-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-build-
 
-      - name: Install deps
+      - name: Install Mix deps
         run: mix deps.get
+
+      - name: Install JS deps
+        run: npm ci
+        working-directory: assets
+
+      - name: Build assets
+        run: npm run build
+        working-directory: assets
 
       - name: Compile
         run: mix compile --warnings-as-errors

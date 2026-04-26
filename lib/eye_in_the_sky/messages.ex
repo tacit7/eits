@@ -64,6 +64,16 @@ defmodule EyeInTheSky.Messages do
   end
 
   @doc """
+  Returns the list of messages for a specific channel.
+  """
+  def list_messages_for_channel(channel_id) do
+    Message
+    |> where([m], m.channel_id == ^channel_id)
+    |> order_by([m], asc: m.inserted_at)
+    |> Repo.all()
+  end
+
+  @doc """
   Returns the list of messages for a specific project.
   """
   def list_messages_for_project(project_id) do

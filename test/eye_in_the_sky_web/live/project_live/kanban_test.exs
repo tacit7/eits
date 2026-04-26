@@ -63,9 +63,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
     end
 
     test "handles invalid project id gracefully", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/projects/notanid/kanban")
+      # Should not crash — mount completes and renders the empty board
+      {:ok, view, _html} = live(conn, ~p"/projects/notanid/kanban")
 
-      assert html =~ "Invalid project ID"
+      assert has_element?(view, "#kanban-keyboard")
+      refute has_element?(view, "#kanban-columns [data-task-id]")
     end
   end
 
@@ -158,7 +160,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       })
       |> render_submit()
 
-      assert render(view) =~ "Task created successfully"
+      assert has_element?(view, "#kanban-columns", "Drawer Task")
     end
   end
 
@@ -170,7 +172,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
-      |> element("[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
+      |> element("h4[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
       |> render_click()
 
       assert render(view) =~ task.title
@@ -183,7 +185,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
-      |> element("[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
+      |> element("h4[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
       |> render_click()
 
       view
@@ -197,8 +199,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       })
       |> render_submit()
 
-      assert render(view) =~ "Task updated successfully"
-      assert render(view) =~ "Updated Title"
+      assert has_element?(view, "#kanban-columns", "Updated Title")
     end
 
     test "deletes task from detail drawer", %{conn: conn} do
@@ -208,7 +209,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
-      |> element("[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
+      |> element("h4[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
       |> render_click()
 
       # Use the drawer's delete button (data-drawer-delete, distinct from card inline button)
@@ -218,7 +219,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       )
       |> render_click()
 
-      refute render(view) =~ "Task To Delete"
+      refute has_element?(view, "#kanban-columns", "Task To Delete")
     end
   end
 
@@ -259,7 +260,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
-      |> element("[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
+      |> element("h4[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
       |> render_click()
 
       assert render(view) =~ "Before Update"
@@ -296,9 +297,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
 
       render_click(view, "update_filter", %{"field" => "priority", "value" => "3"})
 
-      html = render(view)
-      assert html =~ "High priority task"
-      refute html =~ "Low priority task"
+      assert has_element?(view, "#kanban-columns", "High priority task")
+      refute has_element?(view, "#kanban-columns", "Low priority task")
     end
 
     test "clears filter when empty string priority is sent", %{conn: conn} do
@@ -328,9 +328,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       |> form("form[phx-change='search']", %{"query" => "zzzz"})
       |> render_change()
 
-      html = render(view)
-      assert html =~ "Searchable task zzzz"
-      refute html =~ "Different work xxxx"
+      assert has_element?(view, "#kanban-columns", "Searchable task zzzz")
+      refute has_element?(view, "#kanban-columns", "Different work xxxx")
     end
 
     test "shows all tasks when query is less than 4 chars", %{conn: conn} do

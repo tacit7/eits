@@ -1480,6 +1480,260 @@ end
 
 ---
 
+## Batch Updates: Repo.update_all over Raw SQL
+
+When updating multiple database rows based on a list (e.g., task reordering), prefer `Repo.update_all` in a transaction over raw SQL with parameterized placeholders.
+
+**Why:** Raw SQL with dynamic `$N` parameter indexing is fragile and prone to off-by-one errors. For small-to-medium batches (kanban columns, small lists), per-row `Repo.update_all` queries are fine and much safer.
+
+**Pattern (commit 3edb7807):**
+
+```elixir
+# ❌ Fragile: Raw SQL with dynamic placeholder indexing
+defp reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
+  now = DateTime.utc_now()
+
+  {placeholders, extra_params} =
+    ordered_uuids
+    |> Enum.with_index(1)
+    |> Enum.reduce({[], []}, fn {uuid, pos}, {phs, params} ->
+      base = 2 + length(params)
+      {phs ++ ["($#{base}, $#{base + 1})"], params ++ [uuid, pos]}
+    end)
+
+  sql = """
+  UPDATE tasks
+  SET position = v.pos,
+      updated_at = $1
+  FROM (VALUES #{Enum.join(placeholders, ", ")}) AS v(uuid_val, pos)
+  WHERE tasks.uuid = v.uuid_val::uuid
+  """
+
+  Ecto.Adapters.SQL.query!(Repo, sql, [now | extra_params])
+  :ok
+end
+```
+
+**✅ Safe: Repo.update_all in a transaction**
+
+```elixir
+defp reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
+  now = DateTime.utc_now()
+
+  Repo.transaction(fn ->
+    ordered_uuids
+    |> Enum.with_index(1)
+    |> Enum.each(fn {uuid, pos} ->
+      Repo.update_all(
+        from(t in "tasks", where: t.uuid == ^uuid),
+        set: [position: pos, updated_at: now]
+      )
+    end)
+  end)
+
+  :ok
+end
+```
+
+**Benefits:**
+- No dynamic parameter indexing — eliminates off-by-one risk
+- Ecto handles parameterization safely via `^uuid`
+- Transaction ensures atomicity of all position changes
+- Per-row updates are acceptable for small lists (kanban columns are typically < 50 items)
+
+**Rule:** For batch updates of small-to-medium lists, use `Repo.update_all` in a transaction. Reserve raw SQL only for complex queries that can't be expressed in Ecto.
+
+---
+
+## Shared Parameter Parsing Helpers
+
+**Problem:** Multiple controllers or contexts repeat the same parameter parsing logic (e.g., `Integer.parse/1` with error handling).
+
+**Solution:** Define the helper once in `ControllerHelpers` and reuse it across all callers.
+
+**Pattern (commit 63973f7f):**
+
+```elixir
+# ✅ Single definition in ControllerHelpers
+defmodule EyeInTheSkyWeb.ControllerHelpers do
+  def parse_int(raw) when is_integer(raw), do: raw
+
+  def parse_int(raw) when is_binary(raw) do
+    case Integer.parse(raw) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+end
+
+# ❌ Don't define local duplicates
+defmodule TaskController do
+  # WRONG: Re-implements parse_int locally
+  defp parse_int_param(n, _msg) when is_integer(n), do: {:ok, n}
+
+  defp parse_int_param(raw, msg) when is_binary(raw) do
+    case Integer.parse(raw) do
+      {n, ""} -> {:ok, n}
+      _ -> {:error, :bad_request, msg}
+    end
+  end
+end
+
+# ✅ Use the shared helper
+defmodule TaskController do
+  import EyeInTheSkyWeb.ControllerHelpers
+
+  defp parse_task_id_int(raw) do
+    case parse_int(raw) do
+      nil -> {:error, :bad_request, "invalid task_id"}
+      n -> {:ok, n}
+    end
+  end
+end
+```
+
+**When to extract:**
+- The same parsing logic appears in 2+ modules
+- It's a fundamental type conversion (int, uuid, slug)
+- It needs consistent error handling across the app
+
+**Rule:** Shared parameter parsing lives in `ControllerHelpers`. Don't duplicate `parse_int`, `parse_uuid`, or similar functions across controllers.
+
+---
+
+## State Derivation Helper Modules
+
+**Problem:** LiveView event handlers mix state mutation with complex state calculation (indeterminate checkboxes, off-screen counts, select-all toggles), making handlers large and hard to test.
+
+**Solution:** Extract all state derivation logic into a dedicated helper module with pure functions.
+
+**Pattern (commit 58d7bca8):**
+
+```elixir
+# ✅ Pure derivation module
+defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Selection do
+  @doc "Compute set of parent IDs with some — but not all — children selected."
+  def compute_indeterminate_ids(selected_ids, agents) do
+    agents
+    |> Enum.reject(&is_nil(&1.parent_session_id))
+    |> Enum.group_by(&normalize_id(&1.parent_session_id))
+    |> Enum.reduce(MapSet.new(), fn {parent_id, children}, acc ->
+      child_ids = MapSet.new(children, &normalize_id(&1.id))
+      selected_count = MapSet.size(MapSet.intersection(selected_ids, child_ids))
+
+      if selected_count > 0 and selected_count < MapSet.size(child_ids) do
+        MapSet.put(acc, parent_id)
+      else
+        acc
+      end
+    end)
+  end
+
+  @doc "Select all visible rows; toggle if all are already selected."
+  def select_all_visible(selected_ids, agents) do
+    visible_ids = ids_from_agents(agents)
+    all_visible_selected? = MapSet.subset?(visible_ids, selected_ids)
+
+    if all_visible_selected? do
+      MapSet.difference(selected_ids, visible_ids)
+    else
+      MapSet.union(selected_ids, visible_ids)
+    end
+  end
+
+  @doc "Clear selection state: used after bulk operations or mode exit."
+  def clear_selection(socket) do
+    socket
+    |> assign(:select_mode, false)
+    |> assign(:selected_ids, MapSet.new())
+    |> assign(:indeterminate_ids, MapSet.new())
+    |> assign(:off_screen_selected_count, 0)
+  end
+end
+
+# ✅ LiveView event handler delegates to the helper
+defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
+  def handle_event("select_all", _params, socket) do
+    new_selected = Selection.select_all_visible(socket.assigns.selected_ids, socket.assigns.agents)
+    indeterminate = Selection.compute_indeterminate_ids(new_selected, socket.assigns.agents)
+
+    socket =
+      socket
+      |> assign(:selected_ids, new_selected)
+      |> assign(:indeterminate_ids, indeterminate)
+      |> reinsert_visible_rows()
+
+    {:noreply, socket}
+  end
+end
+```
+
+**Why this pattern:**
+- **Testability:** Pure functions are easy to unit test (input → output, no socket magic)
+- **Reusability:** The derivation logic can be called from multiple event handlers
+- **Clarity:** Complex state logic is isolated and documented in one place
+- **Maintainability:** Changes to state rules don't scatter across event handlers
+
+**Rule:** Extract state derivation (MapSet operations, filtering, computation) into dedicated modules when 3+ assigns depend on the same calculation.
+
+---
+
+## LiveView Stream Helpers
+
+**Problem:** When the same stream operation (e.g., re-inserting visible rows) appears twice in different event handlers, it gets duplicated as a reduce loop.
+
+**Solution:** Extract the operation into a private helper function.
+
+**Pattern (commit 3243b7ad):**
+
+```elixir
+# ❌ Duplicate reduce loops in event handlers
+def handle_event("toggle_selection", %{"id" => id}, socket) do
+  new_selected = Selection.toggle_id(socket.assigns.selected_ids, id)
+
+  # DRY violation: this reduce loop appears in 2+ handlers
+  visible_agents = Enum.take(socket.assigns.agents, socket.assigns.visible_count)
+  socket =
+    Enum.reduce(visible_agents, socket, fn agent, acc ->
+      stream_insert(acc, :session_list, agent)
+    end)
+
+  {:noreply, socket}
+end
+
+# ✅ Extract helper
+defp reinsert_visible_rows(socket) do
+  Enum.take(socket.assigns.agents, socket.assigns.visible_count)
+  |> Enum.reduce(socket, fn agent, acc ->
+    stream_insert(acc, :session_list, agent)
+  end)
+end
+
+def handle_event("toggle_selection", %{"id" => id}, socket) do
+  new_selected = Selection.toggle_id(socket.assigns.selected_ids, id)
+  {:noreply, reinsert_visible_rows(assign(socket, :selected_ids, new_selected))}
+end
+
+def handle_event("select_range", _params, socket) do
+  # ... compute new selection
+  {:noreply, reinsert_visible_rows(assign(socket, :selected_ids, new_selected))}
+end
+```
+
+**When to extract:**
+- The stream operation appears in 2+ event handlers
+- It wraps the same data (visible_agents, visible_count)
+- It's called after any assign change that affects row rendering
+
+**Why this matters:**
+- Streams re-render entire items on `stream_insert`, not partial updates
+- After assign changes (select_mode, selected_ids), all visible rows need re-insertion to reflect the new state
+- Helper makes it clear that this is a deliberate re-render, not a typo
+
+**Rule:** Extract repeated stream operations to private helpers. Name them after the operation (`reinsert_visible_rows`, `remove_off_screen_agent`, etc.).
+
+---
+
 ## Module Extraction from Large Contexts
 
 When a context module grows large with distinct responsibilities, extract domain logic into sub-modules. Each sub-module focuses on a single concern (data transformation, parsing, building, validation) and is tested independently.
@@ -1526,6 +1780,7 @@ end
 | `AgentManager` | `AgentManager.RecordBuilder` | UUID/project/worktree resolution, agent + session record creation |
 | `AgentDefinitions` | `AgentDefinitions.FrontmatterParser` | Parse frontmatter YAML from definition files |
 | `Codex.SDK` | `Codex.ToolMapper` | Map tool descriptions for Codex API requests |
+| `ProjectLive.Sessions` | `ProjectLive.Sessions.Selection` | Pure state derivation (indeterminate IDs, select-all toggles) |
 
 ### When to Extract
 

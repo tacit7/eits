@@ -55,7 +55,7 @@
   }
 
   async function buildSettingsExtensions(size, fontSize, vimEnabled) {
-    const [{ EditorView }, { EditorState, Prec }, { indentUnit }] = await Promise.all([
+    const [{ EditorView }, { EditorState }, { indentUnit }] = await Promise.all([
       import('@codemirror/view'),
       import('@codemirror/state'),
       import('@codemirror/language'),
@@ -67,14 +67,6 @@
         "&": { fontSize: fontSize + 'px' },
         ".cm-scroller": { fontFamily: 'monospace' },
       }),
-      // Prec.lowest → sorted to the end of the resolved extension list →
-      // StyleModule mounted last → CSS rules appear last in the stylesheet →
-      // wins over same-specificity rules from theme packages (oneDark, dracula, etc).
-      Prec.lowest(EditorView.theme({
-        ".cm-gutters": { color: "oklch(var(--bc))" },
-        ".cm-gutterElement": { color: "oklch(var(--bc))" },
-        ".cm-activeLineGutter": { color: "oklch(var(--bc))" },
-      })),
     ]
     if (vimEnabled) {
       const { vim } = await import('@replit/codemirror-vim')

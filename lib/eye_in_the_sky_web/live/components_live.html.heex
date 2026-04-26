@@ -228,15 +228,15 @@ badge badge-xs badge-warning   → xs size</code></pre>
             <p class="text-xs text-base-content/40 mb-3">Loading spinners</p>
             <div class="flex items-center gap-6">
               <div class="flex flex-col items-center gap-1.5">
-                <span class="loading loading-spinner loading-xs"></span>
+                <.spinner size="xs" />
                 <span class="text-[10px] text-base-content/40">xs</span>
               </div>
               <div class="flex flex-col items-center gap-1.5">
-                <span class="loading loading-spinner loading-sm"></span>
+                <.spinner size="sm" />
                 <span class="text-[10px] text-base-content/40">sm</span>
               </div>
               <div class="flex flex-col items-center gap-1.5">
-                <span class="loading loading-spinner loading-md"></span>
+                <.spinner size="md" />
                 <span class="text-[10px] text-base-content/40">md</span>
               </div>
             </div>
@@ -245,11 +245,10 @@ badge badge-xs badge-warning   → xs size</code></pre>
           <%!-- Skeleton --%>
           <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5">
             <p class="text-xs text-base-content/40 mb-3">Skeleton loader</p>
-            <div class="space-y-2 max-w-sm">
-              <div class="skeleton h-4 w-full rounded"></div>
-              <div class="skeleton h-4 w-4/5 rounded"></div>
-              <div class="skeleton h-4 w-3/5 rounded"></div>
-              <div class="skeleton h-4 w-2/3 rounded"></div>
+            <div class="max-w-sm border border-base-content/5 rounded-lg overflow-hidden">
+              <.skeleton_row />
+              <.skeleton_row />
+              <.skeleton_row />
             </div>
           </div>
 
@@ -286,17 +285,11 @@ badge badge-xs badge-warning   → xs size</code></pre>
       <section>
         <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">Tab Pills</h2>
         <div class="p-4 bg-base-200/30 rounded-lg border border-base-content/5 space-y-4">
-          <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5 w-fit">
-            <button class="px-3 py-1 rounded-md text-sm font-medium bg-base-100 text-base-content shadow-sm">
-              Messages
-            </button>
-            <button class="px-3 py-1 rounded-md text-sm font-medium text-base-content/60 hover:bg-base-200/60">
-              Tasks
-            </button>
-            <button class="px-3 py-1 rounded-md text-sm font-medium text-base-content/60 hover:bg-base-200/60">
-              Notes
-            </button>
-          </div>
+          <.tab_pills>
+            <:item label="Messages" active={true} />
+            <:item label="Tasks" active={false} />
+            <:item label="Notes" active={false} />
+          </.tab_pills>
           <div class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto">
             <p class="text-warning mb-1 not-italic font-sans text-[11px] uppercase tracking-wider">Note: Never use DaisyUI `tabs`. This bespoke pattern is canonical.</p>
             <pre><code>bg-base-200/40 rounded-lg p-0.5       ← container

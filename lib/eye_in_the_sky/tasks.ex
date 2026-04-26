@@ -104,6 +104,26 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Gets a task by UUID or ID string, returning `{:ok, task}` or `{:error, :not_found}`.
+  Accepts a string that is either a UUID or a stringified integer ID.
+  """
+  def get_task_by_uuid_or_id(id_str) do
+    id_str = to_string(id_str)
+
+    task =
+      if int_id = ToolHelpers.parse_int(id_str) do
+        Repo.get(Task, int_id)
+      else
+        Repo.get_by(Task, uuid: id_str)
+      end
+
+    case task do
+      nil -> {:error, :not_found}
+      t -> {:ok, Repo.preload(t, @full_task_preloads)}
+    end
+  end
+
+  @doc """
   Returns `{:ok, {integer_id, uuid}}` for a task identified by an integer ID or UUID string,
   or `{:error, :not_found}` if no task is found. No preloads.
   """

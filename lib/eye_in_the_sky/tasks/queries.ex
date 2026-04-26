@@ -10,7 +10,7 @@ defmodule EyeInTheSky.Tasks.Queries do
   alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Tasks.{Task, WorkflowState}
 
-  @full_task_preloads [:state, :tags, :sessions, :checklist_items]
+  @full_task_preloads [:state, :tags, :sessions, :checklist_items, :agent]
 
   @doc """
   Returns the list of tasks.

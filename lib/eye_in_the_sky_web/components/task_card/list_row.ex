@@ -34,121 +34,145 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     ~H"""
     <div
       class={[
-        "group flex items-center gap-3 py-3.5 cursor-pointer",
-        @task.completed_at && "opacity-60"
+        "group/row relative",
+        @task.completed_at && "opacity-60 hover:opacity-80"
       ]}
-      phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
-      phx-keyup={if !@select_mode, do: @on_click}
-      phx-key="Enter"
-      phx-value-task_id={@task.uuid || to_string(@task.id)}
-      role="button"
-      tabindex="0"
-      aria-label={"Open task #{@task.title}"}
     >
-      <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
+      <%!-- Checkbox: absolute, outside row flow, hover-reveal --%>
       <div class={[
-        "flex-shrink-0 w-5 flex justify-center",
-        if(@select_mode, do: "", else: "hidden group-hover:flex")
+        "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 left-0 transition duration-100",
+        if(@select_mode,
+          do: "opacity-100 scale-100",
+          else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
+        )
       ]}>
-        <input
-          type="checkbox"
+        <.square_checkbox
           checked={@selected}
           phx-click="toggle_select_task"
           phx-value-task_id={@task.uuid || to_string(@task.id)}
-          class="checkbox checkbox-xs checkbox-primary"
           aria-label={"Select task #{@task.title}"}
         />
       </div>
 
-      <%!-- Completion indicator — hidden in select mode --%>
-      <div class={["flex-shrink-0", @select_mode && "hidden"]}>
+      <%!-- Row body --%>
+      <div
+        class="flex items-center gap-4 py-3 pr-2 pl-2 hover:bg-base-200/40 rounded-lg cursor-pointer"
+        phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
+        phx-keyup={if !@select_mode, do: @on_click}
+        phx-key="Enter"
+        phx-value-task_id={@task.uuid || to_string(@task.id)}
+        role="button"
+        tabindex="0"
+        aria-label={"Open task #{@task.title}"}
+      >
+        <%!-- Completion icon --%>
         <.icon
           name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
           class={
-            if @task.completed_at,
-              do: "w-3.5 h-3.5 text-success/60",
-              else: "w-3.5 h-3.5 text-base-content/20"
+            if(@task.completed_at,
+              do: "size-3.5 shrink-0 text-success/60",
+              else: "size-3.5 shrink-0 text-base-content/20 group-hover/row:text-base-content/35"
+            )
           }
         />
-      </div>
 
-      <%!-- Title + metadata --%>
-      <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span class={[
-          "text-sm font-medium truncate",
-          @task.completed_at && "text-base-content/50 line-through",
-          !@task.completed_at && "text-base-content/85 group-hover:text-base-content"
-        ]}>
-          {@task.title}
-        </span>
-        <div class="flex items-center gap-1.5 text-xs">
-          <%!-- State with color --%>
-          <%= if @task.state do %>
-            <span class={state_text_color(@task.state_id)}>{@task.state.name}</span>
+        <%!-- Content --%>
+        <div class="flex-1 min-w-0">
+          <span class={[
+            "text-[13px] font-medium truncate block",
+            if(@task.completed_at,
+              do: "text-base-content/45 line-through",
+              else: "text-base-content/85 group-hover/row:text-base-content"
+            )
+          ]}>
+            {@task.title}
+          </span>
+
+          <%!-- Metadata line --%>
+          <div class="flex items-center gap-1.5 flex-wrap mt-1 text-[11px]">
+            <%!-- State pill --%>
+            <%= if @task.state do %>
+              <span class={["px-1.5 py-px rounded-full font-medium text-[10px]", state_pill_class(@task.state_id)]}>
+                {@task.state.name}
+              </span>
+            <% end %>
+
+            <%!-- Priority badge (only when set) --%>
+            <%= if is_integer(@task.priority) && @task.priority > 0 do %>
+              <span class={["px-1.5 py-px rounded-full font-medium text-[10px]", priority_pill_class(@task.priority)]}>
+                {priority_label(@task.priority)}
+              </span>
+            <% end %>
+
+            <%!-- Agent name (replaces UUID — much more useful scan anchor) --%>
+            <%= if @task.agent do %>
+              <span class="text-base-content/15">&middot;</span>
+              <span class="text-base-content/40 truncate max-w-[160px]">{@task.agent.name}</span>
+            <% end %>
+
+            <%!-- Notes count --%>
+            <%= if @task.notes_count > 0 do %>
+              <span class="text-base-content/15">&middot;</span>
+              <span class="flex items-center gap-0.5 text-base-content/35">
+                <.icon name="hero-chat-bubble-left-mini" class="size-3" />
+                {@task.notes_count}
+              </span>
+            <% end %>
+
+            <%!-- Updated time --%>
             <span class="text-base-content/15">&middot;</span>
-          <% end %>
-          <%!-- Session link (scan anchor) or task UUID fallback --%>
+            <span class="tabular-nums text-base-content/35">
+              {relative_time(@task.updated_at || @task.created_at)}
+            </span>
+          </div>
+        </div>
+
+        <%!-- Hover actions --%>
+        <div class="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
           <%= if @dm_session do %>
             <.link
               navigate={"/dm/#{@dm_session.uuid}"}
-              class="font-mono text-base-content/45 hover:text-primary transition-colors"
+              class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              title="Open agent DM"
+              aria-label="Open agent direct message"
               onclick="event.stopPropagation();"
-              title="Open session"
             >
-              {String.slice(@dm_session.uuid, 0..7)}
+              <.icon name="hero-chat-bubble-left-ellipsis" class="size-3.5" />
             </.link>
-          <% else %>
-            <span class="font-mono text-base-content/25">
-              {String.slice(@task.uuid || "", 0..7)}
-            </span>
           <% end %>
-          <%!-- Updated time --%>
-          <span class="text-base-content/15">&middot;</span>
-          <span class="tabular-nums text-base-content/45">
-            {relative_time(@task.updated_at || @task.created_at)}
-          </span>
-          <%!-- Tags (compact, lower priority) --%>
-          <%= if not is_nil(@task.tags) && @task.tags != [] do %>
-            <span class="text-base-content/15">&middot;</span>
-            <span class="text-base-content/35">
-              {Enum.map_join(Enum.take(@task.tags, 2), ", ", & &1.name)}
-            </span>
+
+          <%= if @on_delete do %>
+            <button
+              type="button"
+              phx-click={@on_delete}
+              phx-value-task_id={@task.uuid || to_string(@task.id)}
+              aria-label="Delete task"
+              class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+              onclick="event.stopPropagation();"
+            >
+              <.icon name="hero-trash-mini" class="size-3.5" />
+            </button>
           <% end %>
         </div>
-      </div>
-
-      <%!-- Hover actions — always same position, hidden until hover --%>
-      <div class="flex items-center flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-        <%= if @dm_session do %>
-          <.link
-            navigate={"/dm/#{@dm_session.uuid}"}
-            class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-primary hover:bg-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            title="Open agent DM"
-            aria-label="Open agent direct message"
-            onclick="event.stopPropagation();"
-          >
-            <.icon name="hero-chat-bubble-left-ellipsis" class="w-3.5 h-3.5" />
-          </.link>
-        <% end %>
-        <%= if @on_delete do %>
-          <button
-            type="button"
-            phx-click={@on_delete}
-            phx-value-task_id={@task.uuid || to_string(@task.id)}
-            aria-label="Delete task"
-            class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/40 hover:text-error hover:bg-error/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-          >
-            <.icon name="hero-trash-mini" class="w-3.5 h-3.5" />
-          </button>
-        <% end %>
       </div>
     </div>
     """
   end
 
-  defp state_text_color(@state_todo), do: "text-base-content/55"
-  defp state_text_color(@state_in_progress), do: "text-info/80"
-  defp state_text_color(@state_in_review), do: "text-warning/80"
-  defp state_text_color(@state_done), do: "text-success/80"
-  defp state_text_color(_), do: "text-base-content/55"
+  # State pill — muted bg-*/15 pattern, not full DaisyUI badge saturation
+  defp state_pill_class(@state_todo), do: "bg-base-content/10 text-base-content/50"
+  defp state_pill_class(@state_in_progress), do: "bg-info/15 text-info"
+  defp state_pill_class(@state_in_review), do: "bg-warning/15 text-warning"
+  defp state_pill_class(@state_done), do: "bg-success/15 text-success"
+  defp state_pill_class(_), do: "bg-base-content/10 text-base-content/50"
+
+  defp priority_pill_class(p) when p >= 3, do: "bg-error/15 text-error"
+  defp priority_pill_class(2), do: "bg-warning/15 text-warning"
+  defp priority_pill_class(1), do: "bg-base-content/10 text-base-content/50"
+  defp priority_pill_class(_), do: ""
+
+  defp priority_label(p) when p >= 3, do: "High"
+  defp priority_label(2), do: "Med"
+  defp priority_label(1), do: "Low"
+  defp priority_label(_), do: ""
 end

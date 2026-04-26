@@ -9,10 +9,10 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorkerTest do
     Map.merge(
       %{
         "name" => "Dispatch Test Job",
-        "job_type" => "shell_command",
+        "job_type" => "mix_task",
         "schedule_type" => "interval",
         "schedule_value" => "60",
-        "config" => Jason.encode!(%{"command" => "echo hi", "working_dir" => "/tmp"})
+        "config" => Jason.encode!(%{"task" => "help", "args" => [], "project_path" => "/tmp"})
       },
       overrides
     )
@@ -30,7 +30,7 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorkerTest do
       assert :ok = perform_job(JobDispatcherWorker, %{})
 
       assert_enqueued(
-        worker: EyeInTheSky.Workers.ShellCommandWorker,
+        worker: EyeInTheSky.Workers.MixTaskWorker,
         args: %{"job_id" => job.id}
       )
     end
@@ -54,7 +54,7 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorkerTest do
       :ok = perform_job(JobDispatcherWorker, %{})
 
       refute_enqueued(
-        worker: EyeInTheSky.Workers.ShellCommandWorker,
+        worker: EyeInTheSky.Workers.MixTaskWorker,
         args: %{"job_id" => job.id}
       )
     end
@@ -65,7 +65,7 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorkerTest do
       :ok = perform_job(JobDispatcherWorker, %{})
 
       refute_enqueued(
-        worker: EyeInTheSky.Workers.ShellCommandWorker,
+        worker: EyeInTheSky.Workers.MixTaskWorker,
         args: %{"job_id" => job.id}
       )
     end
@@ -125,12 +125,12 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorkerTest do
       :ok = perform_job(JobDispatcherWorker, %{})
 
       assert_enqueued(
-        worker: EyeInTheSky.Workers.ShellCommandWorker,
+        worker: EyeInTheSky.Workers.MixTaskWorker,
         args: %{"job_id" => job1.id}
       )
 
       assert_enqueued(
-        worker: EyeInTheSky.Workers.ShellCommandWorker,
+        worker: EyeInTheSky.Workers.MixTaskWorker,
         args: %{"job_id" => job2.id}
       )
     end

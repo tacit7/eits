@@ -63,7 +63,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
         <div :for={{dom_id, session} <- @streams.session_list} id={dom_id}>
           <.session_row
             session={session}
-            project_name={if session.project, do: session.project.name, else: nil}
+            project_name={session.project && session.project.name}
           />
         </div>
       </div>

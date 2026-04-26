@@ -2,6 +2,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
+  # Max tasks shown in flat list view.
+  @list_limit 20
+  # Max tasks shown per section in kanban view (4 sections × 10 = 40 total,
+  # matching the 40-row fetch limit in load_flyout_tasks/3).
+  @kanban_per_section 10
+
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
   # This prevents the 236px panel from compressing content on first load.
@@ -17,6 +23,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :task_search, :string, default: ""
   attr :task_state_filter, :any, default: nil
   attr :task_filter_open, :boolean, default: false
+  attr :tasks_view, :atom, default: :list
   attr :session_filter_open, :boolean, default: false
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
@@ -112,6 +119,40 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               </button>
             <% end %>
           <% end %>
+          <%= if @active_section == :tasks do %>
+            <button
+              phx-click="toggle_tasks_view"
+              phx-target={@myself}
+              title={if @tasks_view == :list, do: "Switch to kanban", else: "Switch to list"}
+              class={[
+                "w-5 h-5 flex items-center justify-center rounded transition-colors flex-shrink-0",
+                if(@tasks_view == :kanban,
+                  do: "text-primary bg-primary/10",
+                  else: "text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8"
+                )
+              ]}
+            >
+              <%= if @tasks_view == :list do %>
+                <.lucide_kanban />
+              <% else %>
+                <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" />
+              <% end %>
+            </button>
+            <button
+              phx-click="toggle_task_filter"
+              phx-target={@myself}
+              title="Filter tasks"
+              class={[
+                "w-5 h-5 flex items-center justify-center rounded transition-colors flex-shrink-0",
+                if(@task_filter_open,
+                  do: "text-primary bg-primary/10",
+                  else: "text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8"
+                )
+              ]}
+            >
+              <.icon name="hero-funnel-mini" class="w-3.5 h-3.5" />
+            </button>
+          <% end %>
         </div>
 
         <div class="flex-1 overflow-y-auto py-1">
@@ -127,6 +168,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 task_search={@task_search}
                 state_filter={@task_state_filter}
                 filter_open={@task_filter_open}
+                tasks_view={@tasks_view}
                 sidebar_project={@sidebar_project}
                 myself={@myself}
               />
@@ -229,23 +271,24 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
-  # Tasks flyout: list tasks with search and state filter
+  # Tasks flyout: list tasks with filter and optional kanban view
   attr :tasks, :list, default: []
   attr :task_search, :string, default: ""
   attr :state_filter, :any, default: nil
   attr :filter_open, :boolean, default: false
+  attr :tasks_view, :atom, default: :list
   attr :sidebar_project, :any, default: nil
   attr :myself, :any, required: true
 
   defp tasks_content(assigns) do
-    ~H"""
+    assigns = assign(assigns, :list_tasks, Enum.take(assigns.tasks, @list_limit))
 
+    ~H"""
     <%= if @filter_open do %>
-      <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
-        <div class="text-[9px] font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">State</div>
-        <div class="flex flex-col gap-0.5">
+      <div class="px-2 py-2 border-b border-base-content/8 bg-base-200/40">
+        <div class="flex gap-0.5 flex-wrap">
           <.task_state_option label="All" value="all" current={@state_filter} myself={@myself} />
-          <.task_state_option label="To Do" value="1" current={@state_filter} myself={@myself} />
+          <.task_state_option label="Todo" value="1" current={@state_filter} myself={@myself} />
           <.task_state_option label="In Progress" value="2" current={@state_filter} myself={@myself} />
           <.task_state_option label="In Review" value="4" current={@state_filter} myself={@myself} />
           <.task_state_option label="Done" value="3" current={@state_filter} myself={@myself} />
@@ -253,15 +296,62 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       </div>
     <% end %>
 
-    <.task_row :for={t <- @tasks} task={t} />
-
-    <%= if @tasks == [] do %>
-      <% filtering = @task_search != "" or not is_nil(@state_filter) %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">
-        {if filtering, do: "No matching tasks", else: "No tasks"}
-      </div>
+    <%= if @tasks_view == :list do %>
+      <.task_row :for={t <- @list_tasks} task={t} />
+      <%= if @tasks == [] do %>
+        <% filtering = @task_search != "" or not is_nil(@state_filter) %>
+        <div class="px-3 py-4 text-xs text-base-content/35 text-center">
+          {if filtering, do: "No matching tasks", else: "No tasks"}
+        </div>
+      <% end %>
+    <% else %>
+      <.tasks_kanban tasks={@tasks} />
     <% end %>
+    """
+  end
 
+  @kanban_sections [
+    {1, "Todo", "bg-base-content/30"},
+    {2, "In Progress", "bg-blue-500"},
+    {4, "In Review", "bg-amber-400"},
+    {3, "Done", "bg-green-500"}
+  ]
+
+  attr :tasks, :list, required: true
+
+  defp tasks_kanban(assigns) do
+    grouped = Enum.group_by(assigns.tasks, & &1.state_id)
+
+    sections =
+      Enum.map(@kanban_sections, fn {state_id, label, dot_class} ->
+        {state_id, label, dot_class, grouped |> Map.get(state_id, []) |> Enum.take(@kanban_per_section)}
+      end)
+
+    assigns = assign(assigns, :sections, sections)
+
+    ~H"""
+    <%= if @tasks == [] do %>
+      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No tasks</div>
+    <% else %>
+      <%= for {_state_id, label, dot_class, section_tasks} <- @sections do %>
+        <div class="mt-1">
+          <div class="flex items-center gap-1.5 px-3 py-1">
+            <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", dot_class]} />
+            <span class="text-[9px] font-semibold uppercase tracking-widest text-base-content/40">
+              {label}
+            </span>
+            <span class="ml-auto text-[9px] text-base-content/25">
+              {length(section_tasks)}
+            </span>
+          </div>
+          <%= if section_tasks == [] do %>
+            <div class="px-3 py-1 text-[10px] text-base-content/25 italic">empty</div>
+          <% else %>
+            <.task_row :for={t <- section_tasks} task={t} />
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
     """
   end
 
@@ -272,20 +362,23 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp task_state_option(assigns) do
     ~H"""
-    <% active = (@value == "all" and is_nil(@current)) or to_string(@current) == @value %>
+    <% active =
+      case @value do
+        "all" -> is_nil(@current)
+        v -> @current == String.to_integer(v)
+      end %>
     <button
       phx-click="set_task_state_filter"
       phx-value-state={@value}
       phx-target={@myself}
       class={[
-        "flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded transition-colors",
+        "text-[10px] px-2 py-0.5 rounded-full transition-colors font-medium",
         if(active,
-          do: "text-primary bg-primary/10 font-medium",
-          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/8"
+          do: "text-primary bg-primary/15",
+          else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"
         )
       ]}
     >
-      <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", if(active, do: "bg-primary", else: "bg-transparent")]} />
       {@label}
     </button>
     """

@@ -60,7 +60,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Gemini do
       model: context[:model] || "gemini-2.5-flash",
       resume: resume_id,
       yolo: true,
-      system_prompt: Claude.eits_init_prompt(state),
+      system_prompt: write_system_prompt_file(state),
       env: %{
         "EITS_SESSION_UUID" => state.eits_session_uuid,
         "EITS_SESSION_ID" => to_string(state.session_id),
@@ -70,5 +70,18 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Gemini do
       allowed_tools: context[:allowed_tools] || [],
       timeout_ms: 300_000
     }
+  end
+
+  # Gemini CLI reads GEMINI_SYSTEM_MD as a path to a .md file, not inline
+  # content. The SDK stuffs whatever we pass into that env var verbatim, so we
+  # have to materialize the prompt to disk and return the path. Reusing a
+  # stable per-session path keeps the directory from accumulating stray files.
+  defp write_system_prompt_file(state) do
+    content = Claude.eits_init_prompt(state)
+    dir = Path.join(System.tmp_dir!(), "eits-gemini")
+    File.mkdir_p!(dir)
+    path = Path.join(dir, "system-#{state.session_id}.md")
+    File.write!(path, content)
+    path
   end
 end

@@ -101,6 +101,7 @@ Keyboard events are managed via the `GlobalKeydown` hook registered in `assets/j
 - **`start_new_canvas`** — Toggles `:creating_canvas` flag to show name input form
 - **`create_canvas`** — Validates name, creates canvas, appends to list, routes to new canvas
 - **`tidy_canvas`** — Tidy button in the canvas header cascades all windows into a clean layout via `Canvases.tidy/1`, which resets positions and applies consistent spacing
+- **`delete_canvas`** — Deletes canvas and delegates state cleanup to `handle_canvas_deleted/2` helper (refactored to flatten nesting). Updates canvas list, unsubscribes from sessions if active, and redirects to first canvas or empty list.
 
 #### Window Management
 - **`window_moved`** — Records x/y position delta; calls `Canvases.update_window_layout/2`
@@ -116,6 +117,10 @@ Keyboard events are managed via the `GlobalKeydown` hook registered in `assets/j
 - **`+` button** — Opens Add Session submenu directly via command palette (jumps to session picker without full search). Implemented via `palette:open-command` event with `commandId=canvas-add-session`.
 - **Delete canvas button** — Wired event handler to delete canvas from toolbar.
 - **Tidy button** — Cascades all windows into clean layout via `Canvases.tidy/1`, which resets positions and applies consistent spacing.
+
+#### Session Picker Performance
+- **`open_session_picker`** — Caps unscoped `Sessions.list_sessions()` calls with `Sessions.list_sessions_filtered(limit: 100)` to prevent loading all sessions into memory when opening the picker.
+- **`search_sessions`** — Caps session list with `Sessions.list_sessions_filtered(limit: 50)` to avoid expensive queries when filtering results. Search filtering is applied client-side on the capped results.
 
 #### Tab Operations
 - **Double-click tab** — Rename canvas inline. Updates page title on successful rename.
@@ -343,6 +348,7 @@ Clicking a session name or message link within the canvas should route back to `
 - `CanvasHandlers` module extracts canvas-related event logic from AgentLive
 - Keeps AgentLive focused on session list and agent card UI
 - Enables canvas operations (add, create) from session context
+- `handle_canvas_deleted/2` is a private helper in CanvasLive that handles state cleanup when a canvas is deleted (removing from list, unsubscribing from sessions, redirecting). Extracted to flatten nested case statements in the event handler.
 
 ### PubSub Subscription Lifecycle
 - Subscriptions are created during `activate_canvas/2`

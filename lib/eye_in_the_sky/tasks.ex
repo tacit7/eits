@@ -304,24 +304,21 @@ defmodule EyeInTheSky.Tasks do
 
   def reorder_tasks(ordered_uuids) when is_list(ordered_uuids) do
     now = DateTime.utc_now()
+    pairs = Enum.with_index(ordered_uuids, 1)
+    uuids = Enum.map(pairs, fn {u, _} -> u end)
+    positions = Enum.map(pairs, fn {_, p} -> p end)
 
-    {placeholders, extra_params} =
-      ordered_uuids
-      |> Enum.with_index(1)
-      |> Enum.reduce({[], []}, fn {uuid, pos}, {phs, params} ->
-        base = 2 + length(params)
-        {phs ++ ["($#{base}, $#{base + 1})"], params ++ [uuid, pos]}
-      end)
+    Repo.query!(
+      """
+      UPDATE tasks
+      SET position = pos_list.pos,
+          updated_at = $3
+      FROM unnest($1::uuid[], $2::int[]) AS pos_list(uuid, pos)
+      WHERE tasks.uuid = pos_list.uuid
+      """,
+      [uuids, positions, now]
+    )
 
-    sql = """
-    UPDATE tasks
-    SET position = v.pos,
-        updated_at = $1
-    FROM (VALUES #{Enum.join(placeholders, ", ")}) AS v(uuid_val, pos)
-    WHERE tasks.uuid = v.uuid_val::uuid
-    """
-
-    Ecto.Adapters.SQL.query!(Repo, sql, [now | extra_params])
     :ok
   end
 

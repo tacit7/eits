@@ -312,13 +312,15 @@ defmodule EyeInTheSky.Notes do
     sort = Keyword.get(opts, :sort, "newest")
     order = if sort == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
+    # Filter parent_type in a WHERE clause BEFORE the fragment cast so Postgres
+    # never attempts to cast non-numeric parent_ids (session notes, task notes, etc.)
+    # to bigint. The join then only touches rows already known to be project notes.
+    project_ids =
+      from(p in EyeInTheSky.Projects.Project, where: p.workspace_id == ^wid, select: p.id)
+
     Note
-    |> join(:inner, [n], p in EyeInTheSky.Projects.Project,
-      on:
-        n.parent_type == "project" and
-          fragment("?::bigint", n.parent_id) == p.id and
-          p.workspace_id == ^wid
-    )
+    |> where([n], n.parent_type == "project")
+    |> where([n], fragment("?::bigint", n.parent_id) in subquery(project_ids))
     |> order_by(^order)
     |> limit(^limit_val)
     |> Repo.all()

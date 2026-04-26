@@ -93,13 +93,21 @@ defmodule EyeInTheSky.Projects do
 
   defp inject_workspace_id_if_missing(%{workspace_id: id} = attrs) when not is_nil(id), do: attrs
 
-  defp inject_workspace_id_if_missing(attrs) do
-    case Repo.one(
-           from w in EyeInTheSky.Workspaces.Workspace, order_by: [asc: :id], limit: 1
-         ) do
-      nil -> attrs
-      workspace -> Map.put(attrs, :workspace_id, workspace.id)
+  # Test/dev fallback: auto-inject the first available workspace so tests written
+  # before workspace_id was required continue to pass without individual updates.
+  # This does NOT run in production — callers must supply workspace_id explicitly.
+  # See project_fixture/1 in test/support/factory.ex for the preferred test helper.
+  if Mix.env() != :prod do
+    defp inject_workspace_id_if_missing(attrs) do
+      case Repo.one(
+             from w in EyeInTheSky.Workspaces.Workspace, order_by: [asc: :id], limit: 1
+           ) do
+        nil -> attrs
+        workspace -> Map.put(attrs, :workspace_id, workspace.id)
+      end
     end
+  else
+    defp inject_workspace_id_if_missing(attrs), do: attrs
   end
 
   @doc """

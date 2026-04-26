@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.SessionsTest do
   import Phoenix.LiveViewTest
 
   alias EyeInTheSky.{Factory, Projects, Workspaces}
+  alias EyeInTheSkyWeb.Components.NewSessionModal
 
   setup %{user: user} do
     workspace = Workspaces.default_workspace_for_user!(user)
@@ -110,6 +111,84 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.SessionsTest do
         EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions.create_new_session(params, socket)
 
       assert result_socket.assigns.flash["error"] == "Project not found"
+    end
+  end
+
+  describe "NewSessionModal project_changed — cross-workspace agent scan guard" do
+    test "project_changed with out-of-scope project_id returns empty agents", %{
+      project: allowed_project
+    } do
+      # Build a component socket with only the allowed project in assigns
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{
+          __changed__: %{},
+          projects: [allowed_project],
+          current_project: nil,
+          available_agents: [],
+          selected_model: "claude-sonnet-4-6",
+          selected_provider: "claude",
+          selected_prompt_id: nil,
+          prefill_text: "",
+          file_uploads: nil,
+          show: true
+        }
+      }
+
+      # Create an out-of-scope project in another workspace
+      other_user = Factory.user_fixture()
+      other_workspace = Workspaces.default_workspace_for_user!(other_user)
+      n = Factory.uniq()
+
+      {:ok, other_project} =
+        Projects.create_project(%{
+          name: "Foreign Project #{n}",
+          path: "/tmp/foreign_project_#{n}",
+          slug: "foreign-project-#{n}",
+          workspace_id: other_workspace.id
+        })
+
+      {:noreply, result_socket} =
+        NewSessionModal.handle_event(
+          "project_changed",
+          %{"project_id" => to_string(other_project.id)},
+          socket
+        )
+
+      # The guard fired — project_path was set to nil, so the result equals a nil-path scan
+      # (global agents only, NOT agents from the foreign project's filesystem path)
+      {:noreply, nil_path_socket} =
+        NewSessionModal.handle_event("project_changed", %{"project_id" => ""}, socket)
+
+      assert result_socket.assigns.available_agents == nil_path_socket.assigns.available_agents
+    end
+
+    test "project_changed with allowed project_id proceeds normally", %{
+      project: allowed_project
+    } do
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{
+          __changed__: %{},
+          projects: [allowed_project],
+          current_project: nil,
+          available_agents: [],
+          selected_model: "claude-sonnet-4-6",
+          selected_provider: "claude",
+          selected_prompt_id: nil,
+          prefill_text: "",
+          file_uploads: nil,
+          show: true
+        }
+      }
+
+      {:noreply, result_socket} =
+        NewSessionModal.handle_event(
+          "project_changed",
+          %{"project_id" => to_string(allowed_project.id)},
+          socket
+        )
+
+      # Returns noreply without crashing (agents list is a list, possibly empty if no .claude dir)
+      assert is_list(result_socket.assigns.available_agents)
     end
   end
 end

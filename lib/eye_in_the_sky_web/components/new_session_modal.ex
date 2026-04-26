@@ -69,15 +69,28 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   end
 
   def handle_event("project_changed", %{"project_id" => project_id_str}, socket) do
+    allowed_ids =
+      (socket.assigns[:projects] || [])
+      |> Enum.map(& &1.id)
+      |> then(fn ids ->
+        case socket.assigns[:current_project] do
+          nil -> ids
+          cp -> [cp.id | ids]
+        end
+      end)
+      |> MapSet.new()
+
     project_path =
       case parse_int(project_id_str) do
         nil ->
           nil
 
-        id ->
-          case Projects.get_project(id) do
-            {:ok, project} -> project.path
-            {:error, :not_found} -> nil
+        id when not is_nil(id) ->
+          if MapSet.member?(allowed_ids, id) do
+            case Projects.get_project(id) do
+              {:ok, project} -> project.path
+              {:error, :not_found} -> nil
+            end
           end
       end
 

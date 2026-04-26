@@ -36,6 +36,10 @@
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
+/* Make the live_svelte mount target transparent so Svelte components
+   participate directly in their parent's height/flex layout */
+[data-svelte-target] { display: contents }
+
 /* Disable global dimming on LiveView loading states */
 .phx-click-loading,
 .phx-submit-loading,

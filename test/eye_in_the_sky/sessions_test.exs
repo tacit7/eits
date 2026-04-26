@@ -106,11 +106,11 @@ defmodule EyeInTheSky.SessionsTest do
 
     test "sets project_id on both agent and session" do
       uuid = Ecto.UUID.generate()
-      # Use a real project or nil — just verify passthrough
+      project = project_fixture()
       params = %{"session_id" => uuid, "description" => "test"}
 
-      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, 1)
-      assert session.project_id == 1
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, project.id)
+      assert session.project_id == project.id
     end
 
     test "reuses existing agent with same uuid" do
@@ -189,12 +189,13 @@ defmodule EyeInTheSky.SessionsTest do
     test "counts session logs" do
       session = new_session()
 
+      # get_session_counts counts Log records (streaming output), not SessionLog records.
       {:ok, _} =
-        Logs.create_session_log(%{
+        Logs.create_log(%{
           session_id: session.id,
-          level: "info",
-          category: "test",
-          message: "test log"
+          type: "info",
+          message: "test log",
+          timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
         })
 
       counts = Sessions.get_session_counts(session.id)

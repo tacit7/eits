@@ -2,17 +2,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
   use EyeInTheSkyWeb.ConnCase
 
   import Phoenix.LiveViewTest
+  import EyeInTheSky.Factory
 
-  alias EyeInTheSky.{Projects, ScheduledJobs}
+  alias EyeInTheSky.ScheduledJobs
 
   setup do
-    {:ok, project} =
-      Projects.create_project(%{
-        name: "test-project",
-        path: "/tmp/test-project",
-        slug: "test-project"
-      })
-
+    project = project_fixture()
     %{project: project}
   end
 
@@ -20,11 +15,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
     Map.merge(
       %{
         "name" => "Test Job",
-        "job_type" => "shell_command",
+        "job_type" => "spawn_agent",
         "schedule_type" => "interval",
         "schedule_value" => "60",
         "project_id" => project_id,
-        "config" => Jason.encode!(%{"command" => "echo hello", "working_dir" => "/tmp"})
+        "config" => "{}"
       },
       overrides
     )
@@ -42,15 +37,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
     end
 
     test "lists only jobs scoped to the project", %{conn: conn, project: project} do
-      {:ok, other_project} =
-        Projects.create_project(%{name: "other", path: "/tmp/other", slug: "other"})
+      other_project = project_fixture(%{name: "other-scoped"})
 
       {:ok, _} = ScheduledJobs.create_job(job_attrs(project.id, %{"name" => "My Job"}))
       {:ok, _} = ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Other Job"}))
 
-      {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      assert html =~ "My Job"
-      refute html =~ "Other Job"
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      assert has_element?(view, "#main-content", "My Job")
+      refute has_element?(view, "#main-content", "Other Job")
     end
 
     test "shows global (null project_id) jobs in a separate section", %{
@@ -60,7 +54,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       {:ok, _} =
         ScheduledJobs.create_job(%{
           "name" => "Global Job",
-          "job_type" => "shell_command",
+          "job_type" => "spawn_agent",
           "schedule_type" => "interval",
           "schedule_value" => "60",
           "config" => "{}"
@@ -94,7 +88,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       view
       |> form("form[phx-submit='save_job']", %{
         "job[name]" => "New Job",
-        "job[job_type]" => "shell_command",
+        "job[job_type]" => "spawn_agent",
         "job[schedule_type]" => "interval",
         "job[schedule_value]" => "120"
       })
@@ -113,7 +107,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       view
       |> form("form[phx-submit='save_job']", %{
         "job[name]" => "Visible Job",
-        "job[job_type]" => "shell_command",
+        "job[job_type]" => "spawn_agent",
         "job[schedule_type]" => "interval",
         "job[schedule_value]" => "60"
       })
@@ -142,7 +136,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
 
       view
-      |> element("input[type='checkbox'][phx-value-id='#{job.id}']")
+      |> element("input.toggle-sm[phx-value-id='#{job.id}']")
       |> render_click()
 
       {:ok, updated} = ScheduledJobs.get_job(job.id)
@@ -153,20 +147,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
 
       view
-      |> element("button[phx-click='run_now'][phx-value-id='#{job.id}']")
+      |> element("button[aria-label='Run job now'][phx-value-id='#{job.id}']")
       |> render_click()
 
-      assert render(view) =~ "Job triggered"
+      assert has_element?(view, "#flash-info", "Job triggered")
     end
 
     test "delete removes job from list", %{conn: conn, project: project, job: job} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
 
       view
-      |> element("button[phx-click='delete_job'][phx-value-id='#{job.id}']")
+      |> element("button[aria-label='Delete job'][phx-value-id='#{job.id}']")
       |> render_click()
 
-      refute render(view) =~ job.name
+      refute has_element?(view, "#main-content", job.name)
       assert ScheduledJobs.get_job(job.id) == {:error, :not_found}
     end
 
@@ -184,8 +178,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
   describe "cross-project access guard" do
     test "edit_job on another project's job shows error flash and does not open edit form",
          %{conn: conn, project: project} do
-      {:ok, other_project} =
-        Projects.create_project(%{name: "other-ej", path: "/tmp/other-ej", slug: "other-ej"})
+      other_project = project_fixture(%{name: "other-ej"})
 
       {:ok, other_job} =
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Other Edit Job"}))
@@ -199,8 +192,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "edit_schedule on another project's job shows error flash",
          %{conn: conn, project: project} do
-      {:ok, other_project} =
-        Projects.create_project(%{name: "other-es", path: "/tmp/other-es", slug: "other-es"})
+      other_project = project_fixture(%{name: "other-es"})
 
       {:ok, other_job} =
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Sched Target"}))
@@ -221,8 +213,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "toggling a job from another project shows error flash and leaves job unchanged",
          %{conn: conn, project: project} do
-      {:ok, other_project} =
-        Projects.create_project(%{name: "other-xp", path: "/tmp/other-xp", slug: "other-xp"})
+      other_project = project_fixture(%{name: "other-xp"})
 
       {:ok, other_job} =
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Other Job"}))
@@ -240,8 +231,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "deleting a job from another project shows error flash and leaves job in DB",
          %{conn: conn, project: project} do
-      {:ok, other_project} =
-        Projects.create_project(%{name: "other-del", path: "/tmp/other-del", slug: "other-del"})
+      other_project = project_fixture(%{name: "other-del"})
 
       {:ok, other_job} =
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Delete Target"}))
@@ -255,12 +245,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "run_now on a job from another project shows error flash",
          %{conn: conn, project: project} do
-      {:ok, other_project} =
-        Projects.create_project(%{
-          name: "other-run",
-          path: "/tmp/other-run",
-          slug: "other-run"
-        })
+      other_project = project_fixture(%{name: "other-run"})
 
       {:ok, other_job} =
         ScheduledJobs.create_job(job_attrs(other_project.id, %{"name" => "Run Target"}))
@@ -291,13 +276,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
   end
 
   describe "run_now failure" do
-    # Tests via the overview /jobs page where handle_run_now is called without
-    # get_job! first, so a non-existent ID returns {:error, :not_found} cleanly.
-    test "run_now on non-existent job ID shows error flash not success", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/jobs")
+    test "run_now on non-existent job ID shows error flash not success",
+         %{conn: conn, project: project} do
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
       render_click(view, "run_now", %{"id" => "999999"})
 
-      assert has_element?(view, "#flash-error", "Failed to trigger job")
+      assert has_element?(view, "#flash-error", "Job not found")
       refute has_element?(view, "#flash-info", "Job triggered")
     end
   end

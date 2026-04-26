@@ -157,15 +157,36 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   defp dispatch_event("toggle_job", params, socket),
     do: handle_toggle_job(params, socket, &load_jobs/1, socket.assigns.project_id)
 
-  defp dispatch_event("run_now", %{"id" => id} = params, socket) do
+  defp dispatch_event("run_now", %{"id" => id} = _params, socket) do
     with {:ok, int_id} <- parse_job_id(id),
          {:ok, job} <- ScheduledJobs.get_job(int_id),
          :ok <- check_job_access(job, socket.assigns.project_id) do
-      handle_run_now(params, socket)
+      case ScheduledJobs.run_now(int_id, socket.assigns.project_id) do
+        {:ok, _} ->
+          # Bubble flash to parent LiveView — component socket flash is not rendered
+          send(self(), {:jobs_page_flash, :info, "Job triggered"})
+          {:noreply, socket}
+
+        {:error, :unauthorized} ->
+          send(self(), {:jobs_page_flash, :error, "Access denied"})
+          {:noreply, socket}
+
+        {:error, reason} ->
+          send(self(), {:jobs_page_flash, :error, "Failed to trigger job: #{inspect(reason)}"})
+          {:noreply, socket}
+      end
     else
-      :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
-      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
-      {:error, :access_denied} -> {:noreply, put_flash(socket, :error, "Access denied")}
+      :error ->
+        send(self(), {:jobs_page_flash, :error, "Invalid job ID"})
+        {:noreply, socket}
+
+      {:error, :not_found} ->
+        send(self(), {:jobs_page_flash, :error, "Job not found"})
+        {:noreply, socket}
+
+      {:error, :access_denied} ->
+        send(self(), {:jobs_page_flash, :error, "Access denied"})
+        {:noreply, socket}
     end
   end
 

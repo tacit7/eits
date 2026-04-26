@@ -300,6 +300,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def render(assigns) do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-8">
+      <%= if msg = @flash["error"] do %>
+        <div id="flash-error" role="alert" class="alert alert-error text-sm mb-4 max-w-4xl mx-auto">{msg}</div>
+      <% end %>
+      <%= if msg = @flash["info"] do %>
+        <div id="flash-info" role="alert" class="alert alert-info text-sm mb-4 max-w-4xl mx-auto">{msg}</div>
+      <% end %>
       <div class="max-w-4xl mx-auto space-y-6">
         <div class="tabs tabs-bordered overflow-x-auto flex-nowrap whitespace-nowrap">
           <%= for {label, key} <- [

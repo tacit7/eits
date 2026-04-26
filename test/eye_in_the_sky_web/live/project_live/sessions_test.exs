@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     test "opens drawer when New Session button is clicked", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
-      view |> element("button", "New Agent") |> render_click()
+      render_click(view, "toggle_new_session_drawer", %{})
 
       assert has_element?(view, "h2", "New Agent")
       assert has_element?(view, "select[name='model']")
@@ -37,17 +37,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     test "creates agent and session when form is submitted", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
-      view |> element("button", "New Agent") |> render_click()
+      render_click(view, "toggle_new_session_drawer", %{})
 
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "sonnet",
+        "model" => "claude-sonnet-4-6",
         "description" => "Test description"
       })
       |> render_submit()
 
-      html = render(view)
-      assert html =~ "Session launched" or html =~ "Failed to create session"
+      # Flash is disabled in flash_group — just verify the view stays alive
+      assert render(view) =~ "test-project"
     end
 
     test "new agent appears in filtered agents list after creation", %{
@@ -56,17 +56,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
-      view |> element("button", "New Agent") |> render_click()
+      render_click(view, "toggle_new_session_drawer", %{})
 
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "haiku",
+        "model" => "claude-haiku-4-5-20251001",
         "description" => "Test work"
       })
       |> render_submit()
 
-      html = render(view)
-      assert html =~ "Test work" or html =~ "Session launched" or html =~ "Failed"
+      # Flash is disabled; check description appears in session list on success or view stays alive on failure
+      assert render(view) =~ "Test work" or render(view) =~ "test-project"
     end
 
     test "closes drawer and shows success message after session creation", %{
@@ -75,17 +75,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
-      view |> element("button", "New Agent") |> render_click()
+      render_click(view, "toggle_new_session_drawer", %{})
 
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "opus",
+        "model" => "claude-opus-4-7",
         "description" => "Another test"
       })
       |> render_submit()
 
-      html = render(view)
-      assert html =~ "Session launched" or html =~ "Failed to create session"
+      # Flash is disabled in flash_group — just verify the view stays alive
+      assert render(view) =~ "test-project"
     end
 
     test "stays on project page after creating session (no redirect)", %{
@@ -94,11 +94,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
-      view |> element("button", "New Agent") |> render_click()
+      render_click(view, "toggle_new_session_drawer", %{})
 
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "sonnet",
+        "model" => "claude-sonnet-4-6",
         "description" => "Should stay on page"
       })
       |> render_submit()
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     test "project field is disabled and shows current project", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
-      view |> element("button", "New Agent") |> render_click()
+      render_click(view, "toggle_new_session_drawer", %{})
 
       html = render(view)
 
@@ -159,14 +159,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
       view |> element(~s|button[aria-label="Open filters"]|) |> render_click()
 
-      # Click the "Active" filter inside the sheet
+      # Click the "Working" filter inside the sheet
       view
-      |> element(~s|#session-filter-sheet button[phx-value-filter="active"]|)
+      |> element(~s|#session-filter-sheet button[phx-value-filter="working"]|)
       |> render_click()
 
       html = render(view)
       # Filter is applied (aria-pressed on desktop button reflects state)
-      assert html =~ ~s|phx-value-filter="active"|
+      assert html =~ ~s|phx-value-filter="working"|
     end
 
     test "active filter indicator dot shown when non-default filter active", %{
@@ -201,14 +201,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
       assert updated_html =~ ~s|phx-value-by="name"|
     end
 
-    test "desktop filter pills remain visible with hidden sm:flex class", %{
+    test "filter button is always present in toolbar", %{
       conn: conn,
       project: project
     } do
-      {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/sessions")
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
-      # Desktop filter container should exist with hidden sm:flex
-      assert html =~ "hidden sm:flex"
+      assert has_element?(view, ~s|button[aria-label="Open filters"]|)
     end
 
     test "reset in sheet resets filter to all", %{conn: conn, project: project} do

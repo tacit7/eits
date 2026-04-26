@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Live.CanvasChatWindowTest do
         name: "chat-test-session-#{uniq()}",
         agent_id: agent.id,
         started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-        status: "stopped"
+        status: "idle"
       })
 
     {:ok, canvas} = Canvases.create_canvas(%{name: "Test Canvas #{uniq()}"})

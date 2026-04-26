@@ -49,7 +49,8 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       agent_id: agent.id,
       name: Map.get(opts, :session_name, "Test Session"),
       provider: Map.get(opts, :provider, "claude"),
-      started_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+      git_worktree_path: Map.get(opts, :git_worktree_path, File.cwd!())
     }
 
     {:ok, session} = Sessions.create_session(session_attrs)
@@ -86,7 +87,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         "type" => "result",
         "result" => "hello",
         "session_id" => session.uuid,
-        "uuid" => "mock-uuid-#{System.system_time(:second)}",
+        "uuid" => Ecto.UUID.generate(),
         "duration_ms" => 1234,
         "total_cost_usd" => 0.001,
         "usage" => %{"input_tokens" => 10, "output_tokens" => 5},
@@ -138,7 +139,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         "type" => "result",
         "result" => "hello",
         "session_id" => claude_uuid,
-        "uuid" => "mock-uuid-#{System.system_time(:second)}",
+        "uuid" => Ecto.UUID.generate(),
         "duration_ms" => 10,
         "total_cost_usd" => 0.0,
         "usage" => %{"input_tokens" => 1, "output_tokens" => 1},
@@ -282,7 +283,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         "type" => "result",
         "result" => "done",
         "session_id" => session.uuid,
-        "uuid" => "mock-uuid-#{System.system_time(:second)}",
+        "uuid" => Ecto.UUID.generate(),
         "duration_ms" => 100,
         "total_cost_usd" => 0.001,
         "usage" => %{"input_tokens" => 5, "output_tokens" => 3},
@@ -322,7 +323,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         "type" => "result",
         "result" => "test response body",
         "session_id" => session.uuid,
-        "uuid" => "mock-uuid-#{System.system_time(:second)}",
+        "uuid" => Ecto.UUID.generate(),
         "duration_ms" => 50,
         "total_cost_usd" => 0.002,
         "usage" => %{"input_tokens" => 8, "output_tokens" => 4},
@@ -397,7 +398,8 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     opts = [
       model: "haiku",
       description: "Instruction delivery test",
-      instructions: "You are working on task #999: Do something important"
+      instructions: "You are working on task #999: Do something important",
+      project_path: File.cwd!()
     ]
 
     {:ok, %{session: session}} = AgentManager.create_agent(opts)
@@ -499,7 +501,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         "type" => "result",
         "result" => "Credit balance is too low",
         "session_id" => session.uuid,
-        "uuid" => "mock-uuid",
+        "uuid" => Ecto.UUID.generate(),
         "duration_ms" => 0,
         "total_cost_usd" => 0.0,
         "usage" => %{"input_tokens" => 0, "output_tokens" => 0},
@@ -671,7 +673,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         "type" => "result",
         "result" => "hello",
         "session_id" => claude_uuid,
-        "uuid" => "mock-uuid",
+        "uuid" => Ecto.UUID.generate(),
         "duration_ms" => 10,
         "total_cost_usd" => 0.0,
         "usage" => %{"input_tokens" => 1, "output_tokens" => 1},

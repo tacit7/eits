@@ -60,7 +60,8 @@ defmodule EyeInTheSky.SettingsTest do
   # ---- get_integer/1 ----
 
   test "get_integer returns integer for valid numeric string default" do
-    assert Settings.get_integer("cli_idle_timeout_ms") == 300_000
+    # Default is "0" as configured in Settings.@defaults
+    assert Settings.get_integer("cli_idle_timeout_ms") == 0
   end
 
   test "get_integer returns integer for stored value" do

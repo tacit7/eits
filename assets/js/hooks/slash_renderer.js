@@ -117,7 +117,7 @@ export function updateActiveItem(container, idx) {
     const rowIdx = parseInt(row.dataset.slashIdx)
     if (rowIdx === idx) {
       row.classList.add('bg-base-content/[0.06]')
-      row.scrollIntoView({ block: 'nearest' })
+      row.scrollIntoView?.({ block: 'nearest' })
     } else {
       row.classList.remove('bg-base-content/[0.06]')
     }

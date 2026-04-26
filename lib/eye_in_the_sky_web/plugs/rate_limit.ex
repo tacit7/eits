@@ -54,6 +54,14 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimit do
   def init(opts), do: opts
 
   def call(conn, opts) do
+    if Application.get_env(:eye_in_the_sky, :rate_limit_enabled, true) == false do
+      conn
+    else
+      do_call(conn, opts)
+    end
+  end
+
+  defp do_call(conn, opts) do
     rule = Map.get(@rules, conn.path_info)
     default = Keyword.get(opts, :default)
 

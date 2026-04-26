@@ -34,6 +34,7 @@ defmodule EyeInTheSky.Settings do
     "pricing_haiku_cache_creation" => "1.00",
     "preferred_editor" => "code",
     "eits_workflow_enabled" => "true",
+    "vim_nav_enabled" => "false",
     "theme" => "dark",
     "palette_shortcut" => "auto",
     "use_anthropic_api_key" => "false",

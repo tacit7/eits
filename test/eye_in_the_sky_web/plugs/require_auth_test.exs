@@ -1,8 +1,19 @@
 defmodule EyeInTheSkyWeb.Plugs.RequireAuthTest do
-  use EyeInTheSkyWeb.ConnCase, async: true
+  # async: false because we mutate Application env (:api_key) in setup.
+  use EyeInTheSkyWeb.ConnCase, async: false
 
   alias EyeInTheSky.Accounts.ApiKey
   alias EyeInTheSkyWeb.Plugs.RequireAuth
+
+  # Enable auth for all tests. test.exs sets api_key: nil (bypass mode) so that
+  # API controller tests don't need tokens. We override that here so the plug
+  # actually enforces authentication. Each test that needs a different value can
+  # override it further inside the test body; on_exit restores to nil.
+  setup do
+    Application.put_env(:eye_in_the_sky, :api_key, "test-sentinel-key-not-a-real-token")
+    on_exit(fn -> Application.put_env(:eye_in_the_sky, :api_key, nil) end)
+    :ok
+  end
 
   # ---------------------------------------------------------------------------
   # Helpers

@@ -110,10 +110,7 @@ defmodule EyeInTheSkyWeb.ChatLiveE2ETest do
 
   describe "session list view" do
     test "lists all active sessions", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/sessions")
-
-      # Should show session overview
-      assert html =~ "Session Overview"
+      {:ok, view, _html} = live(conn, ~p"/sessions")
 
       # Should have a button to start a new agent/session
       assert has_element?(view, "button", "New Agent")

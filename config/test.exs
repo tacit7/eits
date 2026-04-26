@@ -60,3 +60,7 @@ config :eye_in_the_sky, :api_key, nil
 # connection and crashes, eventually hitting the supervisor restart limit and
 # tearing down the Repo before any test runs.
 config :eye_in_the_sky, :run_iam_seeds, false
+
+# Disable rate limiting in test — Hammer ETS table is global and persists across
+# tests, so repeated requests from 127.0.0.1 trip the default 60 req/min limit.
+config :eye_in_the_sky, :rate_limit_enabled, false

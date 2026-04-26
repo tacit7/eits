@@ -33,14 +33,14 @@ defmodule EyeInTheSky.Agents.AgentTest do
   # ---------------------------------------------------------------------------
 
   describe "schema" do
-    test "last_activity_at is typed as :string" do
-      assert Agent.__schema__(:type, :last_activity_at) == :string
+    test "last_activity_at is typed as :utc_datetime_usec" do
+      assert Agent.__schema__(:type, :last_activity_at) == :utc_datetime_usec
     end
 
-    test "created_at, archived_at, and last_activity_at are all :string" do
-      assert Agent.__schema__(:type, :created_at) == :string
-      assert Agent.__schema__(:type, :archived_at) == :string
-      assert Agent.__schema__(:type, :last_activity_at) == :string
+    test "created_at, archived_at, and last_activity_at are all :utc_datetime_usec" do
+      assert Agent.__schema__(:type, :created_at) == :utc_datetime_usec
+      assert Agent.__schema__(:type, :archived_at) == :utc_datetime_usec
+      assert Agent.__schema__(:type, :last_activity_at) == :utc_datetime_usec
     end
   end
 
@@ -49,14 +49,18 @@ defmodule EyeInTheSky.Agents.AgentTest do
   # ---------------------------------------------------------------------------
 
   describe "changeset/2" do
-    test "casts last_activity_at as a string" do
+    test "casts last_activity_at from ISO8601 string to DateTime" do
       agent = %Agent{}
       ts = "2026-03-15T10:00:00Z"
 
       changeset = Agent.changeset(agent, %{last_activity_at: ts})
 
       assert changeset.valid?
-      assert Ecto.Changeset.get_change(changeset, :last_activity_at) == ts
+      cast_value = Ecto.Changeset.get_change(changeset, :last_activity_at)
+      assert %DateTime{} = cast_value
+      assert cast_value.year == 2026
+      assert cast_value.month == 3
+      assert cast_value.day == 15
     end
 
     test "does not reject nil last_activity_at" do
@@ -72,15 +76,16 @@ defmodule EyeInTheSky.Agents.AgentTest do
   # ---------------------------------------------------------------------------
 
   describe "last_activity_at DB round-trip" do
-    test "stores and loads an ISO8601 string" do
-      ts = "2026-03-15T12:34:56Z"
+    test "stores and loads a DateTime value" do
+      ts = ~U[2026-03-15 12:34:56.000000Z]
       agent = create_agent()
 
       {:ok, updated} = Agents.update_agent(agent, %{last_activity_at: ts})
-      assert updated.last_activity_at == ts
+      assert %DateTime{} = updated.last_activity_at
 
       loaded = reload(updated)
-      assert loaded.last_activity_at == ts
+      assert %DateTime{} = loaded.last_activity_at
+      assert DateTime.compare(loaded.last_activity_at, ts) == :eq
     end
 
     test "returns nil when not set" do
@@ -89,25 +94,26 @@ defmodule EyeInTheSky.Agents.AgentTest do
       assert is_nil(loaded.last_activity_at)
     end
 
-    test "loaded value is always a string, never a NaiveDateTime struct" do
-      ts = "2026-01-01T00:00:00Z"
+    test "loaded value is always a DateTime struct, never a string" do
+      ts = ~U[2026-01-01 00:00:00.000000Z]
       agent = create_agent()
 
       {:ok, _} = Agents.update_agent(agent, %{last_activity_at: ts})
       loaded = reload(agent)
 
-      assert is_binary(loaded.last_activity_at) or is_nil(loaded.last_activity_at)
-      refute match?(%NaiveDateTime{}, loaded.last_activity_at)
+      assert %DateTime{} = loaded.last_activity_at
+      refute is_binary(loaded.last_activity_at)
     end
 
-    test "stores microsecond precision ISO8601 string intact" do
-      ts = "2026-03-15T12:34:56.789123Z"
+    test "stores microsecond precision intact" do
+      ts = ~U[2026-03-15 12:34:56.789123Z]
       agent = create_agent()
 
       {:ok, _} = Agents.update_agent(agent, %{last_activity_at: ts})
       loaded = reload(agent)
 
-      assert loaded.last_activity_at == ts
+      assert %DateTime{} = loaded.last_activity_at
+      assert DateTime.compare(loaded.last_activity_at, ts) == :eq
     end
   end
 end

@@ -333,8 +333,8 @@ defmodule EyeInTheSky.Tasks do
       UPDATE tasks
       SET position = pos_list.pos,
           updated_at = $3
-      FROM unnest($1::uuid[], $2::int[]) AS pos_list(uuid, pos)
-      WHERE tasks.uuid = pos_list.uuid
+      FROM unnest($1::text[], $2::int[]) AS pos_list(uuid, pos)
+      WHERE tasks.uuid::text = pos_list.uuid
       """,
       [uuids, positions, now]
     )

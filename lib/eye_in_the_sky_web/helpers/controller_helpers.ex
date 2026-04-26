@@ -31,6 +31,9 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   """
   def resolve_id(nil, _lookup_fn), do: nil
 
+  # Accept an already-resolved integer (e.g. from JSON body where session_id was sent as a number)
+  def resolve_id(n, _lookup_fn) when is_integer(n), do: n
+
   def resolve_id(raw, lookup_fn) when is_binary(raw) do
     case parse_int(raw) do
       nil ->

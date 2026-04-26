@@ -450,7 +450,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
         EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManagerForTeam
       )
 
-      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :agent_manager_module) end)
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, EyeInTheSky.Agents.MockAgentManager)
+      end)
 
       team = create_team()
 

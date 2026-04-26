@@ -7,17 +7,24 @@ defmodule EyeInTheSkyWeb.Plugs.RequireAuth do
   def call(conn, _opts) do
     configured_key = Application.get_env(:eye_in_the_sky, :api_key)
 
-    case get_req_header(conn, "authorization") do
-      ["Bearer " <> token] ->
-        if authenticated?(token, configured_key) do
-          conn
-        else
-          reject(conn)
-        end
+    # When no API key is configured (nil), bypass auth entirely.
+    # This is intended for test and development environments.
+    # An empty string is NOT treated as bypass — it means misconfiguration and
+    # all requests will be rejected (no token can match "").
+    if is_nil(configured_key) do
+      conn
+    else
+      case get_req_header(conn, "authorization") do
+        ["Bearer " <> token] ->
+          if authenticated?(token, configured_key) do
+            conn
+          else
+            reject(conn)
+          end
 
-      _ ->
-        # No bearer token — always reject, regardless of environment or key config.
-        reject(conn)
+        _ ->
+          reject(conn)
+      end
     end
   end
 

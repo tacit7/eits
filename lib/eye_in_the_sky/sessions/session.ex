@@ -127,6 +127,7 @@ defmodule EyeInTheSky.Sessions.Session do
       "archived"
     ])
     |> validate_inclusion(:status_reason, [nil, "session_ended", "sdk_completed", "zombie_swept"])
+    |> unique_constraint(:uuid, name: :sessions_uuid_index)
   end
 
   @doc """

@@ -281,10 +281,20 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
     test "cancels a running session" do
       test_pid = self()
 
-      stream = [
-        %Types.InitEvent{session_id: "session-789"},
-        %Types.MessageEvent{role: "assistant", content: "Should not see this"}
-      ]
+      # Stream that emits InitEvent immediately then blocks forever.
+      # This prevents the task from completing before cancel/1 is called,
+      # which avoids a race where the registry entry is cleaned up via :DOWN
+      # before the test can invoke cancel. The task is killed by cancel/1 while
+      # it is sleeping inside the stream, so the registry entry is still present.
+      stream =
+        Stream.resource(
+          fn -> :init end,
+          fn
+            :init -> {[%Types.InitEvent{session_id: "session-789"}], :blocking}
+            :blocking -> Process.sleep(:infinity); {[], :done}
+          end,
+          fn _ -> :ok end
+        )
 
       opts = %{}
 
@@ -295,7 +305,8 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
 
       :ok = StreamHandler.cancel(sdk_ref)
 
-      assert_receive {:claude_message, ^sdk_ref, _}, 500
+      # Stream was blocked before MessageEvent — it was never delivered.
+      refute_receive {:claude_message, ^sdk_ref, _}, 100
       Process.sleep(100)
       refute Process.alive?(handler_pid)
     end

@@ -54,10 +54,11 @@ body .phx-change-loading { opacity: 1 !important; }
 
 /* CM6 gutter — theme packages can leave .cm-gutters-before with a transparent
    background, making line numbers invisible against the editor background.
-   Set background explicitly so the gutter is always visible. */
+   NOTE: oklch(var(--b2)) / oklch(var(--bc)) do not resolve here (DaisyUI variable
+   format issue). Hardcoded dark-theme values until a theme-aware solution is found. */
 .cm-editor .cm-gutters.cm-gutters-before {
-  background: rgb(40, 44, 52) !important; /* TEST: swap back to oklch(var(--b2)) */
-  color: rgb(171, 178, 191) !important;   /* TEST: swap back to oklch(var(--bc)) */
+  background: rgb(40, 44, 52) !important;
+  color: rgb(171, 178, 191) !important;
 }
 
 /* Force agent detail to stay visible */

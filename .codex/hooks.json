@@ -1,23 +1,36 @@
 {
-  "hooks": [
+  "UserPromptSubmit": [
     {
-      "event": "UserPromptSubmit",
-      "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-prompt-working.sh",
-      "timeout": 10,
-      "statusMessage": "Updating EITS session status..."
-    },
+      "hooks": [
+        {
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-prompt-working.sh",
+          "timeout": 10,
+          "statusMessage": "Updating EITS session status..."
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
     {
-      "event": "PostToolUse",
       "matcher": "Bash",
-      "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-post-commit.sh",
-      "timeout": 15,
-      "statusMessage": "Logging commit to EITS..."
-    },
+      "hooks": [
+        {
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-post-commit.sh",
+          "timeout": 15,
+          "statusMessage": "Logging commit to EITS..."
+        }
+      ]
+    }
+  ],
+  "Stop": [
     {
-      "event": "Stop",
-      "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-session-stop.sh",
-      "timeout": 30,
-      "statusMessage": "Updating EITS session status..."
+      "hooks": [
+        {
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-session-stop.sh",
+          "timeout": 30,
+          "statusMessage": "Updating EITS session status..."
+        }
+      ]
     }
   ]
 }

@@ -52,6 +52,13 @@ body .phx-change-loading { opacity: 1 !important; }
 /* Agent-driven CodeMirror range highlight */
 .cm-agent-highlight { background: rgba(255, 200, 0, 0.3); border-radius: 2px; }
 
+/* File editor open: expand rail, hide main content.
+   Driven by data-file-editor on <html> (root.html.heex, never morphdom-patched)
+   instead of JS classList manipulation on the app-layout elements (which get
+   clobbered on every LiveView update). */
+[data-file-editor="true"] #main-content-wrapper { display: none; }
+[data-file-editor="true"] #app-rail { flex: 1; }
+
 /* CM6 gutter — theme packages can leave .cm-gutters-before with a transparent
    background, making line numbers invisible against the editor background.
    Set background explicitly so the gutter is always visible. */

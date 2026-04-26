@@ -310,6 +310,8 @@ export const VimNav = {
 
   _renderWhichKey(prefix: string) {
     this.whichKeyTimer = null
+    // Cancel the sequence auto-dismiss — overlay stays until user acts
+    if (this.sequenceTimer) { clearTimeout(this.sequenceTimer); this.sequenceTimer = null }
     // Remove any existing which-key overlay
     this.whichKeyEl?.remove()
     this.whichKeyEl = null

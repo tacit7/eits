@@ -397,7 +397,7 @@ cmd_tasks() {
         local _ann_body _ann_status
         _ann_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
           -H "Content-Type: application/json" \
-          "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" "${SESSION_ARGS[@]}" \
+          ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} ${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"} \
           -d "$_ann_payload" \
           "$BASE_URL/tasks/$id/annotations")
         _ann_status="${_ann_body##*$'\n'}"
@@ -466,7 +466,7 @@ cmd_tasks() {
         local _comp_body _comp_status
         _comp_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
           -H "Content-Type: application/json" \
-          "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" "${SESSION_ARGS[@]}" \
+          ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} ${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"} \
           -d "$_comp_payload" \
           "$BASE_URL/tasks/$id/complete")
         _comp_status="${_comp_body##*$'\n'}"
@@ -973,7 +973,7 @@ USAGE
       while [[ $_sp_attempt -le 3 ]]; do
         _sp_body=$(curl -sk --write-out '\n%{http_code}' -X POST \
           -H "Content-Type: application/json" \
-          "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" "${SESSION_ARGS[@]}" \
+          ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} ${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"} \
           -d "$payload" \
           "$BASE_URL/agents")
         _sp_status="${_sp_body##*$'\n'}"
@@ -1533,19 +1533,12 @@ cmd_teams() {
         case "$1" in
           --name)        name="${2:-}";        shift 2 ;;
           --description) description="${2:-}"; shift 2 ;;
-          *) shift ;;
+          *) die "unknown flag: $1" ;;
         esac
       done
       [[ -n "$name" || -n "$description" ]] || die "at least --name or --description required"
       local payload
-      payload=$(python3 -c "
-import json, sys
-d = {}
-name = sys.argv[1]; desc = sys.argv[2]
-if name: d['name'] = name
-if desc:  d['description'] = desc
-print(json.dumps(d))
-" "$name" "$description")
+      payload=$(json name "$name" description "$description")
       _patch "/teams/$id" "$payload"
       ;;
     members)
@@ -1566,7 +1559,7 @@ print(json.dumps(d))
         esac
       done
       need name
-      session_id="${session_id:-${EITS_SESSION_UUID:-}}"
+      session_id="${session_id:-${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}}"
       _post "/teams/$team_id/members" "$(json name "$name" role "$role" session_id "$session_id" agent_id "$agent_id")"
       ;;
     status)
@@ -1611,7 +1604,7 @@ HELP
           ($members | length) as $total |
           ($members | map(select(.session_status == "working")) | length) as $working |
           ($members | map(select(.session_status == "idle" or .session_status == "waiting")) | length) as $idle |
-          ($members | map(select(.member_status == "done" or .session_status == "completed")) | length) as $done |
+          ($members | map(select(.member_status == "done")) | length) as $done |
           ($members | map(select(.session_status == "failed")) | length) as $failed |
           ($members | map(select(.member_status == "spawn_failed")) | length) as $spawn_failed |
           "Team: \($t.name) (ID: \($t.id))",
@@ -1639,7 +1632,7 @@ HELP
         local spawn_failed_count=0 _wait_delay=2
         while true; do
           local resp _wait_body _wait_status
-          _wait_body=$(curl -sk --write-out '\n%{http_code}' "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" "${SESSION_ARGS[@]}" "$BASE_URL/teams/$id")
+          _wait_body=$(curl -sk --write-out '\n%{http_code}' ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} ${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"} "$BASE_URL/teams/$id")
           _wait_status="${_wait_body##*$'\n'}"
           _wait_body="${_wait_body%$'\n'*}"
           # Only retry on rate-limit (429) or server errors (5xx) — all other 4xx are permanent.
@@ -1922,7 +1915,7 @@ EOF
         local payload; payload=$(json body "$body" title "$title")
         body_out=$(curl -sk --write-out '\n%{http_code}' -X POST \
           -H "Content-Type: application/json" \
-          "${AUTH_ARGS[@]}" "${ROLE_ARGS[@]}" "${SESSION_ARGS[@]}" \
+          ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} ${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"} \
           -d "$payload" \
           "$BASE_URL/tasks/$task_id/annotations" 2>/dev/null) || body_out=$'\n000'
         status="${body_out##*$'\n'}"

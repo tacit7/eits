@@ -113,6 +113,16 @@ defmodule EyeInTheSky.Projects do
   def delete_project(%Project{} = project), do: delete(project)
 
   @doc """
+  Returns all projects belonging to a workspace, ordered case-insensitively by name.
+  """
+  def list_projects_for_workspace(workspace_id) do
+    Project
+    |> where([p], p.workspace_id == ^workspace_id)
+    |> order_by([p], asc: fragment("lower(?)", p.name))
+    |> Repo.all()
+  end
+
+  @doc """
   Sets the bookmarked state of a project. Returns {:ok, project} or {:error, :not_found}.
   """
   def set_bookmarked(project_id, bookmarked) when is_boolean(bookmarked) do

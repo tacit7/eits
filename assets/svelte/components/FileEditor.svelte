@@ -55,7 +55,7 @@
   }
 
   async function buildSettingsExtensions(size, fontSize, vimEnabled) {
-    const [{ EditorView }, { EditorState }, { indentUnit }] = await Promise.all([
+    const [{ EditorView }, { EditorState, Prec }, { indentUnit }] = await Promise.all([
       import('@codemirror/view'),
       import('@codemirror/state'),
       import('@codemirror/language'),
@@ -67,6 +67,13 @@
         "&": { fontSize: fontSize + 'px' },
         ".cm-scroller": { fontFamily: 'monospace' },
       }),
+      // Prec.highest ensures this is injected last in the stylesheet, beating
+      // any theme package that sets .cm-gutters or .cm-gutterElement color.
+      Prec.highest(EditorView.theme({
+        ".cm-gutters": { color: "oklch(var(--bc))" },
+        ".cm-gutterElement": { color: "oklch(var(--bc))" },
+        ".cm-activeLineGutter": { color: "oklch(var(--bc))" },
+      })),
     ]
     if (vimEnabled) {
       const { vim } = await import('@replit/codemirror-vim')
@@ -165,9 +172,8 @@
       styles={{
         "&": { height: "100%", backgroundColor: "oklch(var(--b1))" },
         ".cm-scroller": { overflow: "auto" },
-        ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))", color: "oklch(var(--bc))" },
-        ".cm-gutterElement": { color: "oklch(var(--bc))" },
-        ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))", color: "oklch(var(--bc))" },
+        ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))" },
+        ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))" },
         ".cm-activeLine": { backgroundColor: "oklch(var(--b3) / 0.4)" },
       }}
       on:change={(e) => handleChange(e.detail)}

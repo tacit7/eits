@@ -233,8 +233,8 @@ export const VimNav = {
         return
       }
       if (action.name === "new_agent_drawer") {
-        const cb = document.getElementById("new-agent-drawer") as HTMLInputElement | null
-        if (cb) cb.checked = !cb.checked
+        const cb = document.getElementById("new-agent-drawer")
+        if (cb instanceof HTMLInputElement) cb.checked = !cb.checked
         return
       }
     }

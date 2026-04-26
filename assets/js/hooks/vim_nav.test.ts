@@ -1,5 +1,16 @@
-import { describe, it, expect } from "vitest"
-import { isEditableTarget, keyFromEvent, matchesKnownBindingOrPrefix } from "./vim_nav"
+import { describe, it, expect, beforeEach, vi } from "vitest"
+import { isEditableTarget, keyFromEvent, matchesKnownBindingOrPrefix, VimNav } from "./vim_nav"
+
+function makeHook(opts: { enabled?: boolean; projectPath?: string } = {}) {
+  const el = document.createElement("div")
+  if (opts.enabled !== false) el.dataset.vimNavEnabled = "true"
+  if (opts.projectPath) el.dataset.vimProjectPath = opts.projectPath
+  document.body.appendChild(el)
+  const inst: any = Object.create(VimNav)
+  inst.el = el
+  inst.pushEvent = vi.fn()
+  return inst
+}
 
 describe("isEditableTarget", () => {
   it("returns true for INPUT", () => {
@@ -80,5 +91,80 @@ describe("matchesKnownBindingOrPrefix", () => {
 
   it("returns false for a bad second key", () => {
     expect(matchesKnownBindingOrPrefix(["g"], "x")).toBe(false)
+  })
+})
+
+describe("VimNav.buildPath", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  it("returns absolute path unchanged when not relative", () => {
+    const h = makeHook()
+    expect(h.buildPath("/sessions", false)).toBe("/sessions")
+  })
+
+  it("prepends project path when relative + project context exists", () => {
+    const h = makeHook({ projectPath: "/projects/42" })
+    expect(h.buildPath("tasks", true)).toBe("/projects/42/tasks")
+  })
+
+  it("strips trailing/leading slashes when joining project path", () => {
+    const h = makeHook({ projectPath: "/projects/42/" })
+    expect(h.buildPath("/tasks", true)).toBe("/projects/42/tasks")
+  })
+
+  it("falls back to /workspace/<segment> for known workspace routes", () => {
+    const h = makeHook()
+    expect(h.buildPath("tasks", true)).toBe("/workspace/tasks")
+    expect(h.buildPath("notes", true)).toBe("/workspace/notes")
+    expect(h.buildPath("sessions", true)).toBe("/workspace/sessions")
+  })
+
+  it("returns null for relative agents with no project (no /workspace/agents route)", () => {
+    const h = makeHook()
+    expect(h.buildPath("agents", true)).toBeNull()
+  })
+})
+
+describe("VimNav mode transitions", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  it("focusin on non-editable element does NOT switch to insert", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    h.statusbarEl = document.createElement("div")
+    const button = document.createElement("button")
+    document.body.appendChild(button)
+    h.mounted()
+    button.focus()
+    button.dispatchEvent(new FocusEvent("focusin", { bubbles: true }))
+    expect(h.mode).toBe("normal")
+    h.destroyed()
+  })
+
+  it("focusin on input switches to insert", () => {
+    const h = makeHook()
+    h.mounted()
+    const input = document.createElement("input")
+    document.body.appendChild(input)
+    input.focus()
+    input.dispatchEvent(new FocusEvent("focusin", { bubbles: true }))
+    expect(h.mode).toBe("insert")
+    h.destroyed()
+  })
+
+  it("Esc on editable in insert mode returns to normal", () => {
+    const h = makeHook()
+    h.mounted()
+    const input = document.createElement("input")
+    document.body.appendChild(input)
+    input.focus()
+    h.setMode("insert")
+    h.handleKey(new KeyboardEvent("keydown", { key: "Escape", target: input } as any))
+    // jsdom doesn't fully wire target on KeyboardEvent constructor; call directly
+    Object.defineProperty(Event.prototype, "target", { configurable: true, get() { return input } })
+    const evt = new KeyboardEvent("keydown", { key: "Escape" })
+    h.handleKey(evt)
+    expect(h.mode).toBe("normal")
+    h.destroyed()
   })
 })

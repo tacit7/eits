@@ -94,7 +94,9 @@ export const VimNav = {
     document.body.appendChild(this.statusbarEl)
 
     this._onKeydown = (e: KeyboardEvent) => this.handleKey(e)
-    this._onFocusin = () => this.setMode("insert")
+    this._onFocusin = (e: FocusEvent) => {
+      if (isEditableTarget(e.target)) this.setMode("insert")
+    }
     this._onFocusout = (e: FocusEvent) => {
       if (isEditableTarget(e.target)) {
         setTimeout(() => {
@@ -184,21 +186,29 @@ export const VimNav = {
     this.sequenceTimer = setTimeout(() => this.clearSequence(), 1000)
   },
 
-  buildPath(path: string, relative?: boolean): string {
+  // Top-level routes that have a /workspace/<segment> equivalent for the no-project fallback.
+  // /workspace/agents does NOT exist (router has no such route), so "agents" is project-only.
+  WORKSPACE_FALLBACK_SEGMENTS: new Set(["sessions", "tasks", "notes"]),
+
+  buildPath(path: string, relative?: boolean): string | null {
     if (!relative) return path
     const projectPath = (this.el as HTMLElement).dataset.vimProjectPath
+    const segment = path.replace(/^\//, "")
     if (projectPath) {
       const base = projectPath.replace(/\/$/, "")
-      const segment = path.replace(/^\//, "")
       return `${base}/${segment}`
     }
-    return `/workspace/${path.replace(/^\//, "")}`
+    if (this.WORKSPACE_FALLBACK_SEGMENTS.has(segment)) {
+      return `/workspace/${segment}`
+    }
+    return null
   },
 
   executeCommand(cmd: Command) {
     const { action } = cmd
     if (action.kind === "navigate") {
-      window.location.href = this.buildPath(action.path, action.relative)
+      const target = this.buildPath(action.path, action.relative)
+      if (target) window.location.href = target
       return
     }
     if (action.kind === "push_event") {

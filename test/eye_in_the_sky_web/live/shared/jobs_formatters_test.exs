@@ -164,8 +164,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormattersTest do
       assert "badge-primary" == JobsFormatters.type_badge_class("spawn_agent")
     end
 
-    test "shell_command" do
-      assert "badge-warning" == JobsFormatters.type_badge_class("shell_command")
+    test "shell_command falls through to ghost (type removed)" do
+      assert "badge-ghost" == JobsFormatters.type_badge_class("shell_command")
     end
 
     test "unknown type" do

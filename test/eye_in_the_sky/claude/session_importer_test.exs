@@ -8,7 +8,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
     {:ok, agent} =
       Agents.create_agent(%{
         name: "test-agent",
-        status: "stopped",
+        status: "idle",
         provider: "claude"
       })
 
@@ -16,7 +16,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
       Sessions.create_session(%{
         uuid: Ecto.UUID.generate(),
         agent_id: agent.id,
-        status: "stopped",
+        status: "idle",
         provider: "claude",
         started_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })

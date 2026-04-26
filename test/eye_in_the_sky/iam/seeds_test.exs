@@ -84,7 +84,7 @@ defmodule EyeInTheSky.IAM.SeedsTest do
     # Try to change a locked field (action)
     {:error, cs} = IAM.update_policy(policy, %{"action" => "Bash"})
     refute cs.valid?
-    assert "action" in Enum.map(cs.errors, &elem(&1, 0))
+    assert :action in Enum.map(cs.errors, &elem(&1, 0))
   end
 
   test "builtin_matcher registry contains workflow_business_hours_only" do
@@ -95,6 +95,7 @@ defmodule EyeInTheSky.IAM.SeedsTest do
   test "workflow_business_hours_only matches via builtin registry" do
     {:ok, module} = EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch("workflow_business_hours_only")
     assert module == EyeInTheSky.IAM.Builtin.WorkflowBusinessHoursOnly
+    Code.ensure_loaded?(module)
     assert function_exported?(module, :matches?, 2)
   end
 end

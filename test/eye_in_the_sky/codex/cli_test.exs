@@ -53,18 +53,19 @@ defmodule EyeInTheSky.Codex.CLITest do
   # ---------------------------------------------------------------------------
 
   describe "build_args/1 full_auto" do
-    test "defaults to --full-auto" do
+    test "defaults to --dangerously-bypass-approvals-and-sandbox (bypass_sandbox default true)" do
       args = CLI.build_args(prompt: "x")
+      assert "--dangerously-bypass-approvals-and-sandbox" in args
+      refute "--full-auto" in args
+    end
+
+    test "full_auto: true with bypass_sandbox: false includes --full-auto" do
+      args = CLI.build_args(prompt: "x", full_auto: true, bypass_sandbox: false)
       assert "--full-auto" in args
     end
 
-    test "full_auto: true includes --full-auto" do
-      args = CLI.build_args(prompt: "x", full_auto: true)
-      assert "--full-auto" in args
-    end
-
-    test "full_auto: false omits --full-auto" do
-      args = CLI.build_args(prompt: "x", full_auto: false)
+    test "full_auto: false with bypass_sandbox: false omits --full-auto" do
+      args = CLI.build_args(prompt: "x", full_auto: false, bypass_sandbox: false)
       refute "--full-auto" in args
     end
   end

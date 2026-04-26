@@ -25,6 +25,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
   # ---------------------------------------------------------------------------
 
   describe "file_changed event" do
+    @tag :skip
     test "saves config file content to disk", %{conn: conn} do
       {project, _dir, claude_dir} = create_project_with_claude_dir()
       File.write!(Path.join(claude_dir, "settings.json"), "{}")

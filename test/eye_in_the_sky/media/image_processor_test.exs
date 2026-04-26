@@ -48,7 +48,7 @@ defmodule EyeInTheSky.Media.ImageProcessorTest do
   describe "process_image/2" do
     test "small image passes through with valid data" do
       block = ContentBlock.new_image(@tiny_png_b64, "image/png")
-      result = ImageProcessor.process_image(block)
+      {:ok, result} = ImageProcessor.process_image(block)
       assert ContentBlock.image?(result)
       assert {:ok, raw} = Base.decode64(result.data)
       assert byte_size(raw) > 0
@@ -56,13 +56,13 @@ defmodule EyeInTheSky.Media.ImageProcessorTest do
 
     test "invalid base64 data returns block unchanged (no crash)" do
       block = ContentBlock.new_image("not-valid-base64!!!", "image/png")
-      result = ImageProcessor.process_image(block)
+      {:ok, result} = ImageProcessor.process_image(block)
       assert result == block
     end
 
     test "preserves original mime type on small images" do
       block = ContentBlock.new_image(@tiny_png_b64, "image/png")
-      result = ImageProcessor.process_image(block)
+      {:ok, result} = ImageProcessor.process_image(block)
       assert result.mime_type == "image/png"
     end
   end

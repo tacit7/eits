@@ -1790,8 +1790,14 @@ cmd_worktree() {
       if [[ -d "$wt_path" ]] && [[ -e "$wt_path/.git" ]]; then
         echo "Worktree already exists at $wt_path — reusing"
       else
+        local start_point="origin/main"
+        echo "Fetching origin/main..."
+        if ! git -C "$project_path" fetch origin main --quiet 2>&1; then
+          echo "warning: fetch failed, branching from local HEAD"
+          start_point=""
+        fi
         echo "Creating worktree: $wt_path (branch: $branch)"
-        git -C "$project_path" worktree add "$wt_path" -b "$branch" 2>&1 \
+        git -C "$project_path" worktree add "$wt_path" -b "$branch" $start_point 2>&1 \
           || die "git worktree add failed. If branch exists: git branch -D $branch"
       fi
 

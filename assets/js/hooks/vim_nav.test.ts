@@ -102,22 +102,30 @@ describe("VimNav.buildPath", () => {
     expect(h.buildPath("/sessions", false)).toBe("/sessions")
   })
 
-  it("prepends project path when relative + project context exists", () => {
-    const h = makeHook({ projectPath: "/projects/42" })
+  it("reads project ID from current URL", () => {
+    const h = makeHook()
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/42/sessions" }, configurable: true,
+    })
     expect(h.buildPath("tasks", true)).toBe("/projects/42/tasks")
   })
 
-  it("strips trailing/leading slashes when joining project path", () => {
-    const h = makeHook({ projectPath: "/projects/42/" })
-    expect(h.buildPath("/tasks", true)).toBe("/projects/42/tasks")
+  it("strips leading slash from segment", () => {
+    const h = makeHook()
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/42/sessions" }, configurable: true,
+    })
+    expect(h.buildPath("/notes", true)).toBe("/projects/42/notes")
   })
 
-  it("returns null for all relative paths when no project context", () => {
+  it("returns null for all relative paths when not on a project URL", () => {
     const h = makeHook()
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/settings" }, configurable: true,
+    })
     expect(h.buildPath("tasks", true)).toBeNull()
     expect(h.buildPath("notes", true)).toBeNull()
     expect(h.buildPath("agents", true)).toBeNull()
-    expect(h.buildPath("sessions", true)).toBeNull()
   })
 })
 

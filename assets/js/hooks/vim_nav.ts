@@ -186,13 +186,17 @@ export const VimNav = {
     this.sequenceTimer = setTimeout(() => this.clearSequence(), 1000)
   },
 
+  currentProjectPath(): string | null {
+    const m = window.location.pathname.match(/^(\/projects\/\d+)/)
+    return m ? m[1] : null
+  },
+
   buildPath(path: string, relative?: boolean): string | null {
     if (!relative) return path
-    const projectPath = (this.el as HTMLElement).dataset.vimProjectPath
+    const projectPath = this.currentProjectPath()
     if (!projectPath) return null
-    const base = projectPath.replace(/\/$/, "")
     const segment = path.replace(/^\//, "")
-    return `${base}/${segment}`
+    return `${projectPath}/${segment}`
   },
 
   executeCommand(cmd: Command) {

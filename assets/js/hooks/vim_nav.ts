@@ -31,6 +31,17 @@ export type { Command }
 
 type Mode = "normal" | "insert"
 
+// LiveView injects `el` and `pushEvent` at mount — Phoenix ships no official TS types,
+// so we define the interface here for type safety.
+interface LiveViewHook {
+  el: HTMLElement
+  pushEvent(event: string, payload: object, callback?: (reply: unknown) => void): void
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+}
+
 function createStatusbar(): HTMLElement {
   const el = document.createElement("div")
   el.id = "vim-nav-statusbar"
@@ -61,17 +72,19 @@ function updateStatusbar(el: HTMLElement, mode: Mode): void {
 }
 
 export const VimNav = {
-  el: null as unknown as HTMLElement,
-  pushEvent: null as unknown as (event: string, payload: object) => void,
+  // Injected by LiveView at runtime — `null as unknown as` is intentional since
+  // Phoenix provides no official TS types for hook lifecycle properties.
+  el: null as unknown as LiveViewHook["el"],
+  pushEvent: null as unknown as LiveViewHook["pushEvent"],
   mode: "normal" as Mode,
   buffer: [] as string[],
-  prefixTimer: null as ReturnType<typeof setTimeout> | null,
   sequenceTimer: null as ReturnType<typeof setTimeout> | null,
   statusbarEl: null as HTMLElement | null,
   helpOverlayEl: null as HTMLElement | null,
   _onKeydown: null as ((e: KeyboardEvent) => void) | null,
   _onFocusin: null as ((e: FocusEvent) => void) | null,
   _onFocusout: null as ((e: FocusEvent) => void) | null,
+  _onHelpClose: null as ((e: KeyboardEvent) => void) | null,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -99,12 +112,10 @@ export const VimNav = {
     if (this._onKeydown) document.removeEventListener("keydown", this._onKeydown, { capture: true } as EventListenerOptions)
     if (this._onFocusin) document.removeEventListener("focusin", this._onFocusin)
     if (this._onFocusout) document.removeEventListener("focusout", this._onFocusout)
-    if (this.prefixTimer) clearTimeout(this.prefixTimer)
     if (this.sequenceTimer) clearTimeout(this.sequenceTimer)
+    this.hideHelp()
     this.statusbarEl?.remove()
-    this.helpOverlayEl?.remove()
     this.statusbarEl = null
-    this.helpOverlayEl = null
     this._onKeydown = null
     this._onFocusin = null
     this._onFocusout = null
@@ -165,7 +176,6 @@ export const VimNav = {
 
   clearSequence() {
     this.buffer = []
-    if (this.prefixTimer) { clearTimeout(this.prefixTimer); this.prefixTimer = null }
     if (this.sequenceTimer) { clearTimeout(this.sequenceTimer); this.sequenceTimer = null }
   },
 
@@ -177,8 +187,12 @@ export const VimNav = {
   buildPath(path: string, relative?: boolean): string {
     if (!relative) return path
     const projectPath = (this.el as HTMLElement).dataset.vimProjectPath
-    if (projectPath) return `${projectPath}/${path}`
-    return `/workspace/${path}`
+    if (projectPath) {
+      const base = projectPath.replace(/\/$/, "")
+      const segment = path.replace(/^\//, "")
+      return `${base}/${segment}`
+    }
+    return `/workspace/${path.replace(/^\//, "")}`
   },
 
   executeCommand(cmd: Command) {
@@ -188,7 +202,9 @@ export const VimNav = {
       return
     }
     if (action.kind === "push_event") {
-      this.pushEvent(action.event, action.payload ?? {})
+      if (typeof this.pushEvent === "function") {
+        this.pushEvent(action.event, action.payload ?? {})
+      }
       return
     }
     if (action.kind === "client") {
@@ -226,13 +242,13 @@ export const VimNav = {
 
     for (const [group, cmds] of Object.entries(groups)) {
       html += `<div style="margin-bottom:12px">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(156,163,175,.6);margin-bottom:6px">${groupLabels[group] ?? group}</div>`
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(156,163,175,.6);margin-bottom:6px">${escapeHtml(groupLabels[group] ?? group)}</div>`
       for (const cmd of cmds) {
         const keys = cmd.keys.map(k =>
-          `<kbd style="display:inline-block;padding:1px 5px;border:1px solid rgba(156,163,175,.4);border-radius:3px;font-size:11px;background:rgba(255,255,255,.05)">${k}</kbd>`
+          `<kbd style="display:inline-block;padding:1px 5px;border:1px solid rgba(156,163,175,.4);border-radius:3px;font-size:11px;background:rgba(255,255,255,.05)">${escapeHtml(k)}</kbd>`
         ).join(" ")
         html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0">
-          <span style="font-size:12px;color:rgba(229,231,235,.8)">${cmd.label}</span>
+          <span style="font-size:12px;color:rgba(229,231,235,.8)">${escapeHtml(cmd.label)}</span>
           <span>${keys}</span></div>`
       }
       html += `</div>`
@@ -241,17 +257,22 @@ export const VimNav = {
     html += `<div style="margin-top:12px;font-size:10px;color:rgba(156,163,175,.5);text-align:center">Press any key to close</div></div>`
     overlay.innerHTML = html
 
-    const close = (e: KeyboardEvent) => {
+    this._onHelpClose = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (["Shift", "Control", "Meta", "Alt"].includes(e.key)) return
       e.preventDefault()
       this.hideHelp()
-      document.removeEventListener("keydown", close, { capture: true } as EventListenerOptions)
     }
-    document.addEventListener("keydown", close, { capture: true })
+    document.addEventListener("keydown", this._onHelpClose, { capture: true })
     document.body.appendChild(overlay)
     this.helpOverlayEl = overlay
   },
 
   hideHelp() {
+    if (this._onHelpClose) {
+      document.removeEventListener("keydown", this._onHelpClose, { capture: true } as EventListenerOptions)
+      this._onHelpClose = null
+    }
     this.helpOverlayEl?.remove()
     this.helpOverlayEl = null
   },

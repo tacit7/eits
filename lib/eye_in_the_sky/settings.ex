@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Settings do
   """
 
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @prefix "settings."
 
@@ -63,7 +64,7 @@ defmodule EyeInTheSky.Settings do
   def get_integer(key) do
     case get(key) do
       nil -> nil
-      val -> parse_integer(val)
+      val -> ToolHelpers.parse_int(val) || 0
     end
   end
 
@@ -166,13 +167,4 @@ defmodule EyeInTheSky.Settings do
   defp parse_float(val) when is_integer(val), do: val / 1
   defp parse_float(_), do: 0.0
 
-  defp parse_integer(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {i, _} -> i
-      :error -> 0
-    end
-  end
-
-  defp parse_integer(val) when is_integer(val), do: val
-  defp parse_integer(_), do: 0
 end

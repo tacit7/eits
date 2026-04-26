@@ -107,7 +107,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             <%!-- Agent name (replaces UUID — much more useful scan anchor) --%>
             <%= if @task.agent do %>
               <span class="text-base-content/15">&middot;</span>
-              <span class="text-base-content/40 truncate max-w-[160px]">{@task.agent.name}</span>
+              <span class="text-base-content/40 truncate max-w-[160px]">{@task.agent.description}</span>
             <% end %>
 
             <%!-- Notes count --%>

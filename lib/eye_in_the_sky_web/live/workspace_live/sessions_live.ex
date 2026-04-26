@@ -1,26 +1,13 @@
 defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Scope
-  alias EyeInTheSky.Workspaces
+  on_mount {EyeInTheSkyWeb.WorkspaceLive.Hooks, :require_workspace}
 
   @impl true
   def mount(_params, _session, socket) do
-    user = socket.assigns.current_user
+    workspace = socket.assigns.workspace
 
-    {workspace, scope} =
-      if user do
-        workspace = Workspaces.default_workspace_for_user!(user)
-        {workspace, Scope.for_workspace(user, workspace)}
-      else
-        {nil, nil}
-      end
-
-    socket =
-      socket
-      |> assign(:workspace, workspace)
-      |> assign(:scope, scope)
-      |> assign(:page_title, workspace_title(workspace, "Sessions"))
+    socket = assign(socket, :page_title, "#{workspace.name} — Sessions")
 
     {:ok, socket}
   end
@@ -34,7 +21,4 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
     </div>
     """
   end
-
-  defp workspace_title(nil, resource), do: "Workspace — #{resource}"
-  defp workspace_title(workspace, resource), do: "#{workspace.name} — #{resource}"
 end

@@ -112,11 +112,11 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
 
       # Must NOT contain --to 42 (self-DM bug)
       refute prompt =~ "dm --to 42"
-      # Must contain generic placeholder
-      assert prompt =~ "dm --to <target_session_uuid_or_id>"
+      # Must contain eits dm command with a placeholder (not session_id)
+      assert prompt =~ "eits dm --to <session_uuid>"
     end
 
-    test "includes incoming DM protocol instructions" do
+    test "includes eits CLI usage instructions" do
       state = %{
         eits_session_uuid: "test-uuid-456",
         session_id: 99,
@@ -126,9 +126,9 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
 
       prompt = Claude.eits_init_prompt(state)
 
-      assert prompt =~ "Incoming DM Protocol"
-      assert prompt =~ "DM from:"
-      assert prompt =~ "Always respond"
+      assert prompt =~ "eits tasks begin"
+      assert prompt =~ "eits tasks annotate"
+      assert prompt =~ "eits dm --to"
     end
 
     test "interpolates session context correctly" do

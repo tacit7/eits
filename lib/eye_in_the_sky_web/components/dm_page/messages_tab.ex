@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               </div>
             <% end %>
             <%!-- Scroll anchor: keeps list pinned to bottom on resize (keyboard open/close) --%>
-            <div id="messages-scroll-anchor" style="height: 1px;"></div>
+            <div id="messages-scroll-anchor" style="height: 1px; overflow-anchor: auto;"></div>
           <% end %>
         </div>
       </div>

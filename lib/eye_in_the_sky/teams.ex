@@ -2,6 +2,7 @@ defmodule EyeInTheSky.Teams do
   @moduledoc false
   import Ecto.Query, warn: false
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Agents.Agent
   alias EyeInTheSky.Tasks.Task, as: EitsTask
   alias EyeInTheSky.Teams.{Team, TeamMember}
   alias EyeInTheSky.Utils.ToolHelpers
@@ -28,6 +29,19 @@ defmodule EyeInTheSky.Teams do
       case Keyword.get(opts, :status) do
         nil -> where(query, [t], t.status != "archived")
         status -> where(query, [t], t.status == ^status)
+      end
+
+    query =
+      case Keyword.get(opts, :member_agent_uuid) do
+        nil ->
+          query
+
+        agent_uuid ->
+          query
+          |> join(:inner, [t], m in TeamMember, on: m.team_id == t.id)
+          |> join(:inner, [_t, m], a in Agent, on: a.id == m.agent_id)
+          |> where([_t, _m, a], a.uuid == ^agent_uuid)
+          |> distinct(true)
       end
 
     Repo.all(query)

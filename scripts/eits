@@ -1742,18 +1742,10 @@ HELP
       _post "/teams/$team_id/broadcast" "$(json from_session_id "$from" body "$body")"
       ;;
     my-teams)
-      # List teams where the current agent is a member (by EITS_AGENT_UUID)
+      # List teams where the current agent is a member (by EITS_AGENT_UUID).
+      # Uses ?member_agent_uuid= server filter — single request, no N+1.
       local agent_uuid="${EITS_AGENT_UUID:-}"; need agent_uuid
-      local resp
-      resp=$(_curl "$BASE_URL/teams" | jq .)
-      # Filter to teams where agent is a member — requires iterating .teams[]
-      echo "$resp" | jq --arg uuid "$agent_uuid" '.teams[] | select(.id) | .id' 2>/dev/null | while read -r tid; do
-        local members_resp
-        members_resp=$(_curl "$BASE_URL/teams/$tid/members" 2>/dev/null || true)
-        if echo "$members_resp" | jq -e --arg uuid "$agent_uuid" '.members[] | select(.agent_uuid == $uuid)' >/dev/null 2>&1; then
-          echo "$members_resp" | jq --arg uuid "$agent_uuid" '{team_id: .team_id, member: (.members[] | select(.agent_uuid == $uuid))}'
-        fi
-      done
+      _curl "$BASE_URL/teams?member_agent_uuid=$(printf '%s' "$agent_uuid" | jq -Rr @uri)" | jq .
       ;;
     *)
       echo "usage: eits teams <list|get|create|update|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"

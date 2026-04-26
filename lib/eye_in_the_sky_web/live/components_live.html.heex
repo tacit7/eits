@@ -394,20 +394,22 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
           <%!-- Working row --%>
           <div>
             <p class="text-xs text-base-content/40 mb-1">working — status_dot :working</p>
-            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
-              <.status_dot status={:working} size="sm" />
-              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+            <div class="relative group/row">
+              <div class="p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 sm:left-[-0.875rem] opacity-0 scale-75 pointer-events-none group-hover/row:opacity-100 group-hover/row:scale-100 group-hover/row:pointer-events-auto transition duration-100">
                 <.square_checkbox checked={false} />
               </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate">fix login bug</p>
-                <p class="text-xs text-base-content/50">working · 2m ago</p>
-              </div>
-              <span class="badge badge-sm badge-warning">working</span>
-              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
-                  <.icon name="hero-ellipsis-horizontal" class="size-4" />
-                </button>
+              <div class="flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
+                <.status_dot status={:working} size="sm" />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium truncate">fix login bug</p>
+                  <p class="text-xs text-base-content/50">working · 2m ago</p>
+                </div>
+                <span class="badge badge-sm badge-warning">working</span>
+                <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                  <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
+                    <.icon name="hero-ellipsis-horizontal" class="size-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -415,20 +417,22 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
           <%!-- Idle row --%>
           <div>
             <p class="text-xs text-base-content/40 mb-1">idle — no dot</p>
-            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
-              <span class="size-2 shrink-0" />
-              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+            <div class="relative group/row">
+              <div class="p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 sm:left-[-0.875rem] opacity-0 scale-75 pointer-events-none group-hover/row:opacity-100 group-hover/row:scale-100 group-hover/row:pointer-events-auto transition duration-100">
                 <.square_checkbox checked={false} />
               </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate">refactor auth module</p>
-                <p class="text-xs text-base-content/50">idle · 14m ago</p>
-              </div>
-              <span class="badge badge-sm badge-ghost">idle</span>
-              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
-                  <.icon name="hero-ellipsis-horizontal" class="size-4" />
-                </button>
+              <div class="flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
+                <span class="size-2 shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium truncate">refactor auth module</p>
+                  <p class="text-xs text-base-content/50">idle · 14m ago</p>
+                </div>
+                <span class="badge badge-sm badge-ghost">idle</span>
+                <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                  <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
+                    <.icon name="hero-ellipsis-horizontal" class="size-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -436,27 +440,30 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
           <%!-- Failed row --%>
           <div>
             <p class="text-xs text-base-content/40 mb-1">failed — status_dot :failed</p>
-            <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
-              <.status_dot status={:failed} size="sm" />
-              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+            <div class="relative group/row">
+              <div class="p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 sm:left-[-0.875rem] opacity-0 scale-75 pointer-events-none group-hover/row:opacity-100 group-hover/row:scale-100 group-hover/row:pointer-events-auto transition duration-100">
                 <.square_checkbox checked={false} />
               </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate">deploy to production</p>
-                <p class="text-xs text-base-content/50">failed · 1h ago</p>
-              </div>
-              <span class="badge badge-sm badge-error">failed</span>
-              <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
-                <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
-                  <.icon name="hero-ellipsis-horizontal" class="size-4" />
-                </button>
+              <div class="flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
+                <.status_dot status={:failed} size="sm" />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium truncate">deploy to production</p>
+                  <p class="text-xs text-base-content/50">failed · 1h ago</p>
+                </div>
+                <span class="badge badge-sm badge-error">failed</span>
+                <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+                  <button aria-label="Row actions" class="btn btn-ghost btn-xs btn-square">
+                    <.icon name="hero-ellipsis-horizontal" class="size-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code>group/row + group-hover/row: — named group required for nested hover reveal
-&lt;.status_dot status={:working} size="sm" /&gt;  ← :idle :failed :waiting :completed
-md:opacity-0 md:group-hover/row:opacity-100 — hover-reveal pattern</code></pre>
+          <pre class="bg-base-content/[0.04] rounded-md p-3 text-xs font-mono overflow-x-auto"><code>relative group/row             ← outer wrapper owns the group scope
+absolute sm:left-[-0.875rem]  ← checkbox lives outside the list boundary
+group-hover/row:opacity-100   ← hover-reveal (opacity + scale)
+&lt;.status_dot status={:working} size="sm" /&gt;  ← active states only</code></pre>
         </div>
       </section>
 

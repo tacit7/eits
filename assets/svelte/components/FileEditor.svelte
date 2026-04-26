@@ -165,8 +165,9 @@
       styles={{
         "&": { height: "100%", backgroundColor: "oklch(var(--b1))" },
         ".cm-scroller": { overflow: "auto" },
-        ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))" },
-        ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))" },
+        ".cm-gutters": { backgroundColor: "oklch(var(--b2))", borderRight: "1px solid oklch(var(--b3))", color: "oklch(var(--bc) / 0.4)" },
+        ".cm-gutterElement": { color: "oklch(var(--bc) / 0.4)" },
+        ".cm-activeLineGutter": { backgroundColor: "oklch(var(--b3))", color: "oklch(var(--bc) / 0.7)" },
         ".cm-activeLine": { backgroundColor: "oklch(var(--b3) / 0.4)" },
       }}
       on:change={(e) => handleChange(e.detail)}

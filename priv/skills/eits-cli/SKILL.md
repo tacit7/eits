@@ -76,7 +76,12 @@ eits commits list [--session-id <uuid>] [--project-id <id>]
 ## DMs
 
 ```bash
+# Send
 eits dm --to <session_uuid_or_integer_id> --message "text"
+
+# List inbound DMs (inbox polling — no browser required)
+eits dm list [--session <uuid|id>] [--limit <n>]
+# --session defaults to $EITS_SESSION_UUID; --limit defaults to 20, max 100
 ```
 
 Accepts both UUID and integer session ID.
@@ -98,9 +103,11 @@ eits notes list [--parent-type <type>] [--parent-id <id>]
 ```bash
 eits agents list [--project-id <id>]
 eits agents get <uuid>
-eits agents spawn --project-id <id> --instructions "..."
+eits agents spawn --instructions "..." [--team-name <name>] [--team-id <id>] [--model <m>] [--provider <p>]
 eits agents update <uuid> [--status <s>]
 ```
+
+`--team-name` and `--team-id` are mutually exclusive; `--team-id` resolves to the team name via API.
 
 ---
 
@@ -191,6 +198,7 @@ eits notifications mark-all-read
 6. **Agents commit to wrong branch** — always verify `git branch` before committing in a spawned agent.
 7. **`tasks begin` has no 429 auto-retry** — unlike `tasks annotate`, `begin` fails hard on rate limit. Retry manually with backoff if you hit 429.
 8. **DM to waiting/idle/completed session returns HTTP 500** — the DM controller doesn't gate on session status. Fall back to integer session ID if UUID fails; if both 500, the session is unreachable.
+9. **`EITS_AGENT_UUID` unset on resume** — if the resume hook didn't export it, `commits create` auto-resolves the agent UUID from `EITS_SESSION_UUID` via the sessions API. Any other command that needs it can do the same: `EITS_AGENT_UUID=$(eits sessions get $EITS_SESSION_UUID | jq -r '.agent_id')`
 
 ---
 

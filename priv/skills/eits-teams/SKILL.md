@@ -42,6 +42,8 @@ eits agents spawn \
 
 Only `--instructions` is required. `--project-id` is inherited from parent session automatically — do not pass it.
 
+`--team-name` and `--team-id` are mutually exclusive. Use `--team-id` when you have the integer ID and don't know the name — it resolves automatically via the teams API.
+
 ---
 
 ## Designing the Work (do this BEFORE spawning)
@@ -217,6 +219,7 @@ eits tasks update <task_id> --state 4
 - **DM sequentially** — parallel Bash DM calls cancel siblings on error.
 - **Don't pass `--project-id` when `--parent-session-id` is set** — it's inherited.
 - `--worktree` requires a clean working tree — commit or stash first.
+- **Poll inbound DMs without the browser**: `eits dm list` shows the orchestrator's inbox; use `--session <uuid>` to check any member's inbox.
 
 ---
 

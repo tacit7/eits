@@ -53,6 +53,20 @@ eits dm --to $UUID_2 --message "..."
 
 ---
 
+## Listing Inbound DMs (inbox polling)
+
+Useful when you know agents DM'd you but you can't check the web UI:
+
+```bash
+eits dm list                          # inbox for current session (default limit 20)
+eits dm list --session <uuid|id>      # inbox for any session
+eits dm list --limit 50               # up to 100 max
+```
+
+Returns `{session_id, session_uuid, count, messages[]}`. Messages are ordered oldest-first.
+
+---
+
 ## Environment Variables
 
 | Variable | Value |

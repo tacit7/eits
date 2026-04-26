@@ -686,12 +686,13 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :title, :string, required: true
   attr :toggle_event, :string, required: true
   attr :class, :string, default: nil
+  attr :phx_target, :any, default: nil
 
   def modal_header(assigns) do
     ~H"""
     <div class={["flex items-center justify-between mb-6", @class]}>
       <h2 class="text-xl font-semibold">{@title}</h2>
-      <button phx-click={@toggle_event} class="btn btn-ghost btn-sm btn-circle">
+      <button phx-click={@toggle_event} phx-target={@phx_target} class="btn btn-ghost btn-sm btn-circle">
         <.icon name="hero-x-mark" class="w-4 h-4" />
       </button>
     </div>

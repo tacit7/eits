@@ -583,6 +583,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         current_project={@sidebar_project}
         toggle_event="toggle_new_session_drawer"
         submit_event="create_new_session"
+        target={@myself}
       />
     </div>
     """

@@ -15,7 +15,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "new_agent_drawer"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -68,14 +68,14 @@ export const COMMANDS: Command[] = [
     action: { kind: "push_event", event: "toggle_proj_picker", payload: {}, target: "shell" } },
 
   // n — create actions
-  { id: "create.session", label: "New Session", keys: ["n", "s"], group: "create",
+  { id: "create.agent",   label: "New Agent",   keys: ["n", "a"], group: "create",
     action: { kind: "push_event", event: "toggle_new_session_drawer", payload: {}, target: "shell" } },
   { id: "create.task",    label: "New Task",    keys: ["n", "t"], group: "create",
-    action: { kind: "push_event", event: "toggle_new_task_drawer", payload: {}, target: "shell" } },
+    action: { kind: "client", name: "quick_create_task" } },
   { id: "create.note",    label: "New Note",    keys: ["n", "n"], group: "create",
-    action: { kind: "push_event", event: "open_quick_note_modal", payload: {}, target: "shell" } },
-  { id: "create.agent",   label: "New Agent",   keys: ["n", "a"], group: "create",
-    action: { kind: "client", name: "new_agent_drawer" } },
+    action: { kind: "client", name: "quick_create_note" } },
+  { id: "create.chat",    label: "New Chat",    keys: ["n", "c"], group: "create",
+    action: { kind: "client", name: "quick_create_chat" } },
 
   // global
   { id: "global.help",    label: "Keybinding Help",  keys: ["?"], group: "global",

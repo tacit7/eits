@@ -223,19 +223,13 @@ describe("VimNav.executeCommand shell routing", () => {
     expect(h.pushEvent).not.toHaveBeenCalled()
   })
 
-  it("n a toggles checkbox via instanceof HTMLInputElement", () => {
-    const cb = document.createElement("input")
-    cb.type = "checkbox"
-    cb.id = "new-agent-drawer"
-    cb.checked = false
-    document.body.appendChild(cb)
+  it("n a calls pushEventToShell with toggle_new_session_drawer", () => {
     const h = makeHook()
     h.pushEventToShell = vi.fn()
     const cmd = COMMANDS.find(c => c.id === "create.agent")!
     h.executeCommand(cmd)
-    expect(cb.checked).toBe(true)
-    h.executeCommand(cmd)
-    expect(cb.checked).toBe(false)
+    expect(h.pushEventToShell).toHaveBeenCalledWith("toggle_new_session_drawer", {})
+    expect(h.pushEvent).not.toHaveBeenCalled()
   })
 
   it("command_palette dispatches palette:open event", () => {
@@ -249,6 +243,17 @@ describe("VimNav.executeCommand shell routing", () => {
     const cmd = COMMANDS.find(c => c.id === "global.palette")!
     h.executeCommand(cmd)
     expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it("n c dispatches palette:create-chat window event", () => {
+    const listener = vi.fn()
+    window.addEventListener("palette:create-chat", listener)
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "create.chat")!
+    h.executeCommand(cmd)
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener("palette:create-chat", listener)
   })
 })
 

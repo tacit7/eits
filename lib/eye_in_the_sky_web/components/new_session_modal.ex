@@ -115,9 +115,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         class="modal modal-open modal-bottom sm:modal-middle"
         phx-window-keydown={@toggle_event}
         phx-key="Escape"
+        phx-target={assigns[:target]}
       >
         <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
-          <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} />
+          <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} phx_target={assigns[:target]} />
 
           <form phx-submit={@submit_event} class="flex flex-col gap-4">
             <.provider_field selected_provider={@selected_provider} myself={@myself} />
@@ -135,7 +136,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             <.modal_submit button_text={assigns[:button_text]} />
           </form>
         </div>
-        <div class="modal-backdrop bg-black/50 cursor-pointer" phx-click={@toggle_event}></div>
+        <div class="modal-backdrop bg-black/50 cursor-pointer" phx-click={@toggle_event} phx-target={assigns[:target]}></div>
       </div>
     </div>
     """

@@ -145,7 +145,7 @@ export const VimNav = {
     // Phase 1: insert mode — only Esc exits
     if (this.mode === "insert") {
       if (event.key === "Escape" && isEditableTarget(event.target)) {
-        event.preventDefault()
+        // Don't preventDefault — lets browser close any open <dialog> naturally
         ;(event.target as HTMLElement).blur()
         this.setMode("normal")
       }
@@ -161,6 +161,7 @@ export const VimNav = {
     if (key === "Escape") {
       this.clearSequence()
       this.hideHelp()
+      this.pushEventToShell?.("close_proj_picker", {})
       return
     }
 
@@ -232,9 +233,16 @@ export const VimNav = {
         document.getElementById("command-palette")?.dispatchEvent(new CustomEvent("palette:open"))
         return
       }
-      if (action.name === "new_agent_drawer") {
-        const cb = document.getElementById("new-agent-drawer")
-        if (cb instanceof HTMLInputElement) cb.checked = !cb.checked
+      if (action.name === "quick_create_note") {
+        window.dispatchEvent(new Event("palette:create-note"))
+        return
+      }
+      if (action.name === "quick_create_task") {
+        window.dispatchEvent(new Event("palette:create-task"))
+        return
+      }
+      if (action.name === "quick_create_chat") {
+        window.dispatchEvent(new Event("palette:create-chat"))
         return
       }
     }

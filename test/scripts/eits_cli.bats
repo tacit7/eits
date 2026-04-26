@@ -13,7 +13,14 @@ setup_file() {
   # Resolve agent UUID from known session and write to shared tmp file
   agent=$("$EITS" sessions get "$TEST_SESSION" | jq -r '.agent_id')
   echo "$agent" > "$BATS_FILE_TMPDIR/agent_uuid"
+
+  # Resolve a currently-working session UUID for DM send tests (sender must be active)
+  dm_sender=$("$EITS" sessions list --status working --limit 1 2>/dev/null \
+    | jq -r '.results[0].uuid // empty')
+  echo "${dm_sender:-}" > "$BATS_FILE_TMPDIR/dm_sender_uuid"
 }
+
+_dm_sender_uuid() { cat "$BATS_FILE_TMPDIR/dm_sender_uuid"; }
 
 _agent_uuid() { cat "$BATS_FILE_TMPDIR/agent_uuid"; }
 
@@ -1231,4 +1238,224 @@ teardown_teams() {
   # First ID must be task_a (priority 10 > 5)
   local first_id; first_id=$(echo "$ordered_ids" | head -1)
   [ "$first_id" = "$task_a" ]
+}
+
+# ── dm ───────────────────────────────────────────────────────────────────────
+
+@test "dm: sends request to server via UUID (delivery depends on subscriber)" {
+  sender=$(_dm_sender_uuid)
+  [ -n "$sender" ] || skip "no working session available to send DMs"
+  export EITS_SESSION_UUID="$sender"
+  # Accept success OR server-side failure; just reject local CLI errors
+  run "$EITS" dm --to "$sender" --message "bats dm test $(date +%s)" 2>&1 || true
+  [[ "$output" != *"is required"* ]]
+  [[ "$output" != *"unknown flag"* ]]
+}
+
+@test "dm: accepts numeric session ID as --to target (reaches server, not a local error)" {
+  sender=$(_dm_sender_uuid)
+  [ -n "$sender" ] || skip "no working session available to send DMs"
+  export EITS_SESSION_UUID="$sender"
+  int_id=$("$EITS" sessions get "$sender" | jq -r '.id')
+  run "$EITS" dm --to "$int_id" --message "bats dm numeric $(date +%s)" 2>&1 || true
+  # Accept success (200) or server-side failures (422/500); reject local errors (exit 127 / "is required")
+  [[ "$output" != *"is required"* ]]
+  [[ "$output" != *"unknown flag"* ]]
+}
+
+@test "dm: requires --to flag" {
+  run "$EITS" dm --message "no target" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "to" ]]
+}
+
+@test "dm: requires --message flag" {
+  run "$EITS" dm --to "$TEST_SESSION" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "message" || "$output" =~ "body" ]]
+}
+
+@test "dm: rejects unknown flags" {
+  run "$EITS" dm --to "$TEST_SESSION" --message "x" --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+}
+
+# ── agents spawn --dry-run ────────────────────────────────────────────────────
+
+@test "agents spawn --dry-run: prints curl command without making request" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  run "$EITS" agents spawn \
+    --instructions "bats dry-run test" \
+    --dry-run
+  [ "$status" -eq 0 ]
+  # dry-run must emit the curl command, not the HTTP response
+  [[ "$output" =~ "curl" ]]
+}
+
+@test "agents spawn --dry-run: fails without --instructions" {
+  run "$EITS" agents spawn --dry-run 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "instructions" ]]
+}
+
+# ── teams update ─────────────────────────────────────────────────────────────
+
+@test "teams update: renames team" {
+  team_id=$(setup_team)
+  new_name="bats-renamed-$(date +%s)-$RANDOM"
+  run "$EITS" teams update "$team_id" --name "$new_name"
+  [ "$status" -eq 0 ]
+  fetched_name=$("$EITS" teams get "$team_id" | jq -r '.name')
+  [ "$fetched_name" = "$new_name" ]
+  teardown_teams
+}
+
+@test "teams update: updates description" {
+  team_id=$(setup_team)
+  run "$EITS" teams update "$team_id" --description "bats updated desc"
+  [ "$status" -eq 0 ]
+  fetched_desc=$("$EITS" teams get "$team_id" | jq -r '.description')
+  [ "$fetched_desc" = "bats updated desc" ]
+  teardown_teams
+}
+
+@test "teams update: rejects unknown flags" {
+  team_id=$(setup_team)
+  run "$EITS" teams update "$team_id" --bogus foo 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+  teardown_teams
+}
+
+@test "teams update: fails without --name or --description" {
+  team_id=$(setup_team)
+  run "$EITS" teams update "$team_id" 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "name" || "$output" =~ "description" ]]
+  teardown_teams
+}
+
+# ── teams status --summary ────────────────────────────────────────────────────
+
+@test "teams status --summary: prints team name and member count" {
+  team_id=$(setup_team)
+  run "$EITS" teams status "$team_id" --summary
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Members:" ]]
+  teardown_teams
+}
+
+@test "teams status --summary: rejects unknown flags" {
+  team_id=$(setup_team)
+  run "$EITS" teams status "$team_id" --bogus 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "unknown flag" ]]
+  teardown_teams
+}
+
+# ── teams done-self ───────────────────────────────────────────────────────────
+
+@test "teams done-self: marks current session member as done" {
+  export EITS_SESSION_UUID="$TEST_SESSION"
+  team_id=$(setup_team)
+  # Join with the test session so done-self has a member to update
+  "$EITS" teams join "$team_id" --name "bats-done-self" --session "$TEST_SESSION" >/dev/null
+  run "$EITS" teams done-self "$team_id"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  # Verify the member is now done
+  status_val=$("$EITS" teams members "$team_id" | jq -r '.members[] | select(.name == "bats-done-self") | .member_status')
+  [ "$status_val" = "done" ]
+  teardown_teams
+}
+
+@test "teams done-self: fails when EITS_SESSION_UUID unset" {
+  run env -u EITS_SESSION_UUID "$EITS" teams done-self 1 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "EITS_SESSION_UUID" ]]
+}
+
+# ── teams my-teams ────────────────────────────────────────────────────────────
+
+@test "teams my-teams: returns only teams where agent is a member" {
+  agent_uuid=$(_agent_uuid)
+  export EITS_AGENT_UUID="$agent_uuid"
+  team_id=$(setup_team)
+  # Join this team as our agent
+  "$EITS" teams join "$team_id" --name "bats-my-teams-member" --agent "$agent_uuid" >/dev/null
+  run "$EITS" teams my-teams
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  echo "$output" | jq -e '.teams | type == "array"' >/dev/null
+  # Our joined team must appear in results
+  echo "$output" | jq -e --argjson id "$team_id" '.teams[] | select(.id == $id)' >/dev/null
+  teardown_teams
+}
+
+@test "teams my-teams: requires EITS_AGENT_UUID" {
+  run env -u EITS_AGENT_UUID "$EITS" teams my-teams 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "agent_uuid" ]]
+}
+
+# ── teams join: EITS_SESSION_ID fallback ─────────────────────────────────────
+
+@test "teams join: falls back to EITS_SESSION_ID when EITS_SESSION_UUID unset" {
+  int_id=$("$EITS" sessions get "$TEST_SESSION" | jq -r '.id')
+  team_id=$(setup_team)
+  run env -u EITS_SESSION_UUID EITS_SESSION_ID="$int_id" \
+    "$EITS" teams join "$team_id" --name "bats-session-id-fallback"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.success == true' >/dev/null
+  teardown_teams
+}
+
+# ── queue flush ───────────────────────────────────────────────────────────────
+
+@test "queue status: reports empty when no pending annotations" {
+  # Use an isolated home dir so we don't pollute the real queue
+  run env HOME="$(mktemp -d)" "$EITS" queue status
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "empty" || "$output" =~ "0 pending" ]]
+}
+
+@test "queue flush: succeeds with empty queue" {
+  run env HOME="$(mktemp -d)" "$EITS" queue flush
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "empty" || "$output" =~ "flushed" ]]
+}
+
+@test "queue flush: retries a pending annotation and removes it on success" {
+  tmp_home=$(mktemp -d)
+  mkdir -p "$tmp_home/.eits"
+  # Seed a real pending annotation against a known task
+  task_id=$("$EITS" tasks create --title "bats queue flush test" | jq -r '.task_id')
+  printf '{"task_id":"%s","body":"queued annotation","title":""}\n' "$task_id" \
+    > "$tmp_home/.eits/pending-annotations.log"
+  run env HOME="$tmp_home" "$EITS" queue flush
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "ok" ]]
+  # File should be gone (all entries flushed)
+  [ ! -s "$tmp_home/.eits/pending-annotations.log" ]
+}
+
+# ── set -u safety: auth arrays unbound ────────────────────────────────────────
+
+@test "tasks annotate: succeeds without EITS_API_KEY or EITS_SESSION_UUID set" {
+  task_id=$("$EITS" tasks create --title "bats set-u annotate" | jq -r '.task_id')
+  run env -u EITS_API_KEY -u EITS_SESSION_UUID \
+    "$EITS" tasks annotate "$task_id" --body "unbound var test"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.note_id' >/dev/null
+}
+
+@test "tasks complete: succeeds without EITS_API_KEY or EITS_SESSION_UUID set" {
+  task_id=$("$EITS" tasks create --title "bats set-u complete" | jq -r '.task_id')
+  "$EITS" tasks start "$task_id" >/dev/null
+  run env -u EITS_API_KEY -u EITS_SESSION_UUID \
+    "$EITS" tasks complete "$task_id" "unbound var complete test"
+  [ "$status" -eq 0 ]
+  state_id=$("$EITS" tasks get "$task_id" | jq -r '.task.state_id')
+  [ "$state_id" = "3" ]
 }

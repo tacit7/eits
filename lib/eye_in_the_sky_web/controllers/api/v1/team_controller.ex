@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Sessions, Teams}
+  alias EyeInTheSky.{Agents, Sessions, Teams}
   alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       []
       |> maybe_opt(:project_id, params["project_id"])
       |> maybe_opt(:status, params["status"])
+      |> maybe_opt(:member_agent_uuid, params["member_agent_uuid"])
 
     teams = Teams.list_teams(opts)
 
@@ -150,9 +151,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           team_id: team.id,
           name: params["name"],
           role: params["role"] || "member",
-          agent_id: params["agent_id"],
+          agent_id: resolve_id(params["agent_id"], &Agents.get_agent_by_uuid/1),
           session_id:
-            resolve_id(params["session_id"], &EyeInTheSky.Sessions.get_session_by_uuid/1)
+            resolve_id(params["session_id"], &Sessions.get_session_by_uuid/1)
         }
 
         case Teams.join_team(attrs) do

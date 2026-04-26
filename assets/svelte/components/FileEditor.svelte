@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import CodeMirror from 'svelte-codemirror-editor'
+  import { loadLanguage } from '../../js/cm_lang.js'
 
   export let live
   export let content = ''
@@ -22,47 +23,6 @@
   }
   $: if (hash !== currentHash && hash !== undefined) {
     currentHash = hash
-  }
-
-  async function loadLang(l) {
-    switch (l) {
-      case 'elixir': {
-        const { elixir } = await import('codemirror-lang-elixir')
-        return elixir()
-      }
-      case 'javascript':
-      case 'typescript': {
-        const { javascript } = await import('@codemirror/lang-javascript')
-        return javascript({ typescript: l === 'typescript' })
-      }
-      case 'css': {
-        const { css } = await import('@codemirror/lang-css')
-        return css()
-      }
-      case 'html':
-      case 'heex': {
-        const { html } = await import('@codemirror/lang-html')
-        return html()
-      }
-      case 'markdown': {
-        const { markdown } = await import('@codemirror/lang-markdown')
-        return markdown()
-      }
-      case 'json': {
-        const { json } = await import('@codemirror/lang-json')
-        return json()
-      }
-      case 'shell':
-      case 'bash': {
-        const [{ StreamLanguage }, { shell }] = await Promise.all([
-          import('@codemirror/language'),
-          import('@codemirror/legacy-modes/mode/shell'),
-        ])
-        return StreamLanguage.define(shell)
-      }
-      default:
-        return null
-    }
   }
 
   async function loadTheme(appTheme) {
@@ -150,7 +110,7 @@
       tabSize = initSize
       try {
         ;[langExtension, themeExtension, settingsExtensions] = await Promise.all([
-          loadLang(lang),
+          loadLanguage(lang),
           loadTheme(appTheme),
           buildSettingsExtensions(initSize, initFont, initVim),
         ])
@@ -177,9 +137,7 @@
 
   function save() {
     if (readonly) return
-    window.dispatchEvent(new CustomEvent('file:save', {
-      detail: { path, content: value, original_hash: currentHash }
-    }))
+    live.pushEvent('file_save', { content: value, path: path, original_hash: currentHash })
   }
 </script>
 

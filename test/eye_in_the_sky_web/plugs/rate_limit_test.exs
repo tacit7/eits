@@ -12,6 +12,10 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimitTest do
   setup tags do
     ip = {127, 0, 0, :rand.uniform(250) + 1}
 
+    # Enable rate limiting for all tests in this module (disabled globally in test.exs).
+    Application.put_env(:eye_in_the_sky, :rate_limit_enabled, true)
+    on_exit(fn -> Application.put_env(:eye_in_the_sky, :rate_limit_enabled, false) end)
+
     # Set the Phase 2 flag unless the test opts out.
     if tags[:per_session] do
       Settings.put("rate_limit_per_session", "true")

@@ -386,46 +386,49 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       case Teams.get_team(team_id) do
         {:ok, team} ->
           members = Teams.list_members(team_id)
-
-          if Enum.any?(members, &(&1.session_id == sender_session_id)) do
-            sender_label = get_sender_name(sender_session_id)
-
-            dm_body =
-              "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"
-
-            members
-            |> Enum.filter(fn m ->
-              m.session_id &&
-                m.session_id != sender_session_id &&
-                m.session &&
-                m.session.status not in Sessions.terminated_statuses()
-            end)
-            |> Enum.each(fn member ->
-              case DMDelivery.deliver_and_persist(
-                     member.session_id,
-                     sender_session_id,
-                     dm_body,
-                     %{channel_id: channel_id, broadcast: true}
-                   ) do
-                {:ok, _} ->
-                  :ok
-
-                {:error, reason} ->
-                  Logger.warning(
-                    "team broadcast failed for session #{member.session_id}: #{inspect(reason)}"
-                  )
-              end
-            end)
-          else
-            Logger.warning(
-              "broadcast_to_team: session #{sender_session_id} is not a member of team #{team_id}, skipping"
-            )
-          end
+          do_team_fanout(members, sender_session_id, team, channel_id, body)
 
         _ ->
           Logger.warning("broadcast_to_team: team #{team_id} not found, skipping fanout")
       end
     end)
+  end
+
+  defp do_team_fanout(members, sender_session_id, team, channel_id, body) do
+    if Enum.any?(members, &(&1.session_id == sender_session_id)) do
+      sender_label = get_sender_name(sender_session_id)
+
+      dm_body =
+        "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"
+
+      members
+      |> Enum.filter(fn m ->
+        m.session_id &&
+          m.session_id != sender_session_id &&
+          m.session &&
+          m.session.status not in Sessions.terminated_statuses()
+      end)
+      |> Enum.each(fn member ->
+        case DMDelivery.deliver_and_persist(
+               member.session_id,
+               sender_session_id,
+               dm_body,
+               %{channel_id: channel_id, broadcast: true}
+             ) do
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning(
+              "team broadcast failed for session #{member.session_id}: #{inspect(reason)}"
+            )
+        end
+      end)
+    else
+      Logger.warning(
+        "broadcast_to_team: session #{sender_session_id} is not a member of team #{team.id}, skipping"
+      )
+    end
   end
 
   @doc """

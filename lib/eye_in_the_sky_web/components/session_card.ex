@@ -52,7 +52,8 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     >
       <%!--
         Animated checkbox — absolutely positioned, never pushes content.
-        pointer-events-none when hidden prevents invisible element from eating clicks.
+        No pointer-events-none: keeping events active lets hover on the invisible
+        checkbox bubble up to group/row and trigger the reveal from outside the row.
         select_mode: forced visible without transition (avoids reinsert flicker on streams).
       --%>
       <div
@@ -60,9 +61,8 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2",
           "left-4 sm:left-[-0.875rem]",
           if(@select_mode,
-            do: "opacity-100 scale-100 pointer-events-auto",
-            else:
-              "opacity-0 scale-75 pointer-events-none group-hover/row:opacity-100 group-hover/row:scale-100 group-hover/row:pointer-events-auto transition duration-100"
+            do: "opacity-100 scale-100",
+            else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
           )
         ]}
         aria-hidden={to_string(!@select_mode)}

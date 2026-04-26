@@ -174,7 +174,22 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
           Keyboard
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-0">
+          <div class="card-body p-0 divide-y divide-base-300">
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Vim navigation</p>
+                <p class="text-xs text-base-content/50 mt-0.5">
+                  Keyboard-first navigation with normal/insert modes. Press ? for help.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-primary"
+                checked={@settings["vim_nav_enabled"] == "true"}
+                phx-click="toggle_setting"
+                phx-value-key="vim_nav_enabled"
+              />
+            </div>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
                 <p class="text-sm font-medium text-base-content">Command Palette Shortcut</p>

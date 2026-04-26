@@ -56,8 +56,8 @@ body .phx-change-loading { opacity: 1 !important; }
    background, making line numbers invisible against the editor background.
    Set background explicitly so the gutter is always visible. */
 .cm-editor .cm-gutters.cm-gutters-before {
-  background: rgb(40, 44, 52) !important; /* TEST: swap back to oklch(var(--b2)) */
-  color: rgb(171, 178, 191) !important;   /* TEST: swap back to oklch(var(--bc)) */
+  background: oklch(var(--b2)) !important;
+  color: oklch(var(--bc)) !important;
 }
 
 /* Force agent detail to stay visible */

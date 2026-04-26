@@ -26,6 +26,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       |> assign(:show_all, false)
       |> assign(:selected_note_ids, MapSet.new())
       |> assign(:notes_select_mode, false)
+      |> assign_notes_new_href(params)
 
     {:ok, socket}
   end
@@ -254,39 +255,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     |> assign(:notes_select_mode, false)
   end
 
+  defp assign_notes_new_href(socket, %{"id" => id}) do
+    case parse_id(id) do
+      nil ->
+        socket
+
+      project_id ->
+        href =
+          "/notes/new?parent_type=project&parent_id=#{project_id}&return_to=/projects/#{project_id}/notes"
+
+        assign(socket, :notes_new_href, href)
+    end
+  end
+
+  defp assign_notes_new_href(socket, _params), do: socket
+
   @impl true
   def render(assigns) do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="max-w-4xl mx-auto">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              phx-click="open_quick_note_modal"
-              class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
-            >
-              <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Quick Note
-            </button>
-            <.link
-              navigate={
-                ~p"/notes/new?#{%{parent_type: "project", parent_id: @project.id, return_to: "/projects/#{@project.id}/notes"}}"
-              }
-              class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
-            >
-              <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
-            </.link>
-            <button
-              :if={!@notes_select_mode && @notes != []}
-              class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 min-h-[44px] px-1 transition-colors"
-              phx-click="enter_select_mode_notes"
-            >
-              <div class="shrink-0 w-4 h-4 flex items-center justify-center border border-base-content/20 rounded bg-base-100 transition-colors"></div>
-              Select
-            </button>
-          </div>
-        </div>
-
         <.notes_list
           notes={@notes}
           starred_filter={@starred_filter}

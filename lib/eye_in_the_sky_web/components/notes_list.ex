@@ -18,60 +18,6 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
 
   def notes_list(assigns) do
     ~H"""
-    <%!-- Filter controls --%>
-    <div class="mb-5 flex flex-wrap items-center gap-2">
-      <div class="flex items-center gap-2">
-        <button
-          :if={!@select_mode && @notes != []}
-          type="button"
-          phx-click="enter_select_mode_notes"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium min-h-[44px] text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40 transition-all duration-150"
-        >
-          <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" /> Select
-        </button>
-        <button
-          type="button"
-          phx-click="toggle_starred_filter"
-          class={"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 min-h-[44px] min-w-[44px] " <>
-            if(@starred_filter,
-              do: "bg-warning/10 text-warning",
-              else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
-            )}
-        >
-          <.icon
-            name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
-            class="w-3.5 h-3.5"
-          /> Starred
-        </button>
-        <form phx-change="filter_type">
-          <label for={"#{@empty_id}-type"} class="sr-only">Filter by type</label>
-          <select
-            name="value"
-            id={"#{@empty_id}-type"}
-            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
-          >
-            <option value="all" selected={@type_filter == "all"}>All Types</option>
-            <option value="session" selected={@type_filter == "session"}>Session</option>
-            <option value="agent" selected={@type_filter == "agent"}>Agent</option>
-            <option value="project" selected={@type_filter == "project"}>Project</option>
-            <option value="task" selected={@type_filter == "task"}>Task</option>
-            <option value="system" selected={@type_filter == "system"}>System</option>
-          </select>
-        </form>
-        <form phx-change="sort_notes">
-          <label for={"#{@empty_id}-sort"} class="sr-only">Sort notes</label>
-          <select
-            name="value"
-            id={"#{@empty_id}-sort"}
-            class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
-          >
-            <option value="newest" selected={@sort_by == "newest"}>Newest</option>
-            <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>
-          </select>
-        </form>
-      </div>
-    </div>
-
     <%!-- Bulk-select toolbar --%>
     <%= if @select_mode && @notes != [] do %>
       <div class="mb-3 flex items-center gap-3 px-2 py-1.5">

@@ -79,6 +79,10 @@
       show_completed={assigns[:show_completed]}
       bulk_mode={assigns[:bulk_mode]}
       active_filter_count={assigns[:active_filter_count]}
+      notes_sort_by={assigns[:notes_sort_by]}
+      notes_starred_filter={assigns[:starred_filter] || false}
+      notes_type_filter={assigns[:type_filter] || "all"}
+      notes_new_href={assigns[:notes_new_href]}
       dm_active_tab={assigns[:active_tab]}
       dm_session_name={assigns[:page_title]}
       dm_message_search_query={assigns[:message_search_query]}

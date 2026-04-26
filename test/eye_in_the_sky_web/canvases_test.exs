@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.CanvasesTest do
   use EyeInTheSky.DataCase, async: true
 
-  alias EyeInTheSkyWeb.Canvases
+  alias EyeInTheSky.Canvases
 
   defp uniq, do: System.unique_integer([:positive])
 
@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.CanvasesTest do
         name: "canvas-session-#{uniq()}",
         agent_id: agent.id,
         started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-        status: "stopped"
+        status: "idle"
       })
 
     session

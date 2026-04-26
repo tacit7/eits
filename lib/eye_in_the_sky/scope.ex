@@ -73,9 +73,9 @@ defmodule EyeInTheSky.Scope do
 
   @doc "True when scope covers all projects in a workspace."
   def workspace?(%__MODULE__{type: :workspace}), do: true
-  def workspace?(_), do: false
+  def workspace?(%__MODULE__{}), do: false
 
   @doc "True when scope is limited to a single project."
   def project?(%__MODULE__{type: :project}), do: true
-  def project?(_), do: false
+  def project?(%__MODULE__{}), do: false
 end

@@ -163,8 +163,33 @@ defmodule EyeInTheSkyWeb.Layouts do
   end
 
   defp sessions_toolbar(assigns) do
+    filter_labels = %{
+      "all" => "All",
+      "working" => "Working",
+      "archived" => "Archived"
+    }
+
+    sort_labels = %{
+      "last_message" => "Last message",
+      "name" => "Name",
+      "agent" => "Agent",
+      "model" => "Model"
+    }
+
+    active_filter = assigns[:session_filter] || "all"
+    active_sort = assigns[:sort_by]
+    has_non_default = active_filter != "all" || not is_nil(active_sort)
+
+    assigns =
+      assigns
+      |> assign(:filter_labels, filter_labels)
+      |> assign(:sort_labels, sort_labels)
+      |> assign(:active_filter, active_filter)
+      |> assign(:active_sort, active_sort)
+      |> assign(:has_non_default, has_non_default)
+
     ~H"""
-    <%!-- Sessions: inline search + filter tabs + sort --%>
+    <%!-- Sessions: inline search + filter/sort dropdown --%>
     <form phx-change="search" class="flex-1 max-w-xs">
       <label for="top-bar-search" class="sr-only">Search</label>
       <div class="relative">
@@ -183,36 +208,72 @@ defmodule EyeInTheSkyWeb.Layouts do
         />
       </div>
     </form>
-    <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
-      <%= for {value, label} <- [{"all", "All"}, {"working", "Working"}, {"archived", "Archived"}] do %>
-        <button
-          phx-click="filter_session"
-          phx-value-filter={value}
-          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
-            if(@session_filter == value,
-              do: "bg-base-100 text-base-content shadow-sm",
-              else: "text-base-content/45 hover:text-base-content/70"
-            )}
-        >
-          {label}
-        </button>
-      <% end %>
-    </div>
-    <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
-      <%= for {value, label} <- [{"last_message", "Last msg"}, {"name", "Name"}, {"agent", "Agent"}, {"model", "Model"}] do %>
-        <button
-          phx-click="sort"
-          phx-value-by={value}
-          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
-            if(@sort_by == value,
-              do: "bg-base-100 text-base-content shadow-sm",
-              else: "text-base-content/45 hover:text-base-content/70"
-            )}
-        >
-          {label}
-        </button>
-      <% end %>
-    </div>
+    <%!-- Filter / sort dropdown --%>
+    <details class="dropdown dropdown-end">
+      <summary class={[
+        "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium cursor-pointer select-none list-none transition-colors",
+        if(@has_non_default,
+          do: "bg-primary/10 text-primary",
+          else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6"
+        )
+      ]}>
+        <.icon name="hero-adjustments-horizontal-mini" class="w-3.5 h-3.5" />
+        Filter
+        <%= if @has_non_default do %>
+          <span class="inline-flex items-center justify-center w-1.5 h-1.5 rounded-full bg-primary" />
+        <% end %>
+        <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
+      </summary>
+      <ul class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1.5 w-44 text-[11px] mt-1">
+        <%!-- Status section --%>
+        <li class="menu-title px-2 py-1 text-[10px] uppercase tracking-wider text-base-content/40 font-semibold">
+          Status
+        </li>
+        <%= for {value, label} <- [{"all", "All"}, {"working", "Working"}, {"archived", "Archived"}] do %>
+          <li>
+            <button
+              phx-click="filter_session"
+              phx-value-filter={value}
+              class={[
+                "flex items-center justify-between px-2 py-1.5 rounded-md w-full text-left",
+                if(@active_filter == value,
+                  do: "text-primary font-medium bg-primary/8",
+                  else: "text-base-content/70 hover:bg-base-content/6"
+                )
+              ]}
+            >
+              {label}
+              <%= if @active_filter == value do %>
+                <.icon name="hero-check-mini" class="w-3 h-3 text-primary" />
+              <% end %>
+            </button>
+          </li>
+        <% end %>
+        <li class="menu-title px-2 py-1 mt-1 text-[10px] uppercase tracking-wider text-base-content/40 font-semibold">
+          Sort by
+        </li>
+        <%= for {value, label} <- [{"last_message", "Last message"}, {"name", "Name"}, {"agent", "Agent"}, {"model", "Model"}] do %>
+          <li>
+            <button
+              phx-click="sort"
+              phx-value-by={value}
+              class={[
+                "flex items-center justify-between px-2 py-1.5 rounded-md w-full text-left",
+                if(@active_sort == value,
+                  do: "text-primary font-medium bg-primary/8",
+                  else: "text-base-content/70 hover:bg-base-content/6"
+                )
+              ]}
+            >
+              {label}
+              <%= if @active_sort == value do %>
+                <.icon name="hero-check-mini" class="w-3 h-3 text-primary" />
+              <% end %>
+            </button>
+          </li>
+        <% end %>
+      </ul>
+    </details>
     """
   end
 

@@ -381,6 +381,45 @@ defmodule EyeInTheSky.Sessions do
   defdelegate record_tool_event(session, type, params),
     to: EyeInTheSky.Sessions.ToolEventRecorder
 
+  # --- Scope-aware queries ---
+
+  @doc """
+  Lists sessions for a given `EyeInTheSky.Scope`.
+
+  - Project scope: returns sessions for that project, ordered by started_at desc.
+  - Workspace scope: returns sessions across all projects in the workspace,
+    preloads :project so callers can show the project label.
+
+  Accepts the same opts as `list_project_sessions_with_agent/2`:
+  `include_archived`, `active_only`, `limit`.
+  """
+  def list_sessions_for_scope(scope, opts \\ [])
+
+  def list_sessions_for_scope(%EyeInTheSky.Scope{type: :project, project_id: pid}, opts) do
+    list_project_sessions_with_agent(pid, opts)
+  end
+
+  def list_sessions_for_scope(%EyeInTheSky.Scope{type: :workspace, workspace_id: wid}, opts) do
+    limit_val = Keyword.get(opts, :limit)
+    active_only = Keyword.get(opts, :active_only, false)
+
+    query =
+      from s in Session,
+        join: p in EyeInTheSky.Projects.Project,
+        on: s.project_id == p.id and p.workspace_id == ^wid,
+        order_by: [desc: s.started_at],
+        preload: [project: p]
+
+    query = Archivable.include_archived(query, opts)
+    query = if active_only, do: where(query, [s], is_nil(s.ended_at)), else: query
+    query = if limit_val, do: limit(query, ^limit_val), else: query
+
+    query
+    |> with_agent_preload()
+    |> Repo.all()
+    |> attach_current_task_titles()
+  end
+
   defp project_sessions_base_query(project_id) do
     from(s in Session, where: s.project_id == ^project_id)
   end

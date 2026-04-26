@@ -156,6 +156,9 @@ defmodule EyeInTheSkyWeb.Router do
       live "/dm/:session_id", DmLive, :show
       live "/notes/new", NoteLive.New, :new
       live "/notes/:id/edit", NoteLive.Edit, :edit
+      live "/workspace/sessions", WorkspaceLive.Sessions, :index
+      live "/workspace/tasks", WorkspaceLive.Tasks, :index
+      live "/workspace/notes", WorkspaceLive.Notes, :index
       live "/iam/simulator", IAMLive.Simulator, :index
       live "/iam/policies", IAMLive.Policies, :index
       live "/iam/policies/new", IAMLive.PolicyNew, :new

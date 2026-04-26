@@ -9,6 +9,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
   attr :open, :boolean, default: false
   attr :new_project_path, :any, default: nil
   attr :myself, :any, required: true
+  attr :workspace, :any, default: nil
+  attr :scope_type, :atom, default: :project
 
   def project_switcher(assigns) do
     ~H"""
@@ -17,12 +19,48 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       class="absolute left-[52px] top-[48px] z-50 w-64 bg-base-200 border border-base-content/10 rounded-xl shadow-2xl overflow-hidden"
     >
       <div class="px-3 py-2.5 border-b border-base-content/8 text-[10px] font-semibold uppercase tracking-widest text-base-content/40">
-        Switch Project
+        Switch Context
       </div>
 
-      <div class="p-1.5 max-h-72 overflow-y-auto">
+      <%!-- WORKSPACE section --%>
+      <div class="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-widest text-base-content/30">
+        Workspace
+      </div>
+      <div class="px-1.5 pb-1.5">
+        <% ws_selected = @scope_type == :workspace %>
+        <button
+          phx-click="select_workspace"
+          phx-target={@myself}
+          class={[
+            "w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-left transition-colors",
+            if(ws_selected,
+              do: "bg-primary/10 text-primary",
+              else: "text-base-content/70 hover:bg-base-content/5 hover:text-base-content/90"
+            )
+          ]}
+        >
+          <div class={[
+            "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold",
+            if(ws_selected, do: "bg-primary text-white", else: "bg-base-content/10 text-base-content/60")
+          ]}>
+            <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium truncate">
+              {if @workspace, do: @workspace.name, else: "Personal Workspace"}
+            </div>
+          </div>
+          <.icon :if={ws_selected} name="hero-check-mini" class="w-3.5 h-3.5 flex-shrink-0" />
+        </button>
+      </div>
+
+      <%!-- PROJECTS section --%>
+      <div class="px-3 pt-1 pb-0.5 text-[9px] font-semibold uppercase tracking-widest text-base-content/30 border-t border-base-content/8">
+        Projects
+      </div>
+      <div class="p-1.5 max-h-48 overflow-y-auto">
         <%= for project <- @projects do %>
-          <% selected = not is_nil(@sidebar_project) && @sidebar_project.id == project.id %>
+          <% selected = @scope_type == :project && not is_nil(@sidebar_project) && @sidebar_project.id == project.id %>
           <button
             phx-click="select_project"
             phx-value-project_id={project.id}

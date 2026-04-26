@@ -270,13 +270,6 @@ defmodule EyeInTheSkyWeb.Router do
 
   end
 
-  # Gitea webhooks — no Bearer auth; controller validates HMAC signature from Gitea
-  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
-    pipe_through [:accepts_json]
-
-    post "/webhooks/gitea", GiteaWebhookController, :handle
-  end
-
   # IAM hook endpoint — unauthenticated (hooks run in Claude CLI process with no user session)
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
     pipe_through [:accepts_json]

@@ -31,14 +31,12 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
   def session_row(assigns) do
     display_status = derive_display_status(assigns.session)
 
-    %{label: status_label, border: status_border, class: status_class} =
-      session_status_display(display_status)
+    %{label: status_label} = session_status_display(display_status)
 
     assigns =
       assigns
       |> assign(:status_label, status_label)
-      |> assign(:status_border, status_border)
-      |> assign(:status_class, status_class)
+      |> assign(:status_atom, String.to_atom(display_status))
 
     ~H"""
     <%!--
@@ -48,9 +46,8 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     <div
       id={"session-row-#{@session.id}"}
       class={[
-        "relative group/row border-l-2 pl-2",
-        if(@selected, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg", else: "bg-base-100"),
-        @status_border
+        "relative group/row",
+        if(@selected, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg", else: "bg-base-100")
       ]}
     >
       <%!--
@@ -95,6 +92,9 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         phx-key="Enter"
         aria-label={"Open session: #{@session.name || "Unnamed session"} - #{@status_label}"}
       >
+        <%!-- Status dot --%>
+        <.status_dot status={@status_atom} size="sm" />
+
         <%!-- Main content --%>
         <div class="flex-1 min-w-0">
           <div class="flex items-baseline gap-2">

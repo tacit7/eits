@@ -26,6 +26,7 @@ defmodule EyeInTheSkyWeb.Layouts do
   - Tasks: `search_query`, `filter_state_id`, `workflow_states`, `sort_by`
   - Kanban: `search_query`, `show_completed`, `bulk_mode`, `active_filter_count`, `sidebar_project`
   - DM: `dm_active_tab`, `dm_session_name`, `dm_message_search_query`, `dm_active_timer`
+  - Notes: `notes_sort_by`, `notes_starred_filter`, `notes_type_filter`, `notes_new_href`
   - Generic: `search_query`
 
   Hidden on mobile (the mobile header handles that instead).
@@ -47,6 +48,11 @@ defmodule EyeInTheSkyWeb.Layouts do
   attr :show_completed, :boolean, default: nil
   attr :bulk_mode, :boolean, default: nil
   attr :active_filter_count, :integer, default: nil
+  # Notes toolbar
+  attr :notes_sort_by, :string, default: nil
+  attr :notes_starred_filter, :boolean, default: false
+  attr :notes_type_filter, :string, default: "all"
+  attr :notes_new_href, :string, default: nil
   # DM toolbar
   attr :dm_active_tab, :string, default: nil
   attr :dm_session_name, :string, default: nil
@@ -78,6 +84,8 @@ defmodule EyeInTheSkyWeb.Layouts do
       </div>
 
       <%= cond do %>
+        <% @sidebar_tab == :notes && not is_nil(@notes_sort_by) -> %>
+          <.notes_toolbar {assigns} />
         <% @sidebar_tab == :dm && not is_nil(@dm_active_tab) -> %>
           <.dm_toolbar {assigns} />
         <% @sidebar_tab == :sessions && not is_nil(@session_filter) -> %>
@@ -212,6 +220,85 @@ defmodule EyeInTheSkyWeb.Layouts do
         <% end %>
       </ul>
     </div>
+    """
+  end
+
+  defp notes_toolbar(assigns) do
+    ~H"""
+    <%!-- Notes: search + quick note + starred + type + sort --%>
+    <form phx-change="search" class="w-44">
+      <label for="notes-top-bar-search" class="sr-only">Search notes</label>
+      <div class="relative">
+        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+          <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
+        </div>
+        <input
+          type="text"
+          id="notes-top-bar-search"
+          name="query"
+          value={@search_query || ""}
+          phx-debounce="300"
+          placeholder="Search notes..."
+          autocomplete="off"
+          class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
+        />
+      </div>
+    </form>
+    <button
+      phx-click="open_quick_note_modal"
+      class="flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium text-base-content/60 hover:text-base-content hover:bg-base-content/8 transition-colors"
+    >
+      <.icon name="hero-bolt" class="w-3 h-3" /> Quick Note
+    </button>
+    <div class="w-px h-4 bg-base-content/10 mx-0.5" />
+    <button
+      phx-click="toggle_starred_filter"
+      aria-label={if @notes_starred_filter, do: "Remove starred filter", else: "Filter by starred"}
+      class={"flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium transition-colors " <>
+        if(@notes_starred_filter,
+          do: "bg-warning/10 text-warning",
+          else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"
+        )}
+    >
+      <.icon
+        name={if @notes_starred_filter, do: "hero-star-solid", else: "hero-star"}
+        class="w-3.5 h-3.5"
+      />
+    </button>
+    <form phx-change="filter_type">
+      <label for="notes-type-filter" class="sr-only">Filter by type</label>
+      <select
+        id="notes-type-filter"
+        name="value"
+        class="select select-xs h-7 min-h-0 bg-base-200/50 border-base-content/8 text-base-content/70 text-[11px] pr-6"
+      >
+        <option value="all" selected={@notes_type_filter == "all"}>All Types</option>
+        <option value="session" selected={@notes_type_filter == "session"}>Session</option>
+        <option value="agent" selected={@notes_type_filter == "agent"}>Agent</option>
+        <option value="project" selected={@notes_type_filter == "project"}>Project</option>
+        <option value="task" selected={@notes_type_filter == "task"}>Task</option>
+        <option value="system" selected={@notes_type_filter == "system"}>System</option>
+      </select>
+    </form>
+    <form phx-change="sort_notes">
+      <label for="notes-sort" class="sr-only">Sort notes</label>
+      <select
+        id="notes-sort"
+        name="value"
+        class="select select-xs h-7 min-h-0 bg-base-200/50 border-base-content/8 text-base-content/70 text-[11px] pr-6"
+      >
+        <option value="newest" selected={@notes_sort_by == "newest"}>Newest</option>
+        <option value="oldest" selected={@notes_sort_by == "oldest"}>Oldest</option>
+      </select>
+    </form>
+    <%= if @notes_new_href do %>
+      <.link
+        navigate={@notes_new_href}
+        class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+      >
+        <.icon name="hero-plus" class="w-3 h-3" /> New Note
+      </.link>
+    <% end %>
     """
   end
 

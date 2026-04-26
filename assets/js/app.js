@@ -243,11 +243,11 @@ function _mountVimNav() {
   if (_vimNavInst) { _vimNavInst.destroyed(); _vimNavInst = null }
   const inst = Object.create(VimNav)
   inst.el = el
-  inst.pushEvent = (event, payload) => liveSocket.main?.pushEventTo?.(el, event, payload)
+  inst.pushEvent = (event, payload) => liveSocket.main?.pushHookEvent(el, el, event, payload)
   inst.pushEventToShell = (event, payload) => {
     const rail = document.getElementById("app-rail")
     if (!rail) return
-    liveSocket.main?.pushEventTo?.(rail, event, payload)
+    liveSocket.main?.pushHookEvent(rail, rail, event, payload)
   }
   inst.mounted()
   _vimNavInst = inst

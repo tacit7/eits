@@ -151,6 +151,16 @@ Team members track two independent status fields:
 - **`session_status`** reflects the Claude Code process and lags — a member can be done but still show `working`
 - **Orchestrators should check `member_status`**, not `session_status`
 
+### Terminated Statuses
+
+Terminated statuses (sessions that can no longer send or receive messages) are centralized in the `Sessions` module via the `terminated_statuses/0` function:
+
+```elixir
+Sessions.terminated_statuses()  # Returns ~w(completed failed)
+```
+
+This function is used across the messaging and team controllers to check whether a session is in a terminal state. Previously, this list was duplicated in multiple controllers; it is now centralized to maintain consistency.
+
 ### Spawn Failures
 
 When `eits agents spawn` fails (non-2xx response), the system records a team member with `member_status: spawn_failed`:
@@ -302,6 +312,27 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 - `POST /api/v1/sessions/:uuid/context` — Upsert context
 
 This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
+
+### Session Resume Response
+
+When a session is resumed via `POST /api/v1/sessions/:uuid/resume`, the response includes the agent UUID and project ID needed to set up the Claude Code environment:
+
+```json
+{
+  "id": 3185,
+  "uuid": "8803d56d-dbbd-4916-9ff0-155378a64a47",
+  "agent_id": 42,
+  "agent_uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "project_id": 1,
+  "status": "idle"
+}
+```
+
+**Key fields:**
+- `agent_uuid` — Claude agent UUID (for `EITS_AGENT_UUID` env var) — now correctly populated on resume (previously hardcoded to null)
+- `project_id` — Project integer ID (for project-scoped operations) — now correctly populated on resume (previously hardcoded to null)
+
+This fix ensures the startup hook can properly populate `EITS_AGENT_UUID` and `EITS_PROJECT_ID` in the Claude Code environment when resuming a session.
 
 **Environment Variable: EITS_SESSION_ID**
 Spawned Claude processes set `EITS_SESSION_ID` to the **integer EITS session record ID**, not the UUID. This is critical for child agent spawning:
@@ -477,6 +508,21 @@ end
 ```
 
 The `mark_member_done_by_session/2` function now returns a count of updated members for accuracy (commit 5d4205a2), allowing `member_synced` to report true/false based on whether any members were actually synced.
+
+**Error Handling:**
+The `sync_member_status/2` helper function has a bare rescue clause that catches exceptions from `Teams.mark_member_done_by_session/2` operations. A warning log is now generated on rescue, enabling debugging of team member status sync failures:
+
+```elixir
+defp sync_member_status(session_id, member_status) do
+  EyeInTheSky.Teams.mark_member_done_by_session(session_id, member_status) > 0
+rescue
+  e ->
+    Logger.warning("sync_member_status failed for session #{session_id}: #{inspect(e)}")
+    false
+end
+```
+
+This allows operators to detect and diagnose team member sync failures in logs.
 
 ### Annotation Retry & Persistence
 

@@ -201,15 +201,26 @@ eits notes search <query>
 
 eits notes get <id>
 
-eits notes create --parent-type <session|task|agent> --parent-id <id> \
+eits notes create --parent-type <session|task|agent|project> --parent-id <id> \
   --body <text> [--title <t>] [--starred]
 
-eits notes update <id> [--body <text>] [--title <t>] [--starred]
+eits notes update <id> [--body <text>] [--title <t>] [--starred] \
+  [--parent-type <session|task|agent|project>] [--parent-id <id>]
 
 eits notes add --body <text> [--title <t>]    # Auto-attach to current session
 ```
 
 `--mine` is mutually exclusive with `--session`.
+
+### --help short-circuit
+
+`eits notes get`, `eits notes search`, and `eits notes update` check for `--help` / `-h` before consuming positional arguments, allowing help to be displayed without providing required parameters. Example:
+
+```bash
+eits notes update --help         # Shows usage without requiring <id>
+eits notes search --help         # Shows usage without requiring <query>
+eits notes get --help            # Shows usage without requiring <id>
+```
 
 ---
 

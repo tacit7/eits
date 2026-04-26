@@ -19,6 +19,7 @@ defmodule EyeInTheSky.Workspaces.Workspace do
     workspace
     |> cast(attrs, [:name, :default, :owner_user_id])
     |> validate_required([:name, :owner_user_id])
+    |> validate_inclusion(:default, [true, false])
     |> unique_constraint(:owner_user_id,
       name: :workspaces_owner_user_id_default_unique_index,
       message: "user already has a default workspace"

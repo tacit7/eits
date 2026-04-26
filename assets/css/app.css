@@ -52,11 +52,10 @@ body .phx-change-loading { opacity: 1 !important; }
 /* Agent-driven CodeMirror range highlight */
 .cm-agent-highlight { background: rgba(255, 200, 0, 0.3); border-radius: 2px; }
 
-/* Line number color — ID selector (1,0,0 + 1,0 = 1,1,0) beats CM6's scoped
-   theme rules (.cm-editor.HASH .cm-gutterElement = 0,3,0) without !important.
-   CM6 theme packages (oneDark, dracula, etc) set color on .cm-gutters which
-   would otherwise propagate and override our theme extension attempts. */
-#app-rail .cm-gutterElement { color: oklch(var(--bc)); }
+/* Line number color — CM6 theme packages inject .cm-editor.HASH .cm-gutterElement
+   rules at specificity 0,3,0. Our app.css loads before CM6's dynamic styles so
+   equal-specificity rules lose. !important wins unconditionally; CM6 never uses it. */
+.cm-editor .cm-gutterElement { color: oklch(var(--bc)) !important; }
 
 /* Force agent detail to stay visible */
 .agent-detail-wrapper,

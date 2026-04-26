@@ -698,6 +698,247 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders a search form with a magnifying glass icon on the left.
+
+  ## Examples
+
+      <.search_bar id="agent-search" placeholder="Search agents…" value={@query} on_change="search" />
+  """
+  attr :id, :string, required: true
+  attr :placeholder, :string, default: "Search…"
+  attr :value, :string, default: ""
+  attr :on_change, :string, default: "search"
+  attr :debounce, :string, default: "300"
+  attr :class, :string, default: ""
+
+  def search_bar(assigns) do
+    ~H"""
+    <form id={@id} phx-change={@on_change} class={"relative flex items-center #{@class}"}>
+      <.icon name="hero-magnifying-glass-mini" class="absolute left-2.5 size-4 text-base-content/40 pointer-events-none" />
+      <input
+        type="text"
+        name="query"
+        value={@value}
+        placeholder={@placeholder}
+        phx-debounce={@debounce}
+        class="input input-sm pl-9 w-full bg-base-200/60 border-transparent focus:border-base-content/20 focus:bg-base-100"
+      />
+    </form>
+    """
+  end
+
+  @doc """
+  Renders a loading spinner using the DaisyUI loading class.
+
+  ## Examples
+
+      <.spinner />
+      <.spinner size="lg" class="text-primary" />
+  """
+  attr :size, :string, default: "sm"
+  attr :class, :string, default: ""
+
+  def spinner(assigns) do
+    ~H"""
+    <span class={"loading loading-spinner loading-#{@size} #{@class}"} aria-label="Loading" role="status" />
+    """
+  end
+
+  @doc """
+  Renders a single skeleton placeholder row for list loading states.
+
+  ## Examples
+
+      <.skeleton_row :for={_ <- 1..5} />
+  """
+  attr :class, :string, default: ""
+
+  def skeleton_row(assigns) do
+    ~H"""
+    <div class={"flex items-center gap-3 px-3 py-2.5 #{@class}"}>
+      <div class="skeleton h-4 w-4 rounded-full shrink-0" />
+      <div class="flex flex-col gap-1.5 flex-1">
+        <div class="skeleton h-3 w-2/3" />
+        <div class="skeleton h-2.5 w-1/3" />
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a small colored dot indicating a session or agent status.
+
+  ## Examples
+
+      <.status_dot status={:working} />
+      <.status_dot status={:completed} size="md" />
+  """
+  attr :status, :atom, required: true
+  attr :size, :string, default: "sm"
+  attr :class, :string, default: ""
+
+  def status_dot(assigns) do
+    ~H"""
+    <span class={"rounded-full #{status_dot_size(@size)} #{status_dot_color(@status)} shrink-0 #{@class}"} />
+    """
+  end
+
+  @doc """
+  Renders a DaisyUI badge with semantic status coloring and an optional dot.
+
+  ## Examples
+
+      <.status_badge status={:working} />
+      <.status_badge status={:failed} show_dot={true} label="Error" />
+  """
+  attr :status, :atom, required: true
+  attr :label, :string, default: nil
+  attr :show_dot, :boolean, default: false
+  attr :size, :string, default: "sm"
+  attr :class, :string, default: ""
+
+  def status_badge(assigns) do
+    assigns =
+      assign(assigns, :label_text,
+        assigns[:label] || assigns.status |> Atom.to_string() |> String.replace("_", " ")
+      )
+
+    ~H"""
+    <span class={"badge badge-#{@size} #{status_badge_color(@status)} #{@class}"}>
+      <%= if @show_dot do %>
+        <.status_dot status={@status} size="xs" />
+      <% end %>
+      {@label_text}
+    </span>
+    """
+  end
+
+  @doc """
+  Renders a keyboard key using the DaisyUI kbd component.
+
+  ## Examples
+
+      <.kbd key="⌘" /><.kbd key="K" />
+      <.kbd key="Esc" class="ml-1" />
+  """
+  attr :key, :string, required: true
+  attr :class, :string, default: ""
+
+  def kbd(assigns) do
+    ~H"""
+    <kbd class={"kbd kbd-xs #{@class}"}>{@key}</kbd>
+    """
+  end
+
+  @doc """
+  Renders a pill tab container. Each tab is declared with the `:item` slot.
+
+  ## Examples
+
+      <.tab_pills>
+        <:item label="All" active={@tab == "all"} on_click="switch_tab" value="all" />
+        <:item label="Running" active={@tab == "running"} on_click="switch_tab" value="running" />
+      </.tab_pills>
+  """
+  attr :class, :string, default: ""
+
+  slot :item, required: true do
+    attr :label, :string, required: true
+    attr :active, :boolean
+    attr :on_click, :string
+    attr :value, :string
+  end
+
+  def tab_pills(assigns) do
+    ~H"""
+    <div class={"flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5 #{@class}"}>
+      <%= for item <- @item do %>
+        <button
+          type="button"
+          phx-click={item[:on_click]}
+          phx-value-tab={item[:value]}
+          class={[
+            "px-3 py-1 rounded-md text-sm font-medium transition-colors",
+            if(item[:active],
+              do: "bg-base-100 text-base-content shadow-sm",
+              else: "text-base-content/60 hover:bg-base-200/60 hover:text-base-content"
+            )
+          ]}
+        >
+          {item[:label]}
+        </button>
+      <% end %>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a responsive overlay drawer. On mobile it slides up from the bottom;
+  on desktop it renders as a centered modal overlay.
+
+  ## Examples
+
+      <.side_drawer id="task-drawer" open={@drawer_open} on_close="close_drawer">
+        <p>Drawer content here</p>
+      </.side_drawer>
+  """
+  attr :id, :string, required: true
+  attr :open, :boolean, default: false
+  attr :on_close, :string, default: "close_drawer"
+  attr :aria_label, :string, default: "Dialog"
+  attr :class, :string, default: ""
+
+  slot :inner_block, required: true
+
+  def side_drawer(assigns) do
+    ~H"""
+    <%!-- Backdrop --%>
+    <div
+      :if={@open}
+      phx-click={@on_close}
+      class="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+    />
+
+    <%!-- Mobile: slide from bottom --%>
+    <div
+      id={"#{@id}-mobile"}
+      role="dialog"
+      aria-modal="true"
+      aria-label={@aria_label}
+      aria-hidden={to_string(!@open)}
+      class={[
+        "sm:hidden fixed inset-x-0 bottom-0 z-50 bg-base-100 rounded-t-2xl shadow-xl",
+        "pb-[env(safe-area-inset-bottom)]",
+        "transition-transform duration-200",
+        if(@open, do: "translate-y-0", else: "translate-y-full")
+      ]}
+    >
+      {render_slot(@inner_block)}
+    </div>
+
+    <%!-- Desktop: centered modal overlay --%>
+    <div
+      id={"#{@id}-desktop"}
+      class={[
+        "hidden sm:flex fixed inset-0 z-50 items-center justify-center",
+        if(!@open, do: "pointer-events-none opacity-0", else: "opacity-100"),
+        "transition-opacity duration-150"
+      ]}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={@aria_label}
+        aria-hidden={to_string(!@open)}
+        class={"bg-base-100 rounded-xl shadow-2xl w-full max-w-lg mx-4 #{@class}"}
+      >
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do
@@ -752,5 +993,30 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   # Badge components extracted to EyeInTheSkyWeb.TaskBadges
   defdelegate priority_badge(assigns), to: EyeInTheSkyWeb.TaskBadges
   defdelegate state_badge(assigns), to: EyeInTheSkyWeb.TaskBadges
+
+  defp status_dot_size("xs"), do: "size-1.5"
+  defp status_dot_size("sm"), do: "size-2"
+  defp status_dot_size("md"), do: "size-2.5"
+  defp status_dot_size(_), do: "size-2"
+
+  defp status_dot_color(:working), do: "bg-warning"
+  defp status_dot_color(:running), do: "bg-warning"
+  defp status_dot_color(:idle), do: "bg-base-content/30"
+  defp status_dot_color(:waiting), do: "bg-info"
+  defp status_dot_color(:pending), do: "bg-info"
+  defp status_dot_color(:completed), do: "bg-success"
+  defp status_dot_color(:failed), do: "bg-error"
+  defp status_dot_color(:stopped), do: "bg-base-content/20"
+  defp status_dot_color(_), do: "bg-base-content/30"
+
+  defp status_badge_color(:working), do: "badge-warning"
+  defp status_badge_color(:running), do: "badge-warning"
+  defp status_badge_color(:idle), do: "badge-ghost"
+  defp status_badge_color(:waiting), do: "badge-info"
+  defp status_badge_color(:pending), do: "badge-info"
+  defp status_badge_color(:completed), do: "badge-success"
+  defp status_badge_color(:failed), do: "badge-error"
+  defp status_badge_color(:stopped), do: "badge-ghost"
+  defp status_badge_color(_), do: "badge-ghost"
 
 end

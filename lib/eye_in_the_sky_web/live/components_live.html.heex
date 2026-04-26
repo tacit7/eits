@@ -414,9 +414,9 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
 
           <%!-- Idle row --%>
           <div>
-            <p class="text-xs text-base-content/40 mb-1">idle — status_dot :idle</p>
+            <p class="text-xs text-base-content/40 mb-1">idle — no dot</p>
             <div class="group/row flex items-center gap-2 px-3 py-2.5 hover:bg-base-200/40 cursor-pointer rounded">
-              <.status_dot status={:idle} size="sm" />
+              <span class="size-2 shrink-0" />
               <div class="md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
                 <.square_checkbox checked={false} />
               </div>

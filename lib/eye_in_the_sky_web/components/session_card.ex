@@ -92,8 +92,12 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         phx-key="Enter"
         aria-label={"Open session: #{@session.name || "Unnamed session"} - #{@status_label}"}
       >
-        <%!-- Status dot --%>
-        <.status_dot status={@status_atom} size="sm" />
+        <%!-- Status dot — idle variants are silent (no dot) --%>
+        <%= if @status_atom in [:idle, :idle_stale, :idle_dead, :completed] do %>
+          <span class="size-2 shrink-0" />
+        <% else %>
+          <.status_dot status={@status_atom} size="sm" />
+        <% end %>
 
         <%!-- Main content --%>
         <div class="flex-1 min-w-0">

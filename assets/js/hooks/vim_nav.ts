@@ -161,6 +161,7 @@ export const VimNav = {
     if (key === "Escape") {
       this.clearSequence()
       this.hideHelp()
+      this.pushEventToShell?.("close_proj_picker", {})
       return
     }
 

@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Notes
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
@@ -142,6 +143,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   def handle_event("enter_select_mode_notes", _params, socket) do
     {:noreply, assign(socket, :notes_select_mode, true)}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("edit_note", %{"note_id" => note_id}, socket) do

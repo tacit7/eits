@@ -155,7 +155,7 @@ Hooks.IndeterminateCheckbox = IndeterminateCheckbox
 Hooks.ShiftSelect = ShiftSelect
 Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
-Hooks.VimNav = VimNav
+// VimNav is initialized directly below (not via phx-hook)
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
@@ -233,6 +233,21 @@ if (!window.liveSocket) {
   liveSocket.connect()
   window.liveSocket = liveSocket
 }
+
+// VimNav is mounted directly (not via phx-hook) because Phoenix doesn't
+// call mounted() for hooks on live layout elements.
+let _vimNavInst = null
+function _mountVimNav() {
+  const el = document.getElementById("vim-nav-root")
+  if (!el) return
+  if (_vimNavInst) { _vimNavInst.destroyed(); _vimNavInst = null }
+  const inst = Object.create(VimNav)
+  inst.el = el
+  inst.pushEvent = (event, payload) => liveSocket.main?.pushEventTo?.(el, event, payload)
+  inst.mounted()
+  _vimNavInst = inst
+}
+window.addEventListener("phx:page-loading-stop", _mountVimNav)
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:

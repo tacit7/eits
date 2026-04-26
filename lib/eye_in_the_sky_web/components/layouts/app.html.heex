@@ -2,10 +2,13 @@
   id="app-shell"
   class="flex h-[var(--app-viewport-height)] bg-base-100"
   data-palette-shortcut={@palette_shortcut}
-  data-vim-nav-enabled={EyeInTheSky.Settings.get_boolean("vim_nav_enabled")}
-  data-vim-project-path={assigns[:sidebar_project] && "/projects/#{assigns[:sidebar_project].id}"}
-  phx-hook="VimNav"
 >
+  <div
+    id="vim-nav-root"
+    data-vim-nav-enabled={EyeInTheSky.Settings.get("vim_nav_enabled")}
+    data-vim-project-path={assigns[:sidebar_project] && "/projects/#{assigns[:sidebar_project].id}"}
+    style="display:none"
+  ></div>
   <a
     href="#main-content"
     class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] rounded-md bg-base-100 px-3 py-2 text-xs font-medium shadow"

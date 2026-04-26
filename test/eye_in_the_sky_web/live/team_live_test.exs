@@ -1,6 +1,9 @@
 defmodule EyeInTheSkyWeb.TeamLive.IndexTest do
   use EyeInTheSkyWeb.ConnCase, async: true
 
+  # /teams LiveView removed; route no longer exists
+  @moduletag :skip
+
   import Phoenix.LiveViewTest
 
   alias EyeInTheSky.{Agents, Sessions, Teams}

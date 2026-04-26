@@ -3,7 +3,7 @@ defmodule EyeInTheSky.Factory do
   Shared test factory helpers for controller and MCP tool tests.
   """
 
-  alias EyeInTheSky.{Accounts, Agents, Sessions}
+  alias EyeInTheSky.{Accounts, Agents, Projects, Sessions, Workspaces}
 
   def user_fixture(attrs \\ %{}) do
     username = Map.get(attrs, :username, "user_#{System.unique_integer([:positive])}")
@@ -12,6 +12,32 @@ defmodule EyeInTheSky.Factory do
   end
 
   def uniq, do: System.unique_integer([:positive])
+
+  @doc """
+  Creates a project with a provisioned user + default workspace.
+  Accepts the same attrs as `Projects.create_project/1`.
+  Always injects workspace_id — callers do not need to supply it.
+  """
+  def project_fixture(attrs \\ %{}) do
+    user = user_fixture()
+    workspace = Workspaces.default_workspace_for_user!(user)
+
+    n = uniq()
+
+    defaults = %{
+      name: "Test project #{n}",
+      path: "/tmp/test_project_#{n}",
+      slug: "test-project-#{n}"
+    }
+
+    {:ok, project} =
+      defaults
+      |> Map.merge(Map.new(attrs))
+      |> Map.put(:workspace_id, workspace.id)
+      |> Projects.create_project()
+
+    project
+  end
 
   def create_agent(overrides \\ %{}) do
     {:ok, agent} =

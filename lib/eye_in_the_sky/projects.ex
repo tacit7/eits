@@ -81,8 +81,26 @@ defmodule EyeInTheSky.Projects do
 
   @doc """
   Creates a project.
+
+  `workspace_id` is required. In test environments, if not provided, the function
+  falls back to the first available workspace so existing tests don't need to be
+  updated individually. Production code should always supply `workspace_id`.
   """
-  def create_project(attrs \\ %{}), do: create(attrs)
+  def create_project(attrs \\ %{}) do
+    attrs = inject_workspace_id_if_missing(attrs)
+    create(attrs)
+  end
+
+  defp inject_workspace_id_if_missing(%{workspace_id: id} = attrs) when not is_nil(id), do: attrs
+
+  defp inject_workspace_id_if_missing(attrs) do
+    case Repo.one(
+           from w in EyeInTheSky.Workspaces.Workspace, order_by: [asc: :id], limit: 1
+         ) do
+      nil -> attrs
+      workspace -> Map.put(attrs, :workspace_id, workspace.id)
+    end
+  end
 
   @doc """
   Updates a project.

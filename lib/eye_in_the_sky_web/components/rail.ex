@@ -67,6 +67,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         sidebar_project: nil,
         sidebar_tab: :sessions,
         active_channel_id: nil,
+        workspace: nil,
+        scope_type: :project,
         flyout_canvases: [],
         flyout_teams: [],
         flyout_tasks: [],
@@ -124,6 +126,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
     sidebar_tab = Map.get(assigns, :sidebar_tab, socket.assigns[:sidebar_tab] || :sessions)
     active_channel_id = Map.get(assigns, :active_channel_id, socket.assigns[:active_channel_id])
+    workspace = Map.get(assigns, :workspace, socket.assigns[:workspace])
+    scope_type = Map.get(assigns, :scope_type, socket.assigns[:scope_type] || :project)
 
     previous_tab = socket.assigns[:sidebar_tab]
     next_section = Map.get(@section_map, sidebar_tab, :sessions)
@@ -135,6 +139,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       |> assign(:sidebar_tab, sidebar_tab)
       |> assign(:sidebar_project, sidebar_project)
       |> assign(:active_channel_id, active_channel_id)
+      |> assign(:workspace, workspace)
+      |> assign(:scope_type, scope_type)
 
     # Only reload flyout sessions when the project actually changes — not on every
     # parent re-render. Every PubSub broadcast through the parent would otherwise
@@ -311,7 +317,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     project_id = new_project && new_project.id
     socket4 = push_event(socket3, "save_project", %{project_id: project_id})
 
-    {:noreply, assign(socket4, :proj_picker_open, false)}
+    {:noreply, socket4 |> assign(:proj_picker_open, false) |> assign(:scope_type, :project)}
+  end
+
+  def handle_event("select_workspace", _params, socket) do
+    socket =
+      socket
+      |> assign(:proj_picker_open, false)
+      |> assign(:sidebar_project, nil)
+      |> assign(:scope_type, :workspace)
+      |> push_navigate(to: ~p"/workspace/sessions")
+
+    {:noreply, socket}
   end
 
   def handle_event("show_new_project", _params, socket),
@@ -524,6 +541,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         open={@proj_picker_open}
         new_project_path={@new_project_path}
         myself={@myself}
+        workspace={@workspace}
+        scope_type={@scope_type}
       />
 
       <.flyout

@@ -114,13 +114,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
   end
 
   describe "handle_params — error paths" do
-    # path_within? uses realpath, so non-existent paths resolve to Access denied
     test "non-existent file path assigns an error", %{conn: conn} do
       {project, _dir} = create_project_with_dir()
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=does_not_exist.ex")
 
-      assert render(view) =~ "Access denied"
+      html = render(view)
+      # Linux realpath succeeds for non-existent paths (path_within? -> true -> "File not found")
+      # macOS realpath fails for non-existent paths (path_within? -> false -> "Access denied")
+      assert html =~ "File not found" or html =~ "Access denied"
     end
 
     test "directory path loads listing without error", %{conn: conn} do

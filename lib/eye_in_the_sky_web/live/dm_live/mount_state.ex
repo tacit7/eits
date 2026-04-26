@@ -37,13 +37,12 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     Events.subscribe_codex_raw(session_id)
   end
 
-  defp session_belongs_to?(_session_id, nil), do: false
-
-  defp session_belongs_to?(_session_id, _current_user) do
-    # For now, any authenticated user can access sessions.
-    # Future: add user_id to sessions table and verify ownership.
-    true
-  end
+  # Allow access in both auth-enabled (any user) and auth-disabled (current_user=nil)
+  # modes. The nil -> false clause silently broke real-time updates under
+  # DISABLE_AUTH=true: the LiveView mounted but never called setup_subscriptions,
+  # so {:new_message} and {:new_dm} broadcasts were dropped on the floor.
+  # Future: add user_id to sessions table and verify ownership when auth is required.
+  defp session_belongs_to?(_session_id, _current_user), do: true
 
   def assign_sidebar_context(socket, %{"from" => "project", "project_id" => project_id_str}) do
     case parse_int(project_id_str) do

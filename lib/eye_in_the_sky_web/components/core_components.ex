@@ -855,6 +855,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     <div class={"flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5 #{@class}"}>
       <%= for item <- @item do %>
         <button
+          type="button"
           phx-click={item[:on_click]}
           phx-value-tab={item[:value]}
           class={[
@@ -885,6 +886,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :id, :string, required: true
   attr :open, :boolean, default: false
   attr :on_close, :string, default: "close_drawer"
+  attr :aria_label, :string, default: "Dialog"
   attr :class, :string, default: ""
 
   slot :inner_block, required: true
@@ -901,6 +903,10 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     <%!-- Mobile: slide from bottom --%>
     <div
       id={"#{@id}-mobile"}
+      role="dialog"
+      aria-modal="true"
+      aria-label={@aria_label}
+      aria-hidden={to_string(!@open)}
       class={[
         "sm:hidden fixed inset-x-0 bottom-0 z-50 bg-base-100 rounded-t-2xl shadow-xl",
         "pb-[env(safe-area-inset-bottom)]",
@@ -920,7 +926,13 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         "transition-opacity duration-150"
       ]}
     >
-      <div class={"bg-base-100 rounded-xl shadow-2xl w-full max-w-lg mx-4 #{@class}"}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={@aria_label}
+        aria-hidden={to_string(!@open)}
+        class={"bg-base-100 rounded-xl shadow-2xl w-full max-w-lg mx-4 #{@class}"}
+      >
         {render_slot(@inner_block)}
       </div>
     </div>

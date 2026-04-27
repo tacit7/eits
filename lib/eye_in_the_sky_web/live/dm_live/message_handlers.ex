@@ -122,7 +122,21 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
   The Task sends `:do_message_reload` when done so the LV picks up any newly
   imported messages without the user seeing a blank conversation.
+
+  ## Why skip sync for active sessions
+
+  When a session is actively running ("working" or "compacting"), the
+  event-driven pipeline — `handle_claude_complete` / `handle_agent_stopped` →
+  `sync_and_reload` — handles all JSONL imports. Running the mount Task sync
+  concurrently creates a race: both paths call `SessionImporter.sync` at the
+  same time, read the same `get_last_source_uuid` cursor before either commits,
+  and each inserts the same JSONL entry with its own distinct source_uuid.
+  `on_conflict: :nothing` only deduplicates identical UUIDs, so both rows land
+  in the DB and the message renders twice. Skipping the Task sync for active
+  sessions eliminates this window entirely.
   """
+  @active_session_statuses ~w(working compacting)
+
   def load_messages_on_mount(socket) do
     if connected?(socket) do
       session = socket.assigns.session
@@ -131,19 +145,27 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       session_uuid = socket.assigns.session_uuid
       lv_pid = self()
 
-      Task.start(fn ->
-        result =
-          case session.provider do
-            "codex" -> sync_codex_async(session_id, session_uuid)
-            "gemini" -> {:error, :no_file_sync}
-            _ -> sync_claude_async(session_id, session_uuid, session, agent)
-          end
+      # Skip the file sync when the session is actively running — the
+      # claude_complete / agent_stopped event handlers call sync_and_reload and
+      # will import any new JSONL entries when Claude finishes. Doing the sync
+      # here concurrently causes duplicate DB rows (different source_uuids,
+      # same body) because both paths check agent_reply_already_recorded?
+      # before either commits.
+      unless session.status in @active_session_statuses do
+        Task.start(fn ->
+          result =
+            case session.provider do
+              "codex" -> sync_codex_async(session_id, session_uuid)
+              "gemini" -> {:error, :no_file_sync}
+              _ -> sync_claude_async(session_id, session_uuid, session, agent)
+            end
 
-        case result do
-          {:ok, _} -> send(lv_pid, :do_message_reload)
-          {:error, _} -> :ok
-        end
-      end)
+          case result do
+            {:ok, _} -> send(lv_pid, :do_message_reload)
+            {:error, _} -> :ok
+          end
+        end)
+      end
 
       TabHelpers.load_tab_data(socket, "messages", session_id)
     else

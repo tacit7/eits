@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- Tasks: search + state filter pills + sort --%>
+    <%!-- Tasks: search + view toggle + state filter pills + sort --%>
     <form phx-change="search" class="flex-1 max-w-xs">
       <label for="top-bar-tasks-search" class="sr-only">Search tasks</label>
       <div class="relative">
@@ -35,6 +35,23 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
         />
       </div>
     </form>
+    <%= if @sidebar_project do %>
+      <div class="flex items-center bg-base-200/40 rounded-lg p-0.5">
+        <span
+          class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-base-100 shadow-sm text-base-content cursor-default"
+          title="List view"
+        >
+          <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" /> List
+        </span>
+        <.link
+          navigate={~p"/projects/#{@sidebar_project.id}/kanban"}
+          class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
+          title="Board view"
+        >
+          <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" /> Board
+        </.link>
+      </div>
+    <% end %>
     <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
       <button
         phx-click="filter_status"
@@ -97,23 +114,6 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
         <% end %>
       </ul>
     </details>
-    <%= if @sidebar_project do %>
-      <div class="flex items-center bg-base-200/40 rounded-lg p-0.5 ml-1">
-        <span
-          class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-base-100 shadow-sm text-base-content cursor-default"
-          title="List view"
-        >
-          <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" /> List
-        </span>
-        <.link
-          navigate={~p"/projects/#{@sidebar_project.id}/kanban"}
-          class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
-          title="Board view"
-        >
-          <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" /> Board
-        </.link>
-      </div>
-    <% end %>
     """
   end
 end

@@ -75,6 +75,23 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
           />
         </div>
       </form>
+      <%= if @sidebar_project do %>
+        <div class="flex items-center bg-base-200/40 rounded-lg p-0.5">
+          <.link
+            navigate={~p"/projects/#{@sidebar_project.id}/tasks"}
+            class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
+            title="List view"
+          >
+            <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" /> List
+          </.link>
+          <span
+            class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-base-100 shadow-sm text-base-content cursor-default"
+            title="Board view"
+          >
+            <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" /> Board
+          </span>
+        </div>
+      <% end %>
       <div class="flex items-center gap-1">
         <button
           phx-click="toggle_bulk_mode"
@@ -100,23 +117,6 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
             </span>
           <% end %>
         </button>
-        <%= if @sidebar_project do %>
-          <div class="flex items-center bg-base-200/40 rounded-lg p-0.5 ml-1">
-            <span
-              class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-base-100 shadow-sm text-base-content cursor-default"
-              title="Board view"
-            >
-              <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" /> Board
-            </span>
-            <.link
-              navigate={~p"/projects/#{@sidebar_project.id}/tasks"}
-              class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
-              title="List view"
-            >
-              <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" /> List
-            </.link>
-          </div>
-        <% end %>
       </div>
     <% end %>
     """

@@ -51,6 +51,11 @@ config :eye_in_the_sky,
   # (messaging fanout, cmd_dispatcher, teams_handler) complete before the sandbox
   # owner exits. Same root cause as iam_audit_sync above.
   async_tasks_sync: true,
+  # Skip long-running pollers (Tasks.Poller, Teams.Subscriber) in test env.
+  # They hold sandbox connections during queries; when the test owner exits
+  # mid-query, they crash repeatedly until the supervisor escalates and kills
+  # the Endpoint, breaking subsequent tests with ETS errors.
+  start_pollers: false,
   # Core-layer config keys — keeps core modules free of EyeInTheSkyWeb.Endpoint atom references
   secret_key_base: "nkJhfq4VPfLzvgOOJSPVSc2C8F1X1/VWumsFBiDAmTZDbJHzcF4i0aYV0DIyFUfG",
   server_base_url: "http://localhost:4005"

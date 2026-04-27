@@ -49,10 +49,6 @@ defmodule EyeInTheSky.Application do
           {DynamicSupervisor, name: EyeInTheSky.Claude.ChatSupervisor, strategy: :one_for_one},
           # Oban job processing (includes Cron plugin for JobDispatcherWorker)
           {Oban, Application.fetch_env!(:eye_in_the_sky, Oban)},
-          # React to session lifecycle events and update team member state
-          EyeInTheSky.Teams.Subscriber,
-          # Poll for external task changes from spawned agents
-          EyeInTheSky.Tasks.Poller,
           # Listen for new message inserts via Postgres LISTEN/NOTIFY
           EyeInTheSky.Messages.NotifyListener,
           # Rate limiter ETS backend for auth endpoint throttling
@@ -73,9 +69,27 @@ defmodule EyeInTheSky.Application do
         []
       end
 
+    # Long-running pollers/subscribers that hold sandbox connections during
+    # queries. Skipped in test env: when a test sandbox owner exits while a
+    # poller is mid-query, the poller crashes. Repeated crashes hit the
+    # supervisor's restart limit and take down the Endpoint, breaking
+    # subsequent tests with "ETS table does not refer to existing".
+    pollers =
+      if Application.get_env(:eye_in_the_sky, :start_pollers, true) do
+        [
+          # React to session lifecycle events and update team member state
+          EyeInTheSky.Teams.Subscriber,
+          # Poll for external task changes from spawned agents
+          EyeInTheSky.Tasks.Poller
+        ]
+      else
+        []
+      end
+
     children =
       children ++
         iam_seeds ++
+        pollers ++
         [
           # Start to serve requests, typically the last entry
           EyeInTheSkyWeb.Endpoint,

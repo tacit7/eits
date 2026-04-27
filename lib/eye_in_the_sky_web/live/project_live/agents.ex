@@ -273,17 +273,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
             <% end %>
           </div>
         <% else %>
-          <div class="text-center py-12">
-            <.icon name="hero-user-circle" class="mx-auto h-12 w-12 text-base-content/40" />
-            <h3 class="mt-2 text-sm font-medium text-base-content">No agents directory</h3>
-            <p class="mt-1 text-sm text-base-content/60">
-              <%= if not is_nil(@project) && not is_nil(@project.path) do %>
-                No .claude/agents directory found at {@project.path} or ~/.claude/agents
-              <% else %>
-                Project path not configured
-              <% end %>
-            </p>
-          </div>
+          <.empty_state
+            icon="hero-user-circle"
+            title="No agents directory"
+            subtitle={
+              if not is_nil(@project) && not is_nil(@project.path),
+                do: "No .claude/agents directory found at #{@project.path} or ~/.claude/agents",
+                else: "Project path not configured"
+            }
+          />
         <% end %>
       </div>
     </div>

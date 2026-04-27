@@ -202,6 +202,7 @@ defmodule EyeInTheSky.Tasks.Queries do
 
     order =
       case sort_by do
+        "created_desc" -> [desc: :created_at]
         "created_asc" -> [asc: :created_at]
         "priority" -> [desc: :priority, asc: :position]
         _ -> [asc: :position, desc: :created_at]
@@ -280,6 +281,7 @@ defmodule EyeInTheSky.Tasks.Queries do
 
     order =
       case sort_by do
+        "created_desc" -> [desc: :created_at]
         "created_asc" -> [asc: :created_at]
         "priority" -> [desc: :priority, asc: :position]
         _ -> [asc: :position, desc: :created_at]

@@ -40,7 +40,7 @@ defmodule EyeInTheSky.ScheduledJobsTest do
     p
   end
 
-  defp spawn_agent_attrs(overrides \\ %{}) do
+  defp spawn_agent_attrs(overrides) do
     Map.merge(
       %{
         "name" => "Test Agent Job",

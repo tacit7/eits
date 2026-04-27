@@ -20,22 +20,16 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
     ~H"""
     <%!-- DM: search first, then tab pills --%>
     <%= if @dm_active_tab in ["messages", nil] && not is_nil(@dm_message_search_query) do %>
-      <form phx-change="search_messages" phx-submit="search_messages" class="w-48">
-        <div class="relative">
-          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-            <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
-          </div>
-          <input
-            type="text"
-            name="query"
-            value={@dm_message_search_query}
-            placeholder="Search messages..."
-            autocomplete="off"
-            phx-debounce="300"
-            class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
-          />
-        </div>
-      </form>
+      <.search_bar
+        id="top-bar-dm-search"
+        size="xs"
+        label="Search messages"
+        placeholder="Search messages..."
+        value={@dm_message_search_query}
+        on_change="search_messages"
+        on_submit="search_messages"
+        class="w-48"
+      />
     <% end %>
     <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
       <%= for {tab, label} <- [

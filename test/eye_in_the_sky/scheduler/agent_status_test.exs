@@ -9,7 +9,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatusTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp create_agent(overrides \\ %{}) do
+  defp create_agent(overrides) do
     {:ok, agent} =
       Agents.create_agent(
         Map.merge(

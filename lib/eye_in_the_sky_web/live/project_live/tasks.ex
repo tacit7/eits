@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   end
 
   @impl true
-  def handle_event("sort_by", %{"value" => value}, socket) do
+  def handle_event("sort_by", %{"by" => value}, socket) do
     {:noreply,
      socket
      |> assign(:sort_by, value)

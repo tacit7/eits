@@ -29,9 +29,13 @@ defmodule EyeInTheSky.Claude.CLITest do
           # Clean up: close the port
           Port.close(port)
 
+        {:error, {:binary_not_found, _}} ->
+          # Claude binary not installed on this machine — skip
+          :ok
+
         {:error, reason} ->
           # If Claude is not installed, skip the test
-          if String.contains?(to_string(reason), ["not found", "enoent"]) do
+          if String.contains?(inspect(reason), ["not found", "enoent"]) do
             :ok
           else
             flunk("Unexpected error: #{inspect(reason)}")

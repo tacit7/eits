@@ -13,6 +13,12 @@ export const KanbanKeyboard = {
         const searchInput = this.el.querySelector("input[name='query']")
         if (searchInput) searchInput.focus()
       } else if (e.key === "Escape") {
+        // Exit bulk selection mode first if active
+        if (this.el.dataset.bulkMode === "true") {
+          e.preventDefault()
+          this.pushEvent("toggle_bulk_mode", {})
+          return
+        }
         // Close drawers/quick-add if open
         const detailDrawer = document.getElementById("task-detail-panel")
         const newTaskDrawer = document.getElementById("new-task-drawer")

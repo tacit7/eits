@@ -129,8 +129,17 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
       "agent" ->
         Enum.sort_by(sessions, fn s ->
           case s.agent do
-            nil -> ""
-            agent -> (agent.description || agent.project_name || "") |> String.downcase()
+            nil ->
+              ""
+
+            %{agent_definition: %{display_name: dn}} when is_binary(dn) ->
+              String.downcase(dn)
+
+            %{agent_definition: %{slug: slug}} when is_binary(slug) ->
+              String.downcase(slug)
+
+            agent ->
+              (agent.description || agent.project_name || "") |> String.downcase()
           end
         end)
 

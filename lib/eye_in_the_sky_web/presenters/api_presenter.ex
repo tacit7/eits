@@ -26,7 +26,9 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       parent_type: note.parent_type,
       title: note.title,
       body: note.body,
-      starred: note.starred || false
+      body_length: if(note.body, do: byte_size(note.body), else: 0),
+      starred: note.starred || false,
+      created_at: if(note.created_at, do: to_string(note.created_at), else: nil)
     }
   end
 

@@ -144,14 +144,69 @@ cmd_sessions() {
       _curl "$BASE_URL/tasks?session_id=$uuid" | jq .
       ;;
     notes)
-      # eits sessions notes <uuid>
-      local uuid="${1:-}"; need uuid
-      _curl "$BASE_URL/notes?session_id=$uuid" | jq .
+      # eits sessions notes <uuid> [<note_id>] [--full] [--starred] [--add <body>] [--title <t>]
+      # Default: preview listing (id, title, first 100 chars, size, date)
+      # With note_id: show full body of that note
+      # --full: dump full body for all notes
+      # --starred: only starred notes
+      # --add "body": create a new note on this session
+      local uuid="${1:-}"; need uuid; shift || true
+      local full=0 starred="" note_id="" add_body="" add_title=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --full)    full=1;          shift ;;
+          --starred) starred="&starred=true"; shift ;;
+          --add)     add_body="$2";  shift 2 ;;
+          --title)   add_title="$2"; shift 2 ;;
+          -*)        die "unknown flag: $1" ;;
+          *)         note_id="$1";   shift ;;
+        esac
+      done
+      # --add: create a new note
+      if [[ -n "$add_body" ]]; then
+        _post "/notes" "$(json parent_type "session" parent_id "$uuid" body "$add_body" title "$add_title")" | jq '{id, title, message: "Note created"}'
+        return 0
+      fi
+      # Specific note by ID
+      if [[ -n "$note_id" ]]; then
+        _get "/notes/$note_id"
+        return 0
+      fi
+      # Listing
+      local _notes_resp
+      _notes_resp=$(_curl "$BASE_URL/notes?session_id=$uuid${starred}" 2>/dev/null) || { echo "no notes found" >&2; return 0; }
+      local _count
+      _count=$(echo "$_notes_resp" | jq '.results | length')
+      if [[ "${_count:-0}" -eq 0 ]]; then
+        echo "no notes for this session"
+        return 0
+      fi
+      if [[ $full -eq 1 ]]; then
+        echo "$_notes_resp" | jq .
+      else
+        echo "$_notes_resp" | jq -r '
+          .results[] |
+          ( .body // "" | .[0:100] | gsub("\n"; " ") ) as $preview |
+          ( if (.body_length // (.body | length)) > 100 then "…" else "" end ) as $ellipsis |
+          ( .created_at // "" | if . != "" then (.[5:10] | gsub("-";"/")) else "?" end ) as $date |
+          ( if .starred then "★ " else "  " end ) as $star |
+          "[" + (.id | tostring) + "] " + $star + (.title // "(untitled)") + "  (" + $date + ")  " + $preview + $ellipsis
+        '
+        echo ""
+        echo "  ${_count} note(s) — use --full to dump bodies, or pass <note_id> to read one"
+      fi
       ;;
     get)
       local uuid="${1:-}"; need uuid
       [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
-      _get "/sessions/$uuid"
+      local _sess_resp
+      _sess_resp=$(_curl "$BASE_URL/sessions/$uuid") || return 1
+      # Augment with note count so agents know notes exist without a separate query
+      local _note_count
+      _note_count=$(_curl "$BASE_URL/notes?session_id=$uuid&limit=1" 2>/dev/null \
+        | jq -r '.results | length' 2>/dev/null || echo "0")
+      echo "$_sess_resp" | jq --argjson nc "${_note_count:-0}" \
+        '. + {note_count: $nc, _hint: (if $nc > 0 then ("has \($nc) note(s) — run: eits sessions notes " + (.uuid // .id | tostring)) else null end)}'
       ;;
     create)
       # eits sessions create --session-id <uuid> [--name <n>] [--description <d>] [--project <p>] [--project-path <path>] [--model <m>] [--entrypoint <e>]
@@ -267,18 +322,22 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions|states> [--mine|--assigned] [--created-by] [--quiet]"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions|states> [--mine|--assigned] [--created-by] [--all] [--quiet]
+  When EITS_SESSION_UUID is set, 'list' defaults to the current session's tasks.
+  Pass --all to list across all sessions."; return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by] [--all]
+      # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only the
+      # current session's tasks. Pass --all to list across all sessions.
       # --mine/--assigned: tasks where current session is the active executor (linked via task_sessions)
       # --created-by: tasks created by the current session (via created_by_session_id)
-      local qs="" _session_flag=0 _mine_flag=0
+      local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
           --session) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
+          --agent)   _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
           --state-name)
@@ -292,9 +351,16 @@ cmd_tasks() {
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           --mine|--assigned) [[ $_session_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine/--assigned requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --created-by) local _creator="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_creator" ]] || die "--created-by requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&created_by_session_id=$_creator"; shift ;;
+          --all)     _all_flag=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Agent-centric default: when running as an agent, scope to current session
+      # unless --all, --session, --mine, or --agent explicitly overrides the scope
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 ]]; then
+        local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+        [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
+      fi
       _curl "$BASE_URL/tasks?${qs#&}" | jq .
       ;;
     get)
@@ -330,21 +396,31 @@ cmd_tasks() {
       _post "/tasks" "$body"
       ;;
     update)
-      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>] [--due-at <ISO8601>]
-      # State IDs: 1=To Do, 2=In Progress, 3=Done, 4=In Review
-      # Prefer: eits tasks complete <id> (sets Done + annotates in one shot)
+      # eits tasks update <id> [--state <id|name>] [--priority <p>] [--description <d>] [--title <t>] [--due-at <ISO8601>]
+      # State IDs:   1=To Do, 2=In Progress, 3=Done, 4=In Review
+      # State names: todo, start|in-progress|progress, done, review|in-review
+      # Prefer: eits tasks complete <id> --message "..." (sets Done + annotates in one shot)
       local id="${1:-}"; need id; shift
       local updates="{}"
+      # Normalize a --state value: numeric → state_id, name → server alias string
+      _resolve_state() {
+        local v="$1"
+        if [[ "$v" =~ ^[0-9]+$ ]]; then
+          updates=$(echo "$updates" | jq --argjson n "$v" '. + {state_id: $n}')
+        else
+          # Map friendly names to server aliases
+          case "${v,,}" in
+            todo|"to do"|"to-do")                      v="todo" ;;
+            "in progress"|in-progress|progress|start)  v="start" ;;
+            done|complete|completed)                   v="done" ;;
+            "in review"|in-review|review)              v="in-review" ;;
+          esac
+          updates=$(echo "$updates" | jq --arg s "$v" '. + {state: $s}')
+        fi
+      }
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --state)
-            if [[ "$2" =~ ^[0-9]+$ ]]; then
-              updates=$(echo "$updates" | jq --argjson v "$2" '. + {state_id: $v}')
-            else
-              updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}')
-            fi
-            shift 2 ;;
-          --state-name)  updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}');       shift 2 ;;
+          --state|--state-name) _resolve_state "$2"; shift 2 ;;
           --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
           --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
           --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
@@ -498,21 +574,59 @@ cmd_tasks() {
       [[ $_comp_ok -eq 1 ]] || { echo "complete failed after retries — task $id may need manual completion" >&2; return 1; }
       ;;
     begin|quick)
-      # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks begin --title <title> [--description <text>] [--project <id>] [--priority <p>] [--quiet|-q]"; return 0; }
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
+      # eits tasks begin [--id <task_id>] [--title <t>] [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
+      # With --id: claims an existing task (links session + sets In Progress). No new task created.
+      # Without --id: creates a new task then claims it.
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'HELP'
+usage: eits tasks begin [--id <task_id>] --title <title> [options]
+
+  --id <task_id>     Claim a pre-existing task instead of creating a new one.
+                     Links the current session and sets state to In Progress atomically.
+                     When --id is given, --title and --description are ignored.
+
+  --title <text>     Task title (required when --id is not given)
+  --description <t>  Task description
+  --project <id>     Project ID (default: $EITS_PROJECT_ID)
+  --priority <p>     Priority
+  --quiet|-q         Print only the task ID
+
+NOTES:
+  Orchestrators that pre-create tasks and pass Task ID: <n> in agent instructions
+  should tell agents to run: eits tasks begin --id <n>
+  This atomically claims the task without creating a duplicate.
+HELP
+        return 0; }
+      local task_id_flag="" title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --title)       title="$2";       shift 2 ;;
-          --description) description="$2"; shift 2 ;;
-          --project)     project_id="$2";  shift 2 ;;
-          --priority)    priority="$2";    shift 2 ;;
-          --quiet|-q)    quiet=1;          shift ;;
+          --id)          task_id_flag="$2"; shift 2 ;;
+          --title)       title="$2";        shift 2 ;;
+          --description) description="$2";  shift 2 ;;
+          --project)     project_id="$2";   shift 2 ;;
+          --priority)    priority="$2";     shift 2 ;;
+          --quiet|-q)    quiet=1;           shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      need title
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+
+      # --id path: claim existing task, skip create
+      if [[ -n "$task_id_flag" ]]; then
+        local _claim_resp
+        _claim_resp=$(_curl -X POST -H "Content-Type: application/json" \
+          -d "$(json session_id "$_sess")" \
+          "$BASE_URL/tasks/$task_id_flag/claim")
+        if [[ $quiet -eq 0 ]]; then
+          echo "$_claim_resp" | jq .
+        else
+          echo "$task_id_flag"
+        fi
+        return 0
+      fi
+
+      # create path: require --title
+      need title
       if [[ -n "$_sess" ]]; then
         local _enc_title
         _enc_title=$(printf '%s' "$title" | jq -Rr @uri)
@@ -530,16 +644,17 @@ cmd_tasks() {
       create_resp=$(_post "/tasks" "$body")
       task_id=$(echo "$create_resp" | jq -r '.task_id // empty')
       [[ -n "$task_id" ]] || die "task creation failed"
-      if [[ $quiet -eq 0 ]]; then
-        echo "$create_resp"
-      else
-        echo "$task_id"
-      fi
       _patch "/tasks/$task_id" "$(json state "start" session_id "$_sess")" > /dev/null
       if [[ -n "$_sess" ]]; then
         _curl -sf -X POST -H "Content-Type: application/json" \
           -d "$(json session_id "$_sess")" \
           "$BASE_URL/tasks/$task_id/sessions" >/dev/null 2>&1 || true
+      fi
+      if [[ $quiet -eq 0 ]]; then
+        # Fetch full task so response includes state name, title, etc.
+        _curl "$BASE_URL/tasks/$task_id" | jq '{task_id: .id, title, state: .state, state_id, message: "Task created"}'
+      else
+        echo "$task_id"
       fi
       ;;
     search)
@@ -646,22 +761,85 @@ HELP
 
 cmd_notes() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits notes <list|search|get|create|update|add>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && {
+    cat <<'HELP'
+usage: eits notes <list|search|get|create|update|add>
+
+  list   [--session <uuid>] [--task <id>] [--project <id>] [--mine]
+         [--starred] [--q <query>] [--limit <n>] [--full]
+         Default: preview listing (title + 100 char snippet). --full dumps bodies.
+
+  search <query> [--project <id>] [--starred] [--limit <n>] [--full]
+
+  get    <id>                     Show full note body
+
+  add    --body <text> [--title <t>] [--starred]
+         Create a note on the current session (requires EITS_SESSION_UUID)
+
+  create --parent-type <session|task|agent|project> --parent-id <id>
+         --body <text> [--title <t>] [--starred]
+
+  update <id> [--body <text>] [--title <t>] [--starred]
+HELP
+    return 0; }
+
+  # Shared preview renderer — expects JSON with .results[]
+  _notes_preview() {
+    local resp="$1" full="${2:-0}"
+    local count
+    count=$(echo "$resp" | jq '.results | length')
+    if [[ "${count:-0}" -eq 0 ]]; then
+      echo "no notes found"
+      return 0
+    fi
+    if [[ "$full" -eq 1 ]]; then
+      echo "$resp" | jq .
+    else
+      echo "$resp" | jq -r '
+        .results[] |
+        ( .body // "" | .[0:100] | gsub("\n"; " ") ) as $preview |
+        ( if (.body_length // (.body // "" | length)) > 100 then "…" else "" end ) as $ellipsis |
+        ( .created_at // "" | if . != "" then (.[5:10] | gsub("-";"/")) else "?" end ) as $date |
+        ( if .starred then "★ " else "  " end ) as $star |
+        ( (.body_length // (.body // "" | length) | tostring) + " B" ) as $size |
+        "[" + (.id | tostring) + "] " + $star + (.title // "(untitled)") + "  (" + $date + ", " + $size + ")  " + $preview + $ellipsis
+      '
+      echo ""
+      echo "  ${count} note(s) — pass <note_id> to read one, --full to dump bodies"
+    fi
+  }
+
   case "$sub" in
     list)
-      # eits notes list [--q <query>] [--search <query>] [--session <uuid>] [--limit <n>] [--mine]
-      # --mine is mutually exclusive with --session
-      local qs="" _session_flag=0 _mine_flag=0
+      # eits notes list [--session <uuid>] [--task <id>] [--project <id>] [--mine] [--all]
+      #                 [--starred] [--q <query>] [--limit <n>] [--full]
+      # Agent-centric default: when EITS_SESSION_UUID is set, shows only the current
+      # session's notes. Pass --all to list across all sessions.
+      local qs="" full=0 _session_flag=0 _mine_flag=0 _all_flag=0 _task_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --session) [[ $_mine_flag -eq 1 ]] && die "--session and --mine are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --mine)    [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
-          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          --session)    [[ $_mine_flag -eq 1 ]] && die "--session and --mine are mutually exclusive"
+                        _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --task)       _task_flag=1; qs="${qs}&task_id=$2"; shift 2 ;;
+          --project)    qs="${qs}&project_id=$2"; shift 2 ;;
+          --mine)       [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"
+                        _mine_flag=1
+                        local _mine="${EITS_SESSION_UUID:-}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID to be set"
+                        qs="${qs}&session_id=$_mine"; shift ;;
+          --all)        _all_flag=1; shift ;;
+          --starred)    qs="${qs}&starred=true"; shift ;;
+          --limit)      qs="${qs}&limit=$2"; shift 2 ;;
+          --full)       full=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _curl "$BASE_URL/notes?${qs#&}" | jq .
+      # Agent-centric default: scope to current session unless overridden
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_task_flag -eq 0 ]]; then
+        local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+        [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
+      fi
+      _notes_preview "$(_curl "$BASE_URL/notes?${qs#&}")" "$full"
       ;;
     get)
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits notes get <id>"; return 0; }
@@ -685,7 +863,6 @@ cmd_notes() {
       _post "/notes" "$(json parent_type "$parent_type" parent_id "$parent_id" body "$body" title "$title" starred "$starred")"
       ;;
     update)
-      # eits notes update <id> [--body <text>] [--title <t>] [--starred] [--parent-type <type>] [--parent-id <id>]
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits notes update <id> [--body <text>] [--title <t>] [--starred] [--parent-type <session|task|agent|project>] [--parent-id <id>]"; return 0; }
       local id="${1:-}"; need id; shift
       local updates="{}"
@@ -693,7 +870,8 @@ cmd_notes() {
         case "$1" in
           --body)        updates=$(echo "$updates" | jq --arg v "$2" '. + {body: $v}');        shift 2 ;;
           --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
-          --starred)     updates=$(echo "$updates" | jq '. + {starred: 1}');                    shift ;;
+          --starred)     updates=$(echo "$updates" | jq '. + {starred: true}');                shift ;;
+          --unstar)      updates=$(echo "$updates" | jq '. + {starred: false}');               shift ;;
           --parent-type) updates=$(echo "$updates" | jq --arg v "$2" '. + {parent_type: $v}'); shift 2 ;;
           --parent-id)   updates=$(echo "$updates" | jq --arg v "$2" '. + {parent_id: $v}');   shift 2 ;;
           *) die "unknown flag: $1" ;;
@@ -702,25 +880,35 @@ cmd_notes() {
       _patch "/notes/$id" "${updates}"
       ;;
     search)
-      # eits notes search <query>
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits notes search <query>"; return 0; }
-      local query="${1:-}"; need query
-      _curl "$BASE_URL/notes?q=$(printf '%s' "$query" | jq -Rr @uri)" | jq .
-      ;;
-    add)
-      # eits notes add --body <text> [--title <t>]
-      # Creates a note attached to the current session (parent_type=session, parent_id=$EITS_SESSION_UUID)
-      local body="" title=""
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits notes search <query> [--project <id>] [--starred] [--limit <n>] [--full]"; return 0; }
+      local query="${1:-}"; need query; shift
+      local qs="q=$(printf '%s' "$query" | jq -Rr @uri)" full=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --body)  body="$2";  shift 2 ;;
-          --title) title="$2"; shift 2 ;;
+          --project) qs="${qs}&project_id=$2"; shift 2 ;;
+          --starred) qs="${qs}&starred=true";  shift ;;
+          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          --full)    full=1;                   shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      _notes_preview "$(_curl "$BASE_URL/notes?${qs}")" "$full"
+      ;;
+    add)
+      # eits notes add --body <text> [--title <t>] [--starred]
+      # Creates a note attached to the current session
+      local body="" title="" starred="0"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --body)    body="$2";   shift 2 ;;
+          --title)   title="$2";  shift 2 ;;
+          --starred) starred="1"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need body
       local parent_id="${EITS_SESSION_UUID:-}"; [[ -n "$parent_id" ]] || die "EITS_SESSION_UUID is not set"
-      _post "/notes" "$(json parent_type "session" parent_id "$parent_id" body "$body" title "$title")"
+      _post "/notes" "$(json parent_type "session" parent_id "$parent_id" body "$body" title "$title" starred "$starred")"
       ;;
     *)
       echo "usage: eits notes <list|search|get|create|update|add>"
@@ -1064,18 +1252,26 @@ cmd_commits() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create>"; return 0; }
   case "$sub" in
     list)
-      # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--limit <n>]
+      # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] [--limit <n>]
+      # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only
+      # current session's commits. Pass --all to list across all sessions.
       # --mine, --session, and --agent are mutually exclusive
-      local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0
+      local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0 _all_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session) [[ $_mine_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--session is mutually exclusive with --mine and --agent"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --mine)    [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
+          --all)     _all_flag=1; shift ;;
           --limit)   qs="${qs}&limit=$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Agent-centric default: scope to current session unless overridden
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 ]]; then
+        local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+        [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
+      fi
       _curl "$BASE_URL/commits?${qs#&}" | jq .
       ;;
     create)

@@ -128,12 +128,23 @@ Session status is driven by Claude Code hooks and explicit commands:
 All agents — interactive (`cli`) and headless (`sdk-cli`) — use the `eits` CLI script directly. EITS-CMD directives are deprecated.
 
 ```bash
-eits tasks begin --title "Task name"   # create + start in one shot
+# Start a task
+eits tasks begin --title "Task name"       # create + start in one shot
+eits tasks begin --id <task_id>            # claim a pre-created task (orchestrator-assigned)
+
+# Close a task (atomic: annotates + marks Done)
+eits tasks complete <id> --message "..."   # CANONICAL close path — one round-trip
+
+# Close manually (two round-trips, avoid unless complete fails)
 eits tasks annotate <id> --body "..."
-eits tasks update <id> --state 4
-eits tasks complete <id> --message "Summary"
+eits tasks update <id> --state done        # named aliases: todo, start, done, review
+
+# Read task state
+eits tasks get <id>
+
+# Other
 eits dm --to <session_uuid> --message "done"
-eits dm --to 1740 --message "done"     # numeric session ID also works
+eits dm --to 1740 --message "done"         # numeric session ID also works
 eits commits create --hash <hash>
 ```
 

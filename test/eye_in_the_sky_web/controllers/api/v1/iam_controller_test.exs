@@ -116,9 +116,6 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
     conn = post(conn, "/api/v1/iam/decide", payload)
     assert conn.status == 200
 
-    # Give the fire-and-forget task time to complete
-    :timer.sleep(200)
-
     after_count = Repo.one(from d in "iam_decisions", select: count(d.id))
     assert after_count == before_count + 1
 
@@ -331,8 +328,6 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
 
     conn = post(conn, "/api/v1/iam/decide", payload)
     assert conn.status == 200
-
-    :timer.sleep(200)
 
     after_count = Repo.one(from d in "iam_decisions", select: count(d.id))
     assert after_count == before_count + 1

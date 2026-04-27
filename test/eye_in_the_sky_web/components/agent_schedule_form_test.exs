@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleFormTest do
     %{id: 1, name: "Test Prompt", project_id: nil}
   end
 
-  defp base_job(overrides \\ %{}) do
+  defp base_job(overrides) do
     Map.merge(
       %{
         id: 42,

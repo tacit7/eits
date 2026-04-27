@@ -5,7 +5,7 @@ defmodule EyeInTheSky.IAM.HookResponseTest do
   alias EyeInTheSky.IAM.HookResponse
   alias EyeInTheSky.IAM.Policy
 
-  defp policy(attrs \\ []) do
+  defp policy(attrs) do
     base = %Policy{
       id: 1,
       name: "test-policy",
@@ -23,7 +23,7 @@ defmodule EyeInTheSky.IAM.HookResponseTest do
     struct(base, attrs)
   end
 
-  defp decision(attrs \\ []) do
+  defp decision(attrs) do
     base = %Decision{
       permission: :allow,
       winning_policy: nil,

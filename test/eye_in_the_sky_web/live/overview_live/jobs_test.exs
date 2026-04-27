@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.JobsTest do
 
   alias EyeInTheSky.ScheduledJobs
 
-  defp job_attrs(overrides \\ %{}) do
+  defp job_attrs(overrides) do
     Map.merge(
       %{
         "name" => "Test Job",

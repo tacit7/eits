@@ -19,11 +19,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpers do
      |> reload_fn.()}
   end
 
-  def handle_sort_notes(%{"value" => sort_by}, socket, reload_fn) do
+  def handle_sort_notes(%{"by" => sort_by}, socket, reload_fn) do
     {:noreply, socket |> assign(:notes_sort_by, sort_by) |> reload_fn.()}
   end
 
-  def handle_filter_type(%{"value" => type}, socket, reload_fn) do
+  def handle_filter_type(%{"type" => type}, socket, reload_fn) do
     {:noreply, socket |> assign(:type_filter, type) |> reload_fn.()}
   end
 

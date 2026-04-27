@@ -225,9 +225,6 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
         source_uuid: nil
       })
 
-      # Task.Supervisor async — allow it to complete
-      Process.sleep(100)
-
       messages = Messages.list_messages_for_session(session.id)
       assert Enum.any?(messages, &(&1.body == "hello world"))
     end
@@ -243,8 +240,6 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
         source_uuid: nil
       })
 
-      Process.sleep(100)
-
       messages = Messages.list_messages_for_session(session.id)
       assert messages == []
     end
@@ -259,8 +254,6 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
         channel_id: nil,
         source_uuid: nil
       })
-
-      Process.sleep(100)
 
       messages = Messages.list_messages_for_session(session.id)
       assert messages == []

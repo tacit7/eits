@@ -13,29 +13,21 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
     ~H"""
     <div class="sticky safe-top-sticky md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
       <div class="flex items-center gap-3">
-        <form phx-submit="search" phx-change="search" class="flex-1 sm:max-w-sm">
-          <div class="relative">
-            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
-            </div>
-            <label for="project-sessions-search" class="sr-only">Search sessions</label>
-            <input
-              type="text"
-              name="query"
-              id="project-sessions-search"
-              value={@search_query}
-              phx-debounce="300"
-              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
-              placeholder="Search..."
-            />
-          </div>
-        </form>
+        <.search_bar
+          id="project-sessions-search"
+          label="Search sessions"
+          placeholder="Search..."
+          value={@search_query}
+          on_change="search"
+          on_submit="search"
+          class="flex-1 sm:max-w-sm"
+        />
 
         <%!-- Desktop filter pills --%>
         <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
           <%= for {label, filter, active_class} <- [
             {"All", "all", "bg-base-100 text-base-content shadow-sm"},
-            {"Working", "working", "bg-base-100 text-success shadow-sm"},
+            {"Active", "working", "bg-base-100 text-success shadow-sm"},
             {"Archived", "archived", "bg-base-100 text-warning shadow-sm"}
           ] do %>
             <button
@@ -140,7 +132,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
           <div class="flex flex-wrap gap-2">
             <%= for {label, filter} <- [
               {"All", "all"},
-              {"Working", "working"},
+              {"Active", "working"},
               {"Archived", "archived"}
             ] do %>
               <button

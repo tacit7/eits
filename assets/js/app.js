@@ -85,6 +85,7 @@ import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
 import {VimNav} from "./hooks/vim_nav"
 import {showToast} from "./hooks/utils"
+import SortDropdown from "./hooks/sort_dropdown"
 import {getHooks} from "live_svelte"
 import "./theme"
 
@@ -155,6 +156,7 @@ Hooks.IndeterminateCheckbox = IndeterminateCheckbox
 Hooks.ShiftSelect = ShiftSelect
 Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
+Hooks.SortDropdown = SortDropdown
 // VimNav is initialized directly below (not via phx-hook)
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

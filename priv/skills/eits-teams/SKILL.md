@@ -195,7 +195,7 @@ eits teams delete <id>   # only when explicitly instructed
 Agents auto-receive team context. They are expected to:
 
 ```bash
-eits tasks begin --title "<task name>"   # or: eits tasks start <id> for existing tasks
+eits tasks begin --title "<task name>"   # or: eits tasks begin --id <id> if orchestrator pre-assigned a task ID
 # ... do work ...
 eits tasks complete <task_id> --message "Summary of what was done"
 # complete: annotates, marks done, sets team member status → done, DMs lead

@@ -32,27 +32,18 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     """
   end
 
-  def search_bar(assigns) do
+  def search_toolbar(assigns) do
     ~H"""
     <div class="sticky top-[calc(3rem+env(safe-area-inset-top))] md:top-16 z-10 bg-base-100/85 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-base-content/5">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-        <form phx-change="search" class="flex-1 max-w-sm">
-          <label for="search" class="sr-only">Search agents</label>
-          <div class="relative">
-            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <.icon name="hero-magnifying-glass-mini" class="w-4 h-4 text-base-content/25" />
-            </div>
-            <input
-              type="text"
-              name="query"
-              id="search"
-              value={@search_query}
-              phx-debounce="300"
-              class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
-              placeholder="Search..."
-            />
-          </div>
-        </form>
+        <.search_bar
+          id="agent-search"
+          label="Search agents"
+          placeholder="Search..."
+          value={@search_query}
+          on_change="search"
+          class="flex-1 max-w-sm"
+        />
         <.filter_tabs current={@session_filter} />
       </div>
     </div>

@@ -1,7 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.NotesListTest do
   use EyeInTheSkyWeb.ConnCase
   import Phoenix.LiveViewTest
-  import Phoenix.Component
 
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Projects

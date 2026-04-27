@@ -393,7 +393,9 @@ defmodule EyeInTheSky.Claude.SessionReaderTest do
           "this is garbage"
         ])
 
-      assert {:ok, 0, 0.0} = SessionReader.read_usage(session_id, project_path)
+      assert {:ok, tokens, cost} = SessionReader.read_usage(session_id, project_path)
+      assert tokens == 0
+      assert cost == +0.0
 
       File.rm!(file_path)
     end

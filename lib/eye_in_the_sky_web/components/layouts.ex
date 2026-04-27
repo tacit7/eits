@@ -338,21 +338,32 @@ defmodule EyeInTheSkyWeb.Layouts do
         </button>
       <% end %>
     </div>
-    <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
-      <%= for {value, label} <- [{"last_message", "Last msg"}, {"name", "Name"}, {"agent", "Agent"}, {"model", "Model"}] do %>
-        <button
-          phx-click="sort"
-          phx-value-by={value}
-          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
-            if(@sort_by == value,
-              do: "bg-base-100 text-base-content shadow-sm",
-              else: "text-base-content/45 hover:text-base-content/70"
-            )}
-        >
-          {label}
-        </button>
-      <% end %>
-    </div>
+    <details id="sessions-sort-dropdown" phx-update="ignore" class="dropdown">
+      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+        Sort: {case @sort_by do
+          "last_message" -> "Last msg"
+          "name" -> "Name"
+          "agent" -> "Agent"
+          "model" -> "Model"
+          _ -> "Last msg"
+        end} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
+      </summary>
+      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
+        <%= for {value, label} <- [{"last_message", "Last msg"}, {"name", "Name"}, {"agent", "Agent"}, {"model", "Model"}] do %>
+          <li>
+            <button
+              phx-click="sort"
+              phx-value-by={value}
+              onclick="this.closest('details').removeAttribute('open')"
+              class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
+                if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
+            >
+              {label}
+            </button>
+          </li>
+        <% end %>
+      </ul>
+    </details>
     """
   end
 
@@ -403,18 +414,31 @@ defmodule EyeInTheSkyWeb.Layouts do
         </button>
       <% end %>
     </div>
-    <form phx-change="sort_by">
-      <label for="top-bar-tasks-sort" class="sr-only">Sort tasks</label>
-      <select
-        name="value"
-        id="top-bar-tasks-sort"
-        class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/60 min-h-0 h-7 text-[11px]"
-      >
-        <option value="created_desc" selected={@sort_by == "created_desc"}>Newest</option>
-        <option value="created_asc" selected={@sort_by == "created_asc"}>Oldest</option>
-        <option value="priority" selected={@sort_by == "priority"}>Priority</option>
-      </select>
-    </form>
+    <details id="tasks-sort-dropdown" phx-update="ignore" class="dropdown">
+      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+        Sort: {case @sort_by do
+          "created_desc" -> "Newest"
+          "created_asc" -> "Oldest"
+          "priority" -> "Priority"
+          _ -> "Newest"
+        end} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
+      </summary>
+      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
+        <%= for {value, label} <- [{"created_desc", "Newest"}, {"created_asc", "Oldest"}, {"priority", "Priority"}] do %>
+          <li>
+            <button
+              phx-click="sort_by"
+              phx-value-value={value}
+              onclick="this.closest('details').removeAttribute('open')"
+              class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
+                if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
+            >
+              {label}
+            </button>
+          </li>
+        <% end %>
+      </ul>
+    </details>
     """
   end
 

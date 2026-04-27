@@ -129,6 +129,11 @@
             sort_by={assigns[:sort_by] || "name_asc"}
             scope_filter={assigns[:scope_filter] || "all"}
           />
+        <% :teams -> %>
+          <EyeInTheSkyWeb.TopBar.Teams.toolbar
+            search_query={assigns[:search_query] || ""}
+            show_archived={assigns[:show_archived] || false}
+          />
         <% _ -> %>
           <%= if not is_nil(assigns[:search_query]) do %>
             <EyeInTheSkyWeb.TopBar.Generic.toolbar search_query={assigns[:search_query]} />

@@ -86,34 +86,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
             <span class="ml-1 text-primary">(all projects)</span>
           <% end %>
         </span>
-        <div class="flex items-center gap-1">
-          <%= if @project do %>
-            <.link
-              navigate={if @show_all, do: ~p"/projects/#{@project.id}/teams", else: ~p"/projects/#{@project.id}/teams?show_all=true"}
-              class={[
-                "text-xs px-2 py-1 rounded transition-colors",
-                if(@show_all,
-                  do: "bg-base-content/8 text-base-content/60",
-                  else: "text-base-content/30 hover:text-base-content/60"
-                )
-              ]}
-            >
-              {if @show_all, do: "This project", else: "Show all"}
-            </.link>
-          <% end %>
-          <button
-            phx-click="toggle_archived"
+        <%= if @project do %>
+          <.link
+            navigate={if @show_all, do: ~p"/projects/#{@project.id}/teams", else: ~p"/projects/#{@project.id}/teams?show_all=true"}
             class={[
               "text-xs px-2 py-1 rounded transition-colors",
-              if(@show_archived,
+              if(@show_all,
                 do: "bg-base-content/8 text-base-content/60",
                 else: "text-base-content/30 hover:text-base-content/60"
               )
             ]}
           >
-            {if @show_archived, do: "Hide archived", else: "Archived"}
-          </button>
-        </div>
+            {if @show_all, do: "This project", else: "Show all"}
+          </.link>
+        <% end %>
       </div>
 
       <%= if @filtered_teams == [] do %>

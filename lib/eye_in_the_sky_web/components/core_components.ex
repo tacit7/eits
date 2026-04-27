@@ -1029,8 +1029,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_dot_size("md"), do: "size-2.5"
   defp status_dot_size(_), do: "size-2"
 
-  defp status_dot_color(:working), do: "bg-warning"
-  defp status_dot_color(:running), do: "bg-warning"
+  defp status_dot_color(:working), do: "bg-success"
+  defp status_dot_color(:running), do: "bg-success"
   defp status_dot_color(:idle), do: "bg-base-content/30"
   defp status_dot_color(:waiting), do: "bg-info"
   defp status_dot_color(:pending), do: "bg-info"
@@ -1039,8 +1039,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_dot_color(:stopped), do: "bg-base-content/20"
   defp status_dot_color(_), do: "bg-base-content/30"
 
-  defp status_badge_color(:working), do: "badge-warning"
-  defp status_badge_color(:running), do: "badge-warning"
+  defp status_badge_color(:working), do: "badge-success"
+  defp status_badge_color(:running), do: "badge-success"
   defp status_badge_color(:idle), do: "badge-ghost"
   defp status_badge_color(:waiting), do: "badge-info"
   defp status_badge_color(:pending), do: "badge-info"

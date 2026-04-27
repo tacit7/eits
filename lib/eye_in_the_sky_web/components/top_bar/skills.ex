@@ -28,6 +28,7 @@ defmodule EyeInTheSkyWeb.TopBar.Skills do
       <:item label="All" active={@source_filter == "all"} on_click="filter_source" value="all" />
       <:item label="Skills" active={@source_filter == "skills"} on_click="filter_source" value="skills" />
       <:item label="Commands" active={@source_filter == "commands"} on_click="filter_source" value="commands" />
+      <:item label="Project" active={@source_filter == "project"} on_click="filter_source" value="project" />
     </.tab_pills>
     <details
       id="skills-sort-dropdown"

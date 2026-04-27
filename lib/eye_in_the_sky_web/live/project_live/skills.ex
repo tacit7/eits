@@ -1,28 +1,33 @@
-defmodule EyeInTheSkyWeb.OverviewLive.Skills do
+defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.SkillsHelpers
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(%{"id" => _} = params, _session, socket) do
     socket =
       socket
-      |> assign(:page_title, "Skills")
+      |> mount_project(params,
+        sidebar_tab: :skills,
+        page_title_prefix: "Skills"
+      )
       |> assign(:search_query, "")
       |> assign(:sort_by, "name_asc")
       |> assign(:source_filter, "all")
       |> assign(:skills, [])
       |> assign(:filtered_skills, [])
       |> assign(:selected_skill, nil)
-      |> assign(:sidebar_tab, :skills)
-      |> assign(:sidebar_project, nil)
 
     socket = if connected?(socket), do: load_skills(socket), else: socket
 
     {:ok, socket}
   end
+
+  @impl true
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("search", params, socket),
@@ -63,9 +68,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     <%!-- Mobile-only controls bar --%>
     <div class="md:hidden flex flex-wrap items-center gap-2 px-4 pt-3 pb-1">
       <form phx-change="sort_skills">
-        <label for="skills-sort-mobile" class="sr-only">Sort skills</label>
+        <label for="proj-skills-sort-mobile" class="sr-only">Sort skills</label>
         <select
-          id="skills-sort-mobile"
+          id="proj-skills-sort-mobile"
           name="by"
           class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
         >
@@ -77,9 +82,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
         </select>
       </form>
       <form phx-change="filter_source">
-        <label for="skills-source-mobile" class="sr-only">Filter by source</label>
+        <label for="proj-skills-source-mobile" class="sr-only">Filter by source</label>
         <select
-          id="skills-source-mobile"
+          id="proj-skills-source-mobile"
           name="filter"
           class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
         >
@@ -93,7 +98,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
 
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="max-w-4xl mx-auto">
-        <%!-- Count row --%>
         <div class="mb-3">
           <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
             {length(@filtered_skills)} skills
@@ -102,7 +106,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
 
         <%= if @filtered_skills != [] do %>
           <div class={if @selected_skill, do: "grid grid-cols-1 md:grid-cols-2 gap-6", else: ""}>
-            <%!-- Left: list --%>
             <div>
               <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
                 <%= for skill <- @filtered_skills do %>
@@ -114,7 +117,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                         phx-click="select_skill"
                         phx-value-slug={skill.slug}
                       />
-                      <%!-- Row: fires select_skill for desktop side panel --%>
                       <div class="collapse-title py-3 px-0 min-h-0 flex flex-col gap-1 cursor-pointer">
                         <div class="flex items-center gap-2">
                           <.icon
@@ -152,10 +154,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                           <span class="truncate max-w-xs">{skill.description}</span>
                         </div>
                       </div>
-                      <%!-- Mobile inline viewer: hidden on desktop --%>
                       <div class="collapse-content md:hidden px-0 pb-3">
                         <div
-                          id={"skill-mobile-#{skill.slug}"}
+                          id={"proj-skill-mobile-#{skill.slug}"}
                           class="dm-markdown text-sm text-base-content leading-relaxed"
                           phx-hook="MarkdownMessage"
                           data-raw-body={skill.content}
@@ -168,7 +169,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
               </div>
             </div>
 
-            <%!-- Right: desktop side panel --%>
             <%= if @selected_skill do %>
               <div class="hidden md:block sticky top-[calc(3rem+env(safe-area-inset-top))] md:top-20">
                 <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                     </div>
                     <div class="overflow-auto max-h-[70vh]">
                       <div
-                        id={"skill-viewer-#{@selected_skill.slug}"}
+                        id={"proj-skill-viewer-#{@selected_skill.slug}"}
                         class="dm-markdown p-4 text-sm text-base-content leading-relaxed"
                         phx-hook="MarkdownMessage"
                         data-raw-body={@selected_skill.content}
@@ -200,7 +200,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
           </div>
         <% else %>
           <.empty_state
-            id="overview-skills-empty"
+            id="proj-skills-empty"
             icon="hero-code-bracket"
             title={if @search_query != "" || @source_filter != "all",
               do: "No skills found",
@@ -208,7 +208,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
             subtitle={
               if @search_query != "" || @source_filter != "all",
                 do: "Try adjusting your search or filter",
-                else: "Add .md files to ~/.claude/commands/ or ~/.claude/skills/ to create skills"
+                else: "Add .md files to .claude/commands/ or .claude/skills/ in your project"
             }
           />
         <% end %>

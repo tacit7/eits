@@ -55,16 +55,18 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
   defp sort_skills(skills, _), do: Enum.sort_by(skills, & &1.slug)
 
   defp do_load_skills do
-    commands = load_from_commands()
-    skills = load_from_skills_dir()
-    (commands ++ skills) |> Enum.sort_by(& &1.slug)
+    global_commands = load_from_dir(Path.expand("~/.claude/commands"), :commands)
+    global_skills = load_from_skills_dir(Path.expand("~/.claude/skills"), :skills)
+    project_commands = load_from_dir(Path.join(File.cwd!(), ".claude/commands"), :project)
+    project_skills = load_from_skills_dir(Path.join(File.cwd!(), ".claude/skills"), :project)
+
+    (global_commands ++ global_skills ++ project_commands ++ project_skills)
+    |> Enum.sort_by(& &1.slug)
   end
 
-  defp load_from_commands do
-    commands_dir = Path.expand("~/.claude/commands")
-
-    if File.dir?(commands_dir) do
-      case File.ls(commands_dir) do
+  defp load_from_dir(dir, source) do
+    if File.dir?(dir) do
+      case File.ls(dir) do
         {:error, _} ->
           []
 
@@ -72,7 +74,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
           entries
           |> Enum.filter(&String.ends_with?(&1, ".md"))
           |> Enum.flat_map(fn filename ->
-            path = Path.join(commands_dir, filename)
+            path = Path.join(dir, filename)
             slug = String.replace_trailing(filename, ".md", "")
 
             case File.read(path) do
@@ -86,7 +88,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
                   %Skill{
                     slug: slug,
                     filename: filename,
-                    source: :commands,
+                    source: source,
                     description: extract_description(content),
                     content: content,
                     size: byte_size(content),
@@ -101,9 +103,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
     end
   end
 
-  defp load_from_skills_dir do
-    skills_dir = Path.expand("~/.claude/skills")
-
+  defp load_from_skills_dir(skills_dir, source) do
     if File.dir?(skills_dir) do
       case File.ls(skills_dir) do
         {:error, _} ->
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
                   %Skill{
                     slug: dir,
                     filename: "skills/#{dir}/SKILL.md",
-                    source: :skills,
+                    source: source,
                     description: extract_description(content),
                     content: content,
                     size: byte_size(content),

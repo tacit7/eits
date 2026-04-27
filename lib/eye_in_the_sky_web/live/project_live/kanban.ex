@@ -306,6 +306,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     <div
       id="kanban-keyboard"
       phx-hook="KanbanKeyboard"
+      data-bulk-mode={if @bulk_mode, do: "true", else: "false"}
       class="px-4 sm:px-6 py-6 h-[calc(100dvh-7rem)] md:h-[calc(100dvh-4rem)] flex flex-col"
     >
       <.kanban_bulk_bar

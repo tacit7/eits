@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
           <%= for {label, filter, active_class} <- [
             {"All", "all", "bg-base-100 text-base-content shadow-sm"},
-            {"Working", "working", "bg-base-100 text-success shadow-sm"},
+            {"Active", "working", "bg-base-100 text-success shadow-sm"},
             {"Archived", "archived", "bg-base-100 text-warning shadow-sm"}
           ] do %>
             <button
@@ -140,7 +140,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
           <div class="flex flex-wrap gap-2">
             <%= for {label, filter} <- [
               {"All", "all"},
-              {"Working", "working"},
+              {"Active", "working"},
               {"Archived", "archived"}
             ] do %>
               <button

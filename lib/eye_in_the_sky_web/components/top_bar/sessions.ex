@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
       </div>
     </form>
     <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
-      <%= for {value, label} <- [{"all", "All"}, {"working", "Working"}, {"archived", "Archived"}] do %>
+      <%= for {value, label} <- [{"all", "All"}, {"working", "Active"}, {"archived", "Archived"}] do %>
         <button
           phx-click="filter_session"
           phx-value-filter={value}

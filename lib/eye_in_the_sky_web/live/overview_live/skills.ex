@@ -12,10 +12,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
       |> assign(:page_title, "Skills")
       |> assign(:search_query, "")
       |> assign(:sort_by, "name_asc")
-      |> assign(:source_filter, "all")
+      |> assign(:type_filter, "all")
+      |> assign(:scope_filter, "all")
       |> assign(:skills, [])
       |> assign(:filtered_skills, [])
       |> assign(:selected_skill, nil)
+      |> assign(:detail_tab, :preview)
       |> assign(:sidebar_tab, :skills)
       |> assign(:sidebar_project, nil)
 
@@ -33,8 +35,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     do: handle_sort_skills(params, socket, &load_skills/1)
 
   @impl true
-  def handle_event("filter_source", params, socket),
-    do: handle_filter_source(params, socket, &load_skills/1)
+  def handle_event("filter_type", params, socket),
+    do: handle_filter_type(params, socket, &load_skills/1)
+
+  @impl true
+  def handle_event("filter_scope", params, socket),
+    do: handle_filter_scope(params, socket, &load_skills/1)
 
   @impl true
   def handle_event("select_skill", %{"slug" => slug}, socket) do
@@ -45,12 +51,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
         Enum.find(socket.assigns.skills, &(&1.slug == slug))
       end
 
-    {:noreply, assign(socket, :selected_skill, selected)}
+    {:noreply, socket |> assign(:selected_skill, selected) |> assign(:detail_tab, :preview)}
   end
 
   @impl true
   def handle_event("close_viewer", _params, socket) do
     {:noreply, assign(socket, :selected_skill, nil)}
+  end
+
+  @impl true
+  def handle_event("set_detail_tab", %{"tab" => tab}, socket) do
+    {:noreply, assign(socket, :detail_tab, String.to_existing_atom(tab))}
   end
 
   @impl true
@@ -60,7 +71,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   @impl true
   def render(assigns) do
     ~H"""
-    <%!-- Mobile-only controls bar --%>
+    <%!-- Mobile-only controls --%>
     <div class="md:hidden flex flex-wrap items-center gap-2 px-4 pt-3 pb-1">
       <form phx-change="sort_skills">
         <label for="skills-sort-mobile" class="sr-only">Sort skills</label>
@@ -76,24 +87,41 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
           <option value="size_asc" selected={@sort_by == "size_asc"}>Smallest</option>
         </select>
       </form>
-      <form phx-change="filter_source">
-        <label for="skills-source-mobile" class="sr-only">Filter by source</label>
+      <form phx-change="filter_type">
+        <label for="skills-type-mobile" class="sr-only">Filter by type</label>
         <select
-          id="skills-source-mobile"
+          id="skills-type-mobile"
           name="filter"
           class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
         >
-          <option value="all" selected={@source_filter == "all"}>All Sources</option>
-          <option value="skills" selected={@source_filter == "skills"}>Skills</option>
-          <option value="commands" selected={@source_filter == "commands"}>Commands</option>
-          <option value="project" selected={@source_filter == "project"}>Project</option>
+          <option value="all" selected={@type_filter == "all"}>All Types</option>
+          <option value="skills" selected={@type_filter == "skills"}>Skills</option>
+          <option value="commands" selected={@type_filter == "commands"}>Commands</option>
+        </select>
+      </form>
+      <form phx-change="filter_scope">
+        <label for="skills-scope-mobile" class="sr-only">Filter by source</label>
+        <select
+          id="skills-scope-mobile"
+          name="scope"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+        >
+          <option value="all" selected={@scope_filter == "all"}>All Sources</option>
+          <option value="global" selected={@scope_filter == "global"}>Global</option>
+          <option value="project" selected={@scope_filter == "project"}>Project</option>
         </select>
       </form>
     </div>
 
-    <div class="px-4 sm:px-6 lg:px-8 py-6">
-      <div class="max-w-4xl mx-auto">
-        <%!-- Count row --%>
+    <div class={[
+      "flex overflow-hidden",
+      @selected_skill && "flex-1"
+    ]}>
+      <%!-- List panel --%>
+      <div class={[
+        "overflow-y-auto px-4 sm:px-6 py-6",
+        if(@selected_skill, do: "w-[440px] flex-shrink-0 border-r border-base-content/8", else: "w-full max-w-3xl mx-auto")
+      ]}>
         <div class="mb-3">
           <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
             {length(@filtered_skills)} skills
@@ -101,97 +129,60 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
         </div>
 
         <%= if @filtered_skills != [] do %>
-          <div class={if @selected_skill, do: "grid grid-cols-1 md:grid-cols-2 gap-6", else: ""}>
-            <%!-- Left: list --%>
-            <div>
-              <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
-                <%= for skill <- @filtered_skills do %>
-                  <div class="py-1 relative">
-                    <div class="collapse overflow-visible">
-                      <input
-                        type="checkbox"
-                        class="min-h-0 p-0"
-                        phx-click="select_skill"
-                        phx-value-slug={skill.slug}
+          <div class="divide-y divide-base-content/5">
+            <%= for skill <- @filtered_skills do %>
+              <% selected? = @selected_skill && @selected_skill.slug == skill.slug %>
+              <div class={[
+                "py-0.5",
+                selected? && "relative"
+              ]}>
+                <div class="collapse overflow-visible">
+                  <input
+                    type="checkbox"
+                    class="min-h-0 p-0"
+                    phx-click="select_skill"
+                    phx-value-slug={skill.slug}
+                  />
+                  <div class={[
+                    "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
+                    if(selected?, do: "bg-primary/5 border-l-2 border-primary", else: "hover:bg-base-content/4")
+                  ]}>
+                    <%!-- Name row --%>
+                    <div class="flex items-center gap-2">
+                      <.icon
+                        name="hero-puzzle-piece"
+                        class={"size-3.5 flex-shrink-0 " <>
+                          if(selected?, do: "text-primary", else: "text-base-content/35")}
                       />
-                      <%!-- Row: fires select_skill for desktop side panel --%>
-                      <div class="collapse-title py-3 px-0 min-h-0 flex flex-col gap-1 cursor-pointer">
-                        <div class="flex items-center gap-2">
-                          <.icon
-                            name="hero-puzzle-piece"
-                            class={"size-3.5 flex-shrink-0 " <>
-                              if(@selected_skill && @selected_skill.slug == skill.slug,
-                                do: "text-primary",
-                                else: "text-base-content/40"
-                              )}
-                          />
-                          <code class={"text-sm font-semibold truncate " <>
-                            if(@selected_skill && @selected_skill.slug == skill.slug,
-                              do: "text-primary",
-                              else: "text-base-content/85"
-                            )}>
-                            /{skill.slug}
-                          </code>
-                        </div>
-                        <div class="flex items-center gap-1.5 text-mini text-base-content/40 pl-5">
-                          <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium " <>
-                            case skill.source do
-                              :skills -> "bg-primary/10 text-primary/70"
-                              :project -> "bg-secondary/10 text-secondary/70"
-                              _ -> "bg-base-content/5 text-base-content/40"
-                            end}>
-                            {case skill.source do
-                              :skills -> "skill"
-                              :project -> "project"
-                              _ -> "command"
-                            end}
-                          </span>
-                          <span class="text-base-content/20">&middot;</span>
-                          <span class="tabular-nums">{FileHelpers.format_size(skill.size)}</span>
-                          <span class="text-base-content/20">&middot;</span>
-                          <span class="truncate max-w-xs">{skill.description}</span>
-                        </div>
-                      </div>
-                      <%!-- Mobile inline viewer: hidden on desktop --%>
-                      <div class="collapse-content md:hidden px-0 pb-3">
-                        <div
-                          id={"skill-mobile-#{skill.slug}"}
-                          class="dm-markdown text-sm text-base-content leading-relaxed"
-                          phx-hook="MarkdownMessage"
-                          data-raw-body={skill.content}
-                        >
-                        </div>
-                      </div>
+                      <code class={"text-sm font-semibold " <>
+                        if(selected?, do: "text-primary", else: "text-base-content/85")}>
+                        /{skill.slug}
+                      </code>
+                    </div>
+                    <%!-- Description --%>
+                    <p class="text-xs text-base-content/55 leading-snug pl-5 line-clamp-2">
+                      {skill.description}
+                    </p>
+                    <%!-- Metadata row --%>
+                    <div class="flex items-center gap-1.5 pl-5 mt-0.5">
+                      <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
+                        source_badge_class(skill.source)}>
+                        {source_label(skill.source)}
+                      </span>
+                      <span class="text-base-content/20 text-xs">&middot;</span>
+                      <span class="text-[10px] text-base-content/40 tabular-nums">{FileHelpers.format_size(skill.size)}</span>
+                      <span class="text-base-content/20 text-xs">&middot;</span>
+                      <span class="text-[10px] text-base-content/35 font-mono truncate">{skill.path}</span>
                     </div>
                   </div>
-                <% end %>
-              </div>
-            </div>
-
-            <%!-- Right: desktop side panel --%>
-            <%= if @selected_skill do %>
-              <div class="hidden md:block sticky top-[calc(3rem+env(safe-area-inset-top))] md:top-20">
-                <div class="card bg-base-100 border border-base-300 shadow-sm">
-                  <div class="card-body p-0">
-                    <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
-                      <code class="text-sm font-semibold text-base-content">
-                        /{@selected_skill.slug}
-                      </code>
-                      <button
-                        phx-click="close_viewer"
-                        class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]"
-                      >
-                        <.icon name="hero-x-mark" class="size-4" />
-                      </button>
-                    </div>
-                    <div class="overflow-auto max-h-[70vh]">
-                      <div
-                        id={"skill-viewer-#{@selected_skill.slug}"}
-                        class="dm-markdown p-4 text-sm text-base-content leading-relaxed"
-                        phx-hook="MarkdownMessage"
-                        data-raw-body={@selected_skill.content}
-                      >
-                      </div>
+                  <%!-- Mobile inline viewer --%>
+                  <div class="collapse-content md:hidden px-3 pb-3">
+                    <div
+                      id={"skill-mobile-#{skill.slug}"}
+                      class="dm-markdown text-sm text-base-content leading-relaxed mt-2"
+                      phx-hook="MarkdownMessage"
+                      data-raw-body={skill.content}
+                    >
                     </div>
                   </div>
                 </div>
@@ -202,18 +193,96 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
           <.empty_state
             id="overview-skills-empty"
             icon="hero-code-bracket"
-            title={if @search_query != "" || @source_filter != "all",
+            title={if @search_query != "" || @type_filter != "all" || @scope_filter != "all",
               do: "No skills found",
               else: "No skills yet"}
             subtitle={
-              if @search_query != "" || @source_filter != "all",
-                do: "Try adjusting your search or filter",
+              if @search_query != "" || @type_filter != "all" || @scope_filter != "all",
+                do: "Try adjusting your search or filters",
                 else: "Add .md files to ~/.claude/commands/ or ~/.claude/skills/ to create skills"
             }
           />
         <% end %>
       </div>
+
+      <%!-- Desktop detail panel --%>
+      <%= if @selected_skill do %>
+        <div class="hidden md:flex flex-col flex-1 overflow-hidden">
+          <%!-- Detail header --%>
+          <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <code class="text-base font-semibold text-base-content">/{@selected_skill.slug}</code>
+                  <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
+                    source_badge_class(@selected_skill.source)}>
+                    {source_label(@selected_skill.source)}
+                  </span>
+                </div>
+                <p class="text-xs text-base-content/45 font-mono truncate">{@selected_skill.path}</p>
+                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">{@selected_skill.description}</p>
+              </div>
+              <button
+                phx-click="close_viewer"
+                class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </div>
+            <%!-- Preview / Raw tabs --%>
+            <div class="flex items-center gap-1 mt-3">
+              <button
+                phx-click="set_detail_tab"
+                phx-value-tab="preview"
+                class={"px-3 py-1 rounded text-xs font-medium " <>
+                  if(@detail_tab == :preview,
+                    do: "bg-base-content/8 text-base-content",
+                    else: "text-base-content/50 hover:text-base-content")}
+              >
+                Preview
+              </button>
+              <button
+                phx-click="set_detail_tab"
+                phx-value-tab="raw"
+                class={"px-3 py-1 rounded text-xs font-medium " <>
+                  if(@detail_tab == :raw,
+                    do: "bg-base-content/8 text-base-content",
+                    else: "text-base-content/50 hover:text-base-content")}
+              >
+                Raw
+              </button>
+              <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
+                {FileHelpers.format_size(@selected_skill.size)}
+              </span>
+            </div>
+          </div>
+          <%!-- Detail body --%>
+          <div class="flex-1 overflow-y-auto">
+            <%= if @detail_tab == :preview do %>
+              <div
+                id={"skill-viewer-#{@selected_skill.slug}"}
+                class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                phx-hook="MarkdownMessage"
+                data-raw-body={@selected_skill.content}
+              >
+              </div>
+            <% else %>
+              <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_skill.content}</pre>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end
+
+  defp source_badge_class(:skills), do: "bg-primary/10 text-primary/70"
+  defp source_badge_class(:project_skills), do: "bg-secondary/10 text-secondary/70"
+  defp source_badge_class(:project_commands), do: "bg-secondary/10 text-secondary/70"
+  defp source_badge_class(_), do: "bg-base-content/5 text-base-content/50"
+
+  defp source_label(:skills), do: "skill"
+  defp source_label(:commands), do: "command"
+  defp source_label(:project_skills), do: "project skill"
+  defp source_label(:project_commands), do: "project cmd"
 end

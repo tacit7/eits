@@ -20,22 +20,45 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
     {:noreply, socket |> assign(:sort_by, by) |> reload_fn.()}
   end
 
-  def handle_filter_source(%{"filter" => source}, socket, reload_fn) do
-    {:noreply, socket |> assign(:source_filter, source) |> reload_fn.()}
+  def handle_filter_type(%{"filter" => type}, socket, reload_fn) do
+    {:noreply, socket |> assign(:type_filter, type) |> reload_fn.()}
+  end
+
+  def handle_filter_scope(%{"scope" => scope}, socket, reload_fn) do
+    {:noreply, socket |> assign(:scope_filter, scope) |> reload_fn.()}
   end
 
   def apply_filters_and_sort(skills, assigns) do
     skills
-    |> filter_by_source(assigns.source_filter)
+    |> filter_by_type(assigns.type_filter)
+    |> filter_by_scope(assigns.scope_filter)
     |> filter_by_search(assigns.search_query)
     |> sort_skills(assigns.sort_by)
   end
 
-  defp filter_by_source(skills, "all"), do: skills
+  defp filter_by_type(skills, "all"), do: skills
 
-  defp filter_by_source(skills, source) do
-    Enum.filter(skills, &(to_string(&1.source) == source))
+  defp filter_by_type(skills, "skills") do
+    Enum.filter(skills, &(&1.source in [:skills, :project_skills]))
   end
+
+  defp filter_by_type(skills, "commands") do
+    Enum.filter(skills, &(&1.source in [:commands, :project_commands]))
+  end
+
+  defp filter_by_type(skills, _), do: skills
+
+  defp filter_by_scope(skills, "all"), do: skills
+
+  defp filter_by_scope(skills, "global") do
+    Enum.filter(skills, &(&1.source in [:skills, :commands]))
+  end
+
+  defp filter_by_scope(skills, "project") do
+    Enum.filter(skills, &(&1.source in [:project_skills, :project_commands]))
+  end
+
+  defp filter_by_scope(skills, _), do: skills
 
   defp filter_by_search(skills, ""), do: skills
 
@@ -55,16 +78,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
   defp sort_skills(skills, _), do: Enum.sort_by(skills, & &1.slug)
 
   defp do_load_skills do
-    global_commands = load_from_dir(Path.expand("~/.claude/commands"), :commands)
-    global_skills = load_from_skills_dir(Path.expand("~/.claude/skills"), :skills)
-    project_commands = load_from_dir(Path.join(File.cwd!(), ".claude/commands"), :project)
-    project_skills = load_from_skills_dir(Path.join(File.cwd!(), ".claude/skills"), :project)
+    global_commands = load_from_dir(Path.expand("~/.claude/commands"), :commands, "~/.claude/commands")
+    global_skills = load_from_skills_dir(Path.expand("~/.claude/skills"), :skills, "~/.claude/skills")
+    project_commands = load_from_dir(Path.join(File.cwd!(), ".claude/commands"), :project_commands, ".claude/commands")
+    project_skills = load_from_skills_dir(Path.join(File.cwd!(), ".claude/skills"), :project_skills, ".claude/skills")
 
     (global_commands ++ global_skills ++ project_commands ++ project_skills)
     |> Enum.sort_by(& &1.slug)
   end
 
-  defp load_from_dir(dir, source) do
+  defp load_from_dir(dir, source, display_prefix) do
     if File.dir?(dir) do
       case File.ls(dir) do
         {:error, _} ->
@@ -88,6 +111,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
                   %Skill{
                     slug: slug,
                     filename: filename,
+                    path: "#{display_prefix}/#{filename}",
                     source: source,
                     description: extract_description(content),
                     content: content,
@@ -103,7 +127,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
     end
   end
 
-  defp load_from_skills_dir(skills_dir, source) do
+  defp load_from_skills_dir(skills_dir, source, display_prefix) do
     if File.dir?(skills_dir) do
       case File.ls(skills_dir) do
         {:error, _} ->
@@ -127,7 +151,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
                 [
                   %Skill{
                     slug: dir,
-                    filename: "skills/#{dir}/SKILL.md",
+                    filename: "SKILL.md",
+                    path: "#{display_prefix}/#{dir}/SKILL.md",
                     source: source,
                     description: extract_description(content),
                     content: content,

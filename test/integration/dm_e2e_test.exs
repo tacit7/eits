@@ -172,13 +172,14 @@ defmodule EyeInTheSky.DME2ETest do
       db_messages = Messages.list_messages_for_channel(channel.id)
 
       sent_messages =
-        Enum.filter(db_messages, fn m ->
-          m.body in messages
-        end)
+        db_messages
+        |> Enum.filter(fn m -> m.body in messages end)
+        |> Enum.sort_by(& &1.id)
 
       assert length(sent_messages) == 3, "All 3 DMs should be persisted"
 
-      # Verify order is maintained
+      # Verify order is maintained — sort by auto-increment ID for determinism
+      # (inserted_at has usec precision but async delivery may cause timestamp ties)
       bodies = Enum.map(sent_messages, & &1.body)
       assert bodies == messages, "Message order should be preserved"
 

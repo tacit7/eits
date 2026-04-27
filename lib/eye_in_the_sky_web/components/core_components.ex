@@ -616,10 +616,28 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :show_on_hover, :boolean, default: true
   attr :hover_group, :string, default: "row"
   attr :class, :string, default: nil
+  attr :tooltip, :string, default: nil
 
   def icon_button(assigns) do
     ~H"""
+    <span :if={@tooltip} class="tooltip tooltip-bottom" data-tip={@tooltip}>
+      <button
+        type="button"
+        phx-click={@on_click}
+        aria-label={@aria_label}
+        class={[
+          "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md transition-all focus-visible:outline-none focus-visible:ring-2",
+          @show_on_hover && hover_reveal_class(@hover_group),
+          color_classes(@color),
+          @class
+        ]}
+        {phx_values(@values)}
+      >
+        <.icon name={@icon} class="size-3.5" />
+      </button>
+    </span>
     <button
+      :if={!@tooltip}
       type="button"
       phx-click={@on_click}
       aria-label={@aria_label}

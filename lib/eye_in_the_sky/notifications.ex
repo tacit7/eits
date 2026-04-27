@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Notifications do
   """
 
   import Ecto.Query
+  alias EyeInTheSky.AsyncTask
   alias EyeInTheSky.Notifications.Notification
   alias EyeInTheSky.PushSubscriptions
   alias EyeInTheSky.Repo
@@ -126,7 +127,7 @@ defmodule EyeInTheSky.Notifications do
   defp maybe_push(%{category: "agent"} = notification) do
     url = build_url(notification.resource_type, notification.resource_id)
 
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+    AsyncTask.start(fn ->
       PushSubscriptions.broadcast(notification.title, notification.body, url)
     end)
   end

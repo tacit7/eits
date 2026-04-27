@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
 
       # Change sort to oldest first
       view
-      |> element(~s|#tasks-filter-sheet button[phx-value-value="created_asc"]|)
+      |> element(~s|#tasks-filter-sheet button[phx-value-by="created_asc"]|)
       |> render_click()
 
       # Re-open sheet to verify sort state persisted
@@ -152,7 +152,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
 
       # The created_asc button should show as active (btn-primary)
       assert html =~
-               ~r/phx-value-value="created_asc"[^>]*class="[^"]*btn-primary/s
+               ~r/phx-value-by="created_asc"[^>]*class="[^"]*btn-primary/s
     end
 
     test "backdrop click closes the sheet", %{conn: conn} do

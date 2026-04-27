@@ -163,6 +163,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
       assert is_binary(render_hook(lv, "open_in_editor", %{"path" => "/nonexistent/path/xyz"}))
     end
 
+    @tag :host_dependent
     test "opens file when editor is allowed and path exists", %{conn: conn} do
       EyeInTheSky.Settings.put("preferred_editor", "code")
       path = System.tmp_dir!() |> Path.join("eits_editor_test_#{System.unique_integer()}.txt")

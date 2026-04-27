@@ -127,7 +127,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                   role="button"
                 >
                   <div class="flex items-center gap-2">
-                    <.icon name="hero-cpu-chip"
+                    <.custom_icon name="lucide-robot"
                       class={"size-3.5 flex-shrink-0 " <> if(selected?, do: "text-primary", else: "text-base-content/35")} />
                     <code class={"text-sm font-semibold " <> if(selected?, do: "text-primary", else: "text-base-content/85")}>
                       {agent.name}

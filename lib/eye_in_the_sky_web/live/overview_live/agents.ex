@@ -140,8 +140,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                 >
                   <%!-- Name row --%>
                   <div class="flex items-center gap-2">
-                    <.icon
-                      name="hero-cpu-chip"
+                    <.custom_icon
+                      name="lucide-robot"
                       class={"size-3.5 flex-shrink-0 " <>
                         if(selected?, do: "text-primary", else: "text-base-content/35")}
                     />

@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Live.Shared.SkillsHelpers
 
   @impl true
@@ -51,6 +52,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   def handle_event("close_viewer", _params, socket) do
     {:noreply, assign(socket, :selected_skill, nil)}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def render(assigns) do

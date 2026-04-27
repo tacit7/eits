@@ -895,7 +895,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       <.spinner />
       <.spinner size="lg" class="text-primary" />
   """
-  attr :size, :string, default: "sm"
+  attr :size, :string, default: "md"
   attr :class, :string, default: ""
 
   def spinner(assigns) do
@@ -1054,6 +1054,24 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         </button>
       <% end %>
     </div>
+    """
+  end
+
+  @doc """
+  Renders a DaisyUI skeleton placeholder for loading states.
+  Caller controls width/height via the class attribute.
+
+  ## Examples
+
+      <.skeleton class="h-4 w-full" />
+      <.skeleton class="h-8 w-8 rounded-full" />
+  """
+  attr :class, :string, default: ""
+  attr :rest, :global
+
+  def skeleton(assigns) do
+    ~H"""
+    <div class={["skeleton", @class]} {@rest}></div>
     """
   end
 

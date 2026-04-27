@@ -13,7 +13,7 @@ config :eye_in_the_sky, EyeInTheSky.Repo,
   hostname: "localhost",
   database: "eits_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: 5
+  pool_size: 10
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
@@ -47,6 +47,10 @@ config :eye_in_the_sky,
   # exits at the end of each test. Async writes via Task.Supervisor cause sandbox
   # "owner exited" errors and Postgrex disconnects that contaminate subsequent tests.
   iam_audit_sync: true,
+  # Run all AsyncTask.start/1 calls synchronously so fire-and-forget DB tasks
+  # (messaging fanout, cmd_dispatcher, teams_handler) complete before the sandbox
+  # owner exits. Same root cause as iam_audit_sync above.
+  async_tasks_sync: true,
   # Core-layer config keys — keeps core modules free of EyeInTheSkyWeb.Endpoint atom references
   secret_key_base: "nkJhfq4VPfLzvgOOJSPVSc2C8F1X1/VWumsFBiDAmTZDbJHzcF4i0aYV0DIyFUfG",
   server_base_url: "http://localhost:4005"

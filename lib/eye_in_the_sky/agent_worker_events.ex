@@ -252,26 +252,35 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   defp notify_agent_complete(session_id, provider_conversation_id) do
-    meta = Logger.metadata()
+    # Skip in test mode. Running Notifications.notify in a synchronous Task
+    # (via AsyncTask in test mode) inside AgentWorker.handle_info races with
+    # sandbox teardown: the handle_info may still be executing when the test
+    # process exits, crashing the GenServer and eventually the AgentSupervisor.
+    # Notifications are tested directly in notifications_test.exs.
+    if Application.get_env(:eye_in_the_sky, :async_tasks_sync, false) do
+      :ok
+    else
+      meta = Logger.metadata()
 
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-      Logger.metadata(meta)
+      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+        Logger.metadata(meta)
 
-      title =
-        case Sessions.get_session(session_id) do
-          {:ok, session} when is_binary(session.name) and session.name != "" ->
-            String.slice("Agent finished: #{session.name}", 0, 255)
+        title =
+          case Sessions.get_session(session_id) do
+            {:ok, session} when is_binary(session.name) and session.name != "" ->
+              String.slice("Agent finished: #{session.name}", 0, 255)
 
-          _ ->
-            "Agent finished"
-        end
+            _ ->
+              "Agent finished"
+          end
 
-      EyeInTheSky.Notifications.notify(title,
-        category: :agent,
-        resource: {"session", provider_conversation_id}
-      )
-    end)
+        EyeInTheSky.Notifications.notify(title,
+          category: :agent,
+          resource: {"session", provider_conversation_id}
+        )
+      end)
 
-    :ok
+      :ok
+    end
   end
 end

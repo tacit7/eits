@@ -39,17 +39,22 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       ]}
     >
       <%!-- Checkbox: absolute, outside row flow, hover-reveal --%>
-      <div class={[
-        "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2 left-0 transition duration-100",
-        if(@select_mode,
-          do: "opacity-100 scale-100",
-          else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100"
-        )
-      ]}>
+      <div
+        class={[
+          "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2",
+          "left-4 sm:left-[-0.875rem]",
+          if(@select_mode,
+            do: "opacity-100 scale-100",
+            else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
+          )
+        ]}
+        aria-hidden={to_string(!@select_mode)}
+        phx-click="toggle_select_task"
+        phx-value-task_id={@task.uuid || to_string(@task.id)}
+      >
         <.square_checkbox
           checked={@selected}
-          phx-click="toggle_select_task"
-          phx-value-task_id={@task.uuid || to_string(@task.id)}
+          checkbox_area={true}
           aria-label={"Select task #{@task.title}"}
         />
       </div>

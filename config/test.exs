@@ -43,6 +43,10 @@ config :eye_in_the_sky,
   cli_module: EyeInTheSky.Claude.MockCLI,
   codex_cli_module: EyeInTheSky.Claude.MockCLI,
   agent_manager_module: EyeInTheSky.Agents.MockAgentManager,
+  # Run IAM audit writes synchronously so they complete before the Ecto sandbox owner
+  # exits at the end of each test. Async writes via Task.Supervisor cause sandbox
+  # "owner exited" errors and Postgrex disconnects that contaminate subsequent tests.
+  iam_audit_sync: true,
   # Core-layer config keys — keeps core modules free of EyeInTheSkyWeb.Endpoint atom references
   secret_key_base: "nkJhfq4VPfLzvgOOJSPVSc2C8F1X1/VWumsFBiDAmTZDbJHzcF4i0aYV0DIyFUfG",
   server_base_url: "http://localhost:4005"

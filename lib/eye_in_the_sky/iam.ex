@@ -120,11 +120,15 @@ defmodule EyeInTheSky.IAM do
 
   # ── audit ────────────────────────────────────────────────────────────────────
 
-  @doc "Persist an IAM decision audit record asynchronously."
+  @doc "Persist an IAM decision audit record. Async in production; synchronous in test to avoid sandbox teardown races."
   def record_audit(ctx, decision, raw_payload, duration_us) do
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+    if Application.get_env(:eye_in_the_sky, :iam_audit_sync, false) do
       do_write_audit(ctx, decision, raw_payload, duration_us)
-    end)
+    else
+      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+        do_write_audit(ctx, decision, raw_payload, duration_us)
+      end)
+    end
   end
 
   defp do_write_audit(ctx, decision, raw_payload, duration_us) do

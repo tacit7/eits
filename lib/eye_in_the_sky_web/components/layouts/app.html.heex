@@ -103,17 +103,17 @@
           />
         <% :dm -> %>
           <EyeInTheSkyWeb.TopBar.DM.toolbar
-            dm_active_tab={assigns[:active_tab]}
-            dm_message_search_query={assigns[:message_search_query]}
-            dm_active_timer={assigns[:active_timer]}
+            active_tab={assigns[:active_tab]}
+            search_query={assigns[:message_search_query]}
+            active_timer={assigns[:active_timer]}
           />
         <% :notes -> %>
           <EyeInTheSkyWeb.TopBar.Notes.toolbar
             search_query={assigns[:search_query]}
-            notes_sort_by={assigns[:notes_sort_by] || "newest"}
-            notes_starred_filter={assigns[:starred_filter] || false}
-            notes_type_filter={assigns[:type_filter] || "all"}
-            notes_new_href={assigns[:notes_new_href]}
+            sort_by={assigns[:sort_by] || "newest"}
+            starred_filter={assigns[:starred_filter] || false}
+            type_filter={assigns[:type_filter] || "all"}
+            new_href={assigns[:new_href]}
           />
         <% _ -> %>
           <%= if not is_nil(assigns[:search_query]) do %>

@@ -9,10 +9,10 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
     statics: EyeInTheSkyWeb.static_paths()
 
   attr :search_query, :string, default: nil
-  attr :notes_sort_by, :string, default: "newest"
-  attr :notes_starred_filter, :boolean, default: false
-  attr :notes_type_filter, :string, default: "all"
-  attr :notes_new_href, :string, default: nil
+  attr :sort_by, :string, default: "newest"
+  attr :starred_filter, :boolean, default: false
+  attr :type_filter, :string, default: "all"
+  attr :new_href, :string, default: nil
 
   def toolbar(assigns) do
     ~H"""

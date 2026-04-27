@@ -12,32 +12,32 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
 
   import Phoenix.LiveView.Helpers, only: []
 
-  attr :dm_active_tab, :string, default: "messages"
-  attr :dm_message_search_query, :string, default: nil
-  attr :dm_active_timer, :map, default: nil
+  attr :active_tab, :string, default: "messages"
+  attr :search_query, :string, default: nil
+  attr :active_timer, :map, default: nil
 
   def toolbar(assigns) do
     ~H"""
     <%!-- DM: search first, then tab pills --%>
-    <%= if @dm_active_tab in ["messages", nil] && not is_nil(@dm_message_search_query) do %>
+    <%= if @active_tab in ["messages", nil] && not is_nil(@search_query) do %>
       <.search_bar
         id="top-bar-dm-search"
         size="xs"
         label="Search messages"
         placeholder="Search messages..."
-        value={@dm_message_search_query}
+        value={@search_query}
         on_change="search_messages"
         on_submit="search_messages"
         class="w-48"
       />
     <% end %>
     <.tab_pills value_key="tab">
-      <:item label="Messages" active={@dm_active_tab in ["messages", nil]} on_click="change_tab" value="messages" />
-      <:item label="Tasks" active={@dm_active_tab == "tasks"} on_click="change_tab" value="tasks" />
-      <:item label="Commits" active={@dm_active_tab == "commits"} on_click="change_tab" value="commits" />
-      <:item label="Notes" active={@dm_active_tab == "notes"} on_click="change_tab" value="notes" />
-      <:item label="Context" active={@dm_active_tab == "context"} on_click="change_tab" value="context" />
-      <:item label="Settings" active={@dm_active_tab == "settings"} on_click="change_tab" value="settings" />
+      <:item label="Messages" active={@active_tab in ["messages", nil]} on_click="change_tab" value="messages" />
+      <:item label="Tasks" active={@active_tab == "tasks"} on_click="change_tab" value="tasks" />
+      <:item label="Commits" active={@active_tab == "commits"} on_click="change_tab" value="commits" />
+      <:item label="Notes" active={@active_tab == "notes"} on_click="change_tab" value="notes" />
+      <:item label="Context" active={@active_tab == "context"} on_click="change_tab" value="context" />
+      <:item label="Settings" active={@active_tab == "settings"} on_click="change_tab" value="settings" />
     </.tab_pills>
     <div class="flex-1" />
     <%!-- ... menu --%>
@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             <.icon name="hero-clock" class="size-3.5" /> Schedule Message
           </button>
         </li>
-        <%= if @dm_active_timer do %>
+        <%= if @active_timer do %>
           <li>
             <button
               phx-click="cancel_timer"

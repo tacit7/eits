@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       )
       |> assign(:search_query, "")
       |> assign(:starred_filter, false)
-      |> assign(:notes_sort_by, "newest")
+      |> assign(:sort_by, "newest")
       |> assign(:notes, [])
       |> assign(:editing_note_id, nil)
       |> assign(:show_quick_note_modal, false)
@@ -228,7 +228,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         else
           Notes.list_notes_filtered(
             starred: socket.assigns.starred_filter,
-            sort: socket.assigns.notes_sort_by,
+            sort: socket.assigns.sort_by,
             type_filter: socket.assigns.type_filter
           )
         end
@@ -248,7 +248,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
             project_id: project && project.id,
             agent_ids: agent_ids,
             starred: socket.assigns.starred_filter,
-            sort: socket.assigns.notes_sort_by,
+            sort: socket.assigns.sort_by,
             type_filter: socket.assigns.type_filter
           )
         end

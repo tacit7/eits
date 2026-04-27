@@ -204,17 +204,14 @@ defmodule EyeInTheSky.Tasks do
   def update_task(%Task{} = task, attrs) do
     attrs = Map.put_new(attrs, :updated_at, DateTime.utc_now())
 
-    result =
-      task
-      |> Task.changeset(attrs)
-      |> Repo.update()
+    case task |> Task.changeset(attrs) |> Repo.update() do
+      {:ok, updated} ->
+        broadcast_change({:updated, updated})
+        {:ok, Repo.preload(updated, @full_task_preloads, force: true)}
 
-    case result do
-      {:ok, task} -> broadcast_change({:updated, task})
-      _ -> :ok
+      error ->
+        error
     end
-
-    result
   end
 
   @doc """

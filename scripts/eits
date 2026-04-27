@@ -330,21 +330,31 @@ cmd_tasks() {
       _post "/tasks" "$body"
       ;;
     update)
-      # eits tasks update <id> [--state <id>] [--state-name <done|start>] [--priority <p>] [--description <d>] [--title <t>] [--due-at <ISO8601>]
-      # State IDs: 1=To Do, 2=In Progress, 3=Done, 4=In Review
-      # Prefer: eits tasks complete <id> (sets Done + annotates in one shot)
+      # eits tasks update <id> [--state <id|name>] [--priority <p>] [--description <d>] [--title <t>] [--due-at <ISO8601>]
+      # State IDs:   1=To Do, 2=In Progress, 3=Done, 4=In Review
+      # State names: todo, start|in-progress|progress, done, review|in-review
+      # Prefer: eits tasks complete <id> --message "..." (sets Done + annotates in one shot)
       local id="${1:-}"; need id; shift
       local updates="{}"
+      # Normalize a --state value: numeric → state_id, name → server alias string
+      _resolve_state() {
+        local v="$1"
+        if [[ "$v" =~ ^[0-9]+$ ]]; then
+          updates=$(echo "$updates" | jq --argjson n "$v" '. + {state_id: $n}')
+        else
+          # Map friendly names to server aliases
+          case "${v,,}" in
+            todo|"to do"|"to-do")                      v="todo" ;;
+            "in progress"|in-progress|progress|start)  v="start" ;;
+            done|complete|completed)                   v="done" ;;
+            "in review"|in-review|review)              v="in-review" ;;
+          esac
+          updates=$(echo "$updates" | jq --arg s "$v" '. + {state: $s}')
+        fi
+      }
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --state)
-            if [[ "$2" =~ ^[0-9]+$ ]]; then
-              updates=$(echo "$updates" | jq --argjson v "$2" '. + {state_id: $v}')
-            else
-              updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}')
-            fi
-            shift 2 ;;
-          --state-name)  updates=$(echo "$updates" | jq --arg v "$2" '. + {state: $v}');       shift 2 ;;
+          --state|--state-name) _resolve_state "$2"; shift 2 ;;
           --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
           --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
           --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
@@ -568,16 +578,17 @@ HELP
       create_resp=$(_post "/tasks" "$body")
       task_id=$(echo "$create_resp" | jq -r '.task_id // empty')
       [[ -n "$task_id" ]] || die "task creation failed"
-      if [[ $quiet -eq 0 ]]; then
-        echo "$create_resp"
-      else
-        echo "$task_id"
-      fi
       _patch "/tasks/$task_id" "$(json state "start" session_id "$_sess")" > /dev/null
       if [[ -n "$_sess" ]]; then
         _curl -sf -X POST -H "Content-Type: application/json" \
           -d "$(json session_id "$_sess")" \
           "$BASE_URL/tasks/$task_id/sessions" >/dev/null 2>&1 || true
+      fi
+      if [[ $quiet -eq 0 ]]; then
+        # Fetch full task so response includes state name, title, etc.
+        _curl "$BASE_URL/tasks/$task_id" | jq '{task_id: .id, title, state: .state, state_id, message: "Task created"}'
+      else
+        echo "$task_id"
       fi
       ;;
     search)

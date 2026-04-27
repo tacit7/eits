@@ -135,6 +135,7 @@ defmodule EyeInTheSkyWeb.Router do
       live "/", AgentLive.Index, :index
       live "/usage", OverviewLive.Usage, :index
       live "/skills", OverviewLive.Skills, :index
+      live "/agents", OverviewLive.Agents, :index
       live "/config", OverviewLive.Config, :index
       live "/notifications", OverviewLive.Notifications, :index
       live "/settings", OverviewLive.Settings, :index

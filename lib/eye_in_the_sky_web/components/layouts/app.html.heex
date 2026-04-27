@@ -123,6 +123,12 @@
             type_filter={assigns[:type_filter] || "all"}
             scope_filter={assigns[:scope_filter] || "all"}
           />
+        <% :agents -> %>
+          <EyeInTheSkyWeb.TopBar.Agents.toolbar
+            search_query={assigns[:search_query] || ""}
+            sort_by={assigns[:sort_by] || "name_asc"}
+            scope_filter={assigns[:scope_filter] || "all"}
+          />
         <% _ -> %>
           <%= if not is_nil(assigns[:search_query]) do %>
             <EyeInTheSkyWeb.TopBar.Generic.toolbar search_query={assigns[:search_query]} />

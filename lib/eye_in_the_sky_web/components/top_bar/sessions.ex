@@ -7,8 +7,6 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
     router: EyeInTheSkyWeb.Router,
     statics: EyeInTheSkyWeb.static_paths()
 
-  import EyeInTheSkyWeb.CoreComponents
-
   attr :search_query, :string, default: nil
   attr :session_filter, :string, default: "all"
   attr :sort_by, :string, default: "last_message"

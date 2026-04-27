@@ -7,8 +7,6 @@ defmodule EyeInTheSkyWeb.TopBar.Generic do
     router: EyeInTheSkyWeb.Router,
     statics: EyeInTheSkyWeb.static_paths()
 
-  import EyeInTheSkyWeb.CoreComponents
-  alias Phoenix.LiveView.JS
 
   attr :search_query, :string, default: nil
 

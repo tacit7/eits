@@ -7,10 +7,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
     router: EyeInTheSkyWeb.Router,
     statics: EyeInTheSkyWeb.static_paths()
 
-  import EyeInTheSkyWeb.CoreComponents
   import Phoenix.LiveView.Helpers, only: []
-
-  alias Phoenix.LiveView.JS
 
   attr :dm_active_tab, :string, default: "messages"
   attr :dm_message_search_query, :string, default: nil

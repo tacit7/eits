@@ -7,8 +7,6 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
     router: EyeInTheSkyWeb.Router,
     statics: EyeInTheSkyWeb.static_paths()
 
-  import EyeInTheSkyWeb.CoreComponents
-
   attr :search_query, :string, default: nil
   attr :notes_sort_by, :string, default: "newest"
   attr :notes_starred_filter, :boolean, default: false

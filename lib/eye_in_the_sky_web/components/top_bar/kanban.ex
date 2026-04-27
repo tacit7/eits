@@ -7,8 +7,6 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
     router: EyeInTheSkyWeb.Router,
     statics: EyeInTheSkyWeb.static_paths()
 
-  import EyeInTheSkyWeb.CoreComponents
-
   attr :search_query, :string, default: nil
   attr :show_completed, :boolean, default: false
   attr :bulk_mode, :boolean, default: false

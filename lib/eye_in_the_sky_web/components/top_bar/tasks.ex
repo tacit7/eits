@@ -7,8 +7,6 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
     router: EyeInTheSkyWeb.Router,
     statics: EyeInTheSkyWeb.static_paths()
 
-  import EyeInTheSkyWeb.CoreComponents
-
   attr :search_query, :string, default: nil
   attr :filter_state_id, :any, default: nil
   attr :workflow_states, :list, default: []

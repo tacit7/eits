@@ -56,33 +56,21 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
         class="w-3.5 h-3.5"
       />
     </button>
-    <details id="notes-type-dropdown" phx-update="ignore" class="dropdown">
-      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-        Type: {case @notes_type_filter do
-          "session" -> "Session"
-          "agent" -> "Agent"
-          "project" -> "Project"
-          "task" -> "Task"
-          "system" -> "System"
-          _ -> "All"
-        end} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
-      </summary>
-      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
-        <%= for {value, label} <- [{"all", "All"}, {"session", "Session"}, {"agent", "Agent"}, {"project", "Project"}, {"task", "Task"}, {"system", "System"}] do %>
-          <li>
-            <button
-              phx-click="filter_type"
-              phx-value-value={value}
-              onclick="this.closest('details').removeAttribute('open')"
-              class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
-                if(@notes_type_filter == value, do: "text-base-content font-medium", else: "text-base-content/60")}
-            >
-              {label}
-            </button>
-          </li>
-        <% end %>
-      </ul>
-    </details>
+    <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
+      <%= for {value, label} <- [{"all", "All"}, {"session", "Session"}, {"task", "Task"}] do %>
+        <button
+          phx-click="filter_type"
+          phx-value-value={value}
+          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
+            if(@notes_type_filter == value,
+              do: "bg-base-100 text-base-content shadow-sm",
+              else: "text-base-content/45 hover:text-base-content/70"
+            )}
+        >
+          {label}
+        </button>
+      <% end %>
+    </div>
     <details id="notes-sort-dropdown" phx-update="ignore" class="dropdown">
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort: {if @notes_sort_by == "oldest", do: "Oldest", else: "Newest"} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />

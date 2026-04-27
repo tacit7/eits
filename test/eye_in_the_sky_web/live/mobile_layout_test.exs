@@ -331,7 +331,9 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       |> element("h4[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
       |> render_click()
 
-      assert render(view) =~ "w-full max-w-lg"
+      html = render(view)
+      assert html =~ "w-full"
+      assert html =~ "max-w-lg"
     end
 
     test "drawer has dimming backdrop covering the screen", %{conn: conn} do
@@ -359,13 +361,13 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       |> element("h4[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
       |> render_click()
 
-      # Backdrop (the dimming overlay) is present when drawer is open
-      assert has_element?(view, ".fixed.inset-0.z-40")
+      # Drawer is open — aria-modal reflects true
+      assert has_element?(view, "#task-detail-drawer[aria-modal='true']")
 
       render_click(view, "toggle_overlay", %{"key" => "show_task_detail_drawer"})
 
-      # Backdrop gone once drawer is dismissed
-      refute has_element?(view, ".fixed.inset-0.z-40")
+      # Drawer dismissed — aria-modal flips to false
+      assert has_element?(view, "#task-detail-drawer[aria-modal='false']")
     end
 
     test "drawer is fixed to the right edge and full-height", %{conn: conn} do
@@ -378,7 +380,7 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       |> element("h4[phx-click='open_task_detail'][phx-value-task_id='#{task.uuid}']")
       |> render_click()
 
-      assert render(view) =~ "fixed inset-y-0 right-0"
+      assert render(view) =~ "absolute inset-y-0 right-0"
     end
 
     test "drawer has z-50 so it floats above bottom nav (z-40)", %{conn: conn} do

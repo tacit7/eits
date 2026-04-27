@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
       view |> element(~s|button[aria-label="Open filters"]|) |> render_click()
       assert render(view) =~ "tasks-filter-sheet"
 
-      view |> element(".fixed.inset-0.z-40") |> render_click()
+      view |> element("div[phx-click='close_filter_sheet'].fixed.inset-0.z-40") |> render_click()
       refute render(view) =~ "tasks-filter-sheet"
     end
   end

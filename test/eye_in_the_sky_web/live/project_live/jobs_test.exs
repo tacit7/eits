@@ -121,8 +121,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       view |> element("button", "+ New Job") |> render_click()
       view |> element("button[phx-click='cancel_form']", "Cancel") |> render_click()
 
-      # Backdrop overlay is conditionally rendered — absent means drawer is closed
-      refute has_element?(view, "div.fixed.inset-0.z-40")
+      # side_drawer sets aria-modal="false" when closed
+      assert has_element?(view, "#job-form-drawer[aria-modal='false']")
     end
   end
 

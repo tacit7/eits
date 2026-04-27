@@ -604,6 +604,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :values, :map, default: %{}
   attr :color, :string, default: "primary"
   attr :show_on_hover, :boolean, default: true
+  attr :hover_group, :string, default: "row"
   attr :class, :string, default: nil
 
   def icon_button(assigns) do
@@ -614,7 +615,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       aria-label={@aria_label}
       class={[
         "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md transition-all focus-visible:outline-none focus-visible:ring-2",
-        @show_on_hover && "md:opacity-0 md:group-hover:opacity-100",
+        @show_on_hover && hover_reveal_class(@hover_group),
         color_classes(@color),
         @class
       ]}
@@ -624,6 +625,9 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     </button>
     """
   end
+
+  defp hover_reveal_class(""), do: "md:opacity-0 md:group-hover:opacity-100"
+  defp hover_reveal_class(group), do: "md:opacity-0 md:group-hover/#{group}:opacity-100"
 
   defp color_classes("primary"),
     do: "text-base-content/40 hover:text-primary hover:bg-primary/10 focus-visible:ring-primary"

@@ -112,13 +112,14 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
     <!-- Bookmarks List -->
         <%= if @bookmarks == [] do %>
           <div class="card bg-base-100 shadow-sm">
-            <div class="card-body text-center py-12">
-              <.icon name="hero-bookmark" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
-              <h3 class="text-lg font-semibold text-base-content/60">No bookmarks yet</h3>
-              <p class="text-sm text-base-content/40 mt-2">
-                Start bookmarking files, notes, and other items to find them quickly later
-              </p>
-            </div>
+            <.empty_state
+              icon="hero-bookmark"
+              icon_class="mx-auto w-16 h-16 text-base-content/20 mb-4"
+              title="No bookmarks yet"
+              title_class="text-lg font-semibold text-base-content/60 mt-0"
+              subtitle="Start bookmarking files, notes, and other items to find them quickly later"
+              class="card-body text-center py-12"
+            />
           </div>
         <% else %>
           <div class="space-y-2">

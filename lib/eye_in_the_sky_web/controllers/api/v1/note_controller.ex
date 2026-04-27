@@ -15,13 +15,21 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   """
   def index(conn, params) do
     limit = parse_int(params["limit"], 20)
+    starred_only = params["starred"] in ["true", "1"]
 
     notes =
-      if params["session_id"] do
-        Notes.list_notes_for_session(params["session_id"], limit: limit)
-      else
-        query = params["q"] || ""
-        Notes.search_notes(query, [], limit: limit)
+      cond do
+        params["session_id"] ->
+          raw = Notes.list_notes_for_session(params["session_id"], limit: limit)
+          if starred_only, do: Enum.filter(raw, & &1.starred), else: raw
+
+        params["task_id"] ->
+          raw = Notes.list_notes_for_task(params["task_id"])
+          if starred_only, do: Enum.filter(raw, & &1.starred), else: raw
+
+        true ->
+          query = params["q"] || ""
+          Notes.search_notes(query, [], limit: limit, project_id: params["project_id"], starred: starred_only)
       end
 
     json(conn, %{

@@ -124,7 +124,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
               phx-target={@myself}
             >
               <span class="sr-only">Close Claude drawer</span>
-              <.icon name="hero-x-mark" class="w-4 h-4" />
+              <.icon name="hero-x-mark" class="size-4" />
             </button>
           </div>
           <form phx-submit="create_with_claude" phx-target={@myself} class="flex flex-col gap-4">

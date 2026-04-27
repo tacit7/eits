@@ -33,10 +33,10 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.AllProjectsSection do
           name={
             if @expanded_all_projects, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"
           }
-          class="w-3.5 h-3.5 flex-shrink-0"
+          class="size-3.5 flex-shrink-0"
         />
       <% end %>
-      <.icon name="hero-rectangle-stack" class="w-4 h-4 flex-shrink-0" />
+      <.icon name="hero-rectangle-stack" class="size-4 flex-shrink-0" />
       <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Workspace</span>
       <%= if overview_active && !@collapsed do %>
         <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
@@ -126,7 +126,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.AllProjectsSection do
       ]}
       title={@label}
     >
-      <.icon name={@icon} class="w-3.5 h-3.5 flex-shrink-0" />
+      <.icon name={@icon} class="size-3.5 flex-shrink-0" />
       <span class={["truncate", if(@collapsed, do: "hidden")]}>{@label}</span>
     </.link>
     """
@@ -152,7 +152,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.AllProjectsSection do
       title="Notifications"
     >
       <div class="relative">
-        <.icon name="hero-bell" class="w-3.5 h-3.5 flex-shrink-0" />
+        <.icon name="hero-bell" class="size-3.5 flex-shrink-0" />
         <%= if @count > 0 do %>
           <span class="absolute -top-1.5 -right-1.5 badge badge-xs badge-primary text-xs leading-none min-w-[18px] h-[18px] px-1">
             {if @count > 99, do: "99+", else: @count}

@@ -520,18 +520,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="flex-1" />
 
         <.link navigate="/notifications" class={["relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors", "text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"]} aria-label="Notifications">
-          <.icon name="hero-bell-mini" class="w-4 h-4" />
+          <.icon name="hero-bell-mini" class="size-4" />
           <span :if={@notification_count > 0} class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
             {@notification_count}
           </span>
         </.link>
 
         <.link navigate="/settings" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors" aria-label="Settings">
-          <.icon name="hero-cog-6-tooth-mini" class="w-4 h-4" />
+          <.icon name="hero-cog-6-tooth-mini" class="size-4" />
         </.link>
 
         <.link href="/auth/logout" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors" aria-label="Sign out">
-          <.icon name="hero-arrow-left-on-rectangle-mini" class="w-4 h-4" />
+          <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
         </.link>
       </nav>
 
@@ -631,7 +631,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
               class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
               title="Close"
             >
-              <.icon name="hero-x-mark-mini" class="w-3 h-3" />
+              <.icon name="hero-x-mark-mini" class="size-3" />
             </button>
           </div>
         <% end %>
@@ -692,9 +692,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       ]}
     >
       <%= if String.starts_with?(@icon, "lucide-") do %>
-        <.custom_icon name={@icon} class="w-4 h-4" />
+        <.custom_icon name={@icon} class="size-4" />
       <% else %>
-        <.icon name={@icon} class="w-4 h-4" />
+        <.icon name={@icon} class="size-4" />
       <% end %>
     </button>
     """

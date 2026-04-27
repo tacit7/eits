@@ -323,7 +323,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         aria-label="Go back"
         title="Go back"
       >
-        <.icon name="hero-arrow-left" class="w-4 h-4" />
+        <.icon name="hero-arrow-left" class="size-4" />
       </button>
       <%= for canvas <- @canvases do %>
         <%= if @renaming_canvas_id == canvas.id do %>
@@ -367,7 +367,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
               phx-confirm="Delete canvas and all its windows?"
               class="ml-1 opacity-50 hover:opacity-100"
             >
-              <.icon name="hero-trash-mini" class="w-3 h-3" />
+              <.icon name="hero-trash-mini" class="size-3" />
             </button>
           </a>
         <% end %>
@@ -401,7 +401,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         class="ml-auto btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
         title="Add session to canvas"
       >
-        <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+        <.icon name="hero-plus-mini" class="size-3.5" />
       </button>
       <button
         :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
@@ -412,7 +412,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
         title="2-up layout"
       >
-        <.icon name="hero-view-columns" class="w-4 h-4" />
+        <.icon name="hero-view-columns" class="size-4" />
       </button>
       <button
         :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
@@ -423,7 +423,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         class="btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
         title="4-up layout"
       >
-        <.icon name="hero-squares-2x2" class="w-4 h-4" />
+        <.icon name="hero-squares-2x2" class="size-4" />
       </button>
       <button
         :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
@@ -431,7 +431,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         class="mr-2 btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
         title="Tidy windows"
       >
-        <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
+        <.icon name="hero-squares-2x2-mini" class="size-3.5" />
       </button>
     </div>
     """
@@ -481,7 +481,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           <div class="flex items-center justify-between shrink-0">
             <h3 class="font-semibold text-sm">Add Session to Canvas</h3>
             <button type="button" phx-click="close_session_picker" class="btn btn-ghost btn-xs btn-circle">
-              <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+              <.icon name="hero-x-mark-mini" class="size-4" />
             </button>
           </div>
           <form phx-change="search_sessions" class="shrink-0">

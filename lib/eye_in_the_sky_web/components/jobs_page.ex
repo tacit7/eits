@@ -295,14 +295,14 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               class="btn btn-ghost btn-sm min-h-[44px] w-full sm:w-auto text-base-content/50"
               title="Oban queue dashboard"
             >
-              <.icon name="hero-queue-list" class="w-3.5 h-3.5" /> Oban
+              <.icon name="hero-queue-list" class="size-3.5" /> Oban
             </.link>
             <button
               class="btn btn-outline btn-sm min-h-[44px] w-full sm:w-auto"
               phx-click="toggle_claude_drawer"
               phx-target={@myself}
             >
-              <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
+              <.icon name="hero-sparkles" class="size-3.5" /> Create with Claude
             </button>
             <button
               class="btn btn-primary btn-sm min-h-[44px] w-full sm:w-auto"
@@ -412,7 +412,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                   phx-click="toggle_claude_drawer"
                   phx-target={@myself}
                 >
-                  <.icon name="hero-sparkles" class="w-3.5 h-3.5" /> Create with Claude
+                  <.icon name="hero-sparkles" class="size-3.5" /> Create with Claude
                 </button>
                 <button
                   class="btn btn-primary btn-sm min-h-[44px] w-full sm:w-auto"

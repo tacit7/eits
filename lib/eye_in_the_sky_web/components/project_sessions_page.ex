@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
               phx-click="enter_select_mode"
               class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/40 hover:text-base-content/70"
             >
-              <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" /> Select
+              <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
             </button>
             <button
               phx-click="open_filter_sheet"
@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
               aria-haspopup="dialog"
               class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
             >
-              <.icon name="hero-funnel-mini" class="w-4 h-4" />
+              <.icon name="hero-funnel-mini" class="size-4" />
               <%= if @session_filter != "all" || @sort_by != "last_message" do %>
                 <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true">
                 </span>
@@ -61,7 +61,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
               phx-click="toggle_new_session_drawer"
               class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
             >
-              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Agent
+              <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
             </button>
           </div>
         </div>

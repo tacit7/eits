@@ -177,7 +177,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
                         class="btn btn-ghost btn-sm btn-square"
                         title="Remove bookmark"
                       >
-                        <.icon name="hero-trash" class="w-4 h-4" />
+                        <.icon name="hero-trash" class="size-4" />
                       </button>
                     </div>
                   </div>
@@ -199,15 +199,15 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
     ~H"""
     <%= case @type do %>
       <% "file" -> %>
-        <.icon name="hero-document-text" class="w-5 h-5 text-primary" />
+        <.icon name="hero-document-text" class="size-5 text-primary" />
       <% "note" -> %>
-        <.icon name="hero-clipboard-document-list" class="w-5 h-5 text-secondary" />
+        <.icon name="hero-clipboard-document-list" class="size-5 text-secondary" />
       <% "agent" -> %>
-        <.icon name="hero-user" class="w-5 h-5 text-accent" />
+        <.icon name="hero-user" class="size-5 text-accent" />
       <% "url" -> %>
-        <.icon name="hero-link" class="w-5 h-5 text-info" />
+        <.icon name="hero-link" class="size-5 text-info" />
       <% _ -> %>
-        <.icon name="hero-bookmark" class="w-5 h-5 text-base-content/40" />
+        <.icon name="hero-bookmark" class="size-5 text-base-content/40" />
     <% end %>
     """
   end

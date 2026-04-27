@@ -75,7 +75,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
           aria-haspopup="dialog"
           class="sm:hidden relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
         >
-          <.icon name="hero-funnel-mini" class="w-4 h-4" />
+          <.icon name="hero-funnel-mini" class="size-4" />
           <%= if @session_filter != "all" || @sort_by != "last_message" do %>
             <span
               class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
@@ -121,7 +121,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
             class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close filter panel"
           >
-            <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+            <.icon name="hero-x-mark-mini" class="size-4" />
           </button>
         </div>
 

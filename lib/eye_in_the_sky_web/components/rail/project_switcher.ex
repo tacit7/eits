@@ -43,14 +43,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
             "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold",
             if(ws_selected, do: "bg-primary text-white", else: "bg-base-content/10 text-base-content/60")
           ]}>
-            <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" />
+            <.icon name="hero-squares-2x2-mini" class="size-3.5" />
           </div>
           <div class="flex-1 min-w-0">
             <div class="font-medium truncate">
               {if @workspace, do: @workspace.name, else: "Personal Workspace"}
             </div>
           </div>
-          <.icon :if={ws_selected} name="hero-check-mini" class="w-3.5 h-3.5 flex-shrink-0" />
+          <.icon :if={ws_selected} name="hero-check-mini" class="size-3.5 flex-shrink-0" />
         </button>
       </div>
 
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
             <div class="flex-1 min-w-0">
               <div class="font-medium truncate">{project.name}</div>
             </div>
-            <.icon :if={selected} name="hero-check-mini" class="w-3.5 h-3.5 flex-shrink-0" />
+            <.icon :if={selected} name="hero-check-mini" class="size-3.5 flex-shrink-0" />
           </button>
         <% end %>
       </div>
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
             phx-target={@myself}
             class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-base-content/50 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
           >
-            <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+            <.icon name="hero-plus-mini" class="size-3.5" />
             New project
           </button>
         <% else %>
@@ -114,7 +114,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
               class="text-primary hover:text-primary/80"
               aria-label="Create project"
             >
-              <.icon name="hero-check-mini" class="w-3.5 h-3.5" />
+              <.icon name="hero-check-mini" class="size-3.5" />
             </button>
             <button
               type="button"
@@ -123,7 +123,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
               class="text-base-content/30 hover:text-base-content/60"
               aria-label="Cancel"
             >
-              <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+              <.icon name="hero-x-mark-mini" class="size-3.5" />
             </button>
           </form>
         <% end %>

@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.DeleteAgentDialog do
             class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close"
           >
-            <span class="hero-x-mark w-4 h-4"></span>
+            <span class="hero-x-mark size-4"></span>
           </button>
         </div>
         <form data-qda-form class="p-4 flex flex-col gap-3">
@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.DeleteAgentDialog do
             />
           </div>
           <div class="alert alert-warning text-sm">
-            <.icon name="hero-exclamation-triangle" class="shrink-0 h-5 w-5" />
+            <.icon name="hero-exclamation-triangle" class="shrink-0 size-5" />
             <span>Warning: This action cannot be undone. The agent will be permanently deleted.</span>
           </div>
           <div class="flex justify-end gap-2 pt-1">

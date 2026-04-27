@@ -73,7 +73,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
         class="flex-shrink-0 mt-0.5 touch-none cursor-grab active:cursor-grabbing flex md:hidden text-base-content/20 hover:text-base-content/40"
         aria-label="Drag to reorder"
       >
-        <.icon name="hero-bars-2" class="w-3.5 h-3.5" />
+        <.icon name="hero-bars-2" class="size-3.5" />
       </div>
       <%!-- Completion toggle --%>
       <button
@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       >
         <.icon
           name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
-          class="w-4 h-4"
+          class="size-4"
         />
       </button>
       <h4
@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
     <div class="flex-shrink-0 md:opacity-0 md:group-hover/card:opacity-100 transition-opacity">
       <details class="dropdown dropdown-end">
         <summary class="flex items-center justify-center min-w-[44px] min-h-[44px] -mx-2.5 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
-          <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
+          <.icon name="hero-ellipsis-horizontal-mini" class="size-3.5" />
         </summary>
         <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
           <%!-- Open card --%>
@@ -150,7 +150,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           >
             <.icon
               name="hero-rectangle-stack-mini"
-              class="w-4 h-4 text-base-content/60 flex-shrink-0"
+              class="size-4 text-base-content/60 flex-shrink-0"
             /> Open card
           </button>
           <%!-- Edit labels --%>
@@ -161,7 +161,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             phx-value-focus="tags"
             class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
-            <.icon name="hero-tag-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            <.icon name="hero-tag-mini" class="size-4 text-base-content/60 flex-shrink-0" />
             Edit labels
           </button>
           <%!-- Edit dates --%>
@@ -171,7 +171,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             phx-value-task_id={@task_id}
             class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
-            <.icon name="hero-clock-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            <.icon name="hero-clock-mini" class="size-4 text-base-content/60 flex-shrink-0" />
             Edit dates
           </button>
           <%!-- Copy link --%>
@@ -183,7 +183,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             onclick="event.preventDefault();"
             class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
-            <.icon name="hero-link-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+            <.icon name="hero-link-mini" class="size-4 text-base-content/60 flex-shrink-0" />
             Copy link
           </button>
           <%!-- Move submenu --%>
@@ -193,10 +193,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
               <summary class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
                 <.icon
                   name="hero-arrow-right-mini"
-                  class="w-4 h-4 text-base-content/60 flex-shrink-0"
+                  class="size-4 text-base-content/60 flex-shrink-0"
                 />
                 <span class="flex-1">Move</span>
-                <.icon name="hero-chevron-right-mini" class="w-3 h-3 text-base-content/40" />
+                <.icon name="hero-chevron-right-mini" class="size-3 text-base-content/40" />
               </summary>
               <div class="mt-0.5 ml-3 flex flex-col gap-0.5">
                 <%= for state <- @workflow_states do %>
@@ -227,7 +227,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
               phx-confirm="Archive this task?"
               class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
             >
-              <.icon name="hero-archive-box-mini" class="w-4 h-4 text-base-content/60 flex-shrink-0" />
+              <.icon name="hero-archive-box-mini" class="size-4 text-base-content/60 flex-shrink-0" />
               Archive
             </button>
             <button
@@ -237,7 +237,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
               phx-confirm="Delete this task?"
               class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
             >
-              <.icon name="hero-trash-mini" class="w-4 h-4 flex-shrink-0" /> Delete
+              <.icon name="hero-trash-mini" class="size-4 flex-shrink-0" /> Delete
             </button>
           <% end %>
         </div>
@@ -270,7 +270,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           <span class="tabular-nums">{relative_time(@task.created_at)}</span>
         <% end %>
         <%= if @task.description do %>
-          <.icon name="hero-document-text" class="w-3 h-3 flex-shrink-0" />
+          <.icon name="hero-document-text" class="size-3 flex-shrink-0" />
         <% end %>
         <%= if @aging do %>
           <span
@@ -281,25 +281,25 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             }
             title={elem(@aging, 1)}
           >
-            <.icon name="hero-clock-mini" class="w-3 h-3 flex-shrink-0" />
+            <.icon name="hero-clock-mini" class="size-3 flex-shrink-0" />
           </span>
         <% end %>
         <%= if @task.due_at do %>
           <span class="flex items-center gap-0.5">
-            <.icon name="hero-calendar" class="w-3 h-3" />
+            <.icon name="hero-calendar" class="size-3" />
             <span>{format_due_date(@task.due_at)}</span>
           </span>
         <% end %>
         <%= if @checklist != [] do %>
           <% cl_done = Enum.count(@checklist, & &1.completed) %>
           <span class="flex items-center gap-0.5">
-            <.icon name="hero-check-circle" class="w-3 h-3" />
+            <.icon name="hero-check-circle" class="size-3" />
             <span>{cl_done}/{length(@checklist)}</span>
           </span>
         <% end %>
         <%= if @notes_count > 0 do %>
           <span class="flex items-center gap-0.5">
-            <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
+            <.icon name="hero-chat-bubble-bottom-center-text" class="size-3" />
             <span>{@notes_count}</span>
           </span>
         <% end %>
@@ -325,7 +325,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             <span class="relative inline-flex">
               <.icon
                 name="hero-user-circle"
-                class={"w-3.5 h-3.5 #{cond do
+                class={"size-3.5 #{cond do
                   is_working -> "text-primary"
                   is_waiting -> "text-warning"
                   true -> ""

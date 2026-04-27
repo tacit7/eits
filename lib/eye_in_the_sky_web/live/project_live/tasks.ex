@@ -257,7 +257,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-click="enter_select_mode_tasks"
             class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/50"
           >
-            <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" /> Select
+            <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
           </button>
           <button
             phx-click="open_filter_sheet"
@@ -265,7 +265,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             aria-haspopup="dialog"
             class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
           >
-            <.icon name="hero-funnel-mini" class="w-4 h-4" />
+            <.icon name="hero-funnel-mini" class="size-4" />
             <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
               <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true">
               </span>
@@ -275,7 +275,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-click="toggle_new_task_drawer"
             class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
           >
-            <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> New Task
+            <.icon name="hero-plus-mini" class="size-3.5" /> New Task
           </button>
         </div>
 
@@ -310,7 +310,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
                   data-confirm={"Delete #{MapSet.size(@selected_task_ids)} task#{if MapSet.size(@selected_task_ids) != 1, do: "s"}?"}
                   class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
                 >
-                  <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+                  <.icon name="hero-trash-mini" class="size-3.5" /> Delete
                 </button>
               <% else %>
                 <span class="text-[11px] text-base-content/30">{@task_count} tasks</span>
@@ -320,7 +320,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
                 class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
                 aria-label="Exit select mode"
               >
-                <.icon name="hero-x-mark" class="w-4 h-4" />
+                <.icon name="hero-x-mark" class="size-4" />
               </button>
             </div>
           <% end %>

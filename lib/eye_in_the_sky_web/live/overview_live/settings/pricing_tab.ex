@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.PricingTab do
               Cost per 1M tokens (USD). Used for usage cost estimates.
             </p>
             <button phx-click="reset_pricing" class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]">
-              <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" /> Reset All
+              <.icon name="hero-arrow-uturn-left" class="size-3.5" /> Reset All
             </button>
           </div>
           <form phx-change="save_pricing" phx-debounce="500">

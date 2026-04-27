@@ -1,0 +1,606 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - link "Skip to main content" [ref=e4] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=e5]:
+      - navigation [ref=e1197]:
+        - button "Switch project" [ref=e1198]: E
+        - button "Files" [ref=e8]
+        - button "Sessions" [ref=e10]:
+          - img [ref=e11]
+        - button "Tasks" [ref=e14]
+        - button "Notes" [ref=e16]
+        - button "Skills" [ref=e18]
+        - button "Prompts" [ref=e20]
+        - button "Teams" [ref=e22]
+        - button "Jobs" [ref=e24]
+        - button "Canvas" [ref=e26]
+        - button "Chat" [ref=e28]
+        - button "Usage" [ref=e30]
+        - link "Notifications" [ref=e32] [cursor=pointer]:
+          - /url: /notifications
+          - generic [ref=e224]: "581"
+        - link "Settings" [ref=e34] [cursor=pointer]:
+          - /url: /settings
+        - link "Sign out" [ref=e36] [cursor=pointer]:
+          - /url: /auth/logout
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - link "Sessions" [ref=e1199] [cursor=pointer]:
+            - /url: /projects/1/sessions
+            - generic [ref=e45]: Sessions
+          - button "New session in EITS Web" [ref=e1201]
+        - generic [ref=e46]:
+          - link "fix tests" [ref=e1203] [cursor=pointer]:
+            - /url: /dm/3648
+            - generic [ref=e1205]: fix tests
+          - link "Status dot migration" [ref=e1206] [cursor=pointer]:
+            - /url: /dm/3622
+            - generic [ref=e1208]: Status dot migration
+          - link "dm page regression" [ref=e1209] [cursor=pointer]:
+            - /url: /dm/3653
+            - generic [ref=e1211]: dm page regression
+          - link "cli apr 26" [ref=e1212] [cursor=pointer]:
+            - /url: /dm/3640
+            - generic [ref=e1214]: cli apr 26
+          - link "agent-kanban @ topbar-phase2" [ref=e1215] [cursor=pointer]:
+            - /url: /dm/3659
+            - generic [ref=e1217]: agent-kanban @ topbar-phase2
+          - link "agent-notes @ topbar-phase2" [ref=e1218] [cursor=pointer]:
+            - /url: /dm/3661
+            - generic [ref=e1220]: agent-notes @ topbar-phase2
+          - link "agent-tasks @ topbar-phase2" [ref=e1221] [cursor=pointer]:
+            - /url: /dm/3658
+            - generic [ref=e1223]: agent-tasks @ topbar-phase2
+          - link "agent-sessions @ topbar-phase2" [ref=e1224] [cursor=pointer]:
+            - /url: /dm/3660
+            - generic [ref=e1226]: agent-sessions @ topbar-phase2
+          - link "agent-dm @ topbar-phase2" [ref=e1227] [cursor=pointer]:
+            - /url: /dm/3662
+            - generic [ref=e1229]: agent-dm @ topbar-phase2
+          - link "agent-sessions @ topbar-phase2" [ref=e1230] [cursor=pointer]:
+            - /url: /dm/3664
+            - generic [ref=e1232]: agent-sessions @ topbar-phase2
+          - link "Apply doc updates from recent commits using a parallel agent team" [ref=e1233] [cursor=pointer]:
+            - /url: /dm/3666
+            - generic [ref=e1235]: Apply doc updates from recent commits using a parallel agent team
+          - link "agent-generic @ topbar-phase2" [ref=e1236] [cursor=pointer]:
+            - /url: /dm/3663
+            - generic [ref=e1238]: agent-generic @ topbar-phase2
+          - 'link "You are updating docs/DM_FEATURES.md for the EITS Web project at /Users/urielmaldonado/projects/eits/web. Commits to apply: - fa1f2f94: feat(dm): add Context/Settings tabs and ... menu to desktop top bar - 5cc5e369: fix: remove useless deliver_and_p" [ref=e1239] [cursor=pointer]':
+            - /url: /dm/3667
+            - generic [ref=e1241]: "You are updating docs/DM_FEATURES.md for the EITS Web project at /Users/urielmaldonado/projects/eits/web. Commits to apply: - fa1f2f94: feat(dm): add Context/Settings tabs and ... menu to desktop top bar - 5cc5e369: fix: remove useless deliver_and_p"
+          - 'link "You are updating docs/TOP_BAR_REFACTOR.md for the EITS Web project at /Users/urielmaldonado/projects/eits/web. Commits to apply: - 82fdfc11: refactor(top-bar): migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions - 9426dc1d: chore: linter clea" [ref=e1242] [cursor=pointer]':
+            - /url: /dm/3668
+            - generic [ref=e1244]: "You are updating docs/TOP_BAR_REFACTOR.md for the EITS Web project at /Users/urielmaldonado/projects/eits/web. Commits to apply: - 82fdfc11: refactor(top-bar): migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions - 9426dc1d: chore: linter clea"
+          - link "agent-sessions @ topbar-phase2" [ref=e1245] [cursor=pointer]:
+            - /url: /dm/3665
+            - generic [ref=e1247]: agent-sessions @ topbar-phase2
+    - generic [ref=e197]:
+      - generic [ref=e198]:
+        - generic [ref=e199]: Tasks
+        - generic [ref=e200]:
+          - generic [ref=e201]: Search tasks
+          - textbox "Search tasks" [ref=e203]:
+            - /placeholder: Search tasks...
+        - generic [ref=e204]:
+          - generic "List view" [ref=e205]: List
+          - link "Board" [ref=e207] [cursor=pointer]:
+            - /url: /projects/1/kanban
+            - text: Board
+        - generic [ref=e209]:
+          - button "All" [ref=e210]
+          - button "To Do" [ref=e225]
+          - button "In Progress" [ref=e226]
+          - button "In Review" [ref=e227]
+          - button "Done" [ref=e228]
+        - group [ref=e211]:
+          - 'generic "Sort: Newest" [ref=e212] [cursor=pointer]':
+            - text: "Sort:"
+            - generic [ref=e213]: Newest
+        - button "New Task" [ref=e215]: New Task
+      - main [ref=e217]:
+        - generic [ref=e229]:
+          - generic [ref=e231]:
+            - checkbox "Select task Fix remaining Task sandbox teardown races in tests" [ref=e234]
+            - button "Open task Fix remaining Task sandbox teardown races in tests" [ref=e236] [cursor=pointer]:
+              - generic [ref=e238]:
+                - generic [ref=e239]: Fix remaining Task sandbox teardown races in tests
+                - generic [ref=e240]
+              - generic [ref=e244]:
+                - link "Open agent direct message" [ref=e245]:
+                  - /url: /dm/9a0c0936-251b-424e-acf0-eda2c5ad7c34
+                - button "Delete task" [ref=e247]
+          - generic [ref=e250]:
+            - 'checkbox "Select task Update dm-page-expert memory: root UUID fix" [ref=e253]'
+            - 'button "Open task Update dm-page-expert memory: root UUID fix" [ref=e255] [cursor=pointer]':
+              - generic [ref=e257]:
+                - generic [ref=e258]: "Update dm-page-expert memory: root UUID fix"
+                - generic [ref=e259]
+              - generic [ref=e263]:
+                - link "Open agent direct message" [ref=e264]:
+                  - /url: /dm/be6f1d14-4ebd-4a01-8ed9-ec244628642f
+                - button "Delete task" [ref=e266]
+          - generic [ref=e269]:
+            - checkbox "Select task Fix sort_by on tasks page (created_desc falls through to position order)" [ref=e272]
+            - button "Open task Fix sort_by on tasks page (created_desc falls through to position order)" [ref=e274] [cursor=pointer]:
+              - generic [ref=e276]:
+                - generic [ref=e277]: Fix sort_by on tasks page (created_desc falls through to position order)
+                - generic [ref=e278]
+              - generic [ref=e282]:
+                - link "Open agent direct message" [ref=e283]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e285]
+          - generic [ref=e288]:
+            - checkbox "Select task Move list/board toggle to fixed position next to search" [ref=e291]
+            - button "Open task Move list/board toggle to fixed position next to search" [ref=e293] [cursor=pointer]:
+              - generic [ref=e295]:
+                - generic [ref=e296]: Move list/board toggle to fixed position next to search
+                - generic [ref=e297]
+              - generic [ref=e301]:
+                - link "Open agent direct message" [ref=e302]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e304]
+          - generic [ref=e307]:
+            - checkbox "Select task Propagate JSONL assistant UUID through SDK result to eliminate duplicate messages" [ref=e310]
+            - button "Open task Propagate JSONL assistant UUID through SDK result to eliminate duplicate messages" [ref=e312] [cursor=pointer]:
+              - generic [ref=e314]:
+                - generic [ref=e315]: Propagate JSONL assistant UUID through SDK result to eliminate duplicate messages
+                - generic [ref=e316]
+              - generic [ref=e320]:
+                - link "Open agent direct message" [ref=e321]:
+                  - /url: /dm/be6f1d14-4ebd-4a01-8ed9-ec244628642f
+                - button "Delete task" [ref=e323]
+          - generic [ref=e326]:
+            - 'checkbox "Select task fix(dm): propagate JSONL assistant UUID through SDK result to eliminate duplicate source_uuid mismatch" [ref=e329]'
+            - 'button "Open task fix(dm): propagate JSONL assistant UUID through SDK result to eliminate duplicate source_uuid mismatch" [ref=e331] [cursor=pointer]':
+              - generic [ref=e333]:
+                - generic [ref=e334]: "fix(dm): propagate JSONL assistant UUID through SDK result to eliminate duplicate source_uuid mismatch"
+                - generic [ref=e335]
+              - generic [ref=e339]:
+                - link "Open agent direct message" [ref=e340]:
+                  - /url: /dm/be6f1d14-4ebd-4a01-8ed9-ec244628642f
+                - button "Delete task" [ref=e342]
+          - generic [ref=e345]:
+            - checkbox "Select task Fix IAM record_audit sandbox ownership in tests" [ref=e348]
+            - button "Open task Fix IAM record_audit sandbox ownership in tests" [ref=e350] [cursor=pointer]:
+              - generic [ref=e352]:
+                - generic [ref=e353]: Fix IAM record_audit sandbox ownership in tests
+                - generic [ref=e354]
+              - generic [ref=e358]:
+                - link "Open agent direct message" [ref=e359]:
+                  - /url: /dm/9a0c0936-251b-424e-acf0-eda2c5ad7c34
+                - button "Delete task" [ref=e361]
+          - generic [ref=e364]:
+            - 'checkbox "Select task Update eits-cli skill: --id flag for tasks begin" [ref=e367]'
+            - 'button "Open task Update eits-cli skill: --id flag for tasks begin" [ref=e369] [cursor=pointer]':
+              - generic [ref=e371]:
+                - generic [ref=e372]: "Update eits-cli skill: --id flag for tasks begin"
+                - generic [ref=e373]
+              - generic [ref=e377]:
+                - link "Open agent direct message" [ref=e378]:
+                  - /url: /dm/7f55676e-3683-4926-971f-608bebfb9a10
+                - button "Delete task" [ref=e380]
+          - generic [ref=e383]:
+            - checkbox "Select task Fix test file compile warnings" [ref=e386]
+            - button "Open task Fix test file compile warnings" [ref=e388] [cursor=pointer]:
+              - generic [ref=e390]:
+                - generic [ref=e391]: Fix test file compile warnings
+                - generic [ref=e392]
+              - generic [ref=e396]:
+                - link "Open agent direct message" [ref=e397]:
+                  - /url: /dm/9a0c0936-251b-424e-acf0-eda2c5ad7c34
+                - button "Delete task" [ref=e399]
+          - generic [ref=e402]:
+            - 'checkbox "Select task chore: update dm-page-expert memory with dedup root cause" [ref=e405]'
+            - 'button "Open task chore: update dm-page-expert memory with dedup root cause" [ref=e407] [cursor=pointer]':
+              - generic [ref=e409]:
+                - generic [ref=e410]: "chore: update dm-page-expert memory with dedup root cause"
+                - generic [ref=e411]
+              - generic [ref=e415]:
+                - link "Open agent direct message" [ref=e416]:
+                  - /url: /dm/be6f1d14-4ebd-4a01-8ed9-ec244628642f
+                - button "Delete task" [ref=e418]
+          - generic [ref=e421]:
+            - checkbox "Select task Update agent memory with session learnings" [ref=e424]
+            - button "Open task Update agent memory with session learnings" [ref=e426] [cursor=pointer]:
+              - generic [ref=e428]:
+                - generic [ref=e429]: Update agent memory with session learnings
+                - generic [ref=e430]
+              - generic [ref=e434]:
+                - link "Open agent direct message" [ref=e435]:
+                  - /url: /dm/9a0c0936-251b-424e-acf0-eda2c5ad7c34
+                - button "Delete task" [ref=e437]
+          - generic [ref=e440]:
+            - checkbox "Select task Fix sessions agent sort, working filter, kanban exit select mode" [ref=e443]
+            - button "Open task Fix sessions agent sort, working filter, kanban exit select mode" [ref=e445] [cursor=pointer]:
+              - generic [ref=e447]:
+                - generic [ref=e448]: Fix sessions agent sort, working filter, kanban exit select mode
+                - generic [ref=e449]
+              - generic [ref=e453]:
+                - link "Open agent direct message" [ref=e454]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e456]
+          - generic [ref=e459]:
+            - 'checkbox "Select task fix(dm): extend agent_reply_already_recorded? window for file imports to prevent duplicate messages" [ref=e462]'
+            - 'button "Open task fix(dm): extend agent_reply_already_recorded? window for file imports to prevent duplicate messages" [ref=e464] [cursor=pointer]':
+              - generic [ref=e466]:
+                - generic [ref=e467]: "fix(dm): extend agent_reply_already_recorded? window for file imports to prevent duplicate messages"
+                - generic [ref=e468]
+              - generic [ref=e472]:
+                - link "Open agent direct message" [ref=e473]:
+                  - /url: /dm/be6f1d14-4ebd-4a01-8ed9-ec244628642f
+                - button "Delete task" [ref=e475]
+          - generic [ref=e478]:
+            - checkbox "Select task Fix cli_test binary_not_found crash and dm_e2e order flakiness" [ref=e481]
+            - button "Open task Fix cli_test binary_not_found crash and dm_e2e order flakiness" [ref=e483] [cursor=pointer]:
+              - generic [ref=e485]:
+                - generic [ref=e486]: Fix cli_test binary_not_found crash and dm_e2e order flakiness
+                - generic [ref=e487]
+              - generic [ref=e491]:
+                - link "Open agent direct message" [ref=e492]:
+                  - /url: /dm/9a0c0936-251b-424e-acf0-eda2c5ad7c34
+                - button "Delete task" [ref=e494]
+          - generic [ref=e497]:
+            - checkbox "Select task Fix kanban select button, tasks view toggle, and sort label staleness" [ref=e500]
+            - button "Open task Fix kanban select button, tasks view toggle, and sort label staleness" [ref=e502] [cursor=pointer]:
+              - generic [ref=e504]:
+                - generic [ref=e505]: Fix kanban select button, tasks view toggle, and sort label staleness
+                - generic [ref=e506]
+              - generic [ref=e510]:
+                - link "Open agent direct message" [ref=e511]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e513]
+          - generic [ref=e516]:
+            - checkbox "Select task Update chrome system memory with breadcrumb correction" [ref=e519]
+            - button "Open task Update chrome system memory with breadcrumb correction" [ref=e521] [cursor=pointer]:
+              - generic [ref=e523]:
+                - generic [ref=e524]: Update chrome system memory with breadcrumb correction
+                - generic [ref=e525]
+              - generic [ref=e529]:
+                - link "Open agent direct message" [ref=e530]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e532]
+          - generic [ref=e535]:
+            - checkbox "Select task Remove project breadcrumb from top bar — spec shows section label only" [ref=e538]
+            - button "Open task Remove project breadcrumb from top bar — spec shows section label only" [ref=e540] [cursor=pointer]:
+              - generic [ref=e542]:
+                - generic [ref=e543]: Remove project breadcrumb from top bar — spec shows section label only
+                - generic [ref=e544]
+              - generic [ref=e548]:
+                - link "Open agent direct message" [ref=e549]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e551]
+          - generic [ref=e554]:
+            - checkbox "Select task Replace notes type dropdown with pill group (chrome spec)" [ref=e557]
+            - button "Open task Replace notes type dropdown with pill group (chrome spec)" [ref=e559] [cursor=pointer]:
+              - generic [ref=e561]:
+                - generic [ref=e562]: Replace notes type dropdown with pill group (chrome spec)
+                - generic [ref=e563]
+              - generic [ref=e567]:
+                - link "Open agent direct message" [ref=e568]:
+                  - /url: /dm/f5cdb9c4-74a3-4d03-b186-edc712fc9bdc
+                - button "Delete task" [ref=e570]
+          - generic [ref=e573]:
+            - checkbox "Select task Rework kanban top bar to match chrome system spec" [ref=e576]
+            - button "Open task Rework kanban top bar to match chrome system spec" [ref=e578] [cursor=pointer]:
+              - generic [ref=e580]:
+                - generic [ref=e581]: Rework kanban top bar to match chrome system spec
+                - generic [ref=e582]
+              - generic [ref=e586]:
+                - link "Open agent direct message" [ref=e587]:
+                  - /url: /dm/8174c506-02b4-4bb3-9302-4485a8f3d040
+                - button "Delete task" [ref=e589]
+          - generic [ref=e592]:
+            - checkbox "Select task test claim target" [ref=e595]
+            - button "Open task test claim target" [ref=e597] [cursor=pointer]:
+              - generic [ref=e599]:
+                - generic [ref=e600]: test claim target
+                - generic [ref=e601]
+              - generic [ref=e607]:
+                - link "Open agent direct message" [ref=e608]:
+                  - /url: /dm/7f55676e-3683-4926-971f-608bebfb9a10
+                - button "Delete task" [ref=e610]
+          - generic [ref=e613]:
+            - checkbox "Select task test claim target" [ref=e616]
+            - button "Open task test claim target" [ref=e618] [cursor=pointer]:
+              - generic [ref=e620]:
+                - generic [ref=e621]: test claim target
+                - generic [ref=e622]
+              - generic [ref=e628]:
+                - link "Open agent direct message" [ref=e629]:
+                  - /url: /dm/7f55676e-3683-4926-971f-608bebfb9a10
+                - button "Delete task" [ref=e631]
+          - generic [ref=e634]:
+            - 'checkbox "Select task eits tasks begin --id: claim existing task instead of creating new" [ref=e637]'
+            - 'button "Open task eits tasks begin --id: claim existing task instead of creating new" [ref=e639] [cursor=pointer]':
+              - generic [ref=e641]:
+                - generic [ref=e642]: "eits tasks begin --id: claim existing task instead of creating new"
+                - generic [ref=e643]
+              - generic [ref=e647]:
+                - link "Open agent direct message" [ref=e648]:
+                  - /url: /dm/7f55676e-3683-4926-971f-608bebfb9a10
+                - button "Delete task" [ref=e650]
+          - generic [ref=e653]:
+            - 'checkbox "Select task Cleanup: remove deprecated top_bar/1 and private toolbar defps from layouts.ex" [ref=e656]'
+            - 'button "Open task Cleanup: remove deprecated top_bar/1 and private toolbar defps from layouts.ex" [ref=e658] [cursor=pointer]':
+              - generic [ref=e660]:
+                - generic [ref=e661]: "Cleanup: remove deprecated top_bar/1 and private toolbar defps from layouts.ex"
+                - generic [ref=e662]
+              - generic [ref=e666]:
+                - link "Open agent direct message" [ref=e667]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e669]
+          - generic [ref=e672]:
+            - checkbox "Select task Save last_doc_run_commit SHA" [ref=e675]
+            - button "Open task Save last_doc_run_commit SHA" [ref=e677] [cursor=pointer]:
+              - generic [ref=e679]:
+                - generic [ref=e680]: Save last_doc_run_commit SHA
+                - generic [ref=e681]
+              - generic [ref=e685]:
+                - link "Open agent direct message" [ref=e686]:
+                  - /url: /dm/ae79e718-5ceb-438f-a7b7-83698a62b58d
+                - button "Delete task" [ref=e688]
+          - generic [ref=e691]:
+            - checkbox "Select task Update TOP_BAR_REFACTOR.md" [ref=e694]
+            - button "Open task Update TOP_BAR_REFACTOR.md" [ref=e696] [cursor=pointer]:
+              - generic [ref=e698]:
+                - generic [ref=e699]: Update TOP_BAR_REFACTOR.md
+                - generic [ref=e700]
+              - generic [ref=e704]:
+                - link "Open agent direct message" [ref=e705]:
+                  - /url: /dm/507e8037-8203-44b9-8107-af11b3fb3b15
+                - button "Delete task" [ref=e707]
+          - generic [ref=e710]:
+            - checkbox "Select task Update DM_FEATURES.md" [ref=e713]
+            - button "Open task Update DM_FEATURES.md" [ref=e715] [cursor=pointer]:
+              - generic [ref=e717]:
+                - generic [ref=e718]: Update DM_FEATURES.md
+                - generic [ref=e719]
+              - generic [ref=e723]:
+                - link "Open agent direct message" [ref=e724]:
+                  - /url: /dm/1037702f-792e-4d67-888a-d0c48ecdbe12
+                - button "Delete task" [ref=e726]
+          - generic [ref=e729]:
+            - checkbox "Select task Doc update run 2026-04-26" [ref=e732]
+            - button "Open task Doc update run 2026-04-26" [ref=e734] [cursor=pointer]:
+              - generic [ref=e736]:
+                - generic [ref=e737]: Doc update run 2026-04-26
+                - generic [ref=e738]
+              - generic [ref=e742]:
+                - link "Open agent direct message" [ref=e743]:
+                  - /url: /dm/ae79e718-5ceb-438f-a7b7-83698a62b58d
+                - button "Delete task" [ref=e745]
+          - generic [ref=e748]:
+            - checkbox "Select task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e751]
+            - button "Open task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e753] [cursor=pointer]:
+              - generic [ref=e755]:
+                - generic [ref=e756]: Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions
+                - generic [ref=e757]
+              - generic [ref=e761]:
+                - link "Open agent direct message" [ref=e762]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e764]
+          - generic [ref=e767]:
+            - checkbox "Select task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e770]
+            - button "Open task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e772] [cursor=pointer]:
+              - generic [ref=e774]:
+                - generic [ref=e775]: Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions
+                - generic [ref=e776]
+              - generic [ref=e780]:
+                - link "Open agent direct message" [ref=e781]:
+                  - /url: /dm/daee4d12-f572-4b6f-ab1e-9c67fc38ff29
+                - button "Delete task" [ref=e783]
+          - generic [ref=e786]:
+            - checkbox "Select task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e789]
+            - button "Open task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e791] [cursor=pointer]:
+              - generic [ref=e793]:
+                - generic [ref=e794]: Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions
+                - generic [ref=e795]
+              - generic [ref=e799]:
+                - link "Open agent direct message" [ref=e800]:
+                  - /url: /dm/c7e0d138-ed87-4548-a800-7c94517cec3a
+                - button "Delete task" [ref=e802]
+          - generic [ref=e805]:
+            - checkbox "Select task Migrate generic/default toolbars to EyeInTheSkyWeb.TopBar.Generic" [ref=e808]
+            - button "Open task Migrate generic/default toolbars to EyeInTheSkyWeb.TopBar.Generic" [ref=e810] [cursor=pointer]:
+              - generic [ref=e812]:
+                - generic [ref=e813]: Migrate generic/default toolbars to EyeInTheSkyWeb.TopBar.Generic
+                - generic [ref=e814]
+              - generic [ref=e818]:
+                - link "Open agent direct message" [ref=e819]:
+                  - /url: /dm/7a9959a4-5f07-43c5-8d5d-ff18ae099739
+                - button "Delete task" [ref=e821]
+          - generic [ref=e824]:
+            - checkbox "Select task Migrate tasks_toolbar to EyeInTheSkyWeb.TopBar.Tasks" [ref=e827]
+            - button "Open task Migrate tasks_toolbar to EyeInTheSkyWeb.TopBar.Tasks" [ref=e829] [cursor=pointer]:
+              - generic [ref=e831]:
+                - generic [ref=e832]: Migrate tasks_toolbar to EyeInTheSkyWeb.TopBar.Tasks
+                - generic [ref=e833]
+              - generic [ref=e837]:
+                - link "Open agent direct message" [ref=e838]:
+                  - /url: /dm/41d0ce81-5675-42e6-bb1f-7f736b3a3574
+                - button "Delete task" [ref=e840]
+          - generic [ref=e843]:
+            - checkbox "Select task Migrate dm_toolbar to EyeInTheSkyWeb.TopBar.DM" [ref=e846]
+            - button "Open task Migrate dm_toolbar to EyeInTheSkyWeb.TopBar.DM" [ref=e848] [cursor=pointer]:
+              - generic [ref=e850]:
+                - generic [ref=e851]: Migrate dm_toolbar to EyeInTheSkyWeb.TopBar.DM
+                - generic [ref=e852]
+              - generic [ref=e856]:
+                - link "Open agent direct message" [ref=e857]:
+                  - /url: /dm/a577041d-ce59-4deb-b015-6c7189bb2234
+                - button "Delete task" [ref=e859]
+          - generic [ref=e862]:
+            - checkbox "Select task Migrate kanban_toolbar + selection mode to EyeInTheSkyWeb.TopBar.Kanban" [ref=e865]
+            - button "Open task Migrate kanban_toolbar + selection mode to EyeInTheSkyWeb.TopBar.Kanban" [ref=e867] [cursor=pointer]:
+              - generic [ref=e869]:
+                - generic [ref=e870]: Migrate kanban_toolbar + selection mode to EyeInTheSkyWeb.TopBar.Kanban
+                - generic [ref=e871]
+              - generic [ref=e875]:
+                - link "Open agent direct message" [ref=e876]:
+                  - /url: /dm/8174c506-02b4-4bb3-9302-4485a8f3d040
+                - button "Delete task" [ref=e878]
+          - generic [ref=e881]:
+            - checkbox "Select task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e884]
+            - button "Open task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e886] [cursor=pointer]:
+              - generic [ref=e888]:
+                - generic [ref=e889]: Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions
+                - generic [ref=e890]
+              - generic [ref=e894]:
+                - link "Open agent direct message" [ref=e895]:
+                  - /url: /dm/5b27757e-dbfb-4bcb-95ba-f1b4bcce42bf
+                - button "Delete task" [ref=e897]
+          - generic [ref=e900]:
+            - checkbox "Select task Migrate notes_toolbar to EyeInTheSkyWeb.TopBar.Notes" [ref=e903]
+            - button "Open task Migrate notes_toolbar to EyeInTheSkyWeb.TopBar.Notes" [ref=e905] [cursor=pointer]:
+              - generic [ref=e907]:
+                - generic [ref=e908]: Migrate notes_toolbar to EyeInTheSkyWeb.TopBar.Notes
+                - generic [ref=e909]
+              - generic [ref=e913]:
+                - link "Open agent direct message" [ref=e914]:
+                  - /url: /dm/f5cdb9c4-74a3-4d03-b186-edc712fc9bdc
+                - button "Delete task" [ref=e916]
+          - generic [ref=e919]:
+            - checkbox "Select task Migrate generic/default toolbars to EyeInTheSkyWeb.TopBar.Generic" [ref=e922]
+            - button "Open task Migrate generic/default toolbars to EyeInTheSkyWeb.TopBar.Generic" [ref=e924] [cursor=pointer]:
+              - generic [ref=e926]:
+                - generic [ref=e927]: Migrate generic/default toolbars to EyeInTheSkyWeb.TopBar.Generic
+                - generic [ref=e928]
+              - generic [ref=e934]:
+                - link "Open agent direct message" [ref=e935]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e937]
+          - generic [ref=e940]:
+            - checkbox "Select task Migrate kanban_toolbar to EyeInTheSkyWeb.TopBar.Kanban (+ selection mode)" [ref=e943]
+            - button "Open task Migrate kanban_toolbar to EyeInTheSkyWeb.TopBar.Kanban (+ selection mode)" [ref=e945] [cursor=pointer]:
+              - generic [ref=e947]:
+                - generic [ref=e948]: Migrate kanban_toolbar to EyeInTheSkyWeb.TopBar.Kanban (+ selection mode)
+                - generic [ref=e949]
+              - generic [ref=e955]:
+                - link "Open agent direct message" [ref=e956]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e958]
+          - generic [ref=e961]:
+            - checkbox "Select task Migrate dm_toolbar to EyeInTheSkyWeb.TopBar.DM" [ref=e964]
+            - button "Open task Migrate dm_toolbar to EyeInTheSkyWeb.TopBar.DM" [ref=e966] [cursor=pointer]:
+              - generic [ref=e968]:
+                - generic [ref=e969]: Migrate dm_toolbar to EyeInTheSkyWeb.TopBar.DM
+                - generic [ref=e970]
+              - generic [ref=e976]:
+                - link "Open agent direct message" [ref=e977]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e979]
+          - generic [ref=e982]:
+            - checkbox "Select task Migrate notes_toolbar to EyeInTheSkyWeb.TopBar.Notes" [ref=e985]
+            - button "Open task Migrate notes_toolbar to EyeInTheSkyWeb.TopBar.Notes" [ref=e987] [cursor=pointer]:
+              - generic [ref=e989]:
+                - generic [ref=e990]: Migrate notes_toolbar to EyeInTheSkyWeb.TopBar.Notes
+                - generic [ref=e991]
+              - generic [ref=e997]:
+                - link "Open agent direct message" [ref=e998]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e1000]
+          - generic [ref=e1003]:
+            - checkbox "Select task Migrate tasks_toolbar to EyeInTheSkyWeb.TopBar.Tasks" [ref=e1006]
+            - button "Open task Migrate tasks_toolbar to EyeInTheSkyWeb.TopBar.Tasks" [ref=e1008] [cursor=pointer]:
+              - generic [ref=e1010]:
+                - generic [ref=e1011]: Migrate tasks_toolbar to EyeInTheSkyWeb.TopBar.Tasks
+                - generic [ref=e1012]
+              - generic [ref=e1018]:
+                - link "Open agent direct message" [ref=e1019]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e1021]
+          - generic [ref=e1024]:
+            - checkbox "Select task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e1027]
+            - button "Open task Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions" [ref=e1029] [cursor=pointer]:
+              - generic [ref=e1031]:
+                - generic [ref=e1032]: Migrate sessions_toolbar to EyeInTheSkyWeb.TopBar.Sessions
+                - generic [ref=e1033]
+              - generic [ref=e1039]:
+                - link "Open agent direct message" [ref=e1040]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e1042]
+          - generic [ref=e1045]:
+            - checkbox "Select task Rebase remove/gitea-webhook onto main to pick up MockAgentManager fix" [ref=e1048]
+            - button "Open task Rebase remove/gitea-webhook onto main to pick up MockAgentManager fix" [ref=e1050] [cursor=pointer]:
+              - generic [ref=e1052]:
+                - generic [ref=e1053]: Rebase remove/gitea-webhook onto main to pick up MockAgentManager fix
+                - generic [ref=e1054]
+              - generic [ref=e1058]:
+                - link "Open agent direct message" [ref=e1059]:
+                  - /url: /dm/9a0c0936-251b-424e-acf0-eda2c5ad7c34
+                - button "Delete task" [ref=e1061]
+          - generic [ref=e1064]:
+            - checkbox "Select task Write top_bar refactor contract to docs/" [ref=e1067]
+            - button "Open task Write top_bar refactor contract to docs/" [ref=e1069] [cursor=pointer]:
+              - generic [ref=e1071]:
+                - generic [ref=e1072]: Write top_bar refactor contract to docs/
+                - generic [ref=e1073]
+              - generic [ref=e1077]:
+                - link "Open agent direct message" [ref=e1078]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e1080]
+          - generic [ref=e1083]:
+            - 'checkbox "Select task Phase 1: top_bar refactor — shell, skeletons, contract" [ref=e1086]'
+            - 'button "Open task Phase 1: top_bar refactor — shell, skeletons, contract" [ref=e1088] [cursor=pointer]':
+              - generic [ref=e1090]:
+                - generic [ref=e1091]: "Phase 1: top_bar refactor — shell, skeletons, contract"
+                - generic [ref=e1092]
+              - generic [ref=e1096]:
+                - link "Open agent direct message" [ref=e1097]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e1099]
+          - generic [ref=e1102]:
+            - checkbox "Select task Update agent memory with session learnings" [ref=e1105]
+            - button "Open task Update agent memory with session learnings" [ref=e1107] [cursor=pointer]:
+              - generic [ref=e1109]:
+                - generic [ref=e1110]: Update agent memory with session learnings
+                - generic [ref=e1111]
+              - generic [ref=e1115]:
+                - link "Open agent direct message" [ref=e1116]:
+                  - /url: /dm/9a0c0936-251b-424e-acf0-eda2c5ad7c34
+                - button "Delete task" [ref=e1118]
+          - generic [ref=e1121]:
+            - checkbox "Select task Update product-designer agent memory" [ref=e1124]
+            - button "Open task Update product-designer agent memory" [ref=e1126] [cursor=pointer]:
+              - generic [ref=e1128]:
+                - generic [ref=e1129]: Update product-designer agent memory
+                - generic [ref=e1130]
+              - generic [ref=e1134]:
+                - link "Open agent direct message" [ref=e1135]:
+                  - /url: /dm/1751d04f-699f-41e4-bf5d-89f70d7a6479
+                - button "Delete task" [ref=e1137]
+          - generic [ref=e1140]:
+            - 'checkbox "Select task Fix sort dropdown freeze: close details onclick" [ref=e1143]'
+            - 'button "Open task Fix sort dropdown freeze: close details onclick" [ref=e1145] [cursor=pointer]':
+              - generic [ref=e1147]:
+                - generic [ref=e1148]: "Fix sort dropdown freeze: close details onclick"
+                - generic [ref=e1149]
+              - generic [ref=e1153]:
+                - link "Open agent direct message" [ref=e1154]:
+                  - /url: /dm/48148832-5981-41fa-8399-cc9ba1e22e34
+                - button "Delete task" [ref=e1156]
+          - generic [ref=e1159]:
+            - 'checkbox "Select task fix(dm): prevent concurrent JSONL sync — duplicate message regression" [ref=e1162]'
+            - 'button "Open task fix(dm): prevent concurrent JSONL sync — duplicate message regression" [ref=e1164] [cursor=pointer]':
+              - generic [ref=e1166]:
+                - generic [ref=e1167]: "fix(dm): prevent concurrent JSONL sync — duplicate message regression"
+                - generic [ref=e1168]
+              - generic [ref=e1172]:
+                - link "Open agent direct message" [ref=e1173]:
+                  - /url: /dm/be6f1d14-4ebd-4a01-8ed9-ec244628642f
+                - button "Delete task" [ref=e1175]
+          - generic [ref=e1178]:
+            - checkbox "Select task Fix notes_toolbar selects → dropdown buttons" [ref=e1181]
+            - button "Open task Fix notes_toolbar selects → dropdown buttons" [ref=e1183] [cursor=pointer]:
+              - generic [ref=e1185]:
+                - generic [ref=e1186]: Fix notes_toolbar selects → dropdown buttons
+                - generic [ref=e1187]
+              - generic [ref=e1191]:
+                - link "Open agent direct message" [ref=e1192]:
+                  - /url: /dm/c349499c-ace7-42f1-90fe-d7c7a8a0eda6
+                - button "Delete task" [ref=e1194]
+      - option "Haiku (fast)" [selected]
+      - option "Sonnet (balanced)"
+  - generic: "[ NORMAL ]"

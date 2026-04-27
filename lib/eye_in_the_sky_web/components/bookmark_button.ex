@@ -18,12 +18,12 @@ defmodule EyeInTheSkyWeb.Components.BookmarkButton do
       aria-label={if @is_bookmarked, do: "Remove bookmark", else: "Add bookmark"}
     >
       <%= if @is_bookmarked do %>
-        <.icon name="hero-bookmark-solid" class="h-5 w-5 text-warning transition-colors" />
+        <.icon name="hero-bookmark-solid" class="size-5 text-warning transition-colors" />
         <span class="text-sm">Bookmarked</span>
       <% else %>
         <.icon
           name="hero-bookmark"
-          class="h-5 w-5 text-base-content/40 group-hover:text-warning transition-colors"
+          class="size-5 text-base-content/40 group-hover:text-warning transition-colors"
         />
         <span class="text-sm">Bookmark</span>
       <% end %>

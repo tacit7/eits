@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                     >
                       <.icon
                         name={if entry.type == :dir, do: "hero-folder", else: "hero-document-text"}
-                        class={"w-4 h-4 flex-shrink-0 #{if entry.type == :dir, do: "text-secondary", else: "text-primary"}"}
+                        class={"size-4 flex-shrink-0 #{if entry.type == :dir, do: "text-secondary", else: "text-primary"}"}
                       />
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-base-content">
@@ -187,7 +187,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                           title="Direct message"
                           onclick="event.stopPropagation()"
                         >
-                          <.icon name="hero-chat-bubble-left-right" class="w-4 h-4" />
+                          <.icon name="hero-chat-bubble-left-right" class="size-4" />
                         </.link>
                       <% end %>
                     </div>
@@ -207,9 +207,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                     <div class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
                       <div class="flex-shrink-0">
                         <%= if task.completed_at do %>
-                          <.icon name="hero-check-circle-solid" class="w-4 h-4 text-success" />
+                          <.icon name="hero-check-circle-solid" class="size-4 text-success" />
                         <% else %>
-                          <div class="w-4 h-4 rounded-full border-2 border-base-content/30"></div>
+                          <div class="size-4 rounded-full border-2 border-base-content/30"></div>
                         <% end %>
                       </div>
                       <div class="flex-1 min-w-0">
@@ -258,7 +258,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                     <div class="flex items-start gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
                       <.icon
                         name="hero-code-bracket"
-                        class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0 mt-0.5"
+                        class="size-3.5 text-base-content/30 flex-shrink-0 mt-0.5"
                       />
                       <div class="flex-1 min-w-0">
                         <p class="text-xs font-mono text-base-content/40 mb-0.5">

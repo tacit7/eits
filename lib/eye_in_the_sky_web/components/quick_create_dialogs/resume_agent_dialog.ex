@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
             class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close"
           >
-            <span class="hero-x-mark w-4 h-4"></span>
+            <span class="hero-x-mark size-4"></span>
           </button>
         </div>
         <form data-qra-form class="p-4 flex flex-col gap-3">
@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
             ></textarea>
           </div>
           <div class="alert alert-info text-sm">
-            <.icon name="hero-information-circle" class="shrink-0 w-5 h-5" />
+            <.icon name="hero-information-circle" class="shrink-0 size-5" />
             <span>This will spawn a new Claude session for the existing agent.</span>
           </div>
           <div class="flex justify-end gap-2 pt-1">

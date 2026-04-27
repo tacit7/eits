@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
     <li>
       <details>
         <summary>
-          <.icon name="hero-folder" class="w-4 h-4" />
+          <.icon name="hero-folder" class="size-4" />
           {@entry.name}
         </summary>
         <ul>
@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
         phx-value-path={@entry.path}
         class="flex items-center gap-2 w-full text-left"
       >
-        <.icon name="hero-document" class="w-4 h-4" />
+        <.icon name="hero-document" class="size-4" />
         <span class="truncate">{@entry.name}</span>
         <span class="badge badge-ghost badge-xs ml-auto shrink-0">{format_size(@entry.size)}</span>
       </button>
@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
       >
         <div class="p-4">
           <h2 class="text-sm font-semibold text-base-content/80 mb-2 flex items-center gap-1">
-            <.icon name="hero-cog-6-tooth" class="w-4 h-4" /> .claude/
+            <.icon name="hero-cog-6-tooth" class="size-4" /> .claude/
           </h2>
           <ul class="menu menu-sm bg-base-200 rounded-lg">
             <.tree_item :for={entry <- @entries} entry={entry} />
@@ -78,13 +78,13 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                       class="btn btn-ghost btn-sm min-h-[44px]"
                       title="Open in editor"
                     >
-                      <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
+                      <.icon name="hero-pencil-square" class="size-3.5" /> Edit
                     </button>
                     <button
                       phx-click="close_viewer"
                       class="btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px]"
                     >
-                      <.icon name="hero-x-mark" class="w-4 h-4" />
+                      <.icon name="hero-x-mark" class="size-4" />
                     </button>
                   </div>
                 </div>
@@ -129,7 +129,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
       <div class="p-6">
         <%= if @error do %>
           <div class="alert alert-error mb-4">
-            <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+            <.icon name="hero-x-circle" class="shrink-0 size-6" />
             <span>{@error}</span>
           </div>
         <% end %>
@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                 }
                 class="btn btn-sm btn-ghost"
               >
-                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+                <.icon name="hero-arrow-left" class="size-4" /> Back
               </.link>
               <div>
                 <h2 class="text-lg font-semibold text-base-content">
@@ -160,7 +160,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                 class="btn btn-sm btn-ghost ml-auto"
                 title="Open in editor"
               >
-                <.icon name="hero-pencil-square" class="w-4 h-4" /> Edit
+                <.icon name="hero-pencil-square" class="size-4" /> Edit
               </button>
             </div>
             <div class="bg-base-200 rounded-lg overflow-x-auto">
@@ -191,7 +191,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                   }
                   class="btn btn-sm btn-ghost mb-4"
                 >
-                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+                  <.icon name="hero-arrow-left" class="size-4" /> Back
                 </.link>
               <% end %>
               <h2 class="text-lg font-semibold text-base-content mb-2">
@@ -206,9 +206,9 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                   class="flex items-center gap-3 rounded-lg border border-base-content/10 bg-base-100 px-3 py-2"
                 >
                   <%= if file.is_dir do %>
-                    <.icon name="hero-folder-solid" class="w-4 h-4 text-primary shrink-0" />
+                    <.icon name="hero-folder-solid" class="size-4 text-primary shrink-0" />
                   <% else %>
-                    <.icon name="hero-document" class="w-4 h-4 shrink-0" />
+                    <.icon name="hero-document" class="size-4 shrink-0" />
                   <% end %>
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-sm">{file.name}</p>
@@ -237,9 +237,9 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                           class="flex items-center gap-2"
                         >
                           <%= if file.is_dir do %>
-                            <.icon name="hero-folder-solid" class="w-4 h-4 text-primary" />
+                            <.icon name="hero-folder-solid" class="size-4 text-primary" />
                           <% else %>
-                            <.icon name="hero-document" class="w-4 h-4" />
+                            <.icon name="hero-document" class="size-4" />
                           <% end %>
                           {file.name}
                         </.link>

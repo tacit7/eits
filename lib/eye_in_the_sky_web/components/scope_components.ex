@@ -88,13 +88,13 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
             <span class="text-xs text-base-content/50 ml-1">All projects</span>
           <% end %>
         </span>
-        <.icon name="hero-chevron-down" class="w-3 h-3 text-base-content/50" />
+        <.icon name="hero-chevron-down" class="size-3 text-base-content/50" />
       </summary>
       <ul class="dropdown-content menu bg-base-100 border border-base-300 rounded-box shadow-sm w-56 z-50 p-1">
         <li class="menu-title text-xs text-base-content/40 px-2 pt-1">WORKSPACE</li>
         <li>
           <.link navigate={~p"/workspace/sessions"} class="gap-2 text-sm">
-            <.icon name="hero-squares-2x2" class="w-4 h-4" />
+            <.icon name="hero-squares-2x2" class="size-4" />
             <span>
               {@scope.workspace.name}
               <span class="text-xs text-base-content/50">All projects</span>
@@ -104,7 +104,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
         <li class="menu-title text-xs text-base-content/40 px-2 pt-2">PROJECTS</li>
         <li :for={project <- @projects}>
           <.link navigate={~p"/projects/#{project.id}/sessions"} class={["gap-2 text-sm", Scope.project?(@scope) && @scope.project_id == project.id && "active"]}>
-            <.icon name="hero-folder" class="w-4 h-4" />
+            <.icon name="hero-folder" class="size-4" />
             {project.name}
           </.link>
         </li>
@@ -156,7 +156,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
       <span class="font-medium text-base-content/70">
         <%= if Scope.project?(@scope), do: @scope.project.name, else: @scope.workspace.name %>
       </span>
-      <.icon name="hero-chevron-right" class="w-3 h-3" />
+      <.icon name="hero-chevron-right" class="size-3" />
       <span>{@page_title}</span>
     </nav>
     """

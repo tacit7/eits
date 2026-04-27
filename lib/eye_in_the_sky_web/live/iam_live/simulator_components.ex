@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
     ~H"""
     <div class="flex items-center gap-3">
       <span class={"badge #{@color} badge-lg gap-2"}>
-        <.icon name={@icon_name} class="w-4 h-4" />
+        <.icon name={@icon_name} class="size-4" />
         <%= @permission %>
       </span>
       <%= if @fallback? do %>
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
       <div class="card bg-base-100 border border-base-300">
         <div class="card-body p-4">
           <div class="text-xs text-base-content/60 flex items-center gap-2 mb-2">
-            <.icon name="hero-megaphone" class="w-4 h-4" />
+            <.icon name="hero-megaphone" class="size-4" />
             Instructions (<%= length(@instructions) %>)
           </div>
           <ul class="space-y-2">
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
             <tr class={row_class(t, @winner_id)}>
               <td>
                 <%= if t.policy.id == @winner_id do %>
-                  <.icon name="hero-trophy" class="w-4 h-4 text-warning" />
+                  <.icon name="hero-trophy" class="size-4 text-warning" />
                 <% end %>
               </td>
               <td class="font-mono text-xs"><%= t.policy.id %></td>

@@ -30,10 +30,10 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
             name={
               if @expanded_projects, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"
             }
-            class="w-3.5 h-3.5 flex-shrink-0"
+            class="size-3.5 flex-shrink-0"
           />
         <% end %>
-        <.icon name="hero-folder-open" class="w-4 h-4 flex-shrink-0" />
+        <.icon name="hero-folder-open" class="size-4 flex-shrink-0" />
         <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Projects</span>
         <%= if not is_nil(@sidebar_project) && !@collapsed do %>
           <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
           class="flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center text-base-content/30 hover:text-base-content/60 transition-colors"
           title="New Project"
         >
-          <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+          <.icon name="hero-plus-mini" class="size-3.5" />
         </button>
       <% end %>
     </div>
@@ -75,7 +75,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
             phx-target={@myself}
             class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0"
           >
-            <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+            <.icon name="hero-x-mark" class="size-3.5" />
           </button>
         </form>
       <% end %>
@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                   phx-target={@myself}
                   class="flex-shrink-0 text-base-content/30 hover:text-base-content/60"
                 >
-                  <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+                  <.icon name="hero-x-mark-mini" class="size-3.5" />
                 </button>
               </form>
             <% else %>
@@ -135,8 +135,8 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                   name={if is_selected, do: "hero-folder-open", else: "hero-folder"}
                   class={
                     if is_selected,
-                      do: "w-4 h-4 flex-shrink-0 text-primary",
-                      else: "w-4 h-4 flex-shrink-0"
+                      do: "size-4 flex-shrink-0 text-primary",
+                      else: "size-4 flex-shrink-0"
                   }
                 />
                 <span class={["truncate", if(@collapsed, do: "hidden")]}>{project.name}</span>
@@ -149,7 +149,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                     class="min-h-[44px] min-w-[44px] flex items-center justify-center text-base-content/35 hover:text-base-content/70 transition-colors"
                     title="More options"
                   >
-                    <.icon name="hero-ellipsis-horizontal-mini" class="w-3.5 h-3.5" />
+                    <.icon name="hero-ellipsis-horizontal-mini" class="size-3.5" />
                   </button>
                   <ul
                     tabindex="0"
@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                         phx-target={@myself}
                         class="flex items-center gap-2 text-sm"
                       >
-                        <.icon name="hero-pencil-mini" class="w-3.5 h-3.5" /> Edit name
+                        <.icon name="hero-pencil-mini" class="size-3.5" /> Edit name
                       </button>
                     </li>
                     <li>
@@ -178,7 +178,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                           name={
                             if project.bookmarked, do: "hero-bookmark-solid", else: "hero-bookmark"
                           }
-                          class="w-3.5 h-3.5"
+                          class="size-3.5"
                         />
                         {if project.bookmarked, do: "Unbookmark", else: "Bookmark"}
                       </button>
@@ -191,7 +191,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                         data-confirm={"Remove \"#{project.name}\"?"}
                         class="flex items-center gap-2 text-sm text-error hover:text-error"
                       >
-                        <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" /> Remove
+                        <.icon name="hero-x-mark-mini" class="size-3.5" /> Remove
                       </button>
                     </li>
                   </ul>
@@ -204,7 +204,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
                   class="opacity-0 group-hover:opacity-100 flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center text-base-content/35 hover:text-primary transition-all"
                   title="New session"
                 >
-                  <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
+                  <.icon name="hero-pencil-square" class="size-3.5" />
                 </button>
               <% end %>
             <% end %>
@@ -293,7 +293,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ProjectsSection do
         )
       ]}
     >
-      <.icon name={@icon} class="w-3 h-3 flex-shrink-0" />
+      <.icon name={@icon} class="size-3 flex-shrink-0" />
       <span class="truncate">{@label}</span>
     </.link>
     """

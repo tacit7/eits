@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.Layouts do
           navigate={@href}
           class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
         >
-          <.icon name="hero-plus" class="w-3 h-3" />
+          <.icon name="hero-plus" class="size-3" />
           {@label}
         </.link>
       <% else %>
@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Layouts do
           phx-click={@event}
           class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
         >
-          <.icon name="hero-plus" class="w-3 h-3" />
+          <.icon name="hero-plus" class="size-3" />
           {@label}
         </button>
       <% end %>

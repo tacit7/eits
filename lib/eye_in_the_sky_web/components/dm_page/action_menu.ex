@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
         class={@button_class}
         aria-label="More options"
       >
-        <.icon name="hero-ellipsis-horizontal" class="w-5 h-5" />
+        <.icon name="hero-ellipsis-horizontal" class="size-5" />
       </button>
       <ul
         tabindex="0"
@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
                   @active_tab != tab && "hover:bg-base-content/5"
                 ]}
               >
-                <.icon name={icon} class="w-3.5 h-3.5" /> {label}
+                <.icon name={icon} class="size-3.5" /> {label}
               </button>
             </li>
           <% end %>
@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               data-copy={@session_uuid}
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded font-mono text-[11px]"
             >
-              <.icon name="hero-clipboard-document" class="w-3.5 h-3.5 flex-shrink-0" />
+              <.icon name="hero-clipboard-document" class="size-3.5 flex-shrink-0" />
               Copy {String.slice(@session_uuid, 0..7)}…
             </button>
           </li>
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
             phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
           >
-            <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> {@reload_label}
+            <.icon name="hero-arrow-path" class="size-3.5" /> {@reload_label}
           </button>
         </li>
         <%= if @show_jsonl_export do %>
@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               phx-click="export_jsonl"
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
             >
-              <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as JSONL
+              <.icon name="hero-clipboard-document" class="size-3.5" /> Export as JSONL
             </button>
           </li>
         <% end %>
@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
             phx-click="export_markdown"
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
           >
-            <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
+            <.icon name="hero-clipboard-document" class="size-3.5" /> Export as Markdown
           </button>
         </li>
         <%= if @show_push_setup do %>
@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               title="Enable notifications"
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
             >
-              <.icon name="hero-bell" class="w-3.5 h-3.5" /> Notify
+              <.icon name="hero-bell" class="size-3.5" /> Notify
             </button>
           </li>
         <% end %>
@@ -111,7 +111,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               phx-click="open_iterm"
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
             >
-              <.icon name="hero-command-line" class="w-3.5 h-3.5" /> Open in iTerm
+              <.icon name="hero-command-line" class="size-3.5" /> Open in iTerm
             </button>
           </li>
         <% end %>
@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
             phx-click="open_schedule_timer"
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
           >
-            <.icon name="hero-clock" class="w-3.5 h-3.5" /> Schedule Message
+            <.icon name="hero-clock" class="size-3.5" /> Schedule Message
           </button>
         </li>
         <%= if @active_timer do %>
@@ -132,7 +132,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               phx-click="cancel_timer"
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded"
             >
-              <.icon name="hero-x-circle" class="w-3.5 h-3.5" /> Cancel Schedule
+              <.icon name="hero-x-circle" class="size-3.5" /> Cancel Schedule
             </button>
           </li>
         <% end %>

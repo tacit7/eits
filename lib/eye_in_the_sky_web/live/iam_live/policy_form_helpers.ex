@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
       <div class="card-body p-4 space-y-3">
         <div class="flex items-center justify-between">
           <h2 class="font-semibold flex items-center gap-2">
-            <.icon name="hero-funnel" class="w-5 h-5" /> Scope
+            <.icon name="hero-funnel" class="size-5" /> Scope
           </h2>
           <span class="text-xs text-base-content/60">
             Controls which hook contexts this policy matches.
@@ -151,7 +151,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
       <div class="card-body p-4 space-y-2">
         <div class="flex items-center justify-between">
           <h2 class="font-semibold flex items-center gap-2">
-            <.icon name="hero-code-bracket" class="w-5 h-5" /> Condition (JSON)
+            <.icon name="hero-code-bracket" class="size-5" /> Condition (JSON)
           </h2>
           <span class="text-xs text-base-content/60">
             Predicates: time_between, env_equals, session_state_equals

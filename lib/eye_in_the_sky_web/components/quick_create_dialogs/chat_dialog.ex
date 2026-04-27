@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ChatDialog do
             class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close"
           >
-            <span class="hero-x-mark w-4 h-4"></span>
+            <span class="hero-x-mark size-4"></span>
           </button>
         </div>
         <form data-qcc-form class="p-4 flex flex-col gap-3">

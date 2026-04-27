@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
               class="btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px]"
               aria-label="Close"
             >
-              <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+              <.icon name="hero-x-mark-mini" class="size-4" />
             </button>
           </div>
 
@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
               <form phx-change="search">
                 <div class="relative">
                   <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/25" />
+                    <.icon name="hero-magnifying-glass-mini" class="size-3.5 text-base-content/25" />
                   </div>
                   <input
                     type="text"
@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                       phx-value-field="due_date"
                       phx-value-value={value}
                     />
-                    <.icon name={icon} class={"w-3.5 h-3.5 flex-shrink-0 #{icon_class}"} />
+                    <.icon name={icon} class={"size-3.5 flex-shrink-0 #{icon_class}"} />
                     <span class="text-sm text-base-content/70">{label}</span>
                   </label>
                 <% end %>
@@ -179,7 +179,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                         onclick="event.stopPropagation();"
                         title="Change color"
                       >
-                        <.icon name="hero-swatch-mini" class="w-3.5 h-3.5 text-base-content/50" />
+                        <.icon name="hero-swatch-mini" class="size-3.5 text-base-content/50" />
                       </button>
                     </label>
                   <% end %>

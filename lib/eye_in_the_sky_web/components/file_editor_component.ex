@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.Components.FileEditorComponent do
     ~H"""
     <%= if @file_error do %>
       <div class="alert alert-error text-sm">
-        <.icon name="hero-exclamation-circle" class="w-4 h-4" />
+        <.icon name="hero-exclamation-circle" class="size-4" />
         <span>Could not load file: {@file_error}</span>
       </div>
     <% else %>

@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
           </div>
 
           <button class="btn btn-ghost btn-sm min-h-[44px]" phx-click="mark_all_read">
-            <.icon name="hero-check" class="w-4 h-4" /> Mark all read
+            <.icon name="hero-check" class="size-4" /> Mark all read
           </button>
         </div>
       </div>
@@ -151,7 +151,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
             ]}>
               <%!-- Category icon --%>
               <div class="pt-0.5">
-                <.icon name={category_icon(n.category)} class="w-5 h-5 text-base-content/40" />
+                <.icon name={category_icon(n.category)} class="size-5 text-base-content/40" />
               </div>
 
               <%!-- Content --%>
@@ -194,7 +194,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
                   phx-value-id={n.id}
                   title="Mark as read"
                 >
-                  <.icon name="hero-check" class="w-4 h-4" />
+                  <.icon name="hero-check" class="size-4" />
                 </button>
               <% end %>
             </div>

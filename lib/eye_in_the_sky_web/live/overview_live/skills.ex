@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                   >
                     <div class="card-body p-4">
                       <div class="flex items-center gap-2 mb-2">
-                        <.icon name="hero-puzzle-piece" class="w-4 h-4 text-primary" />
+                        <.icon name="hero-puzzle-piece" class="size-4 text-primary" />
                         <code class="text-sm font-semibold text-primary">/{skill.slug}</code>
                       </div>
                       <p class="text-sm text-base-content/70 line-clamp-2 mb-3">
@@ -217,7 +217,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                         phx-click="close_viewer"
                         class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]"
                       >
-                        <.icon name="hero-x-mark" class="w-4 h-4" />
+                        <.icon name="hero-x-mark" class="size-4" />
                       </button>
                     </div>
                     <div class="overflow-auto max-h-[70vh]">

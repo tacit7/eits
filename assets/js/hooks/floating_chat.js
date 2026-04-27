@@ -165,9 +165,9 @@ export const FloatingChat = {
     if (existing) existing.remove()
     if (this._unreadCount > 0) {
       mainBtn.insertAdjacentHTML('beforeend',
-        `<span class="absolute -top-1 -right-1 flex h-3 w-3">
+        `<span class="absolute -top-1 -right-1 flex size-3">
            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
-           <span class="relative inline-flex rounded-full h-3 w-3 bg-error ring-2 ring-base-100"></span>
+           <span class="relative inline-flex rounded-full size-3 bg-error ring-2 ring-base-100"></span>
          </span>`)
     }
   },

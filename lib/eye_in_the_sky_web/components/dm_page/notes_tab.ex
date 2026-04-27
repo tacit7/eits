@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                 >
                   <.icon
                     name={if note.starred, do: "hero-star-solid", else: "hero-star"}
-                    class={"w-4 h-4 #{if note.starred, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
+                    class={"size-4 #{if note.starred, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
                   />
                 </button>
                 <%!-- Title + meta --%>
@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                       data-copy={note.uuid || to_string(note.id)}
                       onclick="event.stopPropagation(); event.preventDefault();"
                     >
-                      <.icon name="hero-clipboard-document" class="h-3 w-3" />
+                      <.icon name="hero-clipboard-document" class="size-3" />
                     </button>
 
                     <span class="text-base-content/15">/</span>

@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
             onclick="event.stopPropagation(); event.preventDefault();"
             aria-label="Copy task ID"
           >
-            <.icon name="hero-clipboard-document" class="w-3 h-3" />
+            <.icon name="hero-clipboard-document" class="size-3" />
           </button>
           <%= if @task.state do %>
             <.state_badge state_id={@task.state_id} state_name={@task.state.name} />
@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
 
           <%= if @task.due_at do %>
             <span class="badge badge-ghost badge-sm">
-              <.icon name="hero-calendar" class="w-3 h-3 mr-1" />
+              <.icon name="hero-calendar" class="size-3 mr-1" />
               {format_due_date(@task.due_at)}
             </span>
           <% end %>

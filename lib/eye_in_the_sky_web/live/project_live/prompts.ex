@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     <!-- Meta Information -->
                         <div class="flex items-center gap-4 text-xs text-base-content/60">
                           <span class="flex items-center gap-1">
-                            <.icon name="hero-clock" class="w-3 h-3" /> v{prompt.version}
+                            <.icon name="hero-clock" class="size-3" /> v{prompt.version}
                           </span>
                           <%= if prompt.tags do %>
                             <%= for tag <- String.split(prompt.tags, ",", trim: true) do %>
@@ -127,7 +127,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     <!-- Chevron -->
                       <.icon
                         name="hero-chevron-right"
-                        class="w-5 h-5 text-base-content/40 flex-shrink-0 mt-1"
+                        class="size-5 text-base-content/40 flex-shrink-0 mt-1"
                       />
                     </div>
                   </div>

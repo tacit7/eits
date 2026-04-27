@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Components.FilterSheet do
               class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
               aria-label="Close filter panel"
             >
-              <.icon name="hero-x-mark-mini" class="w-4 h-4" />
+              <.icon name="hero-x-mark-mini" class="size-4" />
             </button>
           </div>
 

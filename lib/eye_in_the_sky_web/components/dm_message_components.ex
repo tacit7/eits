@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
           title="Total cost"
         >
-          <.icon name="hero-currency-dollar-mini" class="w-3 h-3" />
+          <.icon name="hero-currency-dollar-mini" class="size-3" />
           {:erlang.float_to_binary(@message.metadata["total_cost_usd"] * 1.0, decimals: 4)}
         </span>
       <% end %>
@@ -63,7 +63,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
           title="Duration"
         >
-          <.icon name="hero-clock-mini" class="w-3 h-3" />
+          <.icon name="hero-clock-mini" class="size-3" />
           {:erlang.float_to_binary(@message.metadata["duration_ms"] * 1.0 / 1000, decimals: 1)}s
         </span>
       <% end %>
@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       <div class="mt-2 space-y-1">
         <%= for attachment <- @attachments do %>
           <div class="flex items-center gap-2 rounded-md bg-base-content/[0.04] px-2.5 py-1.5 text-[11px] font-mono">
-            <.icon name="hero-paper-clip" class="h-3 w-3 text-base-content/30" />
+            <.icon name="hero-paper-clip" class="size-3 text-base-content/30" />
             <span class="text-base-content/60">{attachment.original_filename}</span>
             <span class="ml-auto text-base-content/25">{attachment.storage_path}</span>
           </div>
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       <%= if @dm_info do %>
         <div class="flex items-center gap-1.5 flex-wrap mb-1">
           <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 text-[10px] font-mono font-semibold">
-            <.icon name="hero-cpu-chip" class="w-3 h-3" />
+            <.icon name="hero-cpu-chip" class="size-3" />
             {@dm_info.sender}
             <%= if @dm_info[:session_id] && @dm_info[:session_id] != "" do %>
               <span class="text-primary/40 font-normal">#{@dm_info[:session_id]}</span>
@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
               class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/50 hover:text-primary/80 transition-colors text-[10px] font-mono truncate max-w-[220px]"
               title={@dm_info.url}
             >
-              <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3 flex-shrink-0" />
+              <.icon name="hero-arrow-top-right-on-square" class="size-3 flex-shrink-0" />
               {URI.parse(@dm_info.url).host}{URI.parse(@dm_info.url).path}
             </a>
           <% end %>
@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         }>
           <.icon
             name="hero-sparkles"
-            class={if @compact, do: "w-3 h-3 flex-shrink-0 text-primary/60", else: "w-3.5 h-3.5 flex-shrink-0 text-primary/60"}
+            class={if @compact, do: "size-3 flex-shrink-0 text-primary/60", else: "size-3.5 flex-shrink-0 text-primary/60"}
           />
           <span class={
             "font-mono font-semibold text-primary/60 uppercase tracking-wide " <>
@@ -196,7 +196,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           </span>
           <.icon
             name="hero-chevron-right"
-            class={if @compact, do: "w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90", else: "w-3 h-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"}
+            class={if @compact, do: "w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90", else: "size-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"}
           />
         </summary>
         <div class={if @compact, do: "px-2 pb-1.5 pt-1 border-t border-primary/10", else: "px-2.5 pb-2 pt-1 border-t border-primary/10"}>
@@ -245,7 +245,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       }>
         <.icon
           name="hero-code-bracket"
-          class={if @compact, do: "w-3 h-3 flex-shrink-0 text-base-content/30", else: "w-3.5 h-3.5 flex-shrink-0 text-base-content/30"}
+          class={if @compact, do: "size-3 flex-shrink-0 text-base-content/30", else: "size-3.5 flex-shrink-0 text-base-content/30"}
         />
         <span class={
           "font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0 " <>
@@ -259,11 +259,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           data-copy-text={@body}
           title="Copy output"
         >
-          <.icon name="hero-clipboard-document" class={if @compact, do: "w-3 h-3", else: "w-3.5 h-3.5"} />
+          <.icon name="hero-clipboard-document" class={if @compact, do: "size-3", else: "size-3.5"} />
         </button>
         <.icon
           name="hero-chevron-right"
-          class={if @compact, do: "w-2.5 h-2.5 text-base-content/20 shrink-0 transition-transform group-open:rotate-90", else: "w-3 h-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"}
+          class={if @compact, do: "w-2.5 h-2.5 text-base-content/20 shrink-0 transition-transform group-open:rotate-90", else: "size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"}
         />
       </summary>
       <div class={if @compact, do: "px-2 pb-1.5 pt-1 border-t border-base-content/5", else: "px-2.5 pb-2 pt-1 border-t border-base-content/5"}>
@@ -303,7 +303,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     ~H"""
     <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
       <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-        <.icon name={@icon} class="w-3.5 h-3.5 flex-shrink-0 text-base-content/35" />
+        <.icon name={@icon} class="size-3.5 flex-shrink-0 text-base-content/35" />
         <span class="text-[11px] font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
           {@label}
         </span>
@@ -319,11 +319,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           data-copy-text={@rest}
           title="Copy input"
         >
-          <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
+          <.icon name="hero-clipboard-document" class="size-3.5" />
         </button>
         <.icon
           name="hero-chevron-right"
-          class="w-3 h-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
+          class="size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
         />
       </summary>
       <.tool_widget_body name={@name} rest={@rest} detail={@detail} input={@input} />
@@ -430,7 +430,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       <% @provider == "codex" -> %>
         <img
           src="/images/openai.svg"
-          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          class="size-4 mt-1 flex-shrink-0 animate-pulse"
           alt="Codex"
           width="16"
           height="16"
@@ -439,7 +439,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       <% @provider == "gemini" -> %>
         <img
           src="/images/gemini.svg"
-          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          class="size-4 mt-1 flex-shrink-0 animate-pulse"
           alt="Gemini"
           width="16"
           height="16"
@@ -448,7 +448,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       <% true -> %>
         <img
           src="/images/claude.svg"
-          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          class="size-4 mt-1 flex-shrink-0 animate-pulse"
           alt="Claude"
           width="16"
           height="16"

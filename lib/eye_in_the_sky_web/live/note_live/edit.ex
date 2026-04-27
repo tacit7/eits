@@ -107,7 +107,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
           navigate={@return_to}
           class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 border border-base-content/10 rounded-md px-2.5 py-1.5 transition-colors flex-shrink-0"
         >
-          <.icon name="hero-arrow-left" class="w-3.5 h-3.5" /> Notes
+          <.icon name="hero-arrow-left" class="size-3.5" /> Notes
         </.link>
 
         <input
@@ -141,7 +141,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
           ]}
         >
           <%= if @saved do %>
-            <.icon name="hero-check" class="w-3.5 h-3.5" /> Saved
+            <.icon name="hero-check" class="size-3.5" /> Saved
           <% else %>
             Save <kbd class="text-xs opacity-70 ml-0.5">⌘S</kbd>
           <% end %>

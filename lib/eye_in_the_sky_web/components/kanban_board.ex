@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                 >
                   <.icon
                     name="hero-bars-2"
-                    class="w-3 h-3 text-base-content/20 hover:text-base-content/40"
+                    class="size-3 text-base-content/20 hover:text-base-content/40"
                   />
                   <div
                     class="w-2 h-2 rounded-full flex-shrink-0"
@@ -80,7 +80,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
                     title="Archive all done tasks"
                   >
-                    <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" />
+                    <.icon name="hero-archive-box-mini" class="size-3.5" />
                   </button>
                 <% end %>
               </div>
@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                   data-empty-placeholder
                   class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none"
                 >
-                  <.icon name="hero-inbox" class="w-5 h-5 text-base-content/15 mb-1" />
+                  <.icon name="hero-inbox" class="size-5 text-base-content/15 mb-1" />
                   <span class="text-[11px] text-base-content/20">No tasks</span>
                 </div>
               <% end %>
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                   phx-value-state_id={state.id}
                   class="mt-1 w-full flex items-center gap-1.5 px-2 py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-[11px] text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors"
                 >
-                  <.icon name="hero-plus-mini" class="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                  <.icon name="hero-plus-mini" class="size-4 sm:w-3.5 sm:h-3.5" />
                   <span>Add task</span>
                 </button>
               <% end %>

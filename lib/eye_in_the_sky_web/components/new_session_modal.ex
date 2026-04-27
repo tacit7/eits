@@ -264,7 +264,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         phx-mounted={Phoenix.LiveView.JS.dispatch("focus")}
       >{@prefill_text}</textarea>
       <label class="flex items-center gap-1.5 mt-2 cursor-pointer w-fit">
-        <.icon name="hero-paper-clip-mini" class="w-3.5 h-3.5 text-base-content/40" />
+        <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/40" />
         <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">
           Attach file
         </span>
@@ -291,7 +291,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           <div class="flex flex-wrap gap-2 mb-2">
             <%= for entry <- @file_uploads.agent_images.entries do %>
               <div class="flex items-center gap-1.5 rounded-lg bg-base-content/[0.04] px-2 py-1 text-xs">
-                <.icon name="hero-photo" class="w-3.5 h-3.5 text-base-content/40" />
+                <.icon name="hero-photo" class="size-3.5 text-base-content/40" />
                 <span class="text-base-content/70">{entry.client_name}</span>
                 <button
                   type="button"
@@ -299,7 +299,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                   phx-value-ref={entry.ref}
                   class="text-base-content/30 hover:text-error transition-colors"
                 >
-                  <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+                  <.icon name="hero-x-mark-mini" class="size-3.5" />
                 </button>
               </div>
             <% end %>
@@ -310,7 +310,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           phx-drop-target={@file_uploads.agent_images.ref}
           class="flex items-center gap-1.5 cursor-pointer w-fit"
         >
-          <.icon name="hero-photo-mini" class="w-3.5 h-3.5 text-base-content/40" />
+          <.icon name="hero-photo-mini" class="size-3.5 text-base-content/40" />
           <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">
             Attach image
           </span>
@@ -332,7 +332,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       <div>
         <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Project</label>
         <div class="flex items-center gap-2 px-3 py-2.5 bg-base-200/50 rounded-lg text-sm text-base-content/70 border border-base-content/10">
-          <.icon name="hero-folder-mini" class="w-3.5 h-3.5 text-base-content/40" />
+          <.icon name="hero-folder-mini" class="size-3.5 text-base-content/40" />
           {@current_project.name}
         </div>
       </div>
@@ -440,7 +440,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     <div class="collapse collapse-arrow bg-base-200 rounded-lg">
       <input type="checkbox" class="min-h-0" />
       <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
-        <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" /> Advanced
+        <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced
       </div>
       <div class="collapse-content px-3 pb-3 space-y-3">
         <div class="form-control">

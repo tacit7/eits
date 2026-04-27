@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   phx-target={@target}
                   title="Retry"
                 >
-                  <.icon name="hero-arrow-path" class="w-3 h-3" />
+                  <.icon name="hero-arrow-path" class="size-3" />
                 </button>
               </div>
             <% end %>
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 phx-target={@target}
                 title="Run Now"
               >
-                <.icon name="hero-play" class="w-3 h-3" />
+                <.icon name="hero-play" class="size-3" />
               </button>
               <button
                 class="btn btn-ghost btn-sm min-h-[44px]"
@@ -137,7 +137,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 phx-target={@target}
                 title="Edit"
               >
-                <.icon name="hero-pencil-square" class="w-3 h-3" />
+                <.icon name="hero-pencil-square" class="size-3" />
               </button>
               <button
                 class="btn btn-ghost btn-sm min-h-[44px] text-error"
@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 data-confirm="Delete this job?"
                 title="Delete"
               >
-                <.icon name="hero-trash" class="w-3 h-3" />
+                <.icon name="hero-trash" class="size-3" />
               </button>
             </div>
 
@@ -234,7 +234,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                         phx-target={@target}
                         title="Retry"
                       >
-                        <.icon name="hero-arrow-path" class="w-3 h-3" />
+                        <.icon name="hero-arrow-path" class="size-3" />
                       </button>
                     </div>
                   <% end %>
@@ -284,7 +284,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                       title="Run Now"
                       aria-label="Run job now"
                     >
-                      <.icon name="hero-play" class="w-3.5 h-3.5" />
+                      <.icon name="hero-play" class="size-3.5" />
                     </button>
                     <%= if job.origin != "system" do %>
                       <button
@@ -295,7 +295,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                         title="Edit"
                         aria-label="Edit job"
                       >
-                        <.icon name="hero-pencil-square" class="w-3.5 h-3.5" />
+                        <.icon name="hero-pencil-square" class="size-3.5" />
                       </button>
                       <button
                         class="btn btn-ghost btn-sm min-h-[44px] text-error"
@@ -306,7 +306,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                         title="Delete"
                         aria-label="Delete job"
                       >
-                        <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                        <.icon name="hero-trash" class="size-3.5" />
                       </button>
                     <% end %>
                   </div>
@@ -355,7 +355,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
       </div>
     <% else %>
       <div class="text-center py-8 rounded-lg border border-base-300">
-        <.icon name="hero-calendar" class="w-6 h-6 text-base-content/30 mx-auto mb-2" />
+        <.icon name="hero-calendar" class="size-6 text-base-content/30 mx-auto mb-2" />
         <p class="text-sm text-base-content/50">No scheduled jobs</p>
       </div>
     <% end %>

@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         </p>
       </div>
       <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_schedule">
-        <.icon name="hero-x-mark" class="w-4 h-4" />
+        <.icon name="hero-x-mark" class="size-4" />
       </button>
     </div>
 
@@ -267,7 +267,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     <div class="collapse collapse-arrow bg-base-200 rounded-lg">
       <input type="checkbox" class="min-h-0" />
       <div class="collapse-title min-h-0 py-2 px-3 flex items-center gap-1.5 text-xs text-base-content/60">
-        <.icon name="hero-question-mark-circle" class="w-3.5 h-3.5" /> Cron syntax reference
+        <.icon name="hero-question-mark-circle" class="size-3.5" /> Cron syntax reference
       </div>
       <div class="collapse-content px-3 pb-3">
         <table class="table table-xs w-full">
@@ -350,7 +350,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     <div class="collapse collapse-arrow bg-base-200 rounded-lg">
       <input type="checkbox" class="min-h-0" />
       <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
-        <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" /> Advanced CLI Flags
+        <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced CLI Flags
       </div>
       <div class="collapse-content px-3 pb-3 space-y-3">
         <.budget_and_turns_row

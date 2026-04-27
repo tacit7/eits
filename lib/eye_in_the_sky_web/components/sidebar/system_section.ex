@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.SystemSection do
       ]}
       title={@label}
     >
-      <.icon name={@icon} class="w-3.5 h-3.5 flex-shrink-0" />
+      <.icon name={@icon} class="size-3.5 flex-shrink-0" />
       <span class={["truncate", if(@collapsed, do: "hidden")]}>{@label}</span>
     </.link>
     """

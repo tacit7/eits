@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         {@rest}
       />
       <div class={[
-        "shrink-0 w-4 h-4 flex items-center justify-center border rounded transition-colors duration-100",
+        "shrink-0 size-4 flex items-center justify-center border rounded transition-colors duration-100",
         cond do
           @indeterminate -> "bg-primary/30 border-primary/60"
           @checked -> "bg-primary border-primary"
@@ -521,7 +521,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   attr :name, :string, required: true
-  attr :class, :string, default: "w-4 h-4"
+  attr :class, :string, default: "size-4"
 
   def custom_icon(%{name: "lucide-robot"} = assigns) do
     ~H"""
@@ -601,7 +601,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       ]}
       {phx_values(@values)}
     >
-      <.icon name={@icon} class="w-3.5 h-3.5" />
+      <.icon name={@icon} class="size-3.5" />
     </button>
     """
   end
@@ -693,7 +693,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     <div class={["flex items-center justify-between mb-6", @class]}>
       <h2 class="text-xl font-semibold">{@title}</h2>
       <button phx-click={@toggle_event} phx-target={@phx_target} class="btn btn-ghost btn-sm btn-circle">
-        <.icon name="hero-x-mark" class="w-4 h-4" />
+        <.icon name="hero-x-mark" class="size-4" />
       </button>
     </div>
     """
@@ -735,7 +735,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         name="hero-magnifying-glass-mini"
         class={"absolute left-2.5 pointer-events-none " <>
           if(@size == "xs",
-            do: "w-3.5 h-3.5 text-base-content/30",
+            do: "size-3.5 text-base-content/30",
             else: "size-4 text-base-content/40"
           )}
       />
@@ -787,7 +787,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   def skeleton_row(assigns) do
     ~H"""
     <div class={"flex items-center gap-3 px-3 py-2.5 #{@class}"}>
-      <div class="skeleton h-4 w-4 rounded-full shrink-0" />
+      <div class="skeleton size-4 rounded-full shrink-0" />
       <div class="flex flex-col gap-1.5 flex-1">
         <div class="skeleton h-3 w-2/3" />
         <div class="skeleton h-2.5 w-1/3" />

@@ -103,9 +103,9 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
     <div class="p-6 max-w-4xl mx-auto space-y-6">
       <div class="flex items-center gap-3">
         <.link navigate={~p"/iam/policies"} class="btn btn-ghost btn-sm">
-          <.icon name="hero-arrow-left" class="w-4 h-4" />
+          <.icon name="hero-arrow-left" class="size-4" />
         </.link>
-        <.icon name="hero-shield-plus" class="w-6 h-6 text-primary" />
+        <.icon name="hero-shield-plus" class="size-6 text-primary" />
         <h1 class="text-2xl font-bold">New IAM Policy</h1>
       </div>
 
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
         <div class="flex justify-end gap-2">
           <.link navigate={~p"/iam/policies"} class="btn btn-ghost">Cancel</.link>
           <button type="submit" class="btn btn-primary">
-            <.icon name="hero-check" class="w-4 h-4" /> Create policy
+            <.icon name="hero-check" class="size-4" /> Create policy
           </button>
         </div>
       </.form>

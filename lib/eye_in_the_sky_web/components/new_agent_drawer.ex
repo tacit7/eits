@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
             <div class="collapse collapse-arrow bg-base-200 rounded-lg">
               <input type="checkbox" class="min-h-0" />
               <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
-                <.icon name="hero-adjustments-horizontal" class="w-3.5 h-3.5" /> Advanced
+                <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced
               </div>
               <div class="collapse-content px-3 pb-3 space-y-3">
 

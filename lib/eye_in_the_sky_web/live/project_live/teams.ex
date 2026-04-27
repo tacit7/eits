@@ -197,7 +197,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
             <%= if @filtered_teams == [] do %>
               <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-base-100 rounded-xl">
                 <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
-                  <.icon name="hero-user-group" class="w-5 h-5 text-base-content/30" />
+                  <.icon name="hero-user-group" class="size-5 text-base-content/30" />
                 </div>
                 <p class="text-xs text-base-content/30">
                   {if @search_query != "", do: "No teams match your search", else: "No active teams"}
@@ -238,7 +238,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                         class="shrink-0 p-1.5 rounded hover:bg-base-200 text-base-content/20 hover:text-error/60 transition-colors opacity-0 group-hover:opacity-100 max-sm:opacity-30 pointer-events-none group-hover:pointer-events-auto max-sm:pointer-events-auto min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Delete team"
                       >
-                        <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                        <.icon name="hero-trash" class="size-3.5" />
                       </button>
                     </div>
                   </div>
@@ -255,7 +255,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
             phx-click="close_team"
             class="flex items-center gap-2 py-4 text-sm text-base-content/50 hover:text-base-content/80 transition-colors"
           >
-            <.icon name="hero-arrow-left" class="w-4 h-4" /> Teams
+            <.icon name="hero-arrow-left" class="size-4" /> Teams
           </button>
 
           <%= if @selected_team do %>

@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Components.Sidebar.ChatSection do
       ]}
       title="Chat"
     >
-      <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4 flex-shrink-0" />
+      <.icon name="hero-chat-bubble-left-ellipsis" class="size-4 flex-shrink-0" />
       <span class={["truncate font-medium", if(@collapsed, do: "hidden")]}>Chat</span>
       <%= if @sidebar_tab == :chat && !@collapsed do %>
         <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>

@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
     ~H"""
     <div class="p-6 max-w-7xl mx-auto space-y-6">
       <div class="flex items-center gap-3">
-        <.icon name="hero-beaker" class="w-6 h-6 text-primary" />
+        <.icon name="hero-beaker" class="size-6 text-primary" />
         <h1 class="text-2xl font-bold">IAM Simulator</h1>
         <span class="badge badge-ghost">dry-run</span>
       </div>
@@ -243,7 +243,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
 
               <div class="flex gap-2 pt-2">
                 <button type="submit" class="btn btn-primary btn-sm">
-                  <.icon name="hero-play" class="w-4 h-4" /> Simulate
+                  <.icon name="hero-play" class="size-4" /> Simulate
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" phx-click="reset">Reset</button>
               </div>
@@ -258,7 +258,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
             <.instructions_list instructions={@result.decision.instructions} />
           <% else %>
             <div class="alert">
-              <.icon name="hero-information-circle" class="w-5 h-5" />
+              <.icon name="hero-information-circle" class="size-5" />
               <span>Fill in the form and click Simulate to see a decision and per-policy trace.</span>
             </div>
           <% end %>
@@ -269,7 +269,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
         <section class="card bg-base-200">
           <div class="card-body">
             <h2 class="card-title text-lg flex items-center gap-2">
-              <.icon name="hero-queue-list" class="w-5 h-5" /> Trace
+              <.icon name="hero-queue-list" class="size-5" /> Trace
               <span class="badge badge-ghost"><%= length(@result.traces) %></span>
             </h2>
             <.trace_table traces={@result.traces} winner_id={@result.winner_id} />

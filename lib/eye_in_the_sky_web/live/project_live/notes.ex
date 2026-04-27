@@ -285,13 +285,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         phx-click="open_quick_note_modal"
         class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
       >
-        <.icon name="hero-bolt" class="w-3.5 h-3.5" /> Quick Note
+        <.icon name="hero-bolt" class="size-3.5" /> Quick Note
       </button>
       <.link
         navigate={@notes_new_href || "/notes/new"}
         class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
       >
-        <.icon name="hero-plus" class="w-3.5 h-3.5" /> New Note
+        <.icon name="hero-plus" class="size-3.5" /> New Note
       </.link>
       <button
         type="button"
@@ -305,7 +305,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       >
         <.icon
           name={if @starred_filter, do: "hero-star-solid", else: "hero-star"}
-          class="w-3.5 h-3.5"
+          class="size-3.5"
         />
       </button>
       <form phx-change="filter_type">
@@ -369,7 +369,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
             class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
             aria-label="Close"
           >
-            <.icon name="hero-x-mark" class="w-4 h-4" />
+            <.icon name="hero-x-mark" class="size-4" />
           </button>
         </div>
         <form phx-submit="create_quick_note" class="p-4 flex flex-col gap-3">
@@ -398,7 +398,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           </div>
           <label class="flex items-center gap-2 cursor-pointer select-none">
             <input type="checkbox" name="starred" value="1" class="checkbox checkbox-sm" />
-            <.icon name="hero-star" class="w-3.5 h-3.5 text-warning/70" />
+            <.icon name="hero-star" class="size-3.5 text-warning/70" />
             <span class="text-sm text-base-content/70">Star this note</span>
           </label>
           <div class="flex justify-end gap-2 pt-1">

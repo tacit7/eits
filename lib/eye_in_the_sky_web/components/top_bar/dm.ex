@@ -61,7 +61,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         class="btn btn-ghost btn-square w-7 h-7 text-base-content/50 hover:text-base-content/75"
         aria-label="More options"
       >
-        <.icon name="hero-ellipsis-horizontal" class="w-4 h-4" />
+        <.icon name="hero-ellipsis-horizontal" class="size-4" />
       </button>
       <ul
         tabindex="0"
@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
           >
-            <.icon name="hero-arrow-path" class="w-3.5 h-3.5" /> Reload
+            <.icon name="hero-arrow-path" class="size-3.5" /> Reload
           </button>
         </li>
         <li>
@@ -80,7 +80,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             phx-click="export_markdown"
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
           >
-            <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" /> Export as Markdown
+            <.icon name="hero-clipboard-document" class="size-3.5" /> Export as Markdown
           </button>
         </li>
         <li><div class="divider my-0"></div></li>
@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             phx-click="open_schedule_timer"
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
           >
-            <.icon name="hero-clock" class="w-3.5 h-3.5" /> Schedule Message
+            <.icon name="hero-clock" class="size-3.5" /> Schedule Message
           </button>
         </li>
         <%= if @dm_active_timer do %>
@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
               phx-click="cancel_timer"
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded"
             >
-              <.icon name="hero-x-circle" class="w-3.5 h-3.5" /> Cancel Schedule
+              <.icon name="hero-x-circle" class="size-3.5" /> Cancel Schedule
             </button>
           </li>
         <% end %>

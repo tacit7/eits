@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
           phx-click="toggle_new_session_drawer"
           class="btn btn-primary btn-sm gap-2"
         >
-          <.icon name="hero-plus-mini" class="w-4 h-4" />
+          <.icon name="hero-plus-mini" class="size-4" />
           New Agent
         </button>
       </div>

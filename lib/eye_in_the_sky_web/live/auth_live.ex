@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
     <div class="min-h-[100dvh] flex items-center justify-center bg-base-100">
       <div class="w-full max-w-sm px-6 text-center">
         <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
-          <.icon name="hero-eye" class="w-6 h-6 text-white dark:text-zinc-900" />
+          <.icon name="hero-eye" class="size-6 text-white dark:text-zinc-900" />
         </div>
         <p class="text-sm text-red-500 dark:text-red-400 mt-2">
           This registration link is invalid or has expired.
@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
       <div class="w-full max-w-sm px-6">
         <div class="mb-8 text-center">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
-            <.icon name="hero-eye" class="w-6 h-6 text-white dark:text-zinc-900" />
+            <.icon name="hero-eye" class="size-6 text-white dark:text-zinc-900" />
           </div>
           <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-[Bricolage_Grotesque]">
             Register Passkey
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.AuthLive do
       <div class="w-full max-w-sm px-6">
         <div class="mb-8 text-center">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
-            <.icon name="hero-eye" class="w-6 h-6 text-white dark:text-zinc-900" />
+            <.icon name="hero-eye" class="size-6 text-white dark:text-zinc-900" />
           </div>
           <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-[Bricolage_Grotesque]">
             Eye in the Sky

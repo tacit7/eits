@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
       <div class="mb-6">
         <%= if @project do %>
           <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost btn-sm gap-2">
-            <.icon name="hero-arrow-left" class="h-4 w-4" /> Back to Prompts
+            <.icon name="hero-arrow-left" class="size-4" /> Back to Prompts
           </.link>
         <% end %>
       </div>
@@ -152,7 +152,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
               </.link>
             <% end %>
             <button type="submit" class="btn btn-primary">
-              <.icon name="hero-check" class="h-4 w-4" /> Create Prompt
+              <.icon name="hero-check" class="size-4" /> Create Prompt
             </button>
           </div>
         </div>

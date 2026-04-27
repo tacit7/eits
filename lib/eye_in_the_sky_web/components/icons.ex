@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.Icons do
 
   use Phoenix.Component
 
-  attr :class, :string, default: "h-4 w-4"
+  attr :class, :string, default: "size-4"
 
   def claude(assigns) do
     ~H"""

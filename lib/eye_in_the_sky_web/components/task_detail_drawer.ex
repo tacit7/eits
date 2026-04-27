@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                   onclick="event.stopPropagation(); event.preventDefault();"
                   class="hover:text-primary transition-colors"
                 >
-                  <.icon name="hero-clipboard-document" class="w-3 h-3" />
+                  <.icon name="hero-clipboard-document" class="size-3" />
                 </button>
                 <span class="text-base-content/15">&middot;</span>
                 <span>{relative_time(@task.created_at)}</span>
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                 phx-click={@toggle_event}
                 class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
               >
-                <.icon name="hero-x-mark" class="w-5 h-5" />
+                <.icon name="hero-x-mark" class="size-5" />
               </button>
             </div>
 
@@ -232,7 +232,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     type="submit"
                     class="btn btn-sm btn-ghost text-xs self-end gap-1.5 text-base-content/50 hover:text-base-content/80"
                   >
-                    <.icon name="hero-plus-mini" class="w-3.5 h-3.5" /> Add
+                    <.icon name="hero-plus-mini" class="size-3.5" /> Add
                   </button>
                 </form>
               </div>
@@ -249,7 +249,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                 phx-value-task_id={@task.uuid || to_string(@task.id)}
                 class="btn btn-sm btn-ghost text-xs gap-1.5 text-base-content/50 hover:text-base-content/80"
               >
-                <.icon name="hero-play" class="w-3.5 h-3.5" /> Start Agent
+                <.icon name="hero-play" class="size-3.5" /> Start Agent
               </button>
               <div class="ml-auto flex items-center gap-1">
                 <%= if not is_nil(@copy_event) && @projects != [] do %>
@@ -262,7 +262,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                         class="btn btn-sm btn-ghost text-xs text-base-content/40 hover:text-primary hover:bg-primary/10"
                         title="Copy to project"
                       >
-                        <.icon name="hero-document-duplicate" class="w-3.5 h-3.5" />
+                        <.icon name="hero-document-duplicate" class="size-3.5" />
                       </button>
                       <ul
                         tabindex="0"
@@ -276,7 +276,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                               phx-value-project_id={project.id}
                               class="text-xs"
                             >
-                              <.icon name="hero-folder" class="w-3.5 h-3.5" />
+                              <.icon name="hero-folder" class="size-3.5" />
                               {project.name}
                             </button>
                           </li>
@@ -292,7 +292,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                   class="btn btn-sm btn-ghost text-xs text-base-content/40 hover:text-warning hover:bg-warning/10"
                   title="Archive task"
                 >
-                  <.icon name="hero-archive-box" class="w-3.5 h-3.5" />
+                  <.icon name="hero-archive-box" class="size-3.5" />
                 </button>
                 <button
                   type="button"
@@ -302,7 +302,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                   data-drawer-delete="true"
                   class="btn btn-sm btn-ghost text-xs text-error/50 hover:text-error hover:bg-error/10"
                 >
-                  <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                  <.icon name="hero-trash" class="size-3.5" />
                 </button>
               </div>
             </div>

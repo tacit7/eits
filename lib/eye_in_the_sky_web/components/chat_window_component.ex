@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           <img
             src={DmHelpers.provider_icon(@session && @session.provider)}
             class={[
-              "w-3.5 h-3.5 shrink-0",
+              "size-3.5 shrink-0",
               DmHelpers.provider_icon_class(@session && @session.provider),
               @session && @session.status == "working" && "animate-pulse"
             ]}
@@ -68,16 +68,16 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         <div class="flex items-center gap-1.5">
           <button
             data-minimize-btn
-            class="w-3 h-3 rounded-full bg-warning/70 hover:bg-warning transition-colors shrink-0"
+            class="size-3 rounded-full bg-warning/70 hover:bg-warning transition-colors shrink-0"
             title="Minimize"
           />
           <button
             data-maximize-btn
-            class="w-3 h-3 rounded-full bg-success/70 hover:bg-success transition-colors shrink-0"
+            class="size-3 rounded-full bg-success/70 hover:bg-success transition-colors shrink-0"
             title="Maximize"
           />
           <button
-            class="w-3 h-3 rounded-full bg-error/70 hover:bg-error transition-colors shrink-0"
+            class="size-3 rounded-full bg-error/70 hover:bg-error transition-colors shrink-0"
             phx-click="remove_window"
             phx-value-cs-id={@canvas_session.id}
             phx-target={@myself}
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             <div class="flex items-center gap-1.5 px-1 pt-2 pb-1">
               <img
                 src={DmHelpers.provider_icon(@session.provider)}
-                class={["w-4 h-4 shrink-0", DmHelpers.provider_icon_class(@session.provider), "animate-pulse"]}
+                class={["size-4 shrink-0", DmHelpers.provider_icon_class(@session.provider), "animate-pulse"]}
                 alt="working"
               />
             </div>
@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             title="Auto-scroll"
             class="btn btn-ghost btn-xs px-1 text-base-content/30 hover:text-base-content"
           >
-            <.icon name="hero-arrow-down-mini" class="w-3.5 h-3.5" />
+            <.icon name="hero-arrow-down-mini" class="size-3.5" />
           </button>
           <button type="submit" class="btn btn-primary btn-xs px-2">&#8593;</button>
         </.form>

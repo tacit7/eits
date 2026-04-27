@@ -54,14 +54,14 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                 )
               ]}
             >
-              <.icon name="hero-user-group-mini" class="w-3.5 h-3.5" />
+              <.icon name="hero-user-group-mini" class="size-3.5" />
               {length(@channel_members)} members
             </button>
             <button
               phx-click="toggle_agent_drawer"
               class="btn btn-xs btn-primary gap-1 min-h-[44px] min-w-[44px]"
             >
-              <.icon name="hero-plus-mini" class="w-3 h-3" /> New Agent
+              <.icon name="hero-plus-mini" class="size-3" /> New Agent
             </button>
           </div>
         </div>

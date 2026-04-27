@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
               <input type="checkbox" />
               <div class="collapse-title py-3 px-4">
                 <div class="flex items-center gap-3">
-                  <.icon name="hero-document-text" class="w-4 h-4 flex-shrink-0 text-base-content/30" />
+                  <.icon name="hero-document-text" class="size-4 flex-shrink-0 text-base-content/30" />
                   <div class="flex-1 min-w-0">
                     <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
                       {title}

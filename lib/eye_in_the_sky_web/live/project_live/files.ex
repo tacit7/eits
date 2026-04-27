@@ -308,7 +308,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     <%= if @error do %>
       <div class="p-4">
         <div class="alert alert-error">
-          <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+          <.icon name="hero-x-circle" class="shrink-0 size-6" />
           <span>{@error}</span>
         </div>
       </div>
@@ -321,7 +321,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
               patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
               class="btn btn-sm btn-ghost btn-square"
             >
-              <.icon name="hero-arrow-left" class="w-4 h-4" />
+              <.icon name="hero-arrow-left" class="size-4" />
             </.link>
           </div>
         <% end %>
@@ -373,7 +373,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         <li>
           <details>
             <summary>
-              <.icon name="hero-folder" class="w-4 h-4" />
+              <.icon name="hero-folder" class="size-4" />
               {@item.name}
             </summary>
             <ul>
@@ -388,13 +388,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         <li>
           <%= if binary_file?(@item.name) do %>
             <span class="opacity-40 cursor-not-allowed pointer-events-none" title="Binary file — cannot preview">
-              <.icon name="hero-no-symbol" class="w-4 h-4" />
+              <.icon name="hero-no-symbol" class="size-4" />
               {@item.name}
               <span class="badge badge-ghost badge-xs ml-auto font-mono">bin</span>
             </span>
           <% else %>
             <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}&mode=tree"}>
-              <.icon name="hero-document" class="w-4 h-4" />
+              <.icon name="hero-document" class="size-4" />
               {@item.name}
               <%= if @item.size do %>
                 <span class="badge badge-ghost badge-xs ml-auto">{@item.size}</span>
@@ -419,14 +419,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
               phx-click="toggle_view_mode"
               phx-value-mode="list"
             >
-              <.icon name="hero-bars-3" class="w-4 h-4" /> List
+              <.icon name="hero-bars-3" class="size-4" /> List
             </button>
             <button
               class={"btn btn-sm" <> if @view_mode == :tree, do: " btn-active", else: ""}
               phx-click="toggle_view_mode"
               phx-value-mode="tree"
             >
-              <.icon name="hero-folder" class="w-4 h-4" /> Explore
+              <.icon name="hero-folder" class="size-4" /> Explore
             </button>
           </div>
         </div>
@@ -485,7 +485,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         <div class="p-6">
           <%= if @error do %>
             <div class="alert alert-error mb-4">
-              <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+              <.icon name="hero-x-circle" class="shrink-0 size-6" />
               <span>{@error}</span>
             </div>
           <% end %>
@@ -495,7 +495,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
                 patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
                 class="btn btn-sm btn-ghost mb-4"
               >
-                <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+                <.icon name="hero-arrow-left" class="size-4" /> Back
               </.link>
             <% end %>
             <h2 class="text-lg font-semibold text-base-content mb-2">

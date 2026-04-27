@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
           style="position:absolute;bottom:0;right:0;z-index:2;pointer-events:auto"
           class="btn btn-primary btn-circle shadow-lg outline-none"
         >
-          <.icon name="hero-user" class="w-6 h-6" />
+          <.icon name="hero-user" class="size-6" />
         </div>
 
         <%!-- Agent buttons (radial positions set by JS hook on mounted/updated) --%>
@@ -63,21 +63,21 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
 
             <%!-- Status dot --%>
             <%= if status_style.ping do %>
-              <span class="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
+              <span class="absolute -bottom-0.5 -right-0.5 flex size-3">
                 <span class={[
                   "animate-ping absolute inline-flex h-full w-full rounded-full opacity-50",
                   status_style.dot
                 ]}>
                 </span>
                 <span class={[
-                  "relative inline-flex rounded-full h-3 w-3 ring-2 ring-base-100",
+                  "relative inline-flex rounded-full size-3 ring-2 ring-base-100",
                   status_style.dot
                 ]}>
                 </span>
               </span>
             <% else %>
               <span class={[
-                "absolute -bottom-0.5 -right-0.5 inline-flex rounded-full h-3 w-3 ring-2 ring-base-100",
+                "absolute -bottom-0.5 -right-0.5 inline-flex rounded-full size-3 ring-2 ring-base-100",
                 status_style.dot
               ]}>
               </span>
@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
 
             <%!-- Remove button (shown on hover) --%>
             <span
-              class="fab-remove-btn absolute -top-1 -right-1 w-4 h-4 rounded-full bg-error text-error-content flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 shadow-sm"
+              class="fab-remove-btn absolute -top-1 -right-1 size-4 rounded-full bg-error text-error-content flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10 shadow-sm"
               data-remove-index={index}
               style="pointer-events:auto"
             >

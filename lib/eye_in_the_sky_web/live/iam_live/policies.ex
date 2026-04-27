@@ -129,17 +129,17 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
     <div class="p-6 max-w-7xl mx-auto space-y-6">
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <.icon name="hero-shield-check" class="w-6 h-6 text-primary" />
+          <.icon name="hero-shield-check" class="size-6 text-primary" />
           <h1 class="text-2xl font-bold">IAM Policies</h1>
           <span class="badge badge-ghost"><%= length(@policies) %></span>
         </div>
 
         <div class="flex items-center gap-2">
           <.link navigate={~p"/iam/simulator"} class="btn btn-ghost btn-sm">
-            <.icon name="hero-beaker" class="w-4 h-4" /> Simulator
+            <.icon name="hero-beaker" class="size-4" /> Simulator
           </.link>
           <.link navigate={~p"/iam/policies/new"} class="btn btn-primary btn-sm">
-            <.icon name="hero-plus" class="w-4 h-4" /> New policy
+            <.icon name="hero-plus" class="size-4" /> New policy
           </.link>
         </div>
       </div>
@@ -225,14 +225,14 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                         phx-value-enabled={to_string(not p.enabled)}
                         class={"btn btn-xs " <> (if p.enabled, do: "btn-success", else: "btn-ghost")}
                       >
-                        <.icon name={if p.enabled, do: "hero-check-circle", else: "hero-x-circle"} class="w-4 h-4" />
+                        <.icon name={if p.enabled, do: "hero-check-circle", else: "hero-x-circle"} class="size-4" />
                         <%= if p.enabled, do: "on", else: "off" %>
                       </button>
                     </td>
                     <td>
                       <%= if p.system_key do %>
                         <span class="badge badge-sm badge-info gap-1">
-                          <.icon name="hero-lock-closed" class="w-3 h-3" /> system
+                          <.icon name="hero-lock-closed" class="size-3" /> system
                         </span>
                       <% else %>
                         <span class="badge badge-sm badge-ghost">user</span>
@@ -240,11 +240,11 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                     </td>
                     <td class="text-right whitespace-nowrap">
                       <.link navigate={~p"/iam/policies/#{p.id}/edit"} class="btn btn-ghost btn-xs">
-                        <.icon name="hero-pencil-square" class="w-4 h-4" /> Edit
+                        <.icon name="hero-pencil-square" class="size-4" /> Edit
                       </.link>
                       <%= if p.system_key do %>
                         <button type="button" class="btn btn-ghost btn-xs btn-disabled" disabled title="System policies cannot be deleted">
-                          <.icon name="hero-trash" class="w-4 h-4" />
+                          <.icon name="hero-trash" class="size-4" />
                         </button>
                       <% else %>
                         <button
@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                           phx-value-id={p.id}
                           data-confirm={"Delete policy \"#{p.name}\"? This cannot be undone."}
                         >
-                          <.icon name="hero-trash" class="w-4 h-4" />
+                          <.icon name="hero-trash" class="size-4" />
                         </button>
                       <% end %>
                     </td>

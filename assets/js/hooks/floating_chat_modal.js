@@ -90,7 +90,7 @@ export class FloatingChatModal {
 
     const dmLinkHtml = dmHref
       ? `<a href="${FloatingChatModal.escape(dmHref)}" class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary" title="Open full DM">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
             <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd" />
             <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd" />
           </svg>
@@ -110,7 +110,7 @@ export class FloatingChatModal {
           <div class="flex items-center gap-1">
             ${dmLinkHtml}
             <button id="${this._id}-close" class="btn btn-ghost btn-xs btn-square text-base-content/30" title="Close">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
                 <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
               </svg>
             </button>
@@ -133,7 +133,7 @@ export class FloatingChatModal {
               autocomplete="off"
             />
             <button id="${this._id}-send" class="btn btn-primary btn-sm btn-square">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
                 <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.115A28.897 28.897 0 0 0 3.105 2.289Z" />
               </svg>
             </button>
@@ -148,7 +148,7 @@ export class FloatingChatModal {
         ? `<button onclick="document.getElementById('${this._id}')?.remove()" class="text-xs underline mt-1 opacity-70">Close</button>`
         : ''
       return `<div class="flex items-start gap-2 px-1 py-1.5">
-        <div class="w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 bg-error/20 flex items-center justify-center">
+        <div class="size-3.5 rounded-full mt-0.5 flex-shrink-0 bg-error/20 flex items-center justify-center">
           <div class="w-1 h-1 rounded-full bg-error"></div>
         </div>
         <div class="min-w-0 flex-1 text-sm text-error whitespace-pre-wrap break-words">${FloatingChatModal.escape(m.body)}${closeBtn ? '<br>' + closeBtn : ''}</div>
@@ -156,8 +156,8 @@ export class FloatingChatModal {
     }
     const isUser = m.sender_role === 'user'
     const dotInner = isUser
-      ? `<div class="w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 bg-success/20 flex items-center justify-center"><div class="w-1 h-1 rounded-full bg-success"></div></div>`
-      : `<div class="w-3.5 h-3.5 rounded-full mt-0.5 flex-shrink-0 bg-primary/20 flex items-center justify-center"><div class="w-1 h-1 rounded-full bg-primary/60"></div></div>`
+      ? `<div class="size-3.5 rounded-full mt-0.5 flex-shrink-0 bg-success/20 flex items-center justify-center"><div class="w-1 h-1 rounded-full bg-success"></div></div>`
+      : `<div class="size-3.5 rounded-full mt-0.5 flex-shrink-0 bg-primary/20 flex items-center justify-center"><div class="w-1 h-1 rounded-full bg-primary/60"></div></div>`
     const nameColor = isUser ? 'text-base-content/60' : 'text-primary/70'
     const label = isUser ? 'You' : 'Agent'
     return `<div class="flex items-start gap-2 px-1 py-1.5 rounded-lg hover:bg-base-content/[0.02] transition-colors">

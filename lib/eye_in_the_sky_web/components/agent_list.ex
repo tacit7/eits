@@ -75,7 +75,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           phx-click="confirm_delete_selected"
           class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
         >
-          <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+          <.icon name="hero-trash-mini" class="size-3.5" /> Delete
         </button>
       <% else %>
         <span class="text-[11px] text-base-content/30">{length(@agents)} sessions</span>
@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
         aria-label="Exit select mode"
       >
-        <.icon name="hero-x-mark" class="w-4 h-4" />
+        <.icon name="hero-x-mark" class="size-4" />
       </button>
     </div>
     """
@@ -112,13 +112,13 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
         aria-label="More options"
       >
-        <.icon name="hero-ellipsis-horizontal-mini" class="w-4 h-4" />
+        <.icon name="hero-ellipsis-horizontal-mini" class="size-4" />
       </summary>
       <ul class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1">
         <%= if @agent.id do %>
           <li>
             <a href={~p"/dm/#{@agent.id}"} target="_blank" class="flex items-center gap-2">
-              <.icon name="hero-arrow-top-right-on-square-mini" class="w-3.5 h-3.5" />
+              <.icon name="hero-arrow-top-right-on-square-mini" class="size-3.5" />
               Open in new tab
             </a>
           </li>
@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
             phx-value-session_id={@agent.id}
             class="flex items-center gap-2"
           >
-            <.icon name="hero-pencil-square-mini" class="w-3.5 h-3.5" /> Rename
+            <.icon name="hero-pencil-square-mini" class="size-3.5" /> Rename
           </button>
         </li>
         <%!-- Canvas inline expand --%>
@@ -152,7 +152,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               class="bookmark-button flex items-center gap-2"
               aria-label="Bookmark agent"
             >
-              <.icon name="hero-heart" class="bookmark-icon w-3.5 h-3.5" />
+              <.icon name="hero-heart" class="bookmark-icon size-3.5" />
               <span class="bookmark-label">Favorite</span>
             </button>
           </li>
@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
                 phx-value-session_id={@agent.id}
                 class="flex items-center gap-2 text-info"
               >
-                <.icon name="hero-arrow-up-tray-mini" class="w-3.5 h-3.5" /> Unarchive
+                <.icon name="hero-arrow-up-tray-mini" class="size-3.5" /> Unarchive
               </button>
             </li>
             <li>
@@ -177,7 +177,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
                 phx-value-session_id={@agent.id}
                 class="flex items-center gap-2 text-error"
               >
-                <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+                <.icon name="hero-trash-mini" class="size-3.5" /> Delete
               </button>
             </li>
           <% else %>
@@ -188,7 +188,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
                 phx-value-session_id={@agent.id}
                 class="flex items-center gap-2 text-warning"
               >
-                <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" /> Archive
+                <.icon name="hero-archive-box-mini" class="size-3.5" /> Archive
               </button>
             </li>
           <% end %>
@@ -232,7 +232,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     <li>
       <details>
         <summary class="flex items-center gap-2">
-          <.icon name="hero-squares-2x2-mini" class="w-3.5 h-3.5" /> Add to Canvas
+          <.icon name="hero-squares-2x2-mini" class="size-3.5" /> Add to Canvas
         </summary>
         <ul>
           <%= for canvas <- @canvases do %>

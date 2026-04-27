@@ -224,7 +224,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
             phx-hook="ConfigChatGuide"
             class="btn btn-sm btn-ghost ml-auto"
           >
-            <.icon name="hero-chat-bubble-left-ellipsis" class="w-4 h-4" /> Config Guide
+            <.icon name="hero-chat-bubble-left-ellipsis" class="size-4" /> Config Guide
           </button>
         </div>
       </div>
@@ -234,7 +234,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
         <div class="p-6">
           <%= if @error do %>
             <div class="alert alert-error mb-4">
-              <.icon name="hero-x-circle" class="shrink-0 h-6 w-6" />
+              <.icon name="hero-x-circle" class="shrink-0 size-6" />
               <span>{@error}</span>
             </div>
           <% end %>
@@ -251,7 +251,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                   }
                   class="btn btn-sm btn-ghost"
                 >
-                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+                  <.icon name="hero-arrow-left" class="size-4" /> Back
                 </.link>
                 <div>
                   <h2 class="text-lg font-semibold text-base-content">
@@ -264,7 +264,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                   class="btn btn-sm btn-ghost ml-auto"
                   title="Open in editor"
                 >
-                  <.icon name="hero-pencil-square" class="w-4 h-4" /> Edit
+                  <.icon name="hero-pencil-square" class="size-4" /> Edit
                 </button>
               </div>
               <div class="bg-base-200 rounded-lg overflow-x-auto">
@@ -294,7 +294,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                   }
                   class="btn btn-sm btn-ghost"
                 >
-                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Back
+                  <.icon name="hero-arrow-left" class="size-4" /> Back
                 </.link>
               <% end %>
               <h2 class="text-lg font-semibold text-base-content flex-1">
@@ -306,7 +306,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                 class="btn btn-sm btn-ghost"
                 title="New file"
               >
-                <.icon name="hero-plus" class="w-4 h-4" /> File
+                <.icon name="hero-plus" class="size-4" /> File
               </button>
               <button
                 phx-click="start_create"
@@ -314,7 +314,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                 class="btn btn-sm btn-ghost"
                 title="New folder"
               >
-                <.icon name="hero-plus" class="w-4 h-4" /> Folder
+                <.icon name="hero-plus" class="size-4" /> Folder
               </button>
             </div>
             
@@ -323,7 +323,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
               <form phx-submit="create_entry" class="flex items-center gap-2 mb-4">
                 <.icon
                   name={if @creating == :dir, do: "hero-folder", else: "hero-document"}
-                  class="w-4 h-4 text-base-content/50 shrink-0"
+                  class="size-4 text-base-content/50 shrink-0"
                 />
                 <input
                   type="text"

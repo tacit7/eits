@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
             data-confirm={"Delete #{MapSet.size(@selected_ids)} note#{if MapSet.size(@selected_ids) != 1, do: "s"}?"}
             class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
           >
-            <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+            <.icon name="hero-trash-mini" class="size-3.5" /> Delete
           </button>
         <% else %>
           <span class="text-[11px] text-base-content/30">{length(@notes)} notes</span>
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
           aria-label="Exit select mode"
         >
-          <.icon name="hero-x-mark" class="w-4 h-4" />
+          <.icon name="hero-x-mark" class="size-4" />
         </button>
       </div>
     <% else %>
@@ -84,7 +84,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 <%!-- Title — clicking navigates to full editor --%>
                 <div class="flex items-center gap-2 pr-6">
                   <%= if starred?(note) do %>
-                    <.icon name="hero-star-solid" class="w-3 h-3 text-warning flex-shrink-0" />
+                    <.icon name="hero-star-solid" class="size-3 text-warning flex-shrink-0" />
                   <% end %>
                   <.link
                     navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
@@ -164,7 +164,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
               >
                 <.icon
                   name={if starred?(note), do: "hero-star-solid", else: "hero-star"}
-                  class="w-3.5 h-3.5"
+                  class="size-3.5"
                 />
               </button>
               <div class="dropdown dropdown-end">
@@ -174,7 +174,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                   class="flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="More actions"
                 >
-                  <.icon name="hero-ellipsis-vertical" class="w-4 h-4" />
+                  <.icon name="hero-ellipsis-vertical" class="size-4" />
                 </button>
                 <ul
                   tabindex="0"
@@ -187,7 +187,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                       phx-value-note_id={note.id}
                       class="flex items-center gap-2 text-xs"
                     >
-                      <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit inline
+                      <.icon name="hero-pencil-square" class="size-3.5" /> Edit inline
                     </button>
                   </li>
                   <li>
@@ -195,7 +195,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                       navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
                       class="flex items-center gap-2 text-xs"
                     >
-                      <.icon name="hero-arrows-pointing-out" class="w-3.5 h-3.5" /> Open full editor
+                      <.icon name="hero-arrows-pointing-out" class="size-3.5" /> Open full editor
                     </.link>
                   </li>
                   <li class="mt-1 border-t border-base-content/8 pt-1">
@@ -206,7 +206,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                       data-confirm="Delete this note?"
                       class="flex items-center gap-2 text-xs text-error/70 hover:!text-error hover:!bg-error/10"
                     >
-                      <.icon name="hero-trash" class="w-3.5 h-3.5" /> Delete
+                      <.icon name="hero-trash" class="size-3.5" /> Delete
                     </button>
                   </li>
                 </ul>

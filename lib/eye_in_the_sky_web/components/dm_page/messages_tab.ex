@@ -97,7 +97,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <%= if @codex_raw_lines != [] do %>
         <details class="border-t border-base-300 shrink-0" id="codex-raw-panel">
           <summary class="px-4 py-1.5 text-[10px] font-mono text-base-content/30 cursor-pointer select-none hover:text-base-content/50 flex items-center gap-1.5">
-            <.icon name="hero-code-bracket" class="w-3 h-3" />
+            <.icon name="hero-code-bracket" class="size-3" />
             raw stream ({length(@codex_raw_lines)} lines)
           </summary>
           <div
@@ -203,7 +203,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <% @provider == :codex -> %>
         <img
           src="/images/openai.svg"
-          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          class="size-4 mt-1 flex-shrink-0 animate-pulse"
           alt="Codex"
           width="16"
           height="16"
@@ -212,7 +212,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <% @provider == :gemini -> %>
         <img
           src="/images/gemini.svg"
-          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          class="size-4 mt-1 flex-shrink-0 animate-pulse"
           alt="Gemini"
           width="16"
           height="16"
@@ -221,7 +221,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <% true -> %>
         <img
           src="/images/claude.svg"
-          class="w-4 h-4 mt-1 flex-shrink-0 animate-pulse"
+          class="size-4 mt-1 flex-shrink-0 animate-pulse"
           alt="Claude"
           width="16"
           height="16"

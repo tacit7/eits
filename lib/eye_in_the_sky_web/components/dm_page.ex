@@ -201,12 +201,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
           aria-label="Open menu"
         >
-          <.icon name="hero-bars-3" class="w-5 h-5" />
+          <.icon name="hero-bars-3" class="size-5" />
         </button>
         <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
           <.session_status_dot status={@agent.status} class="w-1.5 h-1.5" />
           <%= if @agent.entrypoint == "cli" do %>
-            <.icon name="hero-command-line" class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
+            <.icon name="hero-command-line" class="size-3.5 text-base-content/40 flex-shrink-0" />
           <% end %>
           <div class="flex flex-col items-center min-w-0 flex-1">
             <input
@@ -251,7 +251,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   <%= if @agent.entrypoint == "cli" do %>
                     <.icon
                       name="hero-command-line"
-                      class="w-4 h-4 text-base-content/40 flex-shrink-0"
+                      class="size-4 text-base-content/40 flex-shrink-0"
                     />
                   <% end %>
                   <input
@@ -284,7 +284,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-warning/10 text-warning text-xs font-medium hover:bg-warning/20 transition-colors"
                   title="Edit scheduled message"
                 >
-                  <.icon name="hero-clock" class="w-3.5 h-3.5" />
+                  <.icon name="hero-clock" class="size-3.5" />
                   <span>{if @overlay_data.active_timer.mode == :once, do: "Once"}</span>
                   <span
                     id="timer-countdown"
@@ -360,7 +360,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 phx-value-tab={tab}
                 id={"dm-tab-#{tab}"}
               >
-                <.icon name={icon} class="w-3.5 h-3.5" />
+                <.icon name={icon} class="size-3.5" />
                 {label}
               </button>
             <% end %>
@@ -370,7 +370,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               <form phx-change="search_messages" phx-submit="search_messages" class="relative">
                 <.icon
                   name="hero-magnifying-glass"
-                  class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30 pointer-events-none"
+                  class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-base-content/30 pointer-events-none"
                 />
                 <input
                   type="text"
@@ -388,7 +388,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                     phx-value-query=""
                     class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content/60 transition-colors"
                   >
-                    <.icon name="hero-x-mark" class="w-3.5 h-3.5" />
+                    <.icon name="hero-x-mark" class="size-3.5" />
                   </button>
                 <% end %>
               </form>

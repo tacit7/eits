@@ -201,14 +201,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
               phx-click="toggle_view_mode"
               phx-value-mode="tree"
             >
-              <.icon name="hero-folder" class="w-4 h-4" /> Explore
+              <.icon name="hero-folder" class="size-4" /> Explore
             </button>
             <button
               class={"btn btn-sm join-item" <> if @view_mode == :list, do: " btn-active", else: ""}
               phx-click="toggle_view_mode"
               phx-value-mode="list"
             >
-              <.icon name="hero-bars-3" class="w-4 h-4" /> List
+              <.icon name="hero-bars-3" class="size-4" /> List
             </button>
           </div>
         </div>

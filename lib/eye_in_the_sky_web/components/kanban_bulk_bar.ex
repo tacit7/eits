@@ -36,14 +36,14 @@ defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
           phx-click="bulk_archive"
           class="btn btn-sm sm:btn-xs btn-ghost text-warning gap-1 min-h-[44px] sm:min-h-0"
         >
-          <.icon name="hero-archive-box-mini" class="w-3 h-3" /> Archive
+          <.icon name="hero-archive-box-mini" class="size-3" /> Archive
         </button>
         <button
           phx-click="bulk_delete"
           phx-confirm={"Delete #{MapSet.size(@selected_tasks)} tasks?"}
           class="btn btn-sm sm:btn-xs btn-ghost text-error gap-1 min-h-[44px] sm:min-h-0"
         >
-          <.icon name="hero-trash-mini" class="w-3 h-3" /> Delete
+          <.icon name="hero-trash-mini" class="size-3" /> Delete
         </button>
       </div>
     <% end %>

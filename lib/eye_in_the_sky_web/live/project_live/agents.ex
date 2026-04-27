@@ -168,7 +168,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
           >
             <div class="py-3 px-4">
               <div class="flex items-center gap-2">
-                <.icon name="hero-document-text" class="w-4 h-4 text-base-content/50 shrink-0" />
+                <.icon name="hero-document-text" class="size-4 text-base-content/50 shrink-0" />
                 <code class="text-sm font-semibold text-base-content">{agent.name}</code>
                 <span class="text-xs text-base-content/40 ml-auto">
                   {FileHelpers.format_size(agent.size)}
@@ -197,7 +197,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
             <div>
               <!-- Project-level agents -->
               <div class="flex items-center gap-2 mb-3">
-                <.icon name="hero-folder" class="w-4 h-4 text-primary/60" />
+                <.icon name="hero-folder" class="size-4 text-primary/60" />
                 <span class="text-sm font-semibold text-base-content/60 uppercase tracking-wider">
                   Project Agents
                 </span>
@@ -214,7 +214,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
               
     <!-- User-level agents -->
               <div class="flex items-center gap-2 mb-3">
-                <.icon name="hero-user" class="w-4 h-4 text-base-content/40" />
+                <.icon name="hero-user" class="size-4 text-base-content/40" />
                 <span class="text-sm font-semibold text-base-content/60 uppercase tracking-wider">
                   User Agents
                 </span>
@@ -248,13 +248,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                           class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                           title="Open in editor"
                         >
-                          <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
+                          <.icon name="hero-pencil-square" class="size-3.5" /> Edit
                         </button>
                         <button
                           phx-click="close_viewer"
                           class="btn btn-ghost btn-xs btn-circle min-h-[44px] min-w-[44px]"
                         >
-                          <.icon name="hero-x-mark" class="w-4 h-4" />
+                          <.icon name="hero-x-mark" class="size-4" />
                         </button>
                       </div>
                     </div>

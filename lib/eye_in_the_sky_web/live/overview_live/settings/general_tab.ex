@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
-                  <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
+                  <.icon name="hero-arrow-uturn-left" class="size-3.5" />
                 </button>
               </div>
             </div>
@@ -99,7 +99,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
-                  <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
+                  <.icon name="hero-arrow-uturn-left" class="size-3.5" />
                 </button>
               </div>
             </div>
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
-                  <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
+                  <.icon name="hero-arrow-uturn-left" class="size-3.5" />
                 </button>
               </div>
             </div>
@@ -161,7 +161,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
-                  <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
+                  <.icon name="hero-arrow-uturn-left" class="size-3.5" />
                 </button>
               </div>
             </div>
@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
                   title="Reset to default"
                 >
-                  <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
+                  <.icon name="hero-arrow-uturn-left" class="size-3.5" />
                 </button>
               </div>
             </div>

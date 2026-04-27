@@ -49,20 +49,20 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
           phx-click="confirm_archive_selected"
           class="btn btn-ghost btn-xs text-warning/70 hover:text-warning hover:bg-warning/10 gap-1 min-h-[44px] min-w-[44px]"
         >
-          <.icon name="hero-archive-box-mini" class="w-3.5 h-3.5" /> Archive
+          <.icon name="hero-archive-box-mini" class="size-3.5" /> Archive
         </button>
         <button
           phx-click="delete_selected"
           class="btn btn-ghost btn-sm min-h-[44px] text-error/70 hover:text-error hover:bg-error/10 gap-1"
         >
-          <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+          <.icon name="hero-trash-mini" class="size-3.5" /> Delete
         </button>
         <button
           phx-click="exit_select_mode"
           class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
           aria-label="Exit select mode"
         >
-          <.icon name="hero-x-mark" class="w-4 h-4" />
+          <.icon name="hero-x-mark" class="size-4" />
         </button>
       </div>
     <% end %>

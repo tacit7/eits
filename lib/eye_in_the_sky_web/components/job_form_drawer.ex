@@ -63,7 +63,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
             </div>
             <button class="btn btn-ghost btn-square min-w-[44px] min-h-[44px]" phx-click="cancel_form" phx-target={@target}>
               <span class="sr-only">Close job form</span>
-              <.icon name="hero-x-mark" class="w-4 h-4" />
+              <.icon name="hero-x-mark" class="size-4" />
             </button>
           </div>
 
@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                       class="tooltip tooltip-bottom cursor-help"
                       data-tip="minute (0-59)  hour (0-23)  day-of-month (1-31)  month (1-12)  day-of-week (0-6, Sun=0)&#10;&#10;Examples:&#10;*/5 * * * *  = every 5 min&#10;0 9 * * 1-5  = 9 AM weekdays&#10;0 0 1 * *    = midnight, 1st of month"
                     >
-                      <.icon name="hero-question-mark-circle" class="w-4 h-4 text-base-content/40" />
+                      <.icon name="hero-question-mark-circle" class="size-4 text-base-content/40" />
                     </span>
                   <% end %>
                 </span>

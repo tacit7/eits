@@ -177,7 +177,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
 
         <%= if Map.get(@team, :unowned_tasks, []) == [] do %>
           <div class="flex items-center gap-3 p-4 rounded-lg border border-dashed border-base-300 text-base-content/30">
-            <.icon name="hero-clipboard-document-list" class="w-4 h-4" />
+            <.icon name="hero-clipboard-document-list" class="size-4" />
             <p class="text-sm">No unassigned tasks</p>
           </div>
         <% else %>
@@ -202,7 +202,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                   <div class="flex items-center gap-1.5 shrink-0">
                     <%= if Map.get(task, :notes, []) != [] do %>
                       <span class="flex items-center gap-1 text-xs text-base-content/40 font-mono">
-                        <.icon name="hero-chat-bubble-left-ellipsis" class="w-3 h-3" />
+                        <.icon name="hero-chat-bubble-left-ellipsis" class="size-3" />
                         {length(task.notes)}
                       </span>
                     <% end %>

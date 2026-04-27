@@ -160,20 +160,20 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
     <div class="p-6 max-w-4xl mx-auto space-y-6">
       <div class="flex items-center gap-3">
         <.link navigate={~p"/iam/policies"} class="btn btn-ghost btn-sm">
-          <.icon name="hero-arrow-left" class="w-4 h-4" />
+          <.icon name="hero-arrow-left" class="size-4" />
         </.link>
-        <.icon name="hero-pencil-square" class="w-6 h-6 text-primary" />
+        <.icon name="hero-pencil-square" class="size-6 text-primary" />
         <h1 class="text-2xl font-bold">Edit policy</h1>
         <%= if @system? do %>
           <span class="badge badge-info gap-1">
-            <.icon name="hero-lock-closed" class="w-3 h-3" /> system
+            <.icon name="hero-lock-closed" class="size-3" /> system
           </span>
         <% end %>
       </div>
 
       <%= if @system? do %>
         <div class="alert alert-warning">
-          <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
+          <.icon name="hero-exclamation-triangle" class="size-5" />
           <div>
             <div class="font-semibold">This is a built-in system policy.</div>
             <div class="text-sm">
@@ -275,7 +275,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
         <div class="flex justify-end gap-2">
           <.link navigate={~p"/iam/policies"} class="btn btn-ghost">Cancel</.link>
           <button type="submit" class="btn btn-primary">
-            <.icon name="hero-check" class="w-4 h-4" /> Save changes
+            <.icon name="hero-check" class="size-4" /> Save changes
           </button>
         </div>
       </.form>

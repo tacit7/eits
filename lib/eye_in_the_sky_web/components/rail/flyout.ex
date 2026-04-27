@@ -55,9 +55,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             >
               <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
                 <%= if @active_section == :tasks do %>
-                  <.custom_icon name="lucide-kanban" class="w-3.5 h-3.5" />
+                  <.custom_icon name="lucide-kanban" class="size-3.5" />
                 <% else %>
-                  <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+                  <.icon name="hero-list-bullet" class="size-3.5" />
                 <% end %>
               </span>
               <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
@@ -69,9 +69,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <%= if dual_page_section?(@active_section) do %>
                 <span class="flex-shrink-0 flex items-center justify-center text-base-content/20">
                   <%= if @active_section == :tasks do %>
-                    <.custom_icon name="lucide-kanban" class="w-3.5 h-3.5" />
+                    <.custom_icon name="lucide-kanban" class="size-3.5" />
                   <% else %>
-                    <.icon name="hero-list-bullet" class="w-3.5 h-3.5" />
+                    <.icon name="hero-list-bullet" class="size-3.5" />
                   <% end %>
                 </span>
               <% end %>
@@ -85,9 +85,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               phx-click="new_note"
               phx-target={@myself}
               title="New note"
-              class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+              class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
             >
-              <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+              <.icon name="hero-plus-mini" class="size-3.5" />
             </button>
           <% end %>
           <%= if @active_section == :sessions do %>
@@ -97,18 +97,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 phx-value-project_id={@sidebar_project.id}
                 phx-target={@myself}
                 title={"New session in #{@sidebar_project.name}"}
-                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+                class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
               >
-                <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+                <.icon name="hero-plus-mini" class="size-3.5" />
               </button>
             <% else %>
               <button
                 phx-click="toggle_new_session_form"
                 phx-target={@myself}
                 title="New agent"
-                class="w-5 h-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+                class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
               >
-                <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+                <.icon name="hero-plus-mini" class="size-3.5" />
               </button>
             <% end %>
           <% end %>
@@ -358,7 +358,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         navigate="/teams"
         class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
-        <.icon name="hero-users" class="w-3 h-3 flex-shrink-0 text-base-content/30" />
+        <.icon name="hero-users" class="size-3 flex-shrink-0 text-base-content/30" />
         <span class="truncate text-xs font-medium">{team.name}</span>
         <span class="ml-auto text-[10px] text-base-content/30 flex-shrink-0">
           {length(team.members)}
@@ -389,7 +389,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         navigate={"/canvases/#{canvas.id}"}
         class="flex items-center gap-2 px-3 py-1.5 text-sm text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
-        <.icon name="hero-squares-2x2" class="w-3 h-3 flex-shrink-0 text-base-content/30" />
+        <.icon name="hero-squares-2x2" class="size-3 flex-shrink-0 text-base-content/30" />
         <span class="truncate font-medium text-xs">{canvas.name}</span>
       </.link>
       <%= for session <- canvas.sessions do %>
@@ -408,7 +408,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           >
             <img
               src={canvas_provider_icon(session.provider)}
-              class={["w-3.5 h-3.5", canvas_provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
+              class={["size-3.5", canvas_provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
               alt={session.provider || "agent"}
             />
           </.link>
@@ -495,7 +495,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       navigate={@href}
       class="flex items-center gap-2.5 px-3 py-2.5 text-sm text-base-content/60 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
     >
-      <.icon name={@icon} class="w-3.5 h-3.5 flex-shrink-0" />
+      <.icon name={@icon} class="size-3.5 flex-shrink-0" />
       <span class="truncate">{@label}</span>
     </.link>
     """
@@ -586,9 +586,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             >
               <.icon
                 name={if expanded, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
-                class="w-3 h-3 text-base-content/30 flex-shrink-0"
+                class="size-3 text-base-content/30 flex-shrink-0"
               />
-              <.icon name={if expanded, do: "hero-folder-open-mini", else: "hero-folder-mini"} class="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
+              <.icon name={if expanded, do: "hero-folder-open-mini", else: "hero-folder-mini"} class="size-3.5 text-base-content/40 flex-shrink-0" />
               <span class="truncate">{node.name}</span>
             </button>
           <% :file -> %>
@@ -600,9 +600,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               style={"padding-left: #{indent + 20}px"}
             >
               <%= if node.sensitive? do %>
-                <.icon name="hero-lock-closed-mini" class="w-3.5 h-3.5 text-warning/50 flex-shrink-0" />
+                <.icon name="hero-lock-closed-mini" class="size-3.5 text-warning/50 flex-shrink-0" />
               <% else %>
-                <.icon name="hero-document-mini" class="w-3.5 h-3.5 text-base-content/20 flex-shrink-0" />
+                <.icon name="hero-document-mini" class="size-3.5 text-base-content/20 flex-shrink-0" />
               <% end %>
               <span class="truncate">{node.name}</span>
             </button>

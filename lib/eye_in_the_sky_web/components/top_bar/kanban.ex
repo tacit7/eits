@@ -32,14 +32,14 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
         class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-success/15 text-success hover:bg-success/25 transition-colors"
         title="Mark selected tasks done"
       >
-        <.icon name="hero-check-circle-mini" class="w-3.5 h-3.5" /> Done
+        <.icon name="hero-check-circle-mini" class="size-3.5" /> Done
       </button>
       <button
         phx-click="clear_selection"
         class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
         title="Clear selection"
       >
-        <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" /> Clear
+        <.icon name="hero-x-mark-mini" class="size-3.5" /> Clear
       </button>
       <button
         phx-click="bulk_delete"
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
         class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium text-error hover:bg-error/10 transition-colors"
         title="Delete selected tasks"
       >
-        <.icon name="hero-trash-mini" class="w-3.5 h-3.5" /> Delete
+        <.icon name="hero-trash-mini" class="size-3.5" /> Delete
       </button>
       <div class="flex-1" />
       <button
@@ -73,13 +73,13 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
             class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
             title="List view"
           >
-            <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" /> List
+            <.icon name="hero-list-bullet-mini" class="size-3.5" /> List
           </.link>
           <span
             class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-base-100 shadow-sm text-base-content cursor-default"
             title="Board view"
           >
-            <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" /> Board
+            <.icon name="hero-view-columns-mini" class="size-3.5" /> Board
           </span>
         </div>
       <% end %>
@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
           class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
           title="Select tasks"
         >
-          <.icon name="hero-check-mini" class="w-3.5 h-3.5" /> Select
+          <.icon name="hero-check-mini" class="size-3.5" /> Select
         </button>
         <button
           phx-click="toggle_filter_drawer"
@@ -100,10 +100,10 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
             )}
           title="Filter"
         >
-          <.icon name="hero-funnel-mini" class="w-3.5 h-3.5" />
+          <.icon name="hero-funnel-mini" class="size-3.5" />
           Filters
           <%= if @active_filter_count && @active_filter_count > 0 do %>
-            <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-content text-[9px] font-bold">
+            <span class="inline-flex items-center justify-center size-4 rounded-full bg-primary text-primary-content text-[9px] font-bold">
               {@active_filter_count}
             </span>
           <% end %>

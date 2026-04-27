@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                 class="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-base-content/25 hover:text-base-content/70 active:text-primary transition-all z-10 md:min-w-0 md:min-h-0 md:mt-3 md:p-1.5"
                 title="Edit task"
               >
-                <.icon name="hero-pencil-square" class="w-4 h-4 md:w-3.5 md:h-3.5" />
+                <.icon name="hero-pencil-square" class="size-4 md:w-3.5 md:h-3.5" />
               </button>
 
               <%!-- Collapse (status dot + title + expandable content) --%>
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                       <%= if Map.get(task, :notes_count, 0) > 0 do %>
                         <span class="text-base-content/15">&middot;</span>
                         <span class="flex items-center gap-0.5 text-base-content/35">
-                          <.icon name="hero-chat-bubble-bottom-center-text" class="w-3 h-3" />
+                          <.icon name="hero-chat-bubble-bottom-center-text" class="size-3" />
                           {Map.get(task, :notes_count)}
                         </span>
                       <% end %>
@@ -144,7 +144,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
         phx-click="toggle_new_task_drawer"
         class="flex items-center gap-2 w-full px-3 py-3 rounded-xl text-sm text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 active:bg-base-content/10 transition-colors border border-dashed border-base-content/15 hover:border-base-content/25"
       >
-        <.icon name="hero-plus" class="w-4 h-4" /> Add task
+        <.icon name="hero-plus" class="size-4" /> Add task
       </button>
     </div>
     """

@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
               phx-click="date_picker_prev_month"
               class="w-7 h-7 flex items-center justify-center rounded-lg text-base-content/50 hover:text-base-content hover:bg-base-content/8 transition-colors"
             >
-              <.icon name="hero-chevron-left-mini" class="w-4 h-4" />
+              <.icon name="hero-chevron-left-mini" class="size-4" />
             </button>
             <span class="text-sm font-semibold text-base-content">
               {@month_name} {@year}
@@ -56,7 +56,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
               phx-click="date_picker_next_month"
               class="w-7 h-7 flex items-center justify-center rounded-lg text-base-content/50 hover:text-base-content hover:bg-base-content/8 transition-colors"
             >
-              <.icon name="hero-chevron-right-mini" class="w-4 h-4" />
+              <.icon name="hero-chevron-right-mini" class="size-4" />
             </button>
           </div>
 

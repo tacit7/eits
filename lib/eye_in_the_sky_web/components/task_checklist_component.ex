@@ -67,7 +67,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
               phx-target={@myself}
               class="opacity-0 group-hover/item:opacity-100 text-base-content/25 hover:text-error transition-all"
             >
-              <.icon name="hero-x-mark-mini" class="w-3.5 h-3.5" />
+              <.icon name="hero-x-mark-mini" class="size-3.5" />
             </button>
           </div>
         <% end %>
@@ -84,7 +84,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
           type="submit"
           class="btn btn-xs btn-ghost text-base-content/30 hover:text-base-content/60"
         >
-          <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
+          <.icon name="hero-plus-mini" class="size-3.5" />
         </button>
       </form>
     </div>

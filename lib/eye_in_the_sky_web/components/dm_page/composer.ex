@@ -180,7 +180,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               <%= if @active_overlay == :effort_menu do %>
                 <ul
                   tabindex="0"
-                  class="dropdown-content menu z-[1] w-52 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
+                  class="dropdown-content menu z-[1] w-48 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
                   id="effort-selector-menu"
                 >
                   <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">

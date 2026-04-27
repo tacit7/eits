@@ -114,7 +114,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
       >
         <.icon name="hero-ellipsis-horizontal-mini" class="size-4" />
       </summary>
-      <ul class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-44 p-1">
+      <ul class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-48 p-1">
         <%= if @agent.id do %>
           <li>
             <a href={~p"/dm/#{@agent.id}"} target="_blank" class="flex items-center gap-2">

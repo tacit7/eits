@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
   attr :filter_state_id, :any, default: nil
   attr :workflow_states, :list, default: []
   attr :sort_by, :string, default: "created_desc"
+  attr :sidebar_project, :any, default: nil
 
   def toolbar(assigns) do
     ~H"""
@@ -60,14 +61,25 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
         </button>
       <% end %>
     </div>
-    <details id="tasks-sort-dropdown" phx-update="ignore" class="dropdown">
+    <details
+      id="tasks-sort-dropdown"
+      phx-update="ignore"
+      phx-hook="SortDropdown"
+      data-label={case @sort_by do
+        "created_desc" -> "Newest"
+        "created_asc" -> "Oldest"
+        "priority" -> "Priority"
+        _ -> "Newest"
+      end}
+      class="dropdown"
+    >
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-        Sort: {case @sort_by do
+        Sort: <span class="js-sort-label">{case @sort_by do
           "created_desc" -> "Newest"
           "created_asc" -> "Oldest"
           "priority" -> "Priority"
           _ -> "Newest"
-        end} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
+        end}</span> <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
         <%= for {value, label} <- [{"created_desc", "Newest"}, {"created_asc", "Oldest"}, {"priority", "Priority"}] do %>
@@ -85,6 +97,23 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
         <% end %>
       </ul>
     </details>
+    <%= if @sidebar_project do %>
+      <div class="flex items-center bg-base-200/40 rounded-lg p-0.5 ml-1">
+        <span
+          class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-base-100 shadow-sm text-base-content cursor-default"
+          title="List view"
+        >
+          <.icon name="hero-list-bullet-mini" class="w-3.5 h-3.5" /> List
+        </span>
+        <.link
+          navigate={~p"/projects/#{@sidebar_project.id}/kanban"}
+          class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
+          title="Board view"
+        >
+          <.icon name="hero-view-columns-mini" class="w-3.5 h-3.5" /> Board
+        </.link>
+      </div>
+    <% end %>
     """
   end
 end

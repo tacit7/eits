@@ -84,6 +84,7 @@ import {ShiftSelect} from "./hooks/shift_select"
 import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
 import {VimNav} from "./hooks/vim_nav"
+import SortDropdown from "./hooks/sort_dropdown"
 import {showToast} from "./hooks/utils"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -144,6 +145,7 @@ Hooks.QuickCreateTask = QuickCreateTask
 Hooks.CommandPalette = CommandPalette
 Hooks.FlashTimeout = FlashTimeout
 Hooks.ReloadConfirmModal = ReloadConfirmModal
+Hooks.SortDropdown = SortDropdown
 Hooks.ChatWindowHook = ChatWindowHook
 Hooks.CanvasLayoutHook = CanvasLayoutHook
 Hooks.CanvasTabHook = CanvasTabHook

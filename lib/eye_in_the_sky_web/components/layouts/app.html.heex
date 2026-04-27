@@ -90,6 +90,7 @@
             filter_state_id={assigns[:filter_state_id]}
             workflow_states={assigns[:workflow_states] || []}
             sort_by={assigns[:sort_by]}
+            sidebar_project={assigns[:sidebar_project]}
           />
         <% :kanban -> %>
           <EyeInTheSkyWeb.TopBar.Kanban.toolbar

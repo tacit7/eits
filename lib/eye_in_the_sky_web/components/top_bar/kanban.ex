@@ -77,6 +77,13 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
       </form>
       <div class="flex items-center gap-1">
         <button
+          phx-click="toggle_bulk_mode"
+          class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 hover:bg-base-content/6 transition-colors"
+          title="Select tasks"
+        >
+          <.icon name="hero-check-mini" class="w-3.5 h-3.5" /> Select
+        </button>
+        <button
           phx-click="toggle_filter_drawer"
           class={"flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium transition-colors " <>
             if(@active_filter_count && @active_filter_count > 0,

@@ -49,15 +49,27 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
         </button>
       <% end %>
     </div>
-    <details id="sessions-sort-dropdown" phx-update="ignore" class="dropdown">
+    <details
+      id="sessions-sort-dropdown"
+      phx-update="ignore"
+      phx-hook="SortDropdown"
+      data-label={case @sort_by do
+        "last_message" -> "Last msg"
+        "name" -> "Name"
+        "agent" -> "Agent"
+        "model" -> "Model"
+        _ -> "Last msg"
+      end}
+      class="dropdown"
+    >
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-        Sort: {case @sort_by do
+        Sort: <span class="js-sort-label">{case @sort_by do
           "last_message" -> "Last msg"
           "name" -> "Name"
           "agent" -> "Agent"
           "model" -> "Model"
           _ -> "Last msg"
-        end} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
+        end}</span> <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
         <%= for {value, label} <- [{"last_message", "Last msg"}, {"name", "Name"}, {"agent", "Agent"}, {"model", "Model"}] do %>

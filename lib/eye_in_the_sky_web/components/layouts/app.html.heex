@@ -99,6 +99,7 @@
             bulk_mode={assigns[:bulk_mode] || false}
             active_filter_count={assigns[:active_filter_count] || 0}
             sidebar_project={assigns[:sidebar_project]}
+            selected_tasks={assigns[:selected_tasks]}
           />
         <% :dm -> %>
           <EyeInTheSkyWeb.TopBar.DM.toolbar

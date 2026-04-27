@@ -52,12 +52,12 @@ jobs:
           key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-
 
-      - name: Cache _build
-        uses: actions/cache@v4
-        with:
-          path: _build
-          key: ${{ runner.os }}-build-${{ hashFiles('mix.lock') }}
-          restore-keys: ${{ runner.os }}-build-
+      # Do NOT cache _build. actions/checkout does not preserve source mtimes,
+      # so Mix's mtime-based recompile detection silently serves stale .beam
+      # files when only test or app source files change (deps stay the same).
+      # This produced phantom test failures where the compiled test code did
+      # not match the source on disk. Recompiling from scratch is ~30s and
+      # eliminates an entire class of CI ghosts.
 
       - name: Install Mix deps
         run: mix deps.get

@@ -62,12 +62,56 @@ body .phx-change-loading { opacity: 1 !important; }
 /* Agent-driven CodeMirror range highlight */
 .cm-agent-highlight { background: rgba(255, 200, 0, 0.3); border-radius: 2px; }
 
-/* File editor open: expand rail, hide main content.
-   Driven by data-file-editor on <html> (root.html.heex, never morphdom-patched)
-   instead of JS classList manipulation on the app-layout elements (which get
-   clobbered on every LiveView update). */
-[data-file-editor="true"] #main-content-wrapper { display: none; }
-[data-file-editor="true"] #app-rail { flex: 1; }
+/* File editor layout modes.
+   data-editor-mode lives on <html> (root layout, never morphdom-patched).
+   Owned by the EditorLayout hook (assets/js/hooks/editor_layout.js).
+
+   Modes:
+     hidden — no editor pane (default)
+     single — editor replaces main content (rail expands, main hidden)
+     split  — editor and main side by side (split width via CSS var) */
+
+/* Default: editor pane and splitter are invisible until a mode is set */
+#file-editor-pane,
+#editor-splitter { display: none; }
+
+/* SINGLE mode (editor replaces main content) */
+[data-editor-mode="single"] #file-editor-pane { display: flex; flex: 1; }
+[data-editor-mode="single"] #main-content-wrapper { display: none; }
+[data-editor-mode="single"] #app-rail { flex: 1; }
+
+/* SPLIT mode (editor + main side by side) */
+[data-editor-mode="split"] #file-editor-pane {
+  display: flex;
+  flex: 0 0 var(--editor-split-width, 50vw);
+  width: var(--editor-split-width, 50vw);
+}
+[data-editor-mode="split"] #editor-splitter {
+  display: block;
+  flex: 0 0 4px;
+  width: 4px;
+  cursor: col-resize;
+  background: oklch(var(--b3));
+  position: relative;
+  z-index: 5;
+}
+[data-editor-mode="split"] #editor-splitter:hover { background: oklch(var(--p)); }
+
+/* Mobile: force single regardless of preference (JS also enforces this; this
+   is defense in depth so layout never breaks if JS load fails). */
+@media (max-width: 767px) {
+  [data-editor-mode="split"] #file-editor-pane { flex: 1; width: auto; }
+  [data-editor-mode="split"] #editor-splitter { display: none; }
+  [data-editor-mode="split"] #main-content-wrapper { display: none; }
+  [data-editor-mode="split"] #app-rail { flex: 1; }
+}
+
+/* Toolbar split-toggle button visibility: only on routes that opt-in. */
+[data-editor-toggle] { display: none; }
+#app-shell[data-allow-split="true"] [data-editor-toggle] { display: inline-flex; }
+@media (max-width: 767px) {
+  [data-editor-toggle] { display: none !important; }
+}
 
 /* CM6 gutter — theme packages can leave .cm-gutters-before with a transparent
    background, making line numbers invisible against the editor background.

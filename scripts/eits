@@ -542,6 +542,17 @@ cmd_tasks() {
         esac
       done
       need message
+      # Guard: bail early if the task is already Done (state_id 3) to prevent double-close noise
+      local _check_body
+      _check_body=$(_curl "$BASE_URL/tasks/$id" 2>/dev/null) || true
+      if [[ -n "$_check_body" ]]; then
+        local _current_state
+        _current_state=$(echo "$_check_body" | jq -r '.task.state_id // .state_id // empty' 2>/dev/null)
+        if [[ "$_current_state" == "3" ]]; then
+          echo '{"status":"already_closed","message":"task is already Done — no change made","task_id":'"$id"'}' | jq .
+          return 0
+        fi
+      fi
       local _sess_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
       local _comp_payload; _comp_payload="$(json message "$message" session_id "$_sess_id")"
       local _comp_attempt=0 _comp_delay=2 _comp_ok=0
@@ -1256,6 +1267,8 @@ cmd_commits() {
       # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only
       # current session's commits. Pass --all to list across all sessions.
       # --mine, --session, and --agent are mutually exclusive
+      # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] [--since <hash>] [--limit <n>]
+      # --since <hash>: return only commits newer than the given hash (sprint reconciliation)
       local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0 _all_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -1263,6 +1276,7 @@ cmd_commits() {
           --agent)   [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --mine)    [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
           --all)     _all_flag=1; shift ;;
+          --since)   qs="${qs}&since_hash=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --limit)   qs="${qs}&limit=$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
@@ -1404,19 +1418,22 @@ cmd_jobs() {
 # ── dm ────────────────────────────────────────────────────────────────────────
 
 cmd_dm() {
-  # eits dm list [--session <uuid|id>] [--limit <n>]
+  # eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>]
   if [[ "${1:-}" == "list" || "${1:-}" == "--list" ]]; then
     shift || true
-    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20
+    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20 from=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --session|-s) session="$2"; shift 2 ;;
+        --from|-f)    from="$2";    shift 2 ;;
         --limit|-n)   limit="$2";   shift 2 ;;
         *) die "unknown flag: $1" ;;
       esac
     done
     need session
-    _get "/dm?session=${session}&limit=${limit}"
+    local qs="session=${session}&limit=${limit}"
+    [[ -n "$from" ]] && qs="${qs}&from=${from}"
+    _get "/dm?${qs}"
     return
   fi
 
@@ -1826,7 +1843,9 @@ HELP
       # session_status: Claude process lifecycle (working, idle, waiting, completed, failed)
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
         cat <<'HELP'
-usage: eits teams status <id> [--summary|-s] [--wait]
+usage: eits teams status <id> [--wait] [--json]
+
+Default output: formatted summary with member status, session state, and current task.
 
 Fields per member:
   member_status  — team membership state (active, done, spawn_failed, idle)
@@ -1835,20 +1854,23 @@ Fields per member:
                    Reflects the Claude Code process state, not task completion.
   session_uuid   — UUID for DM targeting; use with: eits dm --to <uuid> --message "..."
   session_id     — Numeric session ID (alternative DM target)
+  task           — Current claimed task (title + ID) if any
 
 Orchestrators should check member_status, not session_status.
 
 --wait: Block until all members have member_status done or spawn_failed.
         Polls every 5 seconds and prints a summary line each tick.
         Exits with 0 when all done, 1 if any spawn_failed.
+--json: Output raw JSON instead of formatted text (useful for scripting).
 HELP
         return 0; }
       local id="${1:-}"; need id; shift
-      local summary=0 wait=0
+      local summary=0 wait=0 json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --summary|-s) summary=1; shift ;;
+          --summary|-s) summary=1; shift ;;  # kept for compat; now same as default
           --wait)       wait=1;    shift ;;
+          --json|--raw) json=1;    shift ;;  # raw JSON output for scripting
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1886,7 +1908,9 @@ HELP
         '
       }
 
-      if [[ $wait -eq 1 ]]; then
+      if [[ $json -eq 1 ]]; then
+        _curl "$BASE_URL/teams/$id" | jq .
+      elif [[ $wait -eq 1 ]]; then
         local spawn_failed_count=0 _wait_delay=2
         while true; do
           local resp _wait_body _wait_status
@@ -1937,10 +1961,8 @@ HELP
           fi
           sleep 5
         done
-      elif [[ $summary -eq 1 ]]; then
-        _teams_status_summary
       else
-        _curl "$BASE_URL/teams/$id" | jq .
+        _teams_status_summary
       fi
       ;;
     update-member)

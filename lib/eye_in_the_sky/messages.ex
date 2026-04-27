@@ -475,10 +475,22 @@ defmodule EyeInTheSky.Messages do
   Returns the most recent inbound DMs received by a session, oldest-first.
   """
   @spec list_inbound_dms(integer(), pos_integer()) :: [Message.t()]
-  def list_inbound_dms(session_id, limit \\ 20) when is_integer(session_id) do
-    Message
-    |> where([m], m.to_session_id == ^session_id)
-    |> where([m], not is_nil(m.from_session_id))
+  def list_inbound_dms(session_id, limit \\ 20, opts \\ []) when is_integer(session_id) do
+    from_id = Keyword.get(opts, :from_session_id)
+
+    query =
+      Message
+      |> where([m], m.to_session_id == ^session_id)
+      |> where([m], not is_nil(m.from_session_id))
+
+    query =
+      if from_id do
+        where(query, [m], m.from_session_id == ^from_id)
+      else
+        query
+      end
+
+    query
     |> order_by([m], desc: m.inserted_at, desc: m.id)
     |> limit(^limit)
     |> Repo.all()

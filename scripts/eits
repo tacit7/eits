@@ -322,18 +322,22 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions|states> [--mine|--assigned] [--created-by] [--quiet]"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions|states> [--mine|--assigned] [--created-by] [--all] [--quiet]
+  When EITS_SESSION_UUID is set, 'list' defaults to the current session's tasks.
+  Pass --all to list across all sessions."; return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by] [--all]
+      # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only the
+      # current session's tasks. Pass --all to list across all sessions.
       # --mine/--assigned: tasks where current session is the active executor (linked via task_sessions)
       # --created-by: tasks created by the current session (via created_by_session_id)
-      local qs="" _session_flag=0 _mine_flag=0
+      local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project) qs="${qs}&project_id=$2"; shift 2 ;;
           --session) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --agent)   qs="${qs}&agent_id=$2";   shift 2 ;;
+          --agent)   _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)   qs="${qs}&state_id=$2";   shift 2 ;;
           --state-name)
@@ -347,9 +351,16 @@ cmd_tasks() {
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
           --mine|--assigned) [[ $_session_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine/--assigned requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --created-by) local _creator="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_creator" ]] || die "--created-by requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&created_by_session_id=$_creator"; shift ;;
+          --all)     _all_flag=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Agent-centric default: when running as an agent, scope to current session
+      # unless --all, --session, --mine, or --agent explicitly overrides the scope
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 ]]; then
+        local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+        [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
+      fi
       _curl "$BASE_URL/tasks?${qs#&}" | jq .
       ;;
     get)
@@ -800,26 +811,34 @@ HELP
 
   case "$sub" in
     list)
-      # eits notes list [--session <uuid>] [--task <id>] [--project <id>] [--mine]
+      # eits notes list [--session <uuid>] [--task <id>] [--project <id>] [--mine] [--all]
       #                 [--starred] [--q <query>] [--limit <n>] [--full]
-      local qs="" full=0 _session_flag=0 _mine_flag=0
+      # Agent-centric default: when EITS_SESSION_UUID is set, shows only the current
+      # session's notes. Pass --all to list across all sessions.
+      local qs="" full=0 _session_flag=0 _mine_flag=0 _all_flag=0 _task_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --session)    [[ $_mine_flag -eq 1 ]] && die "--session and --mine are mutually exclusive"
                         _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --task)       qs="${qs}&task_id=$2"; shift 2 ;;
+          --task)       _task_flag=1; qs="${qs}&task_id=$2"; shift 2 ;;
           --project)    qs="${qs}&project_id=$2"; shift 2 ;;
           --mine)       [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"
                         _mine_flag=1
                         local _mine="${EITS_SESSION_UUID:-}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID to be set"
                         qs="${qs}&session_id=$_mine"; shift ;;
+          --all)        _all_flag=1; shift ;;
           --starred)    qs="${qs}&starred=true"; shift ;;
           --limit)      qs="${qs}&limit=$2"; shift 2 ;;
           --full)       full=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Agent-centric default: scope to current session unless overridden
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_task_flag -eq 0 ]]; then
+        local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+        [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
+      fi
       _notes_preview "$(_curl "$BASE_URL/notes?${qs#&}")" "$full"
       ;;
     get)
@@ -1233,18 +1252,26 @@ cmd_commits() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create>"; return 0; }
   case "$sub" in
     list)
-      # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--limit <n>]
+      # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] [--limit <n>]
+      # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only
+      # current session's commits. Pass --all to list across all sessions.
       # --mine, --session, and --agent are mutually exclusive
-      local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0
+      local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0 _all_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session) [[ $_mine_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--session is mutually exclusive with --mine and --agent"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --mine)    [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
+          --all)     _all_flag=1; shift ;;
           --limit)   qs="${qs}&limit=$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Agent-centric default: scope to current session unless overridden
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 ]]; then
+        local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+        [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
+      fi
       _curl "$BASE_URL/commits?${qs#&}" | jq .
       ;;
     create)

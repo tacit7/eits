@@ -603,7 +603,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     assigns = assign(assigns, :active_tab, active_tab)
 
     ~H"""
-    <div class="flex-1 min-w-0 flex flex-col border-l border-base-content/8 bg-base-100 overflow-hidden">
+    <div id="rail-file-panel" class="flex-1 min-w-0 flex flex-col border-l border-base-content/8 bg-base-100 overflow-hidden">
       <%!-- Tab strip --%>
       <div class="flex items-center border-b border-base-content/8 bg-base-200/40 overflow-x-auto flex-shrink-0 min-h-[32px]">
         <%= for tab <- @file_tabs do %>

@@ -170,14 +170,24 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+// Use a data attribute on <html> (root layout, never morphdom-patched) instead of
+// adding classes directly to #app-rail / #main-content-wrapper (app layout, patched on
+// every LiveView update — morphdom clobbers JS-added classes on every PubSub event).
 window.addEventListener("phx:file-editor-open", () => {
-  document.getElementById("app-rail")?.classList.add("flex-1")
-  document.getElementById("main-content-wrapper")?.classList.add("hidden")
+  document.documentElement.setAttribute("data-file-editor", "true")
 })
 
 window.addEventListener("phx:file-editor-close", () => {
-  document.getElementById("app-rail")?.classList.remove("flex-1")
-  document.getElementById("main-content-wrapper")?.classList.remove("hidden")
+  document.documentElement.removeAttribute("data-file-editor")
+})
+
+// On LiveView reconnect, the Rail LiveComponent remounts with file_tabs: [] so the
+// file panel is gone, but data-file-editor may still be set from before the disconnect.
+// Guard: if #rail-file-panel isn't in the DOM, the editor is not open — clear the flag.
+window.addEventListener("phx:page-loading-stop", () => {
+  if (!document.getElementById("rail-file-panel")) {
+    document.documentElement.removeAttribute("data-file-editor")
+  }
 })
 
 window.addEventListener("phx:copy_to_clipboard", (e) => {

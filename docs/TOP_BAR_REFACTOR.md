@@ -81,6 +81,24 @@ patch the summary text. Do not remove either attribute.
 
 ---
 
+## Phase 2 Progress
+
+| Module | Status | Commit |
+|---|---|---|
+| `TopBar.Sessions` | ✅ Implemented | `82fdfc11` |
+| `TopBar.Tasks` | pending | — |
+| `TopBar.Notes` | pending | — |
+| `TopBar.DM` | pending | — |
+| `TopBar.Kanban` | pending | — |
+| `TopBar.Generic` | pending | — |
+
+**Linter cleanup** (`9426dc1d`): Removed unused `import EyeInTheSkyWeb.CoreComponents` and
+`alias Phoenix.LiveView.JS` from all skeleton modules that had them but no content yet
+(`dm.ex`, `generic.ex`, `kanban.ex`, `notes.ex`, `tasks.ex`). Also removed the stub
+`import EyeInTheSkyWeb.CoreComponents` from `sessions.ex` (re-added in `82fdfc11` with real content).
+
+---
+
 ## Your job
 
 Each agent migrates ONE toolbar's private `defp` into its own module. Steps:
@@ -100,14 +118,15 @@ Each agent migrates ONE toolbar's private `defp` into its own module. Steps:
 
 ## Per-agent file assignments
 
-### agent-sessions
+### agent-sessions ✅ DONE (`82fdfc11`)
 
 **Module:** `lib/eye_in_the_sky_web/components/top_bar/sessions.ex`
 **Source:** `defp sessions_toolbar(assigns)` in `layouts.ex`
 **Attrs declared:** `search_query`, `session_filter`, `sort_by`
 **Events:** `phx-change="search"`, `phx-click="filter_session" phx-value-filter`,
 `phx-click="sort" phx-value-by`
-**Note:** Sort is already a dropdown button (migrated 2026-04-27). Migrate verbatim.
+**Note:** Implemented — search input, filter pill group (All/Working/Archived), and sort
+dropdown button all in place.
 
 ### agent-tasks
 

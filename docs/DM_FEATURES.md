@@ -789,7 +789,7 @@ The DM page now has a sixth tab (Settings) with scope controls and provider-spec
 
 ## Desktop Top Bar
 
-**Commits:** `d6c5ae2e`, `ef000cd3`, `b58104ad`
+**Commits:** `d6c5ae2e`, `ef000cd3`, `b58104ad`, `fa1f2f94`
 
 A desktop-only top bar appears above the main content area on the DM page, providing breadcrumb navigation, search access, and tab controls.
 
@@ -801,8 +801,19 @@ A desktop-only top bar appears above the main content area on the DM page, provi
 **DM-specific toolbar:**
 - **Session breadcrumb:** Shows current project and "DM" section label
 - **Message search:** Quick-search box for filtering messages in conversation
-- **Tab pills:** Session tabs (Messages, Info, Agents, etc.) — desktop-only
+- **Tab pills:** Messages, Tasks, Commits, Notes, Context, Settings — desktop-only
 - **No inline header card:** The DM page header card is now hidden on desktop (`md:block`)
+
+**`...` dropdown menu (fa1f2f94):**
+
+An ellipsis button in the toolbar opens an inline dropdown with session-level actions:
+
+| Item | Event | Notes |
+|------|-------|-------|
+| Reload | `JS.dispatch("dm:reload-check", ...)` | Opens reload-confirm modal |
+| Export as Markdown | `export_markdown` | — |
+| Schedule Message | `open_schedule_timer` | — |
+| Cancel Schedule | `cancel_timer` | Only rendered when `dm_active_timer` is set |
 
 **Breadcrumb generation:**
 - Section label derived from `sidebar_tab` atom (`:dm` → "DM")
@@ -812,6 +823,7 @@ A desktop-only top bar appears above the main content area on the DM page, provi
 - `dm_active_tab` — current tab identifier
 - `dm_session_name` — session name for breadcrumb
 - `dm_message_search_query` — search filter text
+- `dm_active_timer` — active schedule timer map; controls visibility of "Cancel Schedule" item
 
 **Height calculation fix (b58104ad):**
 - The top bar consumes `h-10` (2.5rem) of the main flex column
@@ -875,6 +887,53 @@ The `/api/v1/dm` endpoint now accepts messages from sessions in the `idle` statu
 
 **File:**
 - `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `do_dm/4` status allowlist
+
+---
+
+## Duplicate Message Fix: Mount Task Race
+
+**Commit:** `5fbe6c7f`
+
+When the DM page mounted while a session was actively running, `load_messages_on_mount` launched an async `Task` that called `SessionImporter.sync` concurrently with the event-driven `handle_claude_complete`/`handle_agent_stopped` handlers. Both paths read the same `get_last_source_uuid` cursor before either committed. Because `agent_reply_already_recorded?` returned false for both, each inserted the same JSONL assistant entry with a distinct `source_uuid`. `on_conflict: :nothing` only deduplicates identical UUIDs, so both rows landed in the DB and the message rendered twice.
+
+**Fix:** `load_messages_on_mount` skips the `Task.start` entirely when `session.status` is `"working"` or `"compacting"`. The event-driven pipeline (`claude_complete → sync_and_reload`) already handles all imports for active sessions; the Task sync is only needed for the "open DM page after session already finished" case.
+
+**File:** `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex`
+
+---
+
+## Real-Time Update Fix: nil Guard in session_belongs_to?
+
+**Commit:** `30ff5d60`
+
+`session_belongs_to?(_session_id, nil)` returned `false`, so with `DISABLE_AUTH=true` (`current_user=nil`), `maybe_subscribe` short-circuited to `:unauthorized` and `setup_subscriptions` never ran. The LiveView mounted and rendered but held no PubSub subscription — all `{:new_message}` and `{:new_dm}` broadcasts were silently dropped.
+
+**Fix:** Collapsed the two-clause function into a single always-true guard:
+
+```elixir
+defp session_belongs_to?(_session_id, _current_user), do: true
+```
+
+This allows access in both auth-enabled (any user) and auth-disabled (`current_user=nil`) modes. Future ownership enforcement requires adding `user_id` to the sessions table.
+
+**File:** `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex`
+
+---
+
+## DM Delivery Internals Cleanup
+
+**Commit:** `5cc5e369`
+
+Two dead-code wrappers were removed from `MessagingController`:
+
+- `deliver_and_persist_dm/4` — one-line private function that delegated to `DMDelivery.deliver_and_persist/4`; all three call sites now call `DMDelivery.deliver_and_persist/4` directly
+- `deliver_team_dm/4` — private wrapper for team broadcasts; inlined at the call site with proper error logging
+
+`Settings.get_integer/1` no longer defines its own `parse_integer/1` helper; it now delegates to the shared `ToolHelpers.parse_int/1`.
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex`
+- `lib/eye_in_the_sky/settings.ex`
 
 ---
 

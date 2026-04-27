@@ -265,7 +265,7 @@ defmodule EyeInTheSkyWeb.Layouts do
         class="w-3.5 h-3.5"
       />
     </button>
-    <details id="notes-type-dropdown" phx-update="ignore" class="dropdown">
+    <details id="notes-type-dropdown" class="dropdown">
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Type: {case @notes_type_filter do
           "session" -> "Session"
@@ -291,7 +291,7 @@ defmodule EyeInTheSkyWeb.Layouts do
         <% end %>
       </ul>
     </details>
-    <details id="notes-sort-dropdown" phx-update="ignore" class="dropdown">
+    <details id="notes-sort-dropdown" class="dropdown">
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort: {if @notes_sort_by == "oldest", do: "Oldest", else: "Newest"} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
       </summary>

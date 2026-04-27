@@ -13,32 +13,19 @@ defmodule EyeInTheSkyWeb.Layouts do
 
   # ── Public top bar helpers (used by app.html.heex shell) ────────────────────
 
-  @doc "Breadcrumb slot: project link + section label (or DM session name)."
+  @doc "Section label slot: section name or DM session name. No project breadcrumb — chrome spec shows label only."
   attr :sidebar_tab, :atom, required: true
-  attr :sidebar_project, :any, default: nil
   attr :dm_session_name, :string, default: nil
 
   def top_bar_breadcrumb(assigns) do
     ~H"""
-    <div class="flex items-center flex-shrink-0">
-      <%= if @sidebar_project do %>
-        <.link
-          navigate={~p"/projects/#{@sidebar_project.id}"}
-          class="flex items-center gap-1.5 text-[12px] font-medium text-base-content/50 hover:text-base-content/75 hover:bg-base-content/5 px-1.5 py-1 rounded-md transition-colors"
-        >
-          <.icon name="hero-folder" class="w-3 h-3" />
-          {@sidebar_project.name}
-        </.link>
-        <span class="text-base-content/20 text-sm mx-1 select-none">/</span>
+    <span class="text-[12px] font-semibold text-base-content/75 px-1 flex-shrink-0">
+      <%= if @sidebar_tab == :dm && @dm_session_name do %>
+        {@dm_session_name}
+      <% else %>
+        {top_bar_section_label(@sidebar_tab)}
       <% end %>
-      <span class="text-[12px] font-semibold text-base-content/75 px-1">
-        <%= if @sidebar_tab == :dm && @dm_session_name do %>
-          {@dm_session_name}
-        <% else %>
-          {top_bar_section_label(@sidebar_tab)}
-        <% end %>
-      </span>
-    </div>
+    </span>
     """
   end
 

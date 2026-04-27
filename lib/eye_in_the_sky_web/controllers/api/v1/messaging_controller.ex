@@ -19,35 +19,49 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   """
   def list_dms(conn, params) do
     session_raw = params["session"] || params["session_id"]
+    from_raw = params["from"] || params["from_session_id"]
     limit = min(String.to_integer(params["limit"] || "20"), 100)
 
     if is_nil(session_raw) or session_raw == "" do
       {:error, :bad_request, "session is required"}
     else
-      case Sessions.resolve(session_raw) do
-        {:ok, session} ->
-          messages = Messages.list_inbound_dms(session.id, limit)
+      with {:ok, session} <- Sessions.resolve(session_raw),
+           {:ok, from_id} <- resolve_optional_session_id(from_raw) do
+        messages = Messages.list_inbound_dms(session.id, limit, from_session_id: from_id)
 
-          json(conn, %{
-            session_id: session.id,
-            session_uuid: session.uuid,
-            count: length(messages),
-            messages:
-              Enum.map(messages, fn msg ->
-                %{
-                  id: msg.id,
-                  uuid: msg.uuid,
-                  body: msg.body,
-                  from_session_id: msg.from_session_id,
-                  to_session_id: msg.to_session_id,
-                  inserted_at: msg.inserted_at
-                }
-              end)
-          })
-
-        {:error, :not_found} ->
-          {:error, :not_found, "session not found"}
+        json(conn, %{
+          session_id: session.id,
+          session_uuid: session.uuid,
+          count: length(messages),
+          filter_from: from_raw,
+          messages:
+            Enum.map(messages, fn msg ->
+              %{
+                id: msg.id,
+                uuid: msg.uuid,
+                body: msg.body,
+                from_session_id: msg.from_session_id,
+                to_session_id: msg.to_session_id,
+                inserted_at: msg.inserted_at
+              }
+            end)
+        })
+      else
+        {:error, :not_found} -> {:error, :not_found, "session not found"}
+        {:error, :bad_request, reason} -> {:error, :bad_request, reason}
       end
+    end
+  end
+
+  # Resolves an optional session identifier to its integer ID.
+  # Returns {:ok, nil} when raw is nil/empty (no filter).
+  defp resolve_optional_session_id(nil), do: {:ok, nil}
+  defp resolve_optional_session_id(""), do: {:ok, nil}
+
+  defp resolve_optional_session_id(raw) do
+    case Sessions.resolve(raw) do
+      {:ok, session} -> {:ok, session.id}
+      {:error, :not_found} -> {:error, :not_found, "from session not found: #{raw}"}
     end
   end
 

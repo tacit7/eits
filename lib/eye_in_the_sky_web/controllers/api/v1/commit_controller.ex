@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   """
   def index(conn, params) do
     limit = parse_int(params["limit"], 20)
+    since_hash = params["since_hash"]
 
     commits =
       cond do
@@ -39,10 +40,35 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
           Commits.list_commits(limit: limit)
       end
 
-    json(conn, %{
+    # Apply since_hash filter: return only commits newer than the given hash.
+    # Commits are ordered oldest-first by list_commits_for_session; we find the
+    # anchor and drop everything up to and including it.
+    {commits, since_hash_found} =
+      if since_hash do
+        idx = Enum.find_index(commits, &(&1.commit_hash == since_hash))
+
+        if idx do
+          {Enum.drop(commits, idx + 1), true}
+        else
+          {commits, false}
+        end
+      else
+        {commits, nil}
+      end
+
+    resp = %{
       success: true,
       commits: Enum.map(commits, &ApiPresenter.present_commit/1)
-    })
+    }
+
+    resp =
+      if since_hash do
+        Map.merge(resp, %{since_hash: since_hash, since_hash_found: since_hash_found})
+      else
+        resp
+      end
+
+    json(conn, resp)
   end
 
   @doc """
@@ -85,21 +111,36 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
           })
         end)
 
+      # on_conflict: :nothing returns {:ok, %Commit{id: nil}} on hash collision.
+      # Split into created (id present), duplicate (id nil), and errors (changeset failures).
       created =
         results
-        |> Enum.filter(&match?({:ok, _}, &1))
-        |> Enum.map(fn {:ok, commit} -> ApiPresenter.present_commit(commit) end)
+        |> Enum.filter(fn
+          {:ok, %{id: id}} when not is_nil(id) -> true
+          _ -> false
+        end)
+        |> Enum.map(fn {:ok, commit} ->
+          commit |> ApiPresenter.present_commit() |> Map.put(:status, "created")
+        end)
+
+      duplicates =
+        results
+        |> Enum.filter(fn
+          {:ok, %{id: nil}} -> true
+          _ -> false
+        end)
+        |> Enum.map(fn {:ok, commit} -> %{commit_hash: commit.commit_hash, status: "duplicate"} end)
 
       errors =
         results
         |> Enum.filter(&match?({:error, _}, &1))
         |> Enum.map(fn {:error, changeset} -> translate_errors(changeset) end)
 
-      status = if errors == [], do: :created, else: :multi_status
+      http_status = if errors == [], do: :created, else: :multi_status
 
       conn
-      |> put_status(status)
-      |> json(%{commits: created, errors: errors})
+      |> put_status(http_status)
+      |> json(%{commits: created, duplicates: duplicates, errors: errors})
     else
       {:error, :not_found} ->
         {:error, :not_found, "Agent not found"}

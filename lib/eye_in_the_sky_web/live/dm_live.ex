@@ -40,6 +40,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
       socket =
         socket
+        |> assign(:allow_split, true)
         |> MountState.assign_sidebar_context(params)
         |> MountState.assign_session_state(session, agent)
         |> MountState.assign_essential_defaults(session)

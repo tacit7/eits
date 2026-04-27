@@ -2,6 +2,7 @@
   id="app-shell"
   class="flex h-[var(--app-viewport-height)] bg-base-100"
   data-palette-shortcut={@palette_shortcut}
+  data-allow-split={if assigns[:allow_split], do: "true", else: "false"}
 >
   <div
     id="vim-nav-root"

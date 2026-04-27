@@ -2,44 +2,38 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSkyWeb.Helpers.FileHelpers
-  alias EyeInTheSkyWeb.OverviewLive.Skills.Skill
+  import EyeInTheSkyWeb.Live.Shared.SkillsHelpers
 
   @impl true
   def mount(_params, _session, socket) do
-    skills = if connected?(socket), do: load_skills(), else: []
-
     socket =
       socket
       |> assign(:page_title, "Skills")
-      |> assign(:skills, skills)
-      |> assign(:filtered_skills, skills)
       |> assign(:search_query, "")
+      |> assign(:sort_by, "name_asc")
+      |> assign(:source_filter, "all")
+      |> assign(:skills, [])
+      |> assign(:filtered_skills, [])
       |> assign(:selected_skill, nil)
       |> assign(:sidebar_tab, :skills)
       |> assign(:sidebar_project, nil)
+
+    socket = if connected?(socket), do: load_skills(socket), else: socket
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_event("search", %{"query" => query}, socket) do
-    filtered =
-      if query == "" do
-        socket.assigns.skills
-      else
-        q = String.downcase(query)
+  def handle_event("search", params, socket),
+    do: handle_search(params, socket, &load_skills/1)
 
-        Enum.filter(socket.assigns.skills, fn skill ->
-          String.contains?(String.downcase(skill.slug), q) ||
-            String.contains?(String.downcase(skill.description), q)
-        end)
-      end
+  @impl true
+  def handle_event("sort_skills", params, socket),
+    do: handle_sort_skills(params, socket, &load_skills/1)
 
-    {:noreply,
-     socket
-     |> assign(:search_query, query)
-     |> assign(:filtered_skills, filtered)}
-  end
+  @impl true
+  def handle_event("filter_source", params, socket),
+    do: handle_filter_source(params, socket, &load_skills/1)
 
   @impl true
   def handle_event("select_skill", %{"slug" => slug}, socket) do
@@ -58,155 +52,113 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     {:noreply, assign(socket, :selected_skill, nil)}
   end
 
-  defp load_skills do
-    commands = load_from_commands()
-    skills = load_from_skills_dir()
-
-    (commands ++ skills)
-    |> Enum.sort_by(& &1.slug)
-  end
-
-  # ~/.claude/commands/*.md (legacy slash commands)
-  defp load_from_commands do
-    commands_dir = Path.expand("~/.claude/commands")
-
-    if File.dir?(commands_dir) do
-      case File.ls(commands_dir) do
-        {:error, _} ->
-          []
-
-        {:ok, entries} ->
-          entries
-          |> Enum.filter(&String.ends_with?(&1, ".md"))
-          |> Enum.flat_map(fn filename ->
-            path = Path.join(commands_dir, filename)
-            slug = String.replace_trailing(filename, ".md", "")
-
-            case File.read(path) do
-              {:error, _} ->
-                []
-
-              {:ok, content} ->
-                [
-                  %Skill{
-                    slug: slug,
-                    filename: filename,
-                    source: :commands,
-                    description: extract_description(content),
-                    content: content,
-                    size: byte_size(content)
-                  }
-                ]
-            end
-          end)
-      end
-    else
-      []
-    end
-  end
-
-  # ~/.claude/skills/*/SKILL.md (new skills format)
-  defp load_from_skills_dir do
-    skills_dir = Path.expand("~/.claude/skills")
-
-    if File.dir?(skills_dir) do
-      case File.ls(skills_dir) do
-        {:error, _} ->
-          []
-
-        {:ok, entries} ->
-          entries
-          |> Enum.filter(fn dir ->
-            Path.join([skills_dir, dir, "SKILL.md"]) |> File.exists?()
-          end)
-          |> Enum.flat_map(fn dir ->
-            path = Path.join([skills_dir, dir, "SKILL.md"])
-
-            case File.read(path) do
-              {:error, _} ->
-                []
-
-              {:ok, content} ->
-                [
-                  %Skill{
-                    slug: dir,
-                    filename: "skills/#{dir}/SKILL.md",
-                    source: :skills,
-                    description: extract_description(content),
-                    content: content,
-                    size: byte_size(content)
-                  }
-                ]
-            end
-          end)
-      end
-    else
-      []
-    end
-  end
-
-  defp extract_description(content) do
-    case Regex.run(~r/^---\n(.*?)\n---/s, content) do
-      [_, frontmatter] ->
-        case Regex.run(~r/description:\s*"?([^"\n]+)"?/, frontmatter) do
-          [_, desc] -> String.trim(desc)
-          _ -> extract_first_heading(content)
-        end
-
-      _ ->
-        extract_first_heading(content)
-    end
-  end
-
-  defp extract_first_heading(content) do
-    content
-    |> String.split("\n")
-    |> Enum.find(&String.starts_with?(&1, "#"))
-    |> case do
-      nil -> "No description"
-      line -> String.replace(line, ~r/^#+\s*/, "") |> String.trim()
-    end
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 lg:px-8 py-8">
-      <div class="max-w-6xl mx-auto">
-        <%= if @skills != [] do %>
-          <div class={if @selected_skill, do: "grid grid-cols-1 lg:grid-cols-2 gap-6", else: ""}>
-            <!-- Left: skill cards -->
+    <%!-- Mobile-only controls bar --%>
+    <div class="md:hidden flex flex-wrap items-center gap-2 px-4 pt-3 pb-1">
+      <form phx-change="sort_skills">
+        <label for="skills-sort-mobile" class="sr-only">Sort skills</label>
+        <select
+          id="skills-sort-mobile"
+          name="by"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+        >
+          <option value="name_asc" selected={@sort_by == "name_asc"}>Name A–Z</option>
+          <option value="name_desc" selected={@sort_by == "name_desc"}>Name Z–A</option>
+          <option value="recent" selected={@sort_by == "recent"}>Recent</option>
+          <option value="size_desc" selected={@sort_by == "size_desc"}>Largest</option>
+          <option value="size_asc" selected={@sort_by == "size_asc"}>Smallest</option>
+        </select>
+      </form>
+      <form phx-change="filter_source">
+        <label for="skills-source-mobile" class="sr-only">Filter by source</label>
+        <select
+          id="skills-source-mobile"
+          name="filter"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+        >
+          <option value="all" selected={@source_filter == "all"}>All Sources</option>
+          <option value="skills" selected={@source_filter == "skills"}>Skills</option>
+          <option value="commands" selected={@source_filter == "commands"}>Commands</option>
+        </select>
+      </form>
+    </div>
+
+    <div class="px-4 sm:px-6 lg:px-8 py-6">
+      <div class="max-w-4xl mx-auto">
+        <%!-- Count row --%>
+        <div class="mb-3">
+          <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+            {length(@filtered_skills)} skills
+          </span>
+        </div>
+
+        <%= if @filtered_skills != [] do %>
+          <div class={if @selected_skill, do: "grid grid-cols-1 md:grid-cols-2 gap-6", else: ""}>
+            <%!-- Left: list --%>
             <div>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
                 <%= for skill <- @filtered_skills do %>
-                  <button
-                    phx-click="select_skill"
-                    phx-value-slug={skill.slug}
-                    class={"card bg-base-100 border border-base-300 shadow-sm text-left transition-all hover:border-primary cursor-pointer #{if @selected_skill && @selected_skill.slug == skill.slug, do: "border-primary ring-1 ring-primary"}"}
-                  >
-                    <div class="card-body p-4">
-                      <div class="flex items-center gap-2 mb-2">
-                        <.icon name="hero-puzzle-piece" class="size-4 text-primary" />
-                        <code class="text-sm font-semibold text-primary">/{skill.slug}</code>
+                  <div class="py-1 relative">
+                    <div class="collapse overflow-visible">
+                      <input type="checkbox" class="min-h-0 p-0" />
+                      <%!-- Row: fires select_skill for desktop side panel --%>
+                      <div
+                        class="collapse-title py-3 px-0 min-h-0 flex flex-col gap-1 cursor-pointer"
+                        phx-click="select_skill"
+                        phx-value-slug={skill.slug}
+                      >
+                        <div class="flex items-center gap-2">
+                          <.icon
+                            name="hero-puzzle-piece"
+                            class={"size-3.5 flex-shrink-0 " <>
+                              if(@selected_skill && @selected_skill.slug == skill.slug,
+                                do: "text-primary",
+                                else: "text-base-content/40"
+                              )}
+                          />
+                          <code class={"text-sm font-semibold truncate " <>
+                            if(@selected_skill && @selected_skill.slug == skill.slug,
+                              do: "text-primary",
+                              else: "text-base-content/85"
+                            )}>
+                            /{skill.slug}
+                          </code>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-mini text-base-content/40 pl-5">
+                          <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium " <>
+                            if(skill.source == :skills,
+                              do: "bg-primary/10 text-primary/70",
+                              else: "bg-base-content/5 text-base-content/40"
+                            )}>
+                            {if skill.source == :skills, do: "skill", else: "command"}
+                          </span>
+                          <span class="text-base-content/20">&middot;</span>
+                          <span class="tabular-nums">{FileHelpers.format_size(skill.size)}</span>
+                          <span class="text-base-content/20">&middot;</span>
+                          <span class="truncate max-w-xs">{skill.description}</span>
+                        </div>
                       </div>
-                      <p class="text-sm text-base-content/70 line-clamp-2 mb-3">
-                        {skill.description}
-                      </p>
-                      <div class="flex items-center justify-between text-xs text-base-content/50">
-                        <span class={"badge badge-xs " <> if(skill.source == :skills, do: "badge-primary", else: "badge-ghost")}>
-                          {if skill.source == :skills, do: "skill", else: "command"}
-                        </span>
-                        <span>{FileHelpers.format_size(skill.size)}</span>
+                      <%!-- Mobile inline viewer: hidden on desktop --%>
+                      <div class="collapse-content md:hidden px-0 pb-3">
+                        <div
+                          id={"skill-mobile-#{skill.slug}"}
+                          class="dm-markdown text-sm text-base-content leading-relaxed"
+                          phx-hook="MarkdownMessage"
+                          data-raw-body={skill.content}
+                        >
+                        </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 <% end %>
               </div>
             </div>
-            
-    <!-- Right: skill viewer -->
+
+            <%!-- Right: desktop side panel --%>
             <%= if @selected_skill do %>
-              <div class="sticky top-[calc(3rem+env(safe-area-inset-top))] md:top-20">
+              <div class="hidden md:block sticky top-[calc(3rem+env(safe-area-inset-top))] md:top-20">
                 <div class="card bg-base-100 border border-base-300 shadow-sm">
                   <div class="card-body p-0">
                     <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
@@ -238,8 +190,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
           <.empty_state
             id="overview-skills-empty"
             icon="hero-code-bracket"
-            title="No skills found"
-            subtitle="Add .md files to ~/.claude/commands/ or ~/.claude/skills/ to create skills"
+            title={if @search_query != "" || @source_filter != "all",
+              do: "No skills found",
+              else: "No skills yet"}
+            subtitle={
+              if @search_query != "" || @source_filter != "all",
+                do: "Try adjusting your search or filter",
+                else: "Add .md files to ~/.claude/commands/ or ~/.claude/skills/ to create skills"
+            }
           />
         <% end %>
       </div>

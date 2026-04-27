@@ -575,7 +575,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
       <.file_panel file_tabs={@file_tabs} active_tab_path={@active_tab_path} myself={@myself} socket={@socket} />
       <%!-- Splitter handle for split-view mode. Visibility driven by data-editor-mode on <html>. --%>
-      <div id="editor-splitter" aria-hidden="true"></div>
+      <%!-- role=separator makes this a keyboard-focusable resize handle per ARIA spec.
+           aria-valuenow/min/max are kept in sync by the EditorLayout hook. --%>
+      <div
+        id="editor-splitter"
+        role="separator"
+        aria-label="Resize editor panel"
+        aria-orientation="vertical"
+        aria-valuenow="0"
+        aria-valuemin="320"
+        aria-valuemax="9999"
+        tabindex="0"
+      ></div>
 
       <.live_component
         module={NewSessionModal}

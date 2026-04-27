@@ -73,6 +73,9 @@ function restoreWidth() {
   applyWidth(w)
 }
 
+// Step size (px) for keyboard-driven resize on the splitter.
+const KEY_STEP = 20
+
 export const EditorLayout = {
   mounted() {
     if (!localStorage.getItem(STORAGE_MODE)) {
@@ -105,37 +108,86 @@ export const EditorLayout = {
     // Splitter drag handle
     const splitter = document.getElementById("editor-splitter")
     if (splitter) {
+      // Keep drag listeners as instance vars so destroyed() can always clean up,
+      // even if the hook is torn down while a drag is in progress.
+      this._dragMove = null
+      this._dragUp = null
+      this._dragCancel = null
+
+      const endDrag = () => {
+        document.removeEventListener("pointermove", this._dragMove)
+        document.removeEventListener("pointerup", this._dragUp)
+        document.removeEventListener("pointercancel", this._dragCancel)
+        this._dragMove = null
+        this._dragUp = null
+        this._dragCancel = null
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+        if (this._lastDragW) {
+          localStorage.setItem(STORAGE_WIDTH, String(this._lastDragW))
+        }
+      }
+
       this._onPointerDown = (e) => {
         e.preventDefault()
         document.body.style.cursor = "col-resize"
         document.body.style.userSelect = "none"
-        const onMove = (ev) => {
+
+        this._dragMove = (ev) => {
           const pane = document.getElementById("file-editor-pane")
           if (!pane) return
           const left = pane.getBoundingClientRect().left
           const w = applyWidth(ev.clientX - left)
           this._lastDragW = w
+          // Keep ARIA value in sync while dragging
+          splitter.setAttribute("aria-valuenow", String(w))
         }
-        const onUp = () => {
-          document.removeEventListener("pointermove", onMove)
-          document.removeEventListener("pointerup", onUp)
-          document.body.style.cursor = ""
-          document.body.style.userSelect = ""
-          if (this._lastDragW) {
-            localStorage.setItem(STORAGE_WIDTH, String(this._lastDragW))
-          }
-        }
-        document.addEventListener("pointermove", onMove)
-        document.addEventListener("pointerup", onUp)
+        this._dragUp = endDrag
+        this._dragCancel = endDrag
+
+        document.addEventListener("pointermove", this._dragMove)
+        document.addEventListener("pointerup", this._dragUp)
+        document.addEventListener("pointercancel", this._dragCancel)
       }
+
+      // Keyboard resize: ArrowLeft / ArrowRight move the splitter by KEY_STEP px.
+      this._onKeyDown = (e) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+        e.preventDefault()
+        const cur = parseInt(
+          document.documentElement.style.getPropertyValue("--editor-split-width") || "0",
+          10,
+        )
+        const next = applyWidth(cur + (e.key === "ArrowRight" ? KEY_STEP : -KEY_STEP))
+        localStorage.setItem(STORAGE_WIDTH, String(next))
+        splitter.setAttribute("aria-valuenow", String(next))
+      }
+
       splitter.addEventListener("pointerdown", this._onPointerDown)
+      splitter.addEventListener("keydown", this._onKeyDown)
       this._splitter = splitter
+
+      // Sync initial ARIA value
+      this._syncAriaValues = () => {
+        const cur = parseInt(
+          document.documentElement.style.getPropertyValue("--editor-split-width") || "0",
+          10,
+        )
+        const min = MIN_W
+        const max = Math.max(MIN_W, window.innerWidth - MIN_MAIN)
+        splitter.setAttribute("aria-valuemin", String(min))
+        splitter.setAttribute("aria-valuemax", String(max))
+        splitter.setAttribute("aria-valuenow", String(cur))
+      }
+      this._syncAriaValues()
     }
   },
 
   updated() {
     // Re-evaluate after LiveView patches (route change might flip allow-split).
     applyMode()
+    // Re-sync ARIA bounds after layout changes.
+    if (this._syncAriaValues) this._syncAriaValues()
   },
 
   destroyed() {
@@ -143,9 +195,16 @@ export const EditorLayout = {
     window.removeEventListener("resize", this._onResize)
     window.removeEventListener("editor:toggle-split", this._onToggle)
     if (this._mo) this._mo.disconnect()
-    if (this._splitter && this._onPointerDown) {
-      this._splitter.removeEventListener("pointerdown", this._onPointerDown)
+    if (this._splitter) {
+      if (this._onPointerDown) this._splitter.removeEventListener("pointerdown", this._onPointerDown)
+      if (this._onKeyDown) this._splitter.removeEventListener("keydown", this._onKeyDown)
     }
+    // Clean up any in-progress drag (navigation mid-drag scenario)
+    if (this._dragMove) document.removeEventListener("pointermove", this._dragMove)
+    if (this._dragUp) document.removeEventListener("pointerup", this._dragUp)
+    if (this._dragCancel) document.removeEventListener("pointercancel", this._dragCancel)
+    document.body.style.cursor = ""
+    document.body.style.userSelect = ""
   },
 }
 

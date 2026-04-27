@@ -618,8 +618,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       data-has-tabs={if @file_tabs == [], do: "false", else: "true"}
       class="min-w-0 flex-col border-l border-base-content/8 bg-base-100 overflow-hidden"
     >
-      <%!-- Tab strip + toolbar --%>
-      <div class="flex items-center border-b border-base-content/8 bg-base-200/40 flex-shrink-0 min-h-[32px]">
+      <%!-- Tab strip + toolbar. h-10 matches the desktop top bar in app.html.heex
+           so editor content aligns with the main pane content in split mode. --%>
+      <div class="flex items-center border-b border-base-content/8 bg-base-200/40 flex-shrink-0 h-10">
         <div class="flex-1 flex items-center overflow-x-auto">
           <%= for tab <- @file_tabs do %>
             <% active = tab.path == @active_tab_path %>

@@ -66,7 +66,6 @@ import {RefreshDot} from "./hooks/refresh_dot"
 import {Highlight} from "./hooks/highlight"
 import {LocalTime} from "./hooks/local_time"
 import {DragUpload} from "./hooks/drag_upload"
-import {SidebarState} from "./hooks/sidebar_state"
 import {RailState} from "./hooks/rail_state"
 import {DrawerSwipeClose} from "./hooks/drawer_swipe_close"
 import {QuickCreateNote, QuickCreateAgent, QuickUpdateAgent, QuickGetAgent, QuickDeleteAgent, QuickResumeAgent, QuickCreateChat, QuickCreateTask} from "./hooks/quick_create"
@@ -131,7 +130,6 @@ Hooks.RefreshDot = RefreshDot
 Hooks.Highlight = Highlight
 Hooks.LocalTime = LocalTime
 Hooks.DragUpload = DragUpload
-Hooks.SidebarState = SidebarState
 Hooks.RailState = RailState
 Hooks.DrawerSwipeClose = DrawerSwipeClose
 Hooks.QuickCreateNote = QuickCreateNote

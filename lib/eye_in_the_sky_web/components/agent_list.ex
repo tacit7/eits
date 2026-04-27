@@ -2,7 +2,6 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
-  import EyeInTheSkyWeb.Components.Icons
 
   @filter_tabs [
     {"all", "All", "text-base-content"},
@@ -153,7 +152,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               class="bookmark-button flex items-center gap-2"
               aria-label="Bookmark agent"
             >
-              <.heart class="bookmark-icon w-3.5 h-3.5" />
+              <.icon name="hero-heart" class="bookmark-icon w-3.5 h-3.5" />
               <span class="bookmark-label">Favorite</span>
             </button>
           </li>

@@ -4,12 +4,20 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
   alias EyeInTheSkyWeb.OverviewLive.Skills.Skill
 
   def load_skills(socket) do
-    skills = do_load_skills()
+    project_path = project_path_for(socket)
+    skills = do_load_skills(project_path)
     filtered = apply_filters_and_sort(skills, socket.assigns)
 
     socket
     |> assign(:skills, skills)
     |> assign(:filtered_skills, filtered)
+  end
+
+  defp project_path_for(socket) do
+    case socket.assigns[:project] do
+      %{path: path} when is_binary(path) and path != "" -> path
+      _ -> File.cwd!()
+    end
   end
 
   def handle_search(%{"query" => query}, socket, reload_fn) do
@@ -77,15 +85,17 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
   defp sort_skills(skills, "recent"), do: Enum.sort_by(skills, & &1.mtime, :desc)
   defp sort_skills(skills, _), do: Enum.sort_by(skills, & &1.slug)
 
-  defp do_load_skills do
+  defp do_load_skills(project_path) do
     global_commands = load_from_dir(Path.expand("~/.claude/commands"), :commands, "~/.claude/commands")
     global_skills = load_from_skills_dir(Path.expand("~/.claude/skills"), :skills, "~/.claude/skills")
-    project_commands = load_from_dir(Path.join(File.cwd!(), ".claude/commands"), :project_commands, ".claude/commands")
-    project_skills = load_from_skills_dir(Path.join(File.cwd!(), ".claude/skills"), :project_skills, ".claude/skills")
+    project_commands = load_from_dir(Path.join(project_path, ".claude/commands"), :project_commands, ".claude/commands")
+    project_skills = load_from_skills_dir(Path.join(project_path, ".claude/skills"), :project_skills, ".claude/skills")
 
     (global_commands ++ global_skills ++ project_commands ++ project_skills)
     |> Enum.sort_by(& &1.slug)
   end
+
+  defp build_id(source, slug), do: "#{source}:#{slug}"
 
   defp load_from_dir(dir, source, display_prefix) do
     if File.dir?(dir) do
@@ -109,6 +119,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
 
                 [
                   %Skill{
+                    id: build_id(source, slug),
                     slug: slug,
                     filename: filename,
                     path: "#{display_prefix}/#{filename}",
@@ -150,6 +161,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
 
                 [
                   %Skill{
+                    id: build_id(source, dir),
                     slug: dir,
                     filename: "SKILL.md",
                     path: "#{display_prefix}/#{dir}/SKILL.md",

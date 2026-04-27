@@ -48,12 +48,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
     do: handle_filter_scope(params, socket, &load_skills/1)
 
   @impl true
-  def handle_event("select_skill", %{"slug" => slug}, socket) do
+  def handle_event("select_skill", %{"id" => id}, socket) do
     selected =
-      if socket.assigns.selected_skill && socket.assigns.selected_skill.slug == slug do
+      if socket.assigns.selected_skill && socket.assigns.selected_skill.id == id do
         nil
       else
-        Enum.find(socket.assigns.skills, &(&1.slug == slug))
+        Enum.find(socket.assigns.skills, &(&1.id == id))
       end
 
     {:noreply, socket |> assign(:selected_skill, selected) |> assign(:detail_tab, :preview)}
@@ -65,9 +65,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   end
 
   @impl true
-  def handle_event("set_detail_tab", %{"tab" => tab}, socket) do
-    {:noreply, assign(socket, :detail_tab, String.to_existing_atom(tab))}
-  end
+  def handle_event("set_detail_tab", %{"tab" => "preview"}, socket),
+    do: {:noreply, assign(socket, :detail_tab, :preview)}
+
+  def handle_event("set_detail_tab", %{"tab" => "raw"}, socket),
+    do: {:noreply, assign(socket, :detail_tab, :raw)}
+
+  def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("set_notify_on_stop", params, socket),
@@ -136,14 +140,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
         <%= if @filtered_skills != [] do %>
           <div class="divide-y divide-base-content/5">
             <%= for skill <- @filtered_skills do %>
-              <% selected? = @selected_skill && @selected_skill.slug == skill.slug %>
+              <% selected? = @selected_skill && @selected_skill.id == skill.id %>
               <div class={["py-0.5", selected? && "relative"]}>
                 <div class="collapse overflow-visible">
                   <input
                     type="checkbox"
                     class="min-h-0 p-0"
                     phx-click="select_skill"
-                    phx-value-slug={skill.slug}
+                    phx-value-id={skill.id}
                   />
                   <div class={[
                     "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
@@ -176,7 +180,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                   </div>
                   <div class="collapse-content md:hidden px-3 pb-3">
                     <div
-                      id={"proj-skill-mobile-#{skill.slug}"}
+                      id={"proj-skill-mobile-#{skill.id}"}
                       class="dm-markdown text-sm text-base-content leading-relaxed mt-2"
                       phx-hook="MarkdownMessage"
                       data-raw-body={skill.content}
@@ -255,7 +259,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
           <div class="flex-1 overflow-y-auto">
             <%= if @detail_tab == :preview do %>
               <div
-                id={"proj-skill-viewer-#{@selected_skill.slug}"}
+                id={"proj-skill-viewer-#{@selected_skill.id}"}
                 class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
                 phx-hook="MarkdownMessage"
                 data-raw-body={@selected_skill.content}

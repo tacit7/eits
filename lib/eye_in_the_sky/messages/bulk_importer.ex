@@ -189,11 +189,13 @@ defmodule EyeInTheSky.Messages.BulkImporter do
 
       # Avoid double-rendering the final agent message. MapSet check (cheap) fires first
       # to catch in-batch duplicates before hitting the DB. DB check (agent_reply_already_recorded?)
-      # catches the cross-process race where record_incoming_reply committed before this reduce.
+      # catches two races:
+      #   1. Concurrent race: record_incoming_reply committed < 30 s ago (e.g. from on_result_received)
+      #   2. Historical sync: same session imported via mount Task after agent finished (window = 86 400 s)
       # User messages are intentionally excluded — repeated user turns are legitimate.
       msg.role != "user" and
           (MapSet.member?(seen_agent_bodies, msg.content) or
-             agent_reply_already_recorded?(session_id, msg.content)) ->
+             agent_reply_already_recorded?(session_id, msg.content, import_opts)) ->
         {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
 
       true ->
@@ -253,15 +255,23 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     end
   end
 
-  # Checks whether an agent reply with the same body was recently persisted by
-  # record_incoming_reply (AgentWorker on_result_received). That path stores
-  # the SDK result UUID as source_uuid, which differs from the per-message
-  # JSONL UUID that BulkImporter uses, so the fast-path UUID set check always
-  # misses. A 30 s window covers the AgentWorker → agent_stopped →
-  # BulkImporter pipeline (typically < 10 s) while keeping the false-positive
-  # surface small.
-  defp agent_reply_already_recorded?(session_id, body) do
-    case Messages.find_recent_dm(session_id, body, seconds: 30) do
+  # Checks whether an agent reply with the same body was already persisted in
+  # this session. Used to prevent BulkImporter from inserting a duplicate when
+  # record_incoming_reply (AgentWorker on_result_received) already committed
+  # the same content under a different source_uuid (SDK result UUID vs JSONL UUID).
+  #
+  # Two windows:
+  #   - Live sync (importing_from_file? false): 30 s — covers the
+  #     AgentWorker → agent_stopped → BulkImporter pipeline (< 10 s typically).
+  #   - File import (importing_from_file? true): 86 400 s (24 h) — covers
+  #     mount-time syncs that run long after the session finished. record_incoming_reply
+  #     only saves final responses, so a 24 h body-match within a session is
+  #     safe; tool-call messages with identical bodies are caught earlier by
+  #     seen_agent_bodies (in-batch MapSet) or existing_source_uuids (fast path).
+  defp agent_reply_already_recorded?(session_id, body, opts) do
+    seconds = if Keyword.get(opts, :importing_from_file?, false), do: 86_400, else: 30
+
+    case Messages.find_recent_dm(session_id, body, seconds: seconds) do
       nil -> false
       _msg -> true
     end

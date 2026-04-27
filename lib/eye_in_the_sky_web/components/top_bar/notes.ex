@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
       <%= for {value, label} <- [{"all", "All"}, {"session", "Session"}, {"task", "Task"}] do %>
         <button
           phx-click="filter_type"
-          phx-value-value={value}
+          phx-value-type={value}
           class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
             if(@notes_type_filter == value,
               do: "bg-base-100 text-base-content shadow-sm",
@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
           <li>
             <button
               phx-click="sort_notes"
-              phx-value-value={value}
+              phx-value-by={value}
               onclick="var d=this.closest('details');d.querySelector('.js-sort-label').textContent=this.textContent.trim();d.removeAttribute('open')"
               class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
                 if(@notes_sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}

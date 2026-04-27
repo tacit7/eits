@@ -100,7 +100,7 @@ defmodule EyeInTheSkyWeb.Components.FilterSheet do
                   ]
                 }
                 phx-click="sort_by"
-                phx-value-value={val}
+                phx-value-by={val}
                 aria-pressed={@sort_by == val}
                 class={"btn btn-sm " <>
                   if(@sort_by == val,

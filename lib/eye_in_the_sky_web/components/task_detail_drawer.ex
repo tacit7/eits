@@ -27,22 +27,14 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
 
   def task_detail_drawer(assigns) do
     ~H"""
-    <div id={@id}>
-      <%= if @show do %>
-        <%!-- Backdrop --%>
-        <div
-          class="fixed inset-0 z-40 bg-black/30 transition-opacity"
-          phx-click={@toggle_event}
-        />
-
-        <%!-- Panel --%>
-        <div
-          id="task-detail-panel"
-          phx-hook="DrawerSwipeClose"
-          data-close-event={@close_event_name || @toggle_event}
-          data-close-key={@close_event_key}
-          class="fixed inset-y-0 right-0 safe-inset-y z-50 w-full max-w-lg bg-base-100 shadow-xl flex flex-col"
-        >
+    <.side_drawer
+      id={@id}
+      show={@show}
+      on_close={@toggle_event}
+      phx-hook="DrawerSwipeClose"
+      data-close-event={@close_event_name || to_string(@toggle_event)}
+      data-close-key={@close_event_key}
+    >
           <%= if @task do %>
             <%!-- Header --%>
             <div class="flex items-center justify-between px-6 py-4 border-b border-base-content/5 flex-shrink-0">
@@ -311,9 +303,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <span class="text-sm text-base-content/30">No task selected</span>
             </div>
           <% end %>
-        </div>
-      <% end %>
-    </div>
+    </.side_drawer>
     """
   end
 

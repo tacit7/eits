@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
   """
   use Phoenix.Component
 
-  import EyeInTheSkyWeb.CoreComponents, only: [icon: 1]
+  import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, side_drawer: 1]
 
   attr :show, :boolean, required: true
   attr :search_query, :string, required: true
@@ -25,10 +25,14 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
     assigns = assign(assigns, :active_filter_count, active_filter_count)
 
     ~H"""
-    <%= if @show do %>
-      <div class="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Filter">
-        <div class="absolute inset-0 bg-black/20" phx-click="toggle_filter_drawer" />
-        <div class="absolute right-0 top-0 h-full w-72 bg-base-200 shadow-xl flex flex-col overflow-hidden border-l border-base-content/8">
+    <.side_drawer
+      id="kanban-filter-drawer"
+      show={@show}
+      on_close="toggle_filter_drawer"
+      max_width="sm"
+      surface={true}
+      class="w-72 border-l border-base-content/8 overflow-hidden"
+    >
           <%!-- Header --%>
           <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
             <h2 class="text-sm font-semibold text-base-content/80">Filter</h2>
@@ -239,9 +243,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
               </button>
             <% end %>
           </div>
-        </div>
-      </div>
-    <% end %>
+    </.side_drawer>
     """
   end
 end

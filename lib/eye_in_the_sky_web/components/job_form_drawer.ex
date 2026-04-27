@@ -42,11 +42,8 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
 
   def job_form_drawer(assigns) do
     ~H"""
-    <div>
-      <div class={[
-        "fixed inset-y-0 right-0 safe-inset-y z-50 w-full max-w-md bg-base-100 shadow-xl transform transition-transform duration-200 ease-in-out overflow-y-auto",
-        if(@show, do: "translate-x-0", else: "translate-x-full")
-      ]}>
+    <.side_drawer id="job-form-drawer" show={@show} on_close="cancel_form" target={@target} max_width="md">
+      <div class="overflow-y-auto flex-1">
         <div class="p-6">
           <div class="flex items-center justify-between mb-4">
             <div>
@@ -270,10 +267,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
           </.form>
         </div>
       </div>
-      <%= if @show do %>
-        <div class="fixed inset-0 z-40 bg-black/30" phx-click="cancel_form" phx-target={@target}></div>
-      <% end %>
-    </div>
+    </.side_drawer>
     """
   end
 end

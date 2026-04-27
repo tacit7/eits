@@ -733,6 +733,84 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
+  Right-side slide-over drawer shell.
+
+  Always present in the DOM; toggled via `translate-x-full` / `translate-x-0`
+  so child hooks and form state survive open/close cycles without being destroyed.
+
+  The `inner_block` slot renders inside the panel div. Pass any panel-level
+  phx-hook or data attributes via global `rest` attrs.
+
+  ## Examples
+
+      <.side_drawer id="job-form" show={@show_form} on_close="cancel_form" max_width="md">
+        <.some_form />
+      </.side_drawer>
+
+      <%!-- With DrawerSwipeClose hook --%>
+      <.side_drawer
+        id="task-detail"
+        show={@show_task}
+        on_close={@toggle_event}
+        phx-hook="DrawerSwipeClose"
+        data-close-event={@close_event_name}
+      >
+        <.task_panel task={@task} />
+      </.side_drawer>
+  """
+  attr :id, :string, required: true
+  attr :show, :boolean, required: true
+  attr :on_close, :any, required: true
+  attr :target, :any, default: nil
+  attr :max_width, :string, default: "lg"
+  attr :surface, :boolean, default: false
+  attr :class, :string, default: ""
+  attr :rest, :global, include: ~w(phx-hook data-close-event data-close-key)
+
+  slot :inner_block, required: true
+
+  def side_drawer(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={["fixed inset-0 z-40", not @show && "pointer-events-none"]}
+      role="dialog"
+      aria-modal={to_string(@show)}
+    >
+      <%!-- Backdrop --%>
+      <div
+        class={[
+          "absolute inset-0 bg-black/30 transition-opacity duration-200",
+          if(@show, do: "opacity-100", else: "opacity-0 pointer-events-none")
+        ]}
+        phx-click={@on_close}
+        phx-target={@target}
+      />
+      <%!-- Panel --%>
+      <div
+        id={"#{@id}-panel"}
+        class={[
+          "absolute inset-y-0 right-0 safe-inset-y w-full shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out",
+          side_drawer_width(@max_width),
+          if(@surface, do: "bg-base-200", else: "bg-base-100"),
+          if(@show, do: "translate-x-0", else: "translate-x-full"),
+          @class
+        ]}
+        {@rest}
+      >
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  defp side_drawer_width("sm"), do: "max-w-xs"
+  defp side_drawer_width("md"), do: "max-w-md"
+  defp side_drawer_width("lg"), do: "max-w-lg"
+  defp side_drawer_width("xl"), do: "max-w-xl"
+  defp side_drawer_width(_), do: "max-w-lg"
+
+  @doc """
   Renders a search form with a magnifying glass icon on the left.
 
   Supports two sizes:
@@ -961,71 +1039,6 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     """
   end
 
-  @doc """
-  Renders a responsive overlay drawer. On mobile it slides up from the bottom;
-  on desktop it renders as a centered modal overlay.
-
-  ## Examples
-
-      <.side_drawer id="task-drawer" open={@drawer_open} on_close="close_drawer">
-        <p>Drawer content here</p>
-      </.side_drawer>
-  """
-  attr :id, :string, required: true
-  attr :open, :boolean, default: false
-  attr :on_close, :string, default: "close_drawer"
-  attr :aria_label, :string, default: "Dialog"
-  attr :class, :string, default: ""
-
-  slot :inner_block, required: true
-
-  def side_drawer(assigns) do
-    ~H"""
-    <%!-- Backdrop --%>
-    <div
-      :if={@open}
-      phx-click={@on_close}
-      class="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
-    />
-
-    <%!-- Mobile: slide from bottom --%>
-    <div
-      id={"#{@id}-mobile"}
-      role="dialog"
-      aria-modal="true"
-      aria-label={@aria_label}
-      aria-hidden={to_string(!@open)}
-      class={[
-        "sm:hidden fixed inset-x-0 bottom-0 z-50 bg-base-100 rounded-t-2xl shadow-xl",
-        "pb-[env(safe-area-inset-bottom)]",
-        "transition-transform duration-200",
-        if(@open, do: "translate-y-0", else: "translate-y-full")
-      ]}
-    >
-      {render_slot(@inner_block)}
-    </div>
-
-    <%!-- Desktop: centered modal overlay --%>
-    <div
-      id={"#{@id}-desktop"}
-      class={[
-        "hidden sm:flex fixed inset-0 z-50 items-center justify-center",
-        if(!@open, do: "pointer-events-none opacity-0", else: "opacity-100"),
-        "transition-opacity duration-150"
-      ]}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={@aria_label}
-        aria-hidden={to_string(!@open)}
-        class={"bg-base-100 rounded-xl shadow-2xl w-full max-w-lg mx-4 #{@class}"}
-      >
-        {render_slot(@inner_block)}
-      </div>
-    </div>
-    """
-  end
 
   ## JS Commands
 

@@ -265,32 +265,53 @@ defmodule EyeInTheSkyWeb.Layouts do
         class="w-3.5 h-3.5"
       />
     </button>
-    <form phx-change="filter_type">
-      <label for="notes-type-filter" class="sr-only">Filter by type</label>
-      <select
-        id="notes-type-filter"
-        name="value"
-        class="select select-xs h-7 min-h-0 bg-base-200/50 border-base-content/8 text-base-content/70 text-[11px] pr-6"
-      >
-        <option value="all" selected={@notes_type_filter == "all"}>All Types</option>
-        <option value="session" selected={@notes_type_filter == "session"}>Session</option>
-        <option value="agent" selected={@notes_type_filter == "agent"}>Agent</option>
-        <option value="project" selected={@notes_type_filter == "project"}>Project</option>
-        <option value="task" selected={@notes_type_filter == "task"}>Task</option>
-        <option value="system" selected={@notes_type_filter == "system"}>System</option>
-      </select>
-    </form>
-    <form phx-change="sort_notes">
-      <label for="notes-sort" class="sr-only">Sort notes</label>
-      <select
-        id="notes-sort"
-        name="value"
-        class="select select-xs h-7 min-h-0 bg-base-200/50 border-base-content/8 text-base-content/70 text-[11px] pr-6"
-      >
-        <option value="newest" selected={@notes_sort_by == "newest"}>Newest</option>
-        <option value="oldest" selected={@notes_sort_by == "oldest"}>Oldest</option>
-      </select>
-    </form>
+    <details id="notes-type-dropdown" phx-update="ignore" class="dropdown">
+      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+        Type: {case @notes_type_filter do
+          "session" -> "Session"
+          "agent" -> "Agent"
+          "project" -> "Project"
+          "task" -> "Task"
+          "system" -> "System"
+          _ -> "All"
+        end} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
+      </summary>
+      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
+        <%= for {value, label} <- [{"all", "All"}, {"session", "Session"}, {"agent", "Agent"}, {"project", "Project"}, {"task", "Task"}, {"system", "System"}] do %>
+          <li>
+            <button
+              phx-click="filter_type"
+              phx-value-value={value}
+              onclick="this.closest('details').removeAttribute('open')"
+              class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
+                if(@notes_type_filter == value, do: "text-base-content font-medium", else: "text-base-content/60")}
+            >
+              {label}
+            </button>
+          </li>
+        <% end %>
+      </ul>
+    </details>
+    <details id="notes-sort-dropdown" phx-update="ignore" class="dropdown">
+      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+        Sort: {if @notes_sort_by == "oldest", do: "Oldest", else: "Newest"} <.icon name="hero-chevron-down-mini" class="w-3 h-3 opacity-50" />
+      </summary>
+      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
+        <%= for {value, label} <- [{"newest", "Newest"}, {"oldest", "Oldest"}] do %>
+          <li>
+            <button
+              phx-click="sort_notes"
+              phx-value-value={value}
+              onclick="this.closest('details').removeAttribute('open')"
+              class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
+                if(@notes_sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
+            >
+              {label}
+            </button>
+          </li>
+        <% end %>
+      </ul>
+    </details>
     <%= if @notes_new_href do %>
       <.link
         navigate={@notes_new_href}

@@ -354,6 +354,7 @@ defmodule EyeInTheSkyWeb.Layouts do
             <button
               phx-click="sort"
               phx-value-by={value}
+              onclick="this.closest('details').removeAttribute('open')"
               class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
                 if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
             >
@@ -428,6 +429,7 @@ defmodule EyeInTheSkyWeb.Layouts do
             <button
               phx-click="sort_by"
               phx-value-value={value}
+              onclick="this.closest('details').removeAttribute('open')"
               class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
                 if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
             >

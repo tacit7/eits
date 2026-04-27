@@ -198,7 +198,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <div class="md:hidden sticky top-0 z-30 flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#app-rail")}
-          class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+          class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-ring"
           aria-label="Open menu"
         >
           <.icon name="hero-bars-3" class="size-5" />
@@ -226,7 +226,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           </div>
         </div>
         <ActionMenu.action_menu
-          button_class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+          button_class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-ring"
           show_tabs={true}
           tabs={@tabs}
           active_tab={@active_tab}

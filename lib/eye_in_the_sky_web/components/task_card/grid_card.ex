@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
           <% end %>
           <button
             type="button"
-            class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer hover:text-primary transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+            class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer hover:text-primary transition-colors z-10 focus-ring rounded"
             phx-hook="CopyToClipboard"
             id={"copy-task-grid-#{@task.id}"}
             data-copy={@task.uuid}

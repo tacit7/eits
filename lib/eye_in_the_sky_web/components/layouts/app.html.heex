@@ -42,7 +42,7 @@
     ]}>
       <button
         phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#app-rail")}
-        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
         title="Open menu"
         aria-label="Open sidebar menu"
       >
@@ -51,7 +51,7 @@
       <span class="flex-1 text-sm font-semibold text-base-content/80">Eye in the Sky</span>
       <button
         phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
-        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
         title="Open command palette"
         aria-label="Open command palette"
       >
@@ -61,7 +61,7 @@
         id="push-setup-btn"
         phx-hook="PushSetup"
         phx-update="ignore"
-        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
         data-push-state="disabled"
         title="Enable push notifications"
         aria-label="Enable push notifications"
@@ -153,7 +153,7 @@
           aria-label="Sessions"
           aria-current={if mobile_nav_tab == :sessions, do: "page"}
           class={[
-            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
             if(mobile_nav_tab == :sessions,
               do: "text-primary bg-primary/10",
               else: "text-base-content/60"
@@ -168,7 +168,7 @@
             aria-label="Tasks"
             aria-current={if mobile_nav_tab == :tasks, do: "page"}
             class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
               if(mobile_nav_tab == :tasks,
                 do: "text-primary bg-primary/10",
                 else: "text-base-content/60"
@@ -182,7 +182,7 @@
             aria-label="Notes"
             aria-current={if mobile_nav_tab == :notes, do: "page"}
             class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
               if(mobile_nav_tab == :notes,
                 do: "text-primary bg-primary/10",
                 else: "text-base-content/60"
@@ -196,7 +196,7 @@
             aria-label="Project"
             aria-current={if mobile_nav_tab == :project, do: "page"}
             class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
               if(mobile_nav_tab == :project,
                 do: "text-primary bg-primary/10",
                 else: "text-base-content/60"
@@ -211,7 +211,7 @@
             aria-label="Notifications"
             aria-current={if mobile_nav_tab == :notifications, do: "page"}
             class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
               if(mobile_nav_tab == :notifications,
                 do: "text-primary bg-primary/10",
                 else: "text-base-content/60"

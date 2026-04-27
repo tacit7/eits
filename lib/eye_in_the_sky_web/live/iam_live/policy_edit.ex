@@ -273,10 +273,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
         />
 
         <div class="flex justify-end gap-2">
-          <.link navigate={~p"/iam/policies"} class="btn btn-ghost">Cancel</.link>
-          <button type="submit" class="btn btn-primary">
-            <.icon name="hero-check" class="size-4" /> Save changes
-          </button>
+          <.form_actions submit_text="Save changes" cancel_navigate={~p"/iam/policies"} />
         </div>
       </.form>
     </div>

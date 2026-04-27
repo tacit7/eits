@@ -240,12 +240,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
               </div>
 
               <div class="card-actions justify-end mt-6">
-                <button type="button" phx-click="cancel_edit" class="btn btn-ghost">
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-primary">
-                  Save Changes
-                </button>
+                <.form_actions submit_text="Save Changes" cancel_event="cancel_edit" />
               </div>
             </div>
           </.form>

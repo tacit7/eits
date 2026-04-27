@@ -402,10 +402,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
             <span class="text-sm text-base-content/70">Star this note</span>
           </label>
           <div class="flex justify-end gap-2 pt-1">
-            <button type="button" phx-click="close_quick_note_modal" class="btn btn-ghost btn-sm">
-              Cancel
-            </button>
-            <button type="submit" class="btn btn-primary btn-sm">Create Note</button>
+            <.form_actions
+              submit_text="Create Note"
+              cancel_event="close_quick_note_modal"
+              size="sm"
+            />
           </div>
         </form>
       </div>

@@ -550,19 +550,38 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   attr :submit_text, :string, required: true
-  attr :cancel_event, :any, required: true
+  attr :cancel_event, :any, default: nil
+  attr :cancel_navigate, :string, default: nil
+  attr :cancel_target, :any, default: nil
+  attr :cancel_text, :string, default: "Cancel"
   attr :submit_disabled, :boolean, default: false
+  attr :size, :string, default: nil
   attr :class, :string, default: nil
 
   def form_actions(assigns) do
     ~H"""
     <div class={["flex gap-2", @class]}>
-      <button type="submit" class="btn btn-primary flex-1" disabled={@submit_disabled}>
+      <button
+        type="submit"
+        class={["btn btn-primary flex-1", @size && "btn-#{@size}"]}
+        disabled={@submit_disabled}
+      >
         {@submit_text}
       </button>
-      <button type="button" phx-click={@cancel_event} class="btn btn-ghost">
-        Cancel
-      </button>
+      <%= if @cancel_navigate do %>
+        <.link navigate={@cancel_navigate} class={["btn btn-ghost", @size && "btn-#{@size}"]}>
+          {@cancel_text}
+        </.link>
+      <% else %>
+        <button
+          type="button"
+          phx-click={@cancel_event}
+          phx-target={@cancel_target}
+          class={["btn btn-ghost", @size && "btn-#{@size}"]}
+        >
+          {@cancel_text}
+        </button>
+      <% end %>
     </div>
     """
   end

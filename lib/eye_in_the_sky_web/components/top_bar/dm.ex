@@ -31,28 +31,14 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         class="w-48"
       />
     <% end %>
-    <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
-      <%= for {tab, label} <- [
-        {"messages", "Messages"},
-        {"tasks", "Tasks"},
-        {"commits", "Commits"},
-        {"notes", "Notes"},
-        {"context", "Context"},
-        {"settings", "Settings"}
-      ] do %>
-        <button
-          phx-click="change_tab"
-          phx-value-tab={tab}
-          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
-            if(@dm_active_tab == tab,
-              do: "bg-base-100 text-base-content shadow-sm",
-              else: "text-base-content/45 hover:text-base-content/70"
-            )}
-        >
-          {label}
-        </button>
-      <% end %>
-    </div>
+    <.tab_pills value_key="tab">
+      <:item label="Messages" active={@dm_active_tab in ["messages", nil]} on_click="change_tab" value="messages" />
+      <:item label="Tasks" active={@dm_active_tab == "tasks"} on_click="change_tab" value="tasks" />
+      <:item label="Commits" active={@dm_active_tab == "commits"} on_click="change_tab" value="commits" />
+      <:item label="Notes" active={@dm_active_tab == "notes"} on_click="change_tab" value="notes" />
+      <:item label="Context" active={@dm_active_tab == "context"} on_click="change_tab" value="context" />
+      <:item label="Settings" active={@dm_active_tab == "settings"} on_click="change_tab" value="settings" />
+    </.tab_pills>
     <div class="flex-1" />
     <%!-- ... menu --%>
     <div class="dropdown dropdown-end">

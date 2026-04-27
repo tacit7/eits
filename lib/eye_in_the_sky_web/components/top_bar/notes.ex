@@ -47,21 +47,11 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
         class="size-3.5"
       />
     </button>
-    <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
-      <%= for {value, label} <- [{"all", "All"}, {"session", "Session"}, {"task", "Task"}] do %>
-        <button
-          phx-click="filter_type"
-          phx-value-type={value}
-          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
-            if(@notes_type_filter == value,
-              do: "bg-base-100 text-base-content shadow-sm",
-              else: "text-base-content/45 hover:text-base-content/70"
-            )}
-        >
-          {label}
-        </button>
-      <% end %>
-    </div>
+    <.tab_pills value_key="type">
+      <:item label="All" active={@notes_type_filter == "all"} on_click="filter_type" value="all" />
+      <:item label="Session" active={@notes_type_filter == "session"} on_click="filter_type" value="session" />
+      <:item label="Task" active={@notes_type_filter == "task"} on_click="filter_type" value="task" />
+    </.tab_pills>
     <details
       id="notes-sort-dropdown"
       phx-update="ignore"

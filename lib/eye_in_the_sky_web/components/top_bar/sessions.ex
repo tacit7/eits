@@ -25,21 +25,13 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
       on_change="search"
       class="flex-1 max-w-xs"
     />
-    <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
-      <%= for {value, label} <- [{"all", "All"}, {"working", "Active"}, {"archived", "Archived"}] do %>
-        <button
-          phx-click="filter_session"
-          phx-value-filter={value}
-          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
-            if(@session_filter == value,
-              do: "bg-base-100 text-base-content shadow-sm",
-              else: "text-base-content/45 hover:text-base-content/70"
-            )}
-        >
-          {label}
-        </button>
-      <% end %>
-    </div>
+    <.tab_pills value_key="filter">
+      <:item label="All" active={@session_filter == "all"} on_click="filter_session" value="all" />
+      <:item label="Active" active={@session_filter == "working"} on_click="filter_session" value="working"
+             active_class="bg-base-100 text-success shadow-sm" />
+      <:item label="Archived" active={@session_filter == "archived"} on_click="filter_session" value="archived"
+             active_class="bg-base-100 text-warning shadow-sm" />
+    </.tab_pills>
     <details
       id="sessions-sort-dropdown"
       phx-update="ignore"

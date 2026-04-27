@@ -883,35 +883,53 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   @doc """
   Renders a pill tab container. Each tab is declared with the `:item` slot.
 
+  `value_key` controls which `phx-value-*` attribute is emitted — default is `"tab"`.
+  Supported values: `"tab"`, `"filter"`, `"type"`, `"by"`.
+
+  Per-item `active_class` overrides the default active styling (useful for coloured status tabs).
+
   ## Examples
 
-      <.tab_pills>
-        <:item label="All" active={@tab == "all"} on_click="switch_tab" value="all" />
-        <:item label="Running" active={@tab == "running"} on_click="switch_tab" value="running" />
+      <.tab_pills value_key="tab">
+        <:item label="Messages" active={@tab == "messages"} on_click="change_tab" value="messages" />
+        <:item label="Tasks" active={@tab == "tasks"} on_click="change_tab" value="tasks" />
+      </.tab_pills>
+
+      <.tab_pills value_key="filter">
+        <:item label="All" active={@filter == "all"} on_click="filter_session" value="all" />
+        <:item label="Active" active={@filter == "working"} on_click="filter_session" value="working"
+               active_class="bg-base-100 text-success shadow-sm" />
+        <:item label="Archived" active={@filter == "archived"} on_click="filter_session" value="archived"
+               active_class="bg-base-100 text-warning shadow-sm" />
       </.tab_pills>
   """
   attr :class, :string, default: ""
+  attr :value_key, :string, default: "tab"
 
   slot :item, required: true do
     attr :label, :string, required: true
     attr :active, :boolean
     attr :on_click, :string
     attr :value, :string
+    attr :active_class, :string
   end
 
   def tab_pills(assigns) do
     ~H"""
-    <div class={"flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5 #{@class}"}>
+    <div class={["flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5 shrink-0", @class]}>
       <%= for item <- @item do %>
         <button
           type="button"
           phx-click={item[:on_click]}
-          phx-value-tab={item[:value]}
+          phx-value-tab={if @value_key == "tab", do: item[:value]}
+          phx-value-filter={if @value_key == "filter", do: item[:value]}
+          phx-value-type={if @value_key == "type", do: item[:value]}
+          phx-value-by={if @value_key == "by", do: item[:value]}
           class={[
-            "px-3 py-1 rounded-md text-sm font-medium transition-colors",
+            "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150",
             if(item[:active],
-              do: "bg-base-100 text-base-content shadow-sm",
-              else: "text-base-content/60 hover:bg-base-200/60 hover:text-base-content"
+              do: item[:active_class] || "bg-base-100 text-base-content shadow-sm",
+              else: "text-base-content/45 hover:text-base-content/70"
             )
           ]}
         >

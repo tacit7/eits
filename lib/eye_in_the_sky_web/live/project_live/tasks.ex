@@ -294,13 +294,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           <%!-- Bulk-select toolbar --%>
           <%= if @tasks_select_mode do %>
             <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
-              <input
-                type="checkbox"
-                checked={MapSet.size(@selected_task_ids) == @task_count}
-                phx-click="toggle_select_all_tasks"
-                class="checkbox checkbox-xs checkbox-primary"
-                aria-label="Select all tasks"
-              />
+              <div phx-click="toggle_select_all_tasks" class="cursor-pointer">
+                <.square_checkbox
+                  checked={MapSet.size(@selected_task_ids) == @task_count}
+                  indeterminate={MapSet.size(@selected_task_ids) > 0 && MapSet.size(@selected_task_ids) < @task_count}
+                  aria-label="Select all tasks"
+                />
+              </div>
               <%= if MapSet.size(@selected_task_ids) > 0 do %>
                 <span class="text-mini text-base-content/50 font-medium">
                   {MapSet.size(@selected_task_ids)} selected

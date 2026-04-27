@@ -21,13 +21,13 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <%!-- Bulk-select toolbar --%>
     <%= if @select_mode && @notes != [] do %>
       <div class="mb-3 flex items-center gap-3 px-2 py-1.5">
-        <input
-          type="checkbox"
-          checked={MapSet.size(@selected_ids) == length(@notes)}
-          phx-click="toggle_select_all_notes"
-          class="checkbox checkbox-xs checkbox-primary"
-          aria-label="Select all notes"
-        />
+        <div phx-click="toggle_select_all_notes" class="cursor-pointer">
+          <.square_checkbox
+            checked={MapSet.size(@selected_ids) == length(@notes)}
+            indeterminate={MapSet.size(@selected_ids) > 0 && MapSet.size(@selected_ids) < length(@notes)}
+            aria-label="Select all notes"
+          />
+        </div>
         <%= if MapSet.size(@selected_ids) > 0 do %>
           <span class="text-mini text-base-content/50 font-medium">
             {MapSet.size(@selected_ids)} selected
@@ -62,19 +62,26 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <%= if @notes != [] do %>
       <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
-          <div class="py-1 flex items-start gap-1 group">
-            <%!-- Select checkbox — hidden until hover, always visible in select mode --%>
-            <div class={[
-              "flex-shrink-0 w-7 flex items-center justify-center pt-3.5",
-              if(@select_mode, do: "", else: "hidden group-hover:flex")
-            ]}>
-              <input
-                type="checkbox"
+          <div class="py-1 relative group/row flex items-start">
+            <%!-- Select checkbox: absolute, outside row flow, hover-reveal --%>
+            <div
+              class={[
+                "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2",
+                "left-4 sm:left-[-0.875rem]",
+                if(@select_mode,
+                  do: "opacity-100 scale-100",
+                  else:
+                    "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
+                )
+              ]}
+              aria-hidden={to_string(!@select_mode)}
+              phx-click="toggle_select_note"
+              phx-value-note_id={note.id}
+            >
+              <.square_checkbox
                 checked={MapSet.member?(@selected_ids, to_string(note.id))}
-                phx-click="toggle_select_note"
-                phx-value-note_id={note.id}
-                class="checkbox checkbox-xs checkbox-primary"
-                aria-label={"Select note #{note.id}"}
+                checkbox_area={true}
+                aria-label={"Select note #{note.title || note.id}"}
               />
             </div>
             <%!-- Collapse: chevron expands inline body --%>

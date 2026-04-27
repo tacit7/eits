@@ -269,7 +269,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         href =
           "/notes/new?parent_type=project&parent_id=#{project_id}&return_to=/projects/#{project_id}/notes"
 
-        assign(socket, :notes_new_href, href)
+        assign(socket, :new_href, href)
     end
   end
 
@@ -288,7 +288,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         <.icon name="hero-bolt" class="size-3.5" /> Quick Note
       </button>
       <.link
-        navigate={@notes_new_href || "/notes/new"}
+        navigate={@new_href || "/notes/new"}
         class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
       >
         <.icon name="hero-plus" class="size-3.5" /> New Note
@@ -330,8 +330,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           name="value"
           class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
         >
-          <option value="newest" selected={@notes_sort_by == "newest"}>Newest</option>
-          <option value="oldest" selected={@notes_sort_by == "oldest"}>Oldest</option>
+          <option value="newest" selected={@sort_by == "newest"}>Newest</option>
+          <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>
         </select>
       </form>
     </div>
@@ -342,7 +342,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           notes={@notes}
           starred_filter={@starred_filter}
           search_query={@search_query}
-          sort_by={@notes_sort_by}
+          sort_by={@sort_by}
           type_filter={@type_filter}
           empty_id="project-notes-empty"
           editing_note_id={@editing_note_id}

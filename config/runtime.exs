@@ -41,9 +41,6 @@ if get_env.("PHX_SERVER") in ~w(true 1) do
   config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint, server: true
 end
 
-# Gitea webhook HMAC secret — required for signature verification in all envs
-config :eye_in_the_sky, :gitea_webhook_secret, get_env.("GITEA_WEBHOOK_SECRET") || ""
-
 # VAPID keys — loaded from env vars. Required in prod, optional in dev.
 if vapid_private = get_env.("VAPID_PRIVATE_KEY") do
   config :web_push_encryption, :vapid_details,

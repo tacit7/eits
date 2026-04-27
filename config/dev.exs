@@ -11,8 +11,6 @@ config :hexdocs_mcp,
 config :hexdocs_mcp, HexdocsMcp.Repo,
   database: Path.join(hexdocs_data_path, "hexdocs_mcp.db")
 
-# Gitea webhook HMAC secret — set this in Gitea webhook settings and here
-config :eye_in_the_sky, :gitea_webhook_secret, System.get_env("GITEA_WEBHOOK_SECRET", "")
 config :eye_in_the_sky, :env, :dev
 # Core-layer config keys — keeps core modules free of EyeInTheSkyWeb.Endpoint atom references
 config :eye_in_the_sky,
@@ -20,8 +18,6 @@ config :eye_in_the_sky,
   server_base_url: "http://localhost:#{System.get_env("PORT", "5001")}"
 config :eye_in_the_sky, :bypass_auth, System.get_env("BYPASS_AUTH", "true") in ~w(true 1)
 config :eye_in_the_sky, digest_desktop_path: Path.expand("~/Desktop")
-# Allow unsigned webhooks in dev when no secret is set (never enable in prod)
-config :eye_in_the_sky, :allow_unsigned_webhooks, true
 
 # Configure your database
 config :eye_in_the_sky, EyeInTheSky.Repo,

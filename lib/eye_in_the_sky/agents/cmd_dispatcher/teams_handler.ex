@@ -16,7 +16,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
 
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
   alias EyeInTheSky.Messaging.DMDelivery
-  alias EyeInTheSky.{Sessions, Teams}
+  alias EyeInTheSky.{AsyncTask, Sessions, Teams}
   alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers,
@@ -183,7 +183,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TeamsHandler do
   end
 
   defp broadcast_to_member(member, from_session_id, dm_body) do
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+    AsyncTask.start(fn ->
       case DMDelivery.deliver_and_persist(member.session_id, from_session_id, dm_body, %{
              broadcast: true
            }) do

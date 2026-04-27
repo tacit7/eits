@@ -3,7 +3,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
 
   import Ecto.Query
 
-  alias Ecto.Adapters.SQL.Sandbox
   alias EyeInTheSky.Agents.CmdDispatcher
   alias EyeInTheSky.{Messages, Sessions, Teams}
 
@@ -74,12 +73,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
     msg
   end
 
-  # Run dispatch_all and wait briefly for async tasks to finish.
+  # dispatch_all runs synchronously in test mode (async_tasks_sync: true).
   defp dispatch(line, session_id) do
     {cmd_lines, _clean} = CmdDispatcher.extract_commands(line)
-    Sandbox.allow(EyeInTheSky.Repo, self(), self())
     CmdDispatcher.dispatch_all(cmd_lines, session_id)
-    Process.sleep(100)
   end
 
   # ---------------------------------------------------------------------------

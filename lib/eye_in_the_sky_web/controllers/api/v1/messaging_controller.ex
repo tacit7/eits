@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Sessions, Teams}
+  alias EyeInTheSky.{Agents, AsyncTask, ChannelMessages, Channels, Messages, Sessions, Teams}
   alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -343,7 +343,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   # Fan out DMs to channel members with notifications="all", excluding the sender.
   # Runs async so the channel message response is not held hostage by N serial DMs.
   defp notify_channel_members(channel_id, sender_session_id, body) do
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+    AsyncTask.start(fn ->
       members =
         EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
 
@@ -382,7 +382,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   # Fan out DMs to all active team members when broadcast_to_team_id is supplied on channel send.
   # Runs async so the channel message response is not held hostage by N serial DMs.
   defp broadcast_to_team(channel_id, sender_session_id, team_id, body) do
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+    AsyncTask.start(fn ->
       case Teams.get_team(team_id) do
         {:ok, team} ->
           members = Teams.list_members(team_id)

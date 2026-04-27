@@ -56,7 +56,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.{DmHandler, Helpers, TaskHandler, TeamsHandler}
-  alias EyeInTheSky.{ChannelMessages, Commits, Notes, Tasks}
+  alias EyeInTheSky.{AsyncTask, ChannelMessages, Commits, Notes, Tasks}
   alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers,
@@ -94,7 +94,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   @spec dispatch_all([String.t()], integer()) :: :ok
   def dispatch_all(cmd_lines, from_session_id) do
     Enum.each(cmd_lines, fn line ->
-      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      AsyncTask.start(fn ->
         dispatch(String.trim(line), from_session_id)
       end)
     end)

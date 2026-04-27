@@ -498,21 +498,59 @@ cmd_tasks() {
       [[ $_comp_ok -eq 1 ]] || { echo "complete failed after retries — task $id may need manual completion" >&2; return 1; }
       ;;
     begin|quick)
-      # eits tasks begin --title <t> [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks begin --title <title> [--description <text>] [--project <id>] [--priority <p>] [--quiet|-q]"; return 0; }
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
+      # eits tasks begin [--id <task_id>] [--title <t>] [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
+      # With --id: claims an existing task (links session + sets In Progress). No new task created.
+      # Without --id: creates a new task then claims it.
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'HELP'
+usage: eits tasks begin [--id <task_id>] --title <title> [options]
+
+  --id <task_id>     Claim a pre-existing task instead of creating a new one.
+                     Links the current session and sets state to In Progress atomically.
+                     When --id is given, --title and --description are ignored.
+
+  --title <text>     Task title (required when --id is not given)
+  --description <t>  Task description
+  --project <id>     Project ID (default: $EITS_PROJECT_ID)
+  --priority <p>     Priority
+  --quiet|-q         Print only the task ID
+
+NOTES:
+  Orchestrators that pre-create tasks and pass Task ID: <n> in agent instructions
+  should tell agents to run: eits tasks begin --id <n>
+  This atomically claims the task without creating a duplicate.
+HELP
+        return 0; }
+      local task_id_flag="" title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --title)       title="$2";       shift 2 ;;
-          --description) description="$2"; shift 2 ;;
-          --project)     project_id="$2";  shift 2 ;;
-          --priority)    priority="$2";    shift 2 ;;
-          --quiet|-q)    quiet=1;          shift ;;
+          --id)          task_id_flag="$2"; shift 2 ;;
+          --title)       title="$2";        shift 2 ;;
+          --description) description="$2";  shift 2 ;;
+          --project)     project_id="$2";   shift 2 ;;
+          --priority)    priority="$2";     shift 2 ;;
+          --quiet|-q)    quiet=1;           shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      need title
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+
+      # --id path: claim existing task, skip create
+      if [[ -n "$task_id_flag" ]]; then
+        local _claim_resp
+        _claim_resp=$(_curl -X POST -H "Content-Type: application/json" \
+          -d "$(json session_id "$_sess")" \
+          "$BASE_URL/tasks/$task_id_flag/claim")
+        if [[ $quiet -eq 0 ]]; then
+          echo "$_claim_resp" | jq .
+        else
+          echo "$task_id_flag"
+        fi
+        return 0
+      fi
+
+      # create path: require --title
+      need title
       if [[ -n "$_sess" ]]; then
         local _enc_title
         _enc_title=$(printf '%s' "$title" | jq -Rr @uri)

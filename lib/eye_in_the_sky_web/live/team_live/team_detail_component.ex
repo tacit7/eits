@@ -117,11 +117,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                   <div class="flex-1 min-w-0">
                     <span class="font-medium text-sm text-base-content truncate">{member.name}</span>
                     <div class="flex items-center gap-2 mt-0.5">
-                      <span class={[
-                        "w-1.5 h-1.5 rounded-full shrink-0",
-                        member_status_dot(member.status)
-                      ]}>
-                      </span>
+                      <.status_dot status={member.status} size="xs" />
                       <span class={["text-mini font-medium", member_status_text(member.status)]}>
                         {member.status}
                       </span>
@@ -252,11 +248,6 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
   defp status_badge_class("active"), do: "badge-success"
   defp status_badge_class("archived"), do: "badge-ghost"
   defp status_badge_class(_), do: "badge-neutral"
-
-  defp member_status_dot("active"), do: "bg-success"
-  defp member_status_dot("idle"), do: "bg-base-content/30"
-  defp member_status_dot("done"), do: "bg-base-content/30"
-  defp member_status_dot(_), do: "bg-base-content/20"
 
   defp member_status_text("active"), do: "text-success"
   defp member_status_text("idle"), do: "text-base-content/50"

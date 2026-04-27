@@ -20,8 +20,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
       job_row_state: 3,
       row_border_class: 1,
       format_schedule: 1,
-      type_label: 1,
-      status_badge_class: 1
+      type_label: 1
     ]
 
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
@@ -159,9 +158,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     <%= for run <- @runs do %>
                       <div class="rounded-md bg-base-100/70 p-2 text-xs">
                         <div class="flex items-center justify-between gap-2">
-                          <span class={"badge badge-xs #{status_badge_class(run.status)}"}>
-                            {run.status}
-                          </span>
+                          <.status_badge status={run.status} size="xs" />
                           <span class="text-base-content/60 truncate">
                             {format_datetime_short_time(run.started_at)}
                           </span>
@@ -330,9 +327,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                           <%= for run <- @runs do %>
                             <tr>
                               <td>
-                                <span class={"badge badge-xs #{status_badge_class(run.status)}"}>
-                                  {run.status}
-                                </span>
+                                <.status_badge status={run.status} size="xs" />
                               </td>
                               <td class="text-xs">{format_datetime_short_time(run.started_at)}</td>
                               <td class="text-xs">{format_datetime_short_time(run.completed_at)}</td>

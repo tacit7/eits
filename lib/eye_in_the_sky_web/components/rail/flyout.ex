@@ -189,10 +189,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       navigate={"/dm/#{@session.id}"}
       class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
     >
-      <span class={[
-        "w-1.5 h-1.5 rounded-full flex-shrink-0",
-        status_dot_class(@session.status)
-      ]} />
+      <.status_dot status={@session.status} size="xs" />
       <span class="truncate font-medium text-xs">{@session.name || "unnamed"}</span>
     </.link>
     """
@@ -666,9 +663,5 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp project_route_for(:notes, %{id: id}), do: "/projects/#{id}/notes"
   defp project_route_for(:jobs, %{id: id}), do: "/projects/#{id}/jobs"
   defp project_route_for(_, _), do: nil
-
-  defp status_dot_class("working"), do: "bg-green-500"
-  defp status_dot_class("waiting"), do: "bg-amber-400"
-  defp status_dot_class(_), do: "bg-base-content/25"
 
 end

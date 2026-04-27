@@ -204,7 +204,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <.icon name="hero-bars-3" class="size-5" />
         </button>
         <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
-          <.session_status_dot status={@agent.status} class="w-1.5 h-1.5" />
+          <.status_dot status={@agent.status} size="xs" animate={@agent.status in ~w(working waiting compacting)} />
           <%= if @agent.entrypoint == "cli" do %>
             <.icon name="hero-command-line" class="size-3.5 text-base-content/40 flex-shrink-0" />
           <% end %>
@@ -245,7 +245,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="px-4 sm:px-5 py-3" id="dm-header">
           <div class="flex items-center gap-2 min-w-0">
             <div class="flex items-start gap-2 min-w-0 flex-1">
-              <.session_status_dot status={@agent.status} class="w-2 h-2 mt-[5px]" />
+              <.status_dot status={@agent.status} animate={@agent.status in ~w(working waiting compacting)} class="mt-[5px]" />
               <div class="flex flex-col min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <%= if @agent.entrypoint == "cli" do %>
@@ -474,17 +474,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
     """
   end
 
-  attr :status, :string, required: true
-  attr :class, :string, default: "w-2 h-2"
-
-  defp session_status_dot(assigns) do
-    ~H"""
-    <div class={"rounded-full flex-shrink-0 #{@class} #{session_status_dot_class(@status)}"} />
-    """
-  end
-
-  defp session_status_dot_class("working"), do: "bg-success animate-pulse"
-  defp session_status_dot_class("waiting"), do: "bg-warning animate-pulse"
-  defp session_status_dot_class("compacting"), do: "bg-orange-500 animate-pulse"
-  defp session_status_dot_class(_), do: "bg-base-content/20"
 end

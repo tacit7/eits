@@ -837,13 +837,20 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       <.status_dot status={:working} />
       <.status_dot status={:completed} size="md" />
   """
-  attr :status, :atom, required: true
+  attr :status, :any, required: true
   attr :size, :string, default: "sm"
+  attr :animate, :boolean, default: false
   attr :class, :string, default: ""
 
   def status_dot(assigns) do
     ~H"""
-    <span class={"rounded-full #{status_dot_size(@size)} #{status_dot_color(@status)} shrink-0 #{@class}"} />
+    <span class={[
+      "rounded-full shrink-0",
+      status_dot_size(@size),
+      status_dot_color(@status),
+      @animate && "animate-pulse",
+      @class
+    ]} />
     """
   end
 
@@ -855,7 +862,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       <.status_badge status={:working} />
       <.status_badge status={:failed} show_dot={true} label="Error" />
   """
-  attr :status, :atom, required: true
+  attr :status, :any, required: true
   attr :label, :string, default: nil
   attr :show_dot, :boolean, default: false
   attr :size, :string, default: "sm"
@@ -1088,6 +1095,21 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_dot_color(:completed), do: "bg-success"
   defp status_dot_color(:failed), do: "bg-error"
   defp status_dot_color(:stopped), do: "bg-base-content/20"
+  defp status_dot_color(:compacting), do: "bg-orange-500"
+  defp status_dot_color(s) when is_binary(s) do
+    case s do
+      "working" -> "bg-success"
+      "running" -> "bg-success"
+      "idle" -> "bg-base-content/30"
+      "waiting" -> "bg-info"
+      "pending" -> "bg-info"
+      "completed" -> "bg-success"
+      "failed" -> "bg-error"
+      "stopped" -> "bg-base-content/20"
+      "compacting" -> "bg-orange-500"
+      _ -> "bg-base-content/30"
+    end
+  end
   defp status_dot_color(_), do: "bg-base-content/30"
 
   defp status_badge_color(:working), do: "badge-success"
@@ -1098,6 +1120,19 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_badge_color(:completed), do: "badge-success"
   defp status_badge_color(:failed), do: "badge-error"
   defp status_badge_color(:stopped), do: "badge-ghost"
+  defp status_badge_color(s) when is_binary(s) do
+    case s do
+      "working" -> "badge-success"
+      "running" -> "badge-success"
+      "idle" -> "badge-ghost"
+      "waiting" -> "badge-info"
+      "pending" -> "badge-info"
+      "completed" -> "badge-success"
+      "failed" -> "badge-error"
+      "stopped" -> "badge-ghost"
+      _ -> "badge-ghost"
+    end
+  end
   defp status_badge_color(_), do: "badge-ghost"
 
 end

@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 </button>
                 <ul
                   tabindex="0"
-                  class="dropdown-content z-50 menu menu-xs p-1 shadow-lg bg-base-200 rounded-lg w-44 border border-base-content/8"
+                  class="dropdown-content z-50 menu menu-xs p-1 shadow-lg bg-base-200 rounded-lg w-48 border border-base-content/8"
                 >
                   <li>
                     <button

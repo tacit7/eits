@@ -325,7 +325,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
-      |> form("form[phx-change='search']", %{"query" => "zzzz"})
+      |> form("#top-bar-kanban-search", %{"query" => "zzzz"})
       |> render_change()
 
       assert has_element?(view, "#kanban-columns", "Searchable task zzzz")
@@ -340,7 +340,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
-      |> form("form[phx-change='search']", %{"query" => "al"})
+      |> form("#top-bar-kanban-search", %{"query" => "al"})
       |> render_change()
 
       html = render(view)

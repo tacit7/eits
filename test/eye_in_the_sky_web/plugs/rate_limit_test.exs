@@ -10,7 +10,11 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimitTest do
   # per test so buckets don't bleed across runs.
 
   setup tags do
-    ip = {127, 0, 0, :rand.uniform(250) + 1}
+    # Use a monotonic counter to guarantee unique IPs across tests.
+    # :rand.uniform is seeded by ExUnit's global seed — the same IP can be drawn
+    # twice in one test run, leaving stale rate-limit buckets that cause failures.
+    n = System.unique_integer([:positive, :monotonic])
+    ip = {10, 0, div(n, 256) |> rem(256), rem(n, 256)}
 
     # Enable rate limiting for all tests in this module (disabled globally in test.exs).
     Application.put_env(:eye_in_the_sky, :rate_limit_enabled, true)

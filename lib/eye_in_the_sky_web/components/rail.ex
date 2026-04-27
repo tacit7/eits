@@ -521,7 +521,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
         <.link navigate="/notifications" class={["relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors", "text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"]} aria-label="Notifications">
           <.icon name="hero-bell-mini" class="size-4" />
-          <span :if={@notification_count > 0} class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+          <span :if={@notification_count > 0} class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5">
             {@notification_count}
           </span>
         </.link>

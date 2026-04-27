@@ -265,7 +265,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
 
     ~H"""
     <%= if @has_footer do %>
-      <div class="flex items-center gap-2 mt-2 text-base-content/35 text-[11px]">
+      <div class="flex items-center gap-2 mt-2 text-base-content/35 text-mini">
         <%= if @task.created_at do %>
           <span class="tabular-nums">{relative_time(@task.created_at)}</span>
         <% end %>

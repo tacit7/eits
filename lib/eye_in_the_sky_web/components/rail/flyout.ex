@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                   <.icon name="hero-list-bullet" class="size-3.5" />
                 <% end %>
               </span>
-              <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+              <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
                 {section_label(@active_section)}
               </span>
             </.link>
@@ -75,7 +75,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                   <% end %>
                 </span>
               <% end %>
-              <span class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40 truncate">
+              <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 truncate">
                 {section_label(@active_section)}
               </span>
             </div>
@@ -242,7 +242,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
     <%= if @filter_open do %>
       <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
-        <div class="text-[9px] font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">State</div>
+        <div class="text-nano font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">State</div>
         <div class="flex flex-col gap-0.5">
           <.task_state_option label="All" value="all" current={@state_filter} myself={@myself} />
           <.task_state_option label="To Do" value="1" current={@state_filter} myself={@myself} />
@@ -327,7 +327,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           {if label == "", do: "(empty)", else: label}
         </span>
         <span :if={preview && preview != ""} class="truncate text-base-content/40">{preview}</span>
-        <span class="text-[10px] text-base-content/30 uppercase tracking-wide">{note.parent_type}</span>
+        <span class="text-micro text-base-content/30 uppercase tracking-wide">{note.parent_type}</span>
       </.link>
     <% end %>
     <%= if @notes == [] do %>
@@ -360,7 +360,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       >
         <.icon name="hero-users" class="size-3 flex-shrink-0 text-base-content/30" />
         <span class="truncate text-xs font-medium">{team.name}</span>
-        <span class="ml-auto text-[10px] text-base-content/30 flex-shrink-0">
+        <span class="ml-auto text-micro text-base-content/30 flex-shrink-0">
           {length(team.members)}
         </span>
       </.link>
@@ -415,7 +415,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         </div>
       <% end %>
       <%= if canvas.sessions == [] do %>
-        <div class="pl-7 pr-3 py-1 text-[10px] text-base-content/30">no sessions</div>
+        <div class="pl-7 pr-3 py-1 text-micro text-base-content/30">no sessions</div>
       <% end %>
     <% end %>
     """
@@ -531,7 +531,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           if(job.enabled, do: "bg-green-500", else: "bg-base-content/20")
         ]} />
         <span class="truncate font-medium flex-1">{job.name}</span>
-        <span class="text-[10px] text-base-content/30 flex-shrink-0 font-mono">{job.schedule_value}</span>
+        <span class="text-micro text-base-content/30 flex-shrink-0 font-mono">{job.schedule_value}</span>
       </.link>
     <% end %>
 
@@ -607,7 +607,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <span class="truncate">{node.name}</span>
             </button>
           <% :warning -> %>
-            <div class="px-3 py-1 text-[10px] text-base-content/25 italic" style={"padding-left: #{indent + 8}px"}>{node.name}</div>
+            <div class="px-3 py-1 text-micro text-base-content/25 italic" style={"padding-left: #{indent + 8}px"}>{node.name}</div>
           <% _ -> %>
         <% end %>
       <% end %>

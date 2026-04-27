@@ -29,14 +29,14 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
     <%= if @sidebar_project do %>
       <div class="flex items-center bg-base-200/40 rounded-lg p-0.5">
         <span
-          class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-base-100 shadow-sm text-base-content cursor-default"
+          class="flex items-center gap-1 h-6 px-2 rounded-md text-mini font-medium bg-base-100 shadow-sm text-base-content cursor-default"
           title="List view"
         >
           <.icon name="hero-list-bullet-mini" class="size-3.5" /> List
         </span>
         <.link
           navigate={~p"/projects/#{@sidebar_project.id}/kanban"}
-          class="flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
+          class="flex items-center gap-1 h-6 px-2 rounded-md text-mini font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
           title="Board view"
         >
           <.icon name="hero-view-columns-mini" class="size-3.5" /> Board
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
       <button
         phx-click="filter_status"
         phx-value-state_id=""
-        class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
+        class={"px-2.5 py-1 rounded-md text-mini font-medium transition-all duration-150 " <>
           if(is_nil(@filter_state_id),
             do: "bg-base-100 text-base-content shadow-sm",
             else: "text-base-content/45 hover:text-base-content/70"
@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
         <button
           phx-click="filter_status"
           phx-value-state_id={state.id}
-          class={"px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 " <>
+          class={"px-2.5 py-1 rounded-md text-mini font-medium transition-all duration-150 " <>
             if(@filter_state_id == state.id,
               do: "bg-base-100 text-base-content shadow-sm",
               else: "text-base-content/45 hover:text-base-content/70"
@@ -80,7 +80,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
       end}
       class="dropdown"
     >
-      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort: <span class="js-sort-label">{case @sort_by do
           "created_asc" -> "Oldest"
           "priority" -> "Priority"
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
               phx-click="sort_by"
               phx-value-by={value}
               onclick="var d=this.closest('details');d.querySelector('.js-sort-label').textContent=this.textContent.trim();d.removeAttribute('open')"
-              class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
+              class={"block w-full px-3 py-1.5 text-left text-mini rounded hover:bg-base-content/5 " <>
                 if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
             >
               {label}

@@ -33,13 +33,13 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
           </div>
           <div class="flex items-center gap-2">
             <%= if @agent_status_counts[:active] do %>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-[11px] font-mono text-success">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-mini font-mono text-success">
                 <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
                 {@agent_status_counts.active} active
               </span>
             <% end %>
             <%= if @agent_status_counts[:working] do %>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 text-mini font-mono text-warning">
                 <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
                 {@agent_status_counts.working} running
               </span>
@@ -97,7 +97,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
             <div class="inline-flex items-center gap-0.5 group">
               <a
                 href={~p"/dm/#{member.session_id}"}
-                class="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 min-h-[44px] rounded-l bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                class="inline-flex items-center gap-1 font-mono text-mini font-medium px-2 py-0.5 min-h-[44px] rounded-l bg-base-content/[0.04] text-base-content/50 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
                 title={"Session ##{member.session_id}"}
               >
                 @{member.session_id}
@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                     <button
                       phx-click="add_agent_to_channel"
                       phx-value-session_id={session.id}
-                      class="inline-flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 min-h-[44px] rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
+                      class="inline-flex items-center gap-1 font-mono text-mini px-2 py-0.5 min-h-[44px] rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
                       title={"Add @#{session.id} to channel"}
                     >
                       <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" /> @{session.id}

@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
     >
       <%= if @display_name do %>
         <div class="flex justify-end px-4 pt-2">
-          <span class="text-[11px] text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded">
+          <span class="text-mini text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded">
             {@display_name}
           </span>
         </div>
@@ -115,7 +115,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           title="Code block (⌘⇧E)"
           class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
         >
-          <span class="font-mono text-[10px] leading-none tracking-tight">```</span>
+          <span class="font-mono text-micro leading-none tracking-tight">```</span>
         </button>
         <div class="w-px h-4 bg-base-content/10 mx-0.5"></div>
         <button
@@ -204,7 +204,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                         <.icon name="hero-adjustments-horizontal" class={"size-4 #{icon_color}"} />
                         <div>
                           <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                          <div class="text-[11px] text-base-content/40">{desc}</div>
+                          <div class="text-mini text-base-content/40">{desc}</div>
                         </div>
                         <%= if @selected_effort == value do %>
                           <.icon name="hero-check-mini" class="size-4 text-primary ml-auto" />
@@ -229,7 +229,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                 true -> "text-error/70"
               end %>
             <span
-              class={"inline-flex items-center gap-1 text-[11px] font-mono tabular-nums " <> color_class}
+              class={"inline-flex items-center gap-1 text-mini font-mono tabular-nums " <> color_class}
               title={"#{format_number(@context_used)} / #{format_number(@context_window)} tokens used"}
             >
               {pct}% ctx
@@ -274,7 +274,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                           <.icon name="hero-bolt" class={"size-4 #{color}"} />
                           <div>
                             <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                            <div class="text-[11px] text-base-content/40">{desc}</div>
+                            <div class="text-mini text-base-content/40">{desc}</div>
                           </div>
                         </a>
                       </li>
@@ -292,7 +292,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                           <.icon name="hero-sparkles" class={"size-4 #{color}"} />
                           <div>
                             <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                            <div class="text-[11px] text-base-content/40">{desc}</div>
+                            <div class="text-mini text-base-content/40">{desc}</div>
                           </div>
                         </a>
                       </li>
@@ -310,7 +310,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                           <.icon name="hero-bolt" class={"size-4 #{color}"} />
                           <div>
                             <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                            <div class="text-[11px] text-base-content/40">{desc}</div>
+                            <div class="text-mini text-base-content/40">{desc}</div>
                           </div>
                         </a>
                       </li>
@@ -362,7 +362,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
     <details class="group mb-2" open>
       <summary class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-base-content/8 bg-base-content/[0.02] cursor-pointer list-none hover:bg-base-content/[0.04] transition-colors select-none">
         <.icon name="hero-clock" class="size-3.5 text-warning/70" />
-        <span class="text-[11px] font-medium text-base-content/40 flex-1 uppercase tracking-wide">
+        <span class="text-mini font-medium text-base-content/40 flex-1 uppercase tracking-wide">
           {length(@prompts)} queued
         </span>
         <.icon name="hero-chevron-down" class="size-3 text-base-content/20" />

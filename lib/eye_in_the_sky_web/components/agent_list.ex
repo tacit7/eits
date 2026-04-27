@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         aria-label="Select all sessions"
       />
       <%= if MapSet.size(@selected_ids) > 0 do %>
-        <span class="text-[11px] text-base-content/50 font-medium">
+        <span class="text-mini text-base-content/50 font-medium">
           {MapSet.size(@selected_ids)} selected
         </span>
         <button
@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           <.icon name="hero-trash-mini" class="size-3.5" /> Delete
         </button>
       <% else %>
-        <span class="text-[11px] text-base-content/30">{length(@agents)} sessions</span>
+        <span class="text-mini text-base-content/30">{length(@agents)} sessions</span>
       <% end %>
       <button
         phx-click="exit_select_mode"

@@ -156,7 +156,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         <div class={@mobile_view == :detail && "hidden"}>
           <%!-- Header --%>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
-            <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+            <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
               {length(@filtered_teams)} teams
               <%= if @show_all do %>
                 <span class="ml-1 text-primary">(all projects)</span>
@@ -218,7 +218,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                         <span class="text-[13px] font-medium text-base-content/85 truncate block">
                           {team.name}
                         </span>
-                        <div class="flex items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+                        <div class="flex items-center gap-1.5 mt-1 text-mini text-base-content/30">
                           <span class="font-mono">{length(team.members)} members</span>
                           <%= if active_member_count(team.members) > 0 do %>
                             <span class="text-base-content/15">/</span>

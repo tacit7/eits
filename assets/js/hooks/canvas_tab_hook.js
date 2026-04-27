@@ -47,7 +47,7 @@ function getOrCreateHelp() {
   })
 
   const hint = document.createElement("p")
-  hint.className = "text-[10px] text-base-content/30 mt-1"
+  hint.className = "text-micro text-base-content/30 mt-1"
   hint.textContent = "Press Esc or click outside to close"
 
   body.append(title, table, hint)

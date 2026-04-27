@@ -117,7 +117,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         </div>
         <div
           data-new-msg-pill
-          class="hidden absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-primary text-primary-content text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer shadow-md z-10"
+          class="hidden absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-primary text-primary-content text-micro font-medium px-2 py-0.5 rounded-full cursor-pointer shadow-md z-10"
         >
           &darr; new messages
         </div>
@@ -238,7 +238,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             </div>
             <time
               id={"msg-time-#{@cs_id}-#{@message.id}"}
-              class="text-[9px] text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+              class="text-nano text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
               data-utc={to_utc_string(@message.inserted_at)}
               phx-hook="LocalTime"
             />

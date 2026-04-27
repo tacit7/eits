@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
       </div>
 
       <%!-- Stats row --%>
-      <div class="flex items-center gap-3 text-[11px] text-base-content/40">
+      <div class="flex items-center gap-3 text-mini text-base-content/40">
         <span>
           <span class="font-mono font-semibold text-base-content/70">{length(@team.members)}</span>
           members
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
       <%!-- Task progress bar --%>
       <%= if @total_tasks > 0 do %>
         <div class="space-y-1">
-          <div class="flex items-center justify-between text-[11px] text-base-content/40">
+          <div class="flex items-center justify-between text-mini text-base-content/40">
             <span>Progress</span>
             <span class="font-mono">{@done_tasks}/{@total_tasks}</span>
           </div>
@@ -85,11 +85,11 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
       <%!-- Members --%>
       <section>
         <div class="flex items-center gap-2 mb-3">
-          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">
+          <h2 class="text-mini font-semibold text-base-content/50 uppercase tracking-widest">
             Members
           </h2>
           <div class="h-px flex-1 bg-base-300"></div>
-          <span class="font-mono text-[11px] text-base-content/30">{length(@team.members)}</span>
+          <span class="font-mono text-mini text-base-content/30">{length(@team.members)}</span>
         </div>
 
         <div class="space-y-2">
@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                         member_status_dot(member.status)
                       ]}>
                       </span>
-                      <span class={["text-[11px] font-medium", member_status_text(member.status)]}>
+                      <span class={["text-mini font-medium", member_status_text(member.status)]}>
                         {member.status}
                       </span>
                     </div>
@@ -166,11 +166,11 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
       <%!-- Unowned Tasks --%>
       <section>
         <div class="flex items-center gap-2 mb-3">
-          <h2 class="text-[11px] font-semibold text-base-content/50 uppercase tracking-widest">
+          <h2 class="text-mini font-semibold text-base-content/50 uppercase tracking-widest">
             Unassigned Tasks
           </h2>
           <div class="h-px flex-1 bg-base-300"></div>
-          <span class="font-mono text-[11px] text-base-content/30">
+          <span class="font-mono text-mini text-base-content/30">
             {length(Map.get(@team, :unowned_tasks, []))}
           </span>
         </div>

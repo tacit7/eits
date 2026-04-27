@@ -53,9 +53,9 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     <% end %>
                   </div>
                   <%= if job.description do %>
-                    <p class="text-[11px] text-base-content/60 mt-0.5 truncate">{job.description}</p>
+                    <p class="text-mini text-base-content/60 mt-0.5 truncate">{job.description}</p>
                   <% end %>
-                  <p class="text-[11px] font-mono text-base-content/50 mt-1 truncate">
+                  <p class="text-mini font-mono text-base-content/50 mt-1 truncate">
                     {format_schedule(job)}
                     <span class="text-base-content/30 not-italic ml-1">{job.timezone || "UTC"}</span>
                   </p>

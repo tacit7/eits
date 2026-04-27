@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <div class="mt-2 flex flex-wrap gap-1.5">
       <%= if @message.metadata["total_cost_usd"] do %>
         <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
           title="Total cost"
         >
           <.icon name="hero-currency-dollar-mini" class="size-3" />
@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
       <%= if @message.metadata["usage"] && @message.metadata["usage"]["input_tokens"] do %>
         <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
           title="Input tokens"
         >
           {@message.metadata["usage"]["input_tokens"]} in
@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
       <%= if @message.metadata["usage"] && @message.metadata["usage"]["output_tokens"] do %>
         <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
           title="Output tokens"
         >
           {@message.metadata["usage"]["output_tokens"]} out
@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
       <%= if @message.metadata["duration_ms"] do %>
         <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
           title="Duration"
         >
           <.icon name="hero-clock-mini" class="size-3" />
@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
       <%= if @message.metadata["num_turns"] do %>
         <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
           title="Number of turns"
         >
           {@message.metadata["num_turns"]} turns
@@ -91,7 +91,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <%= if @attachments != [] do %>
       <div class="mt-2 space-y-1">
         <%= for attachment <- @attachments do %>
-          <div class="flex items-center gap-2 rounded-md bg-base-content/[0.04] px-2.5 py-1.5 text-[11px] font-mono">
+          <div class="flex items-center gap-2 rounded-md bg-base-content/[0.04] px-2.5 py-1.5 text-mini font-mono">
             <.icon name="hero-paper-clip" class="size-3 text-base-content/30" />
             <span class="text-base-content/60">{attachment.original_filename}</span>
             <span class="ml-auto text-base-content/25">{attachment.storage_path}</span>
@@ -145,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     ]}>
       <%= if @dm_info do %>
         <div class="flex items-center gap-1.5 flex-wrap mb-1">
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 text-[10px] font-mono font-semibold">
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 text-micro font-mono font-semibold">
             <.icon name="hero-cpu-chip" class="size-3" />
             {@dm_info.sender}
             <%= if @dm_info[:session_id] && @dm_info[:session_id] != "" do %>
@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           </span>
           <%= if @dm_info.status do %>
             <span class={[
-              "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold",
+              "inline-flex items-center px-1.5 py-0.5 rounded text-micro font-mono font-semibold",
               @dm_info.status in ["done", "completed"] && "bg-success/15 text-success/80",
               @dm_info.status == "failed" && "bg-error/15 text-error/80",
               @dm_info.status not in ["done", "completed", "failed"] && "bg-base-content/8 text-base-content/50"
@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
               href={@dm_info.url}
               target="_blank"
               rel="noopener"
-              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/50 hover:text-primary/80 transition-colors text-[10px] font-mono truncate max-w-[220px]"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/50 hover:text-primary/80 transition-colors text-micro font-mono truncate max-w-[220px]"
               title={@dm_info.url}
             >
               <.icon name="hero-arrow-top-right-on-square" class="size-3 flex-shrink-0" />
@@ -190,7 +190,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           />
           <span class={
             "font-mono font-semibold text-primary/60 uppercase tracking-wide " <>
-              if(@compact, do: "text-[10px]", else: "text-[11px]")
+              if(@compact, do: "text-micro", else: "text-mini")
           }>
             Thinking
           </span>
@@ -200,7 +200,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           />
         </summary>
         <div class={if @compact, do: "px-2 pb-1.5 pt-1 border-t border-primary/10", else: "px-2.5 pb-2 pt-1 border-t border-primary/10"}>
-          <pre class={if @compact, do: "font-mono text-[10px] text-base-content/40 whitespace-pre-wrap break-words leading-relaxed", else: "font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed"}>{@thinking}</pre>
+          <pre class={if @compact, do: "font-mono text-micro text-base-content/40 whitespace-pre-wrap break-words leading-relaxed", else: "font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed"}>{@thinking}</pre>
         </div>
       </details>
       <%= if @stream_type == "tool_result" do %>
@@ -249,7 +249,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         />
         <span class={
           "font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0 " <>
-            if(@compact, do: "text-[10px]", else: "text-[11px]")
+            if(@compact, do: "text-micro", else: "text-mini")
         }>
           Output
         </span>
@@ -267,7 +267,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         />
       </summary>
       <div class={if @compact, do: "px-2 pb-1.5 pt-1 border-t border-base-content/5", else: "px-2.5 pb-2 pt-1 border-t border-base-content/5"}>
-        <pre class={if @compact, do: "font-mono text-[10px] text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto", else: "font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto"}>{@body}</pre>
+        <pre class={if @compact, do: "font-mono text-micro text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto", else: "font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto"}>{@body}</pre>
       </div>
     </details>
     <% end %>
@@ -304,12 +304,12 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
       <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
         <.icon name={@icon} class="size-3.5 flex-shrink-0 text-base-content/35" />
-        <span class="text-[11px] font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
+        <span class="text-mini font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
           {@label}
         </span>
         <span
           :if={@detail != "" && !@wrap_detail}
-          class="text-[11px] font-mono text-base-content/35 truncate flex-1 min-w-0"
+          class="text-mini font-mono text-base-content/35 truncate flex-1 min-w-0"
         >
           {@detail}
         </span>
@@ -362,7 +362,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         </div>
       <% :speak -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="bg-base-200 rounded px-2 py-1.5 text-[11px] text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{@detail}</pre>
+          <pre class="bg-base-200 rounded px-2 py-1.5 text-mini text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{@detail}</pre>
         </div>
       <% :json -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">

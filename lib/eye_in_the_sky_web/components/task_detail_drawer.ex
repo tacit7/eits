@@ -117,7 +117,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     </select>
                   </div>
                   <div>
-                    <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <label class="text-mini font-medium text-base-content/40 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                       <span>Due date</span>
                       <%= cond do %>
                         <% overdue?(@task.due_at) -> %>
@@ -172,10 +172,10 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <%= if not is_nil(@notes) && @notes != [] do %>
                 <div>
                   <div class="flex items-center gap-2 mb-2">
-                    <span class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
+                    <span class="text-mini font-medium text-base-content/40 uppercase tracking-wider">
                       Annotations
                     </span>
-                    <span class="text-[11px] font-mono tabular-nums text-base-content/25">
+                    <span class="text-mini font-mono tabular-nums text-base-content/25">
                       {length(@notes)}
                     </span>
                   </div>
@@ -188,7 +188,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                           </div>
                         <% end %>
                         <pre class="whitespace-pre-wrap text-xs text-base-content/60 font-mono leading-relaxed">{String.trim(note.body || "")}</pre>
-                        <div class="mt-1.5 text-[11px] text-base-content/25">
+                        <div class="mt-1.5 text-mini text-base-content/25">
                           {relative_time(note.created_at)}
                         </div>
                       </div>
@@ -198,7 +198,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <% end %>
 
               <%!-- Metadata --%>
-              <div class="flex items-center gap-3 text-[11px] text-base-content/25 pt-2">
+              <div class="flex items-center gap-3 text-mini text-base-content/25 pt-2">
                 <%= if not is_nil(@task.updated_at) && @task.updated_at != @task.created_at do %>
                   <span>Updated {relative_time(@task.updated_at)}</span>
                   <span class="text-base-content/10">&middot;</span>
@@ -216,7 +216,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
 
               <%!-- Add annotation --%>
               <div class="border-t border-base-content/5 pt-4">
-                <span class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider block mb-2">
+                <span class="text-mini font-medium text-base-content/40 uppercase tracking-wider block mb-2">
                   Add Annotation
                 </span>
                 <form phx-submit="add_task_annotation" class="flex flex-col gap-2">

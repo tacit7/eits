@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
           data-role="selection-count"
           data-selected-count={MapSet.size(@selected_ids)}
           data-offscreen-count={@off_screen_selected_count}
-          class="text-[11px] text-base-content/50 font-medium"
+          class="text-mini text-base-content/50 font-medium"
         >
           {MapSet.size(@selected_ids)} selected
           <%= if @off_screen_selected_count > 0 do %>

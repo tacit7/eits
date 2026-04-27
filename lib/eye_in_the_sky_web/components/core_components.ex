@@ -692,7 +692,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def detail_label(assigns) do
     ~H"""
-    <label class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+    <label class="text-mini font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
       {@text}
     </label>
     """
@@ -727,7 +727,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   Supports two sizes:
   - `"sm"` (default) — page-level search bars (`input-sm min-h-[44px]`)
-  - `"xs"` — compact top-bar search bars (`input-xs h-7 text-[12px]`)
+  - `"xs"` — compact top-bar search bars (`input-xs h-7 text-xs`)
 
   ## Examples
 
@@ -773,7 +773,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         class={"input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 " <>
           "focus:border-primary/30 focus:bg-base-100 transition-colors " <>
           if(@size == "xs",
-            do: "input-xs pl-8 h-7 text-[12px]",
+            do: "input-xs pl-8 h-7 text-xs",
             else: "input-sm pl-9 min-h-[44px] text-base"
           )}
       />
@@ -930,7 +930,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           phx-value-type={if @value_key == "type", do: item[:value]}
           phx-value-by={if @value_key == "by", do: item[:value]}
           class={[
-            "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150",
+            "px-2.5 py-1 rounded-md text-mini font-medium transition-all duration-150",
             if(item[:active],
               do: item[:active_class] || "bg-base-100 text-base-content shadow-sm",
               else: "text-base-content/45 hover:text-base-content/70"

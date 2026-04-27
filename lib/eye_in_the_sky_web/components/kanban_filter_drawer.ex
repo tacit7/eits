@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
           <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
             <%!-- Keyword --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+              <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
                 Keyword
               </h3>
               <form phx-change="search">
@@ -63,13 +63,13 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                     autocomplete="off"
                   />
                 </div>
-                <p class="text-[11px] text-base-content/30 mt-1">Search cards, labels, and more.</p>
+                <p class="text-mini text-base-content/30 mt-1">Search cards, labels, and more.</p>
               </form>
             </div>
 
             <%!-- Card Status --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+              <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
                 Card status
               </h3>
               <div class="space-y-0.5">
@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
 
             <%!-- Due Date --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+              <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
                 Due date
               </h3>
               <div class="space-y-0.5">
@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
 
             <%!-- Priority --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+              <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
                 Priority
               </h3>
               <div class="space-y-1.5">
@@ -140,7 +140,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                       phx-value-value={value}
                     />
                     <div class="flex-1 h-5 rounded" style={"background-color: #{color}"} />
-                    <span class="text-[11px] text-base-content/45 w-7 text-right shrink-0">
+                    <span class="text-mini text-base-content/45 w-7 text-right shrink-0">
                       {label}
                     </span>
                   </label>
@@ -151,7 +151,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
             <%!-- Labels / Tags --%>
             <%= if @available_tags != [] do %>
               <div>
-                <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+                <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
                   Labels
                 </h3>
                 <div class="space-y-1.5">
@@ -169,7 +169,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                         class="flex-1 h-5 rounded flex items-center px-2"
                         style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
                       >
-                        <span class="text-[11px] font-medium text-white/90 truncate">{tag.name}</span>
+                        <span class="text-mini font-medium text-white/90 truncate">{tag.name}</span>
                       </div>
                       <button
                         type="button"
@@ -189,7 +189,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
 
             <%!-- Activity --%>
             <div>
-              <h3 class="text-[11px] font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+              <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
                 Activity
               </h3>
               <div class="space-y-0.5">

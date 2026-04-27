@@ -509,7 +509,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   defp section(assigns) do
     ~H"""
     <div class="px-4 py-3">
-      <h4 class="mb-2 text-[11px] font-medium uppercase tracking-wide text-base-content/50">
+      <h4 class="mb-2 text-mini font-medium uppercase tracking-wide text-base-content/50">
         {@title}
       </h4>
       <div class="flex flex-col divide-y divide-base-content/5">
@@ -537,7 +537,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5 text-sm text-base-content/90">
           {@label}
-          <span :if={@help} class="text-[11px] font-mono text-base-content/40">{@help}</span>
+          <span :if={@help} class="text-mini font-mono text-base-content/40">{@help}</span>
           <span
             :if={@override}
             class="inline-block h-1.5 w-1.5 rounded-full bg-warning"

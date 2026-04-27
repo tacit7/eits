@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <%!-- Codex raw JSONL stream panel — only visible for codex sessions with data --%>
       <%= if @codex_raw_lines != [] do %>
         <details class="border-t border-base-300 shrink-0" id="codex-raw-panel">
-          <summary class="px-4 py-1.5 text-[10px] font-mono text-base-content/30 cursor-pointer select-none hover:text-base-content/50 flex items-center gap-1.5">
+          <summary class="px-4 py-1.5 text-micro font-mono text-base-content/30 cursor-pointer select-none hover:text-base-content/50 flex items-center gap-1.5">
             <.icon name="hero-code-bracket" class="size-3" />
             raw stream ({length(@codex_raw_lines)} lines)
           </summary>
@@ -106,7 +106,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             phx-hook="AutoScroll"
           >
             <%= for line <- Enum.reverse(@codex_raw_lines) do %>
-              <div class="font-mono text-[10px] text-base-content/40 leading-relaxed truncate">
+              <div class="font-mono text-micro text-base-content/40 leading-relaxed truncate">
                 {line}
               </div>
             <% end %>
@@ -162,13 +162,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             <div :if={@role == :agent} class="flex items-center gap-1.5 mt-0.5 px-1">
               <span
                 :if={message_model(@message)}
-                class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
+                class="text-mini font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
               >
                 {message_model(@message)}
               </span>
               <span
                 :if={message_cost(@message)}
-                class="text-[11px] font-mono text-base-content/30"
+                class="text-mini font-mono text-base-content/30"
               >
                 ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
               </span>
@@ -177,7 +177,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             <.message_attachments attachments={@message.attachments || []} />
             <time
               id={"msg-time-#{@message.id}"}
-              class="text-[9px] text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150"
+              class="text-nano text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150"
               data-utc={to_utc_string(@message.inserted_at)}
               phx-hook="LocalTime"
             />

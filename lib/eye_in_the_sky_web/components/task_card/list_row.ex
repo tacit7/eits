@@ -89,17 +89,17 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           </span>
 
           <%!-- Metadata line --%>
-          <div class="flex items-center gap-1.5 flex-wrap mt-1 text-[11px]">
+          <div class="flex items-center gap-1.5 flex-wrap mt-1 text-mini">
             <%!-- State pill --%>
             <%= if @task.state do %>
-              <span class={["px-1.5 py-px rounded-full font-medium text-[10px]", state_pill_class(@task.state_id)]}>
+              <span class={["px-1.5 py-px rounded-full font-medium text-micro", state_pill_class(@task.state_id)]}>
                 {@task.state.name}
               </span>
             <% end %>
 
             <%!-- Priority badge (only when set) --%>
             <%= if is_integer(@task.priority) && @task.priority > 0 do %>
-              <span class={["px-1.5 py-px rounded-full font-medium text-[10px]", priority_pill_class(@task.priority)]}>
+              <span class={["px-1.5 py-px rounded-full font-medium text-micro", priority_pill_class(@task.priority)]}>
                 {priority_label(@task.priority)}
               </span>
             <% end %>

@@ -163,7 +163,7 @@ export class FloatingChatModal {
     return `<div class="flex items-start gap-2 px-1 py-1.5 rounded-lg hover:bg-base-content/[0.02] transition-colors">
       ${dotInner}
       <div class="min-w-0 flex-1">
-        <span class="text-[11px] font-semibold ${nameColor} mr-1">${label}</span>
+        <span class="text-mini font-semibold ${nameColor} mr-1">${label}</span>
         <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">${FloatingChatModal.escape(m.body)}</p>
       </div>
     </div>`

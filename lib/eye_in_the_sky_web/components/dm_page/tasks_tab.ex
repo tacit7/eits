@@ -74,7 +74,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                     ]}>
                       {String.trim(task.title || "")}
                     </span>
-                    <div class="flex items-center gap-1.5 mt-0.5 text-[11px]">
+                    <div class="flex items-center gap-1.5 mt-0.5 text-mini">
                       <%= if task.state do %>
                         <span class={[
                           "font-medium",
@@ -126,7 +126,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                     <%= for note <- Map.get(task, :notes, []) do %>
                       <div class="mt-1.5 rounded-lg bg-base-200/60 px-3 py-2">
                         <%= if note.title do %>
-                          <div class="text-[11px] font-semibold text-base-content/60 mb-0.5">
+                          <div class="text-mini font-semibold text-base-content/60 mb-0.5">
                             {note.title}
                           </div>
                         <% end %>

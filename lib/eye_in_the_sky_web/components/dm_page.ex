@@ -322,7 +322,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </span>
               <div class="flex items-center gap-1.5 min-w-0">
                 <div class="w-1.5 h-1.5 rounded-full bg-info animate-pulse flex-shrink-0" />
-                <span class="text-[12px] font-medium text-base-content/70 truncate">
+                <span class="text-xs font-medium text-base-content/70 truncate">
                   {@task_data.current_task.title}
                 </span>
               </div>
@@ -341,7 +341,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           >
             <div class="flex items-center gap-2">
               <div class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
-              <span class="text-[11px] font-medium text-warning/80">Compacting context...</span>
+              <span class="text-mini font-medium text-warning/80">Compacting context...</span>
             </div>
           </div>
         <% end %>

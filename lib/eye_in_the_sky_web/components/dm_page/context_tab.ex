@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
                       {title}
                     </h3>
                     <%= if idx == 0 and @session_context do %>
-                      <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-base-content/30">
+                      <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30">
                         <time
                           id="context-updated-at"
                           class="tabular-nums"

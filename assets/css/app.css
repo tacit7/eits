@@ -25,6 +25,16 @@
 /* Tokyo Night theme for daisyUI */
 [data-theme="tokyonight"]{color-scheme:dark;--color-primary:#7aa2f7;--color-primary-content:#1a1b26;--color-secondary:#bb9af7;--color-secondary-content:#1a1b26;--color-accent:#7dcfff;--color-accent-content:#1a1b26;--color-neutral:#1a1b26;--color-neutral-content:#c0caf5;--color-base-100:#1a1b26;--color-base-200:#16161e;--color-base-300:#24283b;--color-base-content:#c0caf5;--color-info:#4fd6be;--color-info-content:#1a1b26;--color-success:#9ece6a;--color-success-content:#1a1b26;--color-warning:#e0af68;--color-warning-content:#1a1b26;--color-error:#f7768e;--color-error-content:#1a1b26}
 
+/* Named typography tokens for sub-xs sizes used throughout the dense UI.
+   text-mini  = 11px  (top-bar pills, detail labels — the dominant density size)
+   text-micro = 10px  (mono compact tool output, code inline refs)
+   text-nano  =  9px  (badge counts, kbd hints, section headers) */
+@theme {
+  --text-mini: 0.6875rem;
+  --text-micro: 0.625rem;
+  --text-nano: 0.5625rem;
+}
+
 /* Add variants based on LiveView classes */
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);

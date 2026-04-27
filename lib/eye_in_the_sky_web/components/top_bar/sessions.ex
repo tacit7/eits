@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
       end}
       class="dropdown"
     >
-      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort: <span class="js-sort-label">{case @sort_by do
           "name" -> "Name"
           "agent" -> "Agent"
@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
               phx-click="sort"
               phx-value-by={value}
               onclick="var d=this.closest('details');d.querySelector('.js-sort-label').textContent=this.textContent.trim();d.removeAttribute('open')"
-              class={"block w-full px-3 py-1.5 text-left text-[11px] rounded hover:bg-base-content/5 " <>
+              class={"block w-full px-3 py-1.5 text-left text-mini rounded hover:bg-base-content/5 " <>
                 if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
             >
               {label}

@@ -26,11 +26,11 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
     ~H"""
     <div>
       <div class="flex items-center gap-2 mb-2">
-        <span class="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
+        <span class="text-mini font-medium text-base-content/40 uppercase tracking-wider">
           Checklist
         </span>
         <%= if @total > 0 do %>
-          <span class="text-[11px] font-mono tabular-nums text-base-content/25">
+          <span class="text-mini font-mono tabular-nums text-base-content/25">
             {@done}/{@total}
           </span>
         <% end %>

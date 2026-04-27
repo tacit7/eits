@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Layouts do
 
   def top_bar_breadcrumb(assigns) do
     ~H"""
-    <span class="text-[12px] font-semibold text-base-content/75 px-1 flex-shrink-0">
+    <span class="text-xs font-semibold text-base-content/75 px-1 flex-shrink-0">
       <%= if @sidebar_tab == :dm && @dm_session_name do %>
         {@dm_session_name}
       <% else %>
@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Layouts do
       <%= if @href do %>
         <.link
           navigate={@href}
-          class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+          class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
         >
           <.icon name="hero-plus" class="size-3" />
           {@label}
@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Layouts do
       <% else %>
         <button
           phx-click={@event}
-          class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+          class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
         >
           <.icon name="hero-plus" class="size-3" />
           {@label}

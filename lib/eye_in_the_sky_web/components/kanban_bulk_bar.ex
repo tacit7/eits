@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
           {MapSet.size(@selected_tasks)} selected
         </span>
         <span class="text-base-content/15 hidden sm:inline">|</span>
-        <span class="text-[11px] text-base-content/40 hidden sm:inline">Move to:</span>
+        <span class="text-mini text-base-content/40 hidden sm:inline">Move to:</span>
         <%= for state <- @workflow_states do %>
           <button
             phx-click="bulk_move"

@@ -132,7 +132,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
               </span>
             <% end %>
           </div>
-          <div class="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-base-content/30">
+          <div class="flex flex-wrap items-center gap-1.5 mt-1 text-mini text-base-content/30">
             <span class="font-mono tabular-nums text-base-content/30 shrink-0">#{@session.id}</span>
             <span class="text-base-content/15">/</span>
             <%= if @session.entrypoint == "cli" do %>

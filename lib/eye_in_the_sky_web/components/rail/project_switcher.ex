@@ -18,12 +18,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       :if={@open}
       class="absolute left-[52px] top-[48px] z-50 w-64 bg-base-200 border border-base-content/10 rounded-xl shadow-2xl overflow-hidden"
     >
-      <div class="px-3 py-2.5 border-b border-base-content/8 text-[10px] font-semibold uppercase tracking-widest text-base-content/40">
+      <div class="px-3 py-2.5 border-b border-base-content/8 text-micro font-semibold uppercase tracking-widest text-base-content/40">
         Switch Context
       </div>
 
       <%!-- WORKSPACE section --%>
-      <div class="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-widest text-base-content/30">
+      <div class="px-3 pt-2 pb-0.5 text-nano font-semibold uppercase tracking-widest text-base-content/30">
         Workspace
       </div>
       <div class="px-1.5 pb-1.5">
@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       </div>
 
       <%!-- PROJECTS section --%>
-      <div class="px-3 pt-1 pb-0.5 text-[9px] font-semibold uppercase tracking-widest text-base-content/30 border-t border-base-content/8">
+      <div class="px-3 pt-1 pb-0.5 text-nano font-semibold uppercase tracking-widest text-base-content/30 border-t border-base-content/8">
         Projects
       </div>
       <div class="p-1.5 max-h-48 overflow-y-auto">

@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           aria-label="Select all notes"
         />
         <%= if MapSet.size(@selected_ids) > 0 do %>
-          <span class="text-[11px] text-base-content/50 font-medium">
+          <span class="text-mini text-base-content/50 font-medium">
             {MapSet.size(@selected_ids)} selected
           </span>
           <button
@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
             <.icon name="hero-trash-mini" class="size-3.5" /> Delete
           </button>
         <% else %>
-          <span class="text-[11px] text-base-content/30">{length(@notes)} notes</span>
+          <span class="text-mini text-base-content/30">{length(@notes)} notes</span>
         <% end %>
         <button
           phx-click="exit_select_mode_notes"
@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <% else %>
       <%!-- Notes count --%>
       <div class="mb-3">
-        <span class="text-[11px] font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
+        <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
           {length(@notes)} notes
         </span>
       </div>
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                   </.link>
                 </div>
                 <%!-- Metadata: type badge • source ref • age --%>
-                <div class="flex items-center gap-1.5 text-[11px] text-base-content/40">
+                <div class="flex items-center gap-1.5 text-mini text-base-content/40">
                   <span class={[
                     "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium",
                     parent_type_class(note.parent_type)

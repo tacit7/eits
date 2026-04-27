@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                   <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
                     {extract_commit_title(commit.commit_message)}
                   </h3>
-                  <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-base-content/30">
+                  <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30">
                     <span class="font-mono">{String.slice(hash, 0..7)}</span>
                     <span class="text-base-content/15">/</span>
                     <time

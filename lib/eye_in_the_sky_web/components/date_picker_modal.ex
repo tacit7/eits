@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
           <form phx-submit="save_due_date" class="px-4 pb-4 pt-3 border-t border-base-content/10 mt-2">
             <input type="hidden" name="task_id" value={@task.uuid || to_string(@task.id)} />
             <div class="mb-3">
-              <label class="text-[11px] font-medium text-base-content/50 uppercase tracking-wider mb-1.5 block">
+              <label class="text-mini font-medium text-base-content/50 uppercase tracking-wider mb-1.5 block">
                 Due date
               </label>
               <input

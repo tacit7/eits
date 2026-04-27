@@ -56,7 +56,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               id={"copy-uuid-#{@wrapper_id || "menu"}"}
               phx-hook="CopyToClipboard"
               data-copy={@session_uuid}
-              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded font-mono text-[11px]"
+              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded font-mono text-mini"
             >
               <.icon name="hero-clipboard-document" class="size-3.5 flex-shrink-0" />
               Copy {String.slice(@session_uuid, 0..7)}…

@@ -32,12 +32,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageToolWidget do
     <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
       <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
         <.icon name={@icon} class="size-3.5 flex-shrink-0 text-base-content/35" />
-        <span class="text-[11px] font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
+        <span class="text-mini font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
           {@label}
         </span>
         <span
           :if={@detail != "" && !@wrap_detail}
-          class="text-[11px] font-mono text-base-content/35 truncate flex-1 min-w-0"
+          class="text-mini font-mono text-base-content/35 truncate flex-1 min-w-0"
         >
           {@detail}
         </span>

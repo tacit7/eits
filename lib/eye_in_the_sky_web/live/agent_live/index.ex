@@ -236,7 +236,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
       <div class="max-w-3xl mx-auto">
         <div class="flex items-center justify-between py-5">
-          <span class="text-[11px] font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
+          <span class="text-mini font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
             {length(@agents)} agents
           </span>
           <div class="flex items-center gap-2">

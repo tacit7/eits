@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                   <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
                     {note.title || extract_title(note.body)}
                   </h3>
-                  <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-base-content/30">
+                  <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30">
                     <span class="font-mono">
                       {String.slice(note.uuid || to_string(note.id), 0..7)}
                     </span>

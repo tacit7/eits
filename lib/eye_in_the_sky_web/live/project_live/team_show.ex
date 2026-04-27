@@ -16,15 +16,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
         {:ok, team} ->
           if connected?(socket) do
             EyeInTheSky.Events.subscribe_teams()
+            team = load_team_detail(team)
+            socket
+            |> assign(:team, team)
+            |> assign(:team_id, team_id)
+            |> assign(:agent_session_id, nil)
+            |> assign(:page_title_prefix, team.name)
+          else
+            socket
+            |> assign(:team, team)
+            |> assign(:team_id, team_id)
+            |> assign(:agent_session_id, nil)
           end
-
-          team = load_team_detail(team)
-
-          socket
-          |> assign(:team, team)
-          |> assign(:team_id, team_id)
-          |> assign(:agent_session_id, nil)
-          |> assign(:page_title_prefix, team.name)
 
         _ ->
           socket
@@ -40,10 +43,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_info({event, _payload}, %{assigns: %{team_id: nil}} = socket)
+      when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left],
+      do: {:noreply, socket}
+
   def handle_info({event, _payload}, socket)
       when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left] do
     socket =
-      case socket.assigns.team_id && Teams.get_team(socket.assigns.team_id) do
+      case Teams.get_team(socket.assigns.team_id) do
         {:ok, team} -> assign(socket, :team, load_team_detail(team))
         _ -> push_navigate(socket, to: back_path(socket))
       end

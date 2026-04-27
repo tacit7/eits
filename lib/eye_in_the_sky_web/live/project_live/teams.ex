@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
   alias EyeInTheSky.Teams
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -25,17 +26,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
   @impl true
   def handle_params(%{"show_all" => "true"}, _uri, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_all, true)
-     |> assign(:teams, load_teams(socket, socket.assigns.show_archived, true))}
+    socket = assign(socket, :show_all, true)
+    socket = if connected?(socket), do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, true)), else: socket
+    {:noreply, socket}
   end
 
   def handle_params(_params, _uri, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_all, false)
-     |> assign(:teams, load_teams(socket, socket.assigns.show_archived, false))}
+    socket = assign(socket, :show_all, false)
+    socket = if connected?(socket), do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, false)), else: socket
+    {:noreply, socket}
   end
 
   @impl true
@@ -49,6 +48,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
     {:noreply, assign(socket, :search_query, query)}
+  end
+
+  @impl true
+  def handle_event("delete_team", %{"id" => id}, socket) do
+    case parse_int(id) do
+      nil ->
+        {:noreply, socket}
+
+      team_id ->
+        team = Teams.get_team!(team_id)
+        {:ok, _} = Teams.delete_team(team)
+        {:noreply, assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all))}
+    end
   end
 
   @impl true
@@ -77,7 +89,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         <div class="flex items-center gap-1">
           <%= if @project do %>
             <.link
-              navigate={~p"/projects/#{@project.id}/teams?show_all=true"}
+              navigate={if @show_all, do: ~p"/projects/#{@project.id}/teams", else: ~p"/projects/#{@project.id}/teams?show_all=true"}
               class={[
                 "text-xs px-2 py-1 rounded transition-colors",
                 if(@show_all,
@@ -86,7 +98,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                 )
               ]}
             >
-              {if @show_all, do: "All projects", else: "Show all"}
+              {if @show_all, do: "This project", else: "Show all"}
             </.link>
           <% end %>
           <button
@@ -118,10 +130,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       <% else %>
         <div class="divide-y divide-base-content/5">
           <%= for team <- @filtered_teams do %>
-            <div class="py-0.5">
+            <div class="py-0.5 group flex items-center gap-1">
               <.link
                 navigate={~p"/projects/#{@project.id}/teams/#{team.id}"}
-                class="py-2.5 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors"
+                class="flex-1 py-2.5 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0"
               >
                 <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> member_dot_class(team.members)} />
                 <div class="flex-1 min-w-0">
@@ -147,6 +159,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                 </div>
                 <.icon name="hero-chevron-right" class="size-3.5 text-base-content/20 flex-shrink-0" />
               </.link>
+              <button
+                phx-click="delete_team"
+                phx-value-id={team.id}
+                class="shrink-0 p-1.5 rounded text-base-content/20 hover:text-error/60 hover:bg-base-200 transition-colors opacity-0 group-hover:opacity-100 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                title="Delete team"
+              >
+                <.icon name="hero-trash" class="size-3.5" />
+              </button>
             </div>
           <% end %>
         </div>

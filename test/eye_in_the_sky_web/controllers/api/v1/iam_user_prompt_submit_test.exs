@@ -5,7 +5,6 @@ defmodule EyeInTheSkyWeb.Controllers.Api.V1.IamUserPromptSubmitTest do
   alias EyeInTheSky.IAM.HookResponse
   alias EyeInTheSky.IAM.Normalizer
   alias EyeInTheSky.IAM.Policy
-  alias EyeInTheSky.Repo
 
   setup do
     # Build the policy in memory (not inserted) — PolicyCache runs in a GenServer

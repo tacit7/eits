@@ -20,7 +20,7 @@ defmodule EyeInTheSky.SessionsTest do
     task
   end
 
-  defp in_progress_task(overrides \\ %{}) do
+  defp in_progress_task(overrides) do
     state_id = WorkflowState.in_progress_id()
     create_task(Map.put(overrides, :state_id, state_id))
   end

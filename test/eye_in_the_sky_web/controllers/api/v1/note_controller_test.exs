@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.Api.V1.NoteControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.{Agents, Notes, Sessions}
+  alias EyeInTheSky.Notes
 
   import EyeInTheSky.Factory
 

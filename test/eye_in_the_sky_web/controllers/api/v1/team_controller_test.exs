@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
   alias EyeInTheSky.Accounts.ApiKey
-  alias EyeInTheSky.{Agents, Sessions, Teams}
+  alias EyeInTheSky.Teams
 
   import EyeInTheSky.Factory
 

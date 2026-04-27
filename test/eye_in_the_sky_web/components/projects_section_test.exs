@@ -1,7 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.ProjectsSectionTest do
   use EyeInTheSkyWeb.ConnCase
   import Phoenix.LiveViewTest
-  import Phoenix.Component
 
   alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.Components.Sidebar.ProjectsSection

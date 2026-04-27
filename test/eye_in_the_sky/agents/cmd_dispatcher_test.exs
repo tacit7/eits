@@ -55,8 +55,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
   end
 
   # Seed an inbound DM from `from_session` to `to_session`.
-  defp seed_dm(from_session, to_session, body \\ nil) do
-    body = body || "DM body #{uniq()}"
+  defp seed_dm(from_session, to_session, body) do
 
     {:ok, msg} =
       Messages.create_message(%{
@@ -73,16 +72,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
       })
 
     msg
-  end
-
-  # Grant sandbox access to Task-spawned processes. Required because dispatch_all
-  # wraps each command in Task.start, which runs in a separate process.
-  defp allow_sandbox do
-    pid = self()
-
-    Sandbox.allow(EyeInTheSky.Repo, pid, fn ->
-      Process.sleep(500)
-    end)
   end
 
   # Run dispatch_all and wait briefly for async tasks to finish.

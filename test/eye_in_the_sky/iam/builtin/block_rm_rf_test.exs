@@ -36,7 +36,6 @@ defmodule EyeInTheSky.IAM.Builtin.BlockRmRfTest do
   end
 
   test "allowPaths does not permit sibling by substring (boundary check)" do
-    p = policy(%{"allowPaths" => ["/tmp/scratch"]})
     # The target /tmp/scratch-evil must NOT be allowed even though
     # "/tmp/scratch" is a substring of it. However this is also not a
     # dangerous_targets match, so matches? stays false for a different

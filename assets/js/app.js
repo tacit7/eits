@@ -45,6 +45,7 @@ import {PushSetup} from "./push_notifications"
 import {SwipeRow} from "./hooks/swipe_row"
 import {ConfigChatGuide} from "./hooks/config_chat_guide"
 import {CodeMirrorHook} from "./hooks/codemirror"
+import {EditorLayout, installEditorWindowListeners} from "./hooks/editor_layout"
 const FileEditorRelay = {
   mounted() {
     this._handler = (e) => {
@@ -118,6 +119,7 @@ Hooks.SwipeRow = SwipeRow
 Hooks.ConfigChatGuide = ConfigChatGuide
 Hooks.CodeMirror = CodeMirrorHook
 Hooks.FileEditorRelay = FileEditorRelay
+Hooks.EditorLayout = EditorLayout
 Hooks.NoteEditor = NoteEditorHook
 Hooks.NoteFullEditor = NoteFullEditorHook
 Hooks.SortableKanban = SortableKanban
@@ -168,25 +170,10 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
-// Use a data attribute on <html> (root layout, never morphdom-patched) instead of
-// adding classes directly to #app-rail / #main-content-wrapper (app layout, patched on
-// every LiveView update — morphdom clobbers JS-added classes on every PubSub event).
-window.addEventListener("phx:file-editor-open", () => {
-  document.documentElement.setAttribute("data-file-editor", "true")
-})
-
-window.addEventListener("phx:file-editor-close", () => {
-  document.documentElement.removeAttribute("data-file-editor")
-})
-
-// On LiveView reconnect, the Rail LiveComponent remounts with file_tabs: [] so the
-// file panel is gone, but data-file-editor may still be set from before the disconnect.
-// Guard: if #rail-file-panel isn't in the DOM, the editor is not open — clear the flag.
-window.addEventListener("phx:page-loading-stop", () => {
-  if (!document.getElementById("rail-file-panel")) {
-    document.documentElement.removeAttribute("data-file-editor")
-  }
-})
+// Editor layout: source of truth on <html data-editor-mode>, owned by the
+// EditorLayout hook on #file-editor-pane. Window-level listeners handle
+// open/close + reconnect — see hooks/editor_layout.js for details.
+installEditorWindowListeners()
 
 window.addEventListener("phx:copy_to_clipboard", (e) => {
   const { text, format, error } = e.detail

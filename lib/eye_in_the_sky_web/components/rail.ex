@@ -574,6 +574,19 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       />
 
       <.file_panel file_tabs={@file_tabs} active_tab_path={@active_tab_path} myself={@myself} socket={@socket} />
+      <%!-- Splitter handle for split-view mode. Visibility driven by data-editor-mode on <html>. --%>
+      <%!-- role=separator makes this a keyboard-focusable resize handle per ARIA spec.
+           aria-valuenow/min/max are kept in sync by the EditorLayout hook. --%>
+      <div
+        id="editor-splitter"
+        role="separator"
+        aria-label="Resize editor panel"
+        aria-orientation="vertical"
+        aria-valuenow="0"
+        aria-valuemin="320"
+        aria-valuemax="9999"
+        tabindex="0"
+      ></div>
 
       <.live_component
         module={NewSessionModal}
@@ -594,57 +607,72 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   attr :myself, :any, required: true
   attr :socket, :any, required: true
 
-  defp file_panel(%{file_tabs: []} = assigns) do
-    ~H""
-  end
-
   defp file_panel(assigns) do
     active_tab = Enum.find(assigns.file_tabs, &(&1.path == assigns.active_tab_path))
     assigns = assign(assigns, :active_tab, active_tab)
 
     ~H"""
-    <div id="rail-file-panel" class="flex-1 min-w-0 flex flex-col border-l border-base-content/8 bg-base-100 overflow-hidden">
-      <%!-- Tab strip --%>
-      <div class="flex items-center border-b border-base-content/8 bg-base-200/40 overflow-x-auto flex-shrink-0 min-h-[32px]">
-        <%= for tab <- @file_tabs do %>
-          <% active = tab.path == @active_tab_path %>
-          <div class={[
-            "flex items-center border-r border-base-content/8 flex-shrink-0",
-            if(active, do: "bg-base-100", else: "bg-transparent")
-          ]}>
-            <button
-              phx-click="file_switch_tab"
-              phx-value-path={tab.path}
-              phx-target={@myself}
-              class={[
-                "px-3 py-1.5 text-xs truncate max-w-[160px]",
-                if(active, do: "text-base-content/90 font-medium", else: "text-base-content/45 hover:text-base-content/70")
-              ]}
-              title={tab.path}
-            >
-              {tab.name}
-            </button>
-            <button
-              phx-click="file_close_tab"
-              phx-value-path={tab.path}
-              phx-target={@myself}
-              class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
-              title="Close"
-            >
-              <.icon name="hero-x-mark-mini" class="size-3" />
-            </button>
-          </div>
-        <% end %>
+    <div
+      id="file-editor-pane"
+      phx-hook="EditorLayout"
+      data-has-tabs={if @file_tabs == [], do: "false", else: "true"}
+      class="min-w-0 flex-col border-l border-base-content/8 bg-base-100 overflow-hidden"
+    >
+      <%!-- Tab strip + toolbar --%>
+      <div class="flex items-center border-b border-base-content/8 bg-base-200/40 flex-shrink-0 min-h-[32px]">
+        <div class="flex-1 flex items-center overflow-x-auto">
+          <%= for tab <- @file_tabs do %>
+            <% active = tab.path == @active_tab_path %>
+            <div class={[
+              "flex items-center border-r border-base-content/8 flex-shrink-0",
+              if(active, do: "bg-base-100", else: "bg-transparent")
+            ]}>
+              <button
+                phx-click="file_switch_tab"
+                phx-value-path={tab.path}
+                phx-target={@myself}
+                class={[
+                  "px-3 py-1.5 text-xs truncate max-w-[160px]",
+                  if(active, do: "text-base-content/90 font-medium", else: "text-base-content/45 hover:text-base-content/70")
+                ]}
+                title={tab.path}
+              >
+                {tab.name}
+              </button>
+              <button
+                phx-click="file_close_tab"
+                phx-value-path={tab.path}
+                phx-target={@myself}
+                class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
+                title="Close"
+              >
+                <.icon name="hero-x-mark-mini" class="size-3" />
+              </button>
+            </div>
+          <% end %>
+        </div>
+        <%!-- Split-mode toggle. Hidden unless current page allows split (CSS rule
+             keyed off body[data-allow-split]). Click dispatches a window event
+             handled by the EditorLayout hook. --%>
+        <button
+          type="button"
+          phx-click={Phoenix.LiveView.JS.dispatch("editor:toggle-split", to: "window")}
+          class="px-2 py-1.5 text-base-content/45 hover:text-base-content/80 transition-colors flex-shrink-0 items-center"
+          data-editor-toggle
+          title="Toggle split view"
+          aria-label="Toggle split view"
+        >
+          <.icon name="hero-view-columns" class="size-4" />
+        </button>
       </div>
 
-      <%!-- Editor area --%>
+      <%!-- Editor area or empty state --%>
       <%= if @active_tab do %>
         <div id="file-editor-relay" phx-hook="FileEditorRelay" class="hidden" />
         <%!--
           [&>div]:h-full punches height into the LiveSvelte wrapper div, which is
           auto-height by default. Without it the editor collapses to 0 height since
-          the Svelte root's h-full has no anchor. LiveSvelte does not expose a
-          wrapperClass prop, so this Tailwind arbitrary selector is the cleanest fix.
+          the Svelte root's h-full has no anchor.
         --%>
         <div
           id={"file-editor-#{Base.url_encode64(@active_tab.path, padding: false)}"}
@@ -662,6 +690,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
             }}
             socket={@socket}
           />
+        </div>
+      <% else %>
+        <div class="flex-1 flex flex-col items-center justify-center p-6 text-center text-sm text-base-content/50">
+          <.icon name="hero-document-text" class="w-8 h-8 mb-2 opacity-40" />
+          <p class="font-medium text-base-content/70">No file selected</p>
+          <p class="mt-1">Choose a file from the file explorer to open it here.</p>
         </div>
       <% end %>
     </div>

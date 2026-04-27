@@ -167,6 +167,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   def handle_event("bulk_delete", _params, socket),
     do: BulkHelpers.handle_bulk_delete(socket, &KanbanFilters.load_tasks/1)
 
+  @impl true
+  def handle_event("clear_selection", _params, socket),
+    do: {:noreply, assign(socket, :selected_tasks, MapSet.new())}
+
   # ---------------------------------------------------------------------------
   # Events: filters (delegated to FilterHandlers)
   # ---------------------------------------------------------------------------

@@ -71,29 +71,62 @@
     </header>
 
     <%!-- Desktop top bar — hidden on mobile --%>
-    <.top_bar
-      sidebar_tab={assigns[:sidebar_tab] || :sessions}
-      sidebar_project={assigns[:sidebar_project]}
-      top_bar_cta_label={assigns[:top_bar_cta] && assigns[:top_bar_cta].label}
-      top_bar_cta_href={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :href)}
-      top_bar_cta_event={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :event)}
-      search_query={assigns[:search_query]}
-      session_filter={assigns[:session_filter]}
-      filter_state_id={assigns[:filter_state_id]}
-      workflow_states={assigns[:workflow_states]}
-      sort_by={assigns[:sort_by]}
-      show_completed={assigns[:show_completed]}
-      bulk_mode={assigns[:bulk_mode]}
-      active_filter_count={assigns[:active_filter_count]}
-      notes_sort_by={assigns[:notes_sort_by]}
-      notes_starred_filter={assigns[:starred_filter] || false}
-      notes_type_filter={assigns[:type_filter] || "all"}
-      notes_new_href={assigns[:notes_new_href]}
-      dm_active_tab={assigns[:active_tab]}
-      dm_session_name={assigns[:page_title]}
-      dm_message_search_query={assigns[:message_search_query]}
-      dm_active_timer={assigns[:active_timer]}
-    />
+    <% sidebar_tab = assigns[:sidebar_tab] || :sessions %>
+    <div class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 px-3">
+      <.top_bar_breadcrumb
+        sidebar_tab={sidebar_tab}
+        sidebar_project={assigns[:sidebar_project]}
+        dm_session_name={assigns[:page_title]}
+      />
+      <%= case sidebar_tab do %>
+        <% :sessions -> %>
+          <EyeInTheSkyWeb.TopBar.Sessions.toolbar
+            search_query={assigns[:search_query]}
+            session_filter={assigns[:session_filter]}
+            sort_by={assigns[:sort_by]}
+          />
+        <% :tasks -> %>
+          <EyeInTheSkyWeb.TopBar.Tasks.toolbar
+            search_query={assigns[:search_query]}
+            filter_state_id={assigns[:filter_state_id]}
+            workflow_states={assigns[:workflow_states] || []}
+            sort_by={assigns[:sort_by]}
+          />
+        <% :kanban -> %>
+          <EyeInTheSkyWeb.TopBar.Kanban.toolbar
+            search_query={assigns[:search_query]}
+            show_completed={assigns[:show_completed] || false}
+            bulk_mode={assigns[:bulk_mode] || false}
+            active_filter_count={assigns[:active_filter_count] || 0}
+            sidebar_project={assigns[:sidebar_project]}
+          />
+        <% :dm -> %>
+          <EyeInTheSkyWeb.TopBar.DM.toolbar
+            dm_active_tab={assigns[:active_tab]}
+            dm_message_search_query={assigns[:message_search_query]}
+            dm_active_timer={assigns[:active_timer]}
+          />
+        <% :notes -> %>
+          <EyeInTheSkyWeb.TopBar.Notes.toolbar
+            search_query={assigns[:search_query]}
+            notes_sort_by={assigns[:notes_sort_by] || "newest"}
+            notes_starred_filter={assigns[:starred_filter] || false}
+            notes_type_filter={assigns[:type_filter] || "all"}
+            notes_new_href={assigns[:notes_new_href]}
+          />
+        <% _ -> %>
+          <%= if not is_nil(assigns[:search_query]) do %>
+            <EyeInTheSkyWeb.TopBar.Generic.toolbar search_query={assigns[:search_query]} />
+          <% else %>
+            <EyeInTheSkyWeb.TopBar.Generic.default_toolbar />
+          <% end %>
+      <% end %>
+      <.top_bar_cta
+        label={assigns[:top_bar_cta] && assigns[:top_bar_cta].label}
+        href={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :href)}
+        event={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :event)}
+      />
+    </div>
 
     <main
       id="main-content"

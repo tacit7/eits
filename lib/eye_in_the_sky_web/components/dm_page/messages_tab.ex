@@ -28,19 +28,20 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           style="scrollbar-width: none; -ms-overflow-style: none; overflow-anchor: none;"
         >
           <%= if @messages == [] do %>
-            <div class="flex flex-col items-center justify-center h-full py-20 text-center select-none">
-              <.icon name="hero-chat-bubble-left-right" class="w-16 h-16 text-base-content/10 mb-5" />
-              <p class="text-base font-medium text-base-content/40">
-                {if @agent, do: @agent.name, else: "No messages yet"}
-              </p>
-              <p class="mt-1.5 text-xs text-base-content/25 max-w-xs">
-                <%= if not is_nil(@agent) && not is_nil(@agent.git_worktree_path) do %>
-                  <span class="font-mono">{Path.basename(@agent.git_worktree_path)}</span>
-                  &nbsp;&mdash;
-                  Send a message to start the conversation
-                <% end %>
-              </p>
-            </div>
+            <.empty_state
+              title={if @agent, do: @agent.name, else: "No messages yet"}
+              class="flex flex-col items-center justify-center h-full py-20 text-center select-none"
+              icon="hero-chat-bubble-left-right"
+              icon_class="size-16 text-base-content/10 mb-5"
+              title_class="text-base font-medium text-base-content/40"
+              subtitle_class="mt-1.5 text-xs text-base-content/25 max-w-xs"
+            >
+              <:subtitle_slot :if={not is_nil(@agent) && not is_nil(@agent.git_worktree_path)}>
+                <span class="font-mono">{Path.basename(@agent.git_worktree_path)}</span>
+                &nbsp;&mdash;
+                Send a message to start the conversation
+              </:subtitle_slot>
+            </.empty_state>
           <% else %>
             <div class="py-2 flex items-center justify-center gap-3">
               <%= if @has_more_messages do %>

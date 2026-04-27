@@ -201,15 +201,18 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
           <% end %>
         </div>
       <% else %>
-        <div class="text-center py-16">
-          <div class="mx-auto w-24 h-24 bg-base-200 rounded-full flex items-center justify-center mb-4">
-            <.icon name="hero-bell" class="w-12 h-12 text-base-content/40" />
-          </div>
-          <h3 class="text-lg font-semibold text-base-content mb-2">No notifications</h3>
-          <p class="text-sm text-base-content/60">
-            Notifications from agents, jobs, and system events will appear here.
-          </p>
-        </div>
+        <.empty_state
+          title="No notifications"
+          subtitle="Notifications from agents, jobs, and system events will appear here."
+          class="py-16 text-center"
+          title_class="text-lg font-semibold text-base-content mb-2"
+        >
+          <:icon_slot>
+            <div class="mx-auto w-24 h-24 bg-base-200 rounded-full flex items-center justify-center mb-4">
+              <.icon name="hero-bell" class="size-12 text-base-content/40" />
+            </div>
+          </:icon_slot>
+        </.empty_state>
       <% end %>
     </div>
     """

@@ -202,14 +202,24 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :title_class, :string, default: "mt-2 text-sm font-medium text-base-content"
   attr :subtitle_class, :string, default: "mt-1 text-sm text-base-content/60"
 
+  slot :icon_slot
+  slot :subtitle_slot
   slot :actions
 
   def empty_state(assigns) do
     ~H"""
     <div id={@id} class={@class}>
-      <.icon :if={@icon} name={@icon} class={@icon_class} />
+      <%= if @icon_slot != [] do %>
+        {render_slot(@icon_slot)}
+      <% else %>
+        <.icon :if={@icon} name={@icon} class={@icon_class} />
+      <% end %>
       <h3 class={@title_class}>{@title}</h3>
-      <p :if={@subtitle} class={@subtitle_class}>{@subtitle}</p>
+      <%= if @subtitle_slot != [] do %>
+        <p class={@subtitle_class}>{render_slot(@subtitle_slot)}</p>
+      <% else %>
+        <p :if={@subtitle} class={@subtitle_class}>{@subtitle}</p>
+      <% end %>
       <div :if={@actions != []} class="mt-4 flex justify-center gap-2">
         {render_slot(@actions)}
       </div>

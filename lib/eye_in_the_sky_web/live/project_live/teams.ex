@@ -195,14 +195,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           <%!-- Teams list --%>
           <div class="rounded-xl shadow-sm">
             <%= if @filtered_teams == [] do %>
-              <div class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-base-100 rounded-xl">
-                <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
-                  <.icon name="hero-user-group" class="size-5 text-base-content/30" />
-                </div>
-                <p class="text-xs text-base-content/30">
-                  {if @search_query != "", do: "No teams match your search", else: "No active teams"}
-                </p>
-              </div>
+              <.empty_state
+                title={if @search_query != "", do: "No teams match your search", else: "No active teams"}
+                class="flex flex-col items-center justify-center py-16 px-4 text-center gap-3 bg-base-100 rounded-xl"
+                title_class="text-xs text-base-content/30"
+              >
+                <:icon_slot>
+                  <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
+                    <.icon name="hero-user-group" class="size-5 text-base-content/30" />
+                  </div>
+                </:icon_slot>
+              </.empty_state>
             <% else %>
               <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl px-4">
                 <%= for team <- @filtered_teams do %>

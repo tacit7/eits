@@ -137,7 +137,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           <%= if @dm_session do %>
             <.link
               navigate={"/dm/#{@dm_session.uuid}"}
-              class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-primary focus-ring"
               title="Open agent DM"
               aria-label="Open agent direct message"
               onclick="event.stopPropagation();"

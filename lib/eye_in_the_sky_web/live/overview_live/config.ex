@@ -332,10 +332,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                   class="input input-sm input-bordered flex-1 text-base min-h-[44px]"
                   autofocus
                 />
-                <button type="submit" class="btn btn-sm btn-primary">Create</button>
-                <button type="button" phx-click="cancel_create" class="btn btn-sm btn-ghost">
-                  Cancel
-                </button>
+                <.form_actions submit_text="Create" cancel_event="cancel_create" size="sm" />
               </form>
             <% end %>
 

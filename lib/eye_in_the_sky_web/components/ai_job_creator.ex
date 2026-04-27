@@ -171,17 +171,12 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
                 placeholder="What kind of job do you want to create?"
               ></textarea>
             </div>
-            <div class="flex gap-2 mt-4">
-              <button type="submit" class="btn btn-primary flex-1">Start</button>
-              <button
-                type="button"
-                phx-click="toggle_claude_drawer"
-                phx-target={@myself}
-                class="btn btn-ghost"
-              >
-                Cancel
-              </button>
-            </div>
+            <.form_actions
+              submit_text="Start"
+              cancel_event="toggle_claude_drawer"
+              cancel_target={@myself}
+              class="mt-4"
+            />
           </form>
         </div>
       </div>

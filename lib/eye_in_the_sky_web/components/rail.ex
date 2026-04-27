@@ -656,7 +656,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
              handled by the EditorLayout hook. --%>
         <button
           type="button"
-          phx-click={Phoenix.LiveView.JS.dispatch("editor:toggle-split", to: "window")}
+          phx-click={Phoenix.LiveView.JS.dispatch("editor:toggle-split", to: "body")}
           class="px-2 py-1.5 text-base-content/45 hover:text-base-content/80 transition-colors flex-shrink-0 items-center"
           data-editor-toggle
           title="Toggle split view"

@@ -616,10 +616,28 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :show_on_hover, :boolean, default: true
   attr :hover_group, :string, default: "row"
   attr :class, :string, default: nil
+  attr :tooltip, :string, default: nil
 
   def icon_button(assigns) do
     ~H"""
+    <span :if={@tooltip} class="tooltip tooltip-bottom" data-tip={@tooltip}>
+      <button
+        type="button"
+        phx-click={@on_click}
+        aria-label={@aria_label}
+        class={[
+          "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md transition-all focus-visible:outline-none focus-visible:ring-2",
+          @show_on_hover && hover_reveal_class(@hover_group),
+          color_classes(@color),
+          @class
+        ]}
+        {phx_values(@values)}
+      >
+        <.icon name={@icon} class="size-3.5" />
+      </button>
+    </span>
     <button
+      :if={!@tooltip}
       type="button"
       phx-click={@on_click}
       aria-label={@aria_label}
@@ -877,7 +895,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       <.spinner />
       <.spinner size="lg" class="text-primary" />
   """
-  attr :size, :string, default: "sm"
+  attr :size, :string, default: "md"
   attr :class, :string, default: ""
 
   def spinner(assigns) do
@@ -1036,6 +1054,24 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         </button>
       <% end %>
     </div>
+    """
+  end
+
+  @doc """
+  Renders a DaisyUI skeleton placeholder for loading states.
+  Caller controls width/height via the class attribute.
+
+  ## Examples
+
+      <.skeleton class="h-4 w-full" />
+      <.skeleton class="h-8 w-8 rounded-full" />
+  """
+  attr :class, :string, default: ""
+  attr :rest, :global
+
+  def skeleton(assigns) do
+    ~H"""
+    <div class={["skeleton", @class]} {@rest}></div>
     """
   end
 

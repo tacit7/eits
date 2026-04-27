@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
         </span>
         <.icon name="hero-chevron-down" class="size-3 text-base-content/50" />
       </summary>
-      <ul class="dropdown-content menu bg-base-100 border border-base-300 rounded-box shadow-sm w-56 z-50 p-1">
+      <ul class="dropdown-content menu bg-base-100 border border-base-300 rounded-box shadow-sm w-48 z-50 p-1">
         <li class="menu-title text-xs text-base-content/40 px-2 pt-1">WORKSPACE</li>
         <li>
           <.link navigate={~p"/workspace/sessions"} class="gap-2 text-sm">

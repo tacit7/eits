@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
   defp kanban_context_menu(assigns) do
     ~H"""
     <div class="flex-shrink-0 md:opacity-0 md:group-hover/card:opacity-100 transition-opacity">
-      <details class="dropdown dropdown-end">
+      <details id={"kanban-menu-#{@task_id}"} phx-update="ignore" class="dropdown dropdown-end">
         <summary class="flex items-center justify-center min-w-[44px] min-h-[44px] -mx-2.5 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
           <.icon name="hero-ellipsis-horizontal-mini" class="size-3.5" />
         </summary>

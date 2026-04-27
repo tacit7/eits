@@ -15,24 +15,15 @@ defmodule EyeInTheSkyWeb.TopBar.Generic do
   def toolbar(assigns) do
     ~H"""
     <%!-- Generic search — skills, prompts, teams, notes, etc. --%>
-    <form phx-change="search" class="flex-1 max-w-xs">
-      <label for="top-bar-generic-search" class="sr-only">Search</label>
-      <div class="relative">
-        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-          <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
-        </div>
-        <input
-          type="text"
-          name="query"
-          id="top-bar-generic-search"
-          value={@search_query}
-          phx-debounce="300"
-          placeholder="Search..."
-          autocomplete="off"
-          class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
-        />
-      </div>
-    </form>
+    <.search_bar
+      id="top-bar-generic-search"
+      size="xs"
+      label="Search"
+      placeholder="Search..."
+      value={@search_query}
+      on_change="search"
+      class="flex-1 max-w-xs"
+    />
     """
   end
 

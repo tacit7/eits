@@ -15,25 +15,16 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- Sessions: inline search + filter tabs + sort --%>
-    <form phx-change="search" class="flex-1 max-w-xs">
-      <label for="top-bar-search" class="sr-only">Search</label>
-      <div class="relative">
-        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-          <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
-        </div>
-        <input
-          type="text"
-          name="query"
-          id="top-bar-search"
-          value={@search_query || ""}
-          phx-debounce="300"
-          placeholder="Search..."
-          autocomplete="off"
-          class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
-        />
-      </div>
-    </form>
+    <%!-- Sessions: search + filter tabs + sort --%>
+    <.search_bar
+      id="top-bar-search"
+      size="xs"
+      label="Search sessions"
+      placeholder="Search..."
+      value={@search_query || ""}
+      on_change="search"
+      class="flex-1 max-w-xs"
+    />
     <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
       <%= for {value, label} <- [{"all", "All"}, {"working", "Active"}, {"archived", "Archived"}] do %>
         <button

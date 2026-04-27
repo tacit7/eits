@@ -702,28 +702,57 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   @doc """
   Renders a search form with a magnifying glass icon on the left.
 
+  Supports two sizes:
+  - `"sm"` (default) — page-level search bars (`input-sm min-h-[44px]`)
+  - `"xs"` — compact top-bar search bars (`input-xs h-7 text-[12px]`)
+
   ## Examples
 
-      <.search_bar id="agent-search" placeholder="Search agents…" value={@query} on_change="search" />
+      <.search_bar id="agent-search" placeholder="Search agents…" value={@query} />
+      <.search_bar id="top-bar-search" size="xs" label="Search sessions" placeholder="Search…" value={@search_query || ""} class="flex-1 max-w-xs" />
   """
   attr :id, :string, required: true
+  attr :size, :string, default: "sm"
+  attr :label, :string, default: nil
   attr :placeholder, :string, default: "Search…"
   attr :value, :string, default: ""
   attr :on_change, :string, default: "search"
+  attr :on_submit, :string, default: nil
   attr :debounce, :string, default: "300"
+  attr :autocomplete, :string, default: "off"
   attr :class, :string, default: ""
 
   def search_bar(assigns) do
     ~H"""
-    <form id={@id} phx-change={@on_change} class={"relative flex items-center #{@class}"}>
-      <.icon name="hero-magnifying-glass-mini" class="absolute left-2.5 size-4 text-base-content/40 pointer-events-none" />
+    <form
+      id={@id}
+      phx-change={@on_change}
+      phx-submit={@on_submit}
+      class={"relative flex items-center #{@class}"}
+    >
+      <label :if={@label} for={"#{@id}-input"} class="sr-only">{@label}</label>
+      <.icon
+        name="hero-magnifying-glass-mini"
+        class={"absolute left-2.5 pointer-events-none " <>
+          if(@size == "xs",
+            do: "w-3.5 h-3.5 text-base-content/30",
+            else: "size-4 text-base-content/40"
+          )}
+      />
       <input
         type="text"
+        id={"#{@id}-input"}
         name="query"
         value={@value}
         placeholder={@placeholder}
         phx-debounce={@debounce}
-        class="input input-sm pl-9 w-full bg-base-200/60 border-transparent focus:border-base-content/20 focus:bg-base-100"
+        autocomplete={@autocomplete}
+        class={"input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 " <>
+          "focus:border-primary/30 focus:bg-base-100 transition-colors " <>
+          if(@size == "xs",
+            do: "input-xs pl-8 h-7 text-[12px]",
+            else: "input-sm pl-9 min-h-[44px] text-base"
+          )}
       />
     </form>
     """

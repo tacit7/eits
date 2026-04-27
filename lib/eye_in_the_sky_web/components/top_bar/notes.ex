@@ -17,24 +17,15 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
   def toolbar(assigns) do
     ~H"""
     <%!-- Notes: search + quick note + starred + type + sort --%>
-    <form phx-change="search" class="w-44">
-      <label for="notes-top-bar-search" class="sr-only">Search notes</label>
-      <div class="relative">
-        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-          <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
-        </div>
-        <input
-          type="text"
-          id="notes-top-bar-search"
-          name="query"
-          value={@search_query || ""}
-          phx-debounce="300"
-          placeholder="Search notes..."
-          autocomplete="off"
-          class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
-        />
-      </div>
-    </form>
+    <.search_bar
+      id="notes-top-bar-search"
+      size="xs"
+      label="Search notes"
+      placeholder="Search notes..."
+      value={@search_query || ""}
+      on_change="search"
+      class="w-44"
+    />
     <button
       phx-click="open_quick_note_modal"
       class="flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium text-base-content/60 hover:text-base-content hover:bg-base-content/8 transition-colors"

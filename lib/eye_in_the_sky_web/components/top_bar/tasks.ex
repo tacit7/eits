@@ -17,24 +17,15 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
   def toolbar(assigns) do
     ~H"""
     <%!-- Tasks: search + view toggle + state filter pills + sort --%>
-    <form phx-change="search" class="flex-1 max-w-xs">
-      <label for="top-bar-tasks-search" class="sr-only">Search tasks</label>
-      <div class="relative">
-        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-          <.icon name="hero-magnifying-glass-mini" class="w-3.5 h-3.5 text-base-content/30" />
-        </div>
-        <input
-          type="text"
-          name="query"
-          id="top-bar-tasks-search"
-          value={@search_query || ""}
-          phx-debounce="300"
-          placeholder="Search tasks..."
-          autocomplete="off"
-          class="input input-xs w-full pl-8 h-7 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-[12px]"
-        />
-      </div>
-    </form>
+    <.search_bar
+      id="top-bar-tasks-search"
+      size="xs"
+      label="Search tasks"
+      placeholder="Search tasks..."
+      value={@search_query || ""}
+      on_change="search"
+      class="flex-1 max-w-xs"
+    />
     <%= if @sidebar_project do %>
       <div class="flex items-center bg-base-200/40 rounded-lg p-0.5">
         <span

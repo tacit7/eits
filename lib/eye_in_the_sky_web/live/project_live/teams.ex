@@ -114,14 +114,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           }
         />
       <% else %>
-        <div class="divide-y divide-base-content/5">
+        <div class="divide-y divide-base-content/8">
           <%= for team <- @filtered_teams do %>
-            <div class="py-0.5 group flex items-center gap-1">
+            <div class="py-1 group flex items-center gap-1">
               <.link
                 navigate={~p"/projects/#{@project.id}/teams/#{team.id}"}
-                class="flex-1 py-2.5 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0"
+                class="flex-1 py-2 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0"
               >
-                <div class={"w-1.5 h-1.5 rounded-full flex-shrink-0 " <> member_dot_class(team.members)} />
+                <.status_dot status={team_status_atom(team.members)} size="sm" />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-base-content/85 truncate">
@@ -177,15 +177,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))
 
-  defp member_dot_class([]), do: "bg-base-content/15"
+  defp team_status_atom([]), do: :idle
 
-  defp member_dot_class(members) do
-    active = Enum.count(members, &(&1.status == "active"))
-
-    cond do
-      active > 0 and active == length(members) -> "bg-success"
-      active > 0 -> "bg-success/50"
-      true -> "bg-base-content/15"
-    end
+  defp team_status_atom(members) do
+    if Enum.any?(members, &(&1.status == "active")), do: :working, else: :idle
   end
 end

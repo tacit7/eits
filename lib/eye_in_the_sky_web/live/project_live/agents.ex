@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
@@ -54,6 +55,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   @impl true
   def handle_event("close_viewer", _params, socket) do
     {:noreply, assign(socket, :selected_agent, nil)}
+  end
+
+  @impl true
+  def handle_event("open_file", _params, socket) do
+    case socket.assigns.selected_agent do
+      %{abs_path: path} when is_binary(path) ->
+        if open_path_allowed?(path, socket), do: ViewHelpers.open_in_system(path)
+        {:noreply, socket}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -204,10 +217,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                   </div>
                 <% end %>
               </div>
-              <button phx-click="close_viewer"
-                class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]">
-                <.icon name="hero-x-mark" class="size-4" />
-              </button>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <button phx-click="open_file"
+                  title="Open in editor"
+                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]">
+                  <.icon name="hero-arrow-top-right-on-square" class="size-4" />
+                </button>
+                <button phx-click="close_viewer"
+                  title="Close"
+                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]">
+                  <.icon name="hero-x-mark" class="size-4" />
+                </button>
+              </div>
             </div>
             <div class="flex items-center gap-1 mt-3">
               <button phx-click="set_detail_tab" phx-value-tab="preview"
@@ -249,4 +270,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   defp source_label(:agents), do: "global"
   defp source_label(:project_agents), do: "project"
   defp source_label(_), do: "unknown"
+
+  defp open_path_allowed?(path, socket) do
+    user_dir = Path.expand("~/.claude/agents")
+
+    project_dir =
+      case socket.assigns[:project] do
+        %{path: p} when is_binary(p) and p != "" -> Path.join(p, ".claude/agents")
+        _ -> nil
+      end
+
+    File.exists?(path) &&
+      (String.starts_with?(path, user_dir) ||
+         (not is_nil(project_dir) && String.starts_with?(path, project_dir)))
+  end
 end

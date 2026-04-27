@@ -63,11 +63,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
     end)
   end
 
-  defp sort_agents(agents, "name_desc"), do: Enum.sort_by(agents, & &1.slug, :desc)
+  defp sort_agents(agents, "name_desc"), do: Enum.sort_by(agents, &display_name/1, :desc)
   defp sort_agents(agents, "size_desc"), do: Enum.sort_by(agents, & &1.size, :desc)
   defp sort_agents(agents, "size_asc"), do: Enum.sort_by(agents, & &1.size)
   defp sort_agents(agents, "recent"), do: Enum.sort_by(agents, & &1.mtime, :desc)
-  defp sort_agents(agents, _), do: Enum.sort_by(agents, & &1.slug)
+  defp sort_agents(agents, _), do: Enum.sort_by(agents, &display_name/1)
+
+  defp display_name(agent), do: String.downcase(agent.name || agent.slug)
 
   defp do_load_agents(project_path) do
     global = load_from_dir(Path.expand("~/.claude/agents"), :agents, "~/.claude/agents")
@@ -106,6 +108,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
                     slug: slug,
                     filename: filename,
                     path: "#{display_prefix}/#{filename}",
+                    abs_path: path,
                     source: source,
                     name: name || slug,
                     description: description,

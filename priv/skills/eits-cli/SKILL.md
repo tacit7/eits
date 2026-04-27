@@ -191,7 +191,7 @@ eits notifications mark-all-read
 ## Known Gotchas
 
 1. **`eits agents spawn` exits 7** — `EITS_URL` not set. Always export it first.
-2. **`tasks begin` on existing task duplicates** — use `tasks start <id>` for existing tasks; `begin` always creates a new one.
+2. **Orchestrator pre-created task ID** — use `eits tasks begin --id <task_id>` to claim an existing task atomically (links session + sets In Progress, no duplicate created). Without `--id`, `begin` always creates a new task.
 3. **Spawned agents need `--project-id` explicitly** — `EITS_PROJECT_ID` is not auto-injected into child processes.
 4. **`dm --to` accepts both UUID and integer** — `$EITS_SESSION_ID` is integer; `$EITS_SESSION_UUID` is UUID. Either works.
 5. **Write hook blocks if no active task** — run `eits tasks begin` before editing files.

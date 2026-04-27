@@ -77,14 +77,14 @@ defmodule EyeInTheSky.ScopeTest do
 
       agent = create_agent()
       s1 = create_session(agent, %{project_id: ctx.project.id, status: "working"})
-      _s2 = create_session(agent, %{project_id: other.id, status: "working"})
+      s2 = create_session(agent, %{project_id: other.id, status: "working"})
 
       scope = Scope.for_project(ctx.user, ctx.workspace, ctx.project)
       results = Sessions.list_sessions_for_scope(scope)
 
       ids = Enum.map(results, & &1.id)
       assert s1.id in ids
-      refute other.id in ids
+      refute s2.id in ids
     end
 
     test "workspace scope returns sessions across all projects in workspace" do

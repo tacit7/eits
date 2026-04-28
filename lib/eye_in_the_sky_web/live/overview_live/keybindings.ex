@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
     {:ok,
      socket
      |> assign(:page_title, "Keybinding Reference")
-     |> assign(:sidebar_tab, nil)
+     |> assign(:sidebar_tab, :keybindings)
      |> assign(:sidebar_project, nil)
      |> assign(:commands, @commands)}
   end

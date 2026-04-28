@@ -663,7 +663,7 @@ HELP
       fi
       if [[ $quiet -eq 0 ]]; then
         # Fetch full task so response includes state name, title, etc.
-        _curl "$BASE_URL/tasks/$task_id" | jq '{task_id: .id, title, state: .state, state_id, message: "Task created"}'
+        _curl "$BASE_URL/tasks/$task_id" | jq '{task_id: .task.id, title: .task.title, state: .task.state, state_id: .task.state_id, message: "Task created"}'
       else
         echo "$task_id"
       fi
@@ -1289,14 +1289,16 @@ cmd_commits() {
       _curl "$BASE_URL/commits?${qs#&}" | jq .
       ;;
     create)
-      # eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] ...
+      # eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] [--quiet|-q]
       # --agent defaults to $EITS_AGENT_UUID; falls back to session lookup when unset
-      local agent_id="${EITS_AGENT_UUID:-}" hashes=() messages=()
+      # --quiet: print only the commit hash(es) — one per line; nothing on duplicate
+      local agent_id="${EITS_AGENT_UUID:-}" hashes=() messages=() quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --agent)   agent_id="$2";        shift 2 ;;
-          --hash)    hashes+=("$2");       shift 2 ;;
-          --message) messages+=("$2");     shift 2 ;;
+          --agent)     agent_id="$2";  shift 2 ;;
+          --hash)      hashes+=("$2"); shift 2 ;;
+          --message)   messages+=("$2"); shift 2 ;;
+          --quiet|-q)  quiet=1;        shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1324,7 +1326,14 @@ cmd_commits() {
         payload=$(jq -n --arg a "$agent_id" --argjson h "$hashes_json" \
           '{agent_id: $a, commit_hashes: $h}')
       fi
-      _post "/commits" "$payload"
+      local _commit_resp
+      _commit_resp=$(_post "/commits" "$payload")
+      if [[ $quiet -eq 1 ]]; then
+        # Print only the hashes of newly created commits — nothing for duplicates
+        echo "$_commit_resp" | jq -r '.commits[]?.commit_hash // empty'
+      else
+        echo "$_commit_resp" | jq .
+      fi
       ;;
     *)
       echo "usage: eits commits <list|create>"
@@ -1858,18 +1867,27 @@ Fields per member:
 
 Orchestrators should check member_status, not session_status.
 
---wait: Block until all members have member_status done or spawn_failed.
-        Polls every 5 seconds and prints a summary line each tick.
-        Exits with 0 when all done, 1 if any spawn_failed.
---json: Output raw JSON instead of formatted text (useful for scripting).
+--wait:         Block until all members have member_status done or spawn_failed.
+                Polls every 5 seconds and prints a summary line each tick.
+                Exits with 0 when all done, 1 if any spawn_failed.
+--watch [<n>]:  Continuously refresh status every N seconds (default: 5).
+                Clears the screen each tick. Press Ctrl+C to stop.
+--json:         Output raw JSON instead of formatted text (useful for scripting).
 HELP
         return 0; }
       local id="${1:-}"; need id; shift
-      local summary=0 wait=0 json=0
+      local summary=0 wait=0 json=0 watch=0 watch_interval=5
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --summary|-s) summary=1; shift ;;  # kept for compat; now same as default
           --wait)       wait=1;    shift ;;
+          --watch)      watch=1;
+                        # Accept optional interval: --watch 10
+                        if [[ $# -gt 0 && "${2:-}" =~ ^[0-9]+$ ]]; then
+                          watch_interval="$2"; shift 2
+                        else
+                          shift
+                        fi ;;
           --json|--raw) json=1;    shift ;;  # raw JSON output for scripting
           *) die "unknown flag: $1" ;;
         esac
@@ -1910,6 +1928,14 @@ HELP
 
       if [[ $json -eq 1 ]]; then
         _curl "$BASE_URL/teams/$id" | jq .
+      elif [[ $watch -eq 1 ]]; then
+        # Continuous refresh mode — clears screen each tick until Ctrl+C
+        while true; do
+          clear
+          printf '=== eits teams status %s  [watch: every %ds, Ctrl+C to stop] ===\n\n' "$id" "$watch_interval"
+          _teams_status_summary 2>&1 || printf '[error fetching team status]\n'
+          sleep "$watch_interval"
+        done
       elif [[ $wait -eq 1 ]]; then
         local spawn_failed_count=0 _wait_delay=2
         while true; do

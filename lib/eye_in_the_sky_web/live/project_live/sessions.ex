@@ -185,6 +185,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   # ---------------------------------------------------------------------------
 
   @impl true
+  def handle_info({:agent_updated, %EyeInTheSky.Sessions.Session{id: session_id}}, socket) do
+    {:noreply, Loader.upsert_agent_in_list(socket, session_id)}
+  end
+
+  @impl true
   def handle_info({:agent_updated, _agent}, socket) do
     {:noreply, Loader.load_agents(socket)}
   end

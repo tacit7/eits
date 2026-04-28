@@ -252,6 +252,11 @@ function _mountVimNav() {
     if (!rail) return
     liveSocket.main?.pushHookEvent(rail, rail, event, payload)
   }
+  inst.pushToList = (event, payload) => {
+    const listEl = document.querySelector("[data-vim-list]")
+    if (!listEl) return
+    liveSocket.main?.pushHookEvent(listEl, listEl, event, payload)
+  }
   inst.mounted()
   _vimNavInst = inst
 }

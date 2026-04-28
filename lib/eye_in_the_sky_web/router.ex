@@ -134,6 +134,7 @@ defmodule EyeInTheSkyWeb.Router do
       live "/canvases/:id", CanvasLive, :show
       live "/", AgentLive.Index, :index
       live "/usage", OverviewLive.Usage, :index
+      live "/keybindings", OverviewLive.Keybindings, :index
       live "/skills", OverviewLive.Skills, :index
       live "/agents", OverviewLive.Agents, :index
       live "/config", OverviewLive.Config, :index

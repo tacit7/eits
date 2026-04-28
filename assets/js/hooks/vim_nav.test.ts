@@ -700,3 +700,63 @@ describe("VimNav _renderWhichKey scope filtering", () => {
     h.hideWhichKey()
   })
 })
+
+describe("context bindings", () => {
+  it("f f is a prefix when route includes /tasks", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/tasks" },
+      writable: true,
+      configurable: true,
+    })
+    expect(matchesKnownBindingOrPrefix([], "f")).toBe(true)
+  })
+
+  it("f f is NOT active on non-tasks route", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/notes" },
+      writable: true,
+      configurable: true,
+    })
+    expect(matchesKnownBindingOrPrefix([], "f")).toBe(false)
+  })
+
+  it("a d is active on /chat route", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/chat" },
+      writable: true,
+      configurable: true,
+    })
+    expect(matchesKnownBindingOrPrefix([], "a")).toBe(true)
+    expect(matchesKnownBindingOrPrefix(["a"], "d")).toBe(true)
+  })
+
+  it("m b is active on /chat route", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/chat" },
+      writable: true,
+      configurable: true,
+    })
+    expect(matchesKnownBindingOrPrefix([], "m")).toBe(true)
+    expect(matchesKnownBindingOrPrefix(["m"], "b")).toBe(true)
+  })
+
+  it("isCommandActive returns true for route_suffix:/tasks when pathname includes /tasks", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/tasks" },
+      writable: true,
+      configurable: true,
+    })
+    const cmd = COMMANDS.find(c => c.id === "context.filter_drawer")!
+    expect(isCommandActive(cmd)).toBe(true)
+  })
+
+  it("isCommandActive returns false for route_suffix:/tasks when pathname is /chat", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/chat" },
+      writable: true,
+      configurable: true,
+    })
+    const cmd = COMMANDS.find(c => c.id === "context.filter_drawer")!
+    expect(isCommandActive(cmd)).toBe(false)
+  })
+})

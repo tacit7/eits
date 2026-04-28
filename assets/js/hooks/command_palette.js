@@ -156,7 +156,7 @@ export const CommandPalette = {
   },
 
   renderGrouped(items) {
-    const groupOrder = ["Workspace", "Projects", "Tasks", "Insights", "Knowledge", "Communication", "System"]
+    const groupOrder = ["Current Project", "Workspace", "Projects", "Tasks", "Insights", "Knowledge", "Communication", "System"]
     const groups = new Map()
     for (const item of items) {
       const g = item.group || "Other"

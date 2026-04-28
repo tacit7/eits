@@ -1,5 +1,35 @@
+function currentProjectId() {
+  const m = window.location.pathname.match(/^\/projects\/(\d+)(?:\/|$)/)
+  return m ? parseInt(m[1], 10) : null
+}
+
+function currentProjectCommands(hook) {
+  const projectId = currentProjectId()
+  if (!projectId) return []
+
+  const projects = JSON.parse(hook?.el?.dataset?.projects || "[]")
+  const project = projects.find(p => p.id === projectId)
+  if (!project) return []
+
+  const base = `/projects/${projectId}`
+  return [
+    { id: "cp-sessions", label: "Sessions",      icon: "hero-cpu-chip",               group: "Current Project", hint: project.name, keywords: [],                     shortcut: null, type: "navigate", href: `${base}/sessions`, when: null },
+    { id: "cp-tasks",    label: "Tasks",          icon: "hero-clipboard-document-list", group: "Current Project", hint: project.name, keywords: [],                     shortcut: null, type: "navigate", href: `${base}/tasks`,    when: null },
+    { id: "cp-kanban",   label: "Kanban",         icon: "hero-view-columns",            group: "Current Project", hint: project.name, keywords: ["board"],              shortcut: null, type: "navigate", href: `${base}/kanban`,   when: null },
+    { id: "cp-notes",    label: "Notes",          icon: "hero-document-text",           group: "Current Project", hint: project.name, keywords: [],                     shortcut: null, type: "navigate", href: `${base}/notes`,    when: null },
+    { id: "cp-agents",   label: "Agents",         icon: "hero-users",                   group: "Current Project", hint: project.name, keywords: [],                     shortcut: null, type: "navigate", href: `${base}/agents`,   when: null },
+    { id: "cp-prompts",  label: "Prompts",        icon: "hero-book-open",               group: "Current Project", hint: project.name, keywords: [],                     shortcut: null, type: "navigate", href: `${base}/prompts`,  when: null },
+    { id: "cp-skills",   label: "Skills",         icon: "hero-bolt",                    group: "Current Project", hint: project.name, keywords: [],                     shortcut: null, type: "navigate", href: `${base}/skills`,   when: null },
+    { id: "cp-files",    label: "Files",          icon: "hero-folder-open",             group: "Current Project", hint: project.name, keywords: [],                     shortcut: null, type: "navigate", href: `${base}/files`,    when: null },
+    { id: "cp-teams",    label: "Teams",          icon: "hero-user-group",              group: "Current Project", hint: project.name, keywords: [],                     shortcut: null, type: "navigate", href: `${base}/teams`,    when: null },
+    { id: "cp-config",   label: "Configuration",  icon: "hero-adjustments-horizontal",  group: "Current Project", hint: project.name, keywords: ["settings", "config"], shortcut: null, type: "navigate", href: `${base}/config`,   when: null },
+  ]
+}
+
 export function navigationCommands(hook) {
   return [
+    // --- Current project pages (shown only when inside a project) ---
+    ...currentProjectCommands(hook),
     // --- Workspace navigation ---
     { id: "go-sessions",      label: "Sessions",      icon: "hero-cpu-chip",                  group: "Workspace", hint: "Workspace", keywords: [],                        shortcut: null, type: "navigate", href: "/",              when: null },
     { id: "go-tasks",         label: "Tasks",         icon: "hero-clipboard-document-list",   group: "Workspace", hint: "Workspace", keywords: [],                        shortcut: null, type: "navigate", href: "/tasks",          when: null },

@@ -39,19 +39,21 @@ function showCanvasBanner(message) {
   banner.textContent = message
   banner.style.cssText = [
     'position:absolute',
-    'bottom:16px',
+    'bottom:20px',
     'left:50%',
     'transform:translateX(-50%)',
-    'background:oklch(var(--b2))',
-    'border:1px solid oklch(var(--bc)/0.15)',
-    'color:oklch(var(--bc)/0.7)',
-    'font-size:0.75rem',
-    'padding:6px 14px',
+    'background:oklch(var(--n))',
+    'border:1px solid oklch(var(--nc)/0.2)',
+    'color:oklch(var(--nc))',
+    'font-size:0.8rem',
+    'font-weight:500',
+    'padding:8px 18px',
     'border-radius:9999px',
-    'z-index:100',
+    'z-index:200',
     'pointer-events:none',
     'white-space:nowrap',
-    'box-shadow:0 2px 8px oklch(var(--b3)/0.4)',
+    'box-shadow:0 4px 16px rgba(0,0,0,0.4)',
+    'letter-spacing:0.01em',
   ].join(';')
 
   canvas.appendChild(banner)

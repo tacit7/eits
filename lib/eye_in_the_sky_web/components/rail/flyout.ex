@@ -64,6 +64,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                   Agents
                 </span>
               </.link>
+            <% @active_section == :teams -> %>
+              <.link
+                navigate="/teams"
+                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
+              >
+                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
+                  <.icon name="hero-users" class="size-3.5" />
+                </span>
+                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+                  Teams
+                </span>
+              </.link>
             <% dual_page_section?(@active_section) && project_route_for(@active_section, @sidebar_project) -> %>
               <.link
                 navigate={project_route_for(@active_section, @sidebar_project)}

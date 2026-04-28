@@ -119,24 +119,36 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
         ]}
         style="scrollbar-width: none;"
       >
-        <div class="mb-3">
+        <div class="mb-3 flex items-center gap-3">
           <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
             {length(@filtered_agents)} agents
           </span>
+          <form phx-change="search" class="ml-auto">
+            <input
+              type="text"
+              name="query"
+              value={@search_query}
+              placeholder="Search agents..."
+              data-vim-search
+              class="input input-xs bg-base-200/50 border-base-content/8 text-base-content/70 placeholder:text-base-content/30 min-h-[28px] text-xs w-40 focus:w-56 transition-all"
+            />
+          </form>
         </div>
 
         <%= if @filtered_agents != [] do %>
-          <div class="divide-y divide-base-content/5">
+          <div class="divide-y divide-base-content/5" data-vim-list>
             <%= for agent <- @filtered_agents do %>
               <% selected? = @selected_agent && @selected_agent.id == agent.id %>
               <div class="py-0.5">
                 <div
                   class={[
                     "py-2.5 px-3 flex flex-col gap-0.5 cursor-pointer rounded-lg transition-colors",
+                    "[&.vim-nav-focused]:bg-base-200 [&.vim-nav-focused]:ring-1 [&.vim-nav-focused]:ring-primary",
                     if(selected?, do: "bg-primary/5 border-l-2 border-primary", else: "hover:bg-base-200/40")
                   ]}
                   phx-click="select_agent"
                   phx-value-id={agent.id}
+                  data-vim-list-item
                   role="button"
                 >
                   <div class="flex items-center gap-2">

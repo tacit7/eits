@@ -49,10 +49,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
       %{keys: ["y", "u"], desc: "Copy session UUID"},
       %{keys: ["y", "i"], desc: "Copy session integer ID"},
     ]},
+    %{group: "context", label: "Flyout navigation", scope_note: "When flyout panel is open", bindings: [
+      %{keys: ["F"],     desc: "Focus flyout (then j/k navigate, Enter open, Esc exit)"},
+    ]},
     %{group: "context", label: "Page-specific", scope_note: "Route-dependent", bindings: [
       %{keys: ["f", "f"], desc: "Toggle filter drawer (tasks page)"},
       %{keys: ["a", "d"], desc: "Toggle agent drawer (chat page)"},
       %{keys: ["m", "b"], desc: "Toggle members panel (chat page)"},
+      %{keys: ["i"],      desc: "Focus composer (DM page)"},
     ]},
   ]
 

@@ -89,6 +89,17 @@ export const COMMANDS: Command[] = [
   { id: "global.close",   label: "Close Flyout",     keys: ["q"], group: "global",
     action: { kind: "push_event", event: "close_flyout", payload: {}, target: "shell" } },
 
+  // context — page-specific bindings
+  { id: "context.filter_drawer", label: "Toggle Filter Drawer", keys: ["f", "f"], group: "context",
+    action: { kind: "push_event", event: "toggle_filter_drawer", payload: {}, target: "active_view" },
+    scope: "route_suffix:/tasks" },
+  { id: "context.agent_drawer",  label: "Toggle Agent Drawer",  keys: ["a", "d"], group: "context",
+    action: { kind: "push_event", event: "toggle_agent_drawer", payload: {}, target: "active_view" },
+    scope: "route_suffix:/chat" },
+  { id: "context.members_panel", label: "Toggle Members Panel", keys: ["m", "b"], group: "context",
+    action: { kind: "push_event", event: "toggle_members", payload: {}, target: "active_view" },
+    scope: "route_suffix:/chat" },
+
   // list navigation (context: page with data-vim-list)
   { id: "list.next",  label: "Next item",     keys: ["j"],     group: "context",
     action: { kind: "client", name: "list_next" },  scope: "feature:vim-list" },

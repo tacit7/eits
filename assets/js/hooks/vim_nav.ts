@@ -20,6 +20,11 @@ export function isCommandActive(cmd: Command): boolean {
   if (!cmd.scope || cmd.scope === "global") return true
   if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]")
   if (cmd.scope === "feature:vim-search") return !!document.querySelector("[data-vim-search]")
+  if (cmd.scope.startsWith("route_suffix:")) {
+    const suffix = cmd.scope.slice("route_suffix:".length)
+    const path = window.location.pathname
+    return path.endsWith(suffix) || path.includes(suffix + "/")
+  }
   return true
 }
 

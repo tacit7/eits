@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         <button
           type="button"
           data-fmt="bold"
-          title="Bold (⌘B)"
+          title="Bold"
           class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
         >
           <span class="font-bold text-sm leading-none">B</span>
@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         <button
           type="button"
           data-fmt="italic"
-          title="Italic (⌘I)"
+          title="Italic"
           class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
         >
           <span class="italic text-sm leading-none">I</span>
@@ -104,7 +104,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         <button
           type="button"
           data-fmt="code"
-          title="Inline code (⌘E)"
+          title="Inline code"
           class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
         >
           <.icon name="hero-code-bracket" class="size-3.5" />
@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         <button
           type="button"
           data-fmt="code-block"
-          title="Code block (⌘⇧E)"
+          title="Code block"
           class="flex items-center justify-center w-7 h-7 rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
         >
           <span class="font-mono text-micro leading-none tracking-tight">```</span>

@@ -58,7 +58,11 @@ export const CommandHistory = {
         return
       }
       // Ctrl+P or Up Arrow - Previous command
-      if ((e.ctrlKey && e.key === 'p') || e.key === 'ArrowUp') {
+      // ArrowUp only triggers history navigation when the cursor is on the first line.
+      if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault()
+        this.navigateHistory('prev')
+      } else if (e.key === 'ArrowUp' && this._isOnFirstLine()) {
         e.preventDefault()
         this.navigateHistory('prev')
       }
@@ -134,5 +138,12 @@ export const CommandHistory = {
   autoResize() {
     this.el.style.height = 'auto'
     this.el.style.height = Math.min(this.el.scrollHeight, 160) + 'px'
+  },
+
+  // Returns true when the cursor is on the first line of the textarea.
+  // "First line" = no newline character between the start and the cursor position.
+  _isOnFirstLine() {
+    const beforeCursor = this.el.value.substring(0, this.el.selectionStart)
+    return !beforeCursor.includes('\n')
   }
 }

@@ -60,6 +60,50 @@ The leader is `Space`. Pressing `Space` enters a 2s sequence window and shows th
 | `Space ?` | Keybinding help overlay | Alias of `?`. |
 | `Space n` | New (chord prefix below) | `Space n a` = new agent, etc. — mirror existing `n a`/`n t`/`n n`/`n c`. |
 
+### `Space g` — Go to page (aliases of existing `g` bindings)
+
+| Keys | Action | Existing alias |
+|---|---|---|
+| `Space g s` | Go to Sessions | `g s` |
+| `Space g t` | Go to Tasks | `g t` |
+| `Space g n` | Go to Notes | `g n` |
+| `Space g a` | Go to Agents | `g a` |
+| `Space g k` | Go to Kanban | `g k` |
+| `Space g w` | Go to Canvas | `g w` |
+| `Space g f` | Go to Files | `g f` |
+| `Space g p` | Go to Prompts | `g p` |
+| `Space g c` | Go to Chat | `g c` |
+| `Space g j` | Go to Jobs | `g j` |
+| `Space g u` | Go to Usage | `g u` |
+| `Space g m` | Go to Teams | `g m` |
+| `Space g K` | Go to Skills | `g K` |
+| `Space g N` | Go to Notifications | `g N` |
+| `Space g ,` | Go to Settings | `g ,` |
+| `Space g h` | Go to Keybindings | `g h` |
+
+> All are direct aliases — no new behavior. The bare `g` prefix keeps working. `Space g` is for users who default to reaching for Space first.
+
+### `Space t` — Toggle rail sections (aliases of existing `t` bindings)
+
+| Keys | Action | Existing alias |
+|---|---|---|
+| `Space t s` | Toggle Sessions | `t s` |
+| `Space t t` | Toggle Tasks | `t t` |
+| `Space t n` | Toggle Notes | `t n` |
+| `Space t f` | Toggle Files | `t f` |
+| `Space t w` | Toggle Canvas | `t w` |
+| `Space t c` | Toggle Chat | `t c` |
+| `Space t k` | Toggle Skills | `t k` |
+| `Space t m` | Toggle Teams | `t m` |
+| `Space t j` | Toggle Jobs | `t j` |
+| `Space t a` | Toggle Agents | `t a` |
+| `Space t u` | Toggle Usage | `t u` |
+| `Space t b` | Toggle Notifications | `t b` |
+| `Space t P` | Toggle Prompts | `t P` |
+| `Space t p` | Toggle Project picker | `t p` |
+
+> Same as `Space g` — all aliases. Bare `t` prefix keeps working.
+
 ### `Space f` — Files (Phase 1 only)
 
 | Keys | Action |
@@ -121,7 +165,7 @@ Conflict check: `(` and `)` are not currently bound. No timer disambiguation nee
 
 1. **`keyFromEvent`**: encode modifiers when present (`"C-h"` for Ctrl+H, `"M-x"` for Meta+X). For our Phase A–B plan we only need shift handling, which already works via `event.key` casing — Ctrl/Meta deferred until we actually need them.
 2. **`handleKey`**: stop unconditionally bailing on `ctrlKey/metaKey` — only bail when no command exists for that combo. Phase A–B don't need this; defer.
-3. **`PREFIXES`**: already a `Set` of `keys[0]`. Add `"Space"` once Space-prefixed commands exist.
+3. **`PREFIXES`**: already a `Set` of `keys[0]`. Add `"Space"` once Space-prefixed commands exist. Note that `Space g` and `Space t` are 3-key chords — the which-key refactor in step 4 is required before these work.
 4. **`_renderWhichKey`**: extend to handle 3+ key chords. Currently filters `cmd.keys[0] === prefix && cmd.keys.length > 1`. Need to handle the case where the buffer is `["Space", "f"]` and we want which-key for the third key. Refactor `_renderWhichKey(prefix: string)` to `_renderWhichKey(prefix: string[])` so it filters on the buffer prefix array.
 5. **Sequence timer**: already 1000ms — bump to 1500–2000ms when in a `Space`-led chord to give users time to think (LazyVim parity).
 6. **`Space` as a key**: `keyFromEvent` returns `"Space"` for `" "` already.

@@ -96,6 +96,8 @@ export const CanvasLayoutHook = {
       if (!canvasArea) return
       const W = canvasArea.offsetWidth  - EDGE * 2
       const H = canvasArea.offsetHeight - EDGE * 2
+      // Bail if canvas area is not meaningfully sized yet (collapsed sidebar, not rendered)
+      if (W < 200 || H < 200) return
       const windows = Array.from(document.querySelectorAll('[data-chat-window]'))
       if (windows.length === 0) return
 
@@ -121,8 +123,13 @@ export const CanvasLayoutHook = {
   }
 }
 
+const MIN_DIM = 120  // never write dimensions smaller than this
+
 function applyPosition(win, pos) {
   if (!win || !pos) return
+  const w = Math.max(pos.w, MIN_DIM)
+  const h = Math.max(pos.h, MIN_DIM)
+  pos = { ...pos, w, h }
   win.style.left   = pos.x + 'px'
   win.style.top    = pos.y + 'px'
   win.style.width  = pos.w + 'px'

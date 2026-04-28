@@ -49,18 +49,25 @@ export const ChatWindowHook = {
     const csId = this.el.dataset.csId
     const saved = loadWindowLayout(csId)
     if (saved) {
-      this.el.style.left   = `${saved.x}px`
-      this.el.style.top    = `${saved.y}px`
-      this.el.style.width  = `${saved.w}px`
-      this.el.style.height = `${saved.h}px`
-      this._width  = saved.w
-      this._height = saved.h
-      this._dragLeft = saved.x
-      this._dragTop  = saved.y
-      if (saved.z != null) {
-        this.el.style.zIndex = String(saved.z)
-        this._zIndex = String(saved.z)
-        this.el.dataset.savedZIndex = String(saved.z)
+      // Guard against corrupt values (e.g. layout computed when canvas area was collapsed)
+      const MIN_W = 120, MIN_H = 120
+      if (saved.w < MIN_W || saved.h < MIN_H) {
+        // Wipe the bad entry so DB defaults take over; don't apply it
+        try { localStorage.removeItem(`cw_${csId}`) } catch (_) {}
+      } else {
+        this.el.style.left   = `${saved.x}px`
+        this.el.style.top    = `${saved.y}px`
+        this.el.style.width  = `${saved.w}px`
+        this.el.style.height = `${saved.h}px`
+        this._width  = saved.w
+        this._height = saved.h
+        this._dragLeft = saved.x
+        this._dragTop  = saved.y
+        if (saved.z != null) {
+          this.el.style.zIndex = String(saved.z)
+          this._zIndex = String(saved.z)
+          this.el.dataset.savedZIndex = String(saved.z)
+        }
       }
     }
 

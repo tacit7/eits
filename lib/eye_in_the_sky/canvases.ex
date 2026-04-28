@@ -79,10 +79,24 @@ defmodule EyeInTheSky.Canvases do
     end
   end
 
+  @min_window_dim 100
+
   def update_window_layout(canvas_session_id, attrs) do
+    attrs =
+      attrs
+      |> maybe_clamp(:width)
+      |> maybe_clamp(:height)
+
     case Repo.get(CanvasSession, canvas_session_id) do
       nil -> {:error, :not_found}
       cs -> cs |> CanvasSession.changeset(attrs) |> Repo.update()
+    end
+  end
+
+  defp maybe_clamp(attrs, key) do
+    case Map.fetch(attrs, key) do
+      {:ok, v} when is_integer(v) and v < @min_window_dim -> Map.put(attrs, key, @min_window_dim)
+      _ -> attrs
     end
   end
 

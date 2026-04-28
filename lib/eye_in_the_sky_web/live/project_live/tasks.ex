@@ -39,6 +39,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:total_tasks, 0)
       |> assign(:selected_task_ids, MapSet.new())
       |> assign(:tasks_select_mode, false)
+      |> assign(:show_archive_confirm, false)
       |> assign(:loaded_task_ids, [])
       |> assign(:loaded_tasks, [])
       |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
@@ -188,6 +189,109 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> reinsert_all_tasks()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("bulk_set_state", %{"state_id" => state_id_str}, socket) do
+    state_id = ControllerHelpers.parse_int(state_id_str)
+    ids = socket.assigns.selected_task_ids
+
+    cond do
+      MapSet.size(ids) == 0 ->
+        {:noreply, socket}
+
+      is_nil(state_id) ->
+        {:noreply, put_flash(socket, :error, "Invalid state")}
+
+      true ->
+        results =
+          Enum.map(ids, fn task_id ->
+            case Tasks.get_task_by_uuid_or_id(task_id) do
+              {:ok, task} -> match?({:ok, _}, Tasks.update_task_state(task, state_id))
+              {:error, :not_found} -> false
+            end
+          end)
+
+        moved = Enum.count(results, & &1)
+        failed = length(results) - moved
+
+        state_name =
+          case Enum.find(socket.assigns.workflow_states, &(&1.id == state_id)) do
+            nil -> "state"
+            state -> state.name
+          end
+
+        {flash_level, flash_msg} =
+          cond do
+            moved > 0 and failed > 0 ->
+              {:info, "Moved #{moved} task#{if moved != 1, do: "s"} to #{state_name}; #{failed} failed"}
+
+            moved > 0 ->
+              {:info, "Moved #{moved} task#{if moved != 1, do: "s"} to #{state_name}"}
+
+            true ->
+              {:error, "Could not move #{failed} task#{if failed != 1, do: "s"}"}
+          end
+
+        socket =
+          socket
+          |> assign(:selected_task_ids, MapSet.new())
+          |> assign(:tasks_select_mode, false)
+          |> load_tasks()
+          |> put_flash(flash_level, flash_msg)
+
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("confirm_archive_selected_tasks", _params, socket) do
+    {:noreply, assign(socket, :show_archive_confirm, true)}
+  end
+
+  @impl true
+  def handle_event("cancel_archive_selected_tasks", _params, socket) do
+    {:noreply, assign(socket, :show_archive_confirm, false)}
+  end
+
+  @impl true
+  def handle_event("archive_selected_tasks", _params, socket) do
+    if MapSet.size(socket.assigns.selected_task_ids) == 0 do
+      {:noreply, assign(socket, :show_archive_confirm, false)}
+    else
+      results =
+        Enum.map(socket.assigns.selected_task_ids, fn task_id ->
+          case Tasks.get_task_by_uuid_or_id(task_id) do
+            {:ok, task} -> match?({:ok, _}, Tasks.archive_task(task))
+            {:error, :not_found} -> false
+          end
+        end)
+
+      archived = Enum.count(results, & &1)
+      failed = length(results) - archived
+
+      {flash_level, flash_msg} =
+        cond do
+          archived > 0 and failed > 0 ->
+            {:info, "Archived #{archived} task#{if archived != 1, do: "s"}; #{failed} could not be archived"}
+
+          archived > 0 ->
+            {:info, "Archived #{archived} task#{if archived != 1, do: "s"}"}
+
+          true ->
+            {:error, "Could not archive #{failed} task#{if failed != 1, do: "s"}"}
+        end
+
+      socket =
+        socket
+        |> assign(:show_archive_confirm, false)
+        |> assign(:selected_task_ids, MapSet.new())
+        |> assign(:tasks_select_mode, false)
+        |> load_tasks()
+        |> put_flash(flash_level, flash_msg)
+
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -344,6 +448,40 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
                 <span class="text-mini text-base-content/50 font-medium">
                   {MapSet.size(@selected_task_ids)} selected
                 </span>
+                <details
+                  id="tasks-bulk-state-dropdown"
+                  phx-update="ignore"
+                  class="dropdown"
+                >
+                  <summary class="btn btn-ghost btn-xs gap-1 min-h-[44px] text-base-content/70 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
+                    <.icon name="hero-arrows-right-left-mini" class="size-3.5" /> Move to <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
+                  </summary>
+                  <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[140px]">
+                    <%= for state <- @workflow_states do %>
+                      <li>
+                        <button
+                          phx-click="bulk_set_state"
+                          phx-value-state_id={state.id}
+                          onclick="this.closest('details').removeAttribute('open')"
+                          class="flex items-center gap-2 w-full px-3 py-1.5 text-left text-mini rounded hover:bg-base-content/5 text-base-content/70 hover:text-base-content"
+                        >
+                          <span
+                            class="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                            style={"background-color: #{state.color}"}
+                            aria-hidden="true"
+                          />
+                          {state.name}
+                        </button>
+                      </li>
+                    <% end %>
+                  </ul>
+                </details>
+                <button
+                  phx-click="confirm_archive_selected_tasks"
+                  class="btn btn-ghost btn-xs text-warning/70 hover:text-warning hover:bg-warning/10 gap-1 min-h-[44px] min-w-[44px]"
+                >
+                  <.icon name="hero-archive-box-mini" class="size-3.5" /> Archive
+                </button>
                 <button
                   phx-click="delete_selected_tasks"
                   data-confirm={"Delete #{MapSet.size(@selected_task_ids)} task#{if MapSet.size(@selected_task_ids) != 1, do: "s"}?"}
@@ -427,6 +565,32 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       update_event="update_task"
       delete_event="delete_task"
     />
+
+    <!-- Bulk archive confirm modal -->
+    <dialog
+      id="tasks-archive-confirm-modal"
+      class={"modal modal-bottom sm:modal-middle " <> if(@show_archive_confirm, do: "modal-open", else: "")}
+    >
+      <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+        <h3 class="text-lg font-bold">Archive tasks</h3>
+        <p class="py-4 text-sm text-base-content/70">
+          <% count = MapSet.size(@selected_task_ids) %>
+          Archive {count} selected task{if count == 1, do: "", else: "s"}?
+          Archived tasks can be unarchived later.
+        </p>
+        <div class="modal-action">
+          <button phx-click="cancel_archive_selected_tasks" class="btn btn-sm btn-ghost min-h-[44px]">
+            Cancel
+          </button>
+          <button phx-click="archive_selected_tasks" class="btn btn-sm btn-warning min-h-[44px]">
+            Archive
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button phx-click="cancel_archive_selected_tasks">close</button>
+      </form>
+    </dialog>
     """
   end
 end

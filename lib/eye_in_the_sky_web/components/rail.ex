@@ -23,6 +23,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   alias EyeInTheSkyWeb.Components.Rail.ProjectActions
   alias EyeInTheSkyWeb.Components.NewSessionModal
   alias EyeInTheSkyWeb.AgentLive.IndexActions
+  alias EyeInTheSkyWeb.Live.Shared.AgentsHelpers
 
   @section_map %{
     sessions: :sessions,
@@ -41,12 +42,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     config: :sessions,
     jobs: :jobs,
     settings: :sessions,
-    agents: :sessions,
+    agents: :agents,
     files: :files,
     bookmarks: :sessions
   }
 
-  @valid_sections ~w(sessions tasks prompts chat notes skills teams canvas notifications usage jobs files)
+  @valid_sections ~w(sessions agents tasks prompts chat notes skills teams canvas notifications usage jobs files)
   @sticky_sections [:chat, :canvas]
 
   @impl true
@@ -78,6 +79,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_filter_open: false,
         session_sort: :last_activity,
         session_name_filter: "",
+        flyout_agents: [],
         flyout_notes: [],
         flyout_jobs: [],
         flyout_file_nodes: [],
@@ -86,7 +88,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_error: nil,
         file_tabs: [],
         active_tab_path: nil,
-        show_new_session_form: false
+        show_new_session_form: false,
+        prefill_agent_slug: nil,
+        prefill_agent_name: nil
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
@@ -159,6 +163,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> assign(:flyout_file_expanded, MapSet.new())
         |> assign(:flyout_file_children, %{})
         |> maybe_load_files(socket.assigns.active_section)
+        |> maybe_load_agents(socket.assigns.active_section, sidebar_project)
       else
         socket
       end
@@ -178,6 +183,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> maybe_load_jobs(next_section)
         |> maybe_load_notes(next_section, sidebar_project)
         |> maybe_load_files(next_section)
+        |> maybe_load_agents(next_section, sidebar_project)
       else
         socket
       end
@@ -223,21 +229,30 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        |> maybe_load_tasks(section, socket.assigns.sidebar_project)
        |> maybe_load_jobs(section)
        |> maybe_load_notes(section, socket.assigns.sidebar_project)
-       |> maybe_load_files(section)}
+       |> maybe_load_files(section)
+       |> maybe_load_agents(section, socket.assigns.sidebar_project)}
     end
   end
 
   def handle_event("close_flyout", _params, socket) do
     case sticky_section(socket.assigns.sidebar_tab) do
       nil ->
-        {:noreply, assign(socket, flyout_open: false, mobile_open: false)}
+        {:noreply,
+         assign(socket,
+           flyout_open: false,
+           mobile_open: false,
+           proj_picker_open: false,
+           show_new_session_form: false
+         )}
 
       sticky ->
         {:noreply,
          socket
          |> assign(:active_section, sticky)
          |> assign(:flyout_open, true)
-         |> assign(:mobile_open, false)}
+         |> assign(:mobile_open, false)
+         |> assign(:proj_picker_open, false)
+         |> assign(:show_new_session_form, false)}
     end
   end
 
@@ -373,8 +388,21 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("toggle_new_session_drawer", _params, socket),
     do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
 
+  def handle_event("open_new_session_with_agent", %{"slug" => slug, "name" => name}, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_new_session_form, true)
+     |> assign(:prefill_agent_slug, slug)
+     |> assign(:prefill_agent_name, name)}
+  end
+
   def handle_event("create_new_session", params, socket) do
-    socket = assign(socket, :show_new_session_form, false)
+    socket =
+      socket
+      |> assign(:show_new_session_form, false)
+      |> assign(:prefill_agent_slug, nil)
+      |> assign(:prefill_agent_name, nil)
+
     case params["submit_action"] do
       "chat" -> IndexActions.handle_create_new_session(params, socket)
       _ -> IndexActions.handle_launch_new_session(params, socket)
@@ -511,9 +539,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         </button>
 
         <.rail_item section={:files} active_section={@active_section} flyout_open={@flyout_open} icon="hero-folder" label="Files" myself={@myself} />
-        <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-robot" label="Sessions" myself={@myself} />
+        <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-bot-message-square" label="Sessions" myself={@myself} />
         <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-check-circle" label="Tasks" myself={@myself} />
         <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-pencil-square" label="Notes" myself={@myself} />
+        <.rail_item section={:agents} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-robot" label="Agents" myself={@myself} />
         <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
         <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Prompts" myself={@myself} />
         <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
@@ -569,6 +598,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
         notification_count={@notification_count}
+        flyout_agents={@flyout_agents}
         flyout_notes={@flyout_notes}
         flyout_jobs={@flyout_jobs}
         flyout_file_nodes={@flyout_file_nodes}
@@ -602,6 +632,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         toggle_event="toggle_new_session_drawer"
         submit_event="create_new_session"
         target={@myself}
+        prefill_agent_slug={@prefill_agent_slug}
+        prefill_agent_name={@prefill_agent_name}
       />
     </div>
     """
@@ -827,6 +859,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   defp maybe_load_files(socket, _section), do: socket
+
+  defp maybe_load_agents(socket, :agents, project) do
+    assign(socket, :flyout_agents, AgentsHelpers.list_agents_for_flyout(project))
+  end
+
+  defp maybe_load_agents(socket, _section, _project), do: socket
 
   defp file_error_message(:root_path_not_found), do: "Project directory not found"
   defp file_error_message(:root_path_not_directory), do: "Project path is not a directory"

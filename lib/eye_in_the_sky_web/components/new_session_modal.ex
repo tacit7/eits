@@ -123,10 +123,18 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           <form id="new-session-form" phx-submit={@submit_event} class="flex flex-col gap-4">
             <input type="hidden" name="submit_action" value="launch" id="new-session-submit-action" phx-update="ignore" />
             <.provider_field selected_provider={@selected_provider} myself={@myself} />
-            <.agent_combobox available_agents={@available_agents} />
+            <.agent_combobox
+              available_agents={@available_agents}
+              prefill_agent_slug={assigns[:prefill_agent_slug]}
+              prefill_agent_name={assigns[:prefill_agent_name]}
+            />
             <.prompt_selector prompts={assigns[:prompts]} selected_prompt_id={@selected_prompt_id} myself={@myself} />
-            <.name_field />
-            <.description_field selected_prompt_id={@selected_prompt_id} prefill_text={@prefill_text} />
+            <.name_field focus_on_open={not is_nil(assigns[:prefill_agent_slug])} />
+            <.description_field
+              selected_prompt_id={@selected_prompt_id}
+              prefill_text={@prefill_text}
+              focus_on_open={not is_nil(assigns[:prefill_agent_slug])}
+            />
             <.image_attachments file_uploads={@file_uploads} />
             <.project_selector current_project={assigns[:current_project]} projects={assigns[:projects]} myself={@myself} />
             <.model_selector selected_provider={@selected_provider} selected_model={@selected_model} myself={@myself} />
@@ -165,6 +173,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   end
 
   attr :available_agents, :list, required: true
+  attr :prefill_agent_slug, :string, default: nil
+  attr :prefill_agent_name, :string, default: nil
 
   defp agent_combobox(assigns) do
     ~H"""
@@ -173,6 +183,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         id="agent-combobox"
         phx-hook="AgentCombobox"
         data-agents={Jason.encode!(Enum.map(@available_agents, fn {slug, name, scope} -> [slug, name, to_string(scope)] end))}
+        data-prefill-slug={@prefill_agent_slug}
+        data-prefill-label={@prefill_agent_name}
         class="relative"
       >
         <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
@@ -233,15 +245,18 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     """
   end
 
+  attr :focus_on_open, :boolean, default: false
+
   defp name_field(assigns) do
     ~H"""
     <div>
-      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Name</label>
+      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Session Name</label>
       <input
         type="text"
         name="agent_name"
         class="input input-bordered w-full text-base"
         placeholder="e.g., Fix login bug, Code review..."
+        phx-mounted={if @focus_on_open, do: Phoenix.LiveView.JS.focus()}
       />
     </div>
     """
@@ -249,11 +264,12 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   attr :selected_prompt_id, :any, required: true
   attr :prefill_text, :string, required: true
+  attr :focus_on_open, :boolean, default: false
 
   defp description_field(assigns) do
     ~H"""
     <div>
-      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Description</label>
+      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Prompt</label>
       <textarea
         id={"desc-#{@selected_prompt_id || "none"}"}
         name="description"
@@ -261,7 +277,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         placeholder="What should this agent work on?"
         required
         phx-update="ignore"
-        phx-mounted={Phoenix.LiveView.JS.focus()}
+        phx-mounted={if !@focus_on_open, do: Phoenix.LiveView.JS.focus()}
       >{@prefill_text}</textarea>
       <label class="flex items-center gap-1.5 mt-2 cursor-pointer w-fit">
         <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/40" />

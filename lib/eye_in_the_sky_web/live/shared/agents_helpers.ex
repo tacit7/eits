@@ -3,6 +3,25 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
 
   alias EyeInTheSkyWeb.OverviewLive.Agents.AgentDef
 
+  @doc """
+  Loads agents for the rail flyout.
+  When project is nil, returns global agents (~/.claude/agents) capped at 15.
+  When project is set, returns project-scoped agents (.claude/agents) capped at 15.
+  """
+  def list_agents_for_flyout(nil) do
+    do_load_agents(File.cwd!())
+    |> Enum.filter(&(&1.source == :agents))
+    |> Enum.take(15)
+  end
+
+  def list_agents_for_flyout(%{path: path}) when is_binary(path) and path != "" do
+    do_load_agents(path)
+    |> Enum.filter(&(&1.source == :project_agents))
+    |> Enum.take(15)
+  end
+
+  def list_agents_for_flyout(_), do: list_agents_for_flyout(nil)
+
   def load_agents(socket) do
     project_path = project_path_for(socket)
     agents = do_load_agents(project_path)

@@ -15,7 +15,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -113,6 +113,14 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "list_open" },  scope: "feature:vim-list" },
   { id: "global.search", label: "Search",     keys: ["/"],     group: "global",
     action: { kind: "client", name: "page_search" }, scope: "feature:vim-search" },
+
+  // flyout focus (context: flyout is open)
+  { id: "flyout.focus", label: "Focus flyout", keys: ["F"], group: "context",
+    action: { kind: "client", name: "focus_flyout" }, scope: "feature:vim-flyout" },
+
+  // dm page
+  { id: "dm.focus_composer", label: "Focus composer", keys: ["i"], group: "context",
+    action: { kind: "client", name: "focus_composer" }, scope: "route_suffix:/dm" },
 
   // session context actions (sessions page only)
   { id: "session.archive",   label: "Archive session",  keys: ["A"],       group: "context",

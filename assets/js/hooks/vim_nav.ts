@@ -22,7 +22,8 @@ function isFlyoutOpen(): boolean {
 
 export function isCommandActive(cmd: Command): boolean {
   if (!cmd.scope || cmd.scope === "global") return true
-  if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]") || isFlyoutOpen()
+  if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]")
+  if (cmd.scope === "feature:vim-flyout") return isFlyoutOpen()
   if (cmd.scope === "feature:vim-search") return !!document.querySelector("[data-vim-search]")
   if (cmd.scope === "page:sessions") return !!document.querySelector("[data-vim-page='sessions']")
   if (cmd.scope.startsWith("route_suffix:")) {
@@ -98,6 +99,7 @@ export const VimNav = {
   pushEvent: null as unknown as LiveViewHook["pushEvent"],
   pushEventToShell: null as ((event: string, payload: object) => void) | null,
   pushToList: null as ((event: string, payload: object) => void) | null,
+  flyoutFocused: false as boolean,
   mode: "normal" as Mode,
   buffer: [] as string[],
   sequenceTimer: null as ReturnType<typeof setTimeout> | null,
@@ -188,6 +190,10 @@ export const VimNav = {
     const key = keyFromEvent(event)
 
     if (key === "Escape") {
+      if (this.flyoutFocused) {
+        this.clearListFocus()
+        return
+      }
       this.clearSequence()
       this.hideHelp()
       this.pushEventToShell?.("close_proj_picker", {})
@@ -247,9 +253,8 @@ export const VimNav = {
   },
 
   currentListItems(): HTMLElement[] {
-    if (isFlyoutOpen()) {
-      const flyoutItems = [...document.querySelectorAll<HTMLElement>("[data-vim-flyout-item]")]
-      if (flyoutItems.length > 0) return flyoutItems
+    if (this.flyoutFocused) {
+      return [...document.querySelectorAll<HTMLElement>("[data-vim-flyout-item]")]
     }
     const list = this.currentList()
     if (!list) return []
@@ -272,6 +277,7 @@ export const VimNav = {
     document.querySelectorAll<HTMLElement>("[data-vim-list-item], [data-vim-flyout-item]")
       .forEach(el => el.classList.remove("vim-nav-focused"))
     this.listFocusIndex = -1
+    this.flyoutFocused = false
   },
 
   executeCommand(cmd: Command) {
@@ -345,6 +351,19 @@ export const VimNav = {
         const value = action.name === "list_yank_uuid" ? item.dataset.sessionUuid : item.dataset.sessionId
         if (!value) return
         navigator.clipboard.writeText(value).catch(() => {})
+        return
+      }
+      if (action.name === "focus_flyout") {
+        const items = [...document.querySelectorAll<HTMLElement>("[data-vim-flyout-item]")]
+        if (items.length === 0) return
+        this.flyoutFocused = true
+        this.listFocusIndex = 0
+        this.focusListItem(0)
+        return
+      }
+      if (action.name === "focus_composer") {
+        const composer = document.querySelector<HTMLElement>("[data-vim-composer]")
+        composer?.focus()
         return
       }
     }

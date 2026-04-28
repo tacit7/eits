@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { isEditableTarget, keyFromEvent, matchesKnownBindingOrPrefix, VimNav } from "./vim_nav"
+import { isEditableTarget, isCommandActive, keyFromEvent, matchesKnownBindingOrPrefix, VimNav } from "./vim_nav"
 import { COMMANDS, PREFIXES } from "./vim_nav_commands"
 
 function makeHook(opts: { enabled?: boolean; projectPath?: string } = {}) {
@@ -466,5 +466,133 @@ describe("VimNav page search (/)", () => {
     const h = makeHook()
     const cmd = COMMANDS.find(c => c.id === "global.search")!
     expect(() => h.executeCommand(cmd)).not.toThrow()
+  })
+})
+
+describe("isCommandActive scope gating", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  it("returns true for commands with no scope", () => {
+    const cmd = COMMANDS.find(c => c.id === "nav.sessions")!
+    expect(isCommandActive(cmd)).toBe(true)
+  })
+
+  it("returns false for feature:vim-list when no data-vim-list in DOM", () => {
+    const cmd = COMMANDS.find(c => c.id === "list.next")!
+    expect(isCommandActive(cmd)).toBe(false)
+  })
+
+  it("returns true for feature:vim-list when data-vim-list exists", () => {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    document.body.appendChild(list)
+    const cmd = COMMANDS.find(c => c.id === "list.next")!
+    expect(isCommandActive(cmd)).toBe(true)
+  })
+
+  it("returns false for feature:vim-search when no data-vim-search in DOM", () => {
+    const cmd = COMMANDS.find(c => c.id === "global.search")!
+    expect(isCommandActive(cmd)).toBe(false)
+  })
+
+  it("returns true for feature:vim-search when data-vim-search exists", () => {
+    const input = document.createElement("input")
+    input.setAttribute("data-vim-search", "")
+    document.body.appendChild(input)
+    const cmd = COMMANDS.find(c => c.id === "global.search")!
+    expect(isCommandActive(cmd)).toBe(true)
+  })
+})
+
+describe("matchesKnownBindingOrPrefix respects scope", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  it("returns false for j when no data-vim-list", () => {
+    expect(matchesKnownBindingOrPrefix([], "j")).toBe(false)
+  })
+
+  it("returns true for j when data-vim-list exists", () => {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    document.body.appendChild(list)
+    expect(matchesKnownBindingOrPrefix([], "j")).toBe(true)
+  })
+
+  it("returns false for / when no data-vim-search", () => {
+    expect(matchesKnownBindingOrPrefix([], "/")).toBe(false)
+  })
+
+  it("returns true for / when data-vim-search exists", () => {
+    const input = document.createElement("input")
+    input.setAttribute("data-vim-search", "")
+    document.body.appendChild(input)
+    expect(matchesKnownBindingOrPrefix([], "/")).toBe(true)
+  })
+
+  it("global commands still match without scope elements", () => {
+    expect(matchesKnownBindingOrPrefix([], "?")).toBe(true)
+    expect(matchesKnownBindingOrPrefix([], "g")).toBe(true)
+  })
+})
+
+describe("VimNav.handleKey does NOT preventDefault on inactive scope keys", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  it("j on page without data-vim-list does NOT call preventDefault", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    const evt = new KeyboardEvent("keydown", { key: "j" })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    const spy = vi.spyOn(evt, "preventDefault")
+    h.handleKey(evt)
+    expect(spy).not.toHaveBeenCalled()
+    expect(h.buffer).toEqual([])
+  })
+
+  it("/ on page without data-vim-search does NOT call preventDefault", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    const evt = new KeyboardEvent("keydown", { key: "/" })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    const spy = vi.spyOn(evt, "preventDefault")
+    h.handleKey(evt)
+    expect(spy).not.toHaveBeenCalled()
+    expect(h.buffer).toEqual([])
+  })
+
+  it("k on page without data-vim-list does NOT call preventDefault", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    const evt = new KeyboardEvent("keydown", { key: "k" })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    const spy = vi.spyOn(evt, "preventDefault")
+    h.handleKey(evt)
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it("Enter on page without data-vim-list does NOT call preventDefault", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    const evt = new KeyboardEvent("keydown", { key: "Enter" })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    const spy = vi.spyOn(evt, "preventDefault")
+    h.handleKey(evt)
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it("j on page WITH data-vim-list DOES call preventDefault", () => {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const item = document.createElement("li")
+    item.setAttribute("data-vim-list-item", "")
+    list.appendChild(item)
+    document.body.appendChild(list)
+    const h = makeHook()
+    h.mode = "normal"
+    const evt = new KeyboardEvent("keydown", { key: "j" })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    const spy = vi.spyOn(evt, "preventDefault")
+    h.handleKey(evt)
+    expect(spy).toHaveBeenCalled()
   })
 })

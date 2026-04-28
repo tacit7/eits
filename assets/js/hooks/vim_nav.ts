@@ -16,9 +16,17 @@ export function keyFromEvent(event: KeyboardEvent): string {
   return event.key.length === 1 ? event.key.toLowerCase() : event.key
 }
 
+export function isCommandActive(cmd: Command): boolean {
+  if (!cmd.scope || cmd.scope === "global") return true
+  if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]")
+  if (cmd.scope === "feature:vim-search") return !!document.querySelector("[data-vim-search]")
+  return true
+}
+
 export function matchesKnownBindingOrPrefix(buffer: string[], key: string): boolean {
   const sequence = [...buffer, key]
   return COMMANDS.some(cmd => {
+    if (!isCommandActive(cmd)) return false
     for (let i = 0; i < sequence.length; i++) {
       if (cmd.keys[i] !== sequence[i]) return false
     }

@@ -2,6 +2,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSkyWeb.Components.DmHelpers
+
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
   # This prevents the 236px panel from compressing content on first load.
@@ -34,6 +36,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <div
       data-flyout-panel
+      data-vim-flyout-open={to_string(@open)}
       class={[
         "flex flex-col border-r border-base-content/8 bg-base-100 overflow-hidden flex-shrink-0 transition-[width] duration-150",
         # w-0 is always the mobile base; md:w-[236px] overrides on desktop when open.
@@ -203,6 +206,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <.link
       navigate={"/dm/#{@session.id}"}
+      data-vim-flyout-item
       class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
     >
       <.status_dot status={@session.status} size="xs" />
@@ -222,6 +226,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <% active = not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
       <.link
         navigate={"/chat?channel_id=#{channel.id}"}
+        data-vim-flyout-item
         class={[
           "flex items-center gap-2 px-3 py-2 text-sm transition-colors",
           if(active,
@@ -310,6 +315,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <.link
       navigate={if @task.project_id, do: "/projects/#{@task.project_id}/tasks?task_id=#{@task.id}", else: "/projects"}
+      data-vim-flyout-item
       class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
     >
       <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0 mt-px", task_state_dot(@task.state_id)]} />
@@ -334,6 +340,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <% preview = if note.title && note.title != "", do: note.body %>
       <.link
         navigate={"/notes/#{note.id}/edit"}
+        data-vim-flyout-item
         class="flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
         <span class={["truncate", if(note.title && note.title != "", do: "font-medium text-base-content/80")]}>
@@ -369,6 +376,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <%= for team <- @teams do %>
       <.link
         navigate="/teams"
+        data-vim-flyout-item
         class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
         <.icon name="hero-users" class="size-3 flex-shrink-0 text-base-content/30" />
@@ -400,6 +408,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <%= for canvas <- @canvases do %>
       <.link
         navigate={"/canvases/#{canvas.id}"}
+        data-vim-flyout-item
         class="flex items-center gap-2 px-3 py-1.5 text-sm text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
         <.icon name="hero-squares-2x2" class="size-3 flex-shrink-0 text-base-content/30" />
@@ -420,8 +429,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             title="Open DM"
           >
             <img
-              src={canvas_provider_icon(session.provider)}
-              class={["size-3.5", canvas_provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
+              src={DmHelpers.provider_icon(session.provider)}
+              class={["size-3.5", DmHelpers.provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
               alt={session.provider || "agent"}
             />
           </.link>
@@ -434,19 +443,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
-  defp canvas_session_dot("working"), do: "bg-green-500"
-  defp canvas_session_dot("waiting"), do: "bg-amber-400"
+  defp canvas_session_dot("working"), do: "bg-success"
+  defp canvas_session_dot("waiting"), do: "bg-warning"
   defp canvas_session_dot(_), do: "bg-base-content/20"
-
-  defp canvas_provider_icon("openai"), do: "/images/openai.svg"
-  defp canvas_provider_icon("codex"), do: "/images/openai.svg"
-  defp canvas_provider_icon("gemini"), do: "/images/gemini.svg"
-  defp canvas_provider_icon(_), do: "/images/claude.svg"
-
-  defp canvas_provider_icon_class("openai"), do: "dark:invert"
-  defp canvas_provider_icon_class("codex"), do: "dark:invert"
-  defp canvas_provider_icon_class("gemini"), do: ""
-  defp canvas_provider_icon_class(_), do: ""
 
   # Generic nav links per section
   attr :project, :any, default: nil
@@ -538,6 +537,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       phx-value-slug={@agent.slug}
       phx-value-name={@agent.name || @agent.slug}
       phx-target={@myself}
+      data-vim-flyout-item
       class="w-full flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left"
     >
       <.custom_icon name="lucide-robot" class="size-3 flex-shrink-0 text-base-content/30" />
@@ -569,6 +569,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <%= for job <- @jobs do %>
       <.link
         navigate="/jobs"
+        data-vim-flyout-item
         class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
         <span class={[

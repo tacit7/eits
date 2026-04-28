@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
   When project is set, returns project-scoped agents (.claude/agents) capped at 15.
   """
   def list_agents_for_flyout(nil) do
-    do_load_agents(File.cwd!())
+    do_load_agents(Path.expand("~"))
     |> Enum.filter(&(&1.source == :agents))
     |> Enum.take(15)
   end

@@ -120,7 +120,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
           <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} phx_target={assigns[:target]} />
 
-          <form phx-submit={@submit_event} class="flex flex-col gap-4">
+          <form id="new-session-form" phx-submit={@submit_event} class="flex flex-col gap-4">
+            <input type="hidden" name="submit_action" value="launch" id="new-session-submit-action" phx-update="ignore" />
             <.provider_field selected_provider={@selected_provider} myself={@myself} />
             <.agent_combobox available_agents={@available_agents} />
             <.prompt_selector prompts={assigns[:prompts]} selected_prompt_id={@selected_prompt_id} myself={@myself} />
@@ -565,10 +566,17 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   defp modal_submit(assigns) do
     ~H"""
     <div class="flex gap-2 mt-2">
-      <button type="submit" name="submit_action" value="launch" class="btn btn-primary flex-1">
+      <button type="submit" class="btn btn-primary flex-1">
         {@button_text || "Launch Agent"}
       </button>
-      <button type="submit" name="submit_action" value="chat" class="btn btn-secondary flex-1 gap-1.5">
+      <button
+        type="button"
+        class="btn btn-secondary flex-1 gap-1.5"
+        phx-click={
+          Phoenix.LiveView.JS.set_attribute({"value", "chat"}, to: "#new-session-submit-action")
+          |> Phoenix.LiveView.JS.dispatch("submit", to: "#new-session-form")
+        }
+      >
         <.icon name="hero-chat-bubble-left-right-mini" class="w-4 h-4" />
         Chat
       </button>

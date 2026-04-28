@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <% end %>
 
     <%= if @notes != [] do %>
-      <div class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
+      <div data-vim-list class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
           <div class="py-1 relative group/row flex items-start">
             <%!-- Select checkbox: absolute, outside row flow, hover-reveal --%>
@@ -94,8 +94,9 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                     <.icon name="hero-star-solid" class="size-3 text-warning flex-shrink-0" />
                   <% end %>
                   <.link
+                    data-vim-list-item
                     navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
-                    class="text-sm font-medium text-base-content/85 hover:text-base-content truncate"
+                    class="text-sm font-medium text-base-content/85 hover:text-base-content truncate [&.vim-nav-focused]:bg-base-200 [&.vim-nav-focused]:ring-1 [&.vim-nav-focused]:ring-primary [&.vim-nav-focused]:rounded [&.vim-nav-focused]:px-1"
                   >
                     {note.title || extract_title(note.body)}
                   </.link>

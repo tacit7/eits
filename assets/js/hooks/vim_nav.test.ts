@@ -1038,3 +1038,65 @@ describe("toggle+focus: open-with-late-items path", () => {
     expect(item.classList.contains("vim-nav-focused")).toBe(true)
   })
 })
+
+describe("rail coverage: g and t bindings for all rail items", () => {
+  it("nav commands exist for all rail items", () => {
+    const navIds = [
+      "nav.sessions","nav.tasks","nav.notes","nav.canvas","nav.agents","nav.kanban",
+      "nav.files","nav.prompts","nav.chat","nav.jobs","nav.usage","nav.teams",
+      "nav.skills","nav.notifications",
+    ]
+    for (const id of navIds) {
+      expect(COMMANDS.find(c => c.id === id), `missing ${id}`).toBeTruthy()
+    }
+  })
+
+  it("toggle commands exist for all toggleable rail sections", () => {
+    const toggleIds = [
+      "toggle.sessions","toggle.tasks","toggle.notes","toggle.files","toggle.canvas",
+      "toggle.chat","toggle.skills","toggle.teams","toggle.jobs","toggle.agents",
+      "toggle.usage","toggle.notifications","toggle.prompts",
+    ]
+    for (const id of toggleIds) {
+      expect(COMMANDS.find(c => c.id === id), `missing ${id}`).toBeTruthy()
+    }
+  })
+
+  it("no key conflicts in g namespace", () => {
+    const gKeys = COMMANDS.filter(c => c.keys[0] === "g" && c.keys.length === 2).map(c => c.keys[1])
+    expect(new Set(gKeys).size).toBe(gKeys.length)
+  })
+
+  it("no key conflicts in t namespace", () => {
+    const tKeys = COMMANDS.filter(c => c.keys[0] === "t" && c.keys.length === 2).map(c => c.keys[1])
+    expect(new Set(tKeys).size).toBe(tKeys.length)
+  })
+
+  it("project-scoped nav commands use relative paths", () => {
+    const relativeIds = ["nav.files","nav.prompts","nav.jobs","nav.teams","nav.skills"]
+    for (const id of relativeIds) {
+      const cmd = COMMANDS.find(c => c.id === id)!
+      expect((cmd.action as any).relative).toBe(true)
+    }
+  })
+
+  it("global nav commands use absolute paths", () => {
+    const absoluteCases: [string, string][] = [
+      ["nav.chat", "/chat"],
+      ["nav.usage", "/usage"],
+      ["nav.notifications", "/notifications"],
+    ]
+    for (const [id, path] of absoluteCases) {
+      const cmd = COMMANDS.find(c => c.id === id)!
+      expect((cmd.action as any).path).toBe(path)
+      expect((cmd.action as any).relative).toBeFalsy()
+    }
+  })
+
+  it("tp remains proj_picker (not repurposed); prompts uses tP (capital)", () => {
+    const tp = COMMANDS.find(c => c.keys[0] === "t" && c.keys[1] === "p")!
+    expect(tp.id).toBe("toggle.proj_picker")
+    const tP = COMMANDS.find(c => c.keys[0] === "t" && c.keys[1] === "P")!
+    expect(tP.id).toBe("toggle.prompts")
+  })
+})

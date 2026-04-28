@@ -214,7 +214,7 @@ export const ChatWindowHook = {
       }, 400)
     })
     observer.observe(this.el)
-    this._resizeObserver = observer
+    this._windowResizeObserver = observer
 
     const minimizeBtn = this.el.querySelector("[data-minimize-btn]")
     if (minimizeBtn) {
@@ -247,6 +247,8 @@ export const ChatWindowHook = {
           this.el.dataset.savedMaxHeight = this.el.style.height
           this.el.style.left = "0px"
           this.el.style.top = "0px"
+          this._dragLeft = 0
+          this._dragTop = 0
           this.el.style.width = canvas.offsetWidth + "px"
           this.el.style.height = canvas.offsetHeight + "px"
           this.el.style.resize = "none"
@@ -257,6 +259,8 @@ export const ChatWindowHook = {
         } else {
           this.el.style.left = this.el.dataset.savedLeft || "0px"
           this.el.style.top = this.el.dataset.savedTop || "0px"
+          this._dragLeft = parseInt(this.el.dataset.savedLeft || "0", 10)
+          this._dragTop = parseInt(this.el.dataset.savedTop || "0", 10)
           this.el.style.width = this.el.dataset.savedWidth || ""
           this.el.style.height = this.el.dataset.savedMaxHeight || ""
           this.el.style.resize = "both"
@@ -351,16 +355,16 @@ export const ChatWindowHook = {
       // rendering, code block expansion) that runs after the initial scrollToBottom.
       if (typeof ResizeObserver !== "undefined") {
         this._lastScrollHeight = chatBody.scrollHeight
-        this._resizeObserver = new ResizeObserver(() => {
+        this._chatResizeObserver = new ResizeObserver(() => {
           if (this._minimized) return
           const body = this.el.querySelector("[data-chat-body]")
           if (!body || body.scrollHeight === this._lastScrollHeight) return
           this._lastScrollHeight = body.scrollHeight
           if (this._autoScroll) body.scrollTop = body.scrollHeight
         })
-        this._resizeObserver.observe(chatBody)
+        this._chatResizeObserver.observe(chatBody)
         for (const child of chatBody.children) {
-          this._resizeObserver.observe(child)
+          this._chatResizeObserver.observe(child)
         }
       }
 
@@ -465,7 +469,7 @@ export const ChatWindowHook = {
     this._minimized = true
     this.el.style.display = "none"
     saveWindowMinimized(this.el.dataset.csId, true)
-    if (this._resizeObserver) this._resizeObserver.disconnect()
+    if (this._chatResizeObserver) this._chatResizeObserver.disconnect()
   },
 
   _restoreFromMinimized() {
@@ -473,11 +477,11 @@ export const ChatWindowHook = {
     saveWindowMinimized(this.el.dataset.csId, false)
     this.el.style.display = ""
     // Re-attach resize observer and force-scroll to bottom on restore
-    if (this._resizeObserver) {
+    if (this._chatResizeObserver) {
       const body = this.el.querySelector("[data-chat-body]")
       if (body) {
-        this._resizeObserver.observe(body)
-        for (const child of body.children) this._resizeObserver.observe(child)
+        this._chatResizeObserver.observe(body)
+        for (const child of body.children) this._chatResizeObserver.observe(child)
         this._lastScrollHeight = body.scrollHeight
         body.scrollTop = body.scrollHeight
       }
@@ -543,24 +547,41 @@ export const ChatWindowHook = {
       })
     }
 
+    if (!this._autoScroll && !this._minimized) {
+      const body = this.el.querySelector("[data-chat-body]")
+      if (body && body.scrollHeight > (this._lastBodyScrollHeight || 0)) {
+        this._newMsgCount = (this._newMsgCount || 0) + 1
+        const pill = this.el.querySelector("[data-new-msg-pill]")
+        if (pill) {
+          const n = this._newMsgCount
+          pill.textContent = `\u2193 ${n} new message${n > 1 ? "s" : ""}`
+          pill.classList.remove("hidden")
+        }
+      }
+    }
+
     // Re-observe children after patch — LiveView may have replaced message nodes.
-    if (this._resizeObserver) {
+    if (this._chatResizeObserver) {
       const body = this.el.querySelector("[data-chat-body]")
       if (body) {
-        this._resizeObserver.disconnect()
-        this._resizeObserver.observe(body)
+        this._chatResizeObserver.disconnect()
+        this._chatResizeObserver.observe(body)
         for (const child of body.children) {
-          this._resizeObserver.observe(child)
+          this._chatResizeObserver.observe(child)
         }
         this._lastScrollHeight = body.scrollHeight
       }
     }
+
+    const _body = this.el.querySelector("[data-chat-body]")
+    this._lastBodyScrollHeight = _body ? _body.scrollHeight : 0
   },
 
   destroyed() {
     this._destroyed = true
     clearTimeout(this._resizePersistTimer)
-    if (this._resizeObserver) this._resizeObserver.disconnect()
+    if (this._windowResizeObserver) this._windowResizeObserver.disconnect()
+    if (this._chatResizeObserver) this._chatResizeObserver.disconnect()
     document.removeEventListener("mousedown", this._onBlurWindows)
     window.removeEventListener("canvas:focus-session", this._onFocusSession)
     this._userScrolled = true  // stop any pending force-scroll timeouts

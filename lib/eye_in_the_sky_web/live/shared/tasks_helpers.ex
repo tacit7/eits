@@ -60,11 +60,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   # ---------------------------------------------------------------------------
 
   def handle_search(%{"query" => query}, socket, reload_fn) do
-    effective_query = if String.length(String.trim(query)) >= 4, do: query, else: ""
-
     {:noreply,
      socket
-     |> assign(:search_query, effective_query)
+     |> assign(:search_query, query)
      |> reload_fn.()}
   end
 

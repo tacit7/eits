@@ -596,3 +596,107 @@ describe("VimNav.handleKey does NOT preventDefault on inactive scope keys", () =
     expect(spy).toHaveBeenCalled()
   })
 })
+
+describe("VimNav showHelp scope filtering", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    document.body.innerHTML = ""
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    document.body.innerHTML = ""
+  })
+
+  function getHelpText(): string {
+    const overlay = document.getElementById("vim-nav-help")
+    return overlay?.textContent ?? ""
+  }
+
+  it("? overlay does NOT show Next item / Previous item / Open item on page without data-vim-list", () => {
+    const h = makeHook()
+    h.showHelp()
+    const text = getHelpText()
+    expect(text).not.toContain("Next item")
+    expect(text).not.toContain("Previous item")
+    expect(text).not.toContain("Open item")
+    h.hideHelp()
+  })
+
+  it("? overlay DOES show Next item / Previous item / Open item on page with data-vim-list", () => {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    document.body.appendChild(list)
+    const h = makeHook()
+    h.showHelp()
+    const text = getHelpText()
+    expect(text).toContain("Next item")
+    expect(text).toContain("Previous item")
+    expect(text).toContain("Open item")
+    h.hideHelp()
+  })
+
+  it("? overlay does NOT show Search on page without data-vim-search", () => {
+    const h = makeHook()
+    h.showHelp()
+    const text = getHelpText()
+    expect(text).not.toContain("Search")
+    h.hideHelp()
+  })
+
+  it("? overlay DOES show Search on page with data-vim-search", () => {
+    const input = document.createElement("input")
+    input.setAttribute("data-vim-search", "")
+    document.body.appendChild(input)
+    const h = makeHook()
+    h.showHelp()
+    const text = getHelpText()
+    expect(text).toContain("Search")
+    h.hideHelp()
+  })
+
+  it("? overlay skips Context group header when no data-vim-list on page", () => {
+    const h = makeHook()
+    h.showHelp()
+    const text = getHelpText()
+    expect(text).not.toContain("Context")
+    h.hideHelp()
+  })
+
+  it("? overlay includes Context group header when data-vim-list is present", () => {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    document.body.appendChild(list)
+    const h = makeHook()
+    h.showHelp()
+    const text = getHelpText()
+    expect(text).toContain("Context")
+    h.hideHelp()
+  })
+})
+
+describe("VimNav _renderWhichKey scope filtering", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    document.body.innerHTML = ""
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    document.body.innerHTML = ""
+  })
+
+  it("which-key does not render overlay when all prefix commands are inactive", () => {
+    // There are no two-key commands with scoped keys by default, but we can
+    // verify that a prefix with no active matching commands produces no overlay.
+    // Use a made-up prefix that has no commands at all (already returns early).
+    const h = makeHook()
+    h._renderWhichKey("z")
+    expect(document.getElementById("vim-nav-which-key")).toBeNull()
+  })
+
+  it("which-key renders overlay for active prefix commands", () => {
+    const h = makeHook()
+    h._renderWhichKey("g")
+    expect(document.getElementById("vim-nav-which-key")).not.toBeNull()
+    h.hideWhichKey()
+  })
+})

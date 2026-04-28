@@ -331,6 +331,7 @@ export const VimNav = {
 
     const groups: Record<string, Command[]> = {}
     for (const cmd of COMMANDS) {
+      if (!isCommandActive(cmd)) continue
       if (!groups[cmd.group]) groups[cmd.group] = []
       groups[cmd.group].push(cmd)
     }
@@ -393,7 +394,7 @@ export const VimNav = {
     this.whichKeyEl?.remove()
     this.whichKeyEl = null
 
-    const prefixCmds = COMMANDS.filter(cmd => cmd.keys.length > 1 && cmd.keys[0] === prefix)
+    const prefixCmds = COMMANDS.filter(cmd => cmd.keys.length > 1 && cmd.keys[0] === prefix && isCommandActive(cmd))
     if (prefixCmds.length === 0) return
 
     const overlay = document.createElement("div")

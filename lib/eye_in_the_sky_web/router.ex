@@ -140,6 +140,7 @@ defmodule EyeInTheSkyWeb.Router do
       live "/notifications", OverviewLive.Notifications, :index
       live "/settings", OverviewLive.Settings, :index
       live "/sessions", ProjectLive.Sessions, :index
+      live "/teams", ProjectLive.Teams, :index
       live "/projects/:id", ProjectLive.Show, :show
       live "/projects/:id/sessions", ProjectLive.Sessions, :show
       live "/projects/:id/prompts", ProjectLive.Prompts, :show

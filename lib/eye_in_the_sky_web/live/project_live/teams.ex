@@ -24,6 +24,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     {:ok, socket}
   end
 
+  def mount(_params, _session, socket) do
+    if connected?(socket) do
+      EyeInTheSky.Events.subscribe_teams()
+    end
+
+    socket =
+      socket
+      |> assign(:project, nil)
+      |> assign(:project_id, nil)
+      |> assign(:page_title, "Teams")
+      |> assign(:sidebar_tab, :teams)
+      |> assign(:sidebar_project, nil)
+      |> assign(:show_archived, false)
+      |> assign(:search_query, "")
+      |> assign(:show_all, true)
+      |> assign(:teams, [])
+
+    socket = if connected?(socket), do: assign(socket, :teams, load_teams(socket, false, true)), else: socket
+
+    {:ok, socket}
+  end
+
   @impl true
   def handle_params(%{"show_all" => "true"}, _uri, socket) do
     socket = assign(socket, :show_all, true)
@@ -118,7 +140,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           <%= for team <- @filtered_teams do %>
             <div class="py-1 group flex items-center gap-1">
               <.link
-                navigate={~p"/projects/#{@project.id}/teams/#{team.id}"}
+                navigate={
+                  if @project,
+                    do: ~p"/projects/#{@project.id}/teams/#{team.id}",
+                    else: ~p"/projects/#{team.project_id}/teams/#{team.id}"
+                }
                 class="flex-1 py-2 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0"
               >
                 <.status_dot status={team_status_atom(team.members)} size="sm" />

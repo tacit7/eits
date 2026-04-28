@@ -20,12 +20,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
             socket
             |> assign(:team, team)
             |> assign(:team_id, team_id)
+            |> assign(:team_loaded, true)
             |> assign(:agent_session_id, nil)
             |> assign(:page_title_prefix, team.name)
           else
             socket
             |> assign(:team, team)
             |> assign(:team_id, team_id)
+            |> assign(:team_loaded, false)
             |> assign(:agent_session_id, nil)
           end
 
@@ -33,6 +35,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
           socket
           |> assign(:team, nil)
           |> assign(:team_id, nil)
+          |> assign(:team_loaded, false)
           |> assign(:agent_session_id, nil)
       end
 
@@ -120,12 +123,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
             <.icon name="hero-arrow-left" class="size-3.5" /> Teams
           </.link>
         </div>
-        <.live_component
-          module={EyeInTheSkyWeb.TeamDetailComponent}
-          id="team-show-detail"
-          team={@team}
-          selected_agent_session_id={@agent_session_id}
-        />
+        <%= if @team_loaded do %>
+          <.live_component
+            module={EyeInTheSkyWeb.TeamDetailComponent}
+            id="team-show-detail"
+            team={@team}
+            selected_agent_session_id={@agent_session_id}
+          />
+        <% end %>
       <% else %>
         <div class="px-4 sm:px-6 pt-4">
           <.link

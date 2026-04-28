@@ -15,7 +15,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "page_search"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -88,6 +88,16 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "history_forward" } },
   { id: "global.close",   label: "Close Flyout",     keys: ["q"], group: "global",
     action: { kind: "push_event", event: "close_flyout", payload: {}, target: "shell" } },
+
+  // list navigation (context: page with data-vim-list)
+  { id: "list.next",  label: "Next item",     keys: ["j"],     group: "context",
+    action: { kind: "client", name: "list_next" },  scope: "feature:vim-list" },
+  { id: "list.prev",  label: "Previous item", keys: ["k"],     group: "context",
+    action: { kind: "client", name: "list_prev" },  scope: "feature:vim-list" },
+  { id: "list.open",  label: "Open item",     keys: ["Enter"], group: "context",
+    action: { kind: "client", name: "list_open" },  scope: "feature:vim-list" },
+  { id: "global.search", label: "Search",     keys: ["/"],     group: "global",
+    action: { kind: "client", name: "page_search" }, scope: "feature:vim-search" },
 ]
 
 // All valid first keys in multi-key sequences

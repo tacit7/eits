@@ -16,9 +16,17 @@ export function keyFromEvent(event: KeyboardEvent): string {
   return event.key.length === 1 ? event.key.toLowerCase() : event.key
 }
 
+export function isCommandActive(cmd: Command): boolean {
+  if (!cmd.scope || cmd.scope === "global") return true
+  if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]")
+  if (cmd.scope === "feature:vim-search") return !!document.querySelector("[data-vim-search]")
+  return true
+}
+
 export function matchesKnownBindingOrPrefix(buffer: string[], key: string): boolean {
   const sequence = [...buffer, key]
   return COMMANDS.some(cmd => {
+    if (!isCommandActive(cmd)) return false
     for (let i = 0; i < sequence.length; i++) {
       if (cmd.keys[i] !== sequence[i]) return false
     }
@@ -91,6 +99,8 @@ export const VimNav = {
   _onFocusout: null as ((e: FocusEvent) => void) | null,
   _onHelpClose: null as ((e: KeyboardEvent) => void) | null,
   _onWhichKeyClose: null as ((e: KeyboardEvent) => void) | null,
+  _onPageLoad: null as ((e: Event) => void) | null,
+  listFocusIndex: -1 as number,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -111,6 +121,9 @@ export const VimNav = {
       }
     }
 
+    this._onPageLoad = () => this.clearListFocus()
+    window.addEventListener("phx:page-loading-stop", this._onPageLoad)
+
     document.addEventListener("keydown", this._onKeydown, { capture: true })
     document.addEventListener("focusin", this._onFocusin)
     document.addEventListener("focusout", this._onFocusout)
@@ -120,14 +133,17 @@ export const VimNav = {
     if (this._onKeydown) document.removeEventListener("keydown", this._onKeydown, { capture: true } as EventListenerOptions)
     if (this._onFocusin) document.removeEventListener("focusin", this._onFocusin)
     if (this._onFocusout) document.removeEventListener("focusout", this._onFocusout)
+    if (this._onPageLoad) window.removeEventListener("phx:page-loading-stop", this._onPageLoad)
     if (this.sequenceTimer) clearTimeout(this.sequenceTimer)
     this.hideHelp()
     this.hideWhichKey()
+    this.clearListFocus()
     this.statusbarEl?.remove()
     this.statusbarEl = null
     this._onKeydown = null
     this._onFocusin = null
     this._onFocusout = null
+    this._onPageLoad = null
   },
 
   isEnabled(): boolean {
@@ -215,6 +231,33 @@ export const VimNav = {
     return `${projectPath}/${segment}`
   },
 
+  currentList(): HTMLElement | null {
+    return document.querySelector("[data-vim-list]")
+  },
+
+  currentListItems(): HTMLElement[] {
+    const list = this.currentList()
+    if (!list) return []
+    return [...list.querySelectorAll<HTMLElement>("[data-vim-list-item]")]
+  },
+
+  focusListItem(index: number): void {
+    const items = this.currentListItems()
+    if (items.length === 0) return
+    items.forEach(el => el.classList.remove("vim-nav-focused"))
+    const item = items[index]
+    if (item) {
+      item.classList.add("vim-nav-focused")
+      item.scrollIntoView?.({ block: "nearest" })
+      this.listFocusIndex = index
+    }
+  },
+
+  clearListFocus(): void {
+    this.currentListItems().forEach(el => el.classList.remove("vim-nav-focused"))
+    this.listFocusIndex = -1
+  },
+
   executeCommand(cmd: Command) {
     const { action } = cmd
     if (action.kind === "navigate") {
@@ -245,6 +288,30 @@ export const VimNav = {
       }
       if (action.name === "quick_create_chat") {
         window.dispatchEvent(new Event("palette:create-chat"))
+        return
+      }
+      if (action.name === "list_next") {
+        const items = this.currentListItems()
+        if (items.length === 0) return
+        const next = Math.min(this.listFocusIndex + 1, items.length - 1)
+        this.focusListItem(next)
+        return
+      }
+      if (action.name === "list_prev") {
+        const items = this.currentListItems()
+        if (items.length === 0) return
+        const prev = Math.max(this.listFocusIndex - 1, 0)
+        this.focusListItem(prev)
+        return
+      }
+      if (action.name === "list_open") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        item?.click()
+        return
+      }
+      if (action.name === "page_search") {
+        const input = document.querySelector("[data-vim-search]") as HTMLInputElement | null
+        input?.focus()
         return
       }
     }

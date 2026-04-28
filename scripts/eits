@@ -910,8 +910,32 @@ HELP
       printf '%d updated, %d failed\n' "$ok" "$fail"
       [[ "$fail" -eq 0 ]]
       ;;
+    active|mine)
+      # eits tasks active  — In Progress tasks linked to current session (context recovery on resume)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        echo "usage: eits tasks active [--json]"
+        echo "       eits tasks mine   [--json]"
+        echo ""
+        echo "Show tasks currently In Progress for this session."
+        echo "Uses EITS_SESSION_UUID (or EITS_SESSION_ID as fallback)."
+        return 0
+      }
+      local _json_mode=0
+      [[ "${1:-}" == "--json" ]] && _json_mode=1
+      local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      [[ -n "$_sess" ]] || die "EITS_SESSION_UUID or EITS_SESSION_ID is required"
+      local _resp; _resp=$(_curl "$BASE_URL/tasks?session_id=${_sess}&state_id=2&limit=20") || return 1
+      local _count; _count=$(printf '%s' "$_resp" | jq '[.tasks[]?] | length')
+      if [[ $_json_mode -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      elif [[ "${_count:-0}" -eq 0 ]]; then
+        printf 'No active tasks for this session.\n'
+      else
+        _tbl_tasks "$_resp"
+      fi
+      ;;
     *)
-      echo "usage: eits tasks <list|get|create|update|bulk-update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag|states> [--mine|--assigned] [--created-by] [--title] [--quiet]"
+      echo "usage: eits tasks <list|get|create|update|bulk-update|done|begin|start|claim|complete|delete|annotate|link-session|unlink-session|search|sessions|tag|states|active|mine> [--mine|--assigned] [--created-by] [--title] [--quiet]"
       ;;
   esac
 }
@@ -1469,6 +1493,13 @@ cmd_commits() {
           auto_msg=$(git log -1 --format=%s 2>/dev/null || echo "")
           [[ -n "$auto_msg" ]] && messages=("$auto_msg")
         fi
+      elif [[ ${#messages[@]} -eq 0 ]]; then
+        # explicit hashes given but no --message: auto-fetch subject line for each
+        local _h _m
+        for _h in "${hashes[@]}"; do
+          _m=$(git log -1 --format=%s "$_h" 2>/dev/null || echo "")
+          [[ -n "$_m" ]] && messages+=("$_m")
+        done
       fi
       local hashes_json; hashes_json=$(printf '%s\n' "${hashes[@]}" | jq -R . | jq -s .)
       local payload
@@ -1617,7 +1648,15 @@ cmd_dm() {
   local payload
   payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
     '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
-  _post "/dm" "$payload"
+  local _dm_resp; _dm_resp=$(_post "/dm" "$payload") || return 1
+  # Resolve recipient name — use $to (already known) rather than parsing response
+  local _to_name; _to_name=$(_curl "$BASE_URL/sessions/$to" 2>/dev/null \
+    | jq -r '.session.name // .name // empty' 2>/dev/null)
+  if [[ -n "$_to_name" ]]; then
+    printf '%s\n' "$_dm_resp" | jq --arg n "$_to_name" '. + {to_name: $n}'
+  else
+    printf '%s\n' "$_dm_resp" | jq .
+  fi
 }
 
 # ── timer ─────────────────────────────────────────────────────────────────────

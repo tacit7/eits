@@ -107,6 +107,8 @@
             active_tab={assigns[:active_tab]}
             search_query={assigns[:message_search_query]}
             active_timer={assigns[:active_timer]}
+            session_uuid={assigns[:session_uuid]}
+            show_iterm={true}
           />
         <% :notes -> %>
           <EyeInTheSkyWeb.TopBar.Notes.toolbar

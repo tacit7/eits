@@ -349,3 +349,122 @@ describe("VimNav which-key overlay", () => {
     expect(document.getElementById("vim-nav-which-key")).toBeNull()
   })
 })
+
+describe("VimNav list navigation (j/k/Enter)", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  function makeList(itemCount: number): HTMLElement {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    for (let i = 0; i < itemCount; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      item.textContent = `Item ${i}`
+      list.appendChild(item)
+    }
+    document.body.appendChild(list)
+    return list
+  }
+
+  it("j increments listFocusIndex and applies vim-nav-focused class", () => {
+    makeList(3)
+    const h = makeHook()
+    h.listFocusIndex = -1
+    const cmd = COMMANDS.find(c => c.id === "list.next")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(0)
+    const items = document.querySelectorAll("[data-vim-list-item]")
+    expect(items[0].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("j clamps at last item when already at end", () => {
+    makeList(2)
+    const h = makeHook()
+    h.listFocusIndex = 1
+    const cmd = COMMANDS.find(c => c.id === "list.next")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(1)
+  })
+
+  it("k decrements listFocusIndex", () => {
+    makeList(3)
+    const h = makeHook()
+    h.listFocusIndex = 2
+    const cmd = COMMANDS.find(c => c.id === "list.prev")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(1)
+    const items = document.querySelectorAll("[data-vim-list-item]")
+    expect(items[1].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("k clamps at 0 when already at first item", () => {
+    makeList(3)
+    const h = makeHook()
+    h.listFocusIndex = 0
+    const cmd = COMMANDS.find(c => c.id === "list.prev")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(0)
+  })
+
+  it("Enter dispatches click on the focused list item", () => {
+    makeList(3)
+    const h = makeHook()
+    h.listFocusIndex = 1
+    const items = document.querySelectorAll("[data-vim-list-item]")
+    const clickSpy = vi.fn()
+    items[1].addEventListener("click", clickSpy)
+    const cmd = COMMANDS.find(c => c.id === "list.open")!
+    h.executeCommand(cmd)
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it("Enter is a no-op when listFocusIndex is -1", () => {
+    makeList(3)
+    const h = makeHook()
+    h.listFocusIndex = -1
+    const cmd = COMMANDS.find(c => c.id === "list.open")!
+    expect(() => h.executeCommand(cmd)).not.toThrow()
+  })
+
+  it("j on page without data-vim-list is a no-op and does not throw", () => {
+    // no list in DOM
+    const h = makeHook()
+    h.listFocusIndex = -1
+    const cmd = COMMANDS.find(c => c.id === "list.next")!
+    expect(() => h.executeCommand(cmd)).not.toThrow()
+    expect(h.listFocusIndex).toBe(-1)
+  })
+
+  it("clearListFocus resets index and removes vim-nav-focused from all items", () => {
+    makeList(3)
+    const h = makeHook()
+    h.listFocusIndex = 1
+    h.focusListItem(1)
+    const items = document.querySelectorAll("[data-vim-list-item]")
+    expect(items[1].classList.contains("vim-nav-focused")).toBe(true)
+    h.clearListFocus()
+    expect(h.listFocusIndex).toBe(-1)
+    items.forEach(el => expect(el.classList.contains("vim-nav-focused")).toBe(false))
+  })
+})
+
+describe("VimNav page search (/)", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  it("/ focuses the element with data-vim-search", () => {
+    const input = document.createElement("input")
+    input.setAttribute("data-vim-search", "")
+    document.body.appendChild(input)
+    const focusSpy = vi.spyOn(input, "focus")
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "global.search")!
+    h.executeCommand(cmd)
+    expect(focusSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it("/ is a no-op when no data-vim-search element exists", () => {
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "global.search")!
+    expect(() => h.executeCommand(cmd)).not.toThrow()
+  })
+})

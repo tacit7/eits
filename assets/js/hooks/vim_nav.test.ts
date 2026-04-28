@@ -923,3 +923,92 @@ describe("flyout focus mode", () => {
     expect(h.listFocusIndex).toBe(-1)
   })
 })
+
+describe("toggle+focus commands (t<Upper>)", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  function setupFlyoutClosed(): void {
+    const panel = document.createElement("div")
+    panel.setAttribute("data-vim-flyout-open", "false")
+    document.body.appendChild(panel)
+  }
+
+  function openFlyoutWithItems(count = 3): HTMLElement[] {
+    const panel = document.createElement("div")
+    panel.setAttribute("data-vim-flyout-open", "true")
+    const items: HTMLElement[] = []
+    for (let i = 0; i < count; i++) {
+      const a = document.createElement("a")
+      a.setAttribute("data-vim-flyout-item", "")
+      panel.appendChild(a)
+      items.push(a)
+    }
+    document.body.appendChild(panel)
+    return items
+  }
+
+  it("9 toggle+focus commands are registered (tS through tJ)", () => {
+    const ids = ["toggle.sessions.focus","toggle.tasks.focus","toggle.notes.focus",
+      "toggle.files.focus","toggle.canvas.focus","toggle.chat.focus",
+      "toggle.skills.focus","toggle.teams.focus","toggle.jobs.focus"]
+    for (const id of ids) {
+      expect(COMMANDS.find(c => c.id === id), `missing ${id}`).toBeTruthy()
+    }
+  })
+
+  it("each t<Upper> command has keys ['t', <Upper>] and focus_flyout_after true", () => {
+    const pairs: [string, string][] = [
+      ["toggle.sessions.focus","S"],["toggle.tasks.focus","T"],["toggle.notes.focus","N"],
+      ["toggle.files.focus","F"],["toggle.canvas.focus","W"],["toggle.chat.focus","C"],
+      ["toggle.skills.focus","K"],["toggle.teams.focus","M"],["toggle.jobs.focus","J"],
+    ]
+    for (const [id, letter] of pairs) {
+      const cmd = COMMANDS.find(c => c.id === id)!
+      expect(cmd.keys).toEqual(["t", letter])
+      expect((cmd.action as any).focus_flyout_after).toBe(true)
+    }
+  })
+
+  it("t<Upper> commands are distinct from their t<lower> counterparts", () => {
+    expect(COMMANDS.find(c => c.keys[0] === "t" && c.keys[1] === "S")).toBeTruthy()
+    expect(COMMANDS.find(c => c.keys[0] === "t" && c.keys[1] === "s")).toBeTruthy()
+  })
+
+  it("_focusFlyoutAfterOpen immediately focuses when flyout already open", () => {
+    const items = openFlyoutWithItems(3)
+    const h = makeHook()
+    h._focusFlyoutAfterOpen()
+    expect(h.flyoutFocused).toBe(true)
+    expect(h.listFocusIndex).toBe(0)
+    expect(items[0].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("_focusFlyoutAfterOpen is a no-op when flyout opens with no items", () => {
+    const panel = document.createElement("div")
+    panel.setAttribute("data-vim-flyout-open", "true")
+    document.body.appendChild(panel)
+    const h = makeHook()
+    h._focusFlyoutAfterOpen()
+    expect(h.flyoutFocused).toBe(false)
+  })
+
+  it("_focusFlyoutAfterOpen uses MutationObserver when flyout is initially closed", async () => {
+    setupFlyoutClosed()
+    const h = makeHook()
+    h._focusFlyoutAfterOpen()
+    expect(h.flyoutFocused).toBe(false)
+
+    // Simulate flyout opening: set attribute to true and add items
+    const panel = document.querySelector("[data-vim-flyout-open]") as HTMLElement
+    const item = document.createElement("a")
+    item.setAttribute("data-vim-flyout-item", "")
+    panel.appendChild(item)
+    panel.setAttribute("data-vim-flyout-open", "true")
+
+    // Allow MutationObserver microtask to fire
+    await new Promise(r => setTimeout(r, 0))
+    expect(h.flyoutFocused).toBe(true)
+    expect(h.listFocusIndex).toBe(0)
+  })
+})

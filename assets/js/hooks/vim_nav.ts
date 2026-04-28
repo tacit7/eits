@@ -289,6 +289,22 @@ export const VimNav = {
     this.flyoutFocused = false
   },
 
+  _focusFlyoutAfterOpen(): void {
+    const tryFocus = (): boolean => {
+      if (!isFlyoutOpen()) return false
+      const items = [...document.querySelectorAll<HTMLElement>("[data-vim-flyout-item]")]
+      if (items.length === 0) return false
+      this.flyoutFocused = true
+      this.listFocusIndex = 0
+      this.focusListItem(0)
+      return true
+    }
+    if (tryFocus()) return
+    const obs = new MutationObserver(() => { if (tryFocus()) obs.disconnect() })
+    obs.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["data-vim-flyout-open"] })
+    setTimeout(() => obs.disconnect(), 2000)
+  },
+
   executeCommand(cmd: Command) {
     const { action } = cmd
     if (action.kind === "navigate") {
@@ -304,6 +320,7 @@ export const VimNav = {
       }
       const fn = action.target === "shell" ? this.pushEventToShell : this.pushEvent
       if (typeof fn === "function") fn(action.event, action.payload ?? {})
+      if (action.focus_flyout_after) this._focusFlyoutAfterOpen()
       return
     }
     if (action.kind === "client") {

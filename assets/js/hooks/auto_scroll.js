@@ -22,6 +22,9 @@ export const AutoScroll = {
     }
 
     this.el.addEventListener("scroll", this._onScroll, { passive: true })
+    // Scroll synchronously so scrollTop is correct before any beforeUpdate()
+    // fires. The RAF below catches late-expanding content (images, transitions).
+    this.el.scrollTop = this.el.scrollHeight
     this.scrollToBottom()
 
     // Watch for content growth from non-LiveView sources (LocalTime hooks

@@ -344,6 +344,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   def handle_info(:tasks_changed, socket),
     do: handle_tasks_changed(socket, &load_tasks/1)
 
+  def handle_info(_, socket), do: {:noreply, socket}
+
   defp load_tasks(socket) do
     show_all = Map.get(socket.assigns, :show_all, false)
     project_id = socket.assigns.project_id

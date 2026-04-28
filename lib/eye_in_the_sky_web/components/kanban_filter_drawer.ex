@@ -63,6 +63,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                     value={@search_query}
                     placeholder="Enter a keyword..."
                     phx-debounce="300"
+                    data-vim-search
                     class="input input-sm w-full pl-8 bg-base-100 border-base-content/10 placeholder:text-base-content/25 text-base min-h-[44px]"
                     autocomplete="off"
                   />

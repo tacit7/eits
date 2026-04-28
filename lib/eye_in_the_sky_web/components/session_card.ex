@@ -82,8 +82,10 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       <div
         class={[
           "flex items-center gap-4 py-3 pr-2 -mx-2 rounded-lg cursor-pointer relative",
+          "[&.vim-nav-focused]:bg-base-200 [&.vim-nav-focused]:ring-1 [&.vim-nav-focused]:ring-primary/20",
           if(@select_mode, do: "pl-10 sm:pl-2", else: "pl-2")
         ]}
+        data-vim-list-item
         phx-click={if @select_mode, do: "toggle_select", else: @click_event}
         phx-value-id={@session.id}
         role="button"

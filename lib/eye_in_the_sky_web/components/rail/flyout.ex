@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   @moduledoc false
   use EyeInTheSkyWeb, :html
+  alias EyeInTheSkyWeb.Components.DmHelpers
 
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
@@ -411,8 +412,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             title="Open DM"
           >
             <img
-              src={canvas_provider_icon(session.provider)}
-              class={["size-3.5", canvas_provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
+              src={DmHelpers.provider_icon(session.provider)}
+              class={["size-3.5", DmHelpers.provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
               alt={session.provider || "agent"}
             />
           </.link>
@@ -425,19 +426,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     """
   end
 
-  defp canvas_session_dot("working"), do: "bg-green-500"
-  defp canvas_session_dot("waiting"), do: "bg-amber-400"
+  defp canvas_session_dot("working"), do: "bg-success"
+  defp canvas_session_dot("waiting"), do: "bg-warning"
   defp canvas_session_dot(_), do: "bg-base-content/20"
-
-  defp canvas_provider_icon("openai"), do: "/images/openai.svg"
-  defp canvas_provider_icon("codex"), do: "/images/openai.svg"
-  defp canvas_provider_icon("gemini"), do: "/images/gemini.svg"
-  defp canvas_provider_icon(_), do: "/images/claude.svg"
-
-  defp canvas_provider_icon_class("openai"), do: "dark:invert"
-  defp canvas_provider_icon_class("codex"), do: "dark:invert"
-  defp canvas_provider_icon_class("gemini"), do: ""
-  defp canvas_provider_icon_class(_), do: ""
 
   # Generic nav links per section
   attr :project, :any, default: nil

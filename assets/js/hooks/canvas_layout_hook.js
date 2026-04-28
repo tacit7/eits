@@ -16,6 +16,13 @@ export function saveWindowZ(csId, z) {
   } catch (_) {}
 }
 
+export function saveWindowMinimized(csId, minimized) {
+  try {
+    const existing = loadWindowLayout(csId) || {}
+    localStorage.setItem(LS_KEY(csId), JSON.stringify({ ...existing, minimized }))
+  } catch (_) {}
+}
+
 export function loadWindowLayout(csId) {
   try {
     const raw = localStorage.getItem(LS_KEY(csId))

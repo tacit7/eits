@@ -1,4 +1,4 @@
-import { saveWindowLayout, saveWindowZ, loadWindowLayout } from './canvas_layout_hook'
+import { saveWindowLayout, saveWindowZ, saveWindowMinimized, loadWindowLayout } from './canvas_layout_hook'
 
 const SNAP_THRESHOLD = 40
 
@@ -51,22 +51,32 @@ export const ChatWindowHook = {
     if (saved) {
       // Guard against corrupt values (e.g. layout computed when canvas area was collapsed)
       const MIN_W = 120, MIN_H = 120
-      if (saved.w < MIN_W || saved.h < MIN_H) {
+      if (saved.w != null && (saved.w < MIN_W || saved.h < MIN_H)) {
         // Wipe the bad entry so DB defaults take over; don't apply it
         try { localStorage.removeItem(`cw_${csId}`) } catch (_) {}
       } else {
-        this.el.style.left   = `${saved.x}px`
-        this.el.style.top    = `${saved.y}px`
-        this.el.style.width  = `${saved.w}px`
-        this.el.style.height = `${saved.h}px`
-        this._width  = saved.w
-        this._height = saved.h
-        this._dragLeft = saved.x
-        this._dragTop  = saved.y
+        if (saved.x != null) {
+          this.el.style.left   = `${saved.x}px`
+          this.el.style.top    = `${saved.y}px`
+          this._dragLeft = saved.x
+          this._dragTop  = saved.y
+        }
+        if (saved.w != null) {
+          this.el.style.width  = `${saved.w}px`
+          this.el.style.height = `${saved.h}px`
+          this._width  = saved.w
+          this._height = saved.h
+        }
         if (saved.z != null) {
           this.el.style.zIndex = String(saved.z)
           this._zIndex = String(saved.z)
           this.el.dataset.savedZIndex = String(saved.z)
+        }
+        // Restore minimized state — keeps window hidden across page reloads
+        // until the user explicitly restores via the canvas flyout
+        if (saved.minimized) {
+          this._minimized = true
+          this.el.style.display = "none"
         }
       }
     }
@@ -453,11 +463,13 @@ export const ChatWindowHook = {
   _applyMinimized() {
     this._minimized = true
     this.el.style.display = "none"
+    saveWindowMinimized(this.el.dataset.csId, true)
     if (this._resizeObserver) this._resizeObserver.disconnect()
   },
 
   _restoreFromMinimized() {
     this._minimized = false
+    saveWindowMinimized(this.el.dataset.csId, false)
     this.el.style.display = ""
     // Re-attach resize observer and force-scroll to bottom on restore
     if (this._resizeObserver) {

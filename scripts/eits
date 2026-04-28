@@ -125,7 +125,7 @@ _age() {
   ts="${ts%%.*}"; ts="${ts%Z}"; ts="${ts/T/ }"
   local now; now=$(date +%s)
   local then
-  then=$(date -j -f "%Y-%m-%d %H:%M:%S" "$ts" +%s 2>/dev/null) || \
+  then=$(date -ju -f "%Y-%m-%d %H:%M:%S" "$ts" +%s 2>/dev/null) || \
   then=$(date -d "${ts}Z" +%s 2>/dev/null) || then="$now"
   local diff=$(( now - then ))
   if   [[ $diff -lt 60    ]]; then echo "${diff}s"
@@ -1176,8 +1176,9 @@ Options:
   --dry-run                    Validate inputs without hitting spawn endpoint; print the curl command
 
 Valid models (--provider claude, default):
-  claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5-20250929,
-  claude-haiku-4-5-20251001, opus, opus[1m], sonnet, sonnet[1m], haiku
+  Shorthand (recommended): opus, sonnet, haiku, opus[1m], sonnet[1m]
+  Full names: claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6,
+              claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001
 
 Valid models (--provider codex):
   gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
@@ -1580,24 +1581,93 @@ cmd_jobs() {
 
 # ── dm ────────────────────────────────────────────────────────────────────────
 
+_tbl_dm() {
+  local data="${1:-$(cat)}"
+  local count; count=$(echo "$data" | jq '[.messages[]?] | length')
+  printf '%-8s  %-52s  %s\n' "FROM" "MESSAGE" "AGE"
+  printf '%-8s  %-52s  %s\n' "--------" "----------------------------------------------------" "---"
+  echo "$data" | jq -r '.messages[]? | [
+    ((.from_session_id // "-") | tostring),
+    (.body // ""),
+    (.inserted_at // "")
+  ] | @tsv' | while IFS=$'\t' read -r from body ts; do
+    # single-line body: collapse newlines, strip leading "DM from:..." prefix agents sometimes echo
+    local _body; _body=$(printf '%s' "$body" | tr '\n' ' ' | sed 's/^DM from:[^ ]* ([^)]*) //')
+    printf '%-8s  %-52s  %s\n' \
+      "$(_trunc "$from" 8)" \
+      "$(_trunc "$_body" 52)" \
+      "$(_age "$ts")"
+  done
+  [[ -n "$count" ]] && printf '\n%s message(s)\n' "$count"
+}
+
 cmd_dm() {
-  # eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>]
-  if [[ "${1:-}" == "list" || "${1:-}" == "--list" ]]; then
+  local sub="${1:-}"
+
+  # inbox / list subcommand
+  if [[ "$sub" == "list" || "$sub" == "inbox" || "$sub" == "--list" ]]; then
     shift || true
-    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20 from=""
+    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+      cat <<EOF
+usage: eits dm inbox [--session <uuid|id>] [--from <session_id>] [--limit <n>] [--json]
+       eits dm list  [--session <uuid|id>] [--from <session_id>] [--limit <n>] [--json]
+
+Show inbound DMs for a session. Defaults to current session (EITS_SESSION_UUID / EITS_SESSION_ID).
+
+Options:
+  --session <id>   Recipient session UUID or integer ID (default: current session)
+  --from <id>      Filter by sender session UUID or integer ID
+  --limit <n>      Max messages to return (default: 20)
+  --json           Raw JSON output
+
+Examples:
+  eits dm inbox
+  eits dm inbox --limit 5
+  eits dm inbox --from 3640
+  eits dm inbox --json
+EOF
+      return 0
+    fi
+    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20 from="" json_mode=0
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --session|-s) session="$2"; shift 2 ;;
         --from|-f)    from="$2";    shift 2 ;;
         --limit|-n)   limit="$2";   shift 2 ;;
+        --json)       json_mode=1;  shift ;;
         *) die "unknown flag: $1" ;;
       esac
     done
     need session
     local qs="session=${session}&limit=${limit}"
     [[ -n "$from" ]] && qs="${qs}&from=${from}"
-    _get "/dm?${qs}"
+    local _resp; _resp=$(_curl "${BASE_URL}/dm?${qs}") || return 1
+    if [[ $json_mode -eq 1 ]]; then
+      printf '%s\n' "$_resp" | jq .
+    else
+      _tbl_dm "$_resp"
+    fi
     return
+  fi
+
+  # send subcommand (default when no list/inbox keyword)
+  if [[ "$sub" == "--help" || "$sub" == "-h" ]]; then
+    cat <<EOF
+usage: eits dm inbox|list [options]           — show inbound messages
+       eits dm --to <id> --message <text>     — send a DM
+
+Send:
+  --to <id>              Recipient session UUID or integer ID
+  --message <text>       Message body
+  --from <id>            Sender session UUID or integer ID (default: current session)
+  --response-required    Mark DM as requiring a reply
+
+Read:
+  eits dm inbox          Show your inbox (table, default 20)
+  eits dm inbox --json   Raw JSON
+  eits dm inbox --from <id>   Filter by sender
+EOF
+    return 0
   fi
 
   # eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
@@ -2597,7 +2667,7 @@ Commands:
   agents        list|get|spawn
   commits       list|create
   jobs          list|get|create|update|run|delete
-  dm            list [--session <uuid|id>] [--limit <n>]
+  dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--json]
   dm            [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   channels      list|send|messages
   notifications create

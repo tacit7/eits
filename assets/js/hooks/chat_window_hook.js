@@ -1,4 +1,4 @@
-import { saveWindowLayout, saveWindowZ, loadWindowLayout } from './canvas_layout_hook'
+import { saveWindowLayout, saveWindowZ, saveWindowMinimized, loadWindowLayout } from './canvas_layout_hook'
 
 const SNAP_THRESHOLD = 40
 
@@ -51,22 +51,32 @@ export const ChatWindowHook = {
     if (saved) {
       // Guard against corrupt values (e.g. layout computed when canvas area was collapsed)
       const MIN_W = 120, MIN_H = 120
-      if (saved.w < MIN_W || saved.h < MIN_H) {
+      if (saved.w != null && (saved.w < MIN_W || saved.h < MIN_H)) {
         // Wipe the bad entry so DB defaults take over; don't apply it
         try { localStorage.removeItem(`cw_${csId}`) } catch (_) {}
       } else {
-        this.el.style.left   = `${saved.x}px`
-        this.el.style.top    = `${saved.y}px`
-        this.el.style.width  = `${saved.w}px`
-        this.el.style.height = `${saved.h}px`
-        this._width  = saved.w
-        this._height = saved.h
-        this._dragLeft = saved.x
-        this._dragTop  = saved.y
+        if (saved.x != null) {
+          this.el.style.left   = `${saved.x}px`
+          this.el.style.top    = `${saved.y}px`
+          this._dragLeft = saved.x
+          this._dragTop  = saved.y
+        }
+        if (saved.w != null) {
+          this.el.style.width  = `${saved.w}px`
+          this.el.style.height = `${saved.h}px`
+          this._width  = saved.w
+          this._height = saved.h
+        }
         if (saved.z != null) {
           this.el.style.zIndex = String(saved.z)
           this._zIndex = String(saved.z)
           this.el.dataset.savedZIndex = String(saved.z)
+        }
+        // Restore minimized state — keeps window hidden across page reloads
+        // until the user explicitly restores via the canvas flyout
+        if (saved.minimized) {
+          this._minimized = true
+          this.el.style.display = "none"
         }
       }
     }
@@ -133,7 +143,7 @@ export const ChatWindowHook = {
             this.el.style.top    = `${y}px`
             this.el.style.width  = `${snap.width}px`
             this.el.style.height = `${snap.height}px`
-            this.pushEventTo(this.el, "window_resized", {
+            this.pushEvent("window_resized", {
               id: this.el.dataset.csId, w: snap.width, h: snap.height
             })
           } else if (snap && this._minimized) {
@@ -143,7 +153,7 @@ export const ChatWindowHook = {
             this.el.style.top  = `${y}px`
           }
 
-          this.pushEventTo(this.el, "window_moved", {
+          this.pushEvent("window_moved", {
             id: this.el.dataset.csId, x, y
           })
           saveWindowLayout(this.el.dataset.csId, x, y,
@@ -193,7 +203,7 @@ export const ChatWindowHook = {
       resizePersistTimer = setTimeout(() => {
         const w = this.el.offsetWidth
         const h = this.el.offsetHeight
-        this.pushEventTo(this.el, "window_resized", {
+        this.pushEvent("window_resized", {
           id: this.el.dataset.csId, w, h
         })
         saveWindowLayout(this.el.dataset.csId,
@@ -207,7 +217,7 @@ export const ChatWindowHook = {
 
     const minimizeBtn = this.el.querySelector("[data-minimize-btn]")
     if (minimizeBtn) {
-      this._minimized = false
+      if (this._minimized == null) this._minimized = false
       minimizeBtn.addEventListener("mousedown", (e) => {
         e.stopPropagation()
         e.preventDefault()
@@ -453,11 +463,13 @@ export const ChatWindowHook = {
   _applyMinimized() {
     this._minimized = true
     this.el.style.display = "none"
+    saveWindowMinimized(this.el.dataset.csId, true)
     if (this._resizeObserver) this._resizeObserver.disconnect()
   },
 
   _restoreFromMinimized() {
     this._minimized = false
+    saveWindowMinimized(this.el.dataset.csId, false)
     this.el.style.display = ""
     // Re-attach resize observer and force-scroll to bottom on restore
     if (this._resizeObserver) {

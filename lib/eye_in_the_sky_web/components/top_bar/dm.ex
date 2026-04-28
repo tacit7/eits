@@ -15,6 +15,8 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
   attr :active_tab, :string, default: "messages"
   attr :search_query, :string, default: nil
   attr :active_timer, :map, default: nil
+  attr :session_uuid, :string, default: nil
+  attr :show_iterm, :boolean, default: false
 
   def toolbar(assigns) do
     ~H"""
@@ -53,6 +55,32 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         tabindex="0"
         class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-xs"
       >
+        <%= if @session_uuid do %>
+          <li>
+            <button
+              id="top-bar-copy-uuid"
+              phx-hook="CopyToClipboard"
+              data-copy={@session_uuid}
+              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded font-mono text-mini"
+            >
+              <.icon name="hero-clipboard-document" class="size-3.5 flex-shrink-0" />
+              Copy {String.slice(@session_uuid, 0..7)}…
+            </button>
+          </li>
+        <% end %>
+        <%= if @show_iterm do %>
+          <li>
+            <button
+              phx-click="open_iterm"
+              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+            >
+              <.icon name="hero-command-line" class="size-3.5" /> Open in iTerm
+            </button>
+          </li>
+        <% end %>
+        <%= if @session_uuid || @show_iterm do %>
+          <li><div class="divider my-0"></div></li>
+        <% end %>
         <li>
           <button
             phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}

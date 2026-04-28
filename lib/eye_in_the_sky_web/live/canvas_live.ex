@@ -45,7 +45,15 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         {:noreply, redirect_to_first_or_stay(socket)}
 
       canvas_id ->
-        socket = activate_canvas(socket, canvas_id)
+        # Only re-activate (re-subscribe, re-query sessions) when the canvas actually changes.
+        # Navigating to the same canvas with a different ?focus= param must not reload windows.
+        socket =
+          if canvas_id == socket.assigns.active_canvas_id do
+            socket
+          else
+            activate_canvas(socket, canvas_id)
+          end
+
         {:noreply, assign(socket, :focus_session_id, focus_session_id)}
     end
   end

@@ -20,6 +20,7 @@ export function isCommandActive(cmd: Command): boolean {
   if (!cmd.scope || cmd.scope === "global") return true
   if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]")
   if (cmd.scope === "feature:vim-search") return !!document.querySelector("[data-vim-search]")
+  if (cmd.scope === "page:sessions") return !!document.querySelector("[data-vim-page='sessions']")
   if (cmd.scope.startsWith("route_suffix:")) {
     const suffix = cmd.scope.slice("route_suffix:".length)
     const path = window.location.pathname
@@ -92,6 +93,7 @@ export const VimNav = {
   el: null as unknown as LiveViewHook["el"],
   pushEvent: null as unknown as LiveViewHook["pushEvent"],
   pushEventToShell: null as ((event: string, payload: object) => void) | null,
+  pushToList: null as ((event: string, payload: object) => void) | null,
   mode: "normal" as Mode,
   buffer: [] as string[],
   sequenceTimer: null as ReturnType<typeof setTimeout> | null,
@@ -317,6 +319,23 @@ export const VimNav = {
       if (action.name === "page_search") {
         const input = document.querySelector("[data-vim-search]") as HTMLInputElement | null
         input?.focus()
+        return
+      }
+      if (action.name === "list_archive" || action.name === "list_delete") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const sessionId = item.dataset.sessionId
+        if (!sessionId) return
+        const event = action.name === "list_archive" ? "archive_session" : "delete_session"
+        this.pushToList?.(event, { session_id: sessionId })
+        return
+      }
+      if (action.name === "list_yank_uuid" || action.name === "list_yank_id") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const value = action.name === "list_yank_uuid" ? item.dataset.sessionUuid : item.dataset.sessionId
+        if (!value) return
+        navigator.clipboard.writeText(value).catch(() => {})
         return
       }
     }

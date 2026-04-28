@@ -103,6 +103,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
             phx-update="stream"
             phx-hook="SessionsDropdownGuard"
             data-vim-list
+            data-vim-page="sessions"
             class="divide-y divide-base-content/5"
           >
             <div

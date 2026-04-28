@@ -86,6 +86,8 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           if(@select_mode, do: "pl-10 sm:pl-2", else: "pl-2")
         ]}
         data-vim-list-item
+        data-session-id={@session.id}
+        data-session-uuid={@session.uuid}
         phx-click={if @select_mode, do: "toggle_select", else: @click_event}
         phx-value-id={@session.id}
         role="button"

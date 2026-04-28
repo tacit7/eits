@@ -64,10 +64,12 @@ function createStatusbar(): HTMLElement {
 function updateStatusbar(el: HTMLElement, mode: Mode): void {
   if (mode === "normal") {
     el.textContent = "[ NORMAL ]"
-    el.style.color = "rgba(156,163,175,0.6)"
+    el.style.color = "var(--color-base-content)"
+    el.style.opacity = "0.55"
   } else {
     el.textContent = "[ INSERT ]"
-    el.style.color = "rgba(96,165,250,0.85)"
+    el.style.color = "var(--color-info, var(--color-primary))"
+    el.style.opacity = "0.9"
   }
 }
 
@@ -271,24 +273,24 @@ export const VimNav = {
       global: "Global", context: "Context",
     }
 
-    let html = `<div style="background:var(--b1,#1a1a2e);border:1px solid var(--b3,#374151);border-radius:8px;padding:24px;min-width:360px;max-width:520px;font-family:monospace;color:var(--bc,#e5e7eb)">
+    let html = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:24px;min-width:360px;max-width:520px;font-family:monospace;color:var(--color-base-content)">
       <div style="font-size:14px;font-weight:600;margin-bottom:16px">Keyboard Shortcuts</div>`
 
     for (const [group, cmds] of Object.entries(groups)) {
       html += `<div style="margin-bottom:12px">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(156,163,175,.6);margin-bottom:6px">${escapeHtml(groupLabels[group] ?? group)}</div>`
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--color-base-content);opacity:.6;margin-bottom:6px">${escapeHtml(groupLabels[group] ?? group)}</div>`
       for (const cmd of cmds) {
         const keys = cmd.keys.map(k =>
-          `<kbd style="display:inline-block;padding:1px 5px;border:1px solid rgba(156,163,175,.4);border-radius:3px;font-size:11px;background:rgba(255,255,255,.05)">${escapeHtml(k)}</kbd>`
+          `<kbd style="display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:11px;background:var(--color-base-200);color:var(--color-base-content)">${escapeHtml(k)}</kbd>`
         ).join(" ")
         html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0">
-          <span style="font-size:12px;color:rgba(229,231,235,.8)">${escapeHtml(cmd.label)}</span>
+          <span style="font-size:12px;color:var(--color-base-content);opacity:.8">${escapeHtml(cmd.label)}</span>
           <span>${keys}</span></div>`
       }
       html += `</div>`
     }
 
-    html += `<div style="margin-top:12px;font-size:10px;color:rgba(156,163,175,.5);text-align:center">Press any key to close</div></div>`
+    html += `<div style="margin-top:12px;font-size:10px;color:var(--color-base-content);opacity:.5;text-align:center">Press any key to close</div></div>`
     overlay.innerHTML = html
 
     this._onHelpClose = (e: KeyboardEvent) => {
@@ -338,20 +340,20 @@ export const VimNav = {
       "z-index:9999",
       "font-family:monospace",
       "font-size:12px",
-      "background:var(--b2,#1f2937)",
-      "border:1px solid var(--b3,#374151)",
+      "background:var(--color-base-200)",
+      "border:1px solid var(--color-base-300)",
       "border-radius:6px",
       "padding:8px 12px",
       "display:flex",
       "flex-direction:column",
       "gap:4px",
       "pointer-events:none",
-      "color:var(--bc,#e5e7eb)",
+      "color:var(--color-base-content)",
       "min-width:200px",
     ].join(";")
 
     const header = document.createElement("div")
-    header.style.cssText = "font-size:10px;color:rgba(156,163,175,.6);margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em"
+    header.style.cssText = "font-size:10px;color:var(--color-base-content);opacity:.6;margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em"
     header.textContent = `${prefix} →`
     overlay.appendChild(header)
 
@@ -359,7 +361,7 @@ export const VimNav = {
       const row = document.createElement("div")
       row.style.cssText = "display:flex;align-items:center;gap:8px"
       const key = cmd.keys[1] ?? ""
-      row.innerHTML = `<kbd style="display:inline-block;padding:1px 5px;border:1px solid rgba(156,163,175,.4);border-radius:3px;font-size:11px;background:rgba(255,255,255,.05);min-width:18px;text-align:center">${escapeHtml(key)}</kbd><span style="color:rgba(229,231,235,.8)">${escapeHtml(cmd.label)}</span>`
+      row.innerHTML = `<kbd style="display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:11px;background:var(--color-base-100);color:var(--color-base-content);min-width:18px;text-align:center">${escapeHtml(key)}</kbd><span style="color:var(--color-base-content);opacity:.8">${escapeHtml(cmd.label)}</span>`
       overlay.appendChild(row)
     }
 

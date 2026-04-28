@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
         phx-hook="SortableColumns"
         class="inline-flex gap-3 h-full min-w-full pb-2 snap-x snap-mandatory"
       >
-        <%= for state <- @workflow_states do %>
+        <%= for {state, col_idx} <- Enum.with_index(@workflow_states) do %>
           <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
           <% task_count = length(column_tasks) %>
           <div
@@ -92,6 +92,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
               id={"kanban-col-#{state.id}"}
               phx-hook="SortableKanban"
               data-state-id={state.id}
+              {if col_idx == 0, do: %{"data-vim-list" => ""}, else: %{}}
             >
               <%= if column_tasks == [] do %>
                 <div
@@ -103,7 +104,21 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                 </div>
               <% end %>
               <%= for task <- column_tasks do %>
-                <div class="flex items-start gap-1.5" data-task-id={task.uuid}>
+                <div
+                  class={[
+                    "flex items-start gap-1.5",
+                    col_idx == 0 &&
+                      "[&.vim-nav-focused]:bg-base-300 [&.vim-nav-focused]:ring-1 [&.vim-nav-focused]:ring-primary [&.vim-nav-focused]:rounded-xl"
+                  ]}
+                  data-task-id={task.uuid}
+                  {if col_idx == 0,
+                    do: %{
+                      "data-vim-list-item" => "",
+                      "phx-click" => "open_task_detail",
+                      "phx-value-task_id" => task.uuid || to_string(task.id)
+                    },
+                    else: %{}}
+                >
                   <%= if @bulk_mode do %>
                     <input
                       type="checkbox"

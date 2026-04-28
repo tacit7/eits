@@ -252,7 +252,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       archived_uuids = for {:ok, uuid} <- results, do: uuid
       archived = length(archived_uuids)
 
-      {flash_level, flash_msg} = BulkHelpers.build_bulk_flash(archived, length(results), "session")
+      {flash_level, flash_msg} =
+        BulkHelpers.build_bulk_flash(archived, length(results), verb: "Archived", entity: "session")
 
       socket =
         socket

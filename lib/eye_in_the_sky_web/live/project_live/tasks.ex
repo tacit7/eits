@@ -214,8 +214,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           end)
 
         moved = Enum.count(results, & &1)
+        state_name = Tasks.get_workflow_state!(state_id).name
 
-        {flash_level, flash_msg} = BulkHelpers.build_bulk_flash(moved, length(results), "task")
+        {flash_level, flash_msg} =
+          BulkHelpers.build_bulk_flash(moved, length(results),
+            verb: "Moved",
+            entity: "task",
+            destination: state_name
+          )
 
         socket =
           socket
@@ -253,7 +259,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
       archived = Enum.count(results, & &1)
 
-      {flash_level, flash_msg} = BulkHelpers.build_bulk_flash(archived, length(results), "task")
+      {flash_level, flash_msg} =
+        BulkHelpers.build_bulk_flash(archived, length(results), verb: "Archived", entity: "task")
 
       socket =
         socket

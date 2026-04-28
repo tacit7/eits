@@ -26,6 +26,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
   end
 
   @impl true
+  def handle_params(%{"id" => id}, _uri, socket) do
+    selected = Enum.find(socket.assigns.agents, &(&1.id == id))
+    {:noreply, assign(socket, :selected_agent, selected)}
+  end
+
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   @impl true

@@ -48,6 +48,11 @@ export const AgentCombobox = {
       const idx = items.indexOf(li)
       if (idx !== -1) this._setActive(idx)
     })
+
+    // Pre-select agent from data-prefill-slug if provided (e.g., from flyout click)
+    const prefillSlug = this.el.dataset.prefillSlug
+    const prefillLabel = this.el.dataset.prefillLabel
+    if (prefillSlug) this._select(prefillSlug, prefillLabel || prefillSlug)
   },
 
   updated() {

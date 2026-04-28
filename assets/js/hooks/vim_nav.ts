@@ -13,7 +13,7 @@ export function isEditableTarget(el: Element | EventTarget | null): boolean {
 
 export function keyFromEvent(event: KeyboardEvent): string {
   if (event.key === " ") return "Space"
-  return event.key.length === 1 ? event.key.toLowerCase() : event.key
+  return event.key
 }
 
 function isFlyoutOpen(): boolean {

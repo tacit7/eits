@@ -143,7 +143,7 @@ export const ChatWindowHook = {
             this.el.style.top    = `${y}px`
             this.el.style.width  = `${snap.width}px`
             this.el.style.height = `${snap.height}px`
-            this.pushEventTo(this.el, "window_resized", {
+            this.pushEvent("window_resized", {
               id: this.el.dataset.csId, w: snap.width, h: snap.height
             })
           } else if (snap && this._minimized) {
@@ -153,7 +153,7 @@ export const ChatWindowHook = {
             this.el.style.top  = `${y}px`
           }
 
-          this.pushEventTo(this.el, "window_moved", {
+          this.pushEvent("window_moved", {
             id: this.el.dataset.csId, x, y
           })
           saveWindowLayout(this.el.dataset.csId, x, y,
@@ -203,7 +203,7 @@ export const ChatWindowHook = {
       resizePersistTimer = setTimeout(() => {
         const w = this.el.offsetWidth
         const h = this.el.offsetHeight
-        this.pushEventTo(this.el, "window_resized", {
+        this.pushEvent("window_resized", {
           id: this.el.dataset.csId, w, h
         })
         saveWindowLayout(this.el.dataset.csId,

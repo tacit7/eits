@@ -11,6 +11,7 @@ export type PushEventAction = {
   event: string
   payload?: Record<string, unknown>
   target: "shell" | "active_view"
+  focus_flyout_after?: boolean
 }
 
 export type ClientAction = {
@@ -70,6 +71,26 @@ export const COMMANDS: Command[] = [
     action: { kind: "push_event", event: "toggle_section", payload: { section: "jobs" }, target: "shell" } },
   { id: "toggle.proj_picker", label: "Toggle Project Picker",  keys: ["t", "p"], group: "toggle",
     action: { kind: "push_event", event: "toggle_proj_picker", payload: {}, target: "shell" } },
+
+  // t<Upper> — toggle + focus flyout (same event as lowercase, enters flyout focus mode after open)
+  { id: "toggle.sessions.focus", label: "Toggle + Focus Sessions", keys: ["t", "S"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "sessions" }, target: "shell", focus_flyout_after: true } },
+  { id: "toggle.tasks.focus",    label: "Toggle + Focus Tasks",    keys: ["t", "T"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "tasks" }, target: "shell", focus_flyout_after: true } },
+  { id: "toggle.notes.focus",    label: "Toggle + Focus Notes",    keys: ["t", "N"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "notes" }, target: "shell", focus_flyout_after: true } },
+  { id: "toggle.files.focus",    label: "Toggle + Focus Files",    keys: ["t", "F"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "files" }, target: "shell", focus_flyout_after: true } },
+  { id: "toggle.canvas.focus",   label: "Toggle + Focus Canvas",   keys: ["t", "W"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "canvas" }, target: "shell", focus_flyout_after: true } },
+  { id: "toggle.chat.focus",     label: "Toggle + Focus Chat",     keys: ["t", "C"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "chat" }, target: "shell", focus_flyout_after: true } },
+  { id: "toggle.skills.focus",   label: "Toggle + Focus Skills",   keys: ["t", "K"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "skills" }, target: "shell", focus_flyout_after: true } },
+  { id: "toggle.teams.focus",    label: "Toggle + Focus Teams",    keys: ["t", "M"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "teams" }, target: "shell", focus_flyout_after: true } },
+  { id: "toggle.jobs.focus",     label: "Toggle + Focus Jobs",     keys: ["t", "J"], group: "toggle",
+    action: { kind: "push_event", event: "toggle_section", payload: { section: "jobs" }, target: "shell", focus_flyout_after: true } },
 
   // n — create actions
   { id: "create.agent",   label: "New Agent",   keys: ["n", "a"], group: "create",

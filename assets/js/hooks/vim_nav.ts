@@ -301,7 +301,14 @@ export const VimNav = {
     }
     if (tryFocus()) return
     const obs = new MutationObserver(() => { if (tryFocus()) obs.disconnect() })
-    obs.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["data-vim-flyout-open"] })
+    // Watch both attribute flips (closed→open) and childList (items inserted late
+    // when flyout was already open). Either path needs to wake tryFocus.
+    obs.observe(document.body, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-vim-flyout-open"],
+      childList: true,
+    })
     setTimeout(() => obs.disconnect(), 2000)
   },
 

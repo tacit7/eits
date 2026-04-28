@@ -1012,3 +1012,29 @@ describe("toggle+focus commands (t<Upper>)", () => {
     expect(h.listFocusIndex).toBe(0)
   })
 })
+
+describe("toggle+focus: open-with-late-items path", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  it("focuses items inserted AFTER flyout was already open", async () => {
+    // Flyout already marked open, but items haven't rendered yet
+    const panel = document.createElement("div")
+    panel.setAttribute("data-vim-flyout-open", "true")
+    document.body.appendChild(panel)
+
+    const h = makeHook()
+    h._focusFlyoutAfterOpen()
+    expect(h.flyoutFocused).toBe(false)
+
+    // Items appear later via LiveView patch — childList mutation
+    const item = document.createElement("a")
+    item.setAttribute("data-vim-flyout-item", "")
+    panel.appendChild(item)
+
+    await new Promise(r => setTimeout(r, 0))
+    expect(h.flyoutFocused).toBe(true)
+    expect(h.listFocusIndex).toBe(0)
+    expect(item.classList.contains("vim-nav-focused")).toBe(true)
+  })
+})

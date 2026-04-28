@@ -11,10 +11,14 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpers do
   def handle_update_session_name(%{"value" => value}, socket) do
     session = socket.assigns.session
     value = String.trim(value)
+    name = if(value == "", do: nil, else: value)
 
-    case Sessions.update_session(session, %{name: if(value == "", do: nil, else: value)}) do
+    case Sessions.update_session(session, %{name: name}) do
       {:ok, updated} ->
-        {:noreply, assign(socket, :session, updated)}
+        {:noreply,
+         socket
+         |> assign(:session, updated)
+         |> assign(:page_title, updated.name || "Session")}
 
       {:error, changeset} ->
         Logger.error("Failed to update session name: #{inspect(changeset.errors)}")

@@ -96,3 +96,4 @@ pr-*.md
 # Generated mockup previews
 /priv/static/mockups/
 /priv/static/mockups-*.html
+/docs/.obsidian/

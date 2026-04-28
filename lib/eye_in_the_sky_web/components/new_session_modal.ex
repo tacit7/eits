@@ -572,10 +572,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       <button
         type="button"
         class="btn btn-secondary flex-1 gap-1.5"
-        phx-click={
-          Phoenix.LiveView.JS.set_attribute({"value", "chat"}, to: "#new-session-submit-action")
-          |> Phoenix.LiveView.JS.dispatch("submit", to: "#new-session-form")
-        }
+        onclick="document.getElementById('new-session-submit-action').value='chat'; document.getElementById('new-session-form').requestSubmit();"
       >
         <.icon name="hero-chat-bubble-left-right-mini" class="w-4 h-4" />
         Chat

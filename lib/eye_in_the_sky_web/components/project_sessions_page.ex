@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
 
   def page(assigns) do
     ~H"""
-    <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
+    <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8" id="sessions-page-root" phx-hook="DmHistoryCleanup">
       <div class="max-w-4xl mx-auto">
         <%!-- Toolbar --%>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">

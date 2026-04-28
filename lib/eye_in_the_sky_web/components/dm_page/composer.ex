@@ -20,6 +20,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   attr :context_window, :integer, default: 0
   attr :display_name, :string, default: nil
   attr :session_cli_opts, :list, default: []
+  attr :session_uuid, :string, default: nil
 
   def message_form(assigns) do
     ~H"""
@@ -71,6 +72,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           autocomplete="off"
           phx-hook="CommandHistory"
           id="message-input"
+          data-session-uuid={@session_uuid}
         ></textarea>
       </div>
 

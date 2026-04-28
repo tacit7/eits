@@ -303,7 +303,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         canvases={@canvases}
         active_canvas_id={@active_canvas_id}
         canvas_sessions={@canvas_sessions}
-        canvas_session_counts={@canvas_session_counts}
         renaming_canvas_id={@renaming_canvas_id}
         creating_canvas={@creating_canvas}
       />
@@ -358,22 +357,16 @@ defmodule EyeInTheSkyWeb.CanvasLive do
             id={"canvas-tab-#{canvas.id}"}
             data-canvas-id={canvas.id}
             phx-hook="CanvasTabHook"
-            class={["tab tab-sm", if(@active_canvas_id == canvas.id, do: "tab-active")]}
+            class={["tab tab-sm group/tab", if(@active_canvas_id == canvas.id, do: "tab-active")]}
             phx-click="switch_tab"
             phx-value-canvas-id={canvas.id}
           >
             {canvas.name}
-            <span
-              :if={Map.get(@canvas_session_counts, canvas.id, 0) > 0}
-              class="badge badge-xs badge-ghost ml-1"
-            >{Map.get(@canvas_session_counts, canvas.id, 0)}</span>
             <button
-              :if={@active_canvas_id == canvas.id}
               type="button"
               phx-click.stop="delete_canvas"
               phx-value-canvas-id={canvas.id}
-              phx-confirm="Delete canvas and all its windows?"
-              class="ml-1 opacity-50 hover:opacity-100"
+              class="ml-1 opacity-0 group-hover/tab:opacity-50 hover:!opacity-100 transition-opacity"
             >
               <.icon name="hero-trash-mini" class="size-3" />
             </button>

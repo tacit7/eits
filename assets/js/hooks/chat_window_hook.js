@@ -207,34 +207,14 @@ export const ChatWindowHook = {
 
     const minimizeBtn = this.el.querySelector("[data-minimize-btn]")
     if (minimizeBtn) {
-      this._minimized = this.el.dataset.windowMinimized === "true"
-      if (this._minimized) this._applyMinimized()
+      this._minimized = false
       minimizeBtn.addEventListener("mousedown", (e) => {
         e.stopPropagation()
         e.preventDefault()
       })
       minimizeBtn.addEventListener("click", (e) => {
         e.stopPropagation()
-        this._minimized = !this._minimized
-        const body = this.el.querySelector("[data-chat-body]")
-        const footer = this.el.querySelector("[data-chat-footer]")
-        if (this._minimized) {
-          this.el.dataset.savedHeight = this.el.offsetHeight + "px"
-          this.el.dataset.windowMinimized = "true"
-          this._applyMinimized()
-        } else {
-          delete this.el.dataset.windowMinimized
-          if (body) body.style.display = ""
-          if (footer) footer.style.display = ""
-          this.el.style.resize = "both"
-          this.el.style.overflow = "auto"
-          if (this.el.dataset.savedHeight) {
-            this.el.style.height = this.el.dataset.savedHeight
-          }
-          if (this._resizeObserver) this._resizeObserver.observe(this.el)
-          const unreadDot = this.el.querySelector("[data-unread-dot]")
-          if (unreadDot) unreadDot.remove()
-        }
+        this._applyMinimized()
       })
     }
 
@@ -284,11 +264,10 @@ export const ChatWindowHook = {
     window.addEventListener("canvas:focus-session", this._onFocusSession = (e) => {
       const targetId = String(e.detail?.sessionId)
       if (targetId && targetId === this.el.dataset.sessionId) {
-        this._raiseToFront()
-        // Un-minimize if collapsed
         if (this._minimized) {
-          const btn = this.el.querySelector("[data-minimize-btn]")
-          if (btn) btn.click()
+          this._restoreFromMinimized()
+        } else {
+          this._raiseToFront()
         }
       }
     })
@@ -434,15 +413,7 @@ export const ChatWindowHook = {
 
     this.handleEvent("messages-updated-" + this.el.dataset.csId, () => {
       if (this._minimized) {
-        const handle = this.el.querySelector("[data-drag-handle]")
-        if (handle && !handle.querySelector("[data-unread-dot]")) {
-          const dot = document.createElement("span")
-          dot.dataset.unreadDot = ""
-          dot.className = "w-2 h-2 rounded-full bg-error animate-pulse flex-shrink-0 ml-1"
-          const nameSpan = handle.querySelector("span.truncate") || handle.querySelector("span")
-          if (nameSpan) nameSpan.after(dot)
-          else handle.appendChild(dot)
-        }
+        // Window is hidden — nothing to do; user restores via canvas flyout
       } else if (this._autoScroll) {
         // Defer by one rAF so the browser finishes reflowing the new message
         // before we read scrollHeight. Without this, the layout flush from the
@@ -480,16 +451,25 @@ export const ChatWindowHook = {
   },
 
   _applyMinimized() {
-    const body = this.el.querySelector("[data-chat-body]")
-    const footer = this.el.querySelector("[data-chat-footer]")
-    const handle = this.el.querySelector("[data-drag-handle]")
-    if (body) body.style.display = "none"
-    if (footer) footer.style.display = "none"
-    this.el.style.resize = "none"
-    this.el.style.overflow = "hidden"
-    const headerH = handle ? handle.offsetHeight : 40
+    this._minimized = true
+    this.el.style.display = "none"
     if (this._resizeObserver) this._resizeObserver.disconnect()
-    this.el.style.height = headerH + "px"
+  },
+
+  _restoreFromMinimized() {
+    this._minimized = false
+    this.el.style.display = ""
+    // Re-attach resize observer and force-scroll to bottom on restore
+    if (this._resizeObserver) {
+      const body = this.el.querySelector("[data-chat-body]")
+      if (body) {
+        this._resizeObserver.observe(body)
+        for (const child of body.children) this._resizeObserver.observe(child)
+        this._lastScrollHeight = body.scrollHeight
+        body.scrollTop = body.scrollHeight
+      }
+    }
+    this._raiseToFront()
   },
 
   beforeUpdate() {

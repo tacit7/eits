@@ -107,11 +107,20 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   # Provider / icon helpers
   # ---------------------------------------------------------------------------
 
+  @doc """
+  Canonical provider icon image path. **Do not reimplement per-component.**
+  Use this anywhere you need a provider logo `<img src=...>`.
+  See also `provider_icon_class/1` for the accompanying CSS modifier.
+  """
   def provider_icon("openai"), do: "/images/openai.svg"
   def provider_icon("codex"), do: "/images/openai.svg"
   def provider_icon("gemini"), do: "/images/gemini.svg"
   def provider_icon(_), do: "/images/claude.svg"
 
+  @doc """
+  Canonical provider icon CSS class modifier (dark-mode inversion etc.).
+  **Do not reimplement per-component.** Always pair with `provider_icon/1`.
+  """
   def provider_icon_class("openai"), do: "dark:invert"
   def provider_icon_class("codex"), do: "dark:invert"
   def provider_icon_class("gemini"), do: ""

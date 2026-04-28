@@ -21,6 +21,22 @@ All tables use `:utc_datetime_usec`. Use `DateTime.utc_now()` when setting times
 
 Native PostgreSQL `uuid` type. Ecto handles encoding/decoding automatically — pass plain strings in queries. `source_uuid` tracks the originating session/agent UUID.
 
+## Shared Helpers — Check Before Implementing
+
+**Before writing any utility function, grep for it and check this table.** Re-implementing these is the most common source of duplication caught in audits.
+
+| Need | Function | Module |
+|------|----------|--------|
+| Provider logo `<img src>` | `DmHelpers.provider_icon/1` | `components/dm_helpers.ex` |
+| Provider logo CSS class | `DmHelpers.provider_icon_class/1` | `components/dm_helpers.ex` |
+| Bulk op flash message | `BulkHelpers.build_bulk_flash/3` (opts: `verb:`, `entity:`, `destination:`) | `live/shared/bulk_helpers.ex` |
+| String → integer (nil on fail) | `ControllerHelpers.parse_int/1` or `/2` | `helpers/controller_helpers.ex` |
+| Session terminated? | `Sessions.terminated_statuses/0` → `~w(completed failed)` | `eye_in_the_sky/sessions.ex` |
+| Status dot (UI component) | `<.status_dot status={atom}>` | `components/core_components.ex` |
+| Status badge (UI component) | `<.status_badge status={atom}>` | `components/core_components.ex` |
+
+If you need a helper that doesn't exist, add it to the right shared module and update this table.
+
 ## PubSub
 
 All broadcasting and subscribing goes through `EyeInTheSky.Events` (`lib/eye_in_the_sky/events.ex`). **Never call `Phoenix.PubSub` directly.**

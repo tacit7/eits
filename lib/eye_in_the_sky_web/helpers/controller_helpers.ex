@@ -1,6 +1,11 @@
 defmodule EyeInTheSkyWeb.ControllerHelpers do
   @moduledoc "Shared helpers for API controllers and LiveViews."
 
+  @doc """
+  Canonical string-to-integer parser. **Do not use `Integer.parse/1` directly.**
+  Returns the integer or `nil` (1-arg) / `default` (2-arg) on failure.
+  Import via: `import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]`
+  """
   def parse_int(val), do: EyeInTheSky.Utils.ToolHelpers.parse_int(val)
   def parse_int(val, default), do: EyeInTheSky.Utils.ToolHelpers.parse_int(val, default)
 

@@ -6,6 +6,24 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
 
   alias EyeInTheSky.Tasks
 
+  @doc """
+  Canonical bulk-operation flash message builder. **Do not inline this cond pattern.**
+
+  Returns `{flash_level, message}` where level is `:info` or `:error`.
+
+  Options (keyword list):
+    - `:verb` (required) — past-tense action, e.g. `"Moved"`, `"Archived"`, `"Deleted"`
+    - `:entity` (required) — singular noun, e.g. `"task"`, `"session"`
+    - `:destination` (optional) — destination label for move ops, e.g. state name
+
+  ## Examples
+
+      BulkHelpers.build_bulk_flash(3, 3, verb: "Archived", entity: "task")
+      # => {:info, "Archived 3 tasks"}
+
+      BulkHelpers.build_bulk_flash(2, 3, verb: "Moved", entity: "task", destination: "Done")
+      # => {:info, "Moved 2 tasks to Done; 1 failed"}
+  """
   def build_bulk_flash(succeeded, total, opts) do
     verb = Keyword.fetch!(opts, :verb)
     entity = Keyword.fetch!(opts, :entity)

@@ -322,9 +322,29 @@ cmd_sessions() {
 
 cmd_tasks() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits tasks <list|get|create|update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search|sessions|states> [--mine|--assigned] [--created-by] [--all] [--quiet]
-  When EITS_SESSION_UUID is set, 'list' defaults to the current session's tasks.
-  Pass --all to list across all sessions."; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { cat <<'TASKS_HELP'
+usage: eits tasks <subcommand> [options]
+
+Subcommands:
+  list      [-s <session>] [-p <project>] [-l <limit>] [--mine] [--all]
+  get       <id>
+  begin     -t <title> [-p <project>] [-d <desc>] [-q]   create + claim in one shot
+  complete  <id> -m <message>                             atomic annotate + done
+  annotate  <id> -b <body> [-t <title>]
+  update    <id> -s <state> [-t <title>] [-d <desc>]
+  search    <query> [--project <id>] [--state <id>]
+  states    show state IDs, names, and accepted aliases
+  create    --title <t> [--project <id>] [--description <d>]
+  claim     <id>
+  delete    <id>
+  bulk-update --ids <id,...> --state <id|name>
+
+  When EITS_SESSION_UUID is set, 'list' scopes to the current session.
+  Pass --all to list across all sessions.
+
+Run 'eits tasks states' to see state IDs and all accepted name aliases.
+TASKS_HELP
+  return 0; }
   case "$sub" in
     list)
       # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by] [--all]
@@ -335,10 +355,10 @@ cmd_tasks() {
       local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project) qs="${qs}&project_id=$2"; shift 2 ;;
-          --session) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
+          --session|-s) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
-          --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --q|--search|-q) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)
             # Positional remap: 1=todo(1), 2=progress(2), 3=review(4), 4=done(3)
             local _list_sid
@@ -355,7 +375,7 @@ cmd_tasks() {
               in-review|review)  qs="${qs}&state_id=4"; shift 2 ;;
               *) die "unknown state name: $2" ;;
             esac ;;
-          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          --limit|-l) qs="${qs}&limit=$2";      shift 2 ;;
           --mine|--assigned) [[ $_session_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine/--assigned requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --created-by) local _creator="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_creator" ]] || die "--created-by requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&created_by_session_id=$_creator"; shift ;;
           --all)     _all_flag=1; shift ;;
@@ -439,10 +459,10 @@ cmd_tasks() {
       }
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --state|--state-name) _resolve_state "$2"; shift 2 ;;
+          --state|-s|--state-name) _resolve_state "$2"; shift 2 ;;
           --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
-          --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
-          --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
+          --description|-d) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+          --title|-t)    updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
           --due-at)      updates=$(echo "$updates" | jq --arg v "$2" '. + {due_at: $v}');      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
@@ -487,8 +507,8 @@ cmd_tasks() {
       local body="" title=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --body)  body="$2";  shift 2 ;;
-          --title) title="$2"; shift 2 ;;
+          --body|-b)  body="$2";  shift 2 ;;
+          --title|-t) title="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -556,7 +576,7 @@ cmd_tasks() {
       fi
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --message) message="$2"; shift 2 ;;
+          --message|-m) message="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -630,12 +650,12 @@ HELP
       local task_id_flag="" title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --id)          task_id_flag="$2"; shift 2 ;;
-          --title)       title="$2";        shift 2 ;;
-          --description) description="$2";  shift 2 ;;
-          --project)     project_id="$2";   shift 2 ;;
-          --priority)    priority="$2";     shift 2 ;;
-          --quiet|-q)    quiet=1;           shift ;;
+          --id)             task_id_flag="$2"; shift 2 ;;
+          --title|-t)       title="$2";        shift 2 ;;
+          --description|-d) description="$2";  shift 2 ;;
+          --project|-p)     project_id="$2";   shift 2 ;;
+          --priority)       priority="$2";     shift 2 ;;
+          --quiet|-q)       quiet=1;           shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -720,14 +740,14 @@ HELP
       ;;
     states)
       printf '%-4s %-14s %-30s %s\n' "Pos" "Name" "Accepted aliases" "Notes"
-      printf '%-4s %-14s %-30s %s\n' 1 "To Do"       "todo, to-do"                 ""
+      printf '%-4s %-14s %-30s %s\n' 1 "To Do"       "todo, to-do, to do"           ""
       printf '%-4s %-14s %-30s %s\n' 2 "In Progress" "start, in-progress, progress" "(set by tasks begin / tasks claim)"
       printf '%-4s %-14s %-30s %s\n' 3 "In Review"   "review, in-review"            ""
       printf '%-4s %-14s %-30s %s\n' 4 "Done"        "done, complete, completed"    "(set by tasks complete)"
       printf '\nPositional numbers 1-4 and named aliases both work with --state:\n'
       printf '  eits tasks update <id> --state 4      # done\n'
       printf '  eits tasks update <id> --state done   # same\n'
-      printf '  eits tasks update <id> --state 3      # in review\n'
+      printf '  eits tasks update <id> -s done        # shorthand\n'
       ;;
     bulk-update)
       # eits tasks bulk-update --ids <id,id,...> [--state <id|name>] [--priority <p>] [--title <t>]

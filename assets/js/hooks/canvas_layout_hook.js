@@ -42,9 +42,8 @@ function showCanvasBanner(message) {
     'bottom:20px',
     'left:50%',
     'transform:translateX(-50%)',
-    'background:oklch(var(--n))',
-    'border:1px solid oklch(var(--nc)/0.2)',
-    'color:oklch(var(--nc))',
+    'background:#1e1e2e',
+    'color:#cdd6f4',
     'font-size:0.8rem',
     'font-weight:500',
     'padding:8px 18px',
@@ -52,8 +51,9 @@ function showCanvasBanner(message) {
     'z-index:200',
     'pointer-events:none',
     'white-space:nowrap',
-    'box-shadow:0 4px 16px rgba(0,0,0,0.4)',
+    'box-shadow:0 4px 20px rgba(0,0,0,0.6)',
     'letter-spacing:0.01em',
+    'border:1px solid rgba(205,214,244,0.15)',
   ].join(';')
 
   canvas.appendChild(banner)

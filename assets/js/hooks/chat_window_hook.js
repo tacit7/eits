@@ -323,6 +323,26 @@ export const ChatWindowHook = {
 
     if (chatBody) {
       scrollToBottom()
+
+      // ResizeObserver catches late content growth (LocalTime hooks, markdown
+      // rendering, code block expansion) that runs after the initial scrollToBottom.
+      // Without this, the window mounts at the right position but content expands
+      // and the view ends up stranded partway up.
+      if (typeof ResizeObserver !== "undefined") {
+        this._lastScrollHeight = chatBody.scrollHeight
+        this._resizeObserver = new ResizeObserver(() => {
+          if (this._minimized) return
+          const body = this.el.querySelector("[data-chat-body]")
+          if (!body || body.scrollHeight === this._lastScrollHeight) return
+          this._lastScrollHeight = body.scrollHeight
+          if (this._autoScroll) body.scrollTop = body.scrollHeight
+        })
+        this._resizeObserver.observe(chatBody)
+        for (const child of chatBody.children) {
+          this._resizeObserver.observe(child)
+        }
+      }
+
       chatBody.addEventListener("scroll", () => {
         // Ignore scroll events that fire during a LiveView morphdom patch or message
         // send. morphdom can drop scrollTop, which looks like "user scrolled up".
@@ -497,6 +517,19 @@ export const ChatWindowHook = {
         if (body) body.scrollTop = body.scrollHeight
         this.el.scrollTop = this.el.scrollHeight
       })
+    }
+
+    // Re-observe children after patch — LiveView may have replaced message nodes.
+    if (this._resizeObserver) {
+      const body = this.el.querySelector("[data-chat-body]")
+      if (body) {
+        this._resizeObserver.disconnect()
+        this._resizeObserver.observe(body)
+        for (const child of body.children) {
+          this._resizeObserver.observe(child)
+        }
+        this._lastScrollHeight = body.scrollHeight
+      }
     }
   },
 

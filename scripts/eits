@@ -2431,9 +2431,17 @@ EOF
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --type)        types="$2";   shift 2 ;;
-      --limit|-l)    limit="$2";   shift 2 ;;
-      --project|-p)  project="$2"; shift 2 ;;
+      --type)
+        [[ $# -lt 2 || "${2:0:1}" == "-" ]] && die "--type requires a value (sessions|tasks|notes)"
+        types="$2"; shift 2 ;;
+      --limit|-l)
+        [[ $# -lt 2 || "${2:0:1}" == "-" ]] && die "--limit requires a numeric value"
+        [[ "$2" =~ ^[0-9]+$ ]] || die "--limit must be a positive integer, got: $2"
+        limit="$2"; shift 2 ;;
+      --project|-p)
+        [[ $# -lt 2 || "${2:0:1}" == "-" ]] && die "--project requires a value"
+        [[ "$2" =~ ^[0-9]+$ ]] || die "--project must be a numeric ID, got: $2"
+        project="$2"; shift 2 ;;
       --json)        json_mode=1;  shift ;;
       *) die "unknown option: $1" ;;
     esac
@@ -2441,10 +2449,25 @@ EOF
 
   [[ -z "$query" ]] && die "usage: eits search <query>"
 
+  # validate --type tokens strictly — exact token match, no substring
+  local do_sessions=0 do_tasks=0 do_notes=0
+  local _t; IFS=',' read -ra _type_tokens <<< "$types"
+  for _t in "${_type_tokens[@]}"; do
+    case "$_t" in
+      sessions) do_sessions=1 ;;
+      tasks)    do_tasks=1 ;;
+      notes)    do_notes=1 ;;
+      *) die "unknown type: '$_t' (valid: sessions, tasks, notes)" ;;
+    esac
+  done
+
   local q_enc; q_enc=$(printf '%s' "$query" | jq -Rr @uri)
   local proj_qs=""; [[ -n "$project" ]] && proj_qs="&project_id=${project}"
 
   local tmp_dir; tmp_dir=$(mktemp -d)
+  # trap ensures cleanup on early exit, error, or signal
+  trap '/bin/rm -rf "$tmp_dir" 2>/dev/null || true' EXIT INT TERM
+
   local f_sessions="${tmp_dir}/sessions.json"
   local f_tasks="${tmp_dir}/tasks.json"
   local f_notes="${tmp_dir}/notes.json"
@@ -2455,15 +2478,12 @@ EOF
   echo '{"notes":[]}'    > "$f_notes"
 
   # fan out in parallel — only requested types
-  if echo "$types" | grep -q "sessions"; then
+  [[ $do_sessions -eq 1 ]] && \
     ( _curl "${BASE_URL}/sessions?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_sessions" 2>/dev/null ) &
-  fi
-  if echo "$types" | grep -q "tasks"; then
+  [[ $do_tasks -eq 1 ]] && \
     ( _curl "${BASE_URL}/tasks?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_tasks" 2>/dev/null ) &
-  fi
-  if echo "$types" | grep -q "notes"; then
+  [[ $do_notes -eq 1 ]] && \
     ( _curl "${BASE_URL}/notes?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_notes" 2>/dev/null ) &
-  fi
   wait
 
   if [[ $json_mode -eq 1 ]]; then
@@ -2482,18 +2502,18 @@ EOF
     t_count=$(jq '[.tasks[]?]    | length' "$f_tasks"    2>/dev/null); t_count=${t_count:-0}
     n_count=$(jq '[.notes[]?]    | length' "$f_notes"    2>/dev/null); n_count=${n_count:-0}
 
-    if echo "$types" | grep -q "sessions" && [[ "$s_count" -gt 0 ]]; then
+    [[ $do_sessions -eq 1 && "$s_count" -gt 0 ]] && {
       printf '\n── Sessions (%s) ──────────────────────────────────────────────\n' "$s_count"
       _tbl_sessions "$(cat "$f_sessions")"
-    fi
-    if echo "$types" | grep -q "tasks" && [[ "$t_count" -gt 0 ]]; then
+    }
+    [[ $do_tasks -eq 1 && "$t_count" -gt 0 ]] && {
       printf '\n── Tasks (%s) ─────────────────────────────────────────────────\n' "$t_count"
       _tbl_tasks "$(cat "$f_tasks")"
-    fi
-    if echo "$types" | grep -q "notes" && [[ "$n_count" -gt 0 ]]; then
+    }
+    [[ $do_notes -eq 1 && "$n_count" -gt 0 ]] && {
       printf '\n── Notes (%s) ─────────────────────────────────────────────────\n' "$n_count"
       _tbl_notes "$(cat "$f_notes")"
-    fi
+    }
 
     local total=$(( s_count + t_count + n_count ))
     if [[ $total -eq 0 ]]; then
@@ -2503,6 +2523,7 @@ EOF
     fi
   fi
 
+  trap - EXIT INT TERM
   /bin/rm -rf "$tmp_dir" 2>/dev/null || true
 }
 

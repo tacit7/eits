@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   alias EyeInTheSky.Canvases
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSkyWeb.Live.Shared.BulkHelpers
   import EyeInTheSkyWeb.Helpers.AgentCreationHelpers, only: [build_opts: 2]
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Loader
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
@@ -250,17 +251,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
       archived_uuids = for {:ok, uuid} <- results, do: uuid
       archived = length(archived_uuids)
-      failed = length(results) - archived
 
-      {flash_level, flash_msg} =
-        cond do
-          archived > 0 and failed > 0 ->
-            {:info, "Archived #{archived} #{pluralize_session(archived)}; #{failed} could not be archived"}
-          archived > 0 ->
-            {:info, "Archived #{archived} #{pluralize_session(archived)}"}
-          true ->
-            {:error, "Could not archive #{failed} #{pluralize_session(failed)}"}
-        end
+      {flash_level, flash_msg} = BulkHelpers.build_bulk_flash(archived, length(results), "session")
 
       socket =
         socket
@@ -283,8 +275,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       stream_insert(acc, :session_list, agent)
     end)
   end
-
-  defp pluralize_session(count), do: if(count == 1, do: "session", else: "sessions")
 
   defp fetch_project_session(project_id, raw_id) do
     id = Selection.normalize_id(raw_id)

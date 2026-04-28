@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSkyWeb.Live.Shared.BulkHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -213,25 +214,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           end)
 
         moved = Enum.count(results, & &1)
-        failed = length(results) - moved
 
-        state_name =
-          case Enum.find(socket.assigns.workflow_states, &(&1.id == state_id)) do
-            nil -> "state"
-            state -> state.name
-          end
-
-        {flash_level, flash_msg} =
-          cond do
-            moved > 0 and failed > 0 ->
-              {:info, "Moved #{moved} task#{if moved != 1, do: "s"} to #{state_name}; #{failed} failed"}
-
-            moved > 0 ->
-              {:info, "Moved #{moved} task#{if moved != 1, do: "s"} to #{state_name}"}
-
-            true ->
-              {:error, "Could not move #{failed} task#{if failed != 1, do: "s"}"}
-          end
+        {flash_level, flash_msg} = BulkHelpers.build_bulk_flash(moved, length(results), "task")
 
         socket =
           socket
@@ -268,19 +252,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         end)
 
       archived = Enum.count(results, & &1)
-      failed = length(results) - archived
 
-      {flash_level, flash_msg} =
-        cond do
-          archived > 0 and failed > 0 ->
-            {:info, "Archived #{archived} task#{if archived != 1, do: "s"}; #{failed} could not be archived"}
-
-          archived > 0 ->
-            {:info, "Archived #{archived} task#{if archived != 1, do: "s"}"}
-
-          true ->
-            {:error, "Could not archive #{failed} task#{if failed != 1, do: "s"}"}
-        end
+      {flash_level, flash_msg} = BulkHelpers.build_bulk_flash(archived, length(results), "task")
 
       socket =
         socket

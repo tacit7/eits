@@ -6,6 +6,21 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
 
   alias EyeInTheSky.Tasks
 
+  def build_bulk_flash(succeeded, total, entity_name) do
+    failed = total - succeeded
+
+    cond do
+      succeeded > 0 and failed > 0 ->
+        {:info, "#{succeeded} #{entity_name}#{if succeeded != 1, do: "s"}; #{failed} could not be processed"}
+
+      succeeded > 0 ->
+        {:info, "#{succeeded} #{entity_name}#{if succeeded != 1, do: "s"}"}
+
+      true ->
+        {:error, "Could not process #{failed} #{entity_name}#{if failed != 1, do: "s"}"}
+    end
+  end
+
   def handle_toggle_bulk_mode(socket) do
     {:noreply,
      socket

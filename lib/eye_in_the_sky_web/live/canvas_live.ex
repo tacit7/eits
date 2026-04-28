@@ -614,8 +614,11 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   defp session_status_class("working"), do: "badge-primary"
+  defp session_status_class("idle"), do: "badge-ghost"
   defp session_status_class("waiting"), do: "badge-warning"
   defp session_status_class("completed"), do: "badge-success"
   defp session_status_class("failed"), do: "badge-error"
+  defp session_status_class("compacting"), do: "badge-warning"
+  defp session_status_class("archived"), do: "badge-ghost"
   defp session_status_class(_), do: "badge-ghost"
 end

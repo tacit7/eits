@@ -65,6 +65,25 @@ def handle_params(_params, _url, socket)
   # No ID — redirect to first canvas or stay on empty canvas list
 ```
 
+### Canvas Activation Helper
+
+The `base_canvas_assigns/2` helper function (private) initializes the core canvas state to reduce duplication in `activate_canvas/2`. It sets all default canvas-related assigns:
+
+```elixir
+defp base_canvas_assigns(socket, canvas_id) do
+  socket
+  |> assign(:active_canvas_id, canvas_id)
+  |> assign(:canvas_sessions, [])
+  |> assign(:subscribed_session_ids, [])
+  |> assign(:canvas_session_counts, %{})
+  |> assign(:show_session_picker, false)
+  |> assign(:filtered_sessions, [])
+  |> assign(:session_search, "")
+end
+```
+
+This helper is called by `activate_canvas/2` in both the connected and disconnected branches, eliminating the need to repeat these assignments twice and ensuring consistent initialization across different canvas activation paths.
+
 **Focus parameter handling:**
 - If `:focus_session_id` is assigned, a hidden `<span>` with `phx-mounted` is rendered
 - On mount, the span dispatches a `canvas:focus-session` event with `{sessionId: @focus_session_id}` as detail

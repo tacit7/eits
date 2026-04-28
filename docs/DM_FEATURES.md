@@ -337,6 +337,53 @@ end
 
 ---
 
+## Editor Split-View Mode
+
+**Commit:** `13a2e57c`
+
+The DM page supports three editor layout modes for flexible file editing alongside the conversation.
+
+**Layout modes:**
+- **Hidden** — No editor panel (default; `data-editor-mode="hidden"`)
+- **Single** — Editor replaces main chat content (`data-editor-mode="single"`)
+- **Split** — Editor and chat side-by-side with draggable divider (`data-editor-mode="split"`)
+
+**State persistence:**
+- Mode preference stored in `localStorage` under `editor-mode` key
+- Editor panel width stored in `localStorage` under `editor-width` key
+- Mobile (<768px) viewport forces single layout regardless of saved preference
+
+**Route capability:**
+- Split mode is only available on DM page (controlled by `data-allow-split` attribute on `#app-shell`)
+- Toolbar includes a `hero-view-columns` button to toggle split mode (only visible when `data-allow-split="true"`)
+
+**Architecture:**
+- Mode state lives on `<html>` element (root layout, never morphdom-patched by LiveView)
+- `EditorLayout` JS hook handles:
+  - Mode resolution and application from localStorage
+  - Draggable splitter interaction with pointer events
+  - Lifecycle cleanup on navigation (pointermove/pointerup/pointercancel tracking)
+  - MutationObserver on file panel to react to tab open/close events
+  - Keyboard resize: ArrowLeft/Right adjust panel width by 20px steps
+
+**Splitter accessibility:**
+- `role="separator"` and `aria-orientation="vertical"` for semantic meaning
+- `tabindex="0"` makes splitter keyboard-accessible
+- `aria-valuenow/min/max` synced by hook to reflect current/min/max width
+- Pointer and keyboard cancellation handlers prevent body lock on abrupt termination
+
+**File panel:**
+- Always renders (with empty state when no tabs) so the DOM element exists for split mode
+- `data-has-tabs` attribute reflects tab state; hook observes mutations to react
+- File tabs display in editor header with close buttons
+
+**Files:**
+- `assets/js/hooks/editor_layout.js` — Layout mode management and splitter interaction
+- `assets/css/app.css` — Split-view layout styles
+- `lib/eye_in_the_sky_web/components/rail.ex` — Rail sidebar integration
+
+---
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -346,6 +393,7 @@ end
 | `Cmd/Ctrl + K` | Search agents/tasks |
 | `Cmd/Ctrl + N` | New agent |
 | `Cmd/Ctrl + T` | New task |
+| `ArrowLeft / ArrowRight` (on splitter) | Resize editor panel by 20px |
 
 ---
 
@@ -544,13 +592,19 @@ The `Deduplicator` module and `BulkImporter` guard against duplicate delivery us
 - When importing session files, messages are linked by `source_uuid` to prevent creating duplicates
 - `Repo.insert_all` with `on_conflict: :nothing` and `conflict_target: :source_uuid` handles race conditions atomically
 
-**DM deduplication window split (commit 2dfddb77):**
+**Deduplication window split:**
+
+**DM dedup windows (commit 2dfddb77, extended commit d3b11f8f):**
 - **Live DM path:** 60-second window for `dm_already_recorded?/3`
   - Prevents re-ingesting a DM that was forwarded to the local CLI and bounced back
   - Uses `Messages.find_recent_dm/3` with a tight time window
+  - Applies to messages from `record_incoming_reply/4`
+  
 - **File import path:** 86400-second (24-hour) window when `importing_from_file?: true`
   - Used by Claude and Codex `SessionImporter` to safely replay session history
-  - Avoids false deduplication on legitimate messages with the same content
+  - Extended in commit d3b11f8f to also apply to `agent_reply_already_recorded?`
+  - When a user opens an idle session (agent finished > 30s ago), the mount Task sync calls `BulkImporter`, which needs the 24h window to find matching responses committed under a different `source_uuid`
+  - `record_incoming_reply` only saves final responses (not tool-call messages), so a 24h exact-body match within one session has negligible false-positive risk
 
 **Body-match fallback removed (commit 58e557e9):**
 - Previously, messages without a `source_uuid` would fall back to body matching for dedup
@@ -559,8 +613,8 @@ The `Deduplicator` module and `BulkImporter` guard against duplicate delivery us
 
 **Callsites:**
 - **DM receive:** `Messages.record_incoming_reply/4` sets `source_uuid` on agent responses
-- **File import:** `BulkImporter.import_messages/3` uses source UUIDs from session files
-- **Dedup index:** Partial composite index on `(session_id, sender_role, body, inserted_at) WHERE source_uuid IS NULL` accelerates the unlinked-message lookup for older data
+- **File import:** `BulkImporter.import_messages/3` uses source UUIDs from session files; passes `import_opts` to `agent_reply_already_recorded?` to apply 24h window
+- **Dedup index:** Partial composite index on `(session_id, sender_role, inserted_at) WHERE source_uuid IS NULL` accelerates the unlinked-message lookup for older data
 
 **Use case:** End-to-end tracking via `source_uuid` makes message deduplication reliable across spawned agents, file replays, and CLI tools—retries are safe.
 

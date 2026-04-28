@@ -13,12 +13,16 @@ export EITS_API_KEY=<your-key>
 
 # Injected automatically by EITS hooks — set manually if needed
 export EITS_SESSION_UUID=<session-uuid>
-export EITS_SESSION_ID=<session-id>          # numeric session ID (fallback for --to/--from)
+export EITS_SESSION_ID=<session-id>          # numeric session ID (fallback for --to/--from/--session)
 export EITS_AGENT_UUID=<agent-uuid>
 export EITS_PROJECT_ID=<project-id>
 ```
 
 Requires `curl` and `jq`.
+
+**Fallback order** for session identification (when command requires a session but env var unset):
+1. `$EITS_SESSION_UUID` (primary)
+2. `$EITS_SESSION_ID` (integer fallback)
 
 Pass `--help` to any subcommand for usage details (e.g. `eits tasks --help`, `eits dm --help`).
 
@@ -72,7 +76,14 @@ eits sessions unarchive <uuid>
 eits sessions context <uuid> [--text <text>|--from-stdin] [--metadata <json>]
 
 eits sessions tasks <uuid>     # List tasks linked to session
-eits sessions notes <uuid>     # List notes attached to session
+
+eits sessions notes <uuid> [<note_id>] [--full] [--starred] \
+  [--add <body>] [--title <t>]
+# Default: preview listing (title + 100 char snippet + size + date)
+# <note_id>: show full body of a single note
+# --full: dump full bodies for all notes
+# --starred: filter to starred notes only
+# --add: create a new note on this session
 ```
 
 `--status` filters by session status: `working`, `idle`, `waiting`, `completed`, `failed`.
@@ -89,10 +100,11 @@ eits sessions notes <uuid>     # List notes attached to session
 # List / filter
 eits tasks list [--project <id>] [--session <uuid>] [--q <query>|--search <query>] \
   [--state <id>] [--state-name <todo|in-progress|done|in-review>] \
-  [--agent <uuid>] [--mine|--assigned] [--created-by] [--limit <n>]
-# --mine / --assigned  tasks where current session is the active executor (linked via task_sessions after claim)
-# --created-by         tasks created by the current session (via created_by_session_id)
-# Note: claim transfers session ownership, so --assigned shows only tasks you are currently executing
+  [--agent <uuid>] [--mine|--assigned] [--created-by] [--all] [--limit <n>]
+# Default: lists only current session's tasks when EITS_SESSION_UUID is set
+# --all: override to list across all sessions
+# --mine / --assigned: tasks where current session is the active executor (linked via task_sessions after claim)
+# --created-by: tasks created by the current session (via created_by_session_id)
 
 # Get
 eits tasks get <id>
@@ -106,10 +118,14 @@ eits tasks create --title <t> [--description <d>] [--project <id>] \
 # Create + start in one shot
 eits tasks begin --title <t> [--description <d>] [--project <id>] \
   [--priority <p>] [--quiet|-q]
+# Or claim a pre-created task instead of creating new
+eits tasks begin --id <task_id>
 
 # Update
-eits tasks update <id> [--state <id>|--state-name <done|start|progress|in-progress|in-review|todo>] \
+eits tasks update <id> [--state <id|name>] \
   [--priority <p>] [--title <t>] [--description <d>] [--due-at <ISO8601>]
+# State IDs: 1=To Do, 2=In Progress, 3=Done, 4=In Review
+# State names (aliases): todo, start|in-progress|progress, done, review|in-review
 
 # Bulk update
 eits tasks bulk-update --ids <id,...> [--state <id>] [--priority <p>] [--title <t>]
@@ -161,19 +177,24 @@ eits tasks states
 
 ### Agent task workflow (canonical)
 
+**Option 1: Create new task (agent-initiated)**
 ```bash
-# Pick up work (create + start in one shot)
-# Note: begin deduplicates — won't create duplicate in-progress tasks with the same title for this session
-eits tasks begin --title "Implement X"
+eits tasks begin --title "Implement X"              # create + start in one shot
+eits tasks update 42 --state-name in-review        # move to review when ready
+eits tasks complete 42 "Implemented feature X"     # CANONICAL close: annotate + mark Done + DM lead
+```
 
-# Or start existing task
-eits tasks claim 42
+**Option 2: Claim pre-created task (orchestrator-assigned)**
+```bash
+eits tasks begin --id 42                           # claim task 42 (no title required)
+eits tasks update 42 --state-name in-review        # move to review when ready
+eits tasks complete 42 "Implemented feature X"     # CANONICAL close
+```
 
-# Move to review when ready
-eits tasks update 42 --state-name in-review
-
-# Complete with summary
-eits tasks complete 42 "Implemented via migration + controller change"
+**Manual close (two round-trips, avoid if possible)**
+```bash
+eits tasks annotate 42 --body "Work summary"
+eits tasks update 42 --state done                  # or --state 3, or --state-name done
 ```
 
 ---
@@ -194,20 +215,27 @@ When `eits tasks annotate` encounters persistent HTTP 429 (rate limited) errors,
 ## notes
 
 ```bash
-eits notes list [--q <query>|--search <query>] [--session <uuid>] \
-  [--mine] [--limit <n>]
+eits notes list [--session <uuid>] [--task <id>] [--project <id>] \
+  [--mine] [--starred] [--q <query>|--search <query>] \
+  [--all] [--limit <n>] [--full]
+# Default: lists only current session's notes when EITS_SESSION_UUID is set
+# --all: override to list across all sessions
+# --full: dump full body for all notes (default: preview listing)
+# Preview listing shows: title + first 100 chars + size + created date
 
-eits notes search <query>
+eits notes search <query> [--project <id>] [--starred] [--limit <n>] [--full]
 
 eits notes get <id>
 
 eits notes create --parent-type <session|task|agent|project> --parent-id <id> \
   --body <text> [--title <t>] [--starred]
 
-eits notes update <id> [--body <text>] [--title <t>] [--starred] \
+eits notes update <id> [--body <text>] [--title <t>] \
+  [--starred|--unstar] \
   [--parent-type <session|task|agent|project>] [--parent-id <id>]
 
-eits notes add --body <text> [--title <t>]    # Auto-attach to current session
+eits notes add --body <text> [--title <t>] [--starred]
+# Auto-attach to current session (requires EITS_SESSION_UUID)
 ```
 
 `--mine` is mutually exclusive with `--session`.
@@ -251,7 +279,7 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
   [--project-id <n>] [--project-path <path>] [--worktree <branch>] \
   [--stash-if-dirty] \
   [--effort-level <level>] [--parent-session-id <n>] [--parent-agent-id <n>] \
-  [--team-name <name>] [--member-name <alias>] [--agent <name>] \
+  [--team-name <name>] [--team-id <id>] [--member-name <alias>] [--agent <name>] \
   [--name <session-name>] [--yolo] [--dry-run]
 ```
 
@@ -263,21 +291,39 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Worktree cleanup**: `--stash-if-dirty` auto-stashes uncommitted changes before worktree creation (instead of failing with dirty_working_tree error).
 
+**Team joining**: `--team-name` (by name) or `--team-id` (by integer ID, mutually exclusive). `--team-id` is resolved to team name via GET /teams/:id.
+
 **Sandbox**: `--yolo` bypasses sandbox restrictions. `--provider codex` defaults `bypass_sandbox` to true (can be overridden with explicit flags if needed).
 
 **Session linking**: `--parent-session-id` accepts integer session ID or UUID, linking the spawned agent's session to a parent.
 
 **Pre-flight validation**: `--dry-run` validates inputs without hitting the spawn endpoint. Validates team exists (if `--team-name` provided), parent session exists (if `--parent-session-id` provided), and instructions file is readable (if `--instructions-file` provided). Prints the fully-resolved curl command that would be sent. Exits 0 on success, 1 on any validation failure.
 
+**Valid models by provider:**
+
+`--provider claude` (default):
+- claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001
+- Aliases: opus, opus[1m], sonnet, sonnet[1m], haiku
+
+`--provider codex`:
+- gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
+
+`--provider gemini`:
+- gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+
 ---
 
 ## commits
 
 ```bash
-eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--limit <n>]
+eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] \
+  [--since <hash>] [--limit <n>]
+# Default: lists only current session's commits when EITS_SESSION_UUID is set
+# --all: override to list across all sessions
+# --since <hash>: return only commits newer than the given hash (sprint reconciliation)
 
 eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] ...
-# --agent defaults to $EITS_AGENT_UUID
+# --agent defaults to $EITS_AGENT_UUID; falls back to session lookup when unset
 # If no --hash provided, uses current HEAD (git rev-parse HEAD)
 # If no --message provided, uses git log -1 --format=%s
 ```
@@ -311,7 +357,12 @@ eits jobs delete <id>
 ## dm
 
 ```bash
+eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>]
+# List inbound DMs for a session (CLI-side inbox polling)
+# --from: filter by sender (optional)
+
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
+# Send a direct message to an agent session
 ```
 
 Both `--from` and `--to` accept either an integer session ID or a session UUID. `--from` defaults to `$EITS_SESSION_UUID` or `$EITS_SESSION_ID`.
@@ -396,7 +447,10 @@ eits teams members <id>
 eits teams join <team_id> --name <alias> [--role <member|admin>] \
   [--session <uuid|id>] [--agent <uuid>]
 
-eits teams status <id> [--summary|-s] [--wait]  # --wait blocks until all members done/spawn_failed
+eits teams status <id> [--wait] [--json]
+# Default: formatted summary with member status, session state, and current task
+# --wait: block until all members reach done or spawn_failed (polls every 5s)
+# --json / --raw: output raw JSON instead of formatted text (useful for scripting)
 
 eits teams update-member <team_id> <member_id> --status <s>
 
@@ -430,7 +484,12 @@ Each team member has two status fields:
 
 **`spawn_failed`** in `member_status` means the spawn API returned an error for that team member slot. The member record exists with no linked session or agent.
 
-**DM targeting**: Use `session_uuid` or `session_id` from `teams status --summary` output to send messages: `eits dm --to <uuid|id> --message "..."`. Both UUID and numeric ID are accepted by `dm --to`.
+**DM targeting**: Use `session_uuid` or `session_id` from `teams status` output to send messages: `eits dm --to <uuid|id> --message "..."`. Both UUID and numeric ID are accepted by `dm --to`.
+
+**Default status output** includes:
+- Member name and status (active, done, spawn_failed, idle)
+- Session status (working, idle, waiting, completed, failed)
+- Current claimed task (if any) with title and ID
 
 ---
 

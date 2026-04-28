@@ -339,13 +339,20 @@ cmd_tasks() {
           --session) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --state)   qs="${qs}&state_id=$2";   shift 2 ;;
+          --state)
+            # Positional remap: 1=todo(1), 2=progress(2), 3=review(4), 4=done(3)
+            local _list_sid
+            case "$2" in
+              1) _list_sid=1 ;; 2) _list_sid=2 ;; 3) _list_sid=4 ;; 4) _list_sid=3 ;;
+              *) _list_sid="$2" ;;
+            esac
+            qs="${qs}&state_id=$_list_sid"; shift 2 ;;
           --state-name)
             case "$2" in
-              todo)          qs="${qs}&state_id=1"; shift 2 ;;
+              todo)              qs="${qs}&state_id=1"; shift 2 ;;
               in-progress|start) qs="${qs}&state_id=2"; shift 2 ;;
-              done)          qs="${qs}&state_id=3"; shift 2 ;;
-              in-review|review) qs="${qs}&state_id=4"; shift 2 ;;
+              done|complete)     qs="${qs}&state_id=3"; shift 2 ;;
+              in-review|review)  qs="${qs}&state_id=4"; shift 2 ;;
               *) die "unknown state name: $2" ;;
             esac ;;
           --limit)   qs="${qs}&limit=$2";      shift 2 ;;
@@ -406,10 +413,22 @@ cmd_tasks() {
       _resolve_state() {
         local v="$1"
         if [[ "$v" =~ ^[0-9]+$ ]]; then
-          updates=$(echo "$updates" | jq --argjson n "$v" '. + {state_id: $n}')
+          # Map positional 1-4 to actual DB state IDs.
+          # Workflow order: 1=To Do, 2=In Progress, 3=In Review, 4=Done
+          # DB IDs:         1       2               4             3
+          local _sid
+          case "$v" in
+            1) _sid=1 ;;
+            2) _sid=2 ;;
+            3) _sid=4 ;;
+            4) _sid=3 ;;
+            *) _sid="$v" ;;
+          esac
+          updates=$(echo "$updates" | jq --argjson n "$_sid" '. + {state_id: $n}')
         else
-          # Map friendly names to server aliases
-          case "${v,,}" in
+          # Map friendly names to server aliases (tr for bash 3.2 compat — no ${v,,})
+          local _vl; _vl="$(echo "$v" | tr '[:upper:]' '[:lower:]')"
+          case "$_vl" in
             todo|"to do"|"to-do")                      v="todo" ;;
             "in progress"|in-progress|progress|start)  v="start" ;;
             done|complete|completed)                   v="done" ;;
@@ -700,12 +719,15 @@ HELP
       _post "/tasks/$task_id/tags" "$(json tag_id "$tag_id")"
       ;;
     states)
-      printf '%-4s %-12s %s\n' "ID" "Name" "Notes"
-      printf '%-4s %-12s %s\n' 1 "To Do"       ""
-      printf '%-4s %-12s %s\n' 2 "In Progress" "(set by tasks begin / tasks claim)"
-      printf '%-4s %-12s %s\n' 3 "Done"        "(set by tasks complete)"
-      printf '%-4s %-12s %s\n' 4 "In Review"   ""
-      printf '\nUsage: eits tasks update <id> --state <id>    e.g. --state 3 for Done\n'
+      printf '%-4s %-14s %-30s %s\n' "Pos" "Name" "Accepted aliases" "Notes"
+      printf '%-4s %-14s %-30s %s\n' 1 "To Do"       "todo, to-do"                 ""
+      printf '%-4s %-14s %-30s %s\n' 2 "In Progress" "start, in-progress, progress" "(set by tasks begin / tasks claim)"
+      printf '%-4s %-14s %-30s %s\n' 3 "In Review"   "review, in-review"            ""
+      printf '%-4s %-14s %-30s %s\n' 4 "Done"        "done, complete, completed"    "(set by tasks complete)"
+      printf '\nPositional numbers 1-4 and named aliases both work with --state:\n'
+      printf '  eits tasks update <id> --state 4      # done\n'
+      printf '  eits tasks update <id> --state done   # same\n'
+      printf '  eits tasks update <id> --state 3      # in review\n'
       ;;
     bulk-update)
       # eits tasks bulk-update --ids <id,id,...> [--state <id|name>] [--priority <p>] [--title <t>]

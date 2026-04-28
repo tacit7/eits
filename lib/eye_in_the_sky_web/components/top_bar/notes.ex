@@ -17,15 +17,24 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
   def toolbar(assigns) do
     ~H"""
     <%!-- Notes: search + quick note + starred + type + sort --%>
-    <.search_bar
-      id="notes-top-bar-search"
-      size="xs"
-      label="Search notes"
-      placeholder="Search notes..."
-      value={@search_query || ""}
-      on_change="search"
-      class="w-44"
-    />
+    <form id="notes-top-bar-search" phx-change="search" class="relative flex items-center w-44">
+      <label for="notes-top-bar-search-input" class="sr-only">Search notes</label>
+      <.icon
+        name="hero-magnifying-glass-mini"
+        class="absolute left-2.5 pointer-events-none size-3.5 text-base-content/30"
+      />
+      <input
+        type="text"
+        id="notes-top-bar-search-input"
+        name="query"
+        data-vim-search
+        value={@search_query || ""}
+        placeholder="Search notes..."
+        phx-debounce="300"
+        autocomplete="off"
+        class="input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors input-xs pl-8 h-7 text-xs"
+      />
+    </form>
     <button
       phx-click="open_quick_note_modal"
       class="flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium text-base-content/60 hover:text-base-content hover:bg-base-content/8 transition-colors"

@@ -761,6 +761,52 @@ describe("context bindings", () => {
   })
 })
 
+describe("dm.focus_composer (i on /dm route)", () => {
+  beforeEach(() => {
+    document.body.innerHTML = ""
+  })
+  afterEach(() => {
+    document.body.innerHTML = ""
+  })
+
+  it("command is registered with key i and scope route_suffix:/dm", () => {
+    const cmd = COMMANDS.find(c => c.id === "dm.focus_composer")!
+    expect(cmd).toBeTruthy()
+    expect(cmd.keys).toEqual(["i"])
+    expect(cmd.scope).toBe("route_suffix:/dm")
+    expect(cmd.action).toEqual({ kind: "client", name: "focus_composer" })
+  })
+
+  it("isCommandActive true on /dm path, false elsewhere", () => {
+    const cmd = COMMANDS.find(c => c.id === "dm.focus_composer")!
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/dm" }, writable: true, configurable: true,
+    })
+    expect(isCommandActive(cmd)).toBe(true)
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/sessions" }, writable: true, configurable: true,
+    })
+    expect(isCommandActive(cmd)).toBe(false)
+  })
+
+  it("focus_composer action focuses the [data-vim-composer] element", () => {
+    const composer = document.createElement("textarea")
+    composer.setAttribute("data-vim-composer", "")
+    document.body.appendChild(composer)
+    const focusSpy = vi.spyOn(composer, "focus")
+    const h = makeHook()
+    h.executeCommand(COMMANDS.find(c => c.id === "dm.focus_composer")!)
+    expect(focusSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it("focus_composer is a no-op when [data-vim-composer] is missing", () => {
+    const h = makeHook()
+    expect(() =>
+      h.executeCommand(COMMANDS.find(c => c.id === "dm.focus_composer")!)
+    ).not.toThrow()
+  })
+})
+
 describe("flyout focus mode", () => {
   beforeEach(() => {
     document.body.innerHTML = ""

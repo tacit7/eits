@@ -118,6 +118,7 @@ export const COMMANDS: Command[] = [
   { id: "flyout.focus", label: "Focus flyout", keys: ["F"], group: "context",
     action: { kind: "client", name: "focus_flyout" }, scope: "feature:vim-flyout" },
 
+
   // dm page
   { id: "dm.focus_composer", label: "Focus composer", keys: ["i"], group: "context",
     action: { kind: "client", name: "focus_composer" }, scope: "route_suffix:/dm" },

@@ -137,7 +137,6 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         <.canvas_submenu
           agent={@agent}
           canvases={@canvases}
-          show_new_canvas_for={@show_new_canvas_for}
         />
         <%= if not is_nil(@agent.agent) && not is_nil(@agent.agent.uuid) && not is_nil(@agent.uuid) do %>
           <li>
@@ -249,34 +248,35 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
             </li>
           <% end %>
           <li class="pointer-events-none"><hr class="border-base-content/10 my-0.5" /></li>
-          <%= if @show_new_canvas_for != to_string(@agent.id) do %>
-            <li>
-              <button
-                type="button"
-                phx-click="show_new_canvas_form"
-                phx-value-agent-id={@agent.id}
-                class="flex items-center gap-2 text-secondary"
-              >
-                + New canvas
+          <li id={"new-canvas-btn-#{@agent.id}"}>
+            <button
+              type="button"
+              phx-click={
+                JS.hide(to: "#new-canvas-btn-#{@agent.id}")
+                |> JS.show(to: "#new-canvas-form-#{@agent.id}")
+                |> JS.focus(to: "#new-canvas-input-#{@agent.id}")
+              }
+              class="flex items-center gap-2 text-secondary"
+            >
+              + New canvas
+            </button>
+          </li>
+          <li id={"new-canvas-form-#{@agent.id}"} style="display:none">
+            <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1 w-full">
+              <input type="hidden" name="session_id" value={@agent.id} />
+              <input
+                id={"new-canvas-input-#{@agent.id}"}
+                type="text"
+                name="canvas_name"
+                class="input input-xs w-full text-base"
+                placeholder="Canvas name..."
+                autocomplete="off"
+              />
+              <button type="submit" class="btn btn-primary btn-xs w-full">
+                Create &amp; Add
               </button>
-            </li>
-          <% else %>
-            <li>
-              <form phx-submit="add_to_new_canvas" class="flex flex-col gap-1 p-1 w-full">
-                <input type="hidden" name="session_id" value={@agent.id} />
-                <input
-                  type="text"
-                  name="canvas_name"
-                  class="input input-xs w-full text-base"
-                  placeholder="Canvas name..."
-                  autocomplete="off"
-                />
-                <button type="submit" class="btn btn-primary btn-xs w-full">
-                  Create &amp; Add
-                </button>
-              </form>
-            </li>
-          <% end %>
+            </form>
+          </li>
         </ul>
       </details>
     </li>

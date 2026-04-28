@@ -429,7 +429,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   defp canvas_area(assigns) do
     ~H"""
-    <div data-canvas-area id="canvas-area" phx-hook="CanvasPanHook" class="relative flex-1 overflow-hidden">
+    <div data-canvas-area data-active-canvas-id={@active_canvas_id} id="canvas-area" phx-hook="CanvasPanHook" class="relative flex-1 overflow-hidden">
       <%= for cs <- @canvas_sessions do %>
         <.live_component
           module={ChatWindowComponent}

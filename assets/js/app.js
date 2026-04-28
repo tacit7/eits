@@ -83,6 +83,7 @@ import {IndeterminateCheckbox} from "./hooks/indeterminate_checkbox"
 import {ShiftSelect} from "./hooks/shift_select"
 import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
+import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
 import {VimNav} from "./hooks/vim_nav"
 import {showToast} from "./hooks/utils"
 import SortDropdown from "./hooks/sort_dropdown"
@@ -156,6 +157,7 @@ Hooks.IndeterminateCheckbox = IndeterminateCheckbox
 Hooks.ShiftSelect = ShiftSelect
 Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
+Hooks.DmHistoryCleanup = DmHistoryCleanup
 Hooks.SortDropdown = SortDropdown
 // VimNav is initialized directly below (not via phx-hook)
 

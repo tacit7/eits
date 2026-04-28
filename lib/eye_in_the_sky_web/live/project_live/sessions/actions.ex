@@ -12,7 +12,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     statics: EyeInTheSkyWeb.static_paths()
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [push_navigate: 2, put_flash: 3, stream_insert: 3]
+  import Phoenix.LiveView, only: [push_navigate: 2, push_event: 3, put_flash: 3, stream_insert: 3]
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Canvases
@@ -61,6 +61,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       {:noreply,
        socket
        |> Loader.remove_agent_from_list(session.id)
+       |> push_event("evict-dm-history", %{uuids: [session.uuid]})
        |> put_flash(:info, "Session archived")}
     else
       {:error, :not_found} ->
@@ -238,7 +239,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
         Enum.map(socket.assigns.selected_ids, fn id ->
           with {:ok, session} <- fetch_project_session(project_id, id),
                :ok <- archive_project_session(session) do
-            :ok
+            {:ok, session.uuid}
           else
             {:error, :not_found} -> :error
             {:error, reason} ->
@@ -247,7 +248,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
           end
         end)
 
-      archived = Enum.count(results, &(&1 == :ok))
+      archived_uuids = for {:ok, uuid} <- results, do: uuid
+      archived = length(archived_uuids)
       failed = length(results) - archived
 
       {flash_level, flash_msg} =
@@ -265,6 +267,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
         |> assign(:show_archive_confirm, false)
         |> Selection.clear_selection()
         |> Loader.load_agents()
+        |> push_event("evict-dm-history", %{uuids: archived_uuids})
         |> put_flash(flash_level, flash_msg)
 
       {:noreply, socket}

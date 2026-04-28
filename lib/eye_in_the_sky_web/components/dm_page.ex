@@ -467,6 +467,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                  do: @agent_record.agent_definition.display_name
             }
             session_cli_opts={assigns[:session_cli_opts] || []}
+            session_uuid={@session_uuid}
           />
         </div>
       <% end %>

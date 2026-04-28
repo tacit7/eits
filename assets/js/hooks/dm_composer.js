@@ -6,11 +6,7 @@
 // the bottom so the composer is always visible above the keyboard.
 //
 // Format toolbar: the Aa button toggles a format strip. Each button wraps the
-// current textarea selection with markdown syntax. Keyboard shortcuts:
-//   Cmd/Ctrl+B  → bold
-//   Cmd/Ctrl+I  → italic
-//   Cmd/Ctrl+E  → inline code
-//   Cmd/Ctrl+Shift+E → code block
+// current textarea selection with markdown syntax.
 
 export const DmComposer = {
   mounted() {
@@ -68,28 +64,6 @@ export const DmComposer = {
         this._applyFormat(input, fmt)
       }
       bar.addEventListener('click', this._onFmtClick)
-    }
-
-    if (input) {
-      this._onKeydown = (e) => {
-        const mod = e.metaKey || e.ctrlKey
-        if (!mod) return
-
-        if (e.key === 'b' || e.key === 'B') {
-          e.preventDefault()
-          this._applyFormat(input, 'bold')
-        } else if (e.key === 'i' || e.key === 'I') {
-          e.preventDefault()
-          this._applyFormat(input, 'italic')
-        } else if ((e.key === 'e' || e.key === 'E') && e.shiftKey) {
-          e.preventDefault()
-          this._applyFormat(input, 'code-block')
-        } else if (e.key === 'e' || e.key === 'E') {
-          e.preventDefault()
-          this._applyFormat(input, 'code')
-        }
-      }
-      input.addEventListener('keydown', this._onKeydown)
     }
   },
 
@@ -182,10 +156,8 @@ export const DmComposer = {
 
     const toggle = document.getElementById('formatter-toggle')
     const bar    = document.getElementById('format-bar')
-    const input  = document.getElementById('message-input')
 
     if (toggle && this._onToggle) toggle.removeEventListener('click', this._onToggle)
     if (bar && this._onFmtClick) bar.removeEventListener('click', this._onFmtClick)
-    if (input && this._onKeydown) input.removeEventListener('keydown', this._onKeydown)
   }
 }

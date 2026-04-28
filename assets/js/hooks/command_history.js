@@ -264,8 +264,10 @@ export const CommandHistory = {
         this._updateSearchActive(results)
       } else if (e.key === 'Enter') {
         e.preventDefault()
-        const active = results[this._searchIndex]
-        if (active) this._selectHistoryItem(active.dataset.text)
+        // Read from filtered array — not from the attribute — to preserve newlines.
+        if (this._filteredItems && this._filteredItems[this._searchIndex]) {
+          this._selectHistoryItem(this._filteredItems[this._searchIndex].text)
+        }
       } else if (e.key === 'Escape') {
         e.preventDefault()
         this._closeSearch()
@@ -305,6 +307,9 @@ export const CommandHistory = {
       ? this._searchItems.filter(item => item.text.toLowerCase().includes(q))
       : this._searchItems
 
+    // Store on instance so keyboard handler can read text without attribute round-trip.
+    this._filteredItems = filtered
+
     if (filtered.length === 0) {
       container.innerHTML = '<div class="px-4 py-3 text-xs text-base-content/30 text-center select-none">No matches</div>'
       return
@@ -317,18 +322,19 @@ export const CommandHistory = {
         ? `<span class="shrink-0 font-mono text-xs text-base-content/25">${escapeHtml(item.session)}</span>`
         : ''
       const activeClass = i === this._searchIndex ? 'bg-base-content/[0.06]' : ''
+      // data-history-idx is used only for querying/active-state; text is never stored in attributes.
       return `<button
         type="button"
         data-history-idx="${i}"
-        data-text="${escapeHtml(item.text)}"
         class="w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-base-content/[0.04] transition-colors ${activeClass}"
       ><span class="flex-1 truncate text-base-content/80">${textHtml}</span>${badge}</button>`
     }).join('')
 
-    container.querySelectorAll('[data-history-idx]').forEach(btn => {
+    // Bind click via closure — item.text is the original string, no attribute round-trip.
+    container.querySelectorAll('[data-history-idx]').forEach((btn, i) => {
       btn.addEventListener('mousedown', (e) => {
         e.preventDefault()
-        this._selectHistoryItem(btn.dataset.text)
+        this._selectHistoryItem(filtered[i].text)
       })
     })
   },
@@ -364,6 +370,7 @@ export const CommandHistory = {
     }
     this._searchEl.remove()
     this._searchEl = null
+    this._filteredItems = null
   },
 
   _loadGlobalHistory() {

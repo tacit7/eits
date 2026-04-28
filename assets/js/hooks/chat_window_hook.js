@@ -133,6 +133,7 @@ export const ChatWindowHook = {
 
         clearTimeout(dragPersistTimer)
         dragPersistTimer = setTimeout(() => {
+          if (this._destroyed) return
           let x = parseInt(this.el.style.left, 10) || 0
           let y = parseInt(this.el.style.top, 10)  || 0
 
@@ -193,14 +194,14 @@ export const ChatWindowHook = {
     this._height = this.el.offsetHeight
 
     // --- Resize (native browser handle) ---
-    let resizePersistTimer = null
     const observer = new ResizeObserver(() => {
       // Update tracked dims immediately — don't wait for the persist debounce —
       // so updated() restores correctly if a message is sent mid-resize.
       this._width  = this.el.offsetWidth
       this._height = this.el.offsetHeight
-      clearTimeout(resizePersistTimer)
-      resizePersistTimer = setTimeout(() => {
+      clearTimeout(this._resizePersistTimer)
+      this._resizePersistTimer = setTimeout(() => {
+        if (this._destroyed) return
         const w = this.el.offsetWidth
         const h = this.el.offsetHeight
         this.pushEvent("window_resized", {
@@ -557,6 +558,8 @@ export const ChatWindowHook = {
   },
 
   destroyed() {
+    this._destroyed = true
+    clearTimeout(this._resizePersistTimer)
     if (this._resizeObserver) this._resizeObserver.disconnect()
     document.removeEventListener("mousedown", this._onBlurWindows)
     window.removeEventListener("canvas:focus-session", this._onFocusSession)

@@ -117,6 +117,57 @@ daisyUI is available (themes + some existing UI), but new UI should be **Tailwin
 ### Icons (required)
 Use the imported `<.icon>` component. Don’t use Heroicons modules directly.
 
+### Icon Sizing Convention (size-N)
+Use Tailwind’s `size-N` shorthand for icons. Replace paired `w-N h-N` patterns with single `size-N` class:
+
+```heex
+<!-- ❌ Avoid paired widths/heights -->
+<.icon name="hero-chevron-right" class="w-4 h-4" />
+
+<!-- ✅ Use size-N shorthand -->
+<.icon name="hero-chevron-right" class="size-4" />
+```
+
+Supported sizes: `size-3`, `size-3.5`, `size-4`, `size-5`, `size-6` (and any Tailwind spacing value).
+
+**Rule:** Use `size-N` for all square dimensions. Never mix `w-N` and `h-N` when sizing icons.
+
+### Typography Token Sizes
+Three new named typography tokens replace hardcoded px values:
+
+| Token | Size | Use Case |
+|-------|------|----------|
+| `text-mini` | 11px | Top-bar pills, detail labels |
+| `text-micro` | 10px | Mono compact output, tool results |
+| `text-nano` | 9px | Badge counts, kbd hints, section headers |
+
+Use these instead of `text-[11px]`, `text-[10px]`, `text-[9px]`:
+
+```heex
+<!-- ❌ Hardcoded pixel values -->
+<span class="text-[11px]">Label</span>
+
+<!-- ✅ Use named tokens -->
+<span class="text-mini">Label</span>
+```
+
+**Rule:** Replace all hardcoded small text sizes with the named tokens. The mapping is defined in `assets/css/app.css` via `@theme` directives.
+
+### Focus Ring Utility
+Use the `.focus-ring` utility for keyboard focus styling instead of repeating `focus-visible` patterns:
+
+```heex
+<!-- ❌ Repeated focus-visible pattern -->
+<button class="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
+  Action
+</button>
+
+<!-- ✅ Use .focus-ring utility -->
+<button class="focus-ring">Action</button>
+```
+
+Defined in `assets/css/app.css`. Includes `ring-offset-1` on no-suffix variant; `ring-inset` variants retain modifier flexibility.
+
 ---
 
 ## JavaScript (No Inline Scripts)
@@ -467,6 +518,228 @@ query = Task |> maybe_where(“title”, “bug fix”) |> Repo.all()
 
 ---
 
+## Canonical UI Components (Tier 1)
+
+The following components are the canonical, app-wide implementations. Use these whenever the use case fits; do not create duplicates or project-specific variants.
+
+| Component | Module | Purpose |
+|-----------|--------|---------|
+| `<.status_dot>` | `CoreComponents` | Colored status indicator dot (small circle) |
+| `<.status_badge>` | `CoreComponents` | Status badge with label and color (larger than dot) |
+| `<.search_bar>` | `CoreComponents` | Text input with magnifying glass icon, clear button |
+| `<.spinner>` | `CoreComponents` | Loading spinner (size: `sm`, `md`, `lg`) |
+| `<.skeleton_row>` | `CoreComponents` | Placeholder skeleton for list items (loading state) |
+| `<.kbd>` | `CoreComponents` | Keyboard key display (`<Cmd>`, `<Shift>`, etc.) |
+| `<.tab_pills>` | `CoreComponents` | Pill-style tab navigation (horizontal list) |
+| `<.side_drawer>` | `CoreComponents` | Right-side slide-over panel with backdrop |
+| `<.icon_button>` | `CoreComponents` | Icon-only button with optional tooltip and hover reveal |
+| `<.form_actions>` | `CoreComponents` | Submit/Cancel footer for forms |
+| `<.empty_state>` | `CoreComponents` | Centered empty state with icon, title, description |
+
+**Adoption pattern:** When building UI, check if a Tier 1 component matches before designing custom markup. Tier 1 components handle accessibility, theming, and mobile responsiveness consistently.
+
+### Status Dot & Status Badge
+
+Use `<.status_dot>` for small inline status indicators (in lists, chips):
+
+```heex
+<!-- Status indicator with color based on status -->
+<.status_dot status="working" class="mr-2" />
+
+<!-- Inside a row -->
+<div class="flex items-center gap-2">
+  <.status_dot status="idle" />
+  <span><%= @session.name %></span>
+</div>
+```
+
+Use `<.status_badge>` for larger status displays with label:
+
+```heex
+<.status_badge status="completed" label="Done" />
+```
+
+Valid statuses: `"working"`, `"idle"`, `"waiting"`, `"failed"`, `"completed"`. Colors adapt to theme automatically.
+
+### Search Bar Component
+
+Standardized search input with icon and clear button:
+
+```heex
+<.search_bar
+  id="task-search"
+  placeholder="Search tasks..."
+  phx-change="search_change"
+  value={@search_query}
+/>
+```
+
+Attributes: `id`, `placeholder`, `value`, `phx-change`, `phx-keydown`, `class` (additional Tailwind classes).
+
+### Spinner Component
+
+Loading indicator with configurable size:
+
+```heex
+<div class="flex items-center justify-center gap-2">
+  <.spinner size="md" />
+  <span>Loading...</span>
+</div>
+```
+
+Sizes: `"sm"` (16px), `"md"` (24px), `"lg"` (32px). Default is `"md"`.
+
+### Skeleton Row Component
+
+Placeholder for list items during loading:
+
+```heex
+<div phx-update="ignore">
+  <.skeleton_row />
+  <.skeleton_row />
+  <.skeleton_row />
+</div>
+```
+
+Use `phx-update="ignore"` on the container to prevent LiveView from morphing the skeleton state.
+
+### Keyboard Key Display (KBD)
+
+Display keyboard combinations in help text:
+
+```heex
+<span>Press <.kbd key="Cmd" /> + <.kbd key="K" /> to open the palette</span>
+```
+
+Renders styled `<kbd>` element with proper border and background.
+
+### Tab Pills Navigation
+
+Horizontal tab list with pill-style appearance:
+
+```heex
+<.tab_pills
+  options={[
+    {label: "All", value: "all", active: @filter == "all"},
+    {label: "Active", value: "active", active: @filter == "active"},
+    {label: "Done", value: "done", active: @filter == "done"}
+  ]}
+  on_change="filter_change"
+/>
+```
+
+Each option is a tuple: `{label: string, value: term, active: boolean}`. Calls `handle_event("filter_change", %{"value" => value}, socket)` when a tab is clicked.
+
+### Side Drawer Component
+
+Right-side slide-over panel with backdrop, commonly used for task details, forms, filters:
+
+```heex
+<.side_drawer
+  id="task-detail-drawer"
+  on_close={JS.push("close_drawer")}
+  surface={false}
+  max_width="md"
+>
+  <h2>Task Details</h2>
+  <!-- drawer content -->
+</.side_drawer>
+```
+
+**Attributes:**
+- `on_close` — LiveView event or JS command to fire when backdrop or close button clicked
+- `surface={true}` — add surface/container background color (used in filters, jobs form)
+- `max_width` — max-width class: `"xs"`, `"sm"`, `"md"` (default), `"lg"`, `"2xl"`
+- `:rest` — passed through (e.g., `phx-hook="DrawerSwipeClose"` for mobile swipe-to-close)
+
+The drawer automatically includes a backdrop that's clickable to close. Use `phx-hook` for advanced interactions like swipe detection.
+
+### Icon Button Component
+
+Icon-only button with optional tooltip and hover reveal:
+
+```heex
+<!-- Simple icon button -->
+<.icon_button icon="hero-pencil" phx-click="edit" />
+
+<!-- With tooltip -->
+<.icon_button
+  icon="hero-information-circle"
+  tooltip="Click for more info"
+  phx-click="show_info"
+/>
+
+<!-- With hover reveal (hidden until parent hover) -->
+<div class="group">
+  <span>Item</span>
+  <.icon_button
+    icon="hero-trash"
+    hover_group="group"
+    phx-click="delete"
+  />
+</div>
+```
+
+**Attributes:**
+- `icon` — Heroicon name (required)
+- `tooltip` — Optional tooltip text (wrapped in DaisyUI tooltip component)
+- `hover_group` — CSS class name for hover reveal (e.g., `"group"`, `"group/row"`)
+- `phx-click` — LiveView event
+- `class` — Additional Tailwind classes
+
+When `hover_group` is provided, the button uses `opacity-0 group-hover:opacity-100` to hide until parent hover.
+
+### Form Actions Footer
+
+Standard submit/cancel footer for forms:
+
+```heex
+<.form_actions
+  submit_label="Save"
+  cancel_label="Cancel"
+  loading={@loading}
+  on_cancel={JS.push("cancel")}
+/>
+```
+
+Places buttons in a sticky footer with proper spacing. Applies `disabled` attribute when `loading={true}`.
+
+### Empty State Component
+
+Centered empty state with optional icon, title, and subtitle:
+
+```heex
+<.empty_state
+  title="No tasks yet"
+  description="Create your first task to get started"
+/>
+
+<!-- With custom icon -->
+<.empty_state
+  title="No results"
+  description="Try a different search term"
+>
+  <:icon_slot>
+    <.icon name="hero-magnifying-glass" class="size-8" />
+  </:icon_slot>
+</.empty_state>
+
+<!-- With subtitle slot -->
+<.empty_state title="Session archived">
+  <:subtitle_slot>
+    <p class="text-sm text-base-500">
+      This session is no longer active but you can <a href="#" class="link">view the history</a>.
+    </p>
+  </:subtitle_slot>
+</.empty_state>
+```
+
+**Slots:**
+- `:icon_slot` — Optional custom icon (default is generic empty icon)
+- `:subtitle_slot` — Optional extra content below the description
+
+---
+
 ## Component Patterns
 
 ### Session Card Component
@@ -522,6 +795,46 @@ query = Task |> maybe_where(“title”, “bug fix”) |> Repo.all()
 Removed duplicates: `chat_message_body` and `chat_tool_result_body` from `ChatWindowComponent`; private copies from `MessagesTab`.
 
 **When to apply:** Component is reused across 2+ contexts, and the only meaningful difference is size/density. Do not branch on layout via `if @page == :dm` inside the component — use a neutral `compact` flag.
+
+---
+
+### Form Actions Adoption Pattern
+
+Replace inline submit/cancel button pairs with the canonical `<.form_actions>` component. This ensures consistent spacing, theming, and loading state handling across all forms.
+
+**Before (inline buttons):**
+```heex
+<.form for={@form} phx-submit="save">
+  <.input field={@form[:title]} />
+  
+  <div class="flex gap-2 mt-4">
+    <.button type="submit" loading={@saving}>Save</.button>
+    <.button type="button" secondary phx-click="cancel">Cancel</.button>
+  </div>
+</.form>
+```
+
+**After (using form_actions):**
+```heex
+<.form for={@form} phx-submit="save">
+  <.input field={@form[:title]} />
+  
+  <.form_actions
+    submit_label="Save"
+    cancel_label="Cancel"
+    loading={@saving}
+    on_cancel={JS.push("cancel")}
+  />
+</.form>
+```
+
+**Benefits:**
+- Consistent button styling and spacing across all forms
+- Built-in loading state handling (disables submit, shows spinner)
+- Proper footer positioning (sticky if needed)
+- Keyboard shortcut integration (Escape to cancel)
+
+**Rule:** All forms in new code must use `<.form_actions>` for their submit/cancel buttons. Do not create inline button layouts.
 
 ---
 

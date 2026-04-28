@@ -33,6 +33,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <div
       data-flyout-panel
+      data-vim-flyout-open={to_string(@open)}
       class={[
         "flex flex-col border-r border-base-content/8 bg-base-100 overflow-hidden flex-shrink-0 transition-[width] duration-150",
         # w-0 is always the mobile base; md:w-[236px] overrides on desktop when open.
@@ -187,7 +188,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <.link
       navigate={"/dm/#{@session.id}"}
-      class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+      data-vim-flyout-item
+      class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 [&.vim-nav-focused]:bg-base-200 transition-colors"
     >
       <.status_dot status={@session.status} size="xs" />
       <span class="truncate font-medium text-xs">{@session.name || "unnamed"}</span>
@@ -206,8 +208,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <% active = not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
       <.link
         navigate={"/chat?channel_id=#{channel.id}"}
+        data-vim-flyout-item
         class={[
-          "flex items-center gap-2 px-3 py-2 text-sm transition-colors",
+          "flex items-center gap-2 px-3 py-2 text-sm transition-colors [&.vim-nav-focused]:bg-base-200",
           if(active,
             do: "text-primary bg-primary/8 font-medium",
             else: "text-base-content/60 hover:text-base-content/85 hover:bg-base-content/5"
@@ -294,7 +297,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <.link
       navigate={if @task.project_id, do: "/projects/#{@task.project_id}/tasks?task_id=#{@task.id}", else: "/projects"}
-      class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+      data-vim-flyout-item
+      class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 [&.vim-nav-focused]:bg-base-200 transition-colors"
     >
       <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0 mt-px", task_state_dot(@task.state_id)]} />
       <span class="truncate">{@task.title}</span>
@@ -318,7 +322,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <% preview = if note.title && note.title != "", do: note.body %>
       <.link
         navigate={"/notes/#{note.id}/edit"}
-        class="flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+        data-vim-flyout-item
+        class="flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 [&.vim-nav-focused]:bg-base-200 transition-colors"
       >
         <span class={["truncate", if(note.title && note.title != "", do: "font-medium text-base-content/80")]}>
           {if label == "", do: "(empty)", else: label}
@@ -353,7 +358,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <%= for team <- @teams do %>
       <.link
         navigate="/teams"
-        class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+        data-vim-flyout-item
+        class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 [&.vim-nav-focused]:bg-base-200 transition-colors"
       >
         <.icon name="hero-users" class="size-3 flex-shrink-0 text-base-content/30" />
         <span class="truncate text-xs font-medium">{team.name}</span>
@@ -384,7 +390,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <%= for canvas <- @canvases do %>
       <.link
         navigate={"/canvases/#{canvas.id}"}
-        class="flex items-center gap-2 px-3 py-1.5 text-sm text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+        data-vim-flyout-item
+        class="flex items-center gap-2 px-3 py-1.5 text-sm text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 [&.vim-nav-focused]:bg-base-200 transition-colors"
       >
         <.icon name="hero-squares-2x2" class="size-3 flex-shrink-0 text-base-content/30" />
         <span class="truncate font-medium text-xs">{canvas.name}</span>
@@ -521,7 +528,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <%= for job <- @jobs do %>
       <.link
         navigate="/jobs"
-        class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+        data-vim-flyout-item
+        class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 [&.vim-nav-focused]:bg-base-200 transition-colors"
       >
         <span class={[
           "w-1.5 h-1.5 rounded-full flex-shrink-0",

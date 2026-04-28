@@ -60,7 +60,10 @@ defmodule EyeInTheSky.Messages do
   defp load_messages(session_id, _), do: list_messages_for_session_db(session_id)
 
   defp list_messages_for_session_db(session_id) do
-    QueryHelpers.for_session_direct(Message, session_id, order_by: [asc: :inserted_at])
+    Message
+    |> where([m], m.session_id == ^session_id and m.status != "pending")
+    |> order_by(asc: :inserted_at)
+    |> Repo.all()
   end
 
   @doc """

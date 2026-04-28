@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
   alias EyeInTheSky.Desktop
   alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.DmLive.MessageHandlers
+  alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
 
   require Logger
@@ -110,7 +111,10 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
   # issues can cause misses. The session_updated broadcast always fires and
   # carries the authoritative status.
   defp sync_processing_from_status(socket, "working") do
-    socket |> assign(:compacting, false) |> assign(:processing, true)
+    socket
+    |> assign(:compacting, false)
+    |> assign(:processing, true)
+    |> TabHelpers.force_reload_messages(socket.assigns.session_id)
   end
 
   defp sync_processing_from_status(socket, "compacting") do

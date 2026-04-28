@@ -16,9 +16,13 @@ export function keyFromEvent(event: KeyboardEvent): string {
   return event.key.length === 1 ? event.key.toLowerCase() : event.key
 }
 
+function isFlyoutOpen(): boolean {
+  return document.querySelector("[data-vim-flyout-open='true']") !== null
+}
+
 export function isCommandActive(cmd: Command): boolean {
   if (!cmd.scope || cmd.scope === "global") return true
-  if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]")
+  if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]") || isFlyoutOpen()
   if (cmd.scope === "feature:vim-search") return !!document.querySelector("[data-vim-search]")
   if (cmd.scope === "page:sessions") return !!document.querySelector("[data-vim-page='sessions']")
   if (cmd.scope.startsWith("route_suffix:")) {
@@ -243,6 +247,10 @@ export const VimNav = {
   },
 
   currentListItems(): HTMLElement[] {
+    if (isFlyoutOpen()) {
+      const flyoutItems = [...document.querySelectorAll<HTMLElement>("[data-vim-flyout-item]")]
+      if (flyoutItems.length > 0) return flyoutItems
+    }
     const list = this.currentList()
     if (!list) return []
     return [...list.querySelectorAll<HTMLElement>("[data-vim-list-item]")]
@@ -261,7 +269,8 @@ export const VimNav = {
   },
 
   clearListFocus(): void {
-    this.currentListItems().forEach(el => el.classList.remove("vim-nav-focused"))
+    document.querySelectorAll<HTMLElement>("[data-vim-list-item], [data-vim-flyout-item]")
+      .forEach(el => el.classList.remove("vim-nav-focused"))
     this.listFocusIndex = -1
   },
 

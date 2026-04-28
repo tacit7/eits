@@ -86,6 +86,8 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "history_back" } },
   { id: "global.forward", label: "Go Forward",       keys: ["]"], group: "global",
     action: { kind: "client", name: "history_forward" } },
+  { id: "global.close",   label: "Close Flyout",     keys: ["q"], group: "global",
+    action: { kind: "push_event", event: "close_flyout", payload: {}, target: "shell" } },
 ]
 
 // All valid first keys in multi-key sequences

@@ -286,6 +286,16 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("close_proj_picker", _params, socket),
     do: {:noreply, assign(socket, :proj_picker_open, false)}
 
+  def handle_event("close_flyout", _params, socket),
+    do:
+      {:noreply,
+       assign(socket,
+         flyout_open: false,
+         mobile_open: false,
+         proj_picker_open: false,
+         show_new_session_form: false
+       )}
+
   def handle_event("open_mobile", _params, socket),
     do: {:noreply, assign(socket, mobile_open: true, flyout_open: true)}
 

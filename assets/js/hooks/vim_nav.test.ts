@@ -277,6 +277,14 @@ describe("VimNav.executeCommand shell routing", () => {
     expect(listener).toHaveBeenCalledTimes(1)
     window.removeEventListener("palette:create-task", listener)
   })
+
+  it("q calls pushEventToShell with close_flyout", () => {
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "global.close")!
+    h.executeCommand(cmd)
+    expect(h.pushEventToShell).toHaveBeenCalledWith("close_flyout", {})
+  })
 })
 
 describe("VimNav which-key overlay", () => {

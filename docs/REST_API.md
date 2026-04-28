@@ -67,7 +67,7 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `status` | string | no | One of: `working`, `idle`, `waiting`, `completed`, `failed` |
-| `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`. Auto-cleared when transitioning away from waiting |
+| `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`, `"zombie_swept"`, `"billing_error"`, `"authentication_error"`, `"rate_limit_error"`, `"watchdog_timeout"`, `"retry_exhausted"`. Auto-cleared when transitioning away from waiting. Error values are normally set by the AgentWorker on systemic failure, not by API clients — they drive the red failure-tier badges in the session UI |
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
 
 **Response:** `200 OK`

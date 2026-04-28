@@ -85,7 +85,7 @@ import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
 import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
 import {VimNav} from "./hooks/vim_nav"
-import {showToast} from "./hooks/utils"
+import {showToast, showSessionFailureToast} from "./hooks/utils"
 import SortDropdown from "./hooks/sort_dropdown"
 import {getHooks} from "live_svelte"
 import "./theme"
@@ -176,6 +176,10 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 // EditorLayout hook on #file-editor-pane. Window-level listeners handle
 // open/close + reconnect — see hooks/editor_layout.js for details.
 installEditorWindowListeners()
+
+window.addEventListener("phx:session:failed", (e) => {
+  showSessionFailureToast(e.detail || {})
+})
 
 window.addEventListener("phx:copy_to_clipboard", (e) => {
   const { text, format, error } = e.detail

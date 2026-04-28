@@ -30,7 +30,11 @@ defmodule EyeInTheSky.Claude.AgentWorker.RetryPolicy do
     # Mark all queued messages failed before clearing — DB must reflect loss before memory is cleared.
     WorkerEvents.on_queue_drained(state, :retry_exhausted)
 
-    WorkerEvents.on_max_retries_exceeded(state.session_id, state.provider_conversation_id)
+    WorkerEvents.on_max_retries_exceeded(
+      state.session_id,
+      state.provider_conversation_id,
+      :retry_exhausted
+    )
     WorkerEvents.broadcast_queue_update(state.session_id, [])
 
     %{state | status: :failed, queue: [], retry_attempt: 0}

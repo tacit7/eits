@@ -239,16 +239,19 @@ Set via `PATCH /api/v1/sessions/:uuid` with `status_reason` parameter, or use ex
 - `POST /api/v1/sessions/:uuid/complete` — Set status to completed and sync team member
 
 **Systemic Error Handling:**
-When SessionWorker encounters a systemic error (billing failure, auth error, or watchdog timeout), or when AgentWorker terminates abnormally, the system calls `AgentWorkerEvents.on_session_failed/2`:
+When AgentWorker encounters a systemic error (billing failure, auth error, watchdog timeout, or abnormal termination), it calls `AgentWorkerEvents.on_session_failed/3` with the classified reason:
 1. Streams error event to session channel
-2. Overwrites session status in DB to `"failed"` (ensuring final status persists even if previous status was `"idle"`)
-3. Sets `status_reason` based on the error context
+2. Overwrites session status in DB to `"failed"` and persists the category to `status_reason` (one of `"billing_error"`, `"authentication_error"`, `"watchdog_timeout"`, `"retry_exhausted"`, or `nil` for unclassified crashes)
+3. The LiveView badge layer (`StatusHelpers.derive_display_status/2`) branches on `status_reason` to render distinct red tiers — `failed_billing`, `failed_auth`, `failed_rate_limit`, `failed_timeout`, `failed_retry_exhausted` — instead of collapsing into a generic "Failed"
 
-Implementation in `on_session_failed/2`:
+**Rate-limit note:** `rate_limit_error` is classified so the UI can distinguish it, but is NOT systemic — `RetryPolicy` keeps retrying 429s with exponential backoff. Only after max retries exhaust does the session move to `failed` with `status_reason: "retry_exhausted"`.
+
+Implementation in `on_session_failed/3`:
+
 ```elixir
-def on_session_failed(session_id, provider_conversation_id) do
+def on_session_failed(session_id, provider_conversation_id, reason) do
   Events.stream_error(session_id, provider_conversation_id, "Systemic error — session failed")
-  update_session_status(session_id, "failed")
+  update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason))
   :ok
 end
 ```

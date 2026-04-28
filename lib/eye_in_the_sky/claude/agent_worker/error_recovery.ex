@@ -119,7 +119,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
     WorkerEvents.on_current_job_failed(state.current_job, reason)
     WorkerEvents.on_queue_drained(state, reason)
     WorkerEvents.broadcast_queue_update(state.session_id, [])
-    WorkerEvents.on_session_failed(state.session_id, state.provider_conversation_id)
+    WorkerEvents.on_session_failed(state.session_id, state.provider_conversation_id, reason)
 
     {:noreply,
      %{state | status: :failed, sdk_ref: nil, handler_monitor: nil, current_job: nil, queue: []}}

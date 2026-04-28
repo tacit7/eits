@@ -11,9 +11,10 @@ defmodule EyeInTheSkyWeb.NavHook do
   Palette events are delegated to PaletteHandlers and PaletteAgentHandlers.
   """
 
-  import Phoenix.LiveView, only: [attach_hook: 4]
+  import Phoenix.LiveView, only: [attach_hook: 4, push_event: 3, connected?: 1]
   import Phoenix.Component, only: [assign: 3]
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.MobileNav
@@ -21,6 +22,8 @@ defmodule EyeInTheSkyWeb.NavHook do
   alias EyeInTheSkyWeb.NavHook.PaletteHandlers
 
   def on_mount(:default, _params, _session, socket) do
+    if connected?(socket), do: Events.subscribe_agents()
+
     projects =
       Projects.list_projects()
       |> Enum.map(&%{id: &1.id, name: &1.name})
@@ -32,6 +35,7 @@ defmodule EyeInTheSkyWeb.NavHook do
       |> assign(:palette_projects, projects)
       |> assign(:palette_shortcut, Settings.get("palette_shortcut") || "auto")
       |> attach_hook(:capture_nav_path, :handle_params, &capture_nav_path/3)
+      |> attach_hook(:session_failed_toast, :handle_info, &maybe_push_session_failed/2)
       |> attach_hook(:palette_sessions, :handle_event, &PaletteHandlers.handle_palette_event/3)
       |> attach_hook(
         :palette_create_task,
@@ -72,6 +76,15 @@ defmodule EyeInTheSkyWeb.NavHook do
 
     {:cont, socket}
   end
+
+  defp maybe_push_session_failed({:agent_stopped, %{status: "failed"} = session}, socket) do
+    title = Map.get(session, :name) || Map.get(session, :title) || "Session"
+    reason = Map.get(session, :status_reason)
+
+    {:cont, push_event(socket, "session:failed", %{title: title, reason: reason})}
+  end
+
+  defp maybe_push_session_failed(_msg, socket), do: {:cont, socket}
 
   defp capture_nav_path(_params, url, socket) do
     path = URI.parse(url).path || "/"

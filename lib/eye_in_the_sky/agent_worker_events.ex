@@ -20,6 +20,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   alias EyeInTheSky.{Agents, Messages, Sessions}
 
+  alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
   alias EyeInTheSky.Events
 
   # --- Lifecycle Events ---
@@ -36,9 +37,17 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     end
   end
 
-  @doc "SDK completed successfully."
-  def on_sdk_completed(session_id, provider_conversation_id, _provider \\ "claude") do
-    case update_session_status(session_id, "idle", nil) do
+  @doc """
+  SDK completed successfully.
+
+  Claude sessions transition to `idle` (ready for the next prompt). Codex
+  sessions transition to `waiting` — the headless run ended and the thread
+  is dormant until explicitly resumed. Both clear `status_reason`.
+  """
+  def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
+    status = completion_status_for(provider)
+
+    case update_session_status(session_id, status, nil) do
       {:ok, session} ->
         Events.agent_stopped(session)
         notify_agent_complete(session_id, provider_conversation_id)
@@ -47,6 +56,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         :ok
     end
   end
+
+  defp completion_status_for("codex"), do: "waiting"
+  defp completion_status_for(_), do: "idle"
 
   @doc "Codex thread.started received — confirm session is working."
   def on_codex_thread_started(session_id) do
@@ -63,19 +75,24 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   @doc "Max retries exceeded — worker giving up."
-  def on_max_retries_exceeded(session_id, provider_conversation_id) do
+  def on_max_retries_exceeded(session_id, provider_conversation_id, reason \\ :retry_exhausted) do
     Events.stream_error(session_id, provider_conversation_id, "Max retries exceeded")
 
-    case update_session_status(session_id, "failed") do
+    case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
       {:ok, session} -> Events.agent_stopped(session)
       :error -> :ok
     end
   end
 
-  @doc "Worker hit a systemic error (billing/auth/watchdog) — overwrite idle DB status with failed."
-  def on_session_failed(session_id, provider_conversation_id) do
+  @doc """
+  Worker hit a systemic error (billing/auth/watchdog) — overwrite idle DB status
+  with failed and record the reason so the UI can render a distinct badge
+  ('Billing', 'Auth', etc.) instead of generic 'Failed'. `reason` is required
+  (no default) to prevent silent nil-writes from future callers.
+  """
+  def on_session_failed(session_id, provider_conversation_id, reason) do
     Events.stream_error(session_id, provider_conversation_id, "Systemic error — session failed")
-    update_session_status(session_id, "failed")
+    update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason))
     :ok
   end
 
@@ -95,7 +112,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         %{session_id: session_id, provider_conversation_id: pcid, queue: queue},
         reason
       ) do
-    reason_str = classify_failure_reason(reason)
+    reason_str = failure_message(reason)
 
     Enum.each(queue, fn job ->
       Messages.mark_failed(job.context[:message_id], reason_str)
@@ -112,21 +129,24 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   def on_current_job_failed(nil, _reason), do: :ok
 
   def on_current_job_failed(job, reason) do
-    Messages.mark_failed(job.context[:message_id], classify_failure_reason(reason))
+    Messages.mark_failed(job.context[:message_id], failure_message(reason))
   end
 
-  defp classify_failure_reason({:billing_error, _}), do: "billing_error"
-  defp classify_failure_reason({:authentication_error, _}), do: "authentication_error"
+  # Produces free-form strings persisted to `messages.last_error` (debug field,
+  # no enum constraint). Different from `ErrorClassifier.status_reason/1` which
+  # returns the enum-constrained category string for `sessions.status_reason`.
+  defp failure_message({:billing_error, _}), do: "billing_error"
+  defp failure_message({:authentication_error, _}), do: "authentication_error"
 
-  defp classify_failure_reason({:unknown_error, msg}) when is_binary(msg),
+  defp failure_message({:unknown_error, msg}) when is_binary(msg),
     do: "unknown_error: #{String.slice(msg, 0, 120)}"
 
-  defp classify_failure_reason(:retry_exhausted), do: "retry_exhausted"
+  defp failure_message(:retry_exhausted), do: "retry_exhausted"
 
-  defp classify_failure_reason({:watchdog_timeout, timeout_ms}),
+  defp failure_message({:watchdog_timeout, timeout_ms}),
     do: "watchdog_timeout: #{timeout_ms}ms"
 
-  defp classify_failure_reason(reason), do: inspect(reason) |> String.slice(0, 120)
+  defp failure_message(reason), do: inspect(reason) |> String.slice(0, 120)
 
   # --- Data Events ---
 

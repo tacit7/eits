@@ -470,6 +470,16 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("file_collapse", params, socket),
     do: FileActions.handle_file_collapse(params, socket)
 
+  def handle_event("file_refresh", _params, socket) do
+    socket =
+      socket
+      |> assign(:flyout_file_expanded, MapSet.new())
+      |> assign(:flyout_file_children, %{})
+      |> maybe_load_files(:files)
+
+    {:noreply, socket}
+  end
+
   @impl true
   def handle_async(:pick_folder, {:ok, result}, socket),
     do: ProjectActions.handle_pick_folder(result, socket)

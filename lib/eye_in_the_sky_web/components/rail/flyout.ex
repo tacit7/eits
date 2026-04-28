@@ -107,6 +107,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.icon name="hero-plus-mini" class="size-3.5" />
             </button>
           <% end %>
+          <%= if @active_section == :files do %>
+            <button
+              phx-click="file_refresh"
+              phx-target={@myself}
+              title="Refresh file tree"
+              class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+            >
+              <.icon name="hero-arrow-path-mini" class="size-3.5" />
+            </button>
+          <% end %>
           <%= if @active_section == :sessions do %>
             <%= if @sidebar_project do %>
               <button

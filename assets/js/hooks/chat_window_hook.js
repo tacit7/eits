@@ -324,10 +324,9 @@ export const ChatWindowHook = {
     if (chatBody) {
       scrollToBottom()
       chatBody.addEventListener("scroll", () => {
-        // Ignore scroll events that fire during a LiveView morphdom patch triggered
-        // by sending a message. The patch can drop scrollTop drastically, which
-        // looks like "user scrolled up" but isn't. updated() clears this flag.
-        if (this._sendingMessage) return
+        // Ignore scroll events that fire during a LiveView morphdom patch or message
+        // send. morphdom can drop scrollTop, which looks like "user scrolled up".
+        if (this._sendingMessage || this._patching) return
         const atBottom = chatBody.scrollTop + chatBody.clientHeight >= chatBody.scrollHeight - 10
         const scrolledUp = chatBody.scrollTop + chatBody.clientHeight < chatBody.scrollHeight - 20
         if (atBottom && !this._autoScroll) {
@@ -341,7 +340,7 @@ export const ChatWindowHook = {
     // Also track scroll state on the outer container — if chatBody collapses,
     // this.el becomes the visible scroll target and we need to detect up/down.
     this.el.addEventListener("scroll", () => {
-      if (this._sendingMessage) return
+      if (this._sendingMessage || this._patching) return
       const atBottom = this.el.scrollTop + this.el.clientHeight >= this.el.scrollHeight - 10
       const scrolledUp = this.el.scrollTop + this.el.clientHeight < this.el.scrollHeight - 20
       if (atBottom && !this._autoScroll) {
@@ -442,7 +441,15 @@ export const ChatWindowHook = {
     this.el.style.height = headerH + "px"
   },
 
+  beforeUpdate() {
+    // Block scroll listeners from misreading the morphdom patch as a user scroll.
+    this._patching = true
+  },
+
   updated() {
+    // Release the patch guard after the browser settles the layout.
+    requestAnimationFrame(() => { this._patching = false })
+
     // LiveView patches the style attr but doesn't render z-index — restore it.
     // Prefer dataset.savedZIndex (cross-hook authoritative) over instance memory.
     const saved = this.el.dataset.savedZIndex

@@ -2399,6 +2399,113 @@ EOF
   esac
 }
 
+# ── search ────────────────────────────────────────────────────────────────────
+
+cmd_search() {
+  if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<EOF
+usage: eits search <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
+
+Full-text search across sessions, tasks, and notes in one shot.
+
+Options:
+  --type <csv>    Entity types to search, comma-separated (default: sessions,tasks,notes)
+  --limit <n>     Max results per entity type (default: 5)
+  --project <id>  Scope to a project
+  --json          Emit combined JSON: {"sessions":[...],"tasks":[...],"notes":[...]}
+
+Examples:
+  eits search "auth"
+  eits search "migration" --type tasks,notes --limit 10
+  eits search "deploy" --json
+EOF
+    return 0
+  fi
+
+  local query="" types="sessions,tasks,notes" limit=5 project="" json_mode=0
+
+  # first non-flag arg is the query
+  if [[ -n "${1:-}" && "${1:0:1}" != "-" ]]; then
+    query="$1"; shift
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --type)        types="$2";   shift 2 ;;
+      --limit|-l)    limit="$2";   shift 2 ;;
+      --project|-p)  project="$2"; shift 2 ;;
+      --json)        json_mode=1;  shift ;;
+      *) die "unknown option: $1" ;;
+    esac
+  done
+
+  [[ -z "$query" ]] && die "usage: eits search <query>"
+
+  local q_enc; q_enc=$(printf '%s' "$query" | jq -Rr @uri)
+  local proj_qs=""; [[ -n "$project" ]] && proj_qs="&project_id=${project}"
+
+  local tmp_dir; tmp_dir=$(mktemp -d)
+  local f_sessions="${tmp_dir}/sessions.json"
+  local f_tasks="${tmp_dir}/tasks.json"
+  local f_notes="${tmp_dir}/notes.json"
+
+  # write empty defaults so each file always exists
+  echo '{"sessions":[]}' > "$f_sessions"
+  echo '{"tasks":[]}'    > "$f_tasks"
+  echo '{"notes":[]}'    > "$f_notes"
+
+  # fan out in parallel — only requested types
+  if echo "$types" | grep -q "sessions"; then
+    ( _curl "${BASE_URL}/sessions?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_sessions" 2>/dev/null ) &
+  fi
+  if echo "$types" | grep -q "tasks"; then
+    ( _curl "${BASE_URL}/tasks?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_tasks" 2>/dev/null ) &
+  fi
+  if echo "$types" | grep -q "notes"; then
+    ( _curl "${BASE_URL}/notes?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_notes" 2>/dev/null ) &
+  fi
+  wait
+
+  if [[ $json_mode -eq 1 ]]; then
+    jq -n \
+      --slurpfile s "$f_sessions" \
+      --slurpfile t "$f_tasks" \
+      --slurpfile n "$f_notes" \
+      '{
+        sessions: ($s[0].sessions // []),
+        tasks:    ($t[0].tasks    // []),
+        notes:    ($n[0].notes    // [])
+      }'
+  else
+    local s_count t_count n_count
+    s_count=$(jq '[.sessions[]?] | length' "$f_sessions" 2>/dev/null); s_count=${s_count:-0}
+    t_count=$(jq '[.tasks[]?]    | length' "$f_tasks"    2>/dev/null); t_count=${t_count:-0}
+    n_count=$(jq '[.notes[]?]    | length' "$f_notes"    2>/dev/null); n_count=${n_count:-0}
+
+    if echo "$types" | grep -q "sessions" && [[ "$s_count" -gt 0 ]]; then
+      printf '\n── Sessions (%s) ──────────────────────────────────────────────\n' "$s_count"
+      _tbl_sessions "$(cat "$f_sessions")"
+    fi
+    if echo "$types" | grep -q "tasks" && [[ "$t_count" -gt 0 ]]; then
+      printf '\n── Tasks (%s) ─────────────────────────────────────────────────\n' "$t_count"
+      _tbl_tasks "$(cat "$f_tasks")"
+    fi
+    if echo "$types" | grep -q "notes" && [[ "$n_count" -gt 0 ]]; then
+      printf '\n── Notes (%s) ─────────────────────────────────────────────────\n' "$n_count"
+      _tbl_notes "$(cat "$f_notes")"
+    fi
+
+    local total=$(( s_count + t_count + n_count ))
+    if [[ $total -eq 0 ]]; then
+      printf '\nNo results for "%s"\n' "$query"
+    else
+      printf '\n%s result(s) for "%s"\n' "$total" "$query"
+    fi
+  fi
+
+  /bin/rm -rf "$tmp_dir" 2>/dev/null || true
+}
+
 # ── me / whoami ───────────────────────────────────────────────────────────────
 
 cmd_me() {
@@ -2478,6 +2585,7 @@ Commands:
   timer         show|set|cancel   (default session: self / $EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
+  search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   me            Print current session/agent/project context and verify server-side
 
 Env vars (injected by EITS hooks):
@@ -2514,6 +2622,7 @@ case "$cmd" in
   timer)         cmd_timer         "$@" ;;
   worktree)      cmd_worktree      "$@" ;;
   queue)         cmd_queue         "$@" ;;
+  search)        cmd_search        "$@" ;;
   me|whoami)     cmd_me ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;

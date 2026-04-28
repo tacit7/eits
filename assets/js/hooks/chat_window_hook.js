@@ -217,7 +217,7 @@ export const ChatWindowHook = {
 
     const minimizeBtn = this.el.querySelector("[data-minimize-btn]")
     if (minimizeBtn) {
-      this._minimized = false
+      if (this._minimized == null) this._minimized = false
       minimizeBtn.addEventListener("mousedown", (e) => {
         e.stopPropagation()
         e.preventDefault()

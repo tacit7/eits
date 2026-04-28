@@ -760,3 +760,119 @@ describe("context bindings", () => {
     expect(isCommandActive(cmd)).toBe(false)
   })
 })
+
+describe("flyout focus mode", () => {
+  beforeEach(() => {
+    document.body.innerHTML = ""
+  })
+  afterEach(() => {
+    document.body.innerHTML = ""
+  })
+
+  function setupFlyout(open: boolean, itemCount = 3): HTMLElement[] {
+    const panel = document.createElement("div")
+    panel.setAttribute("data-flyout-panel", "")
+    panel.setAttribute("data-vim-flyout-open", String(open))
+    const items: HTMLElement[] = []
+    for (let i = 0; i < itemCount; i++) {
+      const a = document.createElement("a")
+      a.setAttribute("data-vim-flyout-item", "")
+      a.textContent = `flyout-${i}`
+      panel.appendChild(a)
+      items.push(a)
+    }
+    document.body.appendChild(panel)
+    return items
+  }
+
+  it("feature:vim-flyout scope is active only when flyout is open", () => {
+    const cmd = COMMANDS.find(c => c.id === "flyout.focus")!
+    expect(isCommandActive(cmd)).toBe(false)
+    setupFlyout(true)
+    expect(isCommandActive(cmd)).toBe(true)
+  })
+
+  it("feature:vim-list scope is active when flyout is open even without [data-vim-list]", () => {
+    const cmd = COMMANDS.find(c => c.id === "list.next")!
+    expect(isCommandActive(cmd)).toBe(false)
+    setupFlyout(true)
+    expect(isCommandActive(cmd)).toBe(true)
+  })
+
+  it("F command sets flyoutFocused and highlights first flyout item", () => {
+    const items = setupFlyout(true, 3)
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "flyout.focus")!
+    h.executeCommand(cmd)
+    expect(h.flyoutFocused).toBe(true)
+    expect(h.listFocusIndex).toBe(0)
+    expect(items[0].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("F is a no-op when there are no flyout items", () => {
+    setupFlyout(true, 0)
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "flyout.focus")!
+    h.executeCommand(cmd)
+    expect(h.flyoutFocused).toBe(false)
+  })
+
+  it("j navigates flyout items when flyoutFocused is true", () => {
+    const items = setupFlyout(true, 3)
+    const h = makeHook()
+    h.executeCommand(COMMANDS.find(c => c.id === "flyout.focus")!)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.next")!)
+    expect(h.listFocusIndex).toBe(1)
+    expect(items[1].classList.contains("vim-nav-focused")).toBe(true)
+    expect(items[0].classList.contains("vim-nav-focused")).toBe(false)
+  })
+
+  it("Enter clicks the focused flyout item", () => {
+    const items = setupFlyout(true, 2)
+    const clickSpy = vi.fn()
+    items[0].addEventListener("click", clickSpy)
+    const h = makeHook()
+    h.executeCommand(COMMANDS.find(c => c.id === "flyout.focus")!)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.open")!)
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it("close_flyout push_event clears flyoutFocused", () => {
+    setupFlyout(true)
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    h.executeCommand(COMMANDS.find(c => c.id === "flyout.focus")!)
+    expect(h.flyoutFocused).toBe(true)
+    h.executeCommand(COMMANDS.find(c => c.id === "global.close")!)
+    expect(h.flyoutFocused).toBe(false)
+    expect(h.listFocusIndex).toBe(-1)
+    expect(h.pushEventToShell).toHaveBeenCalledWith("close_flyout", {})
+  })
+
+  it("currentListItems falls back to main list when flyout closes externally", () => {
+    setupFlyout(true, 2)
+    const h = makeHook()
+    h.executeCommand(COMMANDS.find(c => c.id === "flyout.focus")!)
+    expect(h.flyoutFocused).toBe(true)
+    document.body.innerHTML = ""
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const item = document.createElement("li")
+    item.setAttribute("data-vim-list-item", "")
+    list.appendChild(item)
+    document.body.appendChild(list)
+    const items = h.currentListItems()
+    expect(h.flyoutFocused).toBe(false)
+    expect(items).toHaveLength(1)
+    expect(items[0]).toBe(item)
+  })
+
+  it("clearListFocus resets flyoutFocused", () => {
+    setupFlyout(true)
+    const h = makeHook()
+    h.executeCommand(COMMANDS.find(c => c.id === "flyout.focus")!)
+    h.clearListFocus()
+    expect(h.flyoutFocused).toBe(false)
+    expect(h.listFocusIndex).toBe(-1)
+  })
+})

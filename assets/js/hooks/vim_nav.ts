@@ -22,7 +22,10 @@ function isFlyoutOpen(): boolean {
 
 export function isCommandActive(cmd: Command): boolean {
   if (!cmd.scope || cmd.scope === "global") return true
-  if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]")
+  // j/k/Enter (feature:vim-list) must also work when flyout is open so navigation
+  // is reachable on pages without a main list. Whether they target main list or
+  // flyout items is decided by VimNav.flyoutFocused at execute time.
+  if (cmd.scope === "feature:vim-list") return !!document.querySelector("[data-vim-list]") || isFlyoutOpen()
   if (cmd.scope === "feature:vim-flyout") return isFlyoutOpen()
   if (cmd.scope === "feature:vim-search") return !!document.querySelector("[data-vim-search]")
   if (cmd.scope === "page:sessions") return !!document.querySelector("[data-vim-page='sessions']")
@@ -253,6 +256,12 @@ export const VimNav = {
   },
 
   currentListItems(): HTMLElement[] {
+    // Defensive: if flyout was closed via non-vim path (mouse, route change),
+    // drop stale focus state so j/k revert to the page list.
+    if (this.flyoutFocused && !isFlyoutOpen()) {
+      this.flyoutFocused = false
+      this.listFocusIndex = -1
+    }
     if (this.flyoutFocused) {
       return [...document.querySelectorAll<HTMLElement>("[data-vim-flyout-item]")]
     }
@@ -288,6 +297,11 @@ export const VimNav = {
       return
     }
     if (action.kind === "push_event") {
+      // Closing the flyout via q must also drop flyout-focus state, otherwise
+      // j/k continue to target now-hidden flyout items instead of the page list.
+      if (action.event === "close_flyout" && this.flyoutFocused) {
+        this.clearListFocus()
+      }
       const fn = action.target === "shell" ? this.pushEventToShell : this.pushEvent
       if (typeof fn === "function") fn(action.event, action.payload ?? {})
       return

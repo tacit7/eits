@@ -52,9 +52,10 @@ describe("isEditableTarget", () => {
 })
 
 describe("keyFromEvent", () => {
-  it("lowercases single character keys", () => {
-    const e = new KeyboardEvent("keydown", { key: "S" })
-    expect(keyFromEvent(e)).toBe("s")
+  it("preserves case for single character keys", () => {
+    expect(keyFromEvent(new KeyboardEvent("keydown", { key: "s" }))).toBe("s")
+    expect(keyFromEvent(new KeyboardEvent("keydown", { key: "S" }))).toBe("S")
+    expect(keyFromEvent(new KeyboardEvent("keydown", { key: "F" }))).toBe("F")
   })
 
   it("returns Space for space key", () => {

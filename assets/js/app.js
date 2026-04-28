@@ -277,6 +277,25 @@ function _mountVimNav() {
 }
 window.addEventListener("phx:page-loading-stop", _mountVimNav)
 
+// Intercept flyout canvas-session links before LiveView navigation fires.
+// If the clicked session is already on the current canvas, dispatch canvas:focus-session
+// directly (no server round-trip, no re-render). Otherwise let LiveView navigate normally.
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('[data-focus-canvas-id]')
+  if (!link) return
+  const canvasArea = document.querySelector('[data-canvas-area]')
+  if (!canvasArea) return
+  const activeId = canvasArea.dataset.activeCanvasId
+  const targetId = link.dataset.focusCanvasId
+  if (activeId && String(activeId) === String(targetId)) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    window.dispatchEvent(new CustomEvent('canvas:focus-session', {
+      detail: { sessionId: parseInt(link.dataset.focusSessionId, 10) }
+    }))
+  }
+}, true) // capture phase — runs before LiveView's own click handler
+
 // The lines below enable quality of life phoenix_live_reload
 // development features:
 //

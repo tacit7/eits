@@ -401,6 +401,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         <div class="flex items-center hover:bg-base-content/5 transition-colors group">
           <.link
             navigate={"/canvases/#{canvas.id}?focus=#{session.id}"}
+            data-focus-canvas-id={canvas.id}
+            data-focus-session-id={session.id}
             class="flex items-center gap-2 pl-7 py-1 flex-1 min-w-0 text-xs text-base-content/50 group-hover:text-base-content/80"
           >
             <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />

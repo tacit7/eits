@@ -214,15 +214,12 @@ export const CommandHistory = {
       ? this._loadGlobalHistory()
       : this.history.map(t => ({ text: t, session: null }))
 
-    const label = global ? 'ctrl+shift+r — all sessions' : 'ctrl+r — this session'
-
     const popup = document.createElement('div')
     popup.id = 'dm-history-popup'
     popup.style.cssText = 'position:fixed;z-index:9999;width:400px;max-width:90vw'
     popup.className = 'rounded-xl border border-base-content/10 bg-base-100 shadow-xl overflow-hidden'
     popup.innerHTML = `
-      <div class="flex items-center gap-2 px-3 py-2 border-b border-base-content/8">
-        <span class="text-xs font-mono text-base-content/25 shrink-0 select-none">${escapeHtml(label)}</span>
+      <div class="flex items-center px-3 py-2 border-b border-base-content/8">
         <input
           id="dm-history-search-input"
           type="text"

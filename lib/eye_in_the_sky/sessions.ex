@@ -95,6 +95,15 @@ defmodule EyeInTheSky.Sessions do
   @spec get_session(integer()) :: {:ok, Session.t()} | {:error, :not_found}
   def get_session(id), do: get(id)
 
+  @doc "Fetch a single session with agent and agent_definition preloaded."
+  @spec get_session_with_agent(integer()) :: Session.t() | nil
+  def get_session_with_agent(id) do
+    Session
+    |> where([s], s.id == ^id)
+    |> preload(agent: :agent_definition)
+    |> Repo.one()
+  end
+
   @doc """
   Resolves a session from an integer ID or UUID string.
   Returns {:ok, session} or {:error, :not_found}.

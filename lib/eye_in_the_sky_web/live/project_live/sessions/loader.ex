@@ -182,6 +182,71 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
     |> stream_delete_by_dom_id(:session_list, "ps-#{session_id}")
   end
 
+  @doc """
+  Reload a single session from DB and upsert it into the in-memory list,
+  then do a targeted stream_insert of just that row.
+  Avoids full stream reset flicker on session_updated events.
+  """
+  def upsert_agent_in_list(socket, session_id) do
+    scope = Map.get(socket.assigns, :scope, socket.assigns.project_id)
+    refreshed = Sessions.get_session_with_agent(session_id)
+
+    cond do
+      is_nil(refreshed) ->
+        remove_agent_from_list(socket, session_id)
+
+      is_integer(scope) and refreshed.project_id != scope ->
+        socket
+
+      true ->
+        refreshed = maybe_attach_project_name(refreshed, socket)
+
+        updated =
+          if Enum.any?(socket.assigns.all_agents, &(&1.id == session_id)) do
+            Enum.map(socket.assigns.all_agents, fn s ->
+              if s.id == session_id, do: refreshed, else: s
+            end)
+          else
+            [refreshed | socket.assigns.all_agents]
+          end
+
+        socket = assign(socket, :all_agents, updated)
+
+        {ordered_agents, depths} =
+          updated
+          |> filter_agents_by_status(socket.assigns.session_filter)
+          |> filter_agents_by_search(socket.assigns.search_query)
+          |> sort_agents(socket.assigns.sort_by)
+          |> build_tree_order()
+
+        visible_count = socket.assigns.visible_count
+        visible_agents = Enum.take(ordered_agents, visible_count)
+
+        socket =
+          socket
+          |> assign(:agents, ordered_agents)
+          |> assign(:depths, depths)
+          |> assign(:has_more, length(ordered_agents) > visible_count)
+
+        case Enum.find(visible_agents, &(&1.id == session_id)) do
+          nil -> socket
+          changed -> stream_insert(socket, :session_list, changed)
+        end
+    end
+  end
+
+  defp maybe_attach_project_name(session, socket) do
+    if socket.assigns.scope == :all do
+      names_by_id =
+        Projects.list_projects()
+        |> Map.new(&{&1.id, &1.name})
+
+      Map.put(session, :project_name, Map.get(names_by_id, session.project_id))
+    else
+      session
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Private
   # ---------------------------------------------------------------------------

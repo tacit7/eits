@@ -153,6 +153,8 @@ export const ChatWindowHook = {
       }
 
       handle.addEventListener("mousedown", (e) => {
+        // Let buttons inside the handle handle their own clicks (minimize, maximize, close).
+        if (e.target.closest('button')) return
         e.preventDefault()
         this._dragging = true
         startX    = e.clientX
@@ -331,10 +333,32 @@ export const ChatWindowHook = {
     if (chatBody) {
       scrollToBottom()
 
+      // Detect intentional user scroll (wheel/touch) so the post-mount force-scroll
+      // doesn't override a deliberate scroll-up within the settling window.
+      this._userScrolled = false
+      chatBody.addEventListener('wheel', () => { this._userScrolled = true }, { passive: true, once: true })
+      chatBody.addEventListener('touchstart', () => { this._userScrolled = true }, { passive: true, once: true })
+
+      // Post-mount force-scroll: fires after LocalTime hooks, markdown rendering,
+      // and other late-rendering content have had time to expand the scrollHeight.
+      // Uses two staggered rAF+timeout passes to cover async rendering pipelines.
+      // Only fires if the user hasn't intentionally scrolled during the settling window.
+      const forceScrollIfUntouched = () => {
+        if (this._userScrolled || this._minimized) return
+        const body = this.el.querySelector("[data-chat-body]")
+        if (body) {
+          setAutoScroll(true)
+          body.scrollTop = body.scrollHeight
+        }
+      }
+      requestAnimationFrame(() => {
+        forceScrollIfUntouched()
+        setTimeout(forceScrollIfUntouched, 150)
+        setTimeout(forceScrollIfUntouched, 400)
+      })
+
       // ResizeObserver catches late content growth (LocalTime hooks, markdown
       // rendering, code block expansion) that runs after the initial scrollToBottom.
-      // Without this, the window mounts at the right position but content expands
-      // and the view ends up stranded partway up.
       if (typeof ResizeObserver !== "undefined") {
         this._lastScrollHeight = chatBody.scrollHeight
         this._resizeObserver = new ResizeObserver(() => {
@@ -544,5 +568,6 @@ export const ChatWindowHook = {
     if (this._resizeObserver) this._resizeObserver.disconnect()
     document.removeEventListener("mousedown", this._onBlurWindows)
     window.removeEventListener("canvas:focus-session", this._onFocusSession)
+    this._userScrolled = true  // stop any pending force-scroll timeouts
   }
 }

@@ -296,6 +296,50 @@ curl -X POST localhost:5001/api/v1/agents \
 
 ---
 
+### GET /api/v1/commits
+
+List commits for a session or agent with optional filtering.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | string | no | Session UUID to list commits for |
+| `agent_id` | string | no | Agent UUID to list commits for |
+| `limit` | integer | no | Max results (default 20, max 100) |
+| `since_hash` | string | no | Return only commits newer than this hash; includes `since_hash_found` in response |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "commits": [
+    {"id": 1, "commit_hash": "abc123def456", "commit_message": "fix bug"}
+  ]
+}
+```
+
+With `since_hash`:
+
+```json
+{
+  "success": true,
+  "commits": [...],
+  "since_hash": "abc123",
+  "since_hash_found": true
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/commits?session_id=abc-123&limit=10
+curl localhost:5001/api/v1/commits?session_id=abc-123&since_hash=a1b2c3
+```
+
+---
+
 ### POST /commits
 
 Track one or more git commits. Looks up the Agent by UUID to get the integer `session_id` FK.
@@ -308,12 +352,17 @@ Track one or more git commits. Looks up the Agent by UUID to get the integer `se
 | `commit_hashes` | string[] | yes | List of commit hashes |
 | `commit_messages` | string[] | no | Parallel list of commit messages |
 
-**Response:** `201 Created` (or `207 Multi-Status` if partial failures)
+**Response:** `201 Created` (or `207 Multi-Status` if some duplicates)
+
+Distinguishes created commits from duplicates. Duplicate hashes (detected via `on_conflict: :nothing`) are returned separately with `status: "duplicate"`.
 
 ```json
 {
   "commits": [
-    {"id": 1, "commit_hash": "abc123", "commit_message": "fix bug"}
+    {"id": 1, "commit_hash": "abc123", "commit_message": "fix bug", "status": "created"}
+  ],
+  "duplicates": [
+    {"commit_hash": "existing123", "status": "duplicate"}
   ],
   "errors": []
 }
@@ -486,48 +535,6 @@ These endpoints broadcast events for real-time LiveView updates:
 | `"agent:working"` | `{:agent_working, agent}` | PATCH with non-terminal status |
 | `"agent:working"` | `{:agent_stopped, agent}` | PATCH with completed/failed |
 
-### POST /webhooks/gitea
-
-Receive Gitea webhook events for PR review automation.
-
-**Webhook events supported:**
-- `pull_request` (opened) — spawns a Codex review agent
-- `issue_comment` (created on PR) — routes DM to the Claude session embedded in PR body
-
-**Request body:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `action` | string | `opened` or `created` (issue_comment) |
-| `pull_request` | object | PR details (title, body, head.sha, base.ref, diff_url) |
-| `issue` | object | Issue/PR metadata (number, title) |
-| `comment` | object | Comment object (body, created_at) |
-| `repository` | object | Repository details (full_name, clone_url) |
-
-**HMAC authentication:**
-
-Gitea webhook must be signed with `GITEA_WEBHOOK_SECRET` env var. Plug validates `X-Gitea-Signature` header against raw body:
-
-```
-sha256_hmac(raw_body, GITEA_WEBHOOK_SECRET)
-```
-
-The signature header can be in two formats:
-- **New format**: `X-Gitea-Signature: sha256=<hex_digest>`
-- **Legacy format**: Raw hex digest
-
-Both formats are supported. Signature comparison is case-insensitive.
-
-**Validation requirements:**
-- `repository.full_name` is required; returns `400 Bad Request` if missing
-- `project_path` must be configured; returns `500 Internal Server Error` if not configured or derivable
-- Requests without valid signature return `401 Unauthorized`
-- In production, unsigned requests fail closed (return 403) when `GITEA_WEBHOOK_SECRET` is missing
-- In development, unsigned requests can be allowed via `allow_unsigned_webhooks` config flag
-
-**Response:** `202 Accepted` (async processing)
-
----
 
 ### POST /api/v1/push/subscriptions
 
@@ -576,6 +583,61 @@ List all registered push subscriptions for the current user.
     "inserted_at": "2026-03-12T10:30:00Z"
   }
 ]
+```
+
+---
+
+### GET /api/v1/dm
+
+List inbound messages (DMs) to a session with optional sender filtering.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session` or `session_id` | string or integer | yes | Recipient session ID (UUID or integer) |
+| `from` or `from_session_id` | string or integer | no | Filter by sender session ID (UUID or integer) |
+| `limit` | integer | no | Max results (default 20, max 100) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "session_id": 42,
+  "session_uuid": "abc-123",
+  "count": 2,
+  "filter_from": null,
+  "messages": [
+    {
+      "id": 123,
+      "uuid": "msg-uuid",
+      "body": "Looking at the error logs...",
+      "from_session_id": 40,
+      "to_session_id": 42,
+      "inserted_at": "2026-03-17T10:30:00Z"
+    }
+  ]
+}
+```
+
+With `from` filter:
+
+```json
+{
+  "session_id": 42,
+  "session_uuid": "abc-123",
+  "count": 1,
+  "filter_from": "40",
+  "messages": [...]
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/dm?session=42&limit=10
+curl localhost:5001/api/v1/dm?session=abc-123&from=40
+curl localhost:5001/api/v1/dm?session_id=42&from_session_id=sender-uuid
 ```
 
 ---

@@ -405,10 +405,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, canvas} <- Canvases.get_canvas(canvas_id) do
       Canvases.add_session(canvas_id, session_id)
 
-      {:noreply,
-       socket
-       |> put_flash(:info, "Added to #{canvas.name}")
-       |> push_navigate(to: "/canvases/#{canvas_id}")}
+      {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
     else
       nil -> {:noreply, put_flash(socket, :error, "Invalid canvas or session ID")}
       {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Canvas not found")}
@@ -430,10 +427,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
           {:ok, canvas} ->
             Canvases.add_session(canvas.id, session_id)
 
-            {:noreply,
-             socket
-             |> put_flash(:info, "Added to #{canvas.name}")
-             |> push_navigate(to: "/canvases/#{canvas.id}")}
+            {:noreply, put_flash(socket, :info, "Added to #{canvas.name}")}
 
           {:error, _} ->
             {:noreply, put_flash(socket, :error, "Failed to create canvas")}

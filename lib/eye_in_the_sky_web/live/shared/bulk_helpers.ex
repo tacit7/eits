@@ -6,6 +6,35 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
 
   alias EyeInTheSky.Tasks
 
+  def build_bulk_flash(succeeded, total, opts) do
+    verb = Keyword.fetch!(opts, :verb)
+    entity = Keyword.fetch!(opts, :entity)
+    destination = Keyword.get(opts, :destination)
+    failed = total - succeeded
+    succ_noun = if succeeded == 1, do: entity, else: "#{entity}s"
+    fail_noun = if failed == 1, do: entity, else: "#{entity}s"
+    dest_suffix = if destination, do: " to #{destination}", else: ""
+
+    past_negative =
+      case verb do
+        "Moved" -> "move"
+        "Archived" -> "archive"
+        "Deleted" -> "delete"
+        v -> String.downcase(v)
+      end
+
+    cond do
+      succeeded > 0 and failed > 0 ->
+        {:info, "#{verb} #{succeeded} #{succ_noun}#{dest_suffix}; #{failed} failed"}
+
+      succeeded > 0 ->
+        {:info, "#{verb} #{succeeded} #{succ_noun}#{dest_suffix}"}
+
+      true ->
+        {:error, "Could not #{past_negative} #{failed} #{fail_noun}"}
+    end
+  end
+
   def handle_toggle_bulk_mode(socket) do
     {:noreply,
      socket

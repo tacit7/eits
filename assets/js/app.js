@@ -239,17 +239,28 @@ if (!window.liveSocket) {
 
 // VimNav is mounted directly (not via phx-hook) because Phoenix doesn't
 // call mounted() for hooks on live layout elements.
-// The instance is created once and kept alive across all LiveView navigations.
-// Destroying + re-creating on every phx:page-loading-stop causes the keydown
-// listener to be briefly absent, which breaks vim mode after history.back/forward.
-// clearListFocus() on navigation is handled by the _onPageLoad listener inside mounted().
+// Keep the instance alive across LiveView navigations — destroying + re-creating
+// on every phx:page-loading-stop briefly removes the keydown listener and breaks
+// vim mode after history.back/forward. Only re-init when the enabled state on
+// #vim-nav-root flips, so toggling vim_nav_enabled in Settings still takes effect
+// on the next LiveView render without a hard reload.
 let _vimNavInst = null
 function _mountVimNav() {
   const el = document.getElementById("vim-nav-root")
   if (!el) return
-  if (_vimNavInst) return
+  const enabled = el.dataset.vimNavEnabled === "true"
+
+  if (_vimNavInst) {
+    if (_vimNavInst._wasEnabled === enabled) return
+    _vimNavInst.destroyed()
+    _vimNavInst = null
+  }
+
+  if (!enabled) return
+
   const inst = Object.create(VimNav)
   inst.el = el
+  inst._wasEnabled = enabled
   inst.pushEvent = (event, payload) => liveSocket.main?.pushHookEvent(el, el, event, payload)
   inst.pushEventToShell = (event, payload) => {
     const rail = document.getElementById("app-rail")

@@ -217,7 +217,17 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
     if is_nil(project_id) do
       {:noreply, put_flash(socket, :error, "Invalid project")}
     else
-      create_new_session_with_project(params, project_id, socket)
+      create_new_session_with_project(params, project_id, socket, navigate: true)
+    end
+  end
+
+  def handle_launch_new_session(params, socket) do
+    project_id = parse_int(params["project_id"])
+
+    if is_nil(project_id) do
+      {:noreply, put_flash(socket, :error, "Invalid project")}
+    else
+      create_new_session_with_project(params, project_id, socket, navigate: false)
     end
   end
 
@@ -277,17 +287,17 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
   defp action_label("unarchive_session"), do: "unarchived"
   defp action_label("delete_session"), do: "deleted"
 
-  defp create_new_session_with_project(params, project_id, socket) do
+  defp create_new_session_with_project(params, project_id, socket, opts) do
     case EyeInTheSky.Projects.get_project(project_id) do
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Project not found")}
 
       {:ok, project} ->
-        do_create_session(params, project, socket)
+        do_create_session(params, project, socket, opts)
     end
   end
 
-  defp do_create_session(params, project, socket) do
+  defp do_create_session(params, project, socket, action_opts) do
     description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 
@@ -313,10 +323,14 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
           "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"
         )
 
-        {:noreply,
-         socket
-         |> assign(:show_new_session_drawer, false)
-         |> push_navigate(to: ~p"/dm/#{result.session.id}")}
+        if Keyword.get(action_opts, :navigate, true) do
+          {:noreply,
+           socket
+           |> assign(:show_new_session_drawer, false)
+           |> push_navigate(to: ~p"/dm/#{result.session.id}")}
+        else
+          {:noreply, socket}
+        end
 
       {:error, reason} ->
         Logger.error("create_new_session: failed - #{inspect(reason)}")

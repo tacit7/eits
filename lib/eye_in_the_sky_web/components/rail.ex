@@ -373,8 +373,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("toggle_new_session_drawer", _params, socket),
     do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
 
-  def handle_event("create_new_session", params, socket),
-    do: IndexActions.handle_create_new_session(params, socket)
+  def handle_event("create_new_session", params, socket) do
+    socket = assign(socket, :show_new_session_form, false)
+    case params["submit_action"] do
+      "chat" -> IndexActions.handle_create_new_session(params, socket)
+      _ -> IndexActions.handle_launch_new_session(params, socket)
+    end
+  end
 
   def handle_event("toggle_session_filter", _params, socket),
     do: {:noreply, assign(socket, :session_filter_open, !socket.assigns.session_filter_open)}

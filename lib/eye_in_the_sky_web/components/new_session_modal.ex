@@ -259,9 +259,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         class="textarea textarea-bordered w-full h-20 text-base"
         placeholder="What should this agent work on?"
         required
-        autofocus
         phx-update="ignore"
-        phx-mounted={Phoenix.LiveView.JS.dispatch("focus")}
+        phx-mounted={Phoenix.LiveView.JS.focus()}
       >{@prefill_text}</textarea>
       <label class="flex items-center gap-1.5 mt-2 cursor-pointer w-fit">
         <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/40" />
@@ -565,9 +564,15 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   defp modal_submit(assigns) do
     ~H"""
-    <button type="submit" class="btn btn-primary w-full mt-2">
-      {@button_text || "Create Agent"}
-    </button>
+    <div class="flex gap-2 mt-2">
+      <button type="submit" name="submit_action" value="launch" class="btn btn-primary flex-1">
+        {@button_text || "Launch Agent"}
+      </button>
+      <button type="submit" name="submit_action" value="chat" class="btn btn-secondary flex-1 gap-1.5">
+        <.icon name="hero-chat-bubble-left-right-mini" class="w-4 h-4" />
+        Chat
+      </button>
+    </div>
     """
   end
 

@@ -547,7 +547,7 @@ Subcommands:
   list      [-s <session>] [-p <project>] [-l <limit>] [--tag <id>] [--mine] [--all]
   get       <id>
   begin     -t <title> [-p <project>] [-d <desc>] [-q]   create + claim in one shot
-  complete  <id> -m <message>                             atomic annotate + done
+  complete  <id> -m <message> [--notify <session>]         atomic annotate + done
   annotate  <id> -b <body> [-t <title>]
   update    <id> -s <state> [-t <title>] [-d <desc>]
   search    <query> [--project <id>] [--state <id>]
@@ -792,10 +792,10 @@ TASKS_HELP
       _delete "/tasks/$id/sessions/$session_id"
       ;;
     complete)
-      # eits tasks complete <id> [<message>] [--message <text>]
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks complete <id> --message <text>  [PREFERRED close path: atomic annotate + done in one call]"; return 0; }
+      # eits tasks complete <id> [<message>] [--message <text>] [--notify <session_uuid_or_id>]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks complete <id> --message <text> [--notify <session_uuid_or_id>]  [PREFERRED close path: atomic annotate + done in one call]"; return 0; }
       local id="${1:-}"; need id; shift
-      local message=""
+      local message="" notify=""
       # Check if next arg is not a flag and treat it as the message
       if [[ $# -gt 0 && "$1" != --* ]]; then
         message="$1"
@@ -804,6 +804,7 @@ TASKS_HELP
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --message|-m) message="$2"; shift 2 ;;
+          --notify)     notify="$2";  shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -849,6 +850,10 @@ TASKS_HELP
         break
       done
       [[ $_comp_ok -eq 1 ]] || { echo "complete failed after retries — task $id may need manual completion" >&2; return 1; }
+      # --notify: send a DM to the given session after successful complete
+      if [[ -n "$notify" && $_comp_ok -eq 1 ]]; then
+        cmd_dm --to "$notify" --message "Task $id complete: $message" >/dev/null 2>&1 || true
+      fi
       ;;
     begin|quick)
       # eits tasks begin [--id <task_id>] [--title <t>] [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
@@ -1882,8 +1887,8 @@ cmd_dm() {
     shift || true
     if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
       cat <<EOF
-usage: eits dm inbox [--session <uuid|id>] [--from <session_id>] [--limit <n>] [--json]
-       eits dm list  [--session <uuid|id>] [--from <session_id>] [--limit <n>] [--json]
+usage: eits dm inbox [--session <uuid|id>] [--from <session_id>] [--limit <n>] [--json] [--team-only]
+       eits dm list  [--session <uuid|id>] [--from <session_id>] [--limit <n>] [--json] [--team-only]
 
 Show inbound DMs for a session. Defaults to current session (EITS_SESSION_UUID / EITS_SESSION_ID).
 
@@ -1892,22 +1897,25 @@ Options:
   --from <id>      Filter by sender session UUID or integer ID
   --limit <n>      Max messages to return (default: 20)
   --json           Raw JSON output
+  --team-only      Only show DMs from sessions that share a team with the current session
 
 Examples:
   eits dm inbox
   eits dm inbox --limit 5
   eits dm inbox --from 3640
   eits dm inbox --json
+  eits dm inbox --team-only
 EOF
       return 0
     fi
-    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20 from="" json_mode=0
+    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20 from="" json_mode=0 team_only=0
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --session|-s) session="$2"; shift 2 ;;
-        --from|-f)    from="$2";    shift 2 ;;
-        --limit|-n)   limit="$2";   shift 2 ;;
-        --json)       json_mode=1;  shift ;;
+        --session|-s)  session="$2";  shift 2 ;;
+        --from|-f)     from="$2";     shift 2 ;;
+        --limit|-n)    limit="$2";    shift 2 ;;
+        --json)        json_mode=1;   shift ;;
+        --team-only)   team_only=1;   shift ;;
         *) die "unknown flag: $1" ;;
       esac
     done
@@ -1915,6 +1923,33 @@ EOF
     local qs="session=${session}&limit=${limit}"
     [[ -n "$from" ]] && qs="${qs}&from=${from}"
     local _resp; _resp=$(_curl "${BASE_URL}/dm?${qs}") || return 1
+
+    # --team-only: filter client-side to DMs from sessions in shared teams
+    if [[ $team_only -eq 1 ]]; then
+      local _agent_uuid="${EITS_AGENT_UUID:-}"
+      if [[ -z "$_agent_uuid" ]]; then
+        echo "warning: --team-only requires EITS_AGENT_UUID; showing all DMs" >&2
+      else
+        # Collect session_ids of all members across teams this agent belongs to
+        local _teams_json _team_ids _member_ids=""
+        _teams_json=$(_curl "${BASE_URL}/teams?member_agent_uuid=$(printf '%s' "$_agent_uuid" | jq -Rr @uri)") || _teams_json="{}"
+        _team_ids=$(printf '%s' "$_teams_json" | jq -r '.teams[]?.id // empty' 2>/dev/null)
+        while IFS= read -r _tid; do
+          [[ -z "$_tid" ]] && continue
+          local _mresp
+          _mresp=$(_curl "${BASE_URL}/teams/${_tid}/members") || continue
+          local _sids
+          _sids=$(printf '%s' "$_mresp" | jq -r '.members[]?.session_id // empty' 2>/dev/null)
+          _member_ids="${_member_ids} ${_sids}"
+        done <<< "$_team_ids"
+        # Build jq filter: keep only messages from session_ids in the collected set
+        local _filter_array
+        _filter_array=$(printf '%s' "$_member_ids" | tr ' ' '\n' | grep -v '^$' | sort -u | jq -Rsc 'split("\n") | map(select(. != "") | tonumber? // .)')
+        _resp=$(printf '%s' "$_resp" | jq --argjson allowed "$_filter_array" \
+          '.messages = [.messages[]? | select(.from_session_id as $fid | $allowed | map(. == $fid) | any)] | .count = (.messages | length)')
+      fi
+    fi
+
     if [[ $json_mode -eq 1 ]]; then
       printf '%s\n' "$_resp" | jq .
     else
@@ -1940,6 +1975,7 @@ Read:
   eits dm inbox          Show your inbox (table, default 20)
   eits dm inbox --json   Raw JSON
   eits dm inbox --from <id>   Filter by sender
+  eits dm inbox --team-only   Only DMs from sessions in shared teams
 EOF
     return 0
   fi
@@ -2973,7 +3009,7 @@ Commands:
                       --interpolate-env substitutes \$VAR from current shell env into instructions
   commits       list|create   (create returns {errors,commits,duplicates} — no top-level success field)
   jobs          list|get|create|update|run|delete
-  dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--json]
+  dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--json] [--team-only]
   dm            [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   channels      list|send|messages
   notifications create

@@ -126,12 +126,12 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   GET /api/v1/tasks/:id - Show a task.
   """
   def show(conn, %{"id" => id}) do
-    case Tasks.get_task(id) do
+    case Tasks.get_task_by_uuid_or_id(id) do
       {:error, :not_found} ->
         {:error, :not_found, "Task not found"}
 
       {:ok, task} ->
-        annotations = Notes.list_notes_for_task(id)
+        annotations = Notes.list_notes_for_task(task.id)
         presented = ApiPresenter.present_task(task)
 
         json(conn, %{
@@ -249,6 +249,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       json(conn, %{
         success: true,
         message: "Task completed",
+        path: "complete",
         task: ApiPresenter.present_task(updated)
       })
     else

@@ -41,6 +41,13 @@ _curl() {
   local _body _status _attempt=0 _delay=2
   while [[ $_attempt -lt 4 ]]; do
     _body=$(curl -sk --write-out '\n%{http_code}' ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} ${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"} "$@")
+    local _curl_exit=$?
+    if [[ $_curl_exit -eq 7 ]]; then
+      echo "error: cannot connect to ${BASE_URL} — is the EITS server running?" >&2
+      echo "       Start it with: mix phx.server  (or PORT=5001 mix phx.server)" >&2
+      echo "       Override URL:  export EITS_URL=http://localhost:5001/api/v1" >&2
+      return 1
+    fi
     _status="${_body##*$'\n'}"
     _body="${_body%$'\n'*}"
     if [[ "$_status" == "429" ]]; then
@@ -331,7 +338,39 @@ cmd_sessions() {
       _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" project_path "$project_path" model "$model" entrypoint "$entrypoint")"
       ;;
     update)
-      # eits sessions update <uuid> [--status <status>] [--reason <reason>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint] [--ended-at <ISO8601>] [--project-id <id>]
+      # eits sessions update <uuid|self> [--status <status>] [--reason <reason>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint] [--ended-at <ISO8601>] [--project-id <id>]
+      # --status valid values: working | idle | waiting | completed | failed
+      #   working   — Claude is actively processing (set by UserPromptSubmit hook)
+      #   idle      — Claude finished responding (set by Stop hook)
+      #   waiting   — headless session ended; resumable (set by SessionEnd hook on sdk-cli)
+      #   completed — interactive session finished (set by SessionEnd hook on cli, or /i-end-session)
+      #   failed    — process crashed (set by SessionWorker on non-zero exit)
+      if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+        cat <<'SESSIONS_UPDATE_HELP'
+usage: eits sessions update <uuid|self> [options]
+
+Options:
+  --status <s>       Session status (see below)
+  --reason <text>    Human-readable reason for status change
+  --intent <text>    Intent annotation for this session
+  --name <text>      Rename the session
+  --description <d>  Set session description
+  --project-id <n>   Reassign to project
+  --entrypoint <e>   Set entrypoint string
+  --clear-entrypoint Remove entrypoint value
+  --ended-at <ISO>   Set ended_at timestamp (ISO8601)
+
+Valid --status values:
+  working    Claude is actively processing (set by UserPromptSubmit hook)
+  idle       Claude finished responding (set by Stop hook)
+  waiting    Headless session ended; resumable (set by SessionEnd on sdk-cli)
+  completed  Interactive session finished (set by SessionEnd on cli, or /i-end-session)
+  failed     Process crashed (set by SessionWorker on non-zero exit)
+
+'self' resolves to $EITS_SESSION_UUID automatically.
+SESSIONS_UPDATE_HELP
+        return 0
+      fi
       local uuid="${1:-}"; need uuid; shift
       [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
       local status="" reason="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at="" project_id=""
@@ -380,9 +419,67 @@ cmd_sessions() {
       _post "/sessions/$uuid/waiting" '{}'
       ;;
     archive)
-      # eits sessions archive <uuid>
-      local uuid="${1:-}"; need uuid
-      _post "/sessions/$uuid/archive" '{}'
+      # eits sessions archive <uuid>                                          (single)
+      # eits sessions archive --status <status> [--project <id>] [--dry-run] (bulk)
+      if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+        cat <<'ARCHIVE_HELP'
+usage: eits sessions archive <uuid>
+       eits sessions archive --status <status> [--project <id>] [--dry-run]
+
+Single: archive one session by UUID.
+Bulk:   list sessions matching --status and archive all of them.
+
+  --status <s>    Filter by status: waiting, idle, completed, failed
+  --project <id>  Limit to a project (default: all projects)
+  --dry-run       Print sessions that would be archived without archiving
+
+Example — clean up all waiting sessions:
+  eits sessions archive --status waiting --dry-run
+  eits sessions archive --status waiting
+ARCHIVE_HELP
+        return 0
+      fi
+      if [[ "${1:-}" == "--status" || "${1:-}" == "--project" || "${1:-}" == "--dry-run" ]]; then
+        local _status="" _project="" _dry=0
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --status)  _status="$2";  shift 2 ;;
+            --project) _project="$2"; shift 2 ;;
+            --dry-run) _dry=1;        shift ;;
+            *) die "unknown flag: $1" ;;
+          esac
+        done
+        [[ -n "$_status" ]] || die "--status is required for bulk archive"
+        local _qs="status=${_status}"
+        [[ -n "$_project" ]] && _qs="${_qs}&project_id=${_project}"
+        local _list_resp; _list_resp=$(_curl "$BASE_URL/sessions?${_qs}&limit=500" 2>/dev/null) || die "failed to list sessions"
+        local _uuids; _uuids=$(echo "$_list_resp" | jq -r '.sessions[]?.uuid // empty')
+        local _count; _count=$(echo "$_uuids" | grep -c . || true)
+        if [[ $_count -eq 0 ]]; then
+          echo "no sessions found with status='$_status'" >&2
+          return 0
+        fi
+        if [[ $_dry -eq 1 ]]; then
+          echo "dry-run: would archive $_count session(s) with status='$_status':" >&2
+          echo "$_list_resp" | jq -r '.sessions[]? | "  \(.uuid)  \(.name // "(unnamed)")  \(.status)"'
+          return 0
+        fi
+        echo "archiving $_count session(s) with status='$_status'..." >&2
+        local _ok=0 _fail=0
+        while IFS= read -r _uuid; do
+          [[ -z "$_uuid" ]] && continue
+          if _post "/sessions/$_uuid/archive" '{}' >/dev/null 2>&1; then
+            _ok=$((_ok + 1))
+          else
+            echo "  failed: $_uuid" >&2
+            _fail=$((_fail + 1))
+          fi
+        done <<< "$_uuids"
+        echo "archived: $_ok succeeded, $_fail failed" >&2
+      else
+        local uuid="${1:-}"; need uuid
+        _post "/sessions/$uuid/archive" '{}'
+      fi
       ;;
     unarchive)
       # eits sessions unarchive <uuid>
@@ -393,6 +490,23 @@ cmd_sessions() {
       # eits sessions context <uuid>                                    (GET)
       # eits sessions context <uuid> --text <text> [--metadata <json>]  (PATCH)
       # eits sessions context <uuid> --from-stdin [--metadata <json>]   (PATCH; body from stdin)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'CTX_HELP'
+usage: eits sessions context <uuid|self> [options]
+
+  (no options)            GET current context for the session
+  --text <text>           PATCH: set context to this string
+  --from-stdin            PATCH: read context from stdin (pipe-friendly)
+  --metadata <json>       Include a JSON metadata object alongside context
+
+Examples:
+  eits sessions context self                        # read your context
+  eits sessions context self --text "## Status..."  # write context
+  echo "## Status..." | eits sessions context self --from-stdin
+
+'self' resolves to $EITS_SESSION_UUID automatically.
+CTX_HELP
+        return 0; }
       local uuid="${1:-}"; need uuid; shift || true
       local text="" from_stdin=0 metadata=""
       while [[ $# -gt 0 ]]; do
@@ -446,7 +560,13 @@ Subcommands:
   When EITS_SESSION_UUID is set, 'list' scopes to the current session.
   Pass --all to list across all sessions.
 
-Run 'eits tasks states' to see state IDs and all accepted name aliases.
+State quick-reference (--state accepts ID or name alias):
+  1  todo         to-do, todo
+  2  in-progress  start, in-progress, working
+  3  done         done, complete, finished
+  4  in-review    review, in-review
+
+Run 'eits tasks states' for the full alias list.
 TASKS_HELP
   return 0; }
   case "$sub" in
@@ -672,7 +792,7 @@ TASKS_HELP
       ;;
     complete)
       # eits tasks complete <id> [<message>] [--message <text>]
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks complete <id> <message>  OR  eits tasks complete <id> --message <text>"; return 0; }
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks complete <id> --message <text>  [PREFERRED close path: atomic annotate + done in one call]"; return 0; }
       local id="${1:-}"; need id; shift
       local message=""
       # Check if next arg is not a flag and treat it as the message
@@ -1427,8 +1547,119 @@ USAGE
       fi
       printf '%s\n' "$_sp_resp_body" | jq .
       ;;
+    spawn-batch)
+      # eits agents spawn-batch --file <path.json> [--dry-run]
+      # JSON format: array of spawn arg objects, each matching eits agents spawn flags.
+      # Required per entry: instructions (string) OR instructions_file (path).
+      # Optional per entry: model, provider, team_name, team_id, member_name, worktree,
+      #   stash_if_dirty, name, parent_session_id, agent, interpolate_env, effort_level.
+      # Spawns are executed sequentially (not parallel) to avoid 429 rate limits.
+      # Each entry result is printed as JSON; failures print to stderr and continue.
+      if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+        cat <<'BATCH_HELP'
+usage: eits agents spawn-batch --file <path.json> [--dry-run]
+
+JSON file format — array of objects:
+  [
+    {
+      "instructions": "Review PR #42",
+      "team_name": "reviewers",
+      "member_name": "reviewer-1",
+      "model": "sonnet"
+    },
+    {
+      "instructions_file": "/tmp/agent2.txt",
+      "interpolate_env": true,
+      "worktree": "fix/my-bug",
+      "stash_if_dirty": true
+    }
+  ]
+
+Supported fields per entry (all optional except instructions/instructions_file):
+  instructions, instructions_file, interpolate_env, model, provider,
+  team_name, team_id, member_name, worktree, stash_if_dirty, name,
+  parent_session_id, parent_agent_id, agent, effort_level
+
+--dry-run: validate JSON and print the eits agents spawn call per entry without executing.
+
+Spawns run sequentially to avoid rate limits.
+BATCH_HELP
+        return 0
+      fi
+      local batch_file="" dry_run=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --file)    batch_file="$2"; shift 2 ;;
+          --dry-run) dry_run=1; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$batch_file" ]] || die "--file is required"
+      [[ -f "$batch_file" ]] || die "file not found: $batch_file"
+      local _count; _count=$(jq 'length' "$batch_file" 2>/dev/null) || die "invalid JSON in $batch_file"
+      echo "spawn-batch: $_count entries" >&2
+      local _i=0 _ok=0 _fail=0
+      while [[ $_i -lt $_count ]]; do
+        local _entry; _entry=$(jq ".[$_i]" "$batch_file")
+        local _instructions _instructions_file _interpolate _model _provider _team_name _team_id
+        local _member_name _worktree _stash _name _parent_sid _parent_aid _agent _effort
+        _instructions=$(echo "$_entry"     | jq -r '.instructions       // empty')
+        _instructions_file=$(echo "$_entry"| jq -r '.instructions_file  // empty')
+        _interpolate=$(echo "$_entry"      | jq -r '.interpolate_env    // false')
+        _model=$(echo "$_entry"            | jq -r '.model              // empty')
+        _provider=$(echo "$_entry"         | jq -r '.provider           // empty')
+        _team_name=$(echo "$_entry"        | jq -r '.team_name          // empty')
+        _team_id=$(echo "$_entry"          | jq -r '.team_id            // empty')
+        _member_name=$(echo "$_entry"      | jq -r '.member_name        // empty')
+        _worktree=$(echo "$_entry"         | jq -r '.worktree           // empty')
+        _stash=$(echo "$_entry"            | jq -r '.stash_if_dirty     // false')
+        _name=$(echo "$_entry"             | jq -r '.name               // empty')
+        _parent_sid=$(echo "$_entry"       | jq -r '.parent_session_id  // empty')
+        _parent_aid=$(echo "$_entry"       | jq -r '.parent_agent_id    // empty')
+        _agent=$(echo "$_entry"            | jq -r '.agent              // empty')
+        _effort=$(echo "$_entry"           | jq -r '.effort_level       // empty')
+        # Build args array
+        local _args=()
+        if [[ -n "$_instructions" ]]; then
+          _args+=(--instructions "$_instructions")
+        elif [[ -n "$_instructions_file" ]]; then
+          _args+=(--instructions-file "$_instructions_file")
+        else
+          echo "entry $_i: missing instructions or instructions_file — skipping" >&2
+          _fail=$((_fail + 1)); _i=$((_i + 1)); continue
+        fi
+        [[ "$_interpolate" == "true" ]] && _args+=(--interpolate-env)
+        [[ -n "$_model" ]]      && _args+=(--model "$_model")
+        [[ -n "$_provider" ]]   && _args+=(--provider "$_provider")
+        [[ -n "$_team_name" ]]  && _args+=(--team-name "$_team_name")
+        [[ -n "$_team_id" ]]    && _args+=(--team-id "$_team_id")
+        [[ -n "$_member_name" ]]&& _args+=(--member-name "$_member_name")
+        [[ -n "$_worktree" ]]   && _args+=(--worktree "$_worktree")
+        [[ "$_stash" == "true" ]] && _args+=(--stash-if-dirty)
+        [[ -n "$_name" ]]       && _args+=(--name "$_name")
+        [[ -n "$_parent_sid" ]] && _args+=(--parent-session-id "$_parent_sid")
+        [[ -n "$_parent_aid" ]] && _args+=(--parent-agent-id "$_parent_aid")
+        [[ -n "$_agent" ]]      && _args+=(--agent "$_agent")
+        [[ -n "$_effort" ]]     && _args+=(--effort-level "$_effort")
+        if [[ $dry_run -eq 1 ]]; then
+          echo "entry $_i: eits agents spawn ${_args[*]}"
+        else
+          echo "spawning entry $((_i + 1))/$_count..." >&2
+          if cmd_agents spawn "${_args[@]}"; then
+            _ok=$((_ok + 1))
+          else
+            echo "entry $_i: spawn failed — continuing" >&2
+            _fail=$((_fail + 1))
+          fi
+        fi
+        _i=$((_i + 1))
+      done
+      if [[ $dry_run -eq 0 ]]; then
+        echo "spawn-batch complete: $_ok succeeded, $_fail failed" >&2
+      fi
+      ;;
     *)
-      echo "usage: eits agents <list|get|spawn>"
+      echo "usage: eits agents <list|get|spawn|spawn-batch>"
       ;;
   esac
 }
@@ -1518,6 +1749,16 @@ cmd_commits() {
         # Print only the hashes of newly created commits — nothing for duplicates
         echo "$_commit_resp" | jq -r '.commits[]?.commit_hash // empty'
       else
+        local _new_count _dup_count
+        _new_count=$(echo "$_commit_resp" | jq '[.commits[]?] | length')
+        _dup_count=$(echo "$_commit_resp" | jq '[.duplicates[]?] | length')
+        if [[ $_new_count -gt 0 && $_dup_count -gt 0 ]]; then
+          echo "tracked: $_new_count new, $_dup_count already tracked" >&2
+        elif [[ $_new_count -gt 0 ]]; then
+          echo "tracked: $_new_count new commit(s)" >&2
+        elif [[ $_dup_count -gt 0 ]]; then
+          echo "already tracked: $_dup_count commit(s) (no change)" >&2
+        fi
         echo "$_commit_resp" | jq .
       fi
       ;;
@@ -2699,12 +2940,21 @@ Base URL: ${BASE_URL}  (override: EITS_URL=<url>)
 
 Commands:
   sessions      list|get|create|update|end|context   (list --search <q> for full-text)
-  tasks         list|get|create|update|bulk-update|done|begin|complete|annotate|start|claim|delete|link-session|unlink-session|search
-                list --mine, update --title, begin --quiet, search <query> [--project <id>] [--state <id>] [--limit <n>]
-  notes         list|get|create|update|add|search   (search <query> for full-text)
+  tasks         list|get|begin|complete|annotate|update|search|bulk-update|states|...
+                list [-s <session>] [-p <project>] [--mine] [--all]   ← scopes to current session by default; --all overrides
+                begin -t <title>                                       ← create + claim in one shot (PREFERRED start)
+                complete <id> -m <message>                             ← atomic annotate + done (PREFERRED close)
+                get <id|uuid>                                          ← accepts integer ID or UUID
+  notes         list|get|add|create|update|search
+                list [--session <uuid>] [--task <id>] [--project <id>] [--mine] [--full]
+                add --body "..."                                       ← attaches to current session
+                search <query>                                         ← full-text search with body content
   projects      list|get|create
   agents        list|get|spawn
-  commits       list|create
+                spawn --instructions "..." [--instructions-file <path>] [--interpolate-env]
+                      [--worktree <branch>] [--stash-if-dirty] [--team-name <name>] [--model <m>] [--dry-run]
+                      --interpolate-env substitutes \$VAR from current shell env into instructions
+  commits       list|create   (create returns {errors,commits,duplicates} — no top-level success field)
   jobs          list|get|create|update|run|delete
   dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--json]
   dm            [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
@@ -2712,6 +2962,7 @@ Commands:
   notifications create
   prompts       list|get
   teams         list|get|create|update|delete|members|join|status|update-member|leave|broadcast|my-teams
+                status <id> [--wait]   ← blocks until all members done/failed; exits 0 all done, 1 any failed
   timer         show|set|cancel   (default session: self / $EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)

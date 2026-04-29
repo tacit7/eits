@@ -22,6 +22,7 @@
   let loadingOlder = false
   let openOverflowId = null
   let inspectMessage = null
+  let openReactionPickerId = null
 
   function loadOlderMessages() {
     if (!messages.length || loadingOlder) return
@@ -78,6 +79,9 @@
     }
     if (e.key === 'Escape' && openOverflowId !== null) {
       openOverflowId = null
+    }
+    if (e.key === 'Escape' && openReactionPickerId !== null) {
+      openReactionPickerId = null
     }
     if (e.key === 'Escape' && inspectMessage !== null) {
       inspectMessage = null
@@ -160,6 +164,16 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;')
+  }
+
+  function highlightMatch(text, query) {
+    if (!query || !query.trim()) return escapeHtml(text)
+    const escaped = escapeHtml(text)
+    const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return escaped.replace(
+      new RegExp(`(${escapedQuery})`, 'gi'),
+      '<mark class="bg-warning/30 text-base-content rounded px-0.5">$1</mark>'
+    )
   }
 
   // Renders message body with @mention tokens highlighted.
@@ -517,7 +531,7 @@
   }
 </style>
 
-<svelte:document on:keydown={handleDocKeydown} on:click={() => openOverflowId = null} />
+<svelte:document on:keydown={handleDocKeydown} on:click={() => { openOverflowId = null; openReactionPickerId = null }} />
 
 <div class="flex h-full min-w-0">
   <!-- Main chat column -->
@@ -537,8 +551,10 @@
             autocomplete="off"
           />
         </div>
-        {#if searchQuery}
-          <span class="text-[11px] text-base-content/30 whitespace-nowrap">{filteredMessages.length} result{filteredMessages.length !== 1 ? 's' : ''}</span>
+        {#if searchQuery.trim() && filteredMessages.length > 0}
+          <span class="text-[11px] text-base-content/40 ml-2 flex-shrink-0">{filteredMessages.length} result{filteredMessages.length === 1 ? '' : 's'}</span>
+        {:else if searchQuery}
+          <span class="text-[11px] text-base-content/30 whitespace-nowrap">0 results</span>
         {/if}
         <button on:click={closeSearch} class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0" title="Close (Esc)">
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
@@ -588,8 +604,9 @@
           <!-- Message -->
           {@const prevMessage = idx > 0 ? filteredMessages[idx - 1] : null}
           {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
+          {@const isSameSender = prevMessage && !isTurnBoundary && prevMessage.sender_role !== 'system' && message.sender_role !== 'system' && prevMessage.session_id === message.session_id && prevMessage.sender_role === message.sender_role}
           <div
-            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {message.sender_role === 'system' ? 'py-1' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 hover:bg-base-content/[0.04]'}"
+            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {isSameSender ? 'pt-0.5' : ''} {message.sender_role === 'system' ? 'py-1' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 hover:bg-base-content/[0.04]'}"
           >
             {#if message.sender_role === 'system'}
               <!-- System message -->
@@ -606,6 +623,30 @@
             {:else}
               <!-- Hover actions: absolute overlay, not in flex flow -->
               <div class="absolute top-2 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
+                <!-- Reaction picker -->
+                <div class="relative">
+                  <button
+                    class="p-1 rounded text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                    on:click|stopPropagation={() => openReactionPickerId = openReactionPickerId === message.id ? null : message.id}
+                    title="Add reaction"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.536-4.464a.75.75 0 1 0-1.061-1.061 3.5 3.5 0 0 1-4.95 0 .75.75 0 0 0-1.06 1.06 5 5 0 0 0 7.07 0ZM9 8.5c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S7.448 7 8 7s1 .672 1 1.5Zm3 1.5c.552 0 1-.672 1-1.5S12.552 7 12 7s-1 .672-1 1.5.448 1.5 1 1.5Z" clip-rule="evenodd"/></svg>
+                  </button>
+                  {#if openReactionPickerId === message.id}
+                    <div
+                      class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-xl shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
+                      on:click|stopPropagation
+                    >
+                      {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji}
+                        <button
+                          class="text-lg hover:bg-base-content/[0.08] rounded p-1 transition-colors cursor-pointer leading-none"
+                          on:click={() => { live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji }); openReactionPickerId = null }}
+                          title={emoji}
+                        >{emoji}</button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
                 <!-- Reply in thread -->
                 <button
                   class="p-1 rounded text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
@@ -654,46 +695,55 @@
               </div>
 
               <div class="flex items-start gap-2.5">
-                <!-- Sender icon -->
-                {#if message.sender_role === 'user'}
-                  <div class="w-4 h-4 mt-1 flex-shrink-0 text-base-content/40">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-                      <path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" />
-                    </svg>
-                  </div>
+                {#if isSameSender}
+                  <!-- Grouped: narrow gutter only, no icon or name -->
+                  <div class="w-4 flex-shrink-0 mt-1"></div>
                 {:else}
-                  <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0" alt={message.provider || 'Agent'} />
+                  <!-- Sender icon -->
+                  {#if message.sender_role === 'user'}
+                    <div class="w-4 h-4 mt-1 flex-shrink-0 text-base-content/40">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                        <path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" />
+                      </svg>
+                    </div>
+                  {:else}
+                    <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0" alt={message.provider || 'Agent'} />
+                  {/if}
                 {/if}
 
                 <div class="min-w-0 flex-1">
-                  <!-- Identity line: no flex-wrap; hover actions removed from this flow -->
-                  <div class="flex items-baseline gap-2">
-                    {#if message.sender_role === 'user'}
-                      <span class="text-[13px] font-semibold text-base-content/70">You</span>
-                    {:else if message.session_id}
-                      {@const agent = activeAgents.find(a => a.id === message.session_id)}
-                      <button
-                        class="text-[13px] font-semibold text-primary/80 hover:text-primary transition-colors cursor-pointer"
-                        on:click={() => navigateToDm(message.session_id)}
-                        title="Open DM with this agent"
-                      >
-                        {agent?.name || message.session_name || `@${message.session_id}`}
-                      </button>
-                    {:else}
-                      <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
-                    {/if}
+                  {#if !isSameSender}
+                    <!-- Identity line: no flex-wrap; hover actions removed from this flow -->
+                    <div class="flex items-baseline gap-2">
+                      {#if message.sender_role === 'user'}
+                        <span class="text-[13px] font-semibold text-base-content/70">You</span>
+                      {:else if message.session_id}
+                        {@const agent = activeAgents.find(a => a.id === message.session_id)}
+                        <button
+                          class="text-[13px] font-semibold text-primary/80 hover:text-primary transition-colors cursor-pointer"
+                          on:click={() => navigateToDm(message.session_id)}
+                          title="Open DM with this agent"
+                        >
+                          {agent?.name || message.session_name || `@${message.session_id}`}
+                        </button>
+                      {:else}
+                        <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
+                      {/if}
 
-                    <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
+                      <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
 
-                    {#if message.number}
-                      <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
-                    {/if}
-                  </div>
+                      {#if message.number}
+                        <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
+                      {/if}
+                    </div>
+                  {/if}
 
                   <div class="max-w-[720px]">
                     <div class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
                         {@html renderMarkdownBody(message.body)}
+                      {:else if searchQuery.trim()}
+                        <span class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words whitespace-pre-wrap" contenteditable="false">{@html highlightMatch(message.body || '', searchQuery)}</span>
                       {:else}
                         <p class="whitespace-pre-wrap">{@html renderBody(message.body)}</p>
                       {/if}

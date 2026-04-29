@@ -1828,7 +1828,7 @@ BATCH_HELP
           [[ -f "$_file" ]] || continue
           local _name="" _desc=""
           # Extract name field from frontmatter
-          _name=$(awk '/^---/{p++} p==1 && /^name:/{gsub(/^name:[[:space:]]*/,"",$0); gsub(/"/,"",$0); print; exit}' "$_file" | tr -d "'" | xargs)
+          _name=$(awk '/^---/{p++} p==1 && /^name:/{gsub(/^name:[[:space:]]*/,"",$0); gsub(/"/,"",$0); print; exit}' "$_file" | tr -d "'" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           # Extract description — first non-empty line after "description:" in frontmatter
           _desc=$(awk '
             /^---/{p++; next}
@@ -1847,7 +1847,7 @@ BATCH_HELP
             }
           ' "$_file")
           # Strip surrounding quotes, take first sentence only (up to first period or 120 chars)
-          _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-120 | xargs)
+          _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-120 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           [[ -z "$_name" ]] && _name=$(basename "$_file" .md)
           # Filter
           if [[ -n "$_query" ]] && ! echo "$_name" | grep -qi "$_query"; then continue; fi
@@ -3457,7 +3457,7 @@ report to the #standup channel.
 
 Options:
   --since <duration>   Activity window (default: 24h). Formats: 30m, 6h, 7d
-  --channel <id>       Target channel ID (default: 1)
+  --channel <id|name>  Target channel ID or name (default: 1)
   --dry-run            Print report without posting to channel
   --json               Emit raw JSON activity data instead of formatted report
 
@@ -3476,6 +3476,15 @@ USAGE
       done
 
       local cutoff; cutoff=$(_parse_duration "$since")
+
+      # Resolve channel name → id if not numeric
+      if ! [[ "$channel_id" =~ ^[0-9]+$ ]]; then
+        local _ch_resp _ch_id
+        _ch_resp=$(_curl "$BASE_URL/channels" 2>/dev/null) || _ch_resp="{}"
+        _ch_id=$(printf '%s' "$_ch_resp" | jq -r --arg name "$channel_id" '.channels[] | select(.name == $name) | .id' 2>/dev/null | head -1)
+        [[ -n "$_ch_id" ]] || die "channel not found: $channel_id"
+        channel_id="$_ch_id"
+      fi
 
       # 1. Get active agents
       local agents_resp
@@ -3517,8 +3526,11 @@ USAGE
       local report
       report=$(echo "$all_activity" | jq -r '
         .[] |
-        "## \(.agent_uuid // "unknown")\n" +
-        "Sessions: \(.session_count // 0)\n" +
+        "## \(.agent_name // .agent_uuid // "unknown")\n" +
+        (if (.sessions | length) > 0 then
+          "Sessions (\(.sessions | length)):\n" +
+          ([ .sessions[] | "  - \(.name // .uuid // "unknown")"] | join("\n")) + "\n"
+        else "" end) +
         (if (.tasks | length) > 0 then
           "Tasks (\(.tasks | length)):\n" +
           ([ .tasks[] | "  - [\(.state // "??")] \(.title // "(untitled)")"] | join("\n")) + "\n"
@@ -3578,7 +3590,7 @@ Commands:
   tags          list [--q <name>]
   commits       list|create   (create returns {errors,commits,duplicates} — no top-level success field)
                 list --since-time <duration>  ← time-based filter (24h, 7d, 30m) — distinct from --since <hash>
-  standup       run [--since <duration>] [--channel <id>] [--dry-run] [--json]
+  standup       run [--since <duration>] [--channel <id|name>] [--dry-run] [--json]
                 Collect agent activity and post standup to a channel (default: channel 1)
   jobs          list|get|create|update|run|delete
   dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--json] [--team-only]
@@ -3588,7 +3600,7 @@ Commands:
   prompts       list|get
   teams         list|get|create|update|delete|members|join|status|update-member|leave|broadcast|my-teams
                 status <id> [--wait]   ← blocks until all members done/failed; exits 0 all done, 1 any failed
-  timer         show|set|cancel   (default session: self / $EITS_SESSION_UUID)
+  timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]

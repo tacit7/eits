@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentActivityController do
       json(conn, %{
         success: true,
         agent_uuid: agent_uuid,
+        agent_name: agent.name,
         since: since_str,
         tasks: tasks,
         commits: commits,

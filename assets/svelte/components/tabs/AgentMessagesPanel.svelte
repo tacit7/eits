@@ -8,6 +8,7 @@
   // Configure marked once at module level
   marked.setOptions({ gfm: true, breaks: true })
 
+  export let channels = []
   export let activeChannelId = null
   export let messages = []
   export let hasMoreMessages = false
@@ -20,6 +21,8 @@
 
   let loadingOlder = false
   let openOverflowId = null
+  let inspectMessage = null
+  let openReactionPickerId = null
 
   function loadOlderMessages() {
     if (!messages.length || loadingOlder) return
@@ -56,6 +59,30 @@
     ? messages.filter(m => (m.body || '').toLowerCase().includes(searchQuery.toLowerCase()))
     : messages
 
+  $: processedMessages = (() => {
+    const result = []
+    let i = 0
+    while (i < filteredMessages.length) {
+      const msg = filteredMessages[i]
+      if (msg.sender_role === 'system') {
+        const run = [msg]
+        while (i + 1 < filteredMessages.length && filteredMessages[i + 1].sender_role === 'system') {
+          i++
+          run.push(filteredMessages[i])
+        }
+        if (run.length === 1) {
+          result.push({ ...msg, _collapsed: false, _runCount: 1 })
+        } else {
+          result.push({ ...run[0], _collapsed: true, _runCount: run.length, _runMessages: run })
+        }
+      } else {
+        result.push({ ...msg, _collapsed: false, _runCount: 1 })
+      }
+      i++
+    }
+    return result
+  })()
+
   function openSearch() {
     showSearch = true
     setTimeout(() => searchInput?.focus(), 0)
@@ -76,6 +103,19 @@
     }
     if (e.key === 'Escape' && openOverflowId !== null) {
       openOverflowId = null
+    }
+    if (e.key === 'Escape' && openReactionPickerId !== null) {
+      openReactionPickerId = null
+    }
+    if (e.key === 'Escape' && inspectMessage !== null) {
+      inspectMessage = null
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+      const idx = parseInt(e.key, 10) - 1
+      if (channels[idx]) {
+        e.preventDefault()
+        live.pushEvent('change_channel', { channel_id: String(channels[idx].id) })
+      }
     }
   }
 
@@ -148,6 +188,16 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;')
+  }
+
+  function highlightMatch(text, query) {
+    if (!query || !query.trim()) return escapeHtml(text)
+    const escaped = escapeHtml(text)
+    const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return escaped.replace(
+      new RegExp(`(${escapedQuery})`, 'gi'),
+      '<mark class="bg-warning/30 text-base-content rounded px-0.5">$1</mark>'
+    )
   }
 
   // Renders message body with @mention tokens highlighted.
@@ -505,7 +555,7 @@
   }
 </style>
 
-<svelte:document on:keydown={handleDocKeydown} on:click={() => openOverflowId = null} />
+<svelte:document on:keydown={handleDocKeydown} on:click={() => { openOverflowId = null; openReactionPickerId = null }} />
 
 <div class="flex h-full min-w-0">
   <!-- Main chat column -->
@@ -525,8 +575,10 @@
             autocomplete="off"
           />
         </div>
-        {#if searchQuery}
-          <span class="text-[11px] text-base-content/30 whitespace-nowrap">{filteredMessages.length} result{filteredMessages.length !== 1 ? 's' : ''}</span>
+        {#if searchQuery.trim() && filteredMessages.length > 0}
+          <span class="text-[11px] text-base-content/40 ml-2 flex-shrink-0">{filteredMessages.length} result{filteredMessages.length === 1 ? '' : 's'}</span>
+        {:else if searchQuery}
+          <span class="text-[11px] text-base-content/30 whitespace-nowrap">0 results</span>
         {/if}
         <button on:click={closeSearch} class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0" title="Close (Esc)">
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
@@ -563,9 +615,9 @@
 
     {#if filteredMessages && filteredMessages.length > 0}
       <div class="space-y-0">
-        {#each filteredMessages as message, idx}
+        {#each processedMessages as message, idx}
           <!-- Date separator -->
-          {#if idx === 0 || formatDateRelative(filteredMessages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
+          {#if idx === 0 || formatDateRelative(processedMessages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
             <div class="flex items-center gap-3 my-4">
               <div class="flex-1 h-px bg-base-content/5"></div>
               <span class="text-xs uppercase tracking-wider font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
@@ -574,24 +626,52 @@
           {/if}
 
           <!-- Message -->
+          {@const prevMessage = idx > 0 ? processedMessages[idx - 1] : null}
+          {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
+          {@const isSameSender = prevMessage && !isTurnBoundary && prevMessage.sender_role !== 'system' && message.sender_role !== 'system' && prevMessage.session_id === message.session_id && prevMessage.sender_role === message.sender_role}
           <div
-            class="group relative px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? 'py-1' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 hover:bg-base-content/[0.04]'}"
+            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {isSameSender ? 'pt-0.5' : ''} {message.sender_role === 'system' ? 'py-0.5' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 border-l-2 border-base-content/12 hover:bg-base-content/[0.04] hover:border-base-content/20'}"
           >
             {#if message.sender_role === 'system'}
-              <!-- System message -->
-              <div class="flex items-center gap-2 text-[11px] text-base-content/25 italic pl-3 border-l-2 border-base-content/[0.08]">
-                <span class="flex-1">{message.body}</span>
-                <button
-                  class="opacity-0 group-hover:opacity-100 text-base-content/20 hover:text-error transition-all cursor-pointer"
-                  on:click={() => live.pushEvent('delete_message', { id: String(message.id) })}
-                  title="Delete message"
-                >
-                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                </button>
+              <!-- System message — centered annotation, off main reading axis -->
+              <div class="flex items-center gap-3 my-0.5">
+                <div class="flex-1 h-px bg-base-content/[0.04]"></div>
+                <span class="text-[10px] text-base-content/25 select-none">
+                  {#if message._collapsed}
+                    {message._runCount} system events
+                  {:else}
+                    {message.body}
+                  {/if}
+                </span>
+                <div class="flex-1 h-px bg-base-content/[0.04]"></div>
               </div>
             {:else}
               <!-- Hover actions: absolute overlay, not in flex flow -->
               <div class="absolute top-2 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
+                <!-- Reaction picker -->
+                <div class="relative">
+                  <button
+                    class="p-1 rounded text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                    on:click|stopPropagation={() => openReactionPickerId = openReactionPickerId === message.id ? null : message.id}
+                    title="Add reaction"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.536-4.464a.75.75 0 1 0-1.061-1.061 3.5 3.5 0 0 1-4.95 0 .75.75 0 0 0-1.06 1.06 5 5 0 0 0 7.07 0ZM9 8.5c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S7.448 7 8 7s1 .672 1 1.5Zm3 1.5c.552 0 1-.672 1-1.5S12.552 7 12 7s-1 .672-1 1.5.448 1.5 1 1.5Z" clip-rule="evenodd"/></svg>
+                  </button>
+                  {#if openReactionPickerId === message.id}
+                    <div
+                      class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-xl shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
+                      on:click|stopPropagation
+                    >
+                      {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji}
+                        <button
+                          class="text-lg hover:bg-base-content/[0.08] rounded p-1 transition-colors cursor-pointer leading-none"
+                          on:click={() => { live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji }); openReactionPickerId = null }}
+                          title={emoji}
+                        >{emoji}</button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
                 <!-- Reply in thread -->
                 <button
                   class="p-1 rounded text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
@@ -620,6 +700,14 @@
                   {#if openOverflowId === message.id}
                     <div class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-lg shadow-lg py-0.5 w-32 z-20">
                       <button
+                        type="button"
+                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
+                        on:click|stopPropagation={() => { inspectMessage = message; openOverflowId = null }}
+                      >
+                        Inspect
+                      </button>
+                      <div class="my-0.5 border-t border-base-content/5"></div>
+                      <button
                         class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-error/80 hover:bg-error/[0.08] hover:text-error transition-colors cursor-pointer"
                         on:click|stopPropagation={() => { live.pushEvent('delete_message', { id: String(message.id) }); openOverflowId = null }}
                       >
@@ -632,46 +720,55 @@
               </div>
 
               <div class="flex items-start gap-2.5">
-                <!-- Sender icon -->
-                {#if message.sender_role === 'user'}
-                  <div class="w-4 h-4 mt-1 flex-shrink-0 text-base-content/40">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-                      <path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" />
-                    </svg>
-                  </div>
+                {#if isSameSender}
+                  <!-- Grouped: narrow gutter only, no icon or name -->
+                  <div class="w-4 flex-shrink-0 mt-1"></div>
                 {:else}
-                  <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0" alt={message.provider || 'Agent'} />
+                  <!-- Sender icon -->
+                  {#if message.sender_role === 'user'}
+                    <div class="w-4 h-4 mt-1 flex-shrink-0 text-base-content/40">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                        <path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" />
+                      </svg>
+                    </div>
+                  {:else}
+                    <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0" alt={message.provider || 'Agent'} />
+                  {/if}
                 {/if}
 
                 <div class="min-w-0 flex-1">
-                  <!-- Identity line: no flex-wrap; hover actions removed from this flow -->
-                  <div class="flex items-baseline gap-2">
-                    {#if message.sender_role === 'user'}
-                      <span class="text-[13px] font-semibold text-base-content/70">You</span>
-                    {:else if message.session_id}
-                      {@const agent = activeAgents.find(a => a.id === message.session_id)}
-                      <button
-                        class="text-[13px] font-semibold text-primary/80 hover:text-primary transition-colors cursor-pointer"
-                        on:click={() => navigateToDm(message.session_id)}
-                        title="Open DM with this agent"
-                      >
-                        {agent?.name || message.session_name || `@${message.session_id}`}
-                      </button>
-                    {:else}
-                      <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
-                    {/if}
+                  {#if !isSameSender}
+                    <!-- Identity line: no flex-wrap; hover actions removed from this flow -->
+                    <div class="flex items-baseline gap-2">
+                      {#if message.sender_role === 'user'}
+                        <span class="text-[13px] font-semibold text-base-content/85">You</span>
+                      {:else if message.session_id}
+                        {@const agent = activeAgents.find(a => a.id === message.session_id)}
+                        <button
+                          class="text-[13px] font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer"
+                          on:click={() => navigateToDm(message.session_id)}
+                          title="Open DM with this agent"
+                        >
+                          {agent?.name || message.session_name || `@${message.session_id}`}
+                        </button>
+                      {:else}
+                        <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
+                      {/if}
 
-                    <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
+                      <span class="text-[11px] text-base-content/55">{formatTime(message.inserted_at)}</span>
 
-                    {#if message.number}
-                      <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
-                    {/if}
-                  </div>
+                      {#if message.number}
+                        <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
+                      {/if}
+                    </div>
+                  {/if}
 
-                  <div class="max-w-[720px]">
-                    <div class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words">
+                  <div class="max-w-[580px]">
+                    <div class="message-body mt-2 text-sm leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
                         {@html renderMarkdownBody(message.body)}
+                      {:else if searchQuery.trim()}
+                        <span class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words whitespace-pre-wrap" contenteditable="false">{@html highlightMatch(message.body || '', searchQuery)}</span>
                       {:else}
                         <p class="whitespace-pre-wrap">{@html renderBody(message.body)}</p>
                       {/if}
@@ -679,31 +776,25 @@
 
                     <!-- Usage metadata for agent messages -->
                     {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                      <div class="mt-2 flex flex-nowrap gap-x-1.5 min-w-0 overflow-hidden">
+                      <div class="mt-1.5 pt-1.5 border-t border-base-content/[0.05] flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/30 min-w-0 overflow-hidden flex-wrap">
                         {#if message.metadata.total_cost_usd}
-                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-primary/50">
-                            ${message.metadata.total_cost_usd.toFixed(4)}
-                          </span>
+                          <span title="Total cost">${message.metadata.total_cost_usd.toFixed(4)}</span>
                         {/if}
                         {#if message.metadata.usage?.input_tokens}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
-                            {message.metadata.usage.input_tokens} in
-                          </span>
+                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span title="Input tokens">{message.metadata.usage.input_tokens} in</span>
                         {/if}
                         {#if message.metadata.usage?.output_tokens}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
-                            {message.metadata.usage.output_tokens} out
-                          </span>
+                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span title="Output tokens">{message.metadata.usage.output_tokens} out</span>
                         {/if}
                         {#if message.metadata.duration_ms}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
-                            {(message.metadata.duration_ms / 1000).toFixed(1)}s
-                          </span>
+                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span title="Duration">{(message.metadata.duration_ms / 1000).toFixed(1)}s</span>
                         {/if}
                         {#if message.metadata.num_turns}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/25">
-                            {message.metadata.num_turns} turns
-                          </span>
+                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span title="Number of turns">{message.metadata.num_turns} turns</span>
                         {/if}
                       </div>
                     {/if}
@@ -776,11 +867,9 @@
   <!-- Typing indicator -->
   {#if workingMembers.length > 0}
     <div class="flex-shrink-0 px-4 py-1">
-      <div class="flex items-center gap-2 text-xs text-base-content/40">
+      <div class="flex items-center gap-2 text-xs text-base-content/50">
         <span class="inline-flex gap-[3px]">
-          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 0ms"></span>
-          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 150ms"></span>
-          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 300ms"></span>
+          <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
         </span>
         <span>
           {#if workingMembers.length === 1}
@@ -799,7 +888,7 @@
   <div class="flex-shrink-0 pt-2">
     <form
       on:submit|preventDefault={handleSubmit}
-      class="relative bg-base-200 rounded-xl border border-base-content/5 shadow-sm p-4 flex flex-col"
+      class="relative bg-base-200 rounded-xl border border-base-content/[0.15] shadow-sm p-4 flex flex-col"
     >
       <div class="flex gap-2">
         <div class="relative flex-1">
@@ -808,8 +897,8 @@
             bind:this={inputElement}
             on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
             on:keydown={handleInputKeydown}
-            placeholder="Message agents... @id to mention, /skill for commands"
-            class="textarea textarea-bordered w-full text-sm rounded-lg bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors resize-none overflow-y-auto text-base-content"
+            placeholder="Message agents…"
+            class="textarea textarea-bordered w-full text-sm rounded-lg bg-base-200/50 border-base-content/10 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors resize-none overflow-y-auto text-base-content"
             rows="1"
             style="max-height: 7.5rem; line-height: 1.5rem;"
             autocomplete="off"
@@ -881,6 +970,13 @@
           </svg>
         </button>
       </div>
+      <!-- Hint row: always-visible affordance hints -->
+      <div class="flex items-center justify-between mt-2 px-0.5 select-none">
+        <span class="text-[11px] text-base-content/30">
+          <span class="font-mono">@id</span> to mention · <span class="font-mono">/skill</span> for commands
+        </span>
+        <span class="text-[11px] text-base-content/25 font-mono">⏎ send · ⇧⏎ newline</span>
+      </div>
     </form>
   </div>
   </div><!-- end main chat column -->
@@ -888,5 +984,18 @@
   <!-- Thread panel (slides in when a thread is open) -->
   {#if activeThread}
     <ThreadPanel thread={activeThread} {live} />
+  {/if}
+
+  {#if inspectMessage}
+    <div class="modal modal-open z-50">
+      <div class="modal-box max-w-2xl">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-sm">Message #{inspectMessage.id}</h3>
+          <button class="btn btn-xs btn-ghost" on:click={() => inspectMessage = null}>Close</button>
+        </div>
+        <pre class="text-xs bg-base-200 rounded-lg p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
+      </div>
+      <div class="modal-backdrop" on:click={() => inspectMessage = null}></div>
+    </div>
   {/if}
 </div>

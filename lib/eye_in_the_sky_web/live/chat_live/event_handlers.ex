@@ -166,6 +166,14 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
     {:noreply, assign(socket, :show_agent_drawer, !socket.assigns.show_agent_drawer)}
   end
 
+  def handle_event("set_sender_filter", %{"session_id" => ""}, socket) do
+    {:noreply, assign(socket, :sender_filter, nil)}
+  end
+
+  def handle_event("set_sender_filter", %{"session_id" => session_id}, socket) do
+    {:noreply, assign(socket, :sender_filter, session_id)}
+  end
+
   def handle_event("validate_agent_upload", _params, socket) do
     {:noreply, socket}
   end

@@ -782,6 +782,40 @@ describe("VimNav _renderWhichKey scope filtering", () => {
     expect(overlay!.textContent).toContain("Space t →")
     h.hideWhichKey()
   })
+
+  it("Space which-key shows sub-group entries with + prefix for g t n", () => {
+    const h = makeHook()
+    h._renderWhichKey(["Space"])
+    const overlay = document.getElementById("vim-nav-which-key")!
+    const text = overlay.textContent!
+    // sub-group labels
+    expect(text).toContain("+go to page")
+    expect(text).toContain("+toggle rail")
+    expect(text).toContain("+create")
+    h.hideWhichKey()
+  })
+
+  it("Space which-key shows direct actions without + prefix", () => {
+    const h = makeHook()
+    h._renderWhichKey(["Space"])
+    const overlay = document.getElementById("vim-nav-which-key")!
+    const text = overlay.textContent!
+    expect(text).toContain("Toggle Files flyout")
+    expect(text).toContain("Command palette")
+    expect(text).toContain("Close flyout")
+    h.hideWhichKey()
+  })
+
+  it("g which-key shows direct navigation labels (no + prefix)", () => {
+    const h = makeHook()
+    h._renderWhichKey(["g"])
+    const overlay = document.getElementById("vim-nav-which-key")!
+    const text = overlay.textContent!
+    expect(text).toContain("Go to Sessions")
+    expect(text).toContain("Go to Tasks")
+    expect(text).not.toContain("+go to page")
+    h.hideWhichKey()
+  })
 })
 
 describe("Space leader", () => {

@@ -117,6 +117,28 @@ _project_id() {
   eits projects list --path "$dir" 2>/dev/null | jq -r '.projects[0]?.id // empty' | head -1
 }
 
+# Parse duration string (24h, 7d, 30m, 2h) to ISO8601 UTC timestamp (now - duration).
+# Usage: _parse_duration <duration>
+_parse_duration() {
+  local dur="${1:-}"
+  [[ -n "$dur" ]] || { echo "error: duration required (e.g. 24h, 7d, 30m)" >&2; return 1; }
+  local val unit secs
+  val="${dur%[a-zA-Z]*}"
+  unit="${dur##*[0-9]}"
+  case "$unit" in
+    m) secs=$(( val * 60 )) ;;
+    h) secs=$(( val * 3600 )) ;;
+    d) secs=$(( val * 86400 )) ;;
+    *) echo "error: unknown duration unit '$unit' (use m, h, or d)" >&2; return 1 ;;
+  esac
+  # macOS: date -u -v-${secs}S; Linux: date -u -d "@$(( $(date +%s) - secs ))"
+  if date --version &>/dev/null 2>&1; then
+    date -u -d "@$(( $(date +%s) - secs ))" +%Y-%m-%dT%H:%M:%SZ
+  else
+    date -u -v-"${secs}S" +%Y-%m-%dT%H:%M:%SZ
+  fi
+}
+
 # ── display helpers ───────────────────────────────────────────────────────────
 
 # Truncate string to n chars, appending … if over
@@ -1809,16 +1831,17 @@ cmd_commits() {
       # --mine, --session, and --agent are mutually exclusive
       # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] [--since <hash>] [--limit <n>]
       # --since <hash>: return only commits newer than the given hash (sprint reconciliation)
-      local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0 _all_flag=0 _json=0
+      local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0 _all_flag=0 _json=0 _since_time=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session|-s) [[ $_mine_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--session is mutually exclusive with --mine and --agent"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --agent|-a)   [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
-          --mine)       [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
-          --all)        _all_flag=1; shift ;;
-          --since)      qs="${qs}&since_hash=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --limit|-l)   qs="${qs}&limit=$2"; shift 2 ;;
-          --json)       _json=1; shift ;;
+          --session|-s)    [[ $_mine_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--session is mutually exclusive with --mine and --agent"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --agent|-a)      [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --mine)          [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
+          --all)           _all_flag=1; shift ;;
+          --since)         qs="${qs}&since_hash=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --since-time)    _since_time="$2"; shift 2 ;;
+          --limit|-l)      qs="${qs}&limit=$2"; shift 2 ;;
+          --json)          _json=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1827,7 +1850,30 @@ cmd_commits() {
         local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
         [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
       fi
+      # --since-time: convert duration to ISO8601 and pass as created_at_since param.
+      # If server doesn't support it, fetch with high limit and filter client-side.
+      if [[ -n "$_since_time" ]]; then
+        local _cutoff; _cutoff=$(_parse_duration "$_since_time")
+        qs="${qs}&created_at_since=$(printf '%s' "$_cutoff" | jq -Rr @uri)"
+      fi
       local _resp; _resp=$(_curl "$BASE_URL/commits?${qs#&}")
+      # Client-side time filter fallback: if server returned all commits (no server-side filtering),
+      # filter by inserted_at >= cutoff using jq.
+      if [[ -n "$_since_time" ]]; then
+        local _cutoff_epoch
+        if date --version &>/dev/null 2>&1; then
+          _cutoff_epoch=$(date -u -d "$(_parse_duration "$_since_time")" +%s 2>/dev/null || echo 0)
+        else
+          _cutoff_epoch=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$(_parse_duration "$_since_time")" +%s 2>/dev/null || echo 0)
+        fi
+        _resp=$(echo "$_resp" | jq --argjson epoch "$_cutoff_epoch" \
+          '.commits |= map(select(
+            (.inserted_at // .created_at // "") |
+            if . == "" then false
+            else (gsub("[TZ]"; " ") | strptime("%Y-%m-%d %H:%M:%S") | mktime) >= $epoch
+            end
+          ))')
+      fi
       if [[ $_json -eq 1 ]]; then echo "$_resp" | jq .; else _tbl_commits "$_resp"; fi
       ;;
     create)
@@ -3244,6 +3290,116 @@ cmd_me() {
   printf '\n'
 }
 
+# ── standup ───────────────────────────────────────────────────────────────────
+
+cmd_standup() {
+  local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits standup <run>"; return 0; }
+  case "$sub" in
+    run)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { cat <<'USAGE'
+usage: eits standup run [options]
+
+Collect activity from all active agents in the last 24h and post a standup
+report to the #standup channel.
+
+Options:
+  --since <duration>   Activity window (default: 24h). Formats: 30m, 6h, 7d
+  --channel <id>       Target channel ID (default: 1)
+  --dry-run            Print report without posting to channel
+  --json               Emit raw JSON activity data instead of formatted report
+
+USAGE
+        return 0; }
+
+      local since="24h" channel_id="1" dry_run=0 emit_json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --since)    since="$2";      shift 2 ;;
+          --channel)  channel_id="$2"; shift 2 ;;
+          --dry-run)  dry_run=1;       shift ;;
+          --json)     emit_json=1;     shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+
+      local cutoff; cutoff=$(_parse_duration "$since")
+
+      # 1. Get active agents
+      local agents_resp
+      agents_resp=$(_curl "$BASE_URL/agents?active_since=$(printf '%s' "$cutoff" | jq -Rr @uri)" 2>/dev/null) || {
+        agents_resp=$(_curl "$BASE_URL/agents" 2>/dev/null)
+      }
+
+      local agent_uuids
+      agent_uuids=$(echo "$agents_resp" | jq -r '.agents[]?.uuid // empty')
+
+      if [[ -z "$agent_uuids" ]]; then
+        echo "No active agents found in the last $since window." >&2
+        return 0
+      fi
+
+      # 2. Collect activity per agent; skip agents with zero activity
+      local all_activity="[]"
+      while IFS= read -r uuid; do
+        [[ -z "$uuid" ]] && continue
+        local act
+        act=$(_curl "$BASE_URL/agents/activity?uuid=$(printf '%s' "$uuid" | jq -Rr @uri)&since=$(printf '%s' "$cutoff" | jq -Rr @uri)" 2>/dev/null) || continue
+        local task_count commit_count session_count
+        task_count=$(echo "$act" | jq '[.tasks[]?] | length' 2>/dev/null || echo 0)
+        commit_count=$(echo "$act" | jq '[.commits[]?] | length' 2>/dev/null || echo 0)
+        session_count=$(echo "$act" | jq '(.session_count // 0)' 2>/dev/null || echo 0)
+        if [[ "$task_count" -eq 0 && "$commit_count" -eq 0 && "$session_count" -eq 0 ]]; then
+          continue
+        fi
+        all_activity=$(echo "$all_activity" | jq --argjson entry "$act" '. + [$entry]')
+      done <<< "$agent_uuids"
+
+      # 3. Emit raw JSON if requested
+      if [[ $emit_json -eq 1 ]]; then
+        echo "$all_activity" | jq .
+        return 0
+      fi
+
+      # 4. Format per-agent report
+      local report
+      report=$(echo "$all_activity" | jq -r '
+        .[] |
+        "## \(.agent_uuid // "unknown")\n" +
+        "Sessions: \(.session_count // 0)\n" +
+        (if (.tasks | length) > 0 then
+          "Tasks (\(.tasks | length)):\n" +
+          ([ .tasks[] | "  - [\(.state // "??")] \(.title // "(untitled)")"] | join("\n")) + "\n"
+        else "" end) +
+        (if (.commits | length) > 0 then
+          "Commits (\(.commits | length)):\n" +
+          ([ .commits[] | "  - \(.hash // .commit_hash // "(no hash)") \(.message // .commit_message // "")"] | join("\n")) + "\n"
+        else "" end)
+      ' 2>/dev/null || echo "(no activity data)")
+
+      local full_report
+      full_report="# Standup Report — $(date -u +%Y-%m-%dT%H:%M:%SZ) (last ${since})
+
+${report}"
+
+      if [[ $dry_run -eq 1 ]]; then
+        printf '%s\n' "$full_report"
+        return 0
+      fi
+
+      # 5. Post to standup channel
+      local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+      [[ -n "$session_id" ]] || die "EITS_SESSION_UUID or EITS_SESSION_ID is required to post"
+      _post "/channels/$channel_id/messages" \
+        "$(json session_id "$session_id" body "$full_report")" >/dev/null
+      printf 'Standup posted to channel %s\n' "$channel_id"
+      ;;
+    *)
+      echo "usage: eits standup <run>"
+      ;;
+  esac
+}
+
 # ── help ──────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -3269,6 +3425,9 @@ Commands:
                       --interpolate-env substitutes \$VAR from current shell env into instructions
   tags          list [--q <name>]
   commits       list|create   (create returns {errors,commits,duplicates} — no top-level success field)
+                list --since-time <duration>  ← time-based filter (24h, 7d, 30m) — distinct from --since <hash>
+  standup       run [--since <duration>] [--channel <id>] [--dry-run] [--json]
+                Collect agent activity and post standup to a channel (default: channel 1)
   jobs          list|get|create|update|run|delete
   dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--json] [--team-only]
   dm            [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
@@ -3322,6 +3481,7 @@ case "$cmd" in
   search)        cmd_search        "$@" ;;
   messages)      cmd_messages      "$@" ;;
   codex)         cmd_codex         "$@" ;;
+  standup)       cmd_standup      "$@" ;;
   me|whoami)     cmd_me ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;

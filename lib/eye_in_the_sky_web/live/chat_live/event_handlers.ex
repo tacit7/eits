@@ -174,6 +174,30 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
     {:noreply, cancel_upload(socket, :agent_images, ref)}
   end
 
+  def handle_event("noop", _params, socket), do: {:noreply, socket}
+
+  def handle_event("load_older_messages", %{"before_id" => before_id_str}, socket) do
+    channel_id = socket.assigns.active_channel_id
+
+    case parse_int(before_id_str) do
+      nil ->
+        {:noreply, socket}
+
+      before_id ->
+        older =
+          ChannelMessages.list_messages_for_channel(channel_id, before_id: before_id, limit: 50)
+          |> ChatPresenter.serialize_messages()
+
+        messages = older ++ socket.assigns.messages
+        has_more = length(older) == 50
+
+        {:noreply,
+         socket
+         |> assign(:messages, messages)
+         |> assign(:has_more_messages, has_more)}
+    end
+  end
+
   def handle_event("create_channel", params, socket),
     do: ChannelActions.handle_create_channel(socket, params)
 

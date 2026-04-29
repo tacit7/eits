@@ -4,11 +4,22 @@
 
   export let activeChannelId = null
   export let messages = []
+  export let hasMoreMessages = false
   export let activeAgents = []
   export let channelMembers = []
   export let workingAgents = {}
   export let slashItems = []
   export let live
+
+  let loadingOlder = false
+
+  function loadOlderMessages() {
+    if (!messages.length || loadingOlder) return
+    loadingOlder = true
+    live.pushEvent('load_older_messages', { before_id: String(messages[0].id) }, () => {
+      loadingOlder = false
+    })
+  }
 
   let inputValue = ''
   let inputElement
@@ -406,6 +417,24 @@
     class="flex-1 overflow-y-auto px-4 py-2"
     style="scrollbar-width: none; -ms-overflow-style: none;"
   >
+    {#if hasMoreMessages && !searchQuery}
+      <div class="flex justify-center py-3">
+        <button
+          on:click={loadOlderMessages}
+          disabled={loadingOlder}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {#if loadingOlder}
+            <span class="w-3 h-3 rounded-full border border-base-content/30 border-t-transparent animate-spin"></span>
+            Loading…
+          {:else}
+            <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.75-.75V5.612L5.29 9.77a.75.75 0 0 1-1.08-1.04l5.25-5.5a.75.75 0 0 1 1.08 0l5.25 5.5a.75.75 0 1 1-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0 1 10 17Z" clip-rule="evenodd"/></svg>
+            Load older messages
+          {/if}
+        </button>
+      </div>
+    {/if}
+
     {#if filteredMessages && filteredMessages.length > 0}
       <div class="space-y-0">
         {#each filteredMessages as message, idx}

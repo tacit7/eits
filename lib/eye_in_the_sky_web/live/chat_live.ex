@@ -94,6 +94,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     |> assign(:channels, ChatPresenter.serialize_channels(channels))
     |> assign(:active_channel_id, channel_id)
     |> assign(:messages, data.messages)
+    |> assign(:has_more_messages, length(data.messages) == 100)
     |> assign(:unread_counts, data.unread_counts)
     |> assign(:active_thread, data.active_thread)
     |> assign(:agent_status_counts, data.agent_status_counts)
@@ -144,10 +145,12 @@ defmodule EyeInTheSkyWeb.ChatLive do
         <.message_feed
           active_channel_id={@active_channel_id}
           messages={@messages}
+          has_more_messages={@has_more_messages}
           active_agents={@active_agents}
           channel_members={@channel_members}
           working_agents={@working_agents}
           slash_items={@slash_items}
+          uploads={@uploads}
           socket={@socket}
         />
         <.agent_drawer
@@ -166,7 +169,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   defp message_feed(assigns) do
     ~H"""
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
       <.svelte
         name="AgentMessagesPanel"
         ssr={false}
@@ -174,6 +177,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
           %{
             activeChannelId: @active_channel_id,
             messages: @messages,
+            hasMoreMessages: @has_more_messages,
             activeAgents: @active_agents,
             channelMembers: @channel_members,
             workingAgents: @working_agents,
@@ -182,7 +186,62 @@ defmodule EyeInTheSkyWeb.ChatLive do
         }
         socket={@socket}
       />
+      <.upload_tray uploads={@uploads} />
     </div>
+    """
+  end
+
+  defp upload_tray(assigns) do
+    ~H"""
+    <form
+      id="chat-upload-form"
+      phx-change="validate_agent_upload"
+      phx-submit="noop"
+      class="flex-shrink-0 px-4 pb-2"
+    >
+      <%= if @uploads.agent_images.entries != [] do %>
+        <div class="flex flex-wrap gap-2 mb-2">
+          <%= for entry <- @uploads.agent_images.entries do %>
+            <div class="relative group">
+              <.live_img_preview entry={entry} class="w-16 h-16 object-cover rounded-lg border border-base-content/10" />
+              <%= if entry.progress < 100 do %>
+                <div class="absolute inset-0 flex items-center justify-center bg-base-100/70 rounded-lg">
+                  <span class="text-xs font-mono text-base-content/60">{entry.progress}%</span>
+                </div>
+              <% end %>
+              <button
+                type="button"
+                phx-click="cancel_agent_upload"
+                phx-value-ref={entry.ref}
+                class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-error text-error-content flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Remove"
+              >
+                <.icon name="hero-x-mark-mini" class="w-2.5 h-2.5" />
+              </button>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+      <label
+        for="agent-image-upload"
+        class={[
+          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs cursor-pointer transition-colors",
+          if(@uploads.agent_images.entries != [],
+            do: "text-primary bg-primary/10 hover:bg-primary/15",
+            else: "text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5"
+          )
+        ]}
+        title="Attach image (jpg, png, gif, webp — up to 5 files, 20MB each)"
+      >
+        <.icon name="hero-paper-clip-mini" class="w-3.5 h-3.5" />
+        <%= if @uploads.agent_images.entries != [] do %>
+          {length(@uploads.agent_images.entries)} image{if length(@uploads.agent_images.entries) > 1, do: "s"}
+        <% else %>
+          Attach
+        <% end %>
+      </label>
+      <.live_file_input upload={@uploads.agent_images} id="agent-image-upload" class="sr-only" />
+    </form>
     """
   end
 

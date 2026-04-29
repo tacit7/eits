@@ -755,7 +755,7 @@
                         <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                       {/if}
 
-                      <span class="text-[11px] text-base-content/45">{formatTime(message.inserted_at)}</span>
+                      <span class="text-[11px] text-base-content/55">{formatTime(message.inserted_at)}</span>
 
                       {#if message.number}
                         <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
@@ -764,7 +764,7 @@
                   {/if}
 
                   <div class="max-w-[580px]">
-                    <div class="message-body mt-1.5 text-sm leading-relaxed text-base-content/85 break-words">
+                    <div class="message-body mt-2 text-sm leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
                         {@html renderMarkdownBody(message.body)}
                       {:else if searchQuery.trim()}
@@ -888,7 +888,7 @@
   <div class="flex-shrink-0 pt-2">
     <form
       on:submit|preventDefault={handleSubmit}
-      class="relative bg-base-200 rounded-xl border border-base-content/10 shadow-sm p-4 flex flex-col"
+      class="relative bg-base-200 rounded-xl border border-base-content/[0.15] shadow-sm p-4 flex flex-col"
     >
       <div class="flex gap-2">
         <div class="relative flex-1">
@@ -897,8 +897,8 @@
             bind:this={inputElement}
             on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
             on:keydown={handleInputKeydown}
-            placeholder="Message agents... @id to mention, /skill for commands"
-            class="textarea textarea-bordered w-full text-sm rounded-lg bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors resize-none overflow-y-auto text-base-content"
+            placeholder="Message agents…"
+            class="textarea textarea-bordered w-full text-sm rounded-lg bg-base-200/50 border-base-content/10 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors resize-none overflow-y-auto text-base-content"
             rows="1"
             style="max-height: 7.5rem; line-height: 1.5rem;"
             autocomplete="off"
@@ -969,6 +969,13 @@
             <polygon points="22 2 15 22 11 13 2 9 22 2"/>
           </svg>
         </button>
+      </div>
+      <!-- Hint row: always-visible affordance hints -->
+      <div class="flex items-center justify-between mt-2 px-0.5 select-none">
+        <span class="text-[11px] text-base-content/30">
+          <span class="font-mono">@id</span> to mention · <span class="font-mono">/skill</span> for commands
+        </span>
+        <span class="text-[11px] text-base-content/25 font-mono">⏎ send · ⇧⏎ newline</span>
       </div>
     </form>
   </div>

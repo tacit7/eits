@@ -15,21 +15,21 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
   def channel_header(assigns) do
     ~H"""
     <div
-      class="w-full bg-base-100 border-b border-base-content/10 flex-shrink-0"
+      class="w-full bg-base-100 border-b border-base-content/[0.12] flex-shrink-0"
       id="chat-header-card"
     >
-      <div class="px-5 py-4">
+      <div class="px-5 py-5">
         <div class="flex items-center justify-between">
-          <div class="flex flex-col gap-0.5">
+          <div class="flex flex-col gap-1">
             <h1 class="text-xl font-bold tracking-tight text-base-content leading-tight">
               <%= if @active_channel do %>
-                <span class="text-base-content/20 mr-0.5 font-normal">#</span>{@active_channel.name || "Channel"}
+                <span class="text-primary/50 mr-0.5 font-semibold">#</span>{@active_channel.name || "Channel"}
               <% else %>
                 Chat
               <% end %>
             </h1>
             <%= if not is_nil(@active_channel) && not is_nil(@active_channel[:description]) do %>
-              <span class="text-[11px] text-base-content/35 leading-tight">{@active_channel.description}</span>
+              <span class="text-xs text-base-content/50 leading-tight">{@active_channel.description}</span>
             <% end %>
           </div>
           <div class="flex items-center gap-2">

@@ -43,6 +43,11 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
 
     Logger.info("📬 Appended message id=#{message.id}, total=#{length(messages)}")
 
+    Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
+      id: "app-rail",
+      unread_counts: unread_counts
+    )
+
     {:noreply,
      socket
      |> assign(:messages, messages)

@@ -1,313 +1,172 @@
 <script>
-  import { createEventDispatcher } from 'svelte'
   import { formatTime } from '../utils/datetime.js'
+  import { marked } from 'marked'
+  import DOMPurify from 'dompurify'
 
   export let thread = null
   export let live
 
-  const dispatch = createEventDispatcher()
+  marked.setOptions({ gfm: true, breaks: true })
+
+  const DOMPURIFY_CONFIG = {
+    ALLOWED_TAGS: ['p', 'strong', 'em', 'b', 'i', 'code', 'pre', 'ul', 'ol', 'li',
+                   'br', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'a', 'span', 'hr', 'del'],
+    ALLOWED_ATTR: ['class', 'href', 'target', 'rel']
+  }
+
+  function renderBody(body) {
+    if (!body) return ''
+    const html = marked.parse(body)
+    return DOMPurify.sanitize(html, DOMPURIFY_CONFIG)
+  }
+
+  function senderLabel(message) {
+    if (!message) return ''
+    if (message.sender_role === 'user') return 'You'
+    return message.session_name || `@${message.session_id}` || message.provider || 'Agent'
+  }
+
+  let replyInput = ''
 
   function handleSubmit(e) {
-    const formData = new FormData(e.target)
-    const body = formData.get('body')
+    e.preventDefault()
+    if (!replyInput.trim() || !thread?.parent_message) return
+    live.pushEvent('send_thread_reply', {
+      parent_message_id: String(thread.parent_message.id),
+      body: replyInput.trim()
+    })
+    replyInput = ''
+  }
 
-    if (body.trim() && thread && thread.parent_message) {
-      live.pushEvent('send_thread_reply', {
-        parent_message_id: thread.parent_message.id,
-        body: body
-      })
-      e.target.reset()
+  function handleKeydown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      handleSubmit(e)
     }
   }
 
   function close() {
-    dispatch('close')
+    live.pushEvent('close_thread', {})
   }
 </script>
 
 <style>
-  .thread-panel {
-    width: 400px;
-    height: 100%;
-    background-color: white;
-    border-left: 1px solid #ddd;
-    display: flex;
-    flex-direction: column;
-    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  :global(.thread-body p) { margin-bottom: 0.35em; }
+  :global(.thread-body p:last-child) { margin-bottom: 0; }
+  :global(.thread-body ol) { list-style-type: decimal; padding-left: 1.3em; margin: 0.25em 0 0.4em; }
+  :global(.thread-body ul) { list-style-type: disc; padding-left: 1.3em; margin: 0.25em 0 0.4em; }
+  :global(.thread-body li) { line-height: 1.5; margin-bottom: 0.15em; }
+  :global(.thread-body code:not(pre code)) {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8em;
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    background-color: rgb(127 127 127 / 0.1);
   }
-
-  :global(.dark) .thread-panel {
-    background-color: #1a1d21;
-    border-left-color: #2f3437;
+  :global(.thread-body pre) {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8em;
+    padding: 0.6em 0.8em;
+    border-radius: 5px;
+    background-color: rgb(127 127 127 / 0.07);
+    overflow-x: auto;
+    margin: 0.35em 0;
   }
-
-  .thread-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid #ddd;
-  }
-
-  :global(.dark) .thread-header {
-    border-bottom-color: #2f3437;
-  }
-
-  .thread-title {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #1d1c1d;
-  }
-
-  :global(.dark) .thread-title {
-    color: #f8f8f8;
-  }
-
-  .close-button {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    color: #616061;
-    cursor: pointer;
-    padding: 0;
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.25rem;
-  }
-
-  .close-button:hover {
-    background-color: #f8f8f8;
-    color: #1d1c1d;
-  }
-
-  :global(.dark) .close-button:hover {
-    background-color: #2f3437;
-    color: #f8f8f8;
-  }
-
-  .thread-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem 1.25rem;
-  }
-
-  .parent-message {
-    padding: 1rem;
-    background-color: #f8f8f8;
-    border-radius: 0.5rem;
-    margin-bottom: 1.5rem;
-  }
-
-  :global(.dark) .parent-message {
-    background-color: #222529;
-  }
-
-  .message-header {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .sender-name {
-    font-weight: 700;
-    font-size: 0.9375rem;
-    color: #1d1c1d;
-  }
-
-  :global(.dark) .sender-name {
-    color: #f8f8f8;
-  }
-
-  .message-time {
-    font-size: 0.75rem;
-    color: #616061;
-  }
-
-  :global(.dark) .message-time {
-    color: #949699;
-  }
-
-  .message-body {
-    font-size: 0.9375rem;
-    color: #1d1c1d;
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.5;
-  }
-
-  :global(.dark) .message-body {
-    color: #dcddde;
-  }
-
-  .replies-section {
-    border-top: 1px solid #ddd;
-    padding-top: 1rem;
-  }
-
-  :global(.dark) .replies-section {
-    border-top-color: #2f3437;
-  }
-
-  .reply-count {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #616061;
-    margin-bottom: 1rem;
-  }
-
-  :global(.dark) .reply-count {
-    color: #949699;
-  }
-
-  .reply {
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-    border-radius: 0.375rem;
-  }
-
-  .reply:hover {
-    background-color: #f8f8f8;
-  }
-
-  :global(.dark) .reply:hover {
-    background-color: #222529;
-  }
-
-  .thread-input-area {
-    border-top: 1px solid #ddd;
-    padding: 1rem 1.25rem;
-  }
-
-  :global(.dark) .thread-input-area {
-    border-top-color: #2f3437;
-  }
-
-  .input-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .thread-input {
-    width: 100%;
-    padding: 0.75rem;
-    border-radius: 0.375rem;
-    background-color: white;
-    border: 1px solid #ddd;
-    font-size: 0.9375rem;
-    color: #1d1c1d;
-    resize: vertical;
-    min-height: 3rem;
-  }
-
-  .thread-input:focus {
-    outline: 2px solid #1264a3;
-    outline-offset: 0;
-    border-color: transparent;
-  }
-
-  :global(.dark) .thread-input {
-    background-color: #2f3437;
-    border-color: #2f3437;
-    color: #f8f8f8;
-  }
-
-  .send-button {
-    align-self: flex-end;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    background-color: #007a5a;
-    border: none;
-    color: white;
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: background-color 0.15s;
-  }
-
-  .send-button:hover {
-    background-color: #006644;
-  }
-
-  .empty-replies {
-    text-align: center;
-    padding: 2rem 1rem;
-    color: #616061;
-    font-size: 0.875rem;
-  }
-
-  :global(.dark) .empty-replies {
-    color: #949699;
-  }
+  :global(.thread-body pre code) { background: none; padding: 0; font-size: 1em; }
+  :global(.thread-body strong, .thread-body b) { font-weight: 600; }
+  :global(.thread-body em, .thread-body i) { font-style: italic; }
 </style>
 
-<div class="thread-panel">
-  <!-- Thread Header -->
-  <div class="thread-header">
-    <div class="thread-title">Thread</div>
-    <button class="close-button" on:click={close} aria-label="Close thread">
-      ×
+<div class="flex flex-col h-full w-[360px] flex-shrink-0 border-l border-base-content/8 bg-base-100">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/8 flex-shrink-0">
+    <div class="flex items-center gap-2">
+      <svg class="w-3.5 h-3.5 text-base-content/40" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-4 4V5Z" clip-rule="evenodd"/>
+      </svg>
+      <span class="text-sm font-semibold text-base-content/70">Thread</span>
+    </div>
+    <button
+      on:click={close}
+      class="w-6 h-6 flex items-center justify-center rounded text-base-content/30 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+      aria-label="Close thread"
+    >
+      <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/>
+      </svg>
     </button>
   </div>
 
-  <!-- Thread Content -->
-  <div class="thread-content">
+  <!-- Content -->
+  <div class="flex-1 overflow-y-auto" style="scrollbar-width: none;">
+
     {#if thread && thread.parent_message}
-      <!-- Parent Message -->
-      <div class="parent-message">
-        <div class="message-header">
-          <span class="sender-name">
-            {thread.parent_message.sender_role === 'user' ? 'You' : `Agent (${thread.parent_message.provider || 'unknown'})`}
+      <!-- Parent message -->
+      <div class="px-4 pt-4 pb-3 border-b border-base-content/5">
+        <div class="flex items-baseline gap-2 mb-1.5">
+          <span class="text-[13px] font-semibold text-primary/80">
+            {senderLabel(thread.parent_message)}
           </span>
-          <span class="message-time">{formatTime(thread.parent_message.inserted_at)}</span>
+          <span class="text-[11px] text-base-content/25">
+            {formatTime(thread.parent_message.inserted_at)}
+          </span>
         </div>
-        <div class="message-body">{thread.parent_message.body}</div>
+        <div class="thread-body text-sm leading-relaxed text-base-content/80 break-words">
+          {@html renderBody(thread.parent_message.body)}
+        </div>
       </div>
 
-      <!-- Replies Section -->
-      <div class="replies-section">
+      <!-- Replies -->
+      <div class="px-4 pt-3">
         {#if thread.replies && thread.replies.length > 0}
-          <div class="reply-count">
+          <div class="text-[11px] font-medium text-base-content/30 uppercase tracking-wider mb-3">
             {thread.replies.length} {thread.replies.length === 1 ? 'reply' : 'replies'}
           </div>
-
           {#each thread.replies as reply}
-            <div class="reply">
-              <div class="message-header">
-                <span class="sender-name">
-                  {reply.sender_role === 'user' ? 'You' : `Agent (${reply.provider || 'unknown'})`}
+            <div class="mb-4">
+              <div class="flex items-baseline gap-2 mb-1">
+                <span class="text-[13px] font-semibold {reply.sender_role === 'user' ? 'text-base-content/70' : 'text-primary/80'}">
+                  {senderLabel(reply)}
                 </span>
-                <span class="message-time">{formatTime(reply.inserted_at)}</span>
+                <span class="text-[11px] text-base-content/25">{formatTime(reply.inserted_at)}</span>
               </div>
-              <div class="message-body">{reply.body}</div>
+              <div class="thread-body text-sm leading-relaxed text-base-content/80 break-words">
+                {@html renderBody(reply.body)}
+              </div>
             </div>
           {/each}
         {:else}
-          <div class="empty-replies">
-            No replies yet. Start the conversation below.
+          <div class="py-8 text-center">
+            <p class="text-xs text-base-content/30">No replies yet</p>
           </div>
         {/if}
+      </div>
+    {:else}
+      <div class="flex items-center justify-center h-full">
+        <p class="text-xs text-base-content/30">Loading thread…</p>
       </div>
     {/if}
   </div>
 
-  <!-- Thread Input Area -->
-  <div class="thread-input-area">
-    <form on:submit|preventDefault={handleSubmit} class="input-form">
+  <!-- Reply composer -->
+  <div class="flex-shrink-0 p-3 border-t border-base-content/8">
+    <form on:submit={handleSubmit}>
       <textarea
-        name="body"
-        placeholder="Reply to thread..."
-        class="thread-input"
-        rows="2"
+        bind:value={replyInput}
+        on:keydown={handleKeydown}
+        placeholder="Reply to thread… (⌘↵ to send)"
+        rows="3"
+        class="w-full textarea textarea-sm bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 text-sm resize-none focus:border-primary/30 focus:bg-base-100 transition-colors"
       ></textarea>
-
-      <button type="submit" class="send-button">
-        Send
-      </button>
+      <div class="flex justify-end mt-2">
+        <button
+          type="submit"
+          class="btn btn-xs btn-primary"
+          disabled={!replyInput || !replyInput.trim()}
+        >
+          Reply
+        </button>
+      </div>
     </form>
   </div>
 </div>

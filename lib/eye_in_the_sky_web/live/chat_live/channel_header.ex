@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
             </button>
             <button
               phx-click="toggle_agent_drawer"
-              class="btn btn-xs btn-primary gap-1 min-h-[44px] min-w-[44px]"
+              class="btn btn-xs btn-ghost gap-1 min-h-[44px] min-w-[44px]"
             >
               <.icon name="hero-plus-mini" class="size-3" /> New Agent
             </button>

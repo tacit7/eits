@@ -18,6 +18,7 @@
 - [SEARCH.md](SEARCH.md) — PgSearch implementation, prefix-aware tsquery
 - [CODEX_SDK.md](CODEX_SDK.md) — Codex SDK: session lifecycle, JSONL events, resume flow
 - [CHAT.md](CHAT.md) — Chat system: channels, routing, @mentions, cross-project membership
+- [CHAT_UI_DESIGN.md](CHAT_UI_DESIGN.md) — Chat UI design spec: message rendering rules, hierarchy, metadata, actions, composer, known issues
 - [EVENTS.md](EVENTS.md) — PubSub Events: all topics, payload shapes, subscribe helpers
 - [ORCHESTRATOR_TIMERS.md](ORCHESTRATOR_TIMERS.md) — OrchestratorTimers: session-scoped auto-nudge timers, PubSub events, UI integration
 - [MOBILE.md](MOBILE.md) — Mobile layout standards: touch targets, sticky offsets, viewport, overflow

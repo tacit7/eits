@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     <div class="flex h-full flex-col" id="dm-messages-tab">
       <div class="flex-1 min-h-0 flex flex-col">
         <div
-          class="px-4 py-2 overflow-y-auto flex-1 min-h-0"
+          class="px-4 py-4 overflow-y-auto flex-1 min-h-0"
           id="messages-container"
           phx-hook="AutoScroll"
           data-has-more={if @has_more_messages, do: "true", else: "false"}
@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <% end %>
             </div>
 
-            <div class="space-y-1">
+            <div class="space-y-3">
               <%= for message <- @messages do %>
                 <.message_item message={message} />
               <% end %>
@@ -176,12 +176,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             </div>
             <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
             <.message_attachments attachments={@message.attachments || []} />
-            <time
-              id={"msg-time-#{@message.id}"}
-              class="text-nano text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150"
-              data-utc={to_utc_string(@message.inserted_at)}
-              phx-hook="LocalTime"
-            />
+            <div class="flex items-center gap-1 mt-0.5 px-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150">
+              <time
+                id={"msg-time-#{@message.id}"}
+                class="text-nano text-base-content/30"
+                data-utc={to_utc_string(@message.inserted_at)}
+                phx-hook="LocalTime"
+              />
+              <button
+                data-copy-btn
+                data-copy-text={@message.body}
+                class="ml-1 p-0.5 rounded text-base-content/25 hover:text-base-content/55 transition-colors"
+                title="Copy message"
+                aria-label="Copy message"
+              >
+                <.icon name="hero-clipboard-document-mini" class="size-3" />
+              </button>
+            </div>
           </div>
         </div>
       <% end %>

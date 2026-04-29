@@ -60,6 +60,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         active_section: :sessions,
         flyout_sessions: [],
         flyout_channels: [],
+        unread_counts: %{},
         notification_count: 0,
         new_project_path: nil,
         renaming_project_id: nil,
@@ -113,6 +114,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   @impl true
   def update(%{notification_count: :refresh}, socket) do
     {:ok, assign(socket, :notification_count, Notifications.unread_count())}
+  end
+
+  def update(%{unread_counts: counts}, socket) do
+    {:ok, assign(socket, :unread_counts, counts)}
   end
 
   def update(%{refresh_projects: true}, socket) do
@@ -634,6 +639,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         active_channel_id={@active_channel_id}
         flyout_sessions={@flyout_sessions}
         flyout_channels={@flyout_channels}
+        unread_counts={@unread_counts}
         flyout_canvases={@flyout_canvases}
         flyout_teams={@flyout_teams}
         flyout_tasks={@flyout_tasks}

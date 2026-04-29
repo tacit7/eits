@@ -87,26 +87,36 @@ defmodule EyeInTheSkyWeb.ChatLive do
         thread_id: params["thread_id"]
       })
 
+    socket =
+      socket
+      |> assign(:page_title, "Chat")
+      |> assign(:project_id, project_id)
+      |> assign(:all_projects, data.all_projects)
+      |> assign(:channels, ChatPresenter.serialize_channels(channels))
+      |> assign(:active_channel_id, channel_id)
+      |> assign(:messages, data.messages)
+      |> assign(:has_more_messages, length(data.messages) == 100)
+      |> assign(:unread_counts, data.unread_counts)
+      |> assign(:active_thread, data.active_thread)
+      |> assign(:agent_status_counts, data.agent_status_counts)
+      |> assign(:prompts, data.prompts)
+      |> assign(:agent_templates, data.agent_templates)
+      |> assign(:active_agents, data.active_sessions)
+      |> assign(:channel_members, data.channel_members)
+      |> assign(:sessions_by_project, data.sessions_by_project)
+      |> assign(:show_agent_drawer, false)
+      |> assign(:show_members, false)
+      |> assign_new(:session_search, fn -> "" end)
+      |> assign(:slash_items, SlashItems.build())
+
+    if connected?(socket) do
+      Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
+        id: "app-rail",
+        unread_counts: data.unread_counts
+      )
+    end
+
     socket
-    |> assign(:page_title, "Chat")
-    |> assign(:project_id, project_id)
-    |> assign(:all_projects, data.all_projects)
-    |> assign(:channels, ChatPresenter.serialize_channels(channels))
-    |> assign(:active_channel_id, channel_id)
-    |> assign(:messages, data.messages)
-    |> assign(:has_more_messages, length(data.messages) == 100)
-    |> assign(:unread_counts, data.unread_counts)
-    |> assign(:active_thread, data.active_thread)
-    |> assign(:agent_status_counts, data.agent_status_counts)
-    |> assign(:prompts, data.prompts)
-    |> assign(:agent_templates, data.agent_templates)
-    |> assign(:active_agents, data.active_sessions)
-    |> assign(:channel_members, data.channel_members)
-    |> assign(:sessions_by_project, data.sessions_by_project)
-    |> assign(:show_agent_drawer, false)
-    |> assign(:show_members, false)
-    |> assign_new(:session_search, fn -> "" end)
-    |> assign(:slash_items, SlashItems.build())
   end
 
   defp load_channels(project_id) do
@@ -150,6 +160,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
           channel_members={@channel_members}
           working_agents={@working_agents}
           slash_items={@slash_items}
+          active_thread={@active_thread}
           uploads={@uploads}
           socket={@socket}
         />
@@ -181,7 +192,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
             activeAgents: @active_agents,
             channelMembers: @channel_members,
             workingAgents: @working_agents,
-            slashItems: @slash_items
+            slashItems: @slash_items,
+            activeThread: @active_thread
           }
         }
         socket={@socket}

@@ -1,6 +1,12 @@
 <script>
   import { formatTime, formatDateRelative } from '../../utils/datetime.js'
   import { autoScroll } from '../../actions/autoScroll.js'
+  import { marked } from 'marked'
+  import DOMPurify from 'dompurify'
+  import ThreadPanel from '../ThreadPanel.svelte'
+
+  // Configure marked once at module level
+  marked.setOptions({ gfm: true, breaks: true })
 
   export let activeChannelId = null
   export let messages = []
@@ -9,9 +15,11 @@
   export let channelMembers = []
   export let workingAgents = {}
   export let slashItems = []
+  export let activeThread = null
   export let live
 
   let loadingOlder = false
+  let openOverflowId = null
 
   function loadOlderMessages() {
     if (!messages.length || loadingOlder) return
@@ -65,6 +73,9 @@
     }
     if (e.key === 'Escape' && showSearch) {
       closeSearch()
+    }
+    if (e.key === 'Escape' && openOverflowId !== null) {
+      openOverflowId = null
     }
   }
 
@@ -145,6 +156,26 @@
     if (!body) return ''
     const escaped = escapeHtml(body)
     return escaped.replace(/@(all|\d+)/g, (match, token) => {
+      const label = token === 'all' ? '@all' : `@${token}`
+      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">${label}</span>`
+    })
+  }
+
+  // Renders agent message body as parsed markdown with @mention highlighting.
+  // Sanitized via DOMPurify before injection. @mentions applied after sanitization
+  // since they are numeric IDs or "all" — no XSS surface.
+  const DOMPURIFY_CONFIG = {
+    ALLOWED_TAGS: ['p', 'strong', 'em', 'b', 'i', 'code', 'pre', 'ul', 'ol', 'li',
+                   'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'a',
+                   'span', 'hr', 'del', 's'],
+    ALLOWED_ATTR: ['class', 'href', 'target', 'rel']
+  }
+
+  function renderMarkdownBody(body) {
+    if (!body) return ''
+    const html = marked.parse(body)
+    const clean = DOMPurify.sanitize(html, DOMPURIFY_CONFIG)
+    return clean.replace(/@(all|\d+)/g, (match, token) => {
       const label = token === 'all' ? '@all' : `@${token}`
       return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">${label}</span>`
     })
@@ -379,11 +410,94 @@
   :global(div[id^="AgentMessagesPanel"]) {
     height: 100%;
   }
+
+  /* Markdown-rendered agent message body */
+  :global(.message-body p) {
+    margin-bottom: 0.4em;
+  }
+  :global(.message-body p:last-child) {
+    margin-bottom: 0;
+  }
+  :global(.message-body ol) {
+    list-style-type: decimal;
+    padding-left: 1.4em;
+    margin: 0.3em 0 0.5em;
+  }
+  :global(.message-body ul) {
+    list-style-type: disc;
+    padding-left: 1.4em;
+    margin: 0.3em 0 0.5em;
+  }
+  :global(.message-body li) {
+    line-height: 1.55;
+    margin-bottom: 0.2em;
+  }
+  :global(.message-body li:last-child) {
+    margin-bottom: 0;
+  }
+  :global(.message-body li > ol),
+  :global(.message-body li > ul) {
+    margin: 0.15em 0 0.15em;
+  }
+  :global(.message-body code:not(pre code)) {
+    font-family: ui-monospace, 'Cascadia Code', 'SF Mono', monospace;
+    font-size: 0.8em;
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    background-color: rgb(127 127 127 / 0.1);
+  }
+  :global(.message-body pre) {
+    font-family: ui-monospace, 'Cascadia Code', 'SF Mono', monospace;
+    font-size: 0.8em;
+    line-height: 1.5;
+    padding: 0.65em 0.9em;
+    border-radius: 6px;
+    background-color: rgb(127 127 127 / 0.07);
+    overflow-x: auto;
+    margin: 0.4em 0;
+  }
+  :global(.message-body pre code) {
+    background: none;
+    padding: 0;
+    font-size: 1em;
+  }
+  :global(.message-body strong, .message-body b) {
+    font-weight: 600;
+  }
+  :global(.message-body em, .message-body i) {
+    font-style: italic;
+  }
+  :global(.message-body del, .message-body s) {
+    text-decoration: line-through;
+    opacity: 0.6;
+  }
+  :global(.message-body h1) { font-size: 1.1em; font-weight: 600; margin: 0.5em 0 0.25em; line-height: 1.3; }
+  :global(.message-body h2) { font-size: 1.05em; font-weight: 600; margin: 0.5em 0 0.25em; line-height: 1.3; }
+  :global(.message-body h3) { font-size: 1em; font-weight: 600; margin: 0.4em 0 0.2em; }
+  :global(.message-body h4, .message-body h5, .message-body h6) { font-weight: 600; margin: 0.3em 0 0.15em; }
+  :global(.message-body blockquote) {
+    border-left: 2px solid rgb(127 127 127 / 0.25);
+    padding-left: 0.75em;
+    margin: 0.4em 0;
+    opacity: 0.75;
+  }
+  :global(.message-body a) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    opacity: 0.85;
+  }
+  :global(.message-body hr) {
+    border: none;
+    border-top: 1px solid rgb(127 127 127 / 0.15);
+    margin: 0.75em 0;
+  }
 </style>
 
-<svelte:document on:keydown={handleDocKeydown} />
+<svelte:document on:keydown={handleDocKeydown} on:click={() => openOverflowId = null} />
 
-<div class="relative flex flex-col h-full">
+<div class="flex h-full min-w-0">
+  <!-- Main chat column -->
+  <div class="relative flex flex-col flex-1 min-w-0">
   <!-- Search bar -->
   {#if showSearch}
     <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/5 bg-base-100">
@@ -406,6 +520,22 @@
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
         </button>
       </div>
+    </div>
+  {/if}
+
+  <!-- Search trigger (always visible, collapses when search is open) -->
+  {#if !showSearch}
+    <div class="flex-shrink-0 flex items-center justify-end px-4 pt-2 pb-0">
+      <button
+        type="button"
+        on:click={openSearch}
+        class="flex items-center gap-1 text-[11px] text-base-content/20 hover:text-base-content/45 transition-colors"
+        title="Search messages (⌘F)"
+      >
+        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+        Search
+        <kbd class="font-sans text-[10px] px-0.5 rounded border border-base-content/10 bg-base-content/5">⌘F</kbd>
+      </button>
     </div>
   {/if}
 
@@ -449,12 +579,11 @@
 
           <!-- Message -->
           <div
-            class="group py-3 px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? '' : 'hover:bg-base-content/[0.02]'}"
+            class="group relative px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? 'py-1' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 hover:bg-base-content/[0.04]'}"
           >
             {#if message.sender_role === 'system'}
               <!-- System message -->
-              <div class="flex items-center gap-2 text-xs text-base-content/30 italic px-1">
-                <span class="w-1 h-1 rounded-full bg-base-content/20 flex-shrink-0"></span>
+              <div class="flex items-center gap-2 text-[11px] text-base-content/25 italic pl-3 border-l-2 border-base-content/[0.08]">
                 <span class="flex-1">{message.body}</span>
                 <button
                   class="opacity-0 group-hover:opacity-100 text-base-content/20 hover:text-error transition-all cursor-pointer"
@@ -465,6 +594,47 @@
                 </button>
               </div>
             {:else}
+              <!-- Hover actions: absolute overlay, not in flex flow -->
+              <div class="absolute top-2 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
+                <!-- Reply in thread -->
+                <button
+                  class="p-1 rounded text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                  on:click={() => live.pushEvent('open_thread', { message_id: String(message.id) })}
+                  title="Reply in thread"
+                >
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-4 4V5Z" clip-rule="evenodd"/></svg>
+                </button>
+                <!-- Copy -->
+                <button
+                  class="p-1 rounded text-base-content/30 hover:text-base-content/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                  on:click={() => navigator.clipboard.writeText(message.body || '')}
+                  title="Copy message"
+                >
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                </button>
+                <!-- Overflow (contains destructive actions) -->
+                <div class="relative">
+                  <button
+                    class="p-1 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                    on:click|stopPropagation={() => openOverflowId = openOverflowId === message.id ? null : message.id}
+                    title="More actions"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
+                  </button>
+                  {#if openOverflowId === message.id}
+                    <div class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-lg shadow-lg py-0.5 w-32 z-20">
+                      <button
+                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-error/80 hover:bg-error/[0.08] hover:text-error transition-colors cursor-pointer"
+                        on:click|stopPropagation={() => { live.pushEvent('delete_message', { id: String(message.id) }); openOverflowId = null }}
+                      >
+                        <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        Delete
+                      </button>
+                    </div>
+                  {/if}
+                </div>
+              </div>
+
               <div class="flex items-start gap-2.5">
                 <!-- Sender icon -->
                 {#if message.sender_role === 'user'}
@@ -478,9 +648,8 @@
                 {/if}
 
                 <div class="min-w-0 flex-1">
-                  <div class="flex items-baseline gap-2 flex-wrap">
-                    <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
-
+                  <!-- Identity line: no flex-wrap; hover actions removed from this flow -->
+                  <div class="flex items-baseline gap-2">
                     {#if message.sender_role === 'user'}
                       <span class="text-[13px] font-semibold text-base-content/70">You</span>
                     {:else if message.session_id}
@@ -488,7 +657,7 @@
                       <button
                         class="text-[13px] font-semibold text-primary/80 hover:text-primary transition-colors cursor-pointer"
                         on:click={() => navigateToDm(message.session_id)}
-                        title="Session #{message.session_id}"
+                        title="Open DM with this agent"
                       >
                         {agent?.name || message.session_name || `@${message.session_id}`}
                       </button>
@@ -496,50 +665,82 @@
                       <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                     {/if}
 
+                    <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
+
                     {#if message.number}
-                      <span class="font-mono text-xs text-base-content/20">#{message.number}</span>
+                      <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
                     {/if}
-                    <button
-                      class="opacity-0 group-hover:opacity-100 ml-auto text-base-content/20 hover:text-error transition-all cursor-pointer"
-                      on:click={() => live.pushEvent('delete_message', { id: String(message.id) })}
-                      title="Delete message"
-                    >
-                      <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                    </button>
                   </div>
 
-                  <p class="mt-1 text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{@html renderBody(message.body)}</p>
-
-                  <!-- Usage metadata for agent messages -->
-                  {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                    <div class="mt-2 flex flex-wrap gap-1.5">
-                      {#if message.metadata.total_cost_usd}
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          ${message.metadata.total_cost_usd.toFixed(4)}
-                        </span>
-                      {/if}
-                      {#if message.metadata.usage?.input_tokens}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          {message.metadata.usage.input_tokens} in
-                        </span>
-                      {/if}
-                      {#if message.metadata.usage?.output_tokens}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          {message.metadata.usage.output_tokens} out
-                        </span>
-                      {/if}
-                      {#if message.metadata.duration_ms}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          {(message.metadata.duration_ms / 1000).toFixed(1)}s
-                        </span>
-                      {/if}
-                      {#if message.metadata.num_turns}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                          {message.metadata.num_turns} turns
-                        </span>
+                  <div class="max-w-[720px]">
+                    <div class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words">
+                      {#if message.sender_role === 'agent'}
+                        {@html renderMarkdownBody(message.body)}
+                      {:else}
+                        <p class="whitespace-pre-wrap">{@html renderBody(message.body)}</p>
                       {/if}
                     </div>
-                  {/if}
+
+                    <!-- Usage metadata for agent messages -->
+                    {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
+                      <div class="mt-2 flex flex-nowrap gap-x-1.5 min-w-0 overflow-hidden">
+                        {#if message.metadata.total_cost_usd}
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-primary/50">
+                            ${message.metadata.total_cost_usd.toFixed(4)}
+                          </span>
+                        {/if}
+                        {#if message.metadata.usage?.input_tokens}
+                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                            {message.metadata.usage.input_tokens} in
+                          </span>
+                        {/if}
+                        {#if message.metadata.usage?.output_tokens}
+                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                            {message.metadata.usage.output_tokens} out
+                          </span>
+                        {/if}
+                        {#if message.metadata.duration_ms}
+                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                            {(message.metadata.duration_ms / 1000).toFixed(1)}s
+                          </span>
+                        {/if}
+                        {#if message.metadata.num_turns}
+                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/25">
+                            {message.metadata.num_turns} turns
+                          </span>
+                        {/if}
+                      </div>
+                    {/if}
+
+                    <!-- Reactions -->
+                    {#if message.reactions && message.reactions.length > 0}
+                      <div class="mt-2 flex flex-wrap gap-1">
+                        {#each message.reactions as reaction}
+                          <button
+                            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] bg-base-content/[0.05] hover:bg-primary/10 hover:text-primary transition-colors"
+                            on:click={() => live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji: reaction.emoji })}
+                            title="React with {reaction.emoji}"
+                          >
+                            {reaction.emoji}
+                            <span class="text-base-content/50 text-[11px] tabular-nums">{reaction.count}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    <!-- Thread reply count -->
+                    {#if message.thread_reply_count > 0}
+                      <button
+                        class="mt-2 flex items-center gap-1.5 text-[11px] text-primary/60 hover:text-primary transition-colors"
+                        on:click={() => live.pushEvent('open_thread', { message_id: String(message.id) })}
+                      >
+                        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-4 4V5Z" clip-rule="evenodd"/>
+                        </svg>
+                        {message.thread_reply_count} {message.thread_reply_count === 1 ? 'reply' : 'replies'}
+                      </button>
+                    {/if}
+                  </div>
                 </div>
               </div>
             {/if}
@@ -605,15 +806,6 @@
       class="relative bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm p-4 flex flex-col"
     >
       <div class="flex gap-2">
-        <button
-          type="button"
-          on:click={openSearch}
-          class="flex-shrink-0 w-8 h-10 flex items-center justify-center text-base-content/30 hover:text-base-content/60 transition-colors"
-          title="Search messages (⌘F)"
-          aria-label="Search messages"
-        >
-          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
-        </button>
         <div class="relative flex-1">
           <input
             type="text"
@@ -694,4 +886,10 @@
       </div>
     </form>
   </div>
+  </div><!-- end main chat column -->
+
+  <!-- Thread panel (slides in when a thread is open) -->
+  {#if activeThread}
+    <ThreadPanel thread={activeThread} {live} />
+  {/if}
 </div>

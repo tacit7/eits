@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :active_channel_id, :any, default: nil
   attr :flyout_sessions, :list, default: []
   attr :flyout_channels, :list, default: []
+  attr :unread_counts, :map, default: %{}
   attr :flyout_canvases, :list, default: []
   attr :flyout_teams, :list, default: []
   attr :flyout_tasks, :list, default: []
@@ -160,7 +161,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :prompts -> %>
               <.nav_links project={@sidebar_project} section={:prompts} />
             <% :chat -> %>
-              <.chat_content channels={@flyout_channels} active_channel_id={@active_channel_id} myself={@myself} />
+              <.chat_content channels={@flyout_channels} active_channel_id={@active_channel_id} unread_counts={@unread_counts} myself={@myself} />
             <% :notes -> %>
               <.notes_content notes={@flyout_notes} />
             <% :skills -> %>
@@ -228,12 +229,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   # Chat flyout: real channel list
   attr :channels, :list, default: []
   attr :active_channel_id, :any, default: nil
+  attr :unread_counts, :map, default: %{}
   attr :myself, :any, required: true
 
   defp chat_content(assigns) do
     ~H"""
     <%= for channel <- @channels do %>
       <% active = not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
+      <% unread = Map.get(@unread_counts, channel.id, 0) %>
       <.link
         navigate={"/chat?channel_id=#{channel.id}"}
         data-vim-flyout-item
@@ -248,7 +251,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         <span class={["text-[13px] flex-shrink-0", if(active, do: "text-primary/60", else: "text-base-content/25")]}>
           #
         </span>
-        <span class="truncate">{channel.name}</span>
+        <span class={["truncate flex-1", if(unread > 0 && !active, do: "font-semibold text-base-content/85")]}>
+          {channel.name}
+        </span>
+        <%= if unread > 0 && !active do %>
+          <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary"></span>
+        <% end %>
       </.link>
     <% end %>
     <%= if @channels == [] do %>

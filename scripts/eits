@@ -3056,6 +3056,80 @@ EOF
   /bin/rm -rf "$tmp_dir" 2>/dev/null || true
 }
 
+# ── messages ──────────────────────────────────────────────────────────────────
+
+cmd_messages() {
+  local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits messages <search>"; return 0; }
+  case "$sub" in
+    search)
+      # eits messages search <query> [--session <uuid|id>] [--limit <n>] [--json]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'SEARCH_HELP'
+usage: eits messages search <query> [--session <uuid|id>] [--limit <n>] [--json]
+
+Search session message bodies across all sessions.
+
+Arguments:
+  query            Text to search for (full-text search with ILIKE fallback)
+
+Options:
+  --session <id>   Scope to a specific session (UUID or integer ID)
+  --limit <n>      Max results to return (default 10, max 100)
+  --json           Output raw JSON instead of table
+
+Examples:
+  eits messages search "deploy failed"
+  eits messages search "error" --session abc123 --limit 20
+  eits messages search "migration" --json
+SEARCH_HELP
+        return 0
+      }
+      local query="${1:-}"; [[ -z "$query" ]] && die "query is required"; shift
+      local session_id="" limit="10" json_mode=0 qs=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --session)   session_id="$2"; shift 2 ;;
+          --limit|-n)  limit="$2";      shift 2 ;;
+          --json)      json_mode=1;     shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      qs="q=$(printf '%s' "$query" | jq -Rr @uri)&limit=${limit}"
+      [[ -n "$session_id" ]] && qs="${qs}&session_id=$(printf '%s' "$session_id" | jq -Rr @uri)"
+      local _resp; _resp=$(_curl "${BASE_URL}/messages/search?${qs}") || return 1
+      if [[ $json_mode -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      else
+        local count; count=$(printf '%s\n' "$_resp" | jq -r '.count')
+        printf '%s\n' "$_resp" | jq -r \
+          '.messages[] | [
+            (.session_name // .session_uuid // (.session_id | tostring)),
+            .role,
+            (.body_excerpt | gsub("\n";" ") | .[0:80]),
+            (.inserted_at | tostring | .[0:19])
+          ] | @tsv' \
+          | column -t -s $'\t' \
+          | { printf "%-4s  %s\n" "($count results)" ""; cat; }
+      fi
+      ;;
+    *)
+      cat <<USAGE
+usage: eits messages <subcommand>
+
+Subcommands:
+  search <query> [--session <uuid|id>] [--limit|-n <N>] [--json]
+         Full-text search across session message bodies (default limit: 10)
+
+Examples:
+  eits messages search "deploy failed"
+  eits messages search "error" --session abc-uuid --limit 20
+  eits messages search "migration" --json
+USAGE
+      ;;
+  esac
+}
+
 # ── codex ─────────────────────────────────────────────────────────────────────
 
 cmd_codex() {
@@ -3246,6 +3320,7 @@ case "$cmd" in
   worktree)      cmd_worktree      "$@" ;;
   queue)         cmd_queue         "$@" ;;
   search)        cmd_search        "$@" ;;
+  messages)      cmd_messages      "$@" ;;
   codex)         cmd_codex         "$@" ;;
   me|whoami)     cmd_me ;;
   help|--help|-h) usage ;;

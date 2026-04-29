@@ -23,6 +23,8 @@
 - [MOBILE.md](MOBILE.md) — Mobile layout standards: touch targets, sticky offsets, viewport, overflow
 - [RAIL_MENU.md](RAIL_MENU.md) — Rail menu: section map, sticky sections, lazy loaders, project context, known project-persistence bug
 - [WORKSPACE_SCOPE.md](WORKSPACE_SCOPE.md) — Workspace scope contract: Scope struct, WorkspaceLive.Hooks, cross-workspace ownership validation, canonical queries
+- [VIM_NAV.md](VIM_NAV.md) — Vim navigation: all current keybindings, scope system, DOM markers
+- [VIM_NAV_LAZYVIM_PLAN.md](VIM_NAV_LAZYVIM_PLAN.md) — Planned LazyVim-inspired leader bindings (Space prefix, Phase A/B)
 
 ## Claude API Key Blocking
 

@@ -40,13 +40,17 @@ The rail maps `sidebar_tab` atoms (set by each LiveView) to `active_section` ato
   jobs:          :jobs,
   config:        :sessions,
   settings:      :sessions,
-  agents:        :sessions,
-  files:         :sessions,
+  agents:        :agents,
+  files:         :files,
   bookmarks:     :sessions
 }
 ```
 
 `@valid_sections` is the list of atoms that `parse_section/1` accepts from `toggle_section` click events. Any section not in this list falls back to `:sessions`.
+
+```elixir
+@valid_sections ~w(sessions agents tasks prompts chat notes skills teams canvas notifications usage jobs files)
+```
 
 ---
 
@@ -104,6 +108,21 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 
 ---
 
+### Agents Flyout
+
+**Lazy loader**: `maybe_load_agents/3`
+
+**UI features**:
+- Lists project agents (capped at 15 agents)
+- Each agent row is clickable and opens the New Session form with that agent pre-filled in the agent selector
+- Prefill mechanism: agent rows use `data-prefill-slug` and `data-prefill-label` attributes; `AgentCombobox` component reads these on mount to pre-select the agent
+- New Session form field changes: "Name" renamed to "Session Name", "Description" renamed to "Prompt"
+- Agents overview page: supports `?id=<agent_id>` query parameter to pre-select agent detail panel
+
+**Project scope**: agents are project-scoped. If no project selected, shows empty state.
+
+---
+
 ### Tasks Flyout
 
 **Lazy loader**: `maybe_load_tasks/3`
@@ -156,6 +175,22 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 
 ---
 
+### Files Flyout
+
+**Lazy loader**: loads file tree on demand (no explicit loader function name, but data loads when section is opened)
+
+**UI features**:
+- **Flyout header icons**: refresh button (arrow-path icon) re-reads root nodes and re-fetches children for all currently expanded paths
+- **Refresh behavior**: Preserves expanded state (does not clear); prunes any paths that no longer exist on disk (deleted between expand and refresh)
+- **File tree**: hierarchical display with expand/collapse for directories
+- **No broken state**: refresh handles deleted directories gracefully by filtering them from the expanded set
+
+**Project scope**: files are project-scoped. If no project selected, shows empty state.
+
+**Refresh implementation detail**: On refresh, for each expanded path, attempts to re-fetch children from disk. If a path fails to fetch (dir deleted or unreadable), it is removed from the expanded set but the rest of the tree is preserved.
+
+---
+
 ### Chat Flyout
 
 **Lazy loader**: `maybe_load_channels/3`
@@ -198,12 +233,14 @@ Data is only fetched when entering a section, not on every page render:
 | `:tasks`    | `maybe_load_tasks/3`      | Yes            |
 | `:chat`     | `maybe_load_channels/3`   | Yes            |
 | `:teams`    | `maybe_load_teams/3`      | Yes            |
+| `:agents`   | `maybe_load_agents/3`     | Yes            |
 | `:canvas`   | `maybe_load_canvases/2`   | No             |
 | `:notes`    | `maybe_load_notes/3`      | Yes            |
+| `:files`    | File tree on section open | Yes            |
 | `:jobs`     | `maybe_load_jobs/2`       | Yes            |
 | `:usage`    | —                         | —              |
 
-Sessions and notes are also re-fetched when `sidebar_project` changes (project switch triggers a reload).
+Sessions, notes, and agents are also re-fetched when `sidebar_project` changes (project switch triggers a reload).
 
 ### Dual-Page Sections
 
@@ -211,7 +248,7 @@ Sections with both a global and project-scoped page show a single clickable head
 
 ```elixir
 defp dual_page_section?(section),
-  do: section in [:sessions, :tasks, :prompts, :notes, :skills, :jobs]
+  do: section in [:sessions, :tasks, :prompts, :notes, :skills, :agents, :jobs]
 ```
 
 **Header behavior**:
@@ -227,6 +264,7 @@ Route mappings:
 - Prompts: `/projects/:id/prompts`
 - Notes: `/projects/:id/notes`
 - Skills: `/projects/:id/skills`
+- Agents: `/projects/:id/agents`
 - Jobs: `/projects/:id/jobs`
 
 Helper functions:
@@ -357,3 +395,7 @@ Related components:
 11. **FileActions module** — file event handlers (`handle_event` for file operations) were extracted to `lib/eye_in_the_sky_web/components/rail/file_actions.ex`. Rail.ex delegates file events to this module to keep the main component lean. Import and use the module as needed.
 
 12. **Icon consolidation via custom_icon/1** — inline SVGs for Lucide icons are consolidated in the `custom_icon/1` component (core_components.ex). Always use `.custom_icon` for new Lucide icons instead of raw SVG. Use `.icon` for Heroicons.
+
+13. **File refresh preserves expanded state** — when the user clicks the refresh button in the files flyout, the tree re-reads root nodes and re-fetches children for all currently expanded paths. Paths that no longer exist on disk are pruned from the expanded set. This preserves the expanded view context and prevents broken intermediate states (expanded-but-empty directories).
+
+14. **Agent prefill via data attributes** — clicking an agent row in the agents flyout opens the New Session form with that agent pre-filled. The agent row uses `data-prefill-slug` and `data-prefill-label` attributes; `AgentCombobox` reads these on mount and pre-selects the agent in the dropdown.

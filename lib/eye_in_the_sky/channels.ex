@@ -166,9 +166,12 @@ defmodule EyeInTheSky.Channels do
     from(m in ChannelMember,
       left_join: s in EyeInTheSky.Sessions.Session,
       on: s.id == m.session_id,
+      left_join: a in EyeInTheSky.Agents.Agent,
+      on: a.id == m.agent_id,
       where: m.channel_id == ^channel_id,
       order_by: [asc: m.joined_at],
       select: %{
+        agent_uuid: a.uuid,
         session_id: m.session_id,
         session_uuid: s.uuid,
         session_name: s.name,

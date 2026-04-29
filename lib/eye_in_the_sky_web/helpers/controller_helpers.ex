@@ -70,6 +70,46 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   def validate_required(_val, _field), do: :ok
 
   @doc """
+  Parses a duration string into a `%DateTime{}` representing that far in the past.
+
+  Accepts:
+  - `"Nh"` — N hours ago (e.g. `"24h"`, `"1h"`)
+  - `"Nd"` — N days ago (e.g. `"7d"`, `"30d"`)
+  - `"Nm"` — N minutes ago (e.g. `"30m"`, `"90m"`)
+  - Any ISO8601 datetime string (passed through as-is)
+
+  Returns `{:ok, %DateTime{}}` or `{:error, message}`.
+  """
+  def parse_duration(nil), do: {:error, "duration is required"}
+  def parse_duration(""), do: {:error, "duration is required"}
+
+  def parse_duration(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} ->
+        {:ok, dt}
+
+      _ ->
+        case Regex.run(~r/^(\d+)(h|d|m)$/, str) do
+          [_, amount_str, unit] ->
+            amount = String.to_integer(amount_str)
+
+            seconds =
+              case unit do
+                "h" -> amount * 3600
+                "d" -> amount * 86_400
+                "m" -> amount * 60
+              end
+
+            {:ok, DateTime.add(DateTime.utc_now(), -seconds, :second)}
+
+          nil ->
+            {:error,
+             "Invalid duration '#{str}'. Use Nh/Nd/Nm (e.g. 24h, 7d, 30m) or ISO8601."}
+        end
+    end
+  end
+
+  @doc """
   Coerces a `starred` param value to a boolean.
   Accepts boolean, integer (1/0), or string representations ("1"/"true"/"0"/"false").
 

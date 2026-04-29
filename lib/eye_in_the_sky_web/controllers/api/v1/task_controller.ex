@@ -12,23 +12,53 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   @doc """
   GET /api/v1/tasks - List tasks.
-  Query params: project_id, agent_id, session_id, q (search), limit
+  Query params: project_id, agent_id, session_id, q (search), limit,
+                since (duration string), stale_since (duration string)
   """
   def index(conn, params) do
     limit = parse_int(params["limit"], 50)
-    tasks = fetch_tasks(params, limit)
 
-    json(conn, %{
-      success: true,
-      message: "#{length(tasks)} task(s)",
-      tasks: Enum.map(tasks, &ApiPresenter.present_task/1)
-    })
+    with {:ok, time_opts} <- resolve_time_opts(params) do
+      tasks = fetch_tasks(params, limit, time_opts)
+
+      json(conn, %{
+        success: true,
+        message: "#{length(tasks)} task(s)",
+        tasks: Enum.map(tasks, &ApiPresenter.present_task/1)
+      })
+    end
   end
 
-  defp fetch_tasks(params, limit) do
+  defp fetch_tasks(params, limit, time_opts) do
     state_id = parse_int(params["state_id"], nil)
-    opts = [limit: limit] ++ if(state_id, do: [state_id: state_id], else: [])
+
+    opts =
+      [limit: limit]
+      |> then(&if(state_id, do: [{:state_id, state_id} | &1], else: &1))
+      |> Kernel.++(time_opts)
+
     fetch_tasks_by_filter(params, opts)
+  end
+
+  # Parses `since` and `stale_since` query params into DateTime opts.
+  # Returns {:ok, keyword} or {:error, message} on invalid input.
+  defp resolve_time_opts(params) do
+    Enum.reduce_while(
+      [{"since", :since}, {"stale_since", :stale_since}],
+      {:ok, []},
+      fn {key, opt}, {:ok, acc} ->
+        case params[key] do
+          v when v in [nil, ""] ->
+            {:cont, {:ok, acc}}
+
+          val ->
+            case parse_duration(val) do
+              {:ok, dt} -> {:cont, {:ok, [{opt, dt} | acc]}}
+              {:error, msg} -> {:halt, {:error, :bad_request, msg}}
+            end
+        end
+      end
+    )
   end
 
   defp fetch_tasks_by_filter(%{"q" => q} = params, opts) when is_binary(q) and q != "" do

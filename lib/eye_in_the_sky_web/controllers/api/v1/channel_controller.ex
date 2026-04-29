@@ -137,6 +137,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
           members:
             Enum.map(members, fn m ->
               %{
+                agent_uuid: m.agent_uuid,
                 session_id: m.session_id,
                 session_uuid: m.session_uuid,
                 session_name: m.session_name,

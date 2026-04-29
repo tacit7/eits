@@ -49,6 +49,8 @@ defmodule EyeInTheSky.Tasks.Queries do
     Task
     |> where([t], t.agent_id == ^agent_id)
     |> QueryBuilder.maybe_where(opts, :state_id)
+    |> maybe_since(opts)
+    |> maybe_stale_since(opts)
     |> preload(^@full_task_preloads)
     |> order_by([t],
       desc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", t.archived),
@@ -68,6 +70,8 @@ defmodule EyeInTheSky.Tasks.Queries do
       |> join(:inner, [t], ts in "task_sessions", on: ts.task_id == t.id)
       |> where([t, ts], ts.session_id == ^session_id)
       |> QueryBuilder.maybe_where(opts, :state_id)
+      |> maybe_since(opts)
+      |> maybe_stale_since(opts)
       |> order_by([t], desc: t.priority, asc: t.created_at)
       |> preload([:state, :tags])
       |> QueryBuilder.maybe_limit(opts)
@@ -182,6 +186,8 @@ defmodule EyeInTheSky.Tasks.Queries do
     |> join(:inner, [t], tt in "task_tags", on: tt.task_id == t.id)
     |> where([t, tt], tt.tag_id == ^tag_id)
     |> QueryBuilder.maybe_where(opts, :state_id)
+    |> maybe_since(opts)
+    |> maybe_stale_since(opts)
     |> order_by([t], desc: t.priority, asc: t.created_at)
     |> preload(^@full_task_preloads)
     |> QueryBuilder.maybe_limit(opts)
@@ -196,6 +202,8 @@ defmodule EyeInTheSky.Tasks.Queries do
     Task
     |> where([t], t.created_by_session_id == ^session_id)
     |> QueryBuilder.maybe_where(opts, :state_id)
+    |> maybe_since(opts)
+    |> maybe_stale_since(opts)
     |> order_by([t], desc: t.priority, asc: t.created_at)
     |> preload([:state, :tags])
     |> QueryBuilder.maybe_limit(opts)
@@ -224,6 +232,8 @@ defmodule EyeInTheSky.Tasks.Queries do
       end
 
     base_project_tasks_query(project_id, opts)
+    |> maybe_since(opts)
+    |> maybe_stale_since(opts)
     |> order_by(^order)
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
@@ -270,6 +280,31 @@ defmodule EyeInTheSky.Tasks.Queries do
     Task
     |> then(fn q -> if include_archived, do: q, else: where(q, [t], t.archived == false) end)
     |> QueryBuilder.maybe_where(opts, :state_id)
+    |> maybe_since(opts)
+    |> maybe_stale_since(opts)
+  end
+
+  # Filters to tasks whose state changed (updated_at) within the given window.
+  # Applied when `opts[:since]` is a `%DateTime{}`.
+  defp maybe_since(query, opts) do
+    case Keyword.get(opts, :since) do
+      nil -> query
+      %DateTime{} = dt -> where(query, [t], t.updated_at >= ^dt)
+    end
+  end
+
+  # Filters to non-terminal tasks that have NOT been updated since the given cutoff.
+  # Applied when `opts[:stale_since]` is a `%DateTime{}`.
+  # Terminal state: Done (id=3). All others (To Do, In Progress, In Review) qualify.
+  defp maybe_stale_since(query, opts) do
+    case Keyword.get(opts, :stale_since) do
+      nil ->
+        query
+
+      %DateTime{} = dt ->
+        done_id = WorkflowState.done_id()
+        where(query, [t], t.state_id != ^done_id and t.updated_at < ^dt)
+    end
   end
 
   # --- Scope-aware queries ---

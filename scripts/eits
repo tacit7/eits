@@ -1932,6 +1932,7 @@ Send:
   --to <id>              Recipient session UUID or integer ID
   --message <text>       Message body
   --from <id>            Sender session UUID or integer ID (default: current session)
+  --metadata <json>      Structured metadata as JSON (optional, agent context only)
   --response-required    Mark DM as requiring a reply
 
 Read:
@@ -1942,23 +1943,38 @@ EOF
     return 0
   fi
 
-  # eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
+  # eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--metadata <json>] [--response-required]
   # --from defaults to $EITS_SESSION_UUID or $EITS_SESSION_ID when omitted
-  local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" to="" message="" response_required="false"
+  # --metadata is optional JSON string passed as-is to the API
+  local from="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" to="" message="" metadata="" response_required="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --from)              from="$2";              shift 2 ;;
       --to)                to="$2";                shift 2 ;;
       --message|-m)        message="$2";           shift 2 ;;
+      --metadata)          metadata="$2";          shift 2 ;;
       --response-required) response_required="true"; shift ;;
       *) die "unknown flag: $1" ;;
     esac
   done
   need from; need to; need message
 
+  # Validate metadata is valid JSON if provided
+  if [[ -n "$metadata" ]]; then
+    if ! echo "$metadata" | jq . >/dev/null 2>&1; then
+      die "--metadata must be valid JSON"
+    fi
+  fi
+
   local payload
-  payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
-    '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
+  if [[ -n "$metadata" ]]; then
+    # Parse metadata and merge it into the payload
+    payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" --argjson meta "$metadata" \
+      '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r, metadata: $meta}')
+  else
+    payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
+      '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
+  fi
   local _dm_resp; _dm_resp=$(_post "/dm" "$payload") || return 1
   # Resolve recipient name — use $to (already known) rather than parsing response
   local _to_name; _to_name=$(_curl "$BASE_URL/sessions/$to" 2>/dev/null \

@@ -143,7 +143,6 @@
             channel_members={assigns[:channel_members] || []}
             sessions_by_project={assigns[:sessions_by_project] || []}
             session_search={assigns[:session_search] || ""}
-            agent_status_counts={assigns[:agent_status_counts] || %{}}
           />
         <% _ -> %>
           <%= if not is_nil(assigns[:search_query]) do %>

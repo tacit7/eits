@@ -68,6 +68,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       else: []
   end
 
+  defp fetch_tasks_by_filter(%{"tag_id" => tag_id}, opts) do
+    case parse_int(tag_id, nil) do
+      nil -> []
+      tag_int_id -> Tasks.list_tasks_for_tag(tag_int_id, opts)
+    end
+  end
+
   defp fetch_tasks_by_filter(%{"project_id" => project_id}, opts) do
     case parse_int(project_id, nil) do
       nil -> []

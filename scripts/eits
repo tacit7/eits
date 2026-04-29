@@ -544,7 +544,7 @@ cmd_tasks() {
 usage: eits tasks <subcommand> [options]
 
 Subcommands:
-  list      [-s <session>] [-p <project>] [-l <limit>] [--mine] [--all]
+  list      [-s <session>] [-p <project>] [-l <limit>] [--tag <id>] [--mine] [--all]
   get       <id>
   begin     -t <title> [-p <project>] [-d <desc>] [-q]   create + claim in one shot
   complete  <id> -m <message>                             atomic annotate + done
@@ -571,17 +571,18 @@ TASKS_HELP
   return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by] [--all]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--tag <id>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by] [--all]
       # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only the
       # current session's tasks. Pass --all to list across all sessions.
       # --mine/--assigned: tasks where current session is the active executor (linked via task_sessions)
       # --created-by: tasks created by the current session (via created_by_session_id)
-      local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0 _json=0
+      local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0 _tag_flag=0 _json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
           --session|-s) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent)   _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --tag)     _tag_flag=1; qs="${qs}&tag_id=$2"; shift 2 ;;
           --q|--search|-q) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)
             # Positional remap: 1=todo(1), 2=progress(2), 3=review(4), 4=done(3)
@@ -608,8 +609,8 @@ TASKS_HELP
         esac
       done
       # Agent-centric default: when running as an agent, scope to current session
-      # unless --all, --session, --mine, or --agent explicitly overrides the scope
-      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 ]]; then
+      # unless --all, --session, --mine, --agent, or --tag explicitly overrides the scope
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 && $_tag_flag -eq 0 ]]; then
         local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
         [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
       fi

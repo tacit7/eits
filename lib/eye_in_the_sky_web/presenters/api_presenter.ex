@@ -126,7 +126,8 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       name: session.name,
       description: session.description,
       status: session.status,
-      status_reason: session.status_reason
+      status_reason: session.status_reason,
+      read_only: session.read_only || false
     }
   end
 
@@ -152,6 +153,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       name: session.name,
       description: session.description,
       is_spawned: Keyword.get(opts, :is_spawned, false),
+      read_only: session.read_only || false,
       initialized: true,
       tasks: Enum.map(tasks, &present_session_task/1),
       recent_notes: Enum.map(recent_notes, &present_session_note/1),

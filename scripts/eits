@@ -270,7 +270,7 @@ _tbl_commits() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"; echo "  list -q/--search <q>   full-text search sessions by name/description"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|set-intent|end|complete|waiting|archive|unarchive|context|tasks|notes>"; echo "  list -q/--search <q>   full-text search sessions by name/description"; echo "  set-intent <review|work>  declare read-only intent (review) or work mode"; return 0; }
   case "$sub" in
     list)
       # eits sessions list [-q|--search <q>] [-n|--name <partial>] [--status <s>] [-p|--project <id>] [--agent <uuid>] [-l|--limit <n>] [--mine] [--include-archived] [--with-tasks] [-j|--json]
@@ -368,7 +368,7 @@ cmd_sessions() {
       ;;
     create)
       # eits sessions create --session-id <uuid> [--name <n>] [--description <d>] [--project <p>] [--project-path <path>] [--model <m>] [--entrypoint <e>]
-      local session_id="" name="" description="" project_name="" project_path="" model="" entrypoint=""
+      local session_id="" name="" description="" project_name="" project_path="" model="" entrypoint="" read_only="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session-id)  session_id="$2";   shift 2 ;;
@@ -378,11 +378,12 @@ cmd_sessions() {
           --project-path) project_path="$2"; shift 2 ;;
           --model)       model="$2";        shift 2 ;;
           --entrypoint)  entrypoint="$2";   shift 2 ;;
+          --read-only)   read_only="true";  shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need session_id
-      _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" project_path "$project_path" model "$model" entrypoint "$entrypoint")"
+      _post "/sessions" "$(json session_id "$session_id" name "$name" description "$description" project_name "$project_name" project_path "$project_path" model "$model" entrypoint "$entrypoint" read_only "$read_only")"
       ;;
     update)
       # eits sessions update <uuid|self> [--status <status>] [--reason <reason>] [--intent <text>] [--entrypoint <e>] [--name <name>] [--description <desc>] [--clear-entrypoint] [--ended-at <ISO8601>] [--project-id <id>]
@@ -436,6 +437,38 @@ SESSIONS_UPDATE_HELP
         esac
       done
       _patch "/sessions/$uuid" "$(json status "$status" status_reason "$reason" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at" project_id "$project_id")"
+      ;;
+    set-intent)
+      # eits sessions set-intent <review|work> [<uuid>]
+      # review → sets read_only: true on the session
+      # work   → sets read_only: false
+      # uuid defaults to EITS_SESSION_UUID
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'SET_INTENT_HELP'
+usage: eits sessions set-intent <review|work> [<uuid>]
+
+Declare the intent of a session upfront so hooks can make smarter decisions.
+
+  review   Mark session as read-only review mode (read_only: true).
+           Pre-tool-use hooks should skip task enforcement for read-only sessions.
+  work     Mark session as work mode (read_only: false). Default for all sessions.
+
+uuid defaults to $EITS_SESSION_UUID when not provided.
+
+Examples:
+  eits sessions set-intent review
+  eits sessions set-intent work 550e8400-e29b-41d4-a716-446655440000
+SET_INTENT_HELP
+        return 0
+      }
+      local _intent_mode="${1:-}"; shift || true
+      [[ "$_intent_mode" == "review" || "$_intent_mode" == "work" ]] || die "set-intent requires 'review' or 'work' as the first argument"
+      local _uuid="${1:-${EITS_SESSION_UUID:-}}"
+      [[ -n "$_uuid" ]] || die "session UUID required (pass as argument or set EITS_SESSION_UUID)"
+      [[ "$_uuid" == "self" ]] && { _uuid="${EITS_SESSION_UUID:-}"; [[ -n "$_uuid" ]] || die "EITS_SESSION_UUID is not set"; }
+      local _read_only
+      [[ "$_intent_mode" == "review" ]] && _read_only="true" || _read_only="false"
+      _patch "/sessions/$_uuid" "$(json read_only "$_read_only")"
       ;;
     end)
       # eits sessions end <uuid> [--final-status <completed|failed|waiting>]
@@ -3360,6 +3393,20 @@ cmd_me() {
   [[ -n "${EITS_SESSION_UUID:-}" ]]  && printf '  %s Session UUID set\n' "$ok" || printf '  %s Session UUID NOT set — work may be untracked\n' "$fail"
   [[ -n "${EITS_AGENT_UUID:-}" ]]    && printf '  %s Agent UUID set\n'   "$ok" || printf '  %s Agent UUID NOT set — commits/sessions may not link\n' "$fail"
   [[ -n "${EITS_PROJECT_ID:-}" ]]    && printf '  %s Project ID set\n'   "$ok" || printf '  %s Project ID NOT set — tasks will be unscoped\n' "$fail"
+
+  # ── session intent ────────────────────────────────────────────────────────
+  if [[ -n "$uuid" ]]; then
+    local _sess_intent
+    _sess_intent=$(_curl "$BASE_URL/sessions/$uuid" 2>/dev/null | jq -r '.read_only // false' 2>/dev/null || echo "false")
+    printf '\n── Session Intent ───────────────────────────────────────────\n'
+    if [[ "$_sess_intent" == "true" ]]; then
+      printf '  intent: review  (read-only — task enforcement skipped)\n'
+      printf '  To switch: eits sessions set-intent work\n'
+    else
+      printf '  intent: work  (default — pre-tool-use hooks enforce task)\n'
+      printf '  To switch: eits sessions set-intent review\n'
+    fi
+  fi
 
   # ── server reachability ───────────────────────────────────────────────────
   local _ping

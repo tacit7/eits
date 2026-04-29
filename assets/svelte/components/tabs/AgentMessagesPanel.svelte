@@ -119,6 +119,26 @@
     return '/images/claude.svg'
   }
 
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+  // Renders message body with @mention tokens highlighted.
+  // @all and @<integer> are wrapped in a styled span.
+  function renderBody(body) {
+    if (!body) return ''
+    const escaped = escapeHtml(body)
+    return escaped.replace(/@(all|\d+)/g, (match, token) => {
+      const label = token === 'all' ? '@all' : `@${token}`
+      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">${label}</span>`
+    })
+  }
+
   function truncate(str, max = 10) {
     if (!str) return str
     return str.length > max ? str.slice(0, max) + '…' : str
@@ -339,7 +359,6 @@
       historyIndex = -1
       currentDraft = ''
       inputValue = ''
-      shouldAutoScroll = true
     }
   }
 
@@ -460,7 +479,7 @@
                     </button>
                   </div>
 
-                  <p class="mt-1 text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
+                  <p class="mt-1 text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{@html renderBody(message.body)}</p>
 
                   <!-- Usage metadata for agent messages -->
                   {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}

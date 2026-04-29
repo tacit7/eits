@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
-  alias EyeInTheSky.ChannelMessages
+  alias EyeInTheSky.Repo
 
   require Logger
 
@@ -24,17 +24,24 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
 
   def handle_info({:agent_updated, _}, socket), do: {:noreply, socket}
 
-  def handle_info({:new_message, _message}, socket) do
+  def handle_info({:new_message, message}, socket) do
     Logger.info(
       "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
     )
 
-    messages = reload_messages(socket)
+    # Preload associations required by ChatPresenter.serialize_message,
+    # then append — avoids re-fetching the entire message list on every push.
+    serialized =
+      message
+      |> Repo.preload([:session, :reactions])
+      |> ChatPresenter.serialize_message()
 
-    Logger.info("📬 Loaded #{length(messages)} messages from DB")
+    messages = socket.assigns.messages ++ [serialized]
 
     channels = load_channels(socket.assigns.project_id)
     unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
+
+    Logger.info("📬 Appended message id=#{message.id}, total=#{length(messages)}")
 
     {:noreply,
      socket
@@ -45,11 +52,6 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
   # Private helpers
 
   defp get_session_id(socket), do: socket.assigns[:session_id]
-
-  defp reload_messages(socket) do
-    ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-    |> ChatPresenter.serialize_messages()
-  end
 
   defp load_channels(project_id) do
     alias EyeInTheSky.Channels

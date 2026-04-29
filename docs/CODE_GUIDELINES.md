@@ -1858,6 +1858,87 @@ end
 
 ---
 
+## Shared Helpers — Check Before Implementing
+
+**Problem:** Utilities like `parse_int`, `provider_icon`, and `build_bulk_flash` get re-implemented in multiple modules, leading to diverging behavior when requirements change.
+
+**Solution:** Define the helper once in a shared module, annotate it with `@doc "Do not reimplement"`, and check the registry before writing anything similar.
+
+**Canonical Helpers (Commits 983aecdf, 055158cf):**
+
+| Need | Function | Module | Purpose |
+|------|----------|--------|---------|
+| Provider logo path | `DmHelpers.provider_icon/1` | `components/dm_helpers.ex` | Returns SVG path: `"/images/claude.svg"`, `"/images/openai.svg"`, etc. |
+| Provider dark-mode CSS | `DmHelpers.provider_icon_class/1` | `components/dm_helpers.ex` | Returns CSS class for dark-mode inversion: `"dark:invert"` for OpenAI, `""` for others |
+| Bulk operation flash | `BulkHelpers.build_bulk_flash/3` | `live/shared/bulk_helpers.ex` | Generates flash message from succeeded/total count and options (verb, entity, destination) |
+| String → integer | `ControllerHelpers.parse_int/1` or `/2` | `helpers/controller_helpers.ex` | Parses string to int or returns `nil` / default |
+| Session terminated? | `Sessions.terminated_statuses/0` | `eye_in_the_sky/sessions.ex` | Returns list of final statuses: `~w(completed failed)` |
+
+**Build Bulk Flash Pattern (Commit 055158cf):**
+
+Canonical bulk-operation flash message builder. Deduplicates the cond-based pattern from tasks.ex and sessions/actions.ex.
+
+```elixir
+# Usage: Returns {:level, message} where level is :info or :error
+{flash_level, flash_msg} = BulkHelpers.build_bulk_flash(succeeded, total, opts)
+
+# Examples:
+BulkHelpers.build_bulk_flash(3, 3, verb: "Archived", entity: "task")
+# => {:info, "Archived 3 tasks"}
+
+BulkHelpers.build_bulk_flash(2, 3, verb: "Moved", entity: "task", destination: "Done")
+# => {:info, "Moved 2 tasks to Done; 1 failed"}
+
+BulkHelpers.build_bulk_flash(0, 5, verb: "Archived", entity: "session")
+# => {:error, "Could not archive 5 sessions"}
+```
+
+**Options:**
+- `:verb` (required) — past-tense action: `"Moved"`, `"Archived"`, `"Deleted"`
+- `:entity` (required) — singular noun: `"task"`, `"session"`
+- `:destination` (optional) — target label for move operations (e.g., state name `"Done"`)
+
+**Before (Antipattern):**
+```elixir
+# ❌ Duplicated cond logic in tasks.ex
+failed = length(results) - moved
+cond do
+  moved > 0 and failed > 0 ->
+    {:info, "Moved #{moved} task#{if moved != 1, do: "s"} to #{state_name}; #{failed} failed"}
+  moved > 0 ->
+    {:info, "Moved #{moved} task#{if moved != 1, do: "s"} to #{state_name}"}
+  true ->
+    {:error, "Could not move #{failed} task#{if failed != 1, do: "s"}"}
+end
+
+# ❌ Similar duplication in sessions/actions.ex
+failed = length(results) - archived
+cond do
+  archived > 0 and failed > 0 ->
+    {:info, "Archived #{archived} #{pluralize_session(archived)}; #{failed} could not be archived"}
+  # ... more repeated conditions
+end
+```
+
+**After (Using BulkHelpers):**
+```elixir
+# ✅ Single canonical call
+{flash_level, flash_msg} = BulkHelpers.build_bulk_flash(moved, length(results),
+  verb: "Moved",
+  entity: "task",
+  destination: state_name
+)
+
+{flash_level, flash_msg} = BulkHelpers.build_bulk_flash(archived, length(results),
+  verb: "Archived",
+  entity: "session"
+)
+```
+
+**Rule:** Before writing any utility function, grep the codebase and check the registry above. If it exists, use it. If you need a new helper, add it to the appropriate shared module, annotate it with `@doc "Do not reimplement"`, and update this table.
+
+---
+
 ## Shared Parameter Parsing Helpers
 
 **Problem:** Multiple controllers or contexts repeat the same parameter parsing logic (e.g., `Integer.parse/1` with error handling).

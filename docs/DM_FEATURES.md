@@ -696,15 +696,15 @@ A markdown format toolbar (Aa button) in the DM composer enables inline text for
 
 **Trigger:** Click the "Aa" button in the left toolbar to show/hide the format strip.
 
-**Format actions and shortcuts:**
-| Action | Marker | Keyboard |
-|--------|--------|----------|
-| Bold | `**text**` | Cmd+B |
-| Italic | `*text*` | Cmd+I |
-| Strikethrough | `~~text~~` | None |
-| Inline code | `` `text` `` | Cmd+E |
-| Code block | ``` `text` ``` | Cmd+Shift+E |
-| Link | `[text](url)` | None |
+**Format actions:**
+| Action | Marker |
+|--------|--------|
+| Bold | `**text**` |
+| Italic | `*text*` |
+| Strikethrough | `~~text~~` |
+| Inline code | `` `text` `` |
+| Code block | ``` `text` ``` |
+| Link | `[text](url)` |
 
 **Behavior:**
 - Hidden by default; format bar slides in when Aa is clicked
@@ -713,9 +713,170 @@ A markdown format toolbar (Aa button) in the DM composer enables inline text for
 - For links, the URL placeholder is auto-selected after insertion so user can type the URL
 - Correct cursor placement for empty selections (marker pair inserted and cursor centered)
 
+**Note:** Keyboard shortcuts (Cmd+B/I/E, Cmd+Shift+E) were removed (commit `dede88f1`) — use toolbar buttons instead.
+
 **Implementation:** 
 - `lib/eye_in_the_sky_web/components/dm_page/composer.ex` — HEEx format bar
-- `assets/js/hooks/dm_composer.js` — selection wrapping logic, keyboard handlers (Cmd+B/I/E, Cmd+Shift+E)
+- `assets/js/hooks/dm_composer.js` — selection wrapping logic
+
+---
+
+## DM Composer: localStorage History Persistence
+
+**Commit:** `57c4b747`
+
+DM composer messages are persisted to browser localStorage, keyed by session UUID, enabling history recall across page reloads and tab closes.
+
+**Storage:**
+- Key format: `dm_history:<session_uuid>`
+- Max 100 entries per session
+- Loaded on composer mount; written on every new message
+- Includes multiline text (avoids HTML attribute serialization to preserve newlines)
+
+**Archive Eviction:**
+- When sessions are archived, `archive_sessions_action/2` pushes an `evict-dm-history` event with a list of archived session UUIDs
+- `DmHistoryCleanup` hook on the sessions page receives the event and removes `dm_history:*` keys from localStorage
+- Storage sentinel pattern broadcasts the eviction to other open tabs via `dm_history_evict` key
+
+**Files:**
+- `assets/js/hooks/command_history.js` — history load, persistence, cross-tab eviction
+- `assets/js/hooks/dm_history_cleanup.js` — eviction handler
+- `lib/eye_in_the_sky_web/live/project_live/sessions/actions.ex` — eviction broadcast
+
+---
+
+## Keyboard History Navigation (Ctrl+R / Ctrl+Shift+R)
+
+**Commit:** `57c4b747`
+
+The DM composer supports keyboard-driven history search via Ctrl+R and Ctrl+Shift+R.
+
+**Commands:**
+- **Ctrl+R** — Open search dropdown filtered to current session's history
+- **Ctrl+Shift+R** — Open search dropdown merged across all `dm_history:*` keys (global history), each item labeled with the first 8 chars of its source session UUID
+
+**Dropdown UI:**
+- Live filter input as you type
+- Arrow keys (↑/↓) navigate results
+- Enter selects the highlighted item
+- Escape closes dropdown
+- Click outside dismisses
+
+**Multiline Handling:**
+- Results stored in `_filteredItems` on hook instance
+- Click handlers use closure over filtered item text; avoids HTML attribute round-trip that would truncate newlines
+
+**ArrowUp behavior (commit dede88f1):**
+- ArrowUp is gated behind `_isOnFirstLine()` check
+- On first line of textarea: recalls previous history item
+- On any other line: normal cursor movement (up one line)
+
+**Implementation:** 
+- `assets/js/hooks/command_history.js` — Ctrl+R/Ctrl+Shift+R handlers, dropdown, live filter
+
+---
+
+## DM Top Bar: Editable Session Name
+
+**Commit:** `8dd909ea`
+
+The DM session name in the desktop breadcrumb can now be edited inline.
+
+**Behavior:**
+- Desktop breadcrumb renders an `<input>` instead of static text for `:dm` pages
+- Press Enter to save and focus the composer
+- Blur (click away) also saves the change
+- Handler updates `:page_title` so the top bar reflects the new name immediately
+
+**Mobile:**
+- Mobile header card shows the session name (editable on future iteration)
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/layouts.ex` — breadcrumb input rendering
+- `lib/eye_in_the_sky_web/live/shared/dm_session_helpers.ex` — session name update handler
+
+---
+
+## DM Top Bar: Copy UUID & Open in iTerm
+
+**Commits:** `c2f8af10`, `2edd0f05`
+
+The DM page top bar and mobile menu include quick-access actions for session UUID and terminal integration.
+
+**Desktop Top Bar:**
+- "Copy UUID" menu item shows first 8 characters of session UUID (e.g., `1a2b3c4f…`)
+- Click copies the full UUID to clipboard
+- Uses `CopyToClipboard` LiveView hook for system clipboard integration
+
+**Mobile Menu:**
+- Same "Copy UUID" and "Open in iTerm" actions available in the mobile action menu
+- Consistent UX across device sizes
+
+**Open in iTerm:**
+- Sends session UUID to iTerm for terminal-side agent interaction
+- Command format: `eits dm --to <session_uuid> --message "..."`
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/layouts.ex` — desktop top bar
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — mobile menu integration
+- `lib/eye_in_the_sky_web/components/top_bar/dm.ex` — DM-specific actions
+
+---
+
+## Vim Navigation: i Focuses DM Composer
+
+**Commit:** `23a02760`
+
+The vim navigation `i` command (insert mode) now focuses the DM composer on `/dm/*` pages.
+
+**Behavior:**
+- Press `i` on any `/dm` or `/dm/:uuid` page to focus the message input textarea
+- Cursor immediately ready for typing without clicking the input
+- Follows standard vim insert-mode convention
+
+**Scope:** Active only on DM pages (`:dm` route); ignored on other pages.
+
+**Implementation:**
+- `assets/js/hooks/vim_nav_commands.ts` — `i` command registration for DM pages
+- `assets/js/hooks/vim_nav.test.ts` — test coverage for DM composer focus
+
+---
+
+## CLI: eits dm inbox
+
+**Commit:** `1c0b5ba6`
+
+The CLI now supports `eits dm inbox` as a convenient alias for listing DM messages with improved output formatting.
+
+**Usage:**
+```bash
+eits dm inbox                    # List DMs in table format
+eits dm inbox --json            # Raw JSON output
+eits dm inbox --from <uuid>     # Filter by sender
+eits dm inbox --help            # Show command help
+```
+
+**Table Output (_tbl_dm renderer):**
+| Column | Description |
+|--------|-------------|
+| FROM | Sender session UUID (first 8 chars) |
+| MESSAGE | Message body (DM-from prefix stripped) |
+| AGE | Time ago relative format (UTC-aware on macOS) |
+
+**Features:**
+- `--json` flag for programmatic consumption
+- `--from` filter to show DMs from a specific session UUID only
+- `--help` to display command reference
+- Strips redundant `DM from:` prefix from message body for cleaner display
+- UTC age calculation fixed on macOS (commit 1c0b5ba6 fixed `date -ju` parsing)
+
+**Agent Model Aliases (commit 1c0b5ba6):**
+- `eits agents spawn --help` now lists shorthand aliases first (recommended usage)
+- haiku, sonnet, opus appear before full model names (e.g., `claude-haiku-4-5`) for discoverability
+
+**Files:**
+- `scripts/eits` — inbox subcommand, _tbl_dm renderer, --json/--from flags, _age UTC fix
+- `docs/EITS_CLI.md` — command reference
 
 ---
 

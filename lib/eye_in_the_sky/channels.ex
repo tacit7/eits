@@ -162,6 +162,23 @@ defmodule EyeInTheSky.Channels do
     |> Repo.all()
   end
 
+  def list_members_with_sessions(channel_id) do
+    from(m in ChannelMember,
+      left_join: s in EyeInTheSky.Sessions.Session,
+      on: s.id == m.session_id,
+      where: m.channel_id == ^channel_id,
+      order_by: [asc: m.joined_at],
+      select: %{
+        session_id: m.session_id,
+        session_uuid: s.uuid,
+        session_name: s.name,
+        role: m.role,
+        joined_at: m.joined_at
+      }
+    )
+    |> Repo.all()
+  end
+
   @doc """
   Checks if a session is a member of a channel.
   """

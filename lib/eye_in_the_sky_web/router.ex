@@ -265,6 +265,7 @@ defmodule EyeInTheSkyWeb.Router do
     post "/channels", MessagingController, :create_channel
     get "/channels/:channel_id/messages", MessagingController, :list_channel_messages
     post "/channels/:channel_id/messages", MessagingController, :send_channel_message
+    get "/channels/:channel_id/members", MessagingController, :list_channel_members
     post "/channels/:channel_id/members", MessagingController, :join_channel
     delete "/channels/:channel_id/members/:session_id", MessagingController, :leave_channel
 

@@ -732,7 +732,7 @@
                       </svg>
                     </div>
                   {:else}
-                    <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0" alt={message.provider || 'Agent'} />
+                    <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0 opacity-30" title="{message.provider || 'agent'}" alt={message.provider || 'Agent'} />
                   {/if}
                 {/if}
 
@@ -747,10 +747,11 @@
                         <button
                           class="text-[13px] font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer"
                           on:click={() => navigateToDm(message.session_id)}
-                          title="Open DM with this agent"
+                          title="{[message.provider, agent?.model].filter(Boolean).join(' · ') || 'Open DM'}"
                         >
                           {agent?.name || message.session_name || `@${message.session_id}`}
                         </button>
+                        <span class="font-mono text-[11px] text-base-content/35">@{message.session_id}</span>
                       {:else}
                         <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                       {/if}

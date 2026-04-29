@@ -581,7 +581,7 @@ TASKS_HELP
         case "$1" in
           --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
           --session|-s) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --agent)   _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --agent|-a) _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --q|--search|-q) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)
             # Positional remap: 1=todo(1), 2=progress(2), 3=review(4), 4=done(3)
@@ -609,12 +609,17 @@ TASKS_HELP
       done
       # Agent-centric default: when running as an agent, scope to current session
       # unless --all, --session, --mine, or --agent explicitly overrides the scope
+      local _silent_scope=0
       if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 ]]; then
         local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
-        [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
+        if [[ -n "$_self" ]]; then
+          qs="${qs}&session_id=$_self"
+          _silent_scope=1
+        fi
       fi
       local _resp; _resp=$(_curl "$BASE_URL/tasks?${qs#&}")
       if [[ $_json -eq 1 ]]; then echo "$_resp" | jq .; else _tbl_tasks "$_resp"; fi
+      [[ $_silent_scope -eq 1 ]] && echo "(scoped to current session — pass --all to see all tasks)" >&2
       ;;
     get)
       local id="${1:-}"; need id
@@ -626,15 +631,15 @@ TASKS_HELP
       local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id="" due_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --title)       title="$2";       shift 2 ;;
-          --description) description="$2"; shift 2 ;;
-          --project)     project_id="$2";  shift 2 ;;
-          --priority)    priority="$2";    shift 2 ;;
-          --session)     session_id="$2";  shift 2 ;;
-          --agent)       agent_id="$2";    shift 2 ;;
-          --tags)        tags="$2";        shift 2 ;;
-          --team)        team_id="$2";     shift 2 ;;
-          --due-at)      due_at="$2";      shift 2 ;;
+          --title|-t)       title="$2";       shift 2 ;;
+          --description|-d) description="$2"; shift 2 ;;
+          --project|-p)     project_id="$2";  shift 2 ;;
+          --priority)       priority="$2";    shift 2 ;;
+          --session|-s)     session_id="$2";  shift 2 ;;
+          --agent|-a)       agent_id="$2";    shift 2 ;;
+          --tags)           tags="$2";        shift 2 ;;
+          --team)           team_id="$2";     shift 2 ;;
+          --due-at)         due_at="$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1121,18 +1126,18 @@ HELP
       local qs="" full=0 _session_flag=0 _mine_flag=0 _all_flag=0 _task_flag=0 _json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --q|--search) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --session)    [[ $_mine_flag -eq 1 ]] && die "--session and --mine are mutually exclusive"
+          --q|--search|-q) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --session|-s) [[ $_mine_flag -eq 1 ]] && die "--session and --mine are mutually exclusive"
                         _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --task)       _task_flag=1; qs="${qs}&task_id=$2"; shift 2 ;;
-          --project)    qs="${qs}&project_id=$2"; shift 2 ;;
+          --task|-T)    _task_flag=1; qs="${qs}&task_id=$2"; shift 2 ;;
+          --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
           --mine)       [[ $_session_flag -eq 1 ]] && die "--mine and --session are mutually exclusive"
                         _mine_flag=1
                         local _mine="${EITS_SESSION_UUID:-}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID to be set"
                         qs="${qs}&session_id=$_mine"; shift ;;
           --all)        _all_flag=1; shift ;;
           --starred)    qs="${qs}&starred=true"; shift ;;
-          --limit)      qs="${qs}&limit=$2"; shift 2 ;;
+          --limit|-l)   qs="${qs}&limit=$2"; shift 2 ;;
           --full)       full=1; shift ;;
           --json)       _json=1; shift ;;
           *) die "unknown flag: $1" ;;
@@ -1160,8 +1165,8 @@ HELP
         case "$1" in
           --parent-type) parent_type="$2"; shift 2 ;;
           --parent-id)   parent_id="$2";   shift 2 ;;
-          --body)        body="$2";        shift 2 ;;
-          --title)       title="$2";       shift 2 ;;
+          --body|-b)     body="$2";        shift 2 ;;
+          --title|-t)    title="$2";       shift 2 ;;
           --starred)     starred="1";      shift ;;
           *) die "unknown flag: $1" ;;
         esac
@@ -1175,8 +1180,8 @@ HELP
       local updates="{}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --body)        updates=$(echo "$updates" | jq --arg v "$2" '. + {body: $v}');        shift 2 ;;
-          --title)       updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
+          --body|-b)     updates=$(echo "$updates" | jq --arg v "$2" '. + {body: $v}');        shift 2 ;;
+          --title|-t)    updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
           --starred)     updates=$(echo "$updates" | jq '. + {starred: true}');                shift ;;
           --unstar)      updates=$(echo "$updates" | jq '. + {starred: false}');               shift ;;
           --parent-type) updates=$(echo "$updates" | jq --arg v "$2" '. + {parent_type: $v}'); shift 2 ;;
@@ -1192,10 +1197,10 @@ HELP
       local qs="q=$(printf '%s' "$query" | jq -Rr @uri)" full=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project) qs="${qs}&project_id=$2"; shift 2 ;;
-          --starred) qs="${qs}&starred=true";  shift ;;
-          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
-          --full)    full=1;                   shift ;;
+          --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
+          --starred)    qs="${qs}&starred=true";  shift ;;
+          --limit|-l)   qs="${qs}&limit=$2";      shift 2 ;;
+          --full)       full=1;                   shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1207,9 +1212,9 @@ HELP
       local body="" title="" starred="0"
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --body)    body="$2";   shift 2 ;;
-          --title)   title="$2";  shift 2 ;;
-          --starred) starred="1"; shift ;;
+          --body|-b)  body="$2";   shift 2 ;;
+          --title|-t) title="$2";  shift 2 ;;
+          --starred)  starred="1"; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1680,13 +1685,13 @@ cmd_commits() {
       local qs="" _session_flag=0 _mine_flag=0 _agent_flag=0 _all_flag=0 _json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) [[ $_mine_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--session is mutually exclusive with --mine and --agent"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
-          --agent)   [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
-          --mine)    [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
-          --all)     _all_flag=1; shift ;;
-          --since)   qs="${qs}&since_hash=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --limit)   qs="${qs}&limit=$2"; shift 2 ;;
-          --json)    _json=1; shift ;;
+          --session|-s) [[ $_mine_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--session is mutually exclusive with --mine and --agent"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
+          --agent|-a)   [[ $_mine_flag -eq 1 || $_session_flag -eq 1 ]] && die "--agent is mutually exclusive with --mine and --session"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --mine)       [[ $_session_flag -eq 1 || $_agent_flag -eq 1 ]] && die "--mine is mutually exclusive with --session and --agent"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID"; qs="${qs}&session_id=$_mine"; shift ;;
+          --all)        _all_flag=1; shift ;;
+          --since)      qs="${qs}&since_hash=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --limit|-l)   qs="${qs}&limit=$2"; shift 2 ;;
+          --json)       _json=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1705,10 +1710,10 @@ cmd_commits() {
       local agent_id="${EITS_AGENT_UUID:-}" hashes=() messages=() quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --agent)     agent_id="$2";  shift 2 ;;
-          --hash)      hashes+=("$2"); shift 2 ;;
-          --message)   messages+=("$2"); shift 2 ;;
-          --quiet|-q)  quiet=1;        shift ;;
+          --agent|-a)   agent_id="$2";    shift 2 ;;
+          --hash)       hashes+=("$2");   shift 2 ;;
+          --message|-m) messages+=("$2"); shift 2 ;;
+          --quiet|-q)   quiet=1;          shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -2877,6 +2882,66 @@ EOF
   /bin/rm -rf "$tmp_dir" 2>/dev/null || true
 }
 
+# ── codex ─────────────────────────────────────────────────────────────────────
+
+cmd_codex() {
+  local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && {
+    cat <<'CODEX_HELP'
+usage: eits codex <subcommand> [options]
+
+Subcommands:
+  comment  --pr <n> --body <text> [--repo <owner/repo>]
+             Post a PR comment as urielmaldonado-codex, then switch back to tacit7.
+
+             --pr <n>            PR number (required)
+             --body <text>       Comment body (required)
+             --repo <owner/repo> GitHub repo (default: inferred from git remote)
+CODEX_HELP
+    return 0; }
+  case "$sub" in
+    comment)
+      local pr="" body="" repo=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --pr)   pr="$2";   shift 2 ;;
+          --body) body="$2"; shift 2 ;;
+          --repo) repo="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$pr" ]]   || die "--pr is required"
+      [[ -n "$body" ]] || die "--body is required"
+
+      # Infer repo from git remote if not provided
+      if [[ -z "$repo" ]]; then
+        local _remote
+        _remote=$(git remote get-url origin 2>/dev/null || true)
+        repo=$(echo "$_remote" | sed -E 's|.*github\.com[:/]([^/]+/[^/.]+)(\.git)?$|\1|')
+        [[ -n "$repo" && "$repo" != "$_remote" ]] || die "--repo is required (could not infer from git remote)"
+      fi
+
+      # Switch to codex account
+      gh auth switch --user urielmaldonado-codex 2>/dev/null \
+        || die "gh auth switch to urielmaldonado-codex failed — run: gh auth login"
+
+      # Post comment
+      local _comment_exit=0
+      gh pr comment "$pr" --repo "$repo" --body "$body" || _comment_exit=$?
+
+      # Always switch back to tacit7
+      gh auth switch --user tacit7 2>/dev/null \
+        || echo "warning: gh auth switch back to tacit7 failed — run: gh auth switch --user tacit7" >&2
+
+      [[ $_comment_exit -eq 0 ]] || { echo "error: gh pr comment failed" >&2; exit "$_comment_exit"; }
+      ;;
+    *)
+      echo "usage: eits codex <comment> [options]"
+      echo "Run 'eits codex --help' for details."
+      ;;
+  esac
+}
+
 # ── me / whoami ───────────────────────────────────────────────────────────────
 
 cmd_me() {
@@ -2967,6 +3032,7 @@ Commands:
   worktree      create|remove   (EITS Elixir projects only)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
+  codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
   me            Print current session/agent/project context and verify server-side
 
 Env vars (injected by EITS hooks):
@@ -3004,6 +3070,7 @@ case "$cmd" in
   worktree)      cmd_worktree      "$@" ;;
   queue)         cmd_queue         "$@" ;;
   search)        cmd_search        "$@" ;;
+  codex)         cmd_codex         "$@" ;;
   me|whoami)     cmd_me ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;

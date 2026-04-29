@@ -87,6 +87,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   @doc """
+  GET /api/v1/sessions/:uuid/tasks - List tasks linked to a session (path-based alias).
+  """
+  def list_for_session(conn, %{"uuid" => uuid} = params) do
+    index(conn, Map.put(params, "session_id", uuid))
+  end
+
+  @doc """
   POST /api/v1/tasks - Create a task.
   """
   def create(conn, params) do

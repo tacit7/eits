@@ -106,6 +106,11 @@ eits tasks list [--project <id>] [--session <uuid>] [--q <query>|--search <query
 # --mine / --assigned: tasks where current session is the active executor (linked via task_sessions after claim)
 # --created-by: tasks created by the current session (via created_by_session_id)
 
+eits tasks active [--json]
+eits tasks mine [--json]
+# Show In Progress tasks linked to current session (useful for context recovery on resume)
+# Uses EITS_SESSION_UUID (or EITS_SESSION_ID as fallback)
+
 # Get
 eits tasks get <id>
 
@@ -209,6 +214,28 @@ eits queue flush                  # Replay ~/.eits/pending-annotations.log, drop
 ```
 
 When `eits tasks annotate` encounters persistent HTTP 429 (rate limited) errors, the annotation is queued to `~/.eits/pending-annotations.log` (JSONL format). Use `queue status` to see what's pending, and `queue flush` to retry all pending annotations.
+
+---
+
+## search
+
+```bash
+eits search <query> [--type <csv>] [--limit <n>] [--project <id>] [--json]
+# Full-text search across sessions, tasks, and notes in one shot
+
+# Options:
+#   --type <csv>    Entity types to search, comma-separated (default: sessions,tasks,notes)
+#   --limit <n>     Max results per entity type (default: 5)
+#   --project <id>  Scope to a project
+#   --json          Emit combined JSON: {"sessions":[...],"tasks":[...],"notes":[...]}
+
+# Examples:
+eits search "auth"
+eits search "migration" --type tasks,notes --limit 10
+eits search "deploy" --json
+```
+
+Default output groups results by entity type with headers and counts. Use `--json` for machine-readable combined output.
 
 ---
 
@@ -357,8 +384,10 @@ eits jobs delete <id>
 ## dm
 
 ```bash
-eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>]
+eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--json]
+eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--json]
 # List inbound DMs for a session (CLI-side inbox polling)
+# inbox is an alias for list
 # --from: filter by sender (optional)
 
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]

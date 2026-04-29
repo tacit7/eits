@@ -31,16 +31,17 @@ eits tasks claim <id>
 
 # Work...
 
-# Finish: annotate + complete
-eits tasks annotate <id> --body "What happened"
+# Finish (PREFERRED — atomic annotate + done in one call)
 eits tasks complete <id> --message "Summary"
 
-# OR: manually set state
-eits tasks update <id> --state 4   # 4=In Review, 3=Done
+# Finish (manual two-step — avoid unless complete fails)
+eits tasks annotate <id> --body "What happened"
+eits tasks update <id> --state done
 
 # Other
 eits tasks start <id>              # set state=2, link session (use on EXISTING tasks)
-eits tasks list [--project-id <id>] [--state <id>] [--limit <n>]
+eits tasks list [--all]            # WARNING: scopes to current session when EITS_SESSION_UUID is set; --all overrides
+eits tasks list [-p <project>] [-s <session>] [-l <limit>] [--mine]
 eits tasks get <id>
 ```
 
@@ -91,9 +92,20 @@ Accepts both UUID and integer session ID.
 ## Notes
 
 ```bash
-eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --body "..."
-eits notes create --parent-type task --parent-id <task_id> --body "..."
-eits notes list [--parent-type <type>] [--parent-id <id>]
+# Create (two forms)
+eits notes add --body "..." [--title "t"] [--starred]                          # attaches to current session via EITS_SESSION_UUID
+eits notes create --parent-type <session|task|agent|project> --parent-id <id> \
+  --body "..." [--title "t"] [--starred]                                       # explicit parent
+
+# List — uses --session/--task/--project (NOT --parent-type/--parent-id)
+eits notes list [--session <uuid>] [--task <id>] [--project <id>] [--mine] [--starred] [--q <query>] [--full]
+
+# Search across notes (returns body content)
+eits notes search <query> [--project <id>] [--starred] [--limit <n>] [--full]
+
+# Get / update
+eits notes get <id>
+eits notes update <id> [--body "..."] [--title "t"] [--starred]
 ```
 
 ---
@@ -103,11 +115,22 @@ eits notes list [--parent-type <type>] [--parent-id <id>]
 ```bash
 eits agents list [--project-id <id>]
 eits agents get <uuid>
-eits agents spawn --instructions "..." [--team-name <name>] [--team-id <id>] [--model <m>] [--provider <p>]
+eits agents spawn --instructions "..." [options]
+  --instructions-file <path>   read instructions from file (mutually exclusive with --instructions)
+  --interpolate-env            substitute $VAR/${VAR} in instructions from current env at spawn time
+  --name <n>                   session name (NOT --session-name)
+  --team-name <name>           join team on spawn (mutually exclusive with --team-id)
+  --team-id <id>               join team by ID (resolved to name via API)
+  --worktree <branch>          create git worktree branch for the agent
+  --stash-if-dirty             auto-stash uncommitted changes before worktree create
+  --model <m>                  model shorthand: opus, sonnet, haiku; or codex/gemini models
+  --provider <p>               claude (default), codex, gemini
+  --parent-session-id <n>      integer session ID (not UUID) to link as parent
+  --dry-run                    validate + print curl without hitting API
 eits agents update <uuid> [--status <s>]
 ```
 
-`--team-name` and `--team-id` are mutually exclusive; `--team-id` resolves to the team name via API.
+`--team-name` and `--team-id` are mutually exclusive. `--interpolate-env` is the clean way to pass orchestrator context (UUID, session ID) into spawned agent instructions without string interpolation hacks — set the vars in your shell, reference them as `$VAR` in the instructions string, pass `--interpolate-env`.
 
 ---
 
@@ -120,7 +143,7 @@ eits teams create --name "..." [--project-id <id>]
 eits teams join <id>
 eits teams leave <id>
 eits teams done
-eits teams status <id>
+eits teams status <id> [--wait] [--json]   # --wait blocks until all members done/spawn_failed; exits 0 all done, 1 any failed
 eits teams update-member <team_id> [--status <s>]
 ```
 
@@ -129,9 +152,11 @@ eits teams update-member <team_id> [--status <s>]
 ## Channels
 
 ```bash
-eits channels list [--project-id <id>]
-eits channels send --channel <name> --message "..."
-eits channels history <name> [--limit <n>]
+eits channels list [--project <id>]
+eits channels send <channel_id> --body <text> [--session <uuid|id>]   # channel_id is positional integer, NOT --channel flag
+eits channels messages <channel_id> [--limit <n>]
+eits channels join <channel_id>
+eits channels leave <channel_id>
 ```
 
 ---
@@ -199,6 +224,8 @@ eits notifications mark-all-read
 7. **`tasks begin` has no 429 auto-retry** — unlike `tasks annotate`, `begin` fails hard on rate limit. Retry manually with backoff if you hit 429.
 8. **DM to waiting/idle/completed session returns HTTP 500** — the DM controller doesn't gate on session status. Fall back to integer session ID if UUID fails; if both 500, the session is unreachable.
 9. **`EITS_AGENT_UUID` unset on resume** — if the resume hook didn't export it, `commits create` auto-resolves the agent UUID from `EITS_SESSION_UUID` via the sessions API. Any other command that needs it can do the same: `EITS_AGENT_UUID=$(eits sessions get $EITS_SESSION_UUID | jq -r '.agent_id')`
+10. **`commits create` has no top-level `success` field** — response shape is `{errors, commits, duplicates}`. Check `duplicates | length > 0` for duplicate detection, not a `success` boolean. Example: `echo "$result" | jq '.duplicates | length > 0'`
+11. **`--interpolate-env` is the clean env passthrough** — to pass orchestrator UUID to spawned agents without string interpolation: set the var in your shell (`export ORCHESTRATOR_UUID=$EITS_SESSION_UUID`), reference it in the instructions string as `$ORCHESTRATOR_UUID`, pass `--interpolate-env`. No hardcoding, no bash substitution hacks.
 
 ---
 

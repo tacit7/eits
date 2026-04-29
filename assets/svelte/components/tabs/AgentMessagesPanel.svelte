@@ -348,6 +348,12 @@
         inputValue = messageHistory[historyIndex]
       }
     }
+
+    // Enter = send; Shift+Enter = newline (textarea default)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
   }
 
   function selectAutocomplete(sessionId) {
@@ -384,6 +390,11 @@
     }, 0)
   }
 
+  function autoResizeTextarea(el) {
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }
+
   function handleSubmit(e) {
     const body = inputValue.trim()
 
@@ -401,6 +412,7 @@
       historyIndex = -1
       currentDraft = ''
       inputValue = ''
+      if (inputElement) inputElement.style.height = 'auto'
     }
   }
 
@@ -520,22 +532,6 @@
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
         </button>
       </div>
-    </div>
-  {/if}
-
-  <!-- Search trigger (always visible, collapses when search is open) -->
-  {#if !showSearch}
-    <div class="flex-shrink-0 flex items-center justify-end px-4 pt-2 pb-0">
-      <button
-        type="button"
-        on:click={openSearch}
-        class="flex items-center gap-1 text-[11px] text-base-content/20 hover:text-base-content/45 transition-colors"
-        title="Search messages (⌘F)"
-      >
-        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
-        Search
-        <kbd class="font-sans text-[10px] px-0.5 rounded border border-base-content/10 bg-base-content/5">⌘F</kbd>
-      </button>
     </div>
   {/if}
 
@@ -803,24 +799,25 @@
   <div class="flex-shrink-0 pt-2">
     <form
       on:submit|preventDefault={handleSubmit}
-      class="relative bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] rounded-xl border border-base-content/5 shadow-sm p-4 flex flex-col"
+      class="relative bg-base-200 rounded-xl border border-base-content/5 shadow-sm p-4 flex flex-col"
     >
       <div class="flex gap-2">
         <div class="relative flex-1">
-          <input
-            type="text"
+          <textarea
             bind:value={inputValue}
             bind:this={inputElement}
-            on:input={handleInputChange}
+            on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
             on:keydown={handleInputKeydown}
             placeholder="Message agents... @id to mention, /skill for commands"
-            class="input input-sm w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base h-10"
+            class="textarea textarea-bordered w-full text-sm rounded-lg bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors resize-none overflow-y-auto text-base-content"
+            rows="1"
+            style="max-height: 7.5rem; line-height: 1.5rem;"
             autocomplete="off"
-          />
+          ></textarea>
 
           <!-- @ Autocomplete Dropdown -->
           {#if showAutocomplete && autocompleteOptions.length > 0}
-            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-[oklch(97%_0.005_80)] dark:bg-[hsl(60,2.1%,18.4%)] border border-base-content/8 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
+            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-100 border border-base-content/8 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
               {#each autocompleteOptions as option, idx}
                 <button
                   type="button"

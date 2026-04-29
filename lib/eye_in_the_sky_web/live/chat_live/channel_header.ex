@@ -13,13 +13,12 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
   def channel_header(assigns) do
     ~H"""
     <div
-      class="max-w-6xl mx-auto w-full bg-base-100 rounded-xl border border-base-content/5 shadow-sm mb-3 flex-shrink-0"
+      class="w-full bg-base-100 border-b border-base-content/10 flex-shrink-0"
       id="chat-header-card"
     >
       <div class="px-5 py-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="w-2 h-2 rounded-full flex-shrink-0 bg-success animate-pulse" />
             <h1 class="text-lg font-bold text-base-content">
               <%= if @active_channel do %>
                 <span class="text-base-content/30 mr-0.5">#</span>{@active_channel.name || "Channel"}
@@ -44,19 +43,19 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                 {@agent_status_counts.working} running
               </span>
             <% end %>
-            <button
-              phx-click="toggle_members"
-              class={[
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors",
-                if(@show_members,
-                  do: "text-primary bg-primary/10 hover:bg-primary/15",
-                  else: "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
-                )
-              ]}
-            >
-              <.icon name="hero-user-group-mini" class="size-3.5" />
-              {length(@channel_members)} members
-            </button>
+            <details class="dropdown dropdown-end">
+              <summary class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 cursor-pointer list-none">
+                <.icon name="hero-user-group-mini" class="size-3.5" />
+                {length(@channel_members)} members
+              </summary>
+              <div class="dropdown-content z-[10] mt-1 w-80 bg-base-100 border border-base-content/10 rounded-xl shadow-lg">
+                <.member_panel
+                  channel_members={@channel_members}
+                  sessions_by_project={@sessions_by_project}
+                  session_search={@session_search}
+                />
+              </div>
+            </details>
             <button
               phx-click="toggle_agent_drawer"
               class="btn btn-xs btn-ghost gap-1 min-h-[44px] min-w-[44px]"
@@ -66,14 +65,6 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
           </div>
         </div>
       </div>
-
-      <%= if @show_members do %>
-        <.member_panel
-          channel_members={@channel_members}
-          sessions_by_project={@sessions_by_project}
-          session_search={@session_search}
-        />
-      <% end %>
     </div>
     """
   end
@@ -84,7 +75,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
 
   defp member_panel(assigns) do
     ~H"""
-    <div class="px-5 pb-3 border-t border-base-content/5 pt-3" id="chat-members-panel">
+    <div class="px-5 pb-3 pt-3" id="chat-members-panel">
       <div class="flex items-center justify-between mb-2">
         <span class="text-xs uppercase tracking-wider font-medium text-base-content/30">
           Channel Agents

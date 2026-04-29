@@ -558,6 +558,34 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @doc """
+  GET /api/v1/channels/:channel_id/members - List members of a channel.
+  """
+  def list_channel_members(conn, %{"channel_id" => channel_id}) do
+    case Channels.get_channel(channel_id) do
+      nil ->
+        {:error, :not_found, "Channel not found"}
+
+      channel ->
+        members = Channels.list_members_with_sessions(channel.id)
+
+        json(conn, %{
+          success: true,
+          channel_id: channel.id,
+          members:
+            Enum.map(members, fn m ->
+              %{
+                session_id: m.session_id,
+                session_uuid: m.session_uuid,
+                session_name: m.session_name,
+                role: m.role,
+                joined_at: if(m.joined_at, do: to_string(m.joined_at))
+              }
+            end)
+        })
+    end
+  end
+
+  @doc """
   GET /api/v1/channels/:channel_id/messages - List recent messages for a channel.
   Query params: limit (optional, default 20, max 200)
   """

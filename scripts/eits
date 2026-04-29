@@ -142,6 +142,33 @@ _age() {
   fi
 }
 
+# _parse_duration <duration> — convert 24h / 7d / 30m to an ISO8601 UTC timestamp
+# Outputs the cutoff time (now minus the given duration).
+# Portable: uses macOS `date -v` when available, falls back to GNU `date -d`.
+_parse_duration() {
+  local dur="${1:-}"
+  [[ -z "$dur" ]] && die "_parse_duration: duration required (e.g. 24h, 7d, 30m)"
+  local amount unit secs
+  if [[ "$dur" =~ ^([0-9]+)([hHdDmM])$ ]]; then
+    amount="${BASH_REMATCH[1]}"
+    unit="${BASH_REMATCH[2]}"
+  else
+    die "invalid duration '$dur' — use <N>h, <N>d, or <N>m (e.g. 24h, 7d, 30m)"
+  fi
+  case "$unit" in
+    h|H) secs=$(( amount * 3600 )) ;;
+    d|D) secs=$(( amount * 86400 )) ;;
+    m|M) secs=$(( amount * 60 )) ;;
+  esac
+  # macOS (BSD) date: date -u -v-<N>S
+  if date -u -v-1S +%Y-%m-%dT%H:%M:%SZ >/dev/null 2>&1; then
+    date -u -v-"${secs}S" +%Y-%m-%dT%H:%M:%SZ
+  else
+    # GNU date
+    date -u -d "${secs} seconds ago" +%Y-%m-%dT%H:%M:%SZ
+  fi
+}
+
 # Table renderers — accept raw API JSON on stdin or as $1
 _tbl_sessions() {
   local data="${1:-$(cat)}"
@@ -577,6 +604,7 @@ TASKS_HELP
       # --mine/--assigned: tasks where current session is the active executor (linked via task_sessions)
       # --created-by: tasks created by the current session (via created_by_session_id)
       local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0 _tag_flag=0 _json=0
+      local _since_cutoff="" _stale_since_cutoff=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
@@ -618,6 +646,8 @@ TASKS_HELP
           --created-by) local _creator="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_creator" ]] || die "--created-by requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&created_by_session_id=$_creator"; shift ;;
           --all)     _all_flag=1; shift ;;
           --json)    _json=1; shift ;;
+          --since)        _since_cutoff="$(_parse_duration "$2")";       shift 2 ;;
+          --stale-since)  _stale_since_cutoff="$(_parse_duration "$2")"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -632,6 +662,22 @@ TASKS_HELP
         fi
       fi
       local _resp; _resp=$(_curl "$BASE_URL/tasks?${qs#&}")
+      # --since: keep tasks created at or after the cutoff
+      if [[ -n "$_since_cutoff" ]]; then
+        _resp=$(echo "$_resp" | jq --arg cutoff "$_since_cutoff" \
+          '.tasks = [.tasks[]? | select((.created_at // "") >= $cutoff)]
+           | .count = (.tasks | length)')
+      fi
+      # --stale-since: keep in-progress tasks whose updated_at has NOT changed since cutoff
+      if [[ -n "$_stale_since_cutoff" ]]; then
+        _resp=$(echo "$_resp" | jq --arg cutoff "$_stale_since_cutoff" \
+          '.tasks = [.tasks[]?
+            | select(
+                (.state_id == 2) and
+                ((.updated_at // .created_at // "") < $cutoff)
+              )]
+           | .count = (.tasks | length)')
+      fi
       if [[ $_json -eq 1 ]]; then echo "$_resp" | jq .; else _tbl_tasks "$_resp"; fi
       [[ $_silent_scope -eq 1 ]] && echo "(scoped to current session — pass --all to see all tasks)" >&2
       ;;
@@ -2316,6 +2362,37 @@ cmd_channels() {
       need session_id
       _delete "/channels/$channel_id/members/$session_id"
       ;;
+    members)
+      # eits channels members <channel_id> [--json]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits channels members <channel_id> [--json]"; return 0; }
+      local channel_id="${1:-}"; need channel_id; shift
+      local _json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --json) _json=1; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local _resp; _resp=$(_curl "$BASE_URL/channels/$channel_id/members")
+      if [[ $_json -eq 1 ]]; then
+        echo "$_resp" | jq .
+      else
+        local count; count=$(echo "$_resp" | jq '[.members[]?] | length')
+        printf '%-36s  %-8s  %s\n' "SESSION NAME" "ROLE" "JOINED"
+        printf '%-36s  %-8s  %s\n' "------------------------------------" "--------" "-------------------"
+        echo "$_resp" | jq -r '.members[]? | [
+          (.session_name // "(unnamed)"),
+          (.role // "-"),
+          (.joined_at // "-")
+        ] | @tsv' | while IFS=$'\t' read -r name role joined; do
+          printf '%-36s  %-8s  %s\n' \
+            "$(_trunc "$name" 36)" \
+            "$(_trunc "$role" 8)" \
+            "${joined:0:19}"
+        done
+        [[ -n "$count" ]] && printf '\n%s member(s)\n' "$count"
+      fi
+      ;;
     *)
       cat <<USAGE
 usage: eits channels <subcommand>
@@ -2327,6 +2404,7 @@ Subcommands:
   send     <channel_id> --body <text> [--session <id>] [--broadcast-team <team_id>]
            Send a message; --broadcast-team fans out DMs to all team members after posting
   messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
+  members  <channel_id> [--json]                    List channel members (name, role, joined)
   join     <channel_id> [--session <uuid|id>] [--role <member|admin>]
            Join a channel (defaults to current session)
   leave    <channel_id> [--session <uuid|id>]
@@ -2341,6 +2419,8 @@ Examples:
   eits channels send 1 --body "@all deploy done" --broadcast-team 296
   eits channels messages 1
   eits channels messages 1 -n 5
+  eits channels members 1
+  eits channels members 1 --json
   eits channels join 1
   eits channels join 1 --role admin
   eits channels leave 1

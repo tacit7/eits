@@ -87,6 +87,8 @@ Three toggle buttons in the toolbar:
 
 ## Bulk Operations
 
+### Kanban Board
+
 1. Click the **Select** toggle to enter bulk mode
 2. Checkboxes appear on each card. Click cards to select/deselect.
 3. **Select All** checkbox on column headers selects/deselects entire column
@@ -94,6 +96,25 @@ Three toggle buttons in the toolbar:
    - **Move to**: Buttons for each column (moves all selected tasks)
    - **Archive**: Archives all selected tasks
    - **Delete**: Deletes all selected (with confirmation dialog)
+
+### Task List View
+
+The task list view (`/projects/:id/tasks`) also supports bulk operations on selected tasks:
+
+1. Click the **Select** toggle to enter bulk mode
+2. Checkboxes appear on each row. Click rows to select/deselect.
+3. Action bar appears showing count of selected tasks:
+   - **Move to**: Dropdown menu of workflow states (with color dots). Click a state to move all selected tasks to it. No confirmation needed as state changes are reversible.
+   - **Archive**: Archives all selected tasks. Opens a styled confirmation modal before proceeding. Shows mixed-result messaging on completion (e.g., "Archived 3 tasks; 1 failed").
+   - **Delete**: Deletes all selected tasks (with confirmation dialog)
+
+4. After any bulk operation, the selection is cleared and the list reloads.
+
+Success and error messages include counts:
+- "Moved 3 tasks to In Progress"
+- "Archived 2 tasks"
+- "Moved 5 tasks to Done; 1 failed"
+- "Archived 3 tasks; 1 could not be archived"
 
 ## Drag and Drop
 

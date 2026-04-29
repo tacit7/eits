@@ -33,11 +33,49 @@ The `CommandRegistry` defines all available commands with categorization and fil
 
 ---
 
+## Command Groups
+
+Commands are organized into groups that render in priority order:
+
+1. **Current Project** — Project-scoped navigation (shown only when inside `/projects/:id`)
+2. **Workspace** — Global workspace navigation
+3. **Projects** — Project management
+4. **Tasks** — Task-related commands
+5. **Insights** — Analytics and reporting
+6. **Knowledge** — Documentation and references
+7. **Communication** — Chat and messaging
+8. **System** — Settings and configuration
+
+---
+
 ## Navigation Commands
 
-### Go to Session
-- **ID:** `go-to-session`
-- **Category:** Navigation
+### Current Project Commands
+
+When navigating within a project (e.g., `/projects/123/sessions`), a "Current Project" group appears at the top with quick access to all project pages. Each command shows the project name as a hint.
+
+Available current project commands:
+- **Sessions** — Navigate to project Sessions page
+- **Tasks** — Navigate to project Tasks page
+- **Kanban** — Navigate to project Kanban board
+- **Notes** — Navigate to project Notes page
+- **Agents** — Navigate to project Agents page
+- **Prompts** — Navigate to project Prompts page
+- **Skills** — Navigate to project Skills page
+- **Files** — Navigate to project Files page
+- **Teams** — Navigate to project Teams page
+- **Configuration** — Navigate to project Configuration page
+
+**Implementation:**
+- Detected via URL pattern: `/projects/:id`
+- Only rendered when URL matches current project context
+- Uses project ID and name from dataset attribute
+
+### Workspace Navigation
+
+#### Go to Session
+- **ID:** `go-sessions`
+- **Group:** Workspace
 - **Feature:** Submenu with async session fetch
 - **Project scoping:** Filters sessions to current project when in project context
 - **Behavior:**
@@ -47,9 +85,9 @@ The `CommandRegistry` defines all available commands with categorization and fil
   - Fetches all non-archived sessions
   - Click to navigate to session's DM page
 
-### Go to Project
-- **ID:** `go-to-project`
-- **Category:** Navigation
+#### Go to Project
+- **ID:** `go-projects`
+- **Group:** Workspace
 - **Behavior:** Lists all active projects with quick navigation to project overview
 
 ---
@@ -134,7 +172,8 @@ When exactly one search result is visible, pressing Tab automatically activates 
 
 | Component | Path |
 |-----------|------|
-| Hook | `assets/js/app.js` |
-| Command Registry | `assets/js/app.js` |
+| Hook | `assets/js/hooks/command_palette.js` |
+| Navigation Commands | `assets/js/hooks/palette_commands/navigation.js` |
+| Current Project Commands | `assets/js/hooks/palette_commands/navigation.js` |
 | Layout Component | `lib/eye_in_the_sky_web_web/components/layouts/app.html.heex` |
 | API (sessions fetch) | `lib/eye_in_the_sky_web_web/controllers/api/v1/session_controller.ex` |

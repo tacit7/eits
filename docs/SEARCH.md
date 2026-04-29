@@ -2,6 +2,30 @@
 
 ## CLI Quick Reference
 
+### Unified Search (all entity types in one query)
+
+```bash
+# Cross-entity search across sessions, tasks, and notes (parallel, default 5 per type)
+eits search "auth bug"
+
+# Narrow to specific entity types
+eits search "migration" --type tasks,notes       # comma-separated
+eits search "deploy" --type sessions
+
+# Tune results per type (all types get same limit)
+eits search "auth" --limit 10
+
+# Scope to a project
+eits search "pipeline" --project 1
+
+# Machine-readable output
+eits search "context" --json
+```
+
+### Per-Resource Search
+
+Each resource also supports direct search:
+
 ```bash
 # Tasks — full-text search on title + description
 eits tasks search "auth bug"
@@ -19,7 +43,76 @@ eits sessions list --search "login refactor"
 eits sessions list --search "login refactor" --status working
 ```
 
-No top-level `eits search` command. Each resource has its own `search` subcommand or `--search`/`--q` flag on `list`.
+---
+
+## Unified `eits search` Command
+
+The `eits search` command queries multiple entity types in parallel via the REST API:
+
+```bash
+eits search <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
+```
+
+### Implementation
+
+The command:
+
+1. **Validates arguments** — strict type checking; `--limit` and `--project` must be numeric; unknown `--type` tokens error immediately
+2. **Fans out in parallel** — spawns up to 3 background HTTP requests (one per requested entity type) using `_curl` helper
+3. **Writes to temp files** — results collected to temp JSON files in a trap-protected directory (cleaned up on exit/signal/error)
+4. **Formats output** — either grouped tables (default) or combined JSON (`--json`)
+
+### Options
+
+| Flag | Type | Default | Notes |
+|------|------|---------|-------|
+| `--type` | CSV list | `sessions,tasks,notes` | Exact token matching (case-sensitive); invalid tokens die with error |
+| `--limit` | integer | `5` | Results per entity type (same limit applied to all) |
+| `--project` | integer | `null` | Scope to a single project |
+| `--json` | flag | off | Emit `{"sessions":[...],"tasks":[...],"notes":[...]}` instead of tables |
+
+### Output Format
+
+**Grouped tables (default):**
+
+```
+── Sessions (2) ──────────────────────────────────────────────
+ID  Name                Status    Updated
+1   login refactor      working   2026-04-28
+2   password reset      idle      2026-04-27
+
+── Tasks (3) ──────────────────────────────────────────────────
+ID  Title               State     Project
+42  fix auth bug        In Progress 1
+57  update docs         Review    1
+89  deploy migration    Done      2
+
+── Notes (1) ──────────────────────────────────────────────────
+ID  Title               Body Preview
+501 deployment steps    step 1: run migrations...
+
+5 result(s) for "auth"
+```
+
+**JSON output:**
+
+```json
+{
+  "sessions": [{"id": 1, "name": "login refactor", ...}],
+  "tasks": [{"id": 42, "title": "fix auth bug", ...}],
+  "notes": [{"id": 501, "title": "deployment steps", ...}]
+}
+```
+
+### Backend Integration
+
+Each entity type is fetched via the REST API:
+
+- `GET /api/v1/sessions?q=<query>&limit=<n>&project_id=<id>` → `{sessions: [...]}`
+- `GET /api/v1/tasks?q=<query>&limit=<n>&project_id=<id>` → `{tasks: [...]}`
+- `GET /api/v1/notes?q=<query>&limit=<n>&project_id=<id>` → `{notes: [...]}`
+
+The underlying search uses PgSearch (see below) for each endpoint.
 
 ---
 

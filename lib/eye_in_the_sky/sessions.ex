@@ -365,7 +365,8 @@ defmodule EyeInTheSky.Sessions do
           model_name: model_name,
           project_id: project_id,
           git_worktree_path: params["worktree_path"],
-          entrypoint: params["entrypoint"]
+          entrypoint: params["entrypoint"],
+          read_only: params["read_only"] == true or params["read_only"] == "true"
         }
 
         result =

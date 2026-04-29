@@ -117,6 +117,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       |> Helpers.maybe_put(:status, status)
       |> Helpers.maybe_put(:status_reason, params["status_reason"])
       |> Helpers.maybe_put(:intent, params["intent"])
+      |> maybe_put_read_only(params["read_only"])
       |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
       |> Helpers.maybe_put(:name, params["name"])
       |> Helpers.maybe_put(:description, params["description"])
@@ -454,6 +455,12 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   end
 
   defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
+
+  defp maybe_put_read_only(attrs, nil), do: attrs
+  defp maybe_put_read_only(attrs, ""), do: attrs
+  defp maybe_put_read_only(attrs, val) when val in [true, "true", "1", 1], do: Map.put(attrs, :read_only, true)
+  defp maybe_put_read_only(attrs, val) when val in [false, "false", "0", 0], do: Map.put(attrs, :read_only, false)
+  defp maybe_put_read_only(attrs, _), do: attrs
 
   defp build_session_filter_opts(params) do
     query = params["q"] || ""

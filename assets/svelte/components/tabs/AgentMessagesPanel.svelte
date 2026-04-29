@@ -630,7 +630,7 @@
           {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
           {@const isSameSender = prevMessage && !isTurnBoundary && prevMessage.sender_role !== 'system' && message.sender_role !== 'system' && prevMessage.session_id === message.session_id && prevMessage.sender_role === message.sender_role}
           <div
-            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {isSameSender ? 'pt-0.5' : ''} {message.sender_role === 'system' ? 'py-0.5' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 border-l-2 border-base-content/12 hover:bg-base-content/[0.04] hover:border-base-content/20'}"
+            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {isSameSender ? 'pt-0.5' : ''} {message.sender_role === 'system' ? 'py-0.5' : 'py-4 hover:bg-base-content/[0.04]'}"
           >
             {#if message.sender_role === 'system'}
               <!-- System message — centered annotation, off main reading axis -->

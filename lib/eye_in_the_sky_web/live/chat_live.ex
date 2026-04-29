@@ -186,6 +186,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
         ssr={false}
         props={
           %{
+            channels: @channels,
             activeChannelId: @active_channel_id,
             messages: @messages,
             hasMoreMessages: @has_more_messages,

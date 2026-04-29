@@ -150,7 +150,7 @@ Fires before any `Edit` or `Write` tool call. Enforces the EITS workflow.
 **What it does:**
 1. Calls `eits sessions get` — fails open if API is unreachable
 2. **Non-spawned sessions**: denies if session has no name (requires `/eits-init`)
-3. **Non-spawned sessions**: denies if no active task (`state_id=2`) via `eits tasks list --session $session_id --state 2`
+3. **Non-spawned sessions**: denies if no active task (`state_id=2`) via `eits tasks list --session $session_id --state 2 --json` (JSON output required for jq parsing)
 
 **Deny response format:**
 ```json

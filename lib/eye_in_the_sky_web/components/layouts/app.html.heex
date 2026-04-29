@@ -138,6 +138,7 @@
           />
         <% :chat -> %>
           <EyeInTheSkyWeb.TopBar.Chat.toolbar
+            active_channel={assigns[:active_channel]}
             sender_filter={assigns[:sender_filter]}
             channel_members={assigns[:channel_members] || []}
             sessions_by_project={assigns[:sessions_by_project] || []}

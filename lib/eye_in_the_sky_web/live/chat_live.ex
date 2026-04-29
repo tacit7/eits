@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSkyWeb.ChatLive.ChannelDataLoader
-  alias EyeInTheSkyWeb.ChatLive.ChannelHeader
   alias EyeInTheSkyWeb.ChatLive.EventHandlers
   alias EyeInTheSkyWeb.ChatLive.PubSubHandlers
   alias EyeInTheSkyWeb.ChatPresenter
@@ -145,7 +144,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
     ~H"""
     <div class="flex h-[var(--app-viewport-height)] bg-base-100">
       <div class="flex-1 flex flex-col min-w-0">
-        <ChannelHeader.channel_header active_channel={@active_channel} />
         <.message_feed
           channels={@channels}
           active_channel_id={@active_channel_id}

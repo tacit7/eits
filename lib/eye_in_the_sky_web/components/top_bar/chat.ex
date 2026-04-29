@@ -13,33 +13,18 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
   attr :channel_members, :list, default: []
   attr :sessions_by_project, :list, default: []
   attr :session_search, :string, default: ""
-  attr :agent_status_counts, :map, default: %{}
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- Identity group: channel name + live status badges --%>
-    <div class="flex items-center gap-2 min-w-0">
-      <span class="flex items-center gap-0.5 font-semibold text-sm text-base-content truncate">
-        <span class="text-primary/50 font-semibold mr-0.5">#</span>
-        <%= if @active_channel do %>
-          {@active_channel.name || "channel"}
-        <% else %>
-          chat
-        <% end %>
-      </span>
-      <%= if @agent_status_counts[:active] do %>
-        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/10 text-[11px] font-mono text-success flex-shrink-0">
-          <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
-          {@agent_status_counts.active} active
-        </span>
+    <%!-- Identity: channel name only — no status indicators (chrome spec) --%>
+    <span class="flex items-center gap-0.5 font-semibold text-[12px] text-base-content/75 shrink-0">
+      <span class="text-primary/50 font-semibold mr-0.5">#</span>
+      <%= if @active_channel do %>
+        {@active_channel.name || "channel"}
+      <% else %>
+        chat
       <% end %>
-      <%= if @agent_status_counts[:working] do %>
-        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-warning/10 text-[11px] font-mono text-warning flex-shrink-0">
-          <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
-          {@agent_status_counts.working} running
-        </span>
-      <% end %>
-    </div>
+    </span>
     <%!-- Spacer: pushes action controls to the right --%>
     <div class="flex-1" />
     <%!-- Action group: filter, members, new agent --%>
@@ -182,7 +167,7 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
           </div>
         </div>
       </details>
-      <div class="w-px h-4 bg-base-content/10 mx-1"></div>
+      <div class="w-px h-4 bg-base-content/10 mx-0.5"></div>
       <button
         phx-click="toggle_agent_drawer"
         class="btn btn-xs btn-ghost gap-1 min-h-[44px] min-w-[44px]"

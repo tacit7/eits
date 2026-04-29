@@ -3600,7 +3600,7 @@ Commands:
   prompts       list|get
   teams         list|get|create|update|delete|members|join|status|update-member|leave|broadcast|my-teams
                 status <id> [--wait]   ← blocks until all members done/failed; exits 0 all done, 1 any failed
-  timer         show|set|cancel   (default session: self / $EITS_SESSION_UUID)
+  timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]

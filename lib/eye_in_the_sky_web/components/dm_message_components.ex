@@ -28,57 +28,38 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :message, :map, required: true
 
   def message_metrics(assigns) do
+    assigns = assign(assigns, :metrics_text, format_metrics(assigns.message.metadata))
+
     ~H"""
-    <div class="mt-2 flex flex-wrap gap-1.5">
-      <%= if @message.metadata["total_cost_usd"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
-          title="Total cost"
-        >
-          <.icon name="hero-currency-dollar-mini" class="size-3" />
-          {:erlang.float_to_binary(@message.metadata["total_cost_usd"] * 1.0, decimals: 4)}
+    <%= if @metrics_text != "" do %>
+      <div class="mt-1 px-1">
+        <span class="text-[10px] font-mono tabular-nums text-base-content/30">
+          {@metrics_text}
         </span>
-      <% end %>
-
-      <%= if @message.metadata["usage"] && @message.metadata["usage"]["input_tokens"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
-          title="Input tokens"
-        >
-          {@message.metadata["usage"]["input_tokens"]} in
-        </span>
-      <% end %>
-
-      <%= if @message.metadata["usage"] && @message.metadata["usage"]["output_tokens"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
-          title="Output tokens"
-        >
-          {@message.metadata["usage"]["output_tokens"]} out
-        </span>
-      <% end %>
-
-      <%= if @message.metadata["duration_ms"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
-          title="Duration"
-        >
-          <.icon name="hero-clock-mini" class="size-3" />
-          {:erlang.float_to_binary(@message.metadata["duration_ms"] * 1.0 / 1000, decimals: 1)}s
-        </span>
-      <% end %>
-
-      <%= if @message.metadata["num_turns"] do %>
-        <span
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-mini font-mono tabular-nums text-base-content/40"
-          title="Number of turns"
-        >
-          {@message.metadata["num_turns"]} turns
-        </span>
-      <% end %>
-    </div>
+      </div>
+    <% end %>
     """
   end
+
+  defp format_metrics(metadata) when is_map(metadata) do
+    parts =
+      [
+        metadata["total_cost_usd"] &&
+          "$#{:erlang.float_to_binary(metadata["total_cost_usd"] * 1.0, decimals: 4)}",
+        get_in(metadata, ["usage", "input_tokens"]) &&
+          "#{get_in(metadata, ["usage", "input_tokens"])} in",
+        get_in(metadata, ["usage", "output_tokens"]) &&
+          "#{get_in(metadata, ["usage", "output_tokens"])} out",
+        metadata["duration_ms"] &&
+          "#{:erlang.float_to_binary(metadata["duration_ms"] * 1.0 / 1000, decimals: 1)}s",
+        metadata["num_turns"] && "#{metadata["num_turns"]} turns"
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Enum.join(parts, " · ")
+  end
+
+  defp format_metrics(_), do: ""
 
   # ---------------------------------------------------------------------------
   # message_attachments

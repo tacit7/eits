@@ -119,16 +119,15 @@ Keyboard events are managed via the `GlobalKeydown` hook registered in `assets/j
 - **`switch_tab`** — User clicks canvas tab; routes to `/canvases/:id` via `push_patch`
 - **`start_new_canvas`** — Toggles `:creating_canvas` flag to show name input form
 - **`create_canvas`** — Validates name, creates canvas, appends to list, routes to new canvas
-- **`tidy_canvas`** — Tidy button in the canvas header cascades all windows into a clean layout via `Canvases.tidy/1`, which resets positions and applies consistent spacing
 - **`delete_canvas`** — Deletes canvas and delegates state cleanup to `handle_canvas_deleted/2` helper (refactored to flatten nesting). Updates canvas list, unsubscribes from sessions if active, and redirects to first canvas or empty list.
 
 #### Window Management
-- **`window_moved`** — Records x/y position delta; calls `Canvases.update_window_layout/2`
-- **`window_resized`** — Records width/height delta; calls `Canvases.update_window_layout/2`
+- **`window_moved`** — Records x/y position delta; calls `Canvases.update_window_layout/2` with guards against hook destruction (pushEvent checked)
+- **`window_resized`** — Records width/height delta; calls `Canvases.update_window_layout/2` with guards against hook destruction; server clamps width/height to 100px minimum to prevent corrupt layouts (2x2 px windows)
 - **`remove_window`** — Removes session from canvas and unsubscribes from PubSub
 - **`raise_window`** — Clicking any canvas window raises it to the front by updating z-order state in `CanvasLive`
-- **`minimize_window`** — Minimize/collapse toggle for individual windows. Minimized windows show unread indicator dot.
-- **`maximize_window`** — Restore window to full size if minimized. Includes unread dot on minimized windows.
+- **`minimize_window`** — Minimize/hide toggle for individual windows (display:none). Minimized windows show unread indicator dot. Accessed via canvas rail flyout or URL parameter.
+- **`canvas:focus-session` (JS event)** — When a session name is clicked in the canvas rail flyout or triggered via `?focus=` URL param, this event restores a minimized window, reconnects ResizeObserver, scrolls to bottom, raises to z-index 20, and persists the changes.
 
 ### Canvas Management Events
 
@@ -174,29 +173,40 @@ When events arrive, the handler calls `refresh_window/2` which calls `send_updat
 
 ### Canvas Layout Hook
 - **File:** `assets/js/hooks/canvas_layout_hook.js`
-- **Purpose:** Manages preset layout buttons (2up, 4up), applies tiled positioning with precise edge padding and gaps, and exports localStorage persistence utilities
+- **Purpose:** Manages smart auto-layout button that adapts to session count, applies tiled positioning with precise edge padding and gaps, and exports localStorage persistence utilities
 - **Layout constants:**
-  - `EDGE = 8` — Pixel padding on all four edges of the canvas area in tiled presets
-  - `GAP = 8` — Pixel gap between adjacent windows in 2up/4up tiled layouts
-- **Layout calculation:** For 2up preset: 2 columns side-by-side across full canvas width; each window: `width = (canvasWidth - EDGE*2 - GAP) / 2`. For 4up preset: 2x2 grid; each window: `width = (canvasWidth - EDGE*2 - GAP) / 2`, `height = (canvasHeight - EDGE*2 - GAP) / 2`
+  - `EDGE = 8` — Pixel padding on all four edges of the canvas area in tiled layouts
+  - `GAP = 8` — Pixel gap between adjacent windows in tiled layouts
+- **Auto-layout algorithm (`computePositions()`):** Single button adapts to session count:
+  - **1 session**: Full canvas (width=W-2*EDGE, height=H-2*EDGE)
+  - **2 sessions**: Side-by-side columns; each `width = (W - GAP) / 2`, `height = H`
+  - **3–4 sessions**: 2×2 grid; each window `width = (W - GAP) / 2`, `height = (H - GAP) / 2`
+  - **>4 sessions**: Tiles first 4 in grid layout, cascades overflow windows below with 24px + i*32px offset, displays a dismissing banner: "Auto-layout supports up to 4 sessions — drag to arrange the rest"
 - **Exports:**
   - `saveWindowLayout(csId, x, y, w, h, z)` — Persists window position, size, and optionally z-index to localStorage under key `cw_{csId}`
   - `loadWindowLayout(csId)` — Retrieves saved layout from localStorage, returns `{x, y, w, h, z}` or null
   - `saveWindowZ(csId, z)` — Saves z-index separately to existing layout entry (used when only stacking order changes)
-- **Events:** Dispatches `canvas:layout-applied` custom event with detail `{x, y, w, h}` to notify ChatWindowHook of preset layout application and allow syncing of instance variables
+- **Events:** Dispatches `canvas:layout-applied` custom event with detail `{x, y, w, h}` to notify ChatWindowHook of layout application and allow syncing of instance variables
+- **Banner display:** `showCanvasBanner(message)` creates a dismissing overlay at bottom-center of canvas that auto-removes after 3 seconds
 
 ### Chat Window Hook
 - **File:** `assets/js/hooks/chat_window_hook.js`
-- **Purpose:** Handles window drag, resize, focus, minimize/maximize, snap-to-edge detection, localStorage persistence, and chat submission
+- **Purpose:** Handles window drag, resize, focus, minimize/maximize, snap-to-edge detection, localStorage persistence, autoscroll, and chat submission
 - **Lifecycle:**
-  - On mount: Loads position/size/z-index from localStorage via `loadWindowLayout(csId)` and syncs instance variables; adds canvas:layout-applied event listener
-  - During drag: Saves position to localStorage with 50ms debounce via `saveWindowLayout()`
-  - During resize: Prevents window from resizing when a message is being sent (guards against visual jitter); saves dimensions to localStorage with 400ms debounce via `saveWindowLayout()`
+  - On mount: Loads position/size/z-index from localStorage via `loadWindowLayout(csId)`, guards against corrupt layouts (width/height < 120px), syncs instance variables, adds canvas:layout-applied event listener
+  - During drag: Guards `pushEvent` against hook destruction; saves position to localStorage with 50ms debounce via `saveWindowLayout()`
+  - During resize: Guards `pushEvent` against hook destruction; prevents window from resizing when a message is being sent; saves dimensions to localStorage with 400ms debounce via `saveWindowLayout()`
   - On focus: Saves z-index to localStorage via `saveWindowZ()` and dispatches `canvas:focus-session` event
   - On message send: Prevents window resize by temporarily disabling the resize handler
+  - On minimize: Hides entire element (display:none); restores window visibility and ReizeObserver subscription on un-minimize
+  - On maximize: Restores minimized window, reconnects ResizeObserver, scrolls to bottom, raises to front (z-index 20)
+- **ResizeObserver:** Late-rendering content (LocalTime hooks, markdown) expands scrollHeight after initial scrollToBottom. Observer re-fires on content growth and scrolls to bottom when `_autoScroll` is true; re-observes children after each LiveView patch to track new message nodes.
+- **Autoscroll fixes:** Post-mount force-scroll sequence (rAF + 150ms + 400ms timeouts) ensures initial scrollToBottom runs after late-rendering content expands; `beforeUpdate()`/`updated()` `_patching` flag prevents morphdom DOM patches from briefly resetting scrollTop which was falsely triggering scroll-up detection and disabling autoscroll.
+- **Close button fix:** Drag handle's mousedown handler now returns early when target is a button element, preventing preventDefault from suppressing click events on the red close button.
 - **Snap zones:** Configurable threshold (80px) for edge snapping; snap zones detected based on cursor proximity to viewport edges
-- **Instance variables:** Maintains `_width`, `_height`, `_dragLeft`, `_dragTop`, `_zIndex` to track window state; these are synced when layout buttons dispatch canvas:layout-applied event
+- **Instance variables:** Maintains `_width`, `_height`, `_dragLeft`, `_dragTop`, `_zIndex`, `_userScrolled`, `_autoScroll`, `_patching` to track window state; these are synced when layout buttons dispatch canvas:layout-applied event
 - **Z-Index Stacking:** When a window is focused (clicked), z-index updates to "20" and is persisted; all other windows reset to z-index "1". Z-index is restored from localStorage on mount, allowing window stacking order to persist across sessions.
+- **Auto-scroll toggle:** Click button in chat window footer to enable/disable. When enabled (default), new messages scroll to bottom and ResizeObserver keeps tracking content growth. When disabled, stays in current position and shows unread message count pill; clicking pill re-enables auto-scroll and jumps to bottom.
 - **Chat submission:** Submit listener is delegated to the window root element (not the textarea) to capture events from nested components like the chat window. Scrolling to bottom is deferred by one rAF to allow DOM reflow to complete before measuring scroll position.
 
 ### Global Keydown Hook
@@ -255,10 +265,6 @@ This extracted module handles canvas-related events fired from the **AgentLive**
 
 ### Event Handlers
 
-**`show_new_canvas_form`**
-- User clicks "Create and add to canvas" on a session card
-- Sets `:show_new_canvas_for` flag in AgentLive to display canvas name input
-
 **`add_to_canvas`**
 - User selects existing canvas from dropdown
 - Calls `Canvases.add_session/2` to link session to canvas
@@ -269,6 +275,18 @@ This extracted module handles canvas-related events fired from the **AgentLive**
 - If no name provided, generates default: `"Canvas {unix_timestamp}"`
 - Creates canvas, adds session, routes to new canvas with success flash
 - Flash message: `"Added to {canvas_name}"`
+
+### New Canvas Button Implementation
+
+The "New Canvas" button in the agent list dropdown uses **client-side JS commands** (`JS.hide`/`JS.show`/`JS.focus`) instead of server-side state toggling. This enables the button→form swap to work inside the frozen `phx-update="ignore"` dropdown subtree:
+
+- **Button state**: `id="new-canvas-btn-{agent_id}"` visible by default
+- **Form state**: `id="new-canvas-form-{agent_id}"` hidden (`style="display:none"`) until clicked
+- **Interaction**: Clicking button dispatches:
+  - `JS.hide(to: "#new-canvas-btn-#{@agent.id}")` — Hides button
+  - `JS.show(to: "#new-canvas-form-#{@agent.id}")` — Shows form
+  - `JS.focus(to: "#new-canvas-input-#{@agent.id}")` — Focus canvas name input
+- **Submission**: Form submits `add_to_new_canvas` event via `phx-submit`
 
 ## State Management & Data Flow
 
@@ -300,9 +318,12 @@ This extracted module handles canvas-related events fired from the **AgentLive**
 **Database Storage:**
 Window layout (x, y, width, height) is stored in the `canvas_sessions` join table:
 - `pos_x`, `pos_y` — Top-left corner offset (pixels)
-- `width`, `height` — Window dimensions
+- `width`, `height` — Window dimensions (clamped to 100px minimum on server, 120px on client)
 
-When canvas is activated, positions are restored from database. If both are 0, a cascade layout is applied (each window offset by `24 + i*32` pixels) to avoid stack overlap.
+When canvas is activated, positions are restored from database. If both are 0, a cascade layout is applied (each window offset by `24 + i*32` pixels) to avoid stack overlap. **Three-layer minimum dimension defense prevents invisible windows:**
+- **Server**: `update_window_layout/2` clamps width/height to 100px minimum
+- **JS applyPosition**: Clamps before writing to DOM/localStorage (MIN_DIM=120)
+- **JS ChatWindowHook.mounted**: Discards localStorage entries with width/height < 120px; layout button bails early if canvas area < 200px in either dimension
 
 **localStorage Persistence:**
 In addition to database persistence, window layout and z-index are persisted to browser localStorage for immediate restoration across page reloads and browser sessions:
@@ -384,10 +405,18 @@ Clicking a session name or message link within the canvas should route back to `
 ### Canvas Page Layout
 - **Full-screen mode:** Dedicated canvas page with full viewport. Back button available to return to previous page. No sidebar visible during canvas interactions.
 - **Page title:** Browser tab shows active canvas name for easy identification when multiple canvases are open.
-- **Window positioning:** Cascade layout applied by default if window positions not previously persisted. Tidy button resets all windows and cascades them into clean grid layout.
+- **Window positioning:** Cascade layout applied by default if window positions not previously persisted. Auto-layout button adapts to session count (1: full canvas, 2: columns, 3-4: grid, >4: tiles first 4 + cascade).
 
 ### Status & Visual Feedback
-- **Working status indicator** — Session status dot animates with continuous pulse effect (`animate-pulse`) when session is in working state; provider icon in message body also pulses during working state
+- **Working status indicator** — Session status badge animates with continuous pulse effect (`animate-pulse`) when session is in `working` state; provider icon in message body also pulses during working state
+- **Status badge styling** — `session_status_class/1` maps session statuses to badge styles:
+  - `working` → badge-primary (animated pulse)
+  - `idle` → badge-ghost (no activity)
+  - `waiting` → badge-warning (paused, can resume)
+  - `completed` → badge-success (finished)
+  - `failed` → badge-error (error state)
+  - `compacting` → badge-warning (in progress)
+  - `archived` → badge-ghost (inactive)
 - **Unread indicators** — Minimized windows show unread message dot; unread count pill appears when auto-scroll is disabled and new messages arrive
 - **Session added badge** — Refresh badge displayed on add_session to provide visual feedback that canvas was updated
 - **Window focus ring** — Active window displays a visible focus ring to indicate interaction target

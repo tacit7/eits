@@ -9,13 +9,22 @@ defmodule EyeInTheSky.ChannelMessages do
 
   @doc """
   Returns the list of messages for a specific channel.
+
+  Options:
+    - `:limit` — max number of messages to return, default 100
+    - `:before_id` — return only messages with id < before_id (cursor pagination)
+
+  Results are returned in chronological order (oldest first).
   """
   def list_messages_for_channel(channel_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 100)
+    before_id = Keyword.get(opts, :before_id)
 
-    # Get the last N messages by ordering DESC, then reverse for chronological display
     Message
     |> where([m], m.channel_id == ^channel_id and is_nil(m.parent_message_id))
+    |> then(fn q ->
+      if before_id, do: where(q, [m], m.id < ^before_id), else: q
+    end)
     |> order_by([m], desc: m.inserted_at, desc: m.id)
     |> limit(^limit)
     |> preload([:reactions, :attachments, :session])

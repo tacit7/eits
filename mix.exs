@@ -88,7 +88,8 @@ defmodule EyeInTheSky.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:sobelow, "~> 0.13", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:elixirkit, github: "livebook-dev/elixirkit"}
+      {:elixirkit, github: "livebook-dev/elixirkit"},
+      {:erlexec, "~> 2.0"}
     ]
   end
 

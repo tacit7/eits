@@ -56,7 +56,9 @@ defmodule EyeInTheSky.Application do
           # In-memory timer registry for orchestrator sessions
           EyeInTheSky.OrchestratorTimers.Server,
           # IAM policy cache (ETS-backed, single-node)
-          EyeInTheSky.IAM.PolicyCache
+          EyeInTheSky.IAM.PolicyCache,
+          # DynamicSupervisor for per-session PTY processes
+          EyeInTheSky.Terminal.PtySupervisor
         ]
 
     iam_seeds =

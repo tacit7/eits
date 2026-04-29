@@ -57,6 +57,7 @@ const FileEditorRelay = {
     window.removeEventListener("file:save", this._handler)
   },
 }
+import {PtyHook} from "./hooks/pty_hook"
 import {NoteEditorHook} from "./hooks/note_editor"
 import {NoteFullEditorHook} from "./hooks/note_full_editor"
 import {SortableKanban, SortableColumns} from "./hooks/sortable_kanban"
@@ -159,6 +160,7 @@ Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
 Hooks.DmHistoryCleanup = DmHistoryCleanup
 Hooks.SortDropdown = SortDropdown
+Hooks.PtyHook = PtyHook
 // VimNav is initialized directly below (not via phx-hook)
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

@@ -386,7 +386,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp teams_content(assigns) do
     ~H"""
-    <div class="px-3 pt-2 pb-1">
+    <div class="px-3 pb-1">
       <.link
         navigate="/teams"
         class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
@@ -418,7 +418,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp canvas_content(assigns) do
     ~H"""
-    <div class="px-3 pt-2 pb-1">
+    <div class="px-3 pb-1">
       <.link
         navigate="/canvases"
         class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
@@ -529,7 +529,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <.link
       navigate={@href}
-      class="flex items-center gap-2.5 px-3 py-2.5 text-sm text-base-content/60 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
+      class="flex items-center gap-2.5 px-3 py-2 text-sm text-base-content/60 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
     >
       <.icon name={@icon} class="size-3.5 flex-shrink-0" />
       <span class="truncate">{@label}</span>

@@ -125,6 +125,11 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "quick_create_note" } },
   { id: "create.chat",    label: "New Chat",    keys: ["n", "c"], group: "create",
     action: { kind: "client", name: "quick_create_chat" } },
+  { id: "create.prompt",  label: "New Prompt",  keys: ["n", "p"], group: "create",
+    action: { kind: "navigate", path: "prompts/new", relative: true } },
+  { id: "create.kanban_task", label: "New Kanban Task", keys: ["n", "k"], group: "create",
+    action: { kind: "push_event", event: "toggle_new_task_drawer", payload: {}, target: "active_view" },
+    scope: "route_suffix:/kanban" },
 
   // global
   { id: "global.help",    label: "Keybinding Help",  keys: ["?"], group: "global",

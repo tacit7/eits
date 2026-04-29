@@ -49,6 +49,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
       %{keys: ["n", "t"], desc: "New task"},
       %{keys: ["n", "n"], desc: "New note"},
       %{keys: ["n", "c"], desc: "New chat"},
+      %{keys: ["n", "p"], desc: "New prompt"},
+      %{keys: ["n", "k"], desc: "New kanban task", scope: "route_suffix:/kanban"},
     ]},
     %{group: "context", label: "List navigation", scope_note: "Pages with a navigable list", bindings: [
       %{keys: ["j"],     desc: "Next item"},

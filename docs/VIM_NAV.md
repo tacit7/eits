@@ -74,6 +74,8 @@ Lowercase toggles open/close. Uppercase toggles **and enters flyout focus** (sam
 | `n t` | New task |
 | `n n` | New note |
 | `n c` | New chat |
+| `n p` | New prompt |
+| `n k` | New kanban task *(kanban page only)* |
 
 ---
 

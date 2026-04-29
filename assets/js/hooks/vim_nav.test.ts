@@ -279,6 +279,61 @@ describe("VimNav.executeCommand shell routing", () => {
     window.removeEventListener("palette:create-task", listener)
   })
 
+  it("n p command exists with navigate action to prompts/new", () => {
+    const cmd = COMMANDS.find(c => c.id === "create.prompt")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["n", "p"])
+    expect(cmd.action.kind).toBe("navigate")
+    if (cmd.action.kind === "navigate") {
+      expect(cmd.action.path).toBe("prompts/new")
+      expect(cmd.action.relative).toBe(true)
+    }
+  })
+
+  it("n k command exists scoped to route_suffix:/kanban", () => {
+    const cmd = COMMANDS.find(c => c.id === "create.kanban_task")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["n", "k"])
+    expect(cmd.scope).toBe("route_suffix:/kanban")
+    expect(cmd.action.kind).toBe("push_event")
+    if (cmd.action.kind === "push_event") {
+      expect(cmd.action.event).toBe("toggle_new_task_drawer")
+      expect(cmd.action.target).toBe("active_view")
+    }
+  })
+
+  it("isCommandActive returns true for n k when pathname includes /kanban", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/kanban" },
+      writable: true,
+      configurable: true,
+    })
+    const cmd = COMMANDS.find(c => c.id === "create.kanban_task")!
+    const result = isCommandActive(cmd)
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/" },
+      writable: true,
+      configurable: true,
+    })
+    expect(result).toBe(true)
+  })
+
+  it("isCommandActive returns false for n k when pathname is /tasks", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/1/tasks" },
+      writable: true,
+      configurable: true,
+    })
+    const cmd = COMMANDS.find(c => c.id === "create.kanban_task")!
+    const result = isCommandActive(cmd)
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/" },
+      writable: true,
+      configurable: true,
+    })
+    expect(result).toBe(false)
+  })
+
   it("q calls pushEventToShell with close_flyout", () => {
     const h = makeHook()
     h.pushEventToShell = vi.fn()

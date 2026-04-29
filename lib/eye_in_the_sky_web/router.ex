@@ -233,6 +233,9 @@ defmodule EyeInTheSkyWeb.Router do
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session
     post "/tasks/:id/tags", TaskController, :add_tag
 
+    # Tags
+    get "/tags", TagController, :index
+
     # Scheduled Jobs
     get "/jobs", JobController, :index
     post "/jobs", JobController, :create

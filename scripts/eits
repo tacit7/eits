@@ -582,7 +582,20 @@ TASKS_HELP
           --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
           --session|-s) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent|-a) _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
-          --tag)     _tag_flag=1; qs="${qs}&tag_id=$2"; shift 2 ;;
+          --tag)
+            _tag_flag=1
+            local _tag_val="$2"; shift 2
+            # If numeric, use directly; otherwise resolve name → id via API
+            if [[ "$_tag_val" =~ ^[0-9]+$ ]]; then
+              qs="${qs}&tag_id=$_tag_val"
+            else
+              local _tag_resp _tag_id
+              _tag_resp=$(_curl "${BASE_URL}/tags?q=$(printf '%s' "$_tag_val" | jq -Rr @uri)" 2>/dev/null) || _tag_resp="{}"
+              _tag_id=$(printf '%s' "$_tag_resp" | jq -r --arg name "$_tag_val" '.tags[] | select(.name == $name) | .id' 2>/dev/null | head -1)
+              [[ -n "$_tag_id" ]] || die "tag not found: $_tag_val"
+              qs="${qs}&tag_id=$_tag_id"
+            fi
+            ;;
           --q|--search|-q) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --state)
             # Positional remap: 1=todo(1), 2=progress(2), 3=review(4), 4=done(3)
@@ -1672,6 +1685,32 @@ BATCH_HELP
     *)
       echo "usage: eits agents <list|get|spawn|spawn-batch>"
       ;;
+  esac
+}
+
+# ── tags ──────────────────────────────────────────────────────────────────────
+
+cmd_tags() {
+  local sub="${1:-list}"; shift || true
+  case "$sub" in
+    list)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tags list [--q <name>] [--json]"; return 0; }
+      local qs="" json_mode=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --q|-q) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --json) json_mode=1; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local _resp; _resp=$(_curl "${BASE_URL}/tags?${qs#&}") || return 1
+      if [[ $json_mode -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      else
+        printf '%s\n' "$_resp" | jq -r '.tags[] | "\(.id)\t\(.name)"' | column -t -s $'\t'
+      fi
+      ;;
+    *) die "usage: eits tags <list>" ;;
   esac
 }
 
@@ -3072,6 +3111,7 @@ Commands:
                 spawn --instructions "..." [--instructions-file <path>] [--interpolate-env]
                       [--worktree <branch>] [--stash-if-dirty] [--team-name <name>] [--model <m>] [--dry-run]
                       --interpolate-env substitutes \$VAR from current shell env into instructions
+  tags          list [--q <name>]
   commits       list|create   (create returns {errors,commits,duplicates} — no top-level success field)
   jobs          list|get|create|update|run|delete
   dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--json] [--team-only]
@@ -3112,6 +3152,7 @@ case "$cmd" in
   notes)         cmd_notes         "$@" ;;
   projects)      cmd_projects      "$@" ;;
   agents)        cmd_agents        "$@" ;;
+  tags)          cmd_tags          "$@" ;;
   commits)       cmd_commits       "$@" ;;
   jobs)          cmd_jobs          "$@" ;;
   dm)            cmd_dm            "$@" ;;

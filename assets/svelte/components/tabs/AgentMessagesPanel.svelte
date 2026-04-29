@@ -776,7 +776,7 @@
 
                     <!-- Usage metadata for agent messages -->
                     {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                      <div class="mt-1.5 pt-1.5 border-t border-base-content/[0.09] flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/35 min-w-0 overflow-hidden flex-wrap">
+                      <div class="mt-2 flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/35 min-w-0 overflow-hidden flex-wrap">
                         {#if message.metadata.total_cost_usd}
                           <span title="Total cost">${message.metadata.total_cost_usd.toFixed(4)}</span>
                         {/if}

@@ -392,6 +392,7 @@ defmodule EyeInTheSky.Tasks do
   defdelegate active_task_count_for_session(session_id), to: EyeInTheSky.TaskSessions
   defdelegate transfer_session_ownership(task_id, new_session_id), to: EyeInTheSky.TaskSessions
 
+  defdelegate list_tasks_for_tag(tag_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_scope(scope, opts \\ []), to: EyeInTheSky.Tasks.Queries

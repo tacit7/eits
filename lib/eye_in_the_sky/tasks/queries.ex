@@ -175,6 +175,21 @@ defmodule EyeInTheSky.Tasks.Queries do
   end
 
   @doc """
+  Returns tasks that have the given tag_id linked via task_tags.
+  """
+  def list_tasks_for_tag(tag_id, opts \\ []) do
+    Task
+    |> join(:inner, [t], tt in "task_tags", on: tt.task_id == t.id)
+    |> where([t, tt], tt.tag_id == ^tag_id)
+    |> QueryBuilder.maybe_where(opts, :state_id)
+    |> order_by([t], desc: t.priority, asc: t.created_at)
+    |> preload(^@full_task_preloads)
+    |> QueryBuilder.maybe_limit(opts)
+    |> QueryBuilder.maybe_offset(opts)
+    |> Repo.all()
+  end
+
+  @doc """
   Returns tasks created by the given session (via created_by_session_id).
   """
   def list_tasks_created_by_session(session_id, opts \\ []) do

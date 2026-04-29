@@ -153,6 +153,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
           session_search={@session_search}
         />
         <.message_feed
+          channels={@channels}
           active_channel_id={@active_channel_id}
           messages={@messages}
           has_more_messages={@has_more_messages}

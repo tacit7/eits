@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Read(.claude/**)",
+      "Write(.claude/**)",
+      "Edit(.claude/**)"
+    ]
+  },
   "hooks": {
     "Stop": [
       {

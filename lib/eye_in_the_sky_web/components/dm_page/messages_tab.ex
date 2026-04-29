@@ -17,6 +17,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :codex_raw_lines, :list, default: []
 
   def messages_tab(assigns) do
+    messages_with_context =
+      assigns.messages
+      |> Enum.with_index()
+      |> Enum.map(fn {msg, idx} ->
+        prev_role = if idx > 0, do: Enum.at(assigns.messages, idx - 1).sender_role, else: nil
+        {msg, prev_role}
+      end)
+
+    assigns = assign(assigns, :messages_with_context, messages_with_context)
+
     ~H"""
     <div class="flex h-full flex-col" id="dm-messages-tab">
       <div class="flex-1 min-h-0 flex flex-col">
@@ -55,9 +65,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <% end %>
             </div>
 
-            <div class="space-y-3">
-              <%= for message <- @messages do %>
-                <.message_item message={message} />
+            <div>
+              <%= for {message, prev_role} <- @messages_with_context do %>
+                <.message_item message={message} prev_role={prev_role} />
               <% end %>
             </div>
 
@@ -119,6 +129,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   end
 
   attr :message, :map, required: true
+  attr :prev_role, :any, default: nil
 
   defp message_item(assigns) do
     role = if assigns.message.sender_role == "user", do: :user, else: :agent
@@ -127,16 +138,28 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     segments = parse_body_segments(assigns.message.body)
     body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
     is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
+    is_same_sender = assigns.prev_role != nil && assigns.prev_role == assigns.message.sender_role
+    is_new_turn = assigns.prev_role != nil && assigns.prev_role != assigns.message.sender_role
 
     assigns =
       assigns
       |> assign(:role, role)
       |> assign(:is_dm, is_dm)
       |> assign(:is_tool_event, is_tool_event)
+      |> assign(:is_same_sender, is_same_sender)
+      |> assign(:is_new_turn, is_new_turn)
 
     ~H"""
     <div
       id={"dm-message-#{@message.id}"}
+      class={[
+        cond do
+          @is_tool_event -> "mt-1"
+          @is_new_turn -> "mt-5"
+          @is_same_sender -> "mt-1"
+          true -> "mt-3"
+        end
+      ]}
       phx-mounted={
         JS.transition(
           {"transition-all ease-out duration-200", "opacity-0 translate-y-1",
@@ -145,7 +168,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       }
     >
       <%= if @is_tool_event do %>
-        <div class="max-w-[70%] px-1 my-0.5">
+        <div class="max-w-[70%] px-1">
           <.message_body message={@message} compact={false} />
         </div>
       <% else %>
@@ -160,18 +183,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             ]}>
               <.message_body message={@message} compact={false} />
             </div>
-            <div :if={@role == :agent} class="flex items-center gap-1.5 mt-0.5 px-1">
-              <span
-                :if={message_model(@message)}
-                class="text-mini font-mono px-1.5 py-0.5 rounded bg-base-content/[0.05] text-base-content/35"
-              >
-                {message_model(@message)}
-              </span>
-              <span
-                :if={message_cost(@message)}
-                class="text-mini font-mono text-base-content/30"
-              >
-                ${:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}
+            <%!-- Agent inline model + cost — dot-separated plain text --%>
+            <div :if={@role == :agent && (message_model(@message) || message_cost(@message))} class="flex items-center mt-0.5 px-1">
+              <span class="text-[10px] font-mono tabular-nums text-base-content/30">
+                {[
+                  message_model(@message),
+                  message_cost(@message) && "$#{:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}"
+                ] |> Enum.reject(&is_nil/1) |> Enum.join(" · ")}
               </span>
             </div>
             <.message_metrics :if={show_message_metrics?(@message)} message={@message} />

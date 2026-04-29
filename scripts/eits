@@ -1828,7 +1828,7 @@ BATCH_HELP
           [[ -f "$_file" ]] || continue
           local _name="" _desc=""
           # Extract name field from frontmatter
-          _name=$(awk '/^---/{p++} p==1 && /^name:/{gsub(/^name:[[:space:]]*/,"",$0); gsub(/"/,"",$0); print; exit}' "$_file" | tr -d "'" | xargs)
+          _name=$(awk '/^---/{p++} p==1 && /^name:/{gsub(/^name:[[:space:]]*/,"",$0); gsub(/"/,"",$0); print; exit}' "$_file" | tr -d "'" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           # Extract description — first non-empty line after "description:" in frontmatter
           _desc=$(awk '
             /^---/{p++; next}
@@ -1847,7 +1847,7 @@ BATCH_HELP
             }
           ' "$_file")
           # Strip surrounding quotes, take first sentence only (up to first period or 120 chars)
-          _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-120 | xargs)
+          _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-120 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           [[ -z "$_name" ]] && _name=$(basename "$_file" .md)
           # Filter
           if [[ -n "$_query" ]] && ! echo "$_name" | grep -qi "$_query"; then continue; fi

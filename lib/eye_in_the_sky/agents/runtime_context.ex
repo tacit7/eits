@@ -24,7 +24,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
   alias EyeInTheSky.Claude.ModelCapabilities
   alias EyeInTheSky.Messages
 
-  @known_keys ~w(model effort_level channel_id thinking_budget max_budget_usd agent eits_workflow bypass_sandbox content_blocks message_id)a
+  @known_keys ~w(model effort_level channel_id thinking_budget max_budget_usd agent eits_workflow bypass_sandbox content_blocks message_id dm_metadata)a
 
   @type t :: %{
           model: String.t() | nil,
@@ -38,6 +38,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
           bypass_sandbox: boolean(),
           content_blocks: [EyeInTheSky.Claude.ContentBlock.t()],
           message_id: integer() | nil,
+          dm_metadata: map() | nil,
           extra_cli_opts: keyword()
         }
 
@@ -66,6 +67,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
       bypass_sandbox: opts[:bypass_sandbox] || provider == "codex",
       content_blocks: ModelCapabilities.filter_blocks(opts[:content_blocks] || [], opts[:model]),
       message_id: opts[:message_id],
+      dm_metadata: opts[:dm_metadata],
       extra_cli_opts: extra
     }
   end

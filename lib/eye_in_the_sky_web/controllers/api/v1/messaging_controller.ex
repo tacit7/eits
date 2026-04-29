@@ -207,6 +207,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     |> put_status(:created)
     |> json(%{
       success: true,
+      reachable: true,
       message: "DM delivered to session #{to_session.id}",
       message_id: to_string(msg.id),
       message_uuid: msg.uuid

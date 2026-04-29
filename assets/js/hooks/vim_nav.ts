@@ -429,36 +429,41 @@ export const VimNav = {
       "background:rgba(0,0,0,0.6)",
     ].join(";")
 
-    const groups: Record<string, Command[]> = {}
-    for (const cmd of COMMANDS) {
-      if (!isCommandActive(cmd)) continue
-      if (!groups[cmd.group]) groups[cmd.group] = []
-      groups[cmd.group].push(cmd)
-    }
+    // Only base commands — Space aliases duplicate the g/t/n bindings
+    const activeCmds = COMMANDS.filter(cmd => !cmd.id.startsWith("leader.") && isCommandActive(cmd))
 
-    const groupLabels: Record<string, string> = {
-      navigation: "Go to", toggle: "Toggle", create: "New",
-      global: "Global", context: "Context",
-    }
+    type Section = { label: string; group: string }
+    const sections: Section[] = [
+      { label: "Global",       group: "global" },
+      { label: "Go to page",   group: "navigation" },
+      { label: "Toggle rail",  group: "toggle" },
+      { label: "Create",       group: "create" },
+      { label: "Context",      group: "context" },
+    ]
 
-    let html = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:24px;min-width:360px;max-width:520px;font-family:monospace;color:var(--color-base-content)">
-      <div style="font-size:14px;font-weight:600;margin-bottom:16px">Keyboard Shortcuts</div>`
+    const kbdStyle = "display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:10px;background:var(--color-base-200);color:var(--color-base-content)"
 
-    for (const [group, cmds] of Object.entries(groups)) {
-      html += `<div style="margin-bottom:12px">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--color-base-content);opacity:.6;margin-bottom:6px">${escapeHtml(groupLabels[group] ?? group)}</div>`
+    let html = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:20px 24px;max-width:580px;width:90%;max-height:80vh;overflow-y:auto;font-family:monospace;color:var(--color-base-content)"><div style="font-size:13px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">Keyboard Shortcuts</div>`
+
+    for (const section of sections) {
+      const cmds = activeCmds.filter(c => c.group === section.group)
+      if (cmds.length === 0) continue
+
+      html += `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--color-primary,var(--color-base-content));opacity:.7;margin-bottom:5px;font-weight:600">${escapeHtml(section.label)}</div>`
+
+      const useGrid = cmds.length > 6
+      if (useGrid) html += `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:16px">`
+
       for (const cmd of cmds) {
-        const keys = cmd.keys.map(k =>
-          `<kbd style="display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:11px;background:var(--color-base-200);color:var(--color-base-content)">${escapeHtml(k)}</kbd>`
-        ).join(" ")
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0">
-          <span style="font-size:12px;color:var(--color-base-content);opacity:.8">${escapeHtml(cmd.label)}</span>
-          <span>${keys}</span></div>`
+        const keys = cmd.keys.map(k => `<kbd style="${kbdStyle}">${escapeHtml(k)}</kbd>`).join(" ")
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span style="font-size:11px;opacity:.8">${escapeHtml(cmd.label)}</span><span style="white-space:nowrap;padding-left:8px">${keys}</span></div>`
       }
+
+      if (useGrid) html += `</div>`
       html += `</div>`
     }
 
-    html += `<div style="margin-top:12px;font-size:10px;color:var(--color-base-content);opacity:.5;text-align:center">Press any key to close</div></div>`
+    html += `<div style="margin-top:8px;font-size:9px;opacity:.4;text-align:center">Press any key to close</div></div>`
     overlay.innerHTML = html
 
     this._onHelpClose = (e: KeyboardEvent) => {
@@ -490,11 +495,9 @@ export const VimNav = {
     this.whichKeyTimer = null
     // Cancel the sequence auto-dismiss — overlay stays until user acts
     if (this.sequenceTimer) { clearTimeout(this.sequenceTimer); this.sequenceTimer = null }
-    // Remove any existing which-key overlay
     this.whichKeyEl?.remove()
     this.whichKeyEl = null
 
-    // All commands that have `prefix` as a strict prefix (next key not yet typed)
     const prefixCmds = COMMANDS.filter(cmd =>
       cmd.keys.length > prefix.length &&
       prefix.every((k, i) => cmd.keys[i] === k) &&
@@ -502,9 +505,49 @@ export const VimNav = {
     )
     if (prefixCmds.length === 0) return
 
+    // Group by next key, then classify as terminal (direct action) or sub-group
+    const byNextKey = new Map<string, Command[]>()
+    for (const cmd of prefixCmds) {
+      const nk = cmd.keys[prefix.length]
+      if (!byNextKey.has(nk)) byNextKey.set(nk, [])
+      byNextKey.get(nk)!.push(cmd)
+    }
+
+    type Entry = { key: string; label: string; subgroup: boolean }
+    const entries: Entry[] = []
+
+    // Labels for Space leader sub-groups at depth 1
+    const SPACE_SUB_LABELS: Record<string, string> = {
+      g: "go to page", t: "toggle rail", n: "create",
+      b: "buffer/sessions", s: "search", x: "exit",
+    }
+    const GROUP_LABELS: Record<string, string> = {
+      navigation: "go to page", toggle: "toggle rail", create: "create",
+      global: "global", context: "context",
+    }
+
+    for (const [nk, cmds] of byNextKey) {
+      const terminal = cmds.filter(c => c.keys.length === prefix.length + 1)
+      const deeper  = cmds.filter(c => c.keys.length  > prefix.length + 1)
+      for (const cmd of terminal) {
+        entries.push({ key: nk, label: cmd.label, subgroup: false })
+      }
+      if (deeper.length > 0) {
+        let subLabel: string
+        if (prefix[0] === "Space" && prefix.length === 1) {
+          subLabel = SPACE_SUB_LABELS[nk] ?? nk
+        } else {
+          subLabel = GROUP_LABELS[deeper[0]?.group ?? ""] ?? nk
+        }
+        entries.push({ key: nk, label: subLabel, subgroup: true })
+      }
+    }
+
     const overlay = document.createElement("div")
     overlay.id = "vim-nav-which-key"
     overlay.setAttribute("aria-hidden", "true")
+
+    const useGrid = entries.length > 8
     overlay.style.cssText = [
       "position:fixed",
       "bottom:48px",
@@ -516,32 +559,41 @@ export const VimNav = {
       "background:var(--color-base-200)",
       "border:1px solid var(--color-base-300)",
       "border-radius:6px",
-      "padding:8px 12px",
-      "display:flex",
-      "flex-direction:column",
-      "gap:4px",
+      "padding:10px 14px",
       "pointer-events:none",
       "color:var(--color-base-content)",
-      "min-width:200px",
+      "min-width:240px",
+      "max-width:520px",
     ].join(";")
 
+    const kbdStyle = "display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:11px;background:var(--color-base-100);color:var(--color-base-content);min-width:18px;text-align:center"
+    const arrowStyle = "opacity:.35;margin:0 4px"
+
     const header = document.createElement("div")
-    header.style.cssText = "font-size:10px;color:var(--color-base-content);opacity:.6;margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em"
+    header.style.cssText = "font-size:10px;opacity:.5;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--color-base-300);padding-bottom:4px"
     header.textContent = `${prefix.join(" ")} →`
     overlay.appendChild(header)
 
-    for (const cmd of prefixCmds) {
+    const container = document.createElement("div")
+    container.style.cssText = useGrid
+      ? "display:grid;grid-template-columns:1fr 1fr;gap:2px 20px"
+      : "display:flex;flex-direction:column;gap:2px"
+
+    for (const entry of entries) {
       const row = document.createElement("div")
-      row.style.cssText = "display:flex;align-items:center;gap:8px"
-      const key = cmd.keys[prefix.length] ?? ""
-      row.innerHTML = `<kbd style="display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:11px;background:var(--color-base-100);color:var(--color-base-content);min-width:18px;text-align:center">${escapeHtml(key)}</kbd><span style="color:var(--color-base-content);opacity:.8">${escapeHtml(cmd.label)}</span>`
-      overlay.appendChild(row)
+      row.style.cssText = "display:flex;align-items:center"
+      if (entry.subgroup) {
+        row.innerHTML = `<kbd style="${kbdStyle}">${escapeHtml(entry.key)}</kbd><span style="${arrowStyle}">→</span><span style="color:var(--color-primary,var(--color-base-content));opacity:.9">+${escapeHtml(entry.label)}</span>`
+      } else {
+        row.innerHTML = `<kbd style="${kbdStyle}">${escapeHtml(entry.key)}</kbd><span style="${arrowStyle}">→</span><span style="opacity:.8">${escapeHtml(entry.label)}</span>`
+      }
+      container.appendChild(row)
     }
+    overlay.appendChild(container)
 
     this._onWhichKeyClose = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (["Shift", "Control", "Meta", "Alt"].includes(e.key)) return
-      // Don't preventDefault — let the key continue to handleKey
       this.hideWhichKey()
     }
     document.addEventListener("keydown", this._onWhichKeyClose, { capture: true })

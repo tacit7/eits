@@ -145,15 +145,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     ~H"""
     <div class="flex h-[var(--app-viewport-height)] bg-base-100">
       <div class="flex-1 flex flex-col min-w-0">
-        <ChannelHeader.channel_header
-          active_channel={@active_channel}
-          agent_status_counts={@agent_status_counts}
-          show_members={@show_members}
-          channel_members={@channel_members}
-          sessions_by_project={@sessions_by_project}
-          session_search={@session_search}
-          sender_filter={@sender_filter}
-        />
+        <ChannelHeader.channel_header active_channel={@active_channel} />
         <.message_feed
           channels={@channels}
           active_channel_id={@active_channel_id}

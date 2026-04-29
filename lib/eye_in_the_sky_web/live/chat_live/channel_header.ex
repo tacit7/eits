@@ -18,18 +18,18 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
       class="w-full bg-base-100 border-b border-base-content/10 flex-shrink-0"
       id="chat-header-card"
     >
-      <div class="px-5 py-3">
+      <div class="px-5 py-4">
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <h1 class="text-lg font-bold text-base-content">
+          <div class="flex flex-col gap-0.5">
+            <h1 class="text-xl font-bold tracking-tight text-base-content leading-tight">
               <%= if @active_channel do %>
-                <span class="text-base-content/30 mr-0.5">#</span>{@active_channel.name || "Channel"}
+                <span class="text-base-content/20 mr-0.5 font-normal">#</span>{@active_channel.name || "Channel"}
               <% else %>
                 Chat
               <% end %>
             </h1>
             <%= if not is_nil(@active_channel) && not is_nil(@active_channel[:description]) do %>
-              <span class="text-xs text-base-content/30">{@active_channel.description}</span>
+              <span class="text-[11px] text-base-content/35 leading-tight">{@active_channel.description}</span>
             <% end %>
           </div>
           <div class="flex items-center gap-2">
@@ -45,6 +45,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                 {@agent_status_counts.working} running
               </span>
             <% end %>
+            <div class="w-px h-4 bg-base-content/10 mx-1"></div>
             <details class="dropdown dropdown-end" id="sender-filter-dropdown" phx-update="ignore">
               <summary class={[
                 "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer list-none",

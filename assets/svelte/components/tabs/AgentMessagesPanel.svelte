@@ -630,23 +630,20 @@
           {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
           {@const isSameSender = prevMessage && !isTurnBoundary && prevMessage.sender_role !== 'system' && message.sender_role !== 'system' && prevMessage.session_id === message.session_id && prevMessage.sender_role === message.sender_role}
           <div
-            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {isSameSender ? 'pt-0.5' : ''} {message.sender_role === 'system' ? 'py-1' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 hover:bg-base-content/[0.04]'}"
+            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {isSameSender ? 'pt-0.5' : ''} {message.sender_role === 'system' ? 'py-0.5' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 border-l-2 border-base-content/12 hover:bg-base-content/[0.04] hover:border-base-content/20'}"
           >
             {#if message.sender_role === 'system'}
-              <!-- System message -->
-              <div class="flex items-center gap-2 text-[11px] text-base-content/35 italic pl-3 border-l-2 border-base-content/[0.08]">
-                {#if message._collapsed}
-                  <span class="flex-1">{message._runCount} system events — {message.body}{message._runCount > 1 ? ` (+${message._runCount - 1} more)` : ''}</span>
-                {:else}
-                  <span class="flex-1">{message.body}</span>
-                {/if}
-                <button
-                  class="opacity-0 group-hover:opacity-100 text-base-content/20 hover:text-error transition-all cursor-pointer"
-                  on:click={() => live.pushEvent('delete_message', { id: String(message.id) })}
-                  title="Delete message"
-                >
-                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                </button>
+              <!-- System message — centered annotation, off main reading axis -->
+              <div class="flex items-center gap-3 my-0.5">
+                <div class="flex-1 h-px bg-base-content/[0.04]"></div>
+                <span class="text-[10px] text-base-content/25 select-none">
+                  {#if message._collapsed}
+                    {message._runCount} system events
+                  {:else}
+                    {message.body}
+                  {/if}
+                </span>
+                <div class="flex-1 h-px bg-base-content/[0.04]"></div>
               </div>
             {:else}
               <!-- Hover actions: absolute overlay, not in flex flow -->
@@ -744,11 +741,11 @@
                     <!-- Identity line: no flex-wrap; hover actions removed from this flow -->
                     <div class="flex items-baseline gap-2">
                       {#if message.sender_role === 'user'}
-                        <span class="text-[13px] font-semibold text-base-content/70">You</span>
+                        <span class="text-[13px] font-semibold text-base-content/85">You</span>
                       {:else if message.session_id}
                         {@const agent = activeAgents.find(a => a.id === message.session_id)}
                         <button
-                          class="text-[13px] font-semibold text-primary/80 hover:text-primary transition-colors cursor-pointer"
+                          class="text-[13px] font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer"
                           on:click={() => navigateToDm(message.session_id)}
                           title="Open DM with this agent"
                         >
@@ -758,7 +755,7 @@
                         <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                       {/if}
 
-                      <span class="text-[11px] text-base-content/35">{formatTime(message.inserted_at)}</span>
+                      <span class="text-[11px] text-base-content/45">{formatTime(message.inserted_at)}</span>
 
                       {#if message.number}
                         <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
@@ -767,7 +764,7 @@
                   {/if}
 
                   <div class="max-w-[580px]">
-                    <div class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words">
+                    <div class="message-body mt-1.5 text-sm leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
                         {@html renderMarkdownBody(message.body)}
                       {:else if searchQuery.trim()}
@@ -779,31 +776,25 @@
 
                     <!-- Usage metadata for agent messages -->
                     {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                      <div class="mt-2 pt-1.5 border-t border-base-content/[0.06] flex flex-nowrap gap-x-1.5 min-w-0 overflow-hidden">
+                      <div class="mt-1.5 pt-1.5 border-t border-base-content/[0.05] flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/28 min-w-0 overflow-hidden flex-wrap">
                         {#if message.metadata.total_cost_usd}
-                          <span title="Total cost" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/45">
-                            ${message.metadata.total_cost_usd.toFixed(4)}
-                          </span>
+                          <span title="Total cost">${message.metadata.total_cost_usd.toFixed(4)}</span>
                         {/if}
                         {#if message.metadata.usage?.input_tokens}
-                          <span title="Input tokens" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                            {message.metadata.usage.input_tokens} in
-                          </span>
+                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span title="Input tokens">{message.metadata.usage.input_tokens} in</span>
                         {/if}
                         {#if message.metadata.usage?.output_tokens}
-                          <span title="Output tokens" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                            {message.metadata.usage.output_tokens} out
-                          </span>
+                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span title="Output tokens">{message.metadata.usage.output_tokens} out</span>
                         {/if}
                         {#if message.metadata.duration_ms}
-                          <span title="Duration" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
-                            {(message.metadata.duration_ms / 1000).toFixed(1)}s
-                          </span>
+                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span title="Duration">{(message.metadata.duration_ms / 1000).toFixed(1)}s</span>
                         {/if}
                         {#if message.metadata.num_turns}
-                          <span title="Number of turns" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/25">
-                            {message.metadata.num_turns} turns
-                          </span>
+                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span title="Number of turns">{message.metadata.num_turns} turns</span>
                         {/if}
                       </div>
                     {/if}
@@ -897,7 +888,7 @@
   <div class="flex-shrink-0 pt-2">
     <form
       on:submit|preventDefault={handleSubmit}
-      class="relative bg-base-200 rounded-xl border border-base-content/5 shadow-sm p-4 flex flex-col"
+      class="relative bg-base-200 rounded-xl border border-base-content/10 shadow-sm p-4 flex flex-col"
     >
       <div class="flex gap-2">
         <div class="relative flex-1">

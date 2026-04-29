@@ -20,6 +20,7 @@
 
   let loadingOlder = false
   let openOverflowId = null
+  let inspectMessage = null
 
   function loadOlderMessages() {
     if (!messages.length || loadingOlder) return
@@ -76,6 +77,9 @@
     }
     if (e.key === 'Escape' && openOverflowId !== null) {
       openOverflowId = null
+    }
+    if (e.key === 'Escape' && inspectMessage !== null) {
+      inspectMessage = null
     }
   }
 
@@ -574,8 +578,10 @@
           {/if}
 
           <!-- Message -->
+          {@const prevMessage = idx > 0 ? filteredMessages[idx - 1] : null}
+          {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
           <div
-            class="group relative px-2 -mx-2 rounded-lg transition-colors {message.sender_role === 'system' ? 'py-1' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 hover:bg-base-content/[0.04]'}"
+            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {message.sender_role === 'system' ? 'py-1' : message.sender_role === 'agent' ? 'py-4 border-l-2 border-primary/30 hover:bg-base-content/[0.04] hover:border-primary/50' : 'py-4 hover:bg-base-content/[0.04]'}"
           >
             {#if message.sender_role === 'system'}
               <!-- System message -->
@@ -619,6 +625,14 @@
                   </button>
                   {#if openOverflowId === message.id}
                     <div class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-lg shadow-lg py-0.5 w-32 z-20">
+                      <button
+                        type="button"
+                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
+                        on:click|stopPropagation={() => { inspectMessage = message; openOverflowId = null }}
+                      >
+                        Inspect
+                      </button>
+                      <div class="my-0.5 border-t border-base-content/5"></div>
                       <button
                         class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-error/80 hover:bg-error/[0.08] hover:text-error transition-colors cursor-pointer"
                         on:click|stopPropagation={() => { live.pushEvent('delete_message', { id: String(message.id) }); openOverflowId = null }}
@@ -681,27 +695,27 @@
                     {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
                       <div class="mt-2 flex flex-nowrap gap-x-1.5 min-w-0 overflow-hidden">
                         {#if message.metadata.total_cost_usd}
-                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-primary/50">
+                          <span title="Total cost" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-primary/50">
                             ${message.metadata.total_cost_usd.toFixed(4)}
                           </span>
                         {/if}
                         {#if message.metadata.usage?.input_tokens}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                          <span title="Input tokens" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
                             {message.metadata.usage.input_tokens} in
                           </span>
                         {/if}
                         {#if message.metadata.usage?.output_tokens}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                          <span title="Output tokens" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
                             {message.metadata.usage.output_tokens} out
                           </span>
                         {/if}
                         {#if message.metadata.duration_ms}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                          <span title="Duration" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
                             {(message.metadata.duration_ms / 1000).toFixed(1)}s
                           </span>
                         {/if}
                         {#if message.metadata.num_turns}
-                          <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/25">
+                          <span title="Number of turns" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/25">
                             {message.metadata.num_turns} turns
                           </span>
                         {/if}
@@ -778,9 +792,7 @@
     <div class="flex-shrink-0 px-4 py-1">
       <div class="flex items-center gap-2 text-xs text-base-content/40">
         <span class="inline-flex gap-[3px]">
-          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 0ms"></span>
-          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 150ms"></span>
-          <span class="w-1.5 h-1.5 rounded-full bg-base-content/30 animate-bounce" style="animation-delay: 300ms"></span>
+          <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
         </span>
         <span>
           {#if workingMembers.length === 1}
@@ -888,5 +900,18 @@
   <!-- Thread panel (slides in when a thread is open) -->
   {#if activeThread}
     <ThreadPanel thread={activeThread} {live} />
+  {/if}
+
+  {#if inspectMessage}
+    <div class="modal modal-open z-50">
+      <div class="modal-box max-w-2xl">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-sm">Message #{inspectMessage.id}</h3>
+          <button class="btn btn-xs btn-ghost" on:click={() => inspectMessage = null}>Close</button>
+        </div>
+        <pre class="text-xs bg-base-200 rounded-lg p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
+      </div>
+      <div class="modal-backdrop" on:click={() => inspectMessage = null}></div>
+    </div>
   {/if}
 </div>

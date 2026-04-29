@@ -59,6 +59,30 @@
     ? messages.filter(m => (m.body || '').toLowerCase().includes(searchQuery.toLowerCase()))
     : messages
 
+  $: processedMessages = (() => {
+    const result = []
+    let i = 0
+    while (i < filteredMessages.length) {
+      const msg = filteredMessages[i]
+      if (msg.sender_role === 'system') {
+        const run = [msg]
+        while (i + 1 < filteredMessages.length && filteredMessages[i + 1].sender_role === 'system') {
+          i++
+          run.push(filteredMessages[i])
+        }
+        if (run.length === 1) {
+          result.push({ ...msg, _collapsed: false, _runCount: 1 })
+        } else {
+          result.push({ ...run[0], _collapsed: true, _runCount: run.length, _runMessages: run })
+        }
+      } else {
+        result.push({ ...msg, _collapsed: false, _runCount: 1 })
+      }
+      i++
+    }
+    return result
+  })()
+
   function openSearch() {
     showSearch = true
     setTimeout(() => searchInput?.focus(), 0)
@@ -591,9 +615,9 @@
 
     {#if filteredMessages && filteredMessages.length > 0}
       <div class="space-y-0">
-        {#each filteredMessages as message, idx}
+        {#each processedMessages as message, idx}
           <!-- Date separator -->
-          {#if idx === 0 || formatDateRelative(filteredMessages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
+          {#if idx === 0 || formatDateRelative(processedMessages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
             <div class="flex items-center gap-3 my-4">
               <div class="flex-1 h-px bg-base-content/5"></div>
               <span class="text-xs uppercase tracking-wider font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
@@ -602,7 +626,7 @@
           {/if}
 
           <!-- Message -->
-          {@const prevMessage = idx > 0 ? filteredMessages[idx - 1] : null}
+          {@const prevMessage = idx > 0 ? processedMessages[idx - 1] : null}
           {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
           {@const isSameSender = prevMessage && !isTurnBoundary && prevMessage.sender_role !== 'system' && message.sender_role !== 'system' && prevMessage.session_id === message.session_id && prevMessage.sender_role === message.sender_role}
           <div
@@ -610,8 +634,12 @@
           >
             {#if message.sender_role === 'system'}
               <!-- System message -->
-              <div class="flex items-center gap-2 text-[11px] text-base-content/25 italic pl-3 border-l-2 border-base-content/[0.08]">
-                <span class="flex-1">{message.body}</span>
+              <div class="flex items-center gap-2 text-[11px] text-base-content/35 italic pl-3 border-l-2 border-base-content/[0.08]">
+                {#if message._collapsed}
+                  <span class="flex-1">{message._runCount} system events — {message.body}{message._runCount > 1 ? ` (+${message._runCount - 1} more)` : ''}</span>
+                {:else}
+                  <span class="flex-1">{message.body}</span>
+                {/if}
                 <button
                   class="opacity-0 group-hover:opacity-100 text-base-content/20 hover:text-error transition-all cursor-pointer"
                   on:click={() => live.pushEvent('delete_message', { id: String(message.id) })}
@@ -730,7 +758,7 @@
                         <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                       {/if}
 
-                      <span class="text-[11px] text-base-content/25">{formatTime(message.inserted_at)}</span>
+                      <span class="text-[11px] text-base-content/35">{formatTime(message.inserted_at)}</span>
 
                       {#if message.number}
                         <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
@@ -738,7 +766,7 @@
                     </div>
                   {/if}
 
-                  <div class="max-w-[720px]">
+                  <div class="max-w-[580px]">
                     <div class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
                         {@html renderMarkdownBody(message.body)}
@@ -751,24 +779,24 @@
 
                     <!-- Usage metadata for agent messages -->
                     {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                      <div class="mt-2 flex flex-nowrap gap-x-1.5 min-w-0 overflow-hidden">
+                      <div class="mt-2 pt-1.5 border-t border-base-content/[0.06] flex flex-nowrap gap-x-1.5 min-w-0 overflow-hidden">
                         {#if message.metadata.total_cost_usd}
-                          <span title="Total cost" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-primary/50">
+                          <span title="Total cost" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/45">
                             ${message.metadata.total_cost_usd.toFixed(4)}
                           </span>
                         {/if}
                         {#if message.metadata.usage?.input_tokens}
-                          <span title="Input tokens" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                          <span title="Input tokens" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
                             {message.metadata.usage.input_tokens} in
                           </span>
                         {/if}
                         {#if message.metadata.usage?.output_tokens}
-                          <span title="Output tokens" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                          <span title="Output tokens" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
                             {message.metadata.usage.output_tokens} out
                           </span>
                         {/if}
                         {#if message.metadata.duration_ms}
-                          <span title="Duration" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/35">
+                          <span title="Duration" class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-content/[0.04] text-[11px] font-mono tabular-nums text-base-content/40">
                             {(message.metadata.duration_ms / 1000).toFixed(1)}s
                           </span>
                         {/if}
@@ -848,7 +876,7 @@
   <!-- Typing indicator -->
   {#if workingMembers.length > 0}
     <div class="flex-shrink-0 px-4 py-1">
-      <div class="flex items-center gap-2 text-xs text-base-content/40">
+      <div class="flex items-center gap-2 text-xs text-base-content/50">
         <span class="inline-flex gap-[3px]">
           <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
         </span>

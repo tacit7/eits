@@ -13,29 +13,42 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
   @doc """
   GET /api/v1/agents - List agents.
-  Query params: project_id, status, limit (default 20)
+  Query params: project_id, status, limit (default 20), active_since (ISO8601)
   """
   def index(conn, params) do
     limit = parse_int(params["limit"], 20)
 
-    agents =
-      if params["project_id"] do
-        Agents.list_agents_by_project(parse_int(params["project_id"], nil), limit: limit)
-      else
-        Agents.list_agents(limit: limit)
-      end
+    with {:ok, agents} <- resolve_agents(params, limit) do
+      agents =
+        if params["status"] do
+          Enum.filter(agents, &(&1.status == params["status"]))
+        else
+          agents
+        end
 
-    agents =
-      if params["status"] do
-        Enum.filter(agents, &(&1.status == params["status"]))
-      else
-        agents
-      end
+      json(conn, %{
+        success: true,
+        agents: Enum.map(agents, &ApiPresenter.present_agent/1)
+      })
+    else
+      {:error, :invalid_since} ->
+        conn |> put_status(:bad_request) |> json(%{error: "Invalid active_since datetime"})
+    end
+  end
 
-    json(conn, %{
-      success: true,
-      agents: Enum.map(agents, &ApiPresenter.present_agent/1)
-    })
+  defp resolve_agents(%{"active_since" => since_str}, limit) do
+    case DateTime.from_iso8601(since_str) do
+      {:ok, since_dt, _} -> {:ok, Agents.list_agents_active_since(since_dt, limit: limit)}
+      _ -> {:error, :invalid_since}
+    end
+  end
+
+  defp resolve_agents(%{"project_id" => project_id}, limit) do
+    {:ok, Agents.list_agents_by_project(parse_int(project_id, nil), limit: limit)}
+  end
+
+  defp resolve_agents(_params, limit) do
+    {:ok, Agents.list_agents(limit: limit)}
   end
 
   @doc """

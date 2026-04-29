@@ -44,6 +44,37 @@ defmodule EyeInTheSky.Claude.JobTest do
       ctx = Job.normalize_context(allowed_tools: ["bash"])
       assert ctx.allowed_tools == ["bash"]
     end
+
+    test "preserves dm_metadata when provided" do
+      metadata = %{
+        sender_name: "alice",
+        from_session_uuid: "uuid-1",
+        to_session_uuid: "uuid-2",
+        response_required: false,
+        custom_field: "custom_value"
+      }
+
+      ctx = Job.normalize_context(%{dm_metadata: metadata})
+      assert ctx.dm_metadata == metadata
+    end
+
+    test "defaults dm_metadata to nil when not provided" do
+      ctx = Job.normalize_context(%{})
+      assert ctx.dm_metadata == nil
+    end
+
+    test "drops unknown fields but preserves dm_metadata" do
+      ctx =
+        Job.normalize_context(%{
+          dm_metadata: %{custom: "value"},
+          unknown_field: "should_be_dropped",
+          model: "haiku"
+        })
+
+      assert ctx.dm_metadata == %{custom: "value"}
+      assert ctx.model == "haiku"
+      assert !Map.has_key?(ctx, :unknown_field)
+    end
   end
 
   describe "assign_id/1" do

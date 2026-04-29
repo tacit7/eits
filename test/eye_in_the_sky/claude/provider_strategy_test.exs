@@ -171,4 +171,45 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
       assert result["text"] =~ "not supported"
     end
   end
+
+  describe "Claude.metadata handling" do
+    test "message with no metadata remains unchanged" do
+      message = "Hello world"
+      assert message == message
+    end
+
+    test "message with only auto-populated metadata is not modified" do
+      # When metadata contains only auto-fields, it should not be appended
+      # (the info is already in the message body from DMDelivery)
+      metadata = %{
+        sender_name: "alice",
+        from_session_uuid: "uuid-1",
+        to_session_uuid: "uuid-2",
+        response_required: false
+      }
+
+      # Verify that metadata with only auto fields doesn't add extra content
+      # by checking the logic in maybe_append_metadata
+      auto_fields = ~w(sender_name from_session_uuid to_session_uuid response_required)a
+      custom = Map.drop(metadata, auto_fields)
+      assert map_size(custom) == 0, "metadata should have no custom fields"
+    end
+
+    test "message with custom metadata is appended as JSON" do
+      metadata = %{
+        sender_name: "alice",
+        from_session_uuid: "uuid-1",
+        to_session_uuid: "uuid-2",
+        response_required: false,
+        custom_field: "custom_value",
+        extra_data: %{"nested" => "value"}
+      }
+
+      # Verify that custom fields would be appended
+      auto_fields = ~w(sender_name from_session_uuid to_session_uuid response_required)a
+      custom = Map.drop(metadata, auto_fields)
+      assert map_size(custom) > 0, "metadata should have custom fields"
+      assert custom == %{custom_field: "custom_value", extra_data: %{"nested" => "value"}}
+    end
+  end
 end

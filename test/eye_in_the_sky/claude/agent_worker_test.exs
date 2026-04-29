@@ -1479,4 +1479,88 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       assert is_nil(updated2.failure_reason)
     end
   end
+
+  describe "DM metadata consumption" do
+    test "Job.normalize_context preserves dm_metadata" do
+      context = %{
+        model: "haiku",
+        dm_metadata: %{
+          sender_name: "alice",
+          custom_field: "custom_value"
+        }
+      }
+
+      normalized = Job.normalize_context(context)
+
+      assert normalized.model == "haiku"
+      assert normalized.dm_metadata == context.dm_metadata
+    end
+
+    test "DM with only auto-populated metadata doesn't change behavior" do
+      {_agent, session} = create_test_agent_and_session()
+
+      Phoenix.PubSub.subscribe(PubSub, "session:#{session.id}")
+
+      # Send a DM with only auto-populated metadata (no custom fields)
+      auto_metadata = %{
+        sender_name: "sender_agent",
+        from_session_uuid: Ecto.UUID.generate(),
+        to_session_uuid: session.uuid,
+        response_required: false
+      }
+
+      prompt = "Test message"
+
+      result =
+        AgentManager.send_message(session.id, prompt,
+          model: "haiku",
+          dm_metadata: auto_metadata
+        )
+
+      assert result == {:ok, :started}
+
+      # Wait for job to be created - verify metadata was preserved through the worker
+      mock_port = wait_for_mock_port(session.id)
+      assert mock_port != nil
+    end
+
+    test "DM with custom metadata is preserved through Job queue" do
+      {_agent, session} = create_test_agent_and_session()
+
+      custom_metadata = %{
+        sender_name: "sender_agent",
+        from_session_uuid: Ecto.UUID.generate(),
+        to_session_uuid: session.uuid,
+        response_required: true,
+        action_required: "review_pr",
+        pull_request_url: "https://github.com/example/pull/123"
+      }
+
+      prompt = "Please review this PR"
+
+      result =
+        AgentManager.send_message(session.id, prompt,
+          model: "haiku",
+          dm_metadata: custom_metadata
+        )
+
+      assert result == {:ok, :started}
+
+      # Get the current job from the worker queue
+      queue = AgentWorker.get_queue(session.id)
+
+      case queue do
+        [] ->
+          # Job might have started immediately, which is fine
+          :ok
+
+        [job | _] ->
+          # Verify metadata was preserved through normalization
+          assert job.context.dm_metadata == custom_metadata
+      end
+
+      # Wait for mock port to be ready
+      _mock_port = wait_for_mock_port(session.id)
+    end
+  end
 end

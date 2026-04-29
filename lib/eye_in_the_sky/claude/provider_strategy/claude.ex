@@ -44,16 +44,18 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
   def start(state, job) do
     opts = build_opts(state, job.context)
     opts = maybe_add_content_blocks(opts, job.content_blocks)
+    message = maybe_append_metadata(job.message, job.context[:dm_metadata])
     Logger.info("Starting new Claude session #{state.provider_conversation_id}")
-    SDK.start(job.message, opts)
+    SDK.start(message, opts)
   end
 
   @impl true
   def resume(state, job) do
     opts = build_opts(state, job.context)
     opts = maybe_add_content_blocks(opts, job.content_blocks)
+    message = maybe_append_metadata(job.message, job.context[:dm_metadata])
     Logger.info("Resuming Claude session #{state.provider_conversation_id}")
-    SDK.resume(state.provider_conversation_id, job.message, opts)
+    SDK.resume(state.provider_conversation_id, message, opts)
   end
 
   @impl true
@@ -131,4 +133,24 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
     formatted = Enum.map(content_blocks, &format_content/1)
     Keyword.put(opts, :content_blocks, formatted)
   end
+
+  # If dm_metadata contains custom fields (beyond auto-populated ones), append them to the message.
+  # Auto-populated fields (sender_name, from_session_uuid, to_session_uuid, response_required)
+  # are already in the message body via DMDelivery, so we only include additional custom fields
+  # to give the agent machine-readable structured context.
+  defp maybe_append_metadata(message, nil), do: message
+  defp maybe_append_metadata(message, %{} = metadata) do
+    # Filter out auto-populated fields; keep only custom fields
+    auto_fields = ~w(sender_name from_session_uuid to_session_uuid response_required)a
+    custom_fields = Map.drop(metadata, auto_fields)
+
+    if map_size(custom_fields) > 0 do
+      # Append metadata as JSON for structured context
+      metadata_json = Jason.encode!(custom_fields)
+      message <> "\n\n## Metadata\n```json\n" <> metadata_json <> "\n```"
+    else
+      message
+    end
+  end
+  defp maybe_append_metadata(message, _), do: message
 end

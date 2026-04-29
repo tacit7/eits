@@ -618,11 +618,6 @@ TASKS_HELP
       ;;
     get)
       local id="${1:-}"; need id
-      if [[ "$id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-        echo "error: 'tasks get' requires an integer task ID, not a UUID. Tasks do not have UUID lookup support." >&2
-        echo "       Use 'eits tasks list --all | jq \".[] | select(.title | test(\\\"...\\\"))\"' to find by title." >&2
-        exit 1
-      fi
       _get "/tasks/$id"
       ;;
     create)
@@ -2949,7 +2944,7 @@ Commands:
                 list [-s <session>] [-p <project>] [--mine] [--all]   ← scopes to current session by default; --all overrides
                 begin -t <title>                                       ← create + claim in one shot (PREFERRED start)
                 complete <id> -m <message>                             ← atomic annotate + done (PREFERRED close)
-                get <id>                                               ← integer ID only; UUID not supported
+                get <id|uuid>                                          ← accepts integer ID or UUID
   notes         list|get|add|create|update|search
                 list [--session <uuid>] [--task <id>] [--project <id>] [--mine] [--full]
                 add --body "..."                                       ← attaches to current session

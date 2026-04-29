@@ -22,6 +22,8 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
     end)
   end
 
+  def handle_info({:agent_updated, _}, socket), do: {:noreply, socket}
+
   def handle_info({:new_message, _message}, socket) do
     Logger.info(
       "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"

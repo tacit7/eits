@@ -96,15 +96,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               </.link>
             <% true -> %>
               <div class="flex-1 min-w-0 flex items-center gap-1.5">
-                <%= if dual_page_section?(@active_section) do %>
-                  <span class="flex-shrink-0 flex items-center justify-center text-base-content/20">
-                    <%= if @active_section == :tasks do %>
-                      <.custom_icon name="lucide-kanban" class="size-3.5" />
-                    <% else %>
-                      <.icon name="hero-list-bullet" class="size-3.5" />
-                    <% end %>
-                  </span>
-                <% end %>
+                <span class="flex-shrink-0 flex items-center justify-center text-base-content/20">
+                  <.icon name={section_icon(@active_section)} class="size-3.5" />
+                </span>
                 <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 truncate">
                   {section_label(@active_section)}
                 </span>
@@ -729,6 +723,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp section_label(:jobs), do: "Jobs"
   defp section_label(:files), do: "Files"
   defp section_label(_), do: "Navigation"
+
+  defp section_icon(:chat), do: "hero-chat-bubble-left-ellipsis"
+  defp section_icon(:canvas), do: "hero-squares-2x2"
+  defp section_icon(:usage), do: "hero-chart-bar"
+  defp section_icon(:notifications), do: "hero-bell"
+  defp section_icon(:skills), do: "hero-bolt"
+  defp section_icon(:prompts), do: "hero-document-text"
+  defp section_icon(:jobs), do: "hero-clock"
+  defp section_icon(:files), do: "hero-folder"
+  defp section_icon(:notes), do: "hero-pencil-square"
+  defp section_icon(_), do: "hero-list-bullet"
 
   # Sections that have both a global page and a project-scoped page.
   # These get the list icon header treatment.

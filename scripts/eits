@@ -1682,8 +1682,90 @@ BATCH_HELP
         echo "spawn-batch complete: $_ok succeeded, $_fail failed" >&2
       fi
       ;;
+    defs)
+      # eits agents defs [--q <name>] [--json]
+      # Lists agent definition files from ~/.claude/agents/ and .claude/agents/
+      # Parses name + first sentence of description from YAML frontmatter
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        echo "usage: eits agents defs [--q <name>] [--json]"
+        echo ""
+        echo "List agent definitions from ~/.claude/agents/ and .claude/agents/"
+        echo "Parses name and description from YAML frontmatter."
+        echo ""
+        echo "Options:"
+        echo "  --q <name>   Filter by name (case-insensitive substring)"
+        echo "  --json       Output JSON array"
+        return 0
+      }
+      local _query="" _json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --q|-q) _query="$2"; shift 2 ;;
+          --json) _json=1; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+
+      # Collect agent definition dirs: project-local first, then global
+      local _dirs=()
+      local _project_root
+      _project_root=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+      [[ -n "$_project_root" && -d "$_project_root/.claude/agents" ]] && _dirs+=("$_project_root/.claude/agents")
+      [[ -d "$HOME/.claude/agents" ]] && _dirs+=("$HOME/.claude/agents")
+
+      # Parse each .md file — extract name and first sentence of description
+      local _results=()
+      for _dir in "${_dirs[@]}"; do
+        local _scope
+        [[ "$_dir" == "$HOME/.claude/agents" ]] && _scope="global" || _scope="project"
+        for _file in "$_dir"/*.md; do
+          [[ -f "$_file" ]] || continue
+          local _name="" _desc=""
+          # Extract name field from frontmatter
+          _name=$(awk '/^---/{p++} p==1 && /^name:/{gsub(/^name:[[:space:]]*/,"",$0); gsub(/"/,"",$0); print; exit}' "$_file" | tr -d "'" | xargs)
+          # Extract description — first non-empty line after "description:" in frontmatter
+          _desc=$(awk '
+            /^---/{p++; next}
+            p>1{exit}
+            p==1 && /^description:/{
+              # Inline value
+              sub(/^description:[[:space:]]*/,"")
+              if (length($0)>0 && $0 != "|") {print; exit}
+              # Block scalar — read next lines
+              in_desc=1; next
+            }
+            p==1 && in_desc {
+              if (/^[a-z_-]+:/) exit  # next key
+              gsub(/^[[:space:]]*/,"")
+              if (length($0)>0) {print; exit}
+            }
+          ' "$_file")
+          # Strip surrounding quotes, take first sentence only (up to first period or 120 chars)
+          _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-120 | xargs)
+          [[ -z "$_name" ]] && _name=$(basename "$_file" .md)
+          # Filter
+          if [[ -n "$_query" ]] && ! echo "$_name" | grep -qi "$_query"; then continue; fi
+          _results+=("$(printf '%s\t%s\t%s' "$_name" "$_scope" "$_desc")")
+        done
+      done
+
+      if [[ ${#_results[@]} -eq 0 ]]; then
+        echo "no agent definitions found" >&2
+        return 0
+      fi
+
+      if [[ $_json -eq 1 ]]; then
+        printf '%s\n' "${_results[@]}" | awk -F'\t' 'BEGIN{print "["} {
+          gsub(/"/,"\\\"",$1); gsub(/"/,"\\\"",$3)
+          if(NR>1)print ","
+          printf "{\"name\":\"%s\",\"scope\":\"%s\",\"description\":\"%s\"}", $1,$2,$3
+        } END{print "]"}'
+      else
+        printf '%s\n' "${_results[@]}" | column -t -s $'\t'
+      fi
+      ;;
     *)
-      echo "usage: eits agents <list|get|spawn|spawn-batch>"
+      echo "usage: eits agents <list|get|spawn|spawn-batch|defs>"
       ;;
   esac
 }

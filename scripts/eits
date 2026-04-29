@@ -3457,7 +3457,7 @@ report to the #standup channel.
 
 Options:
   --since <duration>   Activity window (default: 24h). Formats: 30m, 6h, 7d
-  --channel <id>       Target channel ID (default: 1)
+  --channel <id|name>  Target channel ID or name (default: 1)
   --dry-run            Print report without posting to channel
   --json               Emit raw JSON activity data instead of formatted report
 
@@ -3476,6 +3476,15 @@ USAGE
       done
 
       local cutoff; cutoff=$(_parse_duration "$since")
+
+      # Resolve channel name → id if not numeric
+      if ! [[ "$channel_id" =~ ^[0-9]+$ ]]; then
+        local _ch_resp _ch_id
+        _ch_resp=$(_curl "$BASE_URL/channels" 2>/dev/null) || _ch_resp="{}"
+        _ch_id=$(printf '%s' "$_ch_resp" | jq -r --arg name "$channel_id" '.channels[] | select(.name == $name) | .id' 2>/dev/null | head -1)
+        [[ -n "$_ch_id" ]] || die "channel not found: $channel_id"
+        channel_id="$_ch_id"
+      fi
 
       # 1. Get active agents
       local agents_resp
@@ -3517,8 +3526,11 @@ USAGE
       local report
       report=$(echo "$all_activity" | jq -r '
         .[] |
-        "## \(.agent_uuid // "unknown")\n" +
-        "Sessions: \(.session_count // 0)\n" +
+        "## \(.agent_name // .agent_uuid // "unknown")\n" +
+        (if (.sessions | length) > 0 then
+          "Sessions (\(.sessions | length)):\n" +
+          ([ .sessions[] | "  - \(.name // .uuid // "unknown")"] | join("\n")) + "\n"
+        else "" end) +
         (if (.tasks | length) > 0 then
           "Tasks (\(.tasks | length)):\n" +
           ([ .tasks[] | "  - [\(.state // "??")] \(.title // "(untitled)")"] | join("\n")) + "\n"
@@ -3578,7 +3590,7 @@ Commands:
   tags          list [--q <name>]
   commits       list|create   (create returns {errors,commits,duplicates} — no top-level success field)
                 list --since-time <duration>  ← time-based filter (24h, 7d, 30m) — distinct from --since <hash>
-  standup       run [--since <duration>] [--channel <id>] [--dry-run] [--json]
+  standup       run [--since <duration>] [--channel <id|name>] [--dry-run] [--json]
                 Collect agent activity and post standup to a channel (default: channel 1)
   jobs          list|get|create|update|run|delete
   dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--json] [--team-only]

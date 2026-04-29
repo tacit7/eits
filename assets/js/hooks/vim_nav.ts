@@ -207,8 +207,17 @@ export const VimNav = {
 
     event.preventDefault()
     this.buffer.push(key)
-    if (this.buffer.length === 1 && PREFIXES.has(key)) {
-      this.showWhichKey(key)
+
+    // Show which-key when current buffer is a prefix of at least one deeper active command.
+    // Space sequences get 0ms delay (immediate) and a longer sequence window.
+    const isLeader = this.buffer[0] === "Space"
+    const hasDeeper = COMMANDS.some(c =>
+      c.keys.length > this.buffer.length &&
+      this.buffer.every((k, i) => c.keys[i] === k) &&
+      isCommandActive(c)
+    )
+    if (hasDeeper) {
+      this.showWhichKey([...this.buffer], isLeader ? 0 : 300)
     } else {
       this.hideWhichKey()
     }
@@ -233,7 +242,8 @@ export const VimNav = {
 
   resetSequenceTimer() {
     if (this.sequenceTimer) clearTimeout(this.sequenceTimer)
-    this.sequenceTimer = setTimeout(() => this.clearSequence(), 1000)
+    const timeout = this.buffer[0] === "Space" ? 2000 : 1000
+    this.sequenceTimer = setTimeout(() => this.clearSequence(), timeout)
   },
 
   currentProjectPath(): string | null {
@@ -471,12 +481,12 @@ export const VimNav = {
     this.helpOverlayEl = null
   },
 
-  showWhichKey(prefix: string) {
+  showWhichKey(prefix: string[], delay = 300) {
     if (this.whichKeyTimer) clearTimeout(this.whichKeyTimer)
-    this.whichKeyTimer = setTimeout(() => this._renderWhichKey(prefix), 300)
+    this.whichKeyTimer = setTimeout(() => this._renderWhichKey(prefix), delay)
   },
 
-  _renderWhichKey(prefix: string) {
+  _renderWhichKey(prefix: string[]) {
     this.whichKeyTimer = null
     // Cancel the sequence auto-dismiss — overlay stays until user acts
     if (this.sequenceTimer) { clearTimeout(this.sequenceTimer); this.sequenceTimer = null }
@@ -484,7 +494,12 @@ export const VimNav = {
     this.whichKeyEl?.remove()
     this.whichKeyEl = null
 
-    const prefixCmds = COMMANDS.filter(cmd => cmd.keys.length > 1 && cmd.keys[0] === prefix && isCommandActive(cmd))
+    // All commands that have `prefix` as a strict prefix (next key not yet typed)
+    const prefixCmds = COMMANDS.filter(cmd =>
+      cmd.keys.length > prefix.length &&
+      prefix.every((k, i) => cmd.keys[i] === k) &&
+      isCommandActive(cmd)
+    )
     if (prefixCmds.length === 0) return
 
     const overlay = document.createElement("div")
@@ -512,13 +527,13 @@ export const VimNav = {
 
     const header = document.createElement("div")
     header.style.cssText = "font-size:10px;color:var(--color-base-content);opacity:.6;margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em"
-    header.textContent = `${prefix} →`
+    header.textContent = `${prefix.join(" ")} →`
     overlay.appendChild(header)
 
     for (const cmd of prefixCmds) {
       const row = document.createElement("div")
       row.style.cssText = "display:flex;align-items:center;gap:8px"
-      const key = cmd.keys[1] ?? ""
+      const key = cmd.keys[prefix.length] ?? ""
       row.innerHTML = `<kbd style="display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:11px;background:var(--color-base-100);color:var(--color-base-content);min-width:18px;text-align:center">${escapeHtml(key)}</kbd><span style="color:var(--color-base-content);opacity:.8">${escapeHtml(cmd.label)}</span>`
       overlay.appendChild(row)
     }

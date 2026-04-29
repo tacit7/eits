@@ -356,7 +356,7 @@ describe("VimNav which-key overlay", () => {
   it("showWhichKey renders overlay after 300ms", () => {
     const h = makeHook()
     h.pushEventToShell = vi.fn()
-    h.showWhichKey("t")
+    h.showWhichKey(["t"])
     expect(document.getElementById("vim-nav-which-key")).toBeNull()
     vi.advanceTimersByTime(300)
     expect(document.getElementById("vim-nav-which-key")).not.toBeNull()
@@ -366,7 +366,7 @@ describe("VimNav which-key overlay", () => {
   it("hideWhichKey before 300ms cancels the timer (no overlay appears)", () => {
     const h = makeHook()
     h.pushEventToShell = vi.fn()
-    h.showWhichKey("t")
+    h.showWhichKey(["t"])
     h.hideWhichKey()
     vi.advanceTimersByTime(300)
     expect(document.getElementById("vim-nav-which-key")).toBeNull()
@@ -375,7 +375,7 @@ describe("VimNav which-key overlay", () => {
   it("hideWhichKey removes DOM element if overlay was rendered", () => {
     const h = makeHook()
     h.pushEventToShell = vi.fn()
-    h.showWhichKey("t")
+    h.showWhichKey(["t"])
     vi.advanceTimersByTime(300)
     expect(document.getElementById("vim-nav-which-key")).not.toBeNull()
     h.hideWhichKey()
@@ -385,9 +385,9 @@ describe("VimNav which-key overlay", () => {
   it("second showWhichKey call resets the timer", () => {
     const h = makeHook()
     h.pushEventToShell = vi.fn()
-    h.showWhichKey("t")
+    h.showWhichKey(["t"])
     vi.advanceTimersByTime(200)
-    h.showWhichKey("n")
+    h.showWhichKey(["n"])
     vi.advanceTimersByTime(100)  // only 100ms since second call — should not render yet
     expect(document.getElementById("vim-nav-which-key")).toBeNull()
     vi.advanceTimersByTime(200)  // 300ms since second call — should render
@@ -398,7 +398,7 @@ describe("VimNav which-key overlay", () => {
   it("clearSequence hides which-key", () => {
     const h = makeHook()
     h.pushEventToShell = vi.fn()
-    h.showWhichKey("g")
+    h.showWhichKey(["g"])
     vi.advanceTimersByTime(300)
     expect(document.getElementById("vim-nav-which-key")).not.toBeNull()
     h.clearSequence()
@@ -745,15 +745,173 @@ describe("VimNav _renderWhichKey scope filtering", () => {
     // verify that a prefix with no active matching commands produces no overlay.
     // Use a made-up prefix that has no commands at all (already returns early).
     const h = makeHook()
-    h._renderWhichKey("z")
+    h._renderWhichKey(["z"])
     expect(document.getElementById("vim-nav-which-key")).toBeNull()
   })
 
   it("which-key renders overlay for active prefix commands", () => {
     const h = makeHook()
-    h._renderWhichKey("g")
+    h._renderWhichKey(["g"])
     expect(document.getElementById("vim-nav-which-key")).not.toBeNull()
     h.hideWhichKey()
+  })
+
+  it("which-key renders overlay for Space prefix with all commands as second level", () => {
+    const h = makeHook()
+    h._renderWhichKey(["Space"])
+    const overlay = document.getElementById("vim-nav-which-key")
+    expect(overlay).not.toBeNull()
+    expect(overlay!.textContent).toContain("Space →")
+    h.hideWhichKey()
+  })
+
+  it("which-key renders overlay for Space g as third-level prefix", () => {
+    const h = makeHook()
+    h._renderWhichKey(["Space", "g"])
+    const overlay = document.getElementById("vim-nav-which-key")
+    expect(overlay).not.toBeNull()
+    expect(overlay!.textContent).toContain("Space g →")
+    expect(overlay!.textContent).toContain("Go to Sessions")
+    h.hideWhichKey()
+  })
+
+  it("which-key header shows full prefix sequence joined by space", () => {
+    const h = makeHook()
+    h._renderWhichKey(["Space", "t"])
+    const overlay = document.getElementById("vim-nav-which-key")
+    expect(overlay!.textContent).toContain("Space t →")
+    h.hideWhichKey()
+  })
+})
+
+describe("Space leader", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    document.body.innerHTML = ""
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    document.body.innerHTML = ""
+  })
+
+  it("Space is in PREFIXES", () => {
+    expect(PREFIXES.has("Space")).toBe(true)
+  })
+
+  it("Space key is accepted by matchesKnownBindingOrPrefix", () => {
+    expect(matchesKnownBindingOrPrefix([], "Space")).toBe(true)
+  })
+
+  it("showWhichKey with Space prefix uses 0ms delay", () => {
+    const h = makeHook()
+    h.showWhichKey(["Space"], 0)
+    // With 0ms delay, overlay renders immediately after advancing 0ms
+    vi.advanceTimersByTime(0)
+    expect(document.getElementById("vim-nav-which-key")).not.toBeNull()
+    h.hideWhichKey()
+  })
+
+  it("resetSequenceTimer uses 2000ms for Space sequences", () => {
+    const h = makeHook()
+    h.buffer = ["Space"]
+    h.resetSequenceTimer()
+    vi.advanceTimersByTime(1999)
+    expect(h.buffer).toEqual(["Space"])
+    vi.advanceTimersByTime(1)
+    expect(h.buffer).toEqual([])
+  })
+
+  it("resetSequenceTimer uses 1000ms for non-Space sequences", () => {
+    const h = makeHook()
+    h.buffer = ["g"]
+    h.resetSequenceTimer()
+    vi.advanceTimersByTime(999)
+    expect(h.buffer).toEqual(["g"])
+    vi.advanceTimersByTime(1)
+    expect(h.buffer).toEqual([])
+  })
+
+  it("Space e calls pushEventToShell with toggle_section files", () => {
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "leader.files")!
+    expect(cmd).toBeDefined()
+    h.executeCommand(cmd)
+    expect(h.pushEventToShell).toHaveBeenCalledWith("toggle_section", { section: "files" })
+  })
+
+  it("Space : opens command palette", () => {
+    const target = document.createElement("div")
+    target.id = "command-palette"
+    document.body.appendChild(target)
+    const listener = vi.fn()
+    target.addEventListener("palette:open", listener)
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "leader.palette")!
+    h.executeCommand(cmd)
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it("Space ? shows help overlay", () => {
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "leader.help")!
+    h.executeCommand(cmd)
+    expect(document.getElementById("vim-nav-help")).not.toBeNull()
+    h.hideHelp()
+  })
+
+  it("Space g s command exists with navigate action", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.nav.sessions")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["Space", "g", "s"])
+    expect(cmd.action.kind).toBe("navigate")
+  })
+
+  it("Space t s command exists with push_event toggle_section sessions", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.toggle.sessions")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["Space", "t", "s"])
+    if (cmd.action.kind === "push_event") {
+      expect(cmd.action.event).toBe("toggle_section")
+      expect((cmd.action.payload as any).section).toBe("sessions")
+    }
+  })
+
+  it("Space n a command exists mirroring create.agent", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.create.agent")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["Space", "n", "a"])
+    if (cmd.action.kind === "push_event") {
+      expect(cmd.action.event).toBe("toggle_new_session_drawer")
+    }
+  })
+
+  it("Space b a archives session (page:sessions scope)", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.buffer.archive")!
+    expect(cmd).toBeDefined()
+    expect(cmd.scope).toBe("page:sessions")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("list_archive")
+  })
+
+  it("Space x x fires close_flyout", () => {
+    const h = makeHook()
+    h.pushEventToShell = vi.fn()
+    const cmd = COMMANDS.find(c => c.id === "leader.exit")!
+    h.executeCommand(cmd)
+    expect(h.pushEventToShell).toHaveBeenCalledWith("close_flyout", {})
+  })
+
+  it("all 16 Space g nav commands exist", () => {
+    const ids = ["s","t","n","a","k","w","f","p","c","j","u","m","K","N",",","h"]
+    for (const id of ids) {
+      const cmd = COMMANDS.find(c => c.id === `leader.nav.${id === "," ? "settings" : id === "h" ? "keybindings" : id === "K" ? "skills" : id === "N" ? "notifications" : id === "m" ? "teams" : id === "u" ? "usage" : id === "j" ? "jobs" : id === "c" ? "chat" : id === "p" ? "prompts" : id === "f" ? "files" : id === "w" ? "canvas" : id === "k" ? "kanban" : id === "a" ? "agents" : id === "n" ? "notes" : id === "t" ? "tasks" : "sessions"}`)
+      expect(cmd, `leader.nav.* for key ${id}`).toBeDefined()
+      expect(cmd!.keys[1]).toBe("g")
+      expect(cmd!.keys[2]).toBe(id)
+    }
   })
 })
 

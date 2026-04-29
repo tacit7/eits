@@ -137,6 +137,91 @@ Active when a flyout panel is open (`feature:vim-flyout` scope).
 
 ---
 
+## Space leader
+
+`Space` is the leader key. Pressing it opens a which-key overlay immediately. The sequence window is 2s (vs 1s for other prefixes).
+
+### Quick actions (2-key)
+
+| Keys | Action |
+|---|---|
+| `Space e` | Toggle Files flyout |
+| `Space q` | Close flyout |
+| `Space :` | Command palette |
+| `Space ?` | Keybinding help |
+
+### Search — `Space s`
+
+| Keys | Action |
+|---|---|
+| `Space s s` | Focus search *(requires search on page)* |
+
+### Buffer/sessions — `Space b`
+
+| Keys | Action |
+|---|---|
+| `Space b a` | Archive session *(sessions page)* |
+| `Space b D` | Delete session *(sessions page)* |
+
+### Exit — `Space x`
+
+| Keys | Action |
+|---|---|
+| `Space x x` | Close all flyouts |
+
+### Go to page — `Space g` (aliases of `g` bindings)
+
+| Keys | Destination |
+|---|---|
+| `Space g s` | Sessions |
+| `Space g t` | Tasks |
+| `Space g n` | Notes |
+| `Space g a` | Agents |
+| `Space g k` | Kanban |
+| `Space g w` | Canvas |
+| `Space g f` | Files |
+| `Space g p` | Prompts |
+| `Space g c` | Chat |
+| `Space g j` | Jobs |
+| `Space g u` | Usage |
+| `Space g m` | Teams |
+| `Space g K` | Skills |
+| `Space g N` | Notifications |
+| `Space g ,` | Settings |
+| `Space g h` | Keybindings |
+
+### Toggle rail — `Space t` (aliases of `t` bindings)
+
+| Keys | Section |
+|---|---|
+| `Space t s` | Sessions |
+| `Space t t` | Tasks |
+| `Space t n` | Notes |
+| `Space t f` | Files |
+| `Space t w` | Canvas |
+| `Space t c` | Chat |
+| `Space t k` | Skills |
+| `Space t m` | Teams |
+| `Space t j` | Jobs |
+| `Space t a` | Agents |
+| `Space t u` | Usage |
+| `Space t b` | Notifications |
+| `Space t P` | Prompts |
+| `Space t p` | Project picker |
+
+### Create — `Space n` (aliases of `n` bindings)
+
+| Keys | Action |
+|---|---|
+| `Space n a` | New agent |
+| `Space n t` | New task |
+| `Space n n` | New note |
+| `Space n c` | New chat |
+| `Space n p` | New prompt |
+| `Space n k` | New kanban task *(kanban page only)* |
+
+---
+
 ## Scope system
 
 Scoped commands only fire when their scope condition is met.

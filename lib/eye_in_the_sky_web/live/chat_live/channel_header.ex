@@ -9,6 +9,8 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
   attr :channel_members, :list, default: []
   attr :sessions_by_project, :list, default: []
   attr :session_search, :string, default: ""
+  attr :sender_filter, :any, default: nil
+  attr :show_agent_drawer, :boolean, default: false
 
   def channel_header(assigns) do
     ~H"""
@@ -43,6 +45,41 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
                 {@agent_status_counts.working} running
               </span>
             <% end %>
+            <details class="dropdown dropdown-end" id="sender-filter-dropdown" phx-update="ignore">
+              <summary class={[
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer list-none",
+                if(@sender_filter,
+                  do: "text-primary bg-primary/10 hover:bg-primary/15",
+                  else: "text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5"
+                )
+              ]}>
+                <.icon name="hero-funnel-mini" class="size-3.5" />
+                <%= if @sender_filter do %>
+                  <%= Enum.find(@channel_members, fn m -> to_string(m.session_id) == to_string(@sender_filter) end) |> then(fn m -> m && (m.session_name || "@#{m.session_id}") || "Filtered" end) %>
+                <% else %>
+                  Filter
+                <% end %>
+              </summary>
+              <div class="dropdown-content z-[10] mt-1 w-52 bg-base-100 border border-base-content/10 rounded-xl shadow-lg py-1">
+                <button
+                  phx-click="set_sender_filter"
+                  phx-value-session_id=""
+                  class={["w-full text-left px-3 py-1.5 text-xs transition-colors", if(is_nil(@sender_filter), do: "text-primary font-medium", else: "text-base-content/60 hover:text-base-content hover:bg-base-content/5")]}
+                >
+                  All agents
+                </button>
+                <div class="my-0.5 border-t border-base-content/5"></div>
+                <%= for member <- @channel_members do %>
+                  <button
+                    phx-click="set_sender_filter"
+                    phx-value-session_id={member.session_id}
+                    class={["w-full text-left px-3 py-1.5 text-xs transition-colors", if(to_string(@sender_filter) == to_string(member.session_id), do: "text-primary font-medium bg-primary/5", else: "text-base-content/60 hover:text-base-content hover:bg-base-content/5")]}
+                  >
+                    <%= member.session_name || "@#{member.session_id}" %>
+                  </button>
+                <% end %>
+              </div>
+            </details>
             <details class="dropdown dropdown-end">
               <summary class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 cursor-pointer list-none">
                 <.icon name="hero-user-group-mini" class="size-3.5" />

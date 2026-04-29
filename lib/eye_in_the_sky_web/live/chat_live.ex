@@ -106,6 +106,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:sessions_by_project, data.sessions_by_project)
       |> assign(:show_agent_drawer, false)
       |> assign(:show_members, false)
+      |> assign(:sender_filter, nil)
       |> assign_new(:session_search, fn -> "" end)
       |> assign(:slash_items, SlashItems.build())
 
@@ -151,6 +152,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
           channel_members={@channel_members}
           sessions_by_project={@sessions_by_project}
           session_search={@session_search}
+          sender_filter={@sender_filter}
         />
         <.message_feed
           channels={@channels}

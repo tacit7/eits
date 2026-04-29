@@ -155,12 +155,22 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       dm_body =
         "DM from:#{sender_name} (session:#{from_session.uuid}) #{trim_param(params["message"])}"
 
+      # Auto-constructed metadata context
       metadata = %{
         sender_name: sender_name,
         from_session_uuid: from_session.uuid,
         to_session_uuid: to_session.uuid,
         response_required: response_required
       }
+
+      # Merge with optional request metadata (request metadata takes precedence)
+      metadata =
+        case params["metadata"] do
+          nil -> metadata
+          "" -> metadata
+          req_metadata when is_map(req_metadata) -> Map.merge(metadata, req_metadata)
+          _ -> metadata
+        end
 
       case Messages.find_recent_dm(to_session.id, dm_body, seconds: 30) do
         nil ->

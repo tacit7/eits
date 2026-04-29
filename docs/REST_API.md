@@ -655,6 +655,7 @@ Messages can only be delivered to sessions with `status` in `["working", "idle"]
 | `from_session_id` | integer \| string | yes | Sender session ID (int) or UUID (string) |
 | `to_session_id` | integer \| string | yes | Recipient session ID (int) or UUID (string) |
 | `body` | string | yes | Message content (markdown) |
+| `metadata` | object | no | Structured JSON metadata. Merged with auto-generated context (sender_name, from_session_uuid, to_session_uuid, response_required). Supplied fields override auto-generated ones. |
 
 **Legacy format (backward compatible):**
 
@@ -734,6 +735,26 @@ curl -X POST localhost:5001/api/v1/dm \
     "content": "Can you check the test output?"
   }'
 ```
+
+**Example (with metadata for structured agent context):**
+
+```bash
+curl -X POST localhost:5001/api/v1/dm \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "from_session_id": 40,
+    "to_session_id": 42,
+    "body": "Please review the PR",
+    "metadata": {
+      "action": "review",
+      "pr_number": 149,
+      "target_branch": "main",
+      "deadline": "2026-04-29T17:00:00Z"
+    }
+  }'
+```
+
+The `body` field is displayed in the UI; `metadata` is machine-readable context for the agent and is never shown to users.
 
 ---
 

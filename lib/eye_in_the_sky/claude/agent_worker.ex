@@ -532,10 +532,17 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # context is guaranteed to be a normalized map — Job.normalize_context/1 is called
   # in handle_call before dispatching here.
   defp process_submit(message, context, state) do
+    metadata_note =
+      if context[:dm_metadata] && context[:dm_metadata] != %{} do
+        ", using_metadata=true"
+      else
+        ""
+      end
+
     Logger.info(
       "AgentWorker.submit_message: session_id=#{state.session_id}, " <>
         "message_length=#{String.length(message)}, has_messages=#{context.has_messages}, " <>
-        "model=#{inspect(context.model)}"
+        "model=#{inspect(context.model)}#{metadata_note}"
     )
 
     state = IdleTimer.cancel(state)

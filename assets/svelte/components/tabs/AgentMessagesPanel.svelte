@@ -8,6 +8,7 @@
   // Configure marked once at module level
   marked.setOptions({ gfm: true, breaks: true })
 
+  export let channels = []
   export let activeChannelId = null
   export let messages = []
   export let hasMoreMessages = false
@@ -80,6 +81,13 @@
     }
     if (e.key === 'Escape' && inspectMessage !== null) {
       inspectMessage = null
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+      const idx = parseInt(e.key, 10) - 1
+      if (channels[idx]) {
+        e.preventDefault()
+        live.pushEvent('change_channel', { channel_id: String(channels[idx].id) })
+      }
     }
   }
 

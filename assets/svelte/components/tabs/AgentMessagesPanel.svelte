@@ -776,24 +776,24 @@
 
                     <!-- Usage metadata for agent messages -->
                     {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                      <div class="mt-1.5 pt-1.5 border-t border-base-content/[0.05] flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/30 min-w-0 overflow-hidden flex-wrap">
+                      <div class="mt-1.5 pt-1.5 border-t border-base-content/[0.09] flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/35 min-w-0 overflow-hidden flex-wrap">
                         {#if message.metadata.total_cost_usd}
                           <span title="Total cost">${message.metadata.total_cost_usd.toFixed(4)}</span>
                         {/if}
                         {#if message.metadata.usage?.input_tokens}
-                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span class="mx-1.5 text-base-content/20">·</span>
                           <span title="Input tokens">{message.metadata.usage.input_tokens} in</span>
                         {/if}
                         {#if message.metadata.usage?.output_tokens}
-                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span class="mx-1.5 text-base-content/20">·</span>
                           <span title="Output tokens">{message.metadata.usage.output_tokens} out</span>
                         {/if}
                         {#if message.metadata.duration_ms}
-                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span class="mx-1.5 text-base-content/20">·</span>
                           <span title="Duration">{(message.metadata.duration_ms / 1000).toFixed(1)}s</span>
                         {/if}
                         {#if message.metadata.num_turns}
-                          <span class="mx-1.5 text-base-content/15">·</span>
+                          <span class="mx-1.5 text-base-content/20">·</span>
                           <span title="Number of turns">{message.metadata.num_turns} turns</span>
                         {/if}
                       </div>
@@ -898,7 +898,7 @@
             on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
             on:keydown={handleInputKeydown}
             placeholder="Message agents…"
-            class="textarea textarea-bordered w-full text-sm rounded-lg bg-base-200/50 border-base-content/10 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors resize-none overflow-y-auto text-base-content"
+            class="textarea textarea-bordered w-full text-sm rounded-lg bg-base-100 border-base-content/10 placeholder:text-base-content/25 focus:border-primary/30 transition-colors resize-none overflow-y-auto text-base-content"
             rows="1"
             style="max-height: 7.5rem; line-height: 1.5rem;"
             autocomplete="off"

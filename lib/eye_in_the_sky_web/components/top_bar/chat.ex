@@ -16,19 +16,27 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
 
   def toolbar(assigns) do
     ~H"""
-    <%= if @agent_status_counts[:active] do %>
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-mini font-mono text-success">
-        <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
-        {@agent_status_counts.active} active
-      </span>
+    <%!-- Status group: informational, left-anchored --%>
+    <%= if @agent_status_counts[:active] || @agent_status_counts[:working] do %>
+      <div class="flex items-center gap-1.5">
+        <%= if @agent_status_counts[:active] do %>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-mini font-mono text-success">
+            <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+            {@agent_status_counts.active} active
+          </span>
+        <% end %>
+        <%= if @agent_status_counts[:working] do %>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 text-mini font-mono text-warning">
+            <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
+            {@agent_status_counts.working} running
+          </span>
+        <% end %>
+      </div>
     <% end %>
-    <%= if @agent_status_counts[:working] do %>
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 text-mini font-mono text-warning">
-        <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
-        {@agent_status_counts.working} running
-      </span>
-    <% end %>
-    <div class="w-px h-4 bg-base-content/10 mx-1"></div>
+    <%!-- Spacer: pushes action controls to the right --%>
+    <div class="flex-1" />
+    <%!-- Action group: filter, members, new agent --%>
+    <div class="flex items-center gap-1">
     <details class="dropdown dropdown-end" id="sender-filter-dropdown" phx-update="ignore">
       <summary class={[
         "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer list-none",
@@ -174,6 +182,7 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
     >
       <.icon name="hero-plus-mini" class="size-3" /> New Agent
     </button>
+    </div>
     """
   end
 end

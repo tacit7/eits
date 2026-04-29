@@ -83,6 +83,25 @@ _delete() { _curl -X DELETE "$BASE_URL$1" | jq .; }
 die()  { echo "error: $*" >&2; exit 1; }
 need() { [[ -n "${!1:-}" ]] || die "$1 is required"; }
 
+# _parse_duration <24h|7d|30m|...> → ISO8601 UTC datetime string
+# Supports: Nh (hours), Nd (days), Nm (minutes)
+_parse_duration() {
+  local dur="${1:-}"
+  local secs=0
+  if [[ "$dur" =~ ^([0-9]+)h$ ]]; then
+    secs=$(( ${BASH_REMATCH[1]} * 3600 ))
+  elif [[ "$dur" =~ ^([0-9]+)d$ ]]; then
+    secs=$(( ${BASH_REMATCH[1]} * 86400 ))
+  elif [[ "$dur" =~ ^([0-9]+)m$ ]]; then
+    secs=$(( ${BASH_REMATCH[1]} * 60 ))
+  else
+    die "invalid duration '$dur' — use format: 24h, 7d, 30m"
+  fi
+  # macOS date syntax: -v-Xs subtracts X seconds from now
+  date -u -v-"${secs}S" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -d "${secs} seconds ago" +%Y-%m-%dT%H:%M:%SZ
+}
+
 # Build a compact JSON object from key=value pairs, skipping empty values.
 # Usage: json key1 val1 key2 val2 ...
 json() {
@@ -1300,17 +1319,24 @@ cmd_agents() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits agents <list|get|spawn>"; return 0; }
   case "$sub" in
     list)
-      # eits agents list [--project <id>] [--status <status>] [--limit <n>]
-      local qs=""
+      # eits agents list [--project <id>] [--status <status>] [--limit <n>] [--active-since <duration>] [--json]
+      local qs="" _json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project) qs="${qs}&project_id=$2"; shift 2 ;;
-          --status)  qs="${qs}&status=$2";     shift 2 ;;
-          --limit)   qs="${qs}&limit=$2";      shift 2 ;;
+          --project)      qs="${qs}&project_id=$2";                        shift 2 ;;
+          --status)       qs="${qs}&status=$2";                            shift 2 ;;
+          --limit)        qs="${qs}&limit=$2";                             shift 2 ;;
+          --active-since) qs="${qs}&active_since=$(_parse_duration "$2")"; shift 2 ;;
+          --json)         _json=1;                                         shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _curl "$BASE_URL/agents?${qs#&}" | jq .
+      local _resp; _resp=$(_curl "$BASE_URL/agents?${qs#&}")
+      if [[ "$_json" -eq 1 ]]; then
+        printf '%s\n' "$_resp"
+      else
+        printf '%s\n' "$_resp" | jq .
+      fi
       ;;
     get)
       local id="${1:-}"; need id
@@ -1764,8 +1790,28 @@ BATCH_HELP
         printf '%s\n' "${_results[@]}" | column -t -s $'\t'
       fi
       ;;
+    activity)
+      # eits agents activity <uuid> --since <duration> [--json]
+      local _uuid="${1:-}"; shift || true
+      [[ -z "$_uuid" ]] && die "usage: eits agents activity <uuid> --since <duration> [--json]"
+      local _since="" _json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --since) _since="$(_parse_duration "$2")"; shift 2 ;;
+          --json)  _json=1;                          shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -z "$_since" ]] && die "--since <duration> is required (e.g. --since 24h)"
+      local _resp; _resp=$(_curl "$BASE_URL/agents/activity?uuid=${_uuid}&since=${_since}")
+      if [[ "$_json" -eq 1 ]]; then
+        printf '%s\n' "$_resp"
+      else
+        printf '%s\n' "$_resp" | jq .
+      fi
+      ;;
     *)
-      echo "usage: eits agents <list|get|spawn|spawn-batch|defs>"
+      echo "usage: eits agents <list|get|spawn|spawn-batch|defs|activity>"
       ;;
   esac
 }

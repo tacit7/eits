@@ -228,6 +228,22 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
+  Returns agents that have had session activity at or after `since_dt`.
+  Matches agents with sessions where last_activity_at >= since OR inserted_at >= since.
+  """
+  def list_agents_active_since(%DateTime{} = since_dt, opts \\ []) do
+    from(a in Agent,
+      join: s in assoc(a, :sessions),
+      where: s.last_activity_at >= ^since_dt or s.inserted_at >= ^since_dt,
+      distinct: true,
+      preload: [:project]
+    )
+    |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
+    |> Repo.all()
+    |> Enum.map(&populate_project_name/1)
+  end
+
+  @doc """
   Lists agents by project ID.
   """
   def list_agents_by_project(project_id, opts \\ []) do

@@ -253,6 +253,7 @@ defmodule EyeInTheSkyWeb.Router do
     # Agents
     get "/agents", AgentController, :index
     post "/agents", AgentController, :create
+    get "/agents/activity", AgentActivityController, :activity
     get "/agents/:id", AgentController, :show
 
     # Messages

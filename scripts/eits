@@ -270,26 +270,26 @@ _tbl_commits() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"; echo "  list --search <q>   full-text search sessions by name/description"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|end|complete|waiting|archive|unarchive|context|tasks|notes>"; echo "  list -q/--search <q>   full-text search sessions by name/description"; return 0; }
   case "$sub" in
     list)
-      # eits sessions list [--search <q>] [--name <partial>] [--status <s>] [--project <id>] [--agent <uuid>] [--limit <n>] [--mine] [--include-archived] [--with-tasks]
+      # eits sessions list [-q|--search <q>] [-n|--name <partial>] [--status <s>] [-p|--project <id>] [--agent <uuid>] [-l|--limit <n>] [--mine] [--include-archived] [--with-tasks] [-j|--json]
       # --agent is mutually exclusive with --search, --status, --project, and --mine
       # --mine is mutually exclusive with --agent, --search, --status, and --project
       # --name cannot combine with --agent or --mine
       local qs="" _agent_flag=0 _other_flag=0 _mine_flag=0 _json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --search)     [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--search cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --name)       [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--name cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&name=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --search|-q)  [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--search cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --name|-n)    [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--name cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&name=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --status)     [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--status cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&status=$2";     shift 2 ;;
-          --project)    [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--project cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
+          --project|-p) [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--project cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
           --agent)      [[ $_other_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, --project, and --mine"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --mine)       [[ $_agent_flag -eq 1 || $_other_flag -eq 1 ]] && die "--mine cannot combine with --agent, --search, --status, and --project"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
-          --limit)      qs="${qs}&limit=$2";      shift 2 ;;
+          --limit|-l)   qs="${qs}&limit=$2";      shift 2 ;;
           --include-archived) qs="${qs}&include_archived=true"; shift ;;
           --with-tasks) qs="${qs}&with_tasks=true"; shift ;;
-          --json)       _json=1; shift ;;
+          --json|-j)    _json=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -591,15 +591,15 @@ cmd_tasks() {
 usage: eits tasks <subcommand> [options]
 
 Subcommands:
-  list      [-s <session>] [-p <project>] [-l <limit>] [--tag <id>] [--mine] [--all]
+  list      [-s <session>] [-p <project>] [-l <limit>] [-q <query>] [--tag <id>] [--mine] [--all] [-j|--json]
   get       <id>
   begin     -t <title> [-p <project>] [-d <desc>] [-q]   create + claim in one shot
   complete  <id> -m <message> [--notify <session>]         atomic annotate + done
   annotate  <id> -b <body> [-t <title>]
   update    <id> -s <state> [-t <title>] [-d <desc>]
-  search    <query> [--project <id>] [--state <id>]
+  search    <query> [-p <project>] [-l <limit>] [--state <id>]
   states    show state IDs, names, and accepted aliases
-  create    --title <t> [--project <id>] [--description <d>]
+  create    -t <title> [-p <project>] [-d <desc>]
   claim     <id>
   delete    <id>
   bulk-update --ids <id,...> --state <id|name>
@@ -664,8 +664,8 @@ TASKS_HELP
           --limit|-l) qs="${qs}&limit=$2";      shift 2 ;;
           --mine|--assigned) [[ $_session_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine/--assigned requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --created-by) local _creator="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_creator" ]] || die "--created-by requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&created_by_session_id=$_creator"; shift ;;
-          --all)     _all_flag=1; shift ;;
-          --json)    _json=1; shift ;;
+          --all)      _all_flag=1; shift ;;
+          --json|-j)  _json=1; shift ;;
           --since)        _since_cutoff="$(_parse_duration "$2")";       shift 2 ;;
           --stale-since)  _stale_since_cutoff="$(_parse_duration "$2")"; shift 2 ;;
           *) die "unknown flag: $1" ;;
@@ -1024,7 +1024,7 @@ HELP
       fi
       ;;
     search)
-      # eits tasks search <query> [--project <id>] [--limit <n>] [--state <id>]
+      # eits tasks search <query> [-p|--project <id>] [-l|--limit <n>] [--state <id>]
       local query="${1:-}"; [[ -n "$query" ]] || die "query is required"
       shift
       local qs="q=$(printf '%s' "$query" | jq -Rr @uri)"
@@ -1032,9 +1032,9 @@ HELP
       local limit="" state_id=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project)  project_id="$2"; shift 2 ;;
-          --limit)    limit="$2";      shift 2 ;;
-          --state)    state_id="$2";   shift 2 ;;
+          --project|-p) project_id="$2"; shift 2 ;;
+          --limit|-l)   limit="$2";      shift 2 ;;
+          --state)      state_id="$2";   shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1224,7 +1224,7 @@ HELP
           --starred)    qs="${qs}&starred=true"; shift ;;
           --limit|-l)   qs="${qs}&limit=$2"; shift 2 ;;
           --full)       full=1; shift ;;
-          --json)       _json=1; shift ;;
+          --json|-j)    _json=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1366,15 +1366,15 @@ cmd_agents() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits agents <list|get|spawn>"; return 0; }
   case "$sub" in
     list)
-      # eits agents list [--project <id>] [--status <status>] [--limit <n>] [--active-since <duration>] [--json]
+      # eits agents list [-p|--project <id>] [--status <status>] [-l|--limit <n>] [--active-since <duration>] [-j|--json]
       local qs="" _json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project)      qs="${qs}&project_id=$2";                        shift 2 ;;
+          --project|-p)   qs="${qs}&project_id=$2";                        shift 2 ;;
           --status)       qs="${qs}&status=$2";                            shift 2 ;;
-          --limit)        qs="${qs}&limit=$2";                             shift 2 ;;
+          --limit|-l)     qs="${qs}&limit=$2";                             shift 2 ;;
           --active-since) qs="${qs}&active_since=$(_parse_duration "$2")"; shift 2 ;;
-          --json)         _json=1;                                         shift ;;
+          --json|-j)      _json=1;                                         shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1773,8 +1773,8 @@ BATCH_HELP
       local _query="" _json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --q|-q) _query="$2"; shift 2 ;;
-          --json) _json=1; shift ;;
+          --q|-q)    _query="$2"; shift 2 ;;
+          --json|-j) _json=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1873,8 +1873,8 @@ cmd_tags() {
       local qs="" json_mode=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --q|-q) qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --json) json_mode=1; shift ;;
+          --q|-q)    qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --json|-j) json_mode=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1912,7 +1912,7 @@ cmd_commits() {
           --since)         qs="${qs}&since_hash=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --since-time)    _since_time="$2"; shift 2 ;;
           --limit|-l)      qs="${qs}&limit=$2"; shift 2 ;;
-          --json)          _json=1; shift ;;
+          --json|-j)       _json=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -2024,12 +2024,12 @@ cmd_jobs() {
   [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits jobs <list|get|create|update|run|delete>"; return 0; }
   case "$sub" in
     list)
-      # eits jobs list [--project <id>] [--global]
+      # eits jobs list [-p|--project <id>] [--global]
       local qs=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project) qs="${qs}&project_id=$2"; shift 2 ;;
-          --global)  qs="${qs}&global=true";   shift ;;
+          --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
+          --global)     qs="${qs}&global=true";   shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -2130,17 +2130,17 @@ cmd_dm() {
     shift || true
     if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
       cat <<EOF
-usage: eits dm inbox [--session <uuid|id>] [--from <session_id>] [--limit <n>] [--json] [--team-only]
-       eits dm list  [--session <uuid|id>] [--from <session_id>] [--limit <n>] [--json] [--team-only]
+usage: eits dm inbox [-s <session>] [-f <from>] [-l|-n <limit>] [-j|--json] [--team-only]
+       eits dm list  [-s <session>] [-f <from>] [-l|-n <limit>] [-j|--json] [--team-only]
 
 Show inbound DMs for a session. Defaults to current session (EITS_SESSION_UUID / EITS_SESSION_ID).
 
 Options:
-  --session <id>   Recipient session UUID or integer ID (default: current session)
-  --from <id>      Filter by sender session UUID or integer ID
-  --limit <n>      Max messages to return (default: 20)
-  --json           Raw JSON output
-  --team-only      Only show DMs from sessions that share a team with the current session
+  -s/--session <id>   Recipient session UUID or integer ID (default: current session)
+  -f/--from <id>      Filter by sender session UUID or integer ID
+  -l/-n/--limit <n>   Max messages to return (default: 20)
+  -j/--json           Raw JSON output
+  --team-only         Only show DMs from sessions that share a team with the current session
 
 Examples:
   eits dm inbox
@@ -2154,11 +2154,11 @@ EOF
     local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20 from="" json_mode=0 team_only=0
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --session|-s)  session="$2";  shift 2 ;;
-        --from|-f)     from="$2";     shift 2 ;;
-        --limit|-n)    limit="$2";    shift 2 ;;
-        --json)        json_mode=1;   shift ;;
-        --team-only)   team_only=1;   shift ;;
+        --session|-s)    session="$2";  shift 2 ;;
+        --from|-f)       from="$2";     shift 2 ;;
+        --limit|-l|-n)   limit="$2";    shift 2 ;;
+        --json|-j)       json_mode=1;   shift ;;
+        --team-only)     team_only=1;   shift ;;
         *) die "unknown flag: $1" ;;
       esac
     done
@@ -2362,7 +2362,7 @@ cmd_channels() {
       local project_id=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project) project_id="$2"; shift 2 ;;
+          --project|-p) project_id="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -2537,12 +2537,12 @@ cmd_prompts() {
   [[ "${sub:-}" == "--help" || "${sub:-}" == "-h" ]] && { echo "usage: eits prompts <list|get|create>"; return 0; }
   case "$sub" in
     list)
-      # eits prompts list [--query <q>] [--project <id>]
+      # eits prompts list [-q|--query <q>] [-p|--project <id>]
       local qs=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --query|-q)  qs="${qs}&query=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --project)   qs="${qs}&project_id=$2"; shift 2 ;;
+          --query|-q)   qs="${qs}&query=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -2600,8 +2600,8 @@ cmd_teams() {
       local project_id="" status=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project) project_id="$2"; shift 2 ;;
-          --status)  status="$2";     shift 2 ;;
+          --project|-p) project_id="$2"; shift 2 ;;
+          --status)     status="$2";     shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -3122,7 +3122,7 @@ EOF
         [[ $# -lt 2 || "${2:0:1}" == "-" ]] && die "--project requires a value"
         [[ "$2" =~ ^[0-9]+$ ]] || die "--project must be a numeric ID, got: $2"
         project="$2"; shift 2 ;;
-      --json)        json_mode=1;  shift ;;
+      --json|-j)     json_mode=1;  shift ;;
       *) die "unknown option: $1" ;;
     esac
   done
@@ -3240,9 +3240,9 @@ SEARCH_HELP
       local session_id="" limit="10" json_mode=0 qs=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session)   session_id="$2"; shift 2 ;;
-          --limit|-n)  limit="$2";      shift 2 ;;
-          --json)      json_mode=1;     shift ;;
+          --session|-s)    session_id="$2"; shift 2 ;;
+          --limit|-l|-n)   limit="$2";      shift 2 ;;
+          --json|-j)       json_mode=1;     shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done

@@ -62,6 +62,14 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
   def maybe_opt(opts, key, val), do: Keyword.put(opts, key, val)
 
   @doc """
+  Returns `:ok` when `val` is present (non-nil, non-empty string);
+  `{:error, :bad_request, msg}` otherwise.
+  """
+  def validate_required(nil, field), do: {:error, :bad_request, "#{field} is required"}
+  def validate_required("", field), do: {:error, :bad_request, "#{field} is required"}
+  def validate_required(_val, _field), do: :ok
+
+  @doc """
   Coerces a `starred` param value to a boolean.
   Accepts boolean, integer (1/0), or string representations ("1"/"true"/"0"/"false").
 

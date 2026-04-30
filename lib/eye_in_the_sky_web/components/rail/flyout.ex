@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               </.link>
             <% @active_section == :teams -> %>
               <.link
-                navigate="/teams"
+                navigate={teams_route(@sidebar_project)}
                 class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
               >
                 <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
@@ -461,7 +461,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <div class="px-3 pb-1">
       <.link
-        navigate="/teams"
+        navigate={teams_route(@sidebar_project)}
         class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
       >
         All Teams &rarr;
@@ -472,7 +472,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <% end %>
     <%= for team <- @teams do %>
       <.link
-        navigate="/teams"
+        navigate={team_route(@sidebar_project, team.id)}
         data-vim-flyout-item
         class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
@@ -847,6 +847,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp agents_route(_), do: "/agents"
   defp skills_route(%{id: id}), do: "/projects/#{id}/skills"
   defp skills_route(_), do: "/skills"
+  defp teams_route(%{id: id}), do: "/projects/#{id}/teams"
+  defp teams_route(_), do: "/teams"
+  defp team_route(%{id: project_id}, team_id), do: "/projects/#{project_id}/teams/#{team_id}"
+  defp team_route(_, _team_id), do: "/teams"
 
   # Returns the project-scoped route for a section, or nil if none exists
   # or no project is selected.

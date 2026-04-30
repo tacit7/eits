@@ -181,6 +181,21 @@
     return '/images/claude.svg'
   }
 
+  // Deterministic hue from session UUID → oklch session color
+  function sessionHue(uuid) {
+    if (!uuid) return 220
+    let h = 0x811c9dc5 // FNV-1a offset basis
+    for (let i = 0; i < uuid.length; i++) {
+      h ^= uuid.charCodeAt(i)
+      h = (h * 0x01000193) >>> 0 // FNV prime, unsigned 32-bit
+    }
+    return h % 360
+  }
+
+  function sessionBg(uuid) {
+    return `oklch(0.72 0.11 ${sessionHue(uuid)} / 0.18)`
+  }
+
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -648,8 +663,8 @@
             {:else}
               <div class="flex items-start gap-2.5">
                 {#if isSameSender}
-                  <!-- Grouped: narrow gutter only, no icon or name -->
-                  <div class="w-4 flex-shrink-0 mt-1"></div>
+                  <!-- Grouped: gutter matches squircle icon width -->
+                  <div class="w-6 flex-shrink-0 mt-1"></div>
                 {:else}
                   <!-- Sender icon -->
                   {#if message.sender_role === 'user'}
@@ -659,7 +674,12 @@
                       </svg>
                     </div>
                   {:else}
-                    <img src={getProviderIcon(message)} class="w-4 h-4 mt-1 flex-shrink-0 opacity-30" title="{message.provider || 'agent'}" alt={message.provider || 'Agent'} />
+                    <div
+                      class="w-6 h-6 mt-0.5 flex-shrink-0 rounded-md flex items-center justify-center"
+                      style="background-color: {sessionBg(message.session_uuid)};"
+                    >
+                      <img src={getProviderIcon(message)} class="w-3.5 h-3.5 flex-shrink-0 opacity-60" title="{message.provider || 'agent'}" alt={message.provider || 'Agent'} />
+                    </div>
                   {/if}
                 {/if}
 

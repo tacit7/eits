@@ -26,10 +26,18 @@ defmodule EyeInTheSkyWeb.ChatPresenter do
         nil
       end
 
+    session_uuid =
+      if Ecto.assoc_loaded?(message.session) && message.session do
+        message.session.uuid
+      else
+        nil
+      end
+
     %{
       id: message.id,
       number: message.channel_message_number,
       session_id: message.session_id,
+      session_uuid: session_uuid,
       session_name: session_name,
       sender_role: message.sender_role,
       direction: message.direction,

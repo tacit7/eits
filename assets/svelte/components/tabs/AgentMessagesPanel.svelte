@@ -751,7 +751,11 @@
                         >
                           {agent?.name || message.session_name || `@${message.session_id}`}
                         </button>
-                        <span class="font-mono text-[11px] text-base-content/35">@{message.session_id}</span>
+                        {#if message.session_name}
+                          <span class="text-[11px] text-base-content/40">{message.session_name}</span>
+                        {:else}
+                          <span class="font-mono text-[11px] text-base-content/30">@{message.session_id}</span>
+                        {/if}
                       {:else}
                         <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                       {/if}

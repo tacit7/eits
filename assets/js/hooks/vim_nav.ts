@@ -114,7 +114,6 @@ export const VimNav = {
   _onFocusin: null as ((e: FocusEvent) => void) | null,
   _onFocusout: null as ((e: FocusEvent) => void) | null,
   _onHelpClose: null as ((e: KeyboardEvent) => void) | null,
-  _onWhichKeyClose: null as ((e: KeyboardEvent) => void) | null,
   _onPageLoad: null as ((e: Event) => void) | null,
   listFocusIndex: -1 as number,
 
@@ -137,7 +136,10 @@ export const VimNav = {
       }
     }
 
-    this._onPageLoad = () => this.clearListFocus()
+    this._onPageLoad = () => {
+      this.clearListFocus()
+      this._recordSessionVisit()
+    }
     window.addEventListener("phx:page-loading-stop", this._onPageLoad)
 
     document.addEventListener("keydown", this._onKeydown, { capture: true })
@@ -211,7 +213,10 @@ export const VimNav = {
       return
     }
 
-    if (!matchesKnownBindingOrPrefix(this.buffer, key)) return
+    if (!matchesKnownBindingOrPrefix(this.buffer, key)) {
+      if (this.whichKeyEl) this.hideWhichKey()
+      return
+    }
 
     event.preventDefault()
     this.buffer.push(key)
@@ -422,7 +427,32 @@ export const VimNav = {
         composer?.focus()
         return
       }
+      if (action.name === "find_sessions") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "list-sessions" } })
+        )
+        return
+      }
+      if (action.name === "find_recent_sessions") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "recent-sessions" } })
+        )
+        return
+      }
     }
+  },
+
+  _recordSessionVisit() {
+    const m = window.location.pathname.match(/^\/dm\/([0-9a-f-]{36})/)
+    if (!m) return
+    const uuid = m[1]
+    const name = document.title || uuid.slice(0, 8)
+    try {
+      const key = "vim-nav:recent-sessions"
+      const existing: Array<{ uuid: string; name: string }> = JSON.parse(sessionStorage.getItem(key) || "[]")
+      const updated = [{ uuid, name }, ...existing.filter(s => s.uuid !== uuid)].slice(0, 20)
+      sessionStorage.setItem(key, JSON.stringify(updated))
+    } catch { /* ignore quota/parse errors */ }
   },
 
   showHelp(prefix?: string[]) {
@@ -618,22 +648,12 @@ export const VimNav = {
     }
     overlay.appendChild(container)
 
-    this._onWhichKeyClose = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      if (["Shift", "Control", "Meta", "Alt"].includes(e.key)) return
-      this.hideWhichKey()
-    }
-    document.addEventListener("keydown", this._onWhichKeyClose, { capture: true })
     document.body.appendChild(overlay)
     this.whichKeyEl = overlay
   },
 
   hideWhichKey() {
     if (this.whichKeyTimer) { clearTimeout(this.whichKeyTimer); this.whichKeyTimer = null }
-    if (this._onWhichKeyClose) {
-      document.removeEventListener("keydown", this._onWhichKeyClose, { capture: true } as EventListenerOptions)
-      this._onWhichKeyClose = null
-    }
     this.whichKeyEl?.remove()
     this.whichKeyEl = null
   },

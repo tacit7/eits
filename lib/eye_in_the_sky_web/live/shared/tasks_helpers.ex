@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   require Logger
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [put_flash: 3]
+  import Phoenix.LiveView, only: [put_flash: 3, stream_insert: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]
 
   alias EyeInTheSky.{Notes, Tasks}
@@ -275,6 +275,83 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
         {:noreply, put_flash(socket, :error, "Failed to copy task")}
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Task list select-mode handlers
+  # ---------------------------------------------------------------------------
+
+  def handle_toggle_select_task(task_id, socket) do
+    prev_select_mode = socket.assigns.tasks_select_mode
+
+    selected =
+      if MapSet.member?(socket.assigns.selected_task_ids, task_id),
+        do: MapSet.delete(socket.assigns.selected_task_ids, task_id),
+        else: MapSet.put(socket.assigns.selected_task_ids, task_id)
+
+    new_select_mode = MapSet.size(selected) > 0
+    select_mode_changed? = prev_select_mode != new_select_mode
+
+    socket =
+      socket
+      |> assign(:selected_task_ids, selected)
+      |> assign(:tasks_select_mode, new_select_mode)
+
+    socket =
+      if select_mode_changed? do
+        reinsert_all_tasks(socket)
+      else
+        case Enum.find(socket.assigns.loaded_tasks, fn t -> task_id(t) == task_id end) do
+          nil -> socket
+          task -> stream_insert(socket, :tasks, task)
+        end
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_toggle_select_all_tasks(socket) do
+    all_ids = MapSet.new(socket.assigns.loaded_task_ids)
+
+    selected =
+      if MapSet.equal?(socket.assigns.selected_task_ids, all_ids),
+        do: MapSet.new(),
+        else: all_ids
+
+    socket =
+      socket
+      |> assign(:selected_task_ids, selected)
+      |> assign(:tasks_select_mode, MapSet.size(selected) > 0)
+      |> reinsert_all_tasks()
+
+    {:noreply, socket}
+  end
+
+  def handle_enter_select_mode(socket) do
+    {:noreply,
+     socket
+     |> assign(:tasks_select_mode, true)
+     |> reinsert_all_tasks()}
+  end
+
+  def handle_exit_select_mode(socket) do
+    {:noreply,
+     socket
+     |> assign(:tasks_select_mode, false)
+     |> assign(:selected_task_ids, MapSet.new())
+     |> reinsert_all_tasks()}
+  end
+
+  def reinsert_all_tasks(socket) do
+    Enum.reduce(socket.assigns.loaded_tasks, socket, fn task, acc ->
+      stream_insert(acc, :tasks, task)
+    end)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
+
+  defp task_id(task), do: task.uuid || to_string(task.id)
 
   # Lenient integer parser for form params. Accepts trailing chars ("2 " → 2)
   # unlike ControllerHelpers.parse_int which requires exact match ("2 " → default).

@@ -10,7 +10,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.QueueManager do
   require Logger
 
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
-  alias EyeInTheSky.Claude.AgentWorker.{RetryPolicy, SdkLifecycle, WatchdogTimer}
+  alias EyeInTheSky.Claude.AgentWorker.{IdleTimer, Reconciliation, RetryPolicy, SdkLifecycle, WatchdogTimer}
   alias EyeInTheSky.Claude.Job
   alias EyeInTheSky.Messages
 
@@ -119,6 +119,57 @@ defmodule EyeInTheSky.Claude.AgentWorker.QueueManager do
         WorkerEvents.on_spawn_error(state.session_id, reason)
 
         {{:ok, :retry_queued}, state |> enqueue_job(job) |> RetryPolicy.schedule_retry_start()}
+    end
+  end
+
+  @doc """
+  Handles the full submit_message logic. Recovers from :failed state, logs,
+  emits telemetry, creates a Job, then delegates to `admit_idle/2` or `admit_busy/2`.
+
+  Returns `{reply_term, new_state}`. Context must already be normalized via
+  `Job.normalize_context/1` before calling.
+  """
+  def submit(message, context, %{status: :failed} = state) do
+    Logger.info("AgentWorker: recovering from :failed state for session_id=#{state.session_id}")
+    submit(message, context, %{state | status: :idle, retry_attempt: 0})
+  end
+
+  def submit(message, context, state) do
+    metadata_note =
+      if context[:dm_metadata] && context[:dm_metadata] != %{} do
+        ", using_metadata=true"
+      else
+        ""
+      end
+
+    Logger.info(
+      "AgentWorker.submit_message: session_id=#{state.session_id}, " <>
+        "message_length=#{String.length(message)}, has_messages=#{context.has_messages}, " <>
+        "model=#{inspect(context.model)}#{metadata_note}"
+    )
+
+    state = IdleTimer.cancel(state)
+    queue_len = length(state.queue)
+
+    Reconciliation.emit(
+      [:eits, :agent, :job, :received],
+      %{system_time: System.system_time()},
+      %{queue_length: queue_len, has_messages: context.has_messages},
+      state
+    )
+
+    job = Job.new(message, context, context[:content_blocks] || [])
+
+    if state.status == :idle do
+      case admit_idle(state, job) do
+        {{:ok, :started}, new_state} ->
+          {{:ok, :started}, Reconciliation.start_job_trace(new_state)}
+
+        other ->
+          other
+      end
+    else
+      admit_busy(state, job)
     end
   end
 

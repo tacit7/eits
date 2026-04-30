@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
   @moduledoc false
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
-  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1, parse_int: 2]
 
   alias EyeInTheSky.Tasks
 
@@ -134,5 +134,91 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
      |> assign(:selected_tasks, MapSet.new())
      |> reload_fn.()
      |> put_flash(:info, "Tasks deleted")}
+  end
+
+  # ---------------------------------------------------------------------------
+  # Tasks list bulk operations (selected_task_ids + tasks_select_mode pattern)
+  # ---------------------------------------------------------------------------
+
+  def handle_tasks_bulk_set_state(ids, state_id_str, socket, reload_fn) do
+    state_id = parse_int(state_id_str)
+
+    cond do
+      MapSet.size(ids) == 0 ->
+        {:noreply, socket}
+
+      is_nil(state_id) ->
+        {:noreply, put_flash(socket, :error, "Invalid state")}
+
+      true ->
+        results =
+          Enum.map(ids, fn task_id ->
+            case Tasks.get_task_by_uuid_or_id(task_id) do
+              {:ok, task} -> match?({:ok, _}, Tasks.update_task_state(task, state_id))
+              {:error, :not_found} -> false
+            end
+          end)
+
+        moved = Enum.count(results, & &1)
+        state_name = Tasks.get_workflow_state!(state_id).name
+
+        {flash_level, flash_msg} =
+          build_bulk_flash(moved, length(results),
+            verb: "Moved",
+            entity: "task",
+            destination: state_name
+          )
+
+        {:noreply,
+         socket
+         |> assign(:selected_task_ids, MapSet.new())
+         |> assign(:tasks_select_mode, false)
+         |> reload_fn.()
+         |> put_flash(flash_level, flash_msg)}
+    end
+  end
+
+  def handle_tasks_archive_selected(ids, socket, reload_fn) do
+    if MapSet.size(ids) == 0 do
+      {:noreply, assign(socket, :show_archive_confirm, false)}
+    else
+      results =
+        Enum.map(ids, fn task_id ->
+          case Tasks.get_task_by_uuid_or_id(task_id) do
+            {:ok, task} -> match?({:ok, _}, Tasks.archive_task(task))
+            {:error, :not_found} -> false
+          end
+        end)
+
+      archived = Enum.count(results, & &1)
+
+      {flash_level, flash_msg} =
+        build_bulk_flash(archived, length(results), verb: "Archived", entity: "task")
+
+      {:noreply,
+       socket
+       |> assign(:show_archive_confirm, false)
+       |> assign(:selected_task_ids, MapSet.new())
+       |> assign(:tasks_select_mode, false)
+       |> reload_fn.()
+       |> put_flash(flash_level, flash_msg)}
+    end
+  end
+
+  def handle_tasks_delete_selected(ids, socket, reload_fn) do
+    deleted =
+      Enum.count(ids, fn task_id ->
+        case Tasks.get_task_by_uuid_or_id(task_id) do
+          {:ok, task} -> match?({:ok, _}, Tasks.delete_task_with_associations(task))
+          {:error, :not_found} -> false
+        end
+      end)
+
+    {:noreply,
+     socket
+     |> assign(:selected_task_ids, MapSet.new())
+     |> assign(:tasks_select_mode, false)
+     |> reload_fn.()
+     |> put_flash(:info, "Deleted #{deleted} task#{if deleted != 1, do: "s"}")}
   end
 end

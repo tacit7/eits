@@ -53,13 +53,14 @@ defmodule EyeInTheSky.Terminal.PtyServer do
       {:stdout, self()},
       {:stderr, :stdout},
       :pty,
-      {:winsz, rows, cols},
       {:env, env},
       :monitor
     ]
 
     case :exec.run(@shell, opts) do
       {:ok, _pid, os_pid} ->
+        # Set initial window size after spawn — winsz is not a valid exec:run option
+        :exec.winsz(os_pid, rows, cols)
         {:ok, %{subscriber: subscriber, os_pid: os_pid, cols: cols, rows: rows}}
 
       {:error, reason} ->

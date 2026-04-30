@@ -107,17 +107,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
 
   @impl true
   def handle_event("delete_selected_notes", _params, socket) do
-    ids = socket.assigns.selected_note_ids
+    int_ids =
+      socket.assigns.selected_note_ids
+      |> Enum.map(&parse_int/1)
+      |> Enum.reject(&is_nil/1)
 
-    deleted =
-      Enum.count(ids, fn id ->
-        case parse_int(id) do
-          nil -> false
-          int_id ->
-            note = Notes.get_note!(int_id)
-            match?({:ok, _}, Notes.delete_note(note))
-        end
-      end)
+    {deleted, _} = Notes.delete_notes_by_ids(int_ids)
 
     socket =
       socket
@@ -218,45 +213,39 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   defp load_notes(socket) do
     show_all = Map.get(socket.assigns, :show_all, false)
     project = socket.assigns.project
-    query = socket.assigns.search_query
+    query = String.trim(socket.assigns.search_query)
 
     notes =
       if show_all do
-        if String.trim(query) != "" do
-          Notes.search_notes(query, [], starred: socket.assigns.starred_filter)
-        else
-          Notes.list_notes_filtered(
-            starred: socket.assigns.starred_filter,
-            sort: socket.assigns.sort_by,
-            type_filter: socket.assigns.type_filter
-          )
-        end
+        fetch_notes(query, starred: socket.assigns.starred_filter, sort: socket.assigns.sort_by, type_filter: socket.assigns.type_filter)
       else
         agent_ids =
           if project && Map.has_key?(project, :agents),
             do: Enum.map(project.agents, & &1.id),
             else: []
 
-        if String.trim(query) != "" do
-          Notes.search_notes(query, agent_ids,
-            project_id: project && project.id,
-            starred: socket.assigns.starred_filter
-          )
-        else
-          Notes.list_notes_filtered(
-            project_id: project && project.id,
-            agent_ids: agent_ids,
-            starred: socket.assigns.starred_filter,
-            sort: socket.assigns.sort_by,
-            type_filter: socket.assigns.type_filter
-          )
-        end
+        fetch_notes(query,
+          project_id: project && project.id,
+          agent_ids: agent_ids,
+          starred: socket.assigns.starred_filter,
+          sort: socket.assigns.sort_by,
+          type_filter: socket.assigns.type_filter
+        )
       end
 
     socket
     |> assign(:notes, notes)
     |> assign(:selected_note_ids, MapSet.new())
     |> assign(:notes_select_mode, false)
+  end
+
+  defp fetch_notes("", opts), do: Notes.list_notes_filtered(opts)
+  defp fetch_notes(query, opts) do
+    agent_ids = Keyword.get(opts, :agent_ids, [])
+    project_id = Keyword.get(opts, :project_id)
+    starred = Keyword.get(opts, :starred)
+
+    Notes.search_notes(query, agent_ids, Keyword.merge(opts, project_id: project_id, starred: starred))
   end
 
   defp assign_notes_new_href(socket, %{"id" => id}) do

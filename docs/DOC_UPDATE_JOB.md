@@ -53,13 +53,26 @@ You are a documentation updater for the EITS Web project. You coordinate a team 
 
    Do not write to doc_update_suggestions.md.
 
+   Each entry must include `name` (session display name) and `member_name` (team member alias)
+   so agents appear readable in the sessions page and team status — not as raw instruction text.
+
    Then write the array to a temp file and spawn:
 
    ```bash
    cat > /tmp/doc-agents.json << 'EOF'
    [
-     {"instructions": "...", "team_id": TEAM_ID},
-     {"instructions": "...", "team_id": TEAM_ID}
+     {
+       "name": "Update CHAT.md",
+       "member_name": "chat-doc",
+       "instructions": "...",
+       "team_id": TEAM_ID
+     },
+     {
+       "name": "Update EITS_CLI.md",
+       "member_name": "cli-doc",
+       "instructions": "...",
+       "team_id": TEAM_ID
+     }
    ]
    EOF
    EITS_URL=http://localhost:5001/api/v1 eits agents spawn-batch --file /tmp/doc-agents.json

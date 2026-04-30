@@ -203,6 +203,14 @@ export const VimNav = {
       return
     }
 
+    // ? with an active buffer shows scoped help for the current prefix
+    if (key === "?" && this.buffer.length > 0) {
+      event.preventDefault()
+      this.showHelp([...this.buffer])
+      this.clearSequence()
+      return
+    }
+
     if (!matchesKnownBindingOrPrefix(this.buffer, key)) return
 
     event.preventDefault()
@@ -417,7 +425,7 @@ export const VimNav = {
     }
   },
 
-  showHelp() {
+  showHelp(prefix?: string[]) {
     if (this.helpOverlayEl) { this.hideHelp(); return }
 
     const overlay = document.createElement("div")
@@ -429,38 +437,57 @@ export const VimNav = {
       "background:rgba(0,0,0,0.6)",
     ].join(";")
 
-    // Only base commands — Space aliases duplicate the g/t/n bindings
-    const activeCmds = COMMANDS.filter(cmd => !cmd.id.startsWith("leader.") && isCommandActive(cmd))
-
-    type Section = { label: string; group: string }
-    const sections: Section[] = [
-      { label: "Global",       group: "global" },
-      { label: "Go to page",   group: "navigation" },
-      { label: "Toggle rail",  group: "toggle" },
-      { label: "Create",       group: "create" },
-      { label: "Context",      group: "context" },
-    ]
-
     const kbdStyle = "display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:10px;background:var(--color-base-200);color:var(--color-base-content)"
 
-    let html = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:20px 24px;max-width:580px;width:90%;max-height:80vh;overflow-y:auto;font-family:monospace;color:var(--color-base-content)"><div style="font-size:13px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">Keyboard Shortcuts</div>`
+    let html = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:20px 24px;max-width:580px;width:90%;max-height:80vh;overflow-y:auto;font-family:monospace;color:var(--color-base-content)">`
 
-    for (const section of sections) {
-      const cmds = activeCmds.filter(c => c.group === section.group)
-      if (cmds.length === 0) continue
+    if (prefix && prefix.length > 0) {
+      // Scoped help: show all commands under the given prefix
+      const prefixCmds = COMMANDS.filter(cmd =>
+        cmd.keys.length > prefix.length &&
+        prefix.every((k, i) => cmd.keys[i] === k) &&
+        isCommandActive(cmd)
+      )
+      const prefixLabel = prefix.join(" ")
+      html += `<div style="font-size:13px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">${escapeHtml(prefixLabel)} → Help</div>`
 
-      html += `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--color-primary,var(--color-base-content));opacity:.7;margin-bottom:5px;font-weight:600">${escapeHtml(section.label)}</div>`
-
-      const useGrid = cmds.length > 6
+      const useGrid = prefixCmds.length > 8
       if (useGrid) html += `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:16px">`
-
-      for (const cmd of cmds) {
-        const keys = cmd.keys.map(k => `<kbd style="${kbdStyle}">${escapeHtml(k)}</kbd>`).join(" ")
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span style="font-size:11px;opacity:.8">${escapeHtml(cmd.label)}</span><span style="white-space:nowrap;padding-left:8px">${keys}</span></div>`
+      for (const cmd of prefixCmds) {
+        const relKeys = cmd.keys.slice(prefix.length).map(k => `<kbd style="${kbdStyle}">${escapeHtml(k)}</kbd>`).join(" ")
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span style="font-size:11px;opacity:.8">${escapeHtml(cmd.label)}</span><span style="white-space:nowrap;padding-left:8px">${relKeys}</span></div>`
       }
-
       if (useGrid) html += `</div>`
-      html += `</div>`
+    } else {
+      // Global help: grouped by section
+      const activeCmds = COMMANDS.filter(cmd => !cmd.id.startsWith("leader.") && isCommandActive(cmd))
+
+      type Section = { label: string; group: string }
+      const sections: Section[] = [
+        { label: "Global",       group: "global" },
+        { label: "Go to page",   group: "navigation" },
+        { label: "Toggle rail",  group: "toggle" },
+        { label: "Create",       group: "create" },
+        { label: "Context",      group: "context" },
+      ]
+
+      html += `<div style="font-size:13px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">Keyboard Shortcuts</div>`
+
+      for (const section of sections) {
+        const cmds = activeCmds.filter(c => c.group === section.group)
+        if (cmds.length === 0) continue
+
+        html += `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--color-primary,var(--color-base-content));opacity:.7;margin-bottom:5px;font-weight:600">${escapeHtml(section.label)}</div>`
+
+        const useGrid = cmds.length > 6
+        if (useGrid) html += `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:16px">`
+        for (const cmd of cmds) {
+          const keys = cmd.keys.map(k => `<kbd style="${kbdStyle}">${escapeHtml(k)}</kbd>`).join(" ")
+          html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span style="font-size:11px;opacity:.8">${escapeHtml(cmd.label)}</span><span style="white-space:nowrap;padding-left:8px">${keys}</span></div>`
+        }
+        if (useGrid) html += `</div>`
+        html += `</div>`
+      }
     }
 
     html += `<div style="margin-top:8px;font-size:9px;opacity:.4;text-align:center">Press any key to close</div></div>`
@@ -550,9 +577,9 @@ export const VimNav = {
     const useGrid = entries.length > 8
     overlay.style.cssText = [
       "position:fixed",
-      "bottom:48px",
+      "top:50%",
       "left:50%",
-      "transform:translateX(-50%)",
+      "transform:translate(-50%,-50%)",
       "z-index:9999",
       "font-family:monospace",
       "font-size:12px",

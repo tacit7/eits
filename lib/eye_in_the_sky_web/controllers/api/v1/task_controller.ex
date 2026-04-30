@@ -37,11 +37,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   defp fetch_tasks_by_filter(%{"session_id" => session_id}, opts) do
-    session_int_id =
-      case Helpers.resolve_session_int_id(session_id) do
-        {:ok, id} -> id
-        _ -> nil
-      end
+    session_int_id = resolve_session_id(session_id)
 
     if session_int_id,
       do: Tasks.list_tasks_for_session(session_int_id, opts),
@@ -49,11 +45,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   defp fetch_tasks_by_filter(%{"created_by_session_id" => session_id}, opts) do
-    session_int_id =
-      case Helpers.resolve_session_int_id(session_id) do
-        {:ok, id} -> id
-        _ -> nil
-      end
+    session_int_id = resolve_session_id(session_id)
 
     if session_int_id,
       do: Tasks.list_tasks_created_by_session(session_int_id, opts),
@@ -350,11 +342,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         {:error, :bad_request, "Invalid task ID"}
 
       {:ok, task} ->
-        int_id =
-          case Helpers.resolve_session_int_id(session_uuid) do
-            {:ok, id} -> id
-            _ -> nil
-          end
+        int_id = resolve_session_id(session_uuid)
 
         if int_id do
           Tasks.unlink_session_from_task(task.id, int_id)
@@ -425,6 +413,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp maybe_link_session(_task_id, nil), do: :ok
 
+  defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
+    int_id = resolve_session_id(session_id)
+    if int_id, do: maybe_link_session(task_id, int_id), else: :ok
+  end
+
   defp maybe_link_session(task_id, session_id) when is_integer(session_id) do
     case parse_task_id(task_id) do
       nil -> :ok
@@ -432,26 +425,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     end
 
     :ok
-  end
-
-  defp maybe_link_session(task_id, session_id) when is_binary(session_id) do
-    int_id =
-      case Helpers.resolve_session_int_id(session_id) do
-        {:ok, id} -> id
-        _ -> nil
-      end
-
-    case parse_task_id(task_id) do
-      nil ->
-        :ok
-
-      task_int_id ->
-        if int_id do
-          Tasks.link_session_to_task(task_int_id, int_id)
-        end
-
-        :ok
-    end
   end
 
   defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
@@ -482,6 +455,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     case Helpers.resolve_session_int_id(session_id) do
       {:ok, int_id} -> Teams.mark_member_done_by_session(int_id)
       _ -> :ok
+    end
+  end
+
+  defp resolve_session_id(sid) do
+    case Helpers.resolve_session_int_id(sid) do
+      {:ok, id} -> id
+      _ -> nil
     end
   end
 

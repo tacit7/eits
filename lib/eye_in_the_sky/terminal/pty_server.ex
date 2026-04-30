@@ -18,6 +18,10 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   - Include `:stdin` in the opts. Without it, erlexec defaults stdin to /dev/null.
     Bash reads EOF and exits cleanly (code 0) before accepting any input.
 
+  - PTYs start with echo disabled unless `:pty_echo` (or equivalent termios opts)
+    is set. Without it, typed characters are sent to bash and commands execute,
+    but the user sees a blank terminal while typing.
+
   - `{:winsz, {rows, cols}}` is a valid exec:run option (2-element nested tuple),
     but we call :exec.winsz/3 after spawn instead to keep the opts list simpler.
 
@@ -76,10 +80,14 @@ defmodule EyeInTheSky.Terminal.PtyServer do
     shell_cmd = [@shell_bin, "--norc", "--noprofile", "-i"]
 
     opts = [
-      :stdin,             # CRITICAL: without this erlexec defaults stdin to /dev/null
-      {:stdout, self()},  # deliver PTY output as {:stdout, os_pid, data}
-      {:stderr, :stdout}, # merge stderr into stdout stream
+      # CRITICAL: without this erlexec defaults stdin to /dev/null
+      :stdin,
+      # deliver PTY output as {:stdout, os_pid, data}
+      {:stdout, self()},
+      # merge stderr into stdout stream
+      {:stderr, :stdout},
       :pty,
+      :pty_echo,
       {:env, env},
       :monitor
     ]

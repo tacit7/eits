@@ -40,9 +40,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
               overrides={@overrides}
             />
           <% "anthropic" -> %>
-            <.anthropic_section scope={@scope} overrides={@overrides} />
+            <.anthropic_section scope={@scope} />
           <% "openai" -> %>
-            <.openai_section scope={@scope} overrides={@overrides} />
+            <.openai_section scope={@scope} />
         <% end %>
       </div>
 
@@ -226,7 +226,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   # -- CLAUDE / ANTHROPIC FLAGS ---------------------------------------------
 
   attr :scope, :string, required: true
-  attr :overrides, :list, default: []
 
   defp anthropic_section(assigns) do
     ~H"""
@@ -512,7 +511,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   # -- CODEX / OPENAI FLAGS --------------------------------------------------
 
   attr :scope, :string, required: true
-  attr :overrides, :list, default: []
 
   defp openai_section(assigns) do
     ~H"""

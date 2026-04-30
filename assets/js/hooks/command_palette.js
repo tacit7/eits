@@ -35,6 +35,13 @@ export const CommandPalette = {
       }
     })
 
+    this.handleEvent("palette:recent-sessions-result", ({ sessions }) => {
+      if (this._paletteRecentSessionsResolve) {
+        this._paletteRecentSessionsResolve(sessions)
+        this._paletteRecentSessionsResolve = null
+      }
+    })
+
     this.handleEvent("palette:list-agents-result", ({ agents }) => {
       if (this._paletteAgentsResolve) {
         this._paletteAgentsResolve(agents)

@@ -36,36 +36,26 @@ export function sessionCommands(hook) {
       icon: "hero-clock",
       group: "Workspace",
       hint: null,
-      keywords: ["recent", "visited", "history", "dm", "chat"],
+      keywords: ["recent", "activity", "history", "dm", "chat"],
       shortcut: null,
       type: "submenu",
       commands: () => {
-        try {
-          const raw = sessionStorage.getItem("vim-nav:recent-sessions") || "[]"
-          const sessions = JSON.parse(raw)
-          if (sessions.length === 0) return Promise.resolve([{
-            id: "recent-sessions-empty",
-            label: "No recently visited sessions",
-            icon: "hero-information-circle",
-            group: "Recent",
-            hint: null, keywords: [], shortcut: null, type: "action",
-            action: () => {}, when: null
-          }])
-          return Promise.resolve(sessions.map(s => ({
-            id: "session-" + s.uuid,
-            label: s.name || s.uuid.slice(0, 8),
-            icon: "hero-chat-bubble-left-right",
-            group: "Recent",
-            hint: null,
-            keywords: [],
-            shortcut: null,
-            type: "navigate",
-            href: "/dm/" + s.uuid,
-            when: null
-          })))
-        } catch {
-          return Promise.resolve([])
-        }
+        if (!hook) return Promise.resolve([])
+        return new Promise((resolve) => {
+          hook._paletteRecentSessionsResolve = resolve
+          hook.pushEvent("palette:recent-sessions", {})
+        }).then(sessions => sessions.map(s => ({
+          id: "session-" + s.uuid,
+          label: s.name || s.description || (s.uuid || "").slice(0, 8),
+          icon: "hero-chat-bubble-left-right",
+          group: "Recent",
+          hint: s.status,
+          keywords: [],
+          shortcut: null,
+          type: "navigate",
+          href: "/dm/" + s.uuid,
+          when: null
+        })))
       },
       when: null
     },

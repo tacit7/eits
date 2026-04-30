@@ -32,6 +32,21 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     {:halt, push_event(socket, "palette:sessions-result", %{sessions: results})}
   end
 
+  # ---------------------------------------------------------------------------
+  # palette:recent-sessions
+  # ---------------------------------------------------------------------------
+
+  def handle_palette_event("palette:recent-sessions", _params, socket) do
+    sessions = Sessions.list_sessions_filtered(status_filter: "all", sort_by: :last_activity, limit: 15)
+
+    results =
+      Enum.map(sessions, fn s ->
+        %{id: s.id, uuid: s.uuid, name: s.name, description: s.description, status: s.status}
+      end)
+
+    {:halt, push_event(socket, "palette:recent-sessions-result", %{sessions: results})}
+  end
+
   def handle_palette_event(_event, _params, socket), do: {:cont, socket}
 
   # ---------------------------------------------------------------------------

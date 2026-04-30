@@ -10,13 +10,13 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   use GenServer, restart: :transient
   require Logger
 
-  alias EyeInTheSky.Agents.CmdDispatcher
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
 
   alias EyeInTheSky.Claude.AgentWorker.{
     ErrorRecovery,
     IdleTimer,
     QueueManager,
+    Reconciliation,
     RetryPolicy,
     SdkLifecycle,
     WatchdogTimer
@@ -26,7 +26,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   alias EyeInTheSky.Claude.StreamAssemblerProtocol
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.Messages
-  alias EyeInTheSky.Messages.Trace
 
   @registry EyeInTheSky.Claude.AgentRegistry
 
@@ -208,7 +207,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def handle_call({:submit_message, message, context}, _from, state) when is_binary(message) do
-    {reply, new_state} = process_submit(message, Job.normalize_context(context), state)
+    {reply, new_state} = QueueManager.submit(message, Job.normalize_context(context), state)
     {:reply, reply, new_state}
   end
 
@@ -264,7 +263,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     })
 
     result_len = if(is_binary(text), do: String.length(text), else: 0)
-    emit([:eits, :agent, :result, :saved], %{text_length: result_len}, state)
+    Reconciliation.emit([:eits, :agent, :result, :saved], %{text_length: result_len}, state)
 
     {:noreply, state}
   end
@@ -283,9 +282,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %__MODULE__{sdk_ref: ref} = state) do
-    msg = maybe_dispatch_commands(msg, state)
+    msg = Reconciliation.maybe_dispatch_commands(msg, state)
     {stream, events} = StreamAssemblerProtocol.handle_message(state.stream, msg)
-    broadcast_events(events, state)
+    Reconciliation.broadcast_events(events, state)
     {:noreply, %{state | stream: stream}}
   end
 
@@ -293,7 +292,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def handle_info({:tool_block_stop, ref}, %__MODULE__{sdk_ref: ref} = state) do
     {stream, events} = StreamAssemblerProtocol.handle_tool_block_stop(state.stream)
-    broadcast_events(events, state)
+    Reconciliation.broadcast_events(events, state)
     {:noreply, %{state | stream: stream}}
   end
 
@@ -304,7 +303,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # Codex thread_id arrived via thread.started — sync immediately so resume works
   @impl true
   def handle_info({:codex_session_id, ref, thread_id}, %__MODULE__{sdk_ref: ref} = state) do
-    state = maybe_sync_provider_conversation_id(state, thread_id)
+    state = Reconciliation.maybe_sync_provider_conversation_id(state, thread_id)
     WorkerEvents.on_codex_thread_started(state.session_id)
     {:noreply, state}
   end
@@ -316,13 +315,13 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # SDK completion - process next queued job
   @impl true
   def handle_info({:claude_complete, ref, session_id}, %__MODULE__{sdk_ref: ref} = state) do
-    state = maybe_sync_provider_conversation_id(state, session_id)
+    state = Reconciliation.maybe_sync_provider_conversation_id(state, session_id)
     WorkerEvents.broadcast_stream_clear(state.session_id)
     state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
 
     Logger.info("[#{state.session_id}] SDK complete")
 
-    emit([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, state)
+    Reconciliation.emit([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, state)
 
     WorkerEvents.on_sdk_completed(
       state.session_id,
@@ -335,7 +334,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     state = WatchdogTimer.cancel_watchdog(state)
     SdkLifecycle.demonitor_handler(state.handler_monitor)
 
-    state = clear_job_trace(state)
+    state = Reconciliation.clear_job_trace(state)
 
     next_state =
       QueueManager.process_next_job(%{
@@ -349,7 +348,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     next_state =
       if next_state.status == :running,
-        do: start_job_trace(next_state),
+        do: Reconciliation.start_job_trace(next_state),
         else: next_state
 
     {:noreply, IdleTimer.maybe_schedule(next_state)}
@@ -489,30 +488,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def terminate(reason, %__MODULE__{} = state) do
     SdkLifecycle.cancel_active_sdk(state)
-    maybe_mark_session_failed(reason, state)
+    Reconciliation.maybe_mark_session_failed(reason, state)
     :ok
-  end
-
-  # Normal termination (:normal, :shutdown, {:shutdown, _}) means the worker
-  # completed cleanly — its callbacks already updated session status.
-  # Any other reason means the worker crashed and session is now a zombie.
-  defp maybe_mark_session_failed(:normal, _state), do: :ok
-  defp maybe_mark_session_failed(:shutdown, _state), do: :ok
-  defp maybe_mark_session_failed({:shutdown, _}, _state), do: :ok
-
-  defp maybe_mark_session_failed(reason, %__MODULE__{session_id: session_id, provider_conversation_id: pcid}) do
-    Logger.warning("AgentWorker terminating abnormally for session_id=#{session_id}: #{inspect(reason)}")
-
-    try do
-      # Abnormal GenServer terminate — the crash reason is not one of our
-      # classified error tuples, so status_reason falls back to nil (UI renders
-      # generic 'Failed'). Explicit pass rather than default arg so future
-      # callers must think about which reason to record.
-      EyeInTheSky.AgentWorkerEvents.on_session_failed(session_id, pcid, reason)
-    rescue
-      e ->
-        Logger.error("Failed to mark session failed on abnormal terminate: #{inspect(e)}")
-    end
   end
 
   # --- Private ---
@@ -521,119 +498,4 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
   defp stream_assembler_for("gemini"), do: StreamAssembler.new()
   defp stream_assembler_for(_provider), do: StreamAssembler.new()
-
-  # Recover from :failed state before processing submit
-  defp process_submit(message, context, %__MODULE__{status: :failed} = state) do
-    Logger.info("AgentWorker: recovering from :failed state for session_id=#{state.session_id}")
-    process_submit(message, context, %{state | status: :idle, retry_attempt: 0})
-  end
-
-  # Handles the full submit_message logic; returns {reply_term, new_state}.
-  # context is guaranteed to be a normalized map — Job.normalize_context/1 is called
-  # in handle_call before dispatching here.
-  defp process_submit(message, context, state) do
-    metadata_note =
-      if context[:dm_metadata] && context[:dm_metadata] != %{} do
-        ", using_metadata=true"
-      else
-        ""
-      end
-
-    Logger.info(
-      "AgentWorker.submit_message: session_id=#{state.session_id}, " <>
-        "message_length=#{String.length(message)}, has_messages=#{context.has_messages}, " <>
-        "model=#{inspect(context.model)}#{metadata_note}"
-    )
-
-    state = IdleTimer.cancel(state)
-    queue_len = length(state.queue)
-
-    emit(
-      [:eits, :agent, :job, :received],
-      %{system_time: System.system_time()},
-      %{queue_length: queue_len, has_messages: context.has_messages},
-      state
-    )
-
-    job = Job.new(message, context, context[:content_blocks] || [])
-
-    if state.status == :idle do
-      case QueueManager.admit_idle(state, job) do
-        {{:ok, :started}, new_state} ->
-          {{:ok, :started}, start_job_trace(new_state)}
-
-        other ->
-          other
-      end
-    else
-      QueueManager.admit_busy(state, job)
-    end
-  end
-
-  defp broadcast_events(events, state) do
-    meta = Logger.metadata()
-
-    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-      Logger.metadata(meta)
-
-      Enum.each(events, fn event ->
-        EyeInTheSky.Events.stream_event(state.session_id, event)
-      end)
-    end)
-  end
-
-  defp maybe_dispatch_commands(%Message{type: :text, content: content} = msg, state)
-       when is_binary(content) do
-    case CmdDispatcher.extract_commands(content) do
-      {[], _} ->
-        msg
-
-      {cmds, clean} ->
-        CmdDispatcher.dispatch_all(cmds, state.session_id)
-        %{msg | content: clean}
-    end
-  end
-
-  defp maybe_dispatch_commands(msg, _state), do: msg
-
-  defp maybe_sync_provider_conversation_id(state, claude_provider_conversation_id)
-       when is_binary(claude_provider_conversation_id) and claude_provider_conversation_id != "" do
-    if state.provider_conversation_id == claude_provider_conversation_id do
-      state
-    else
-      WorkerEvents.on_provider_conversation_id_changed(
-        state.session_id,
-        state.provider_conversation_id,
-        claude_provider_conversation_id
-      )
-
-      %{state | provider_conversation_id: claude_provider_conversation_id}
-    end
-  end
-
-  defp maybe_sync_provider_conversation_id(state, _), do: state
-
-  defp emit(event, measurements, state) do
-    emit(event, measurements, %{}, state)
-  end
-
-  defp emit(event, measurements, extra_meta, state) do
-    meta =
-      extra_meta
-      |> Map.put(:session_id, state.session_id)
-      |> Map.put(:message_trace_id, state.message_trace_id)
-
-    :telemetry.execute(event, measurements, meta)
-  end
-
-  defp start_job_trace(state) do
-    trace_id = Trace.new()
-    Trace.set_in_logger(trace_id)
-    %{state | message_trace_id: trace_id}
-  end
-
-  defp clear_job_trace(state) do
-    Logger.metadata(message_trace_id: nil)
-    %{state | message_trace_id: nil}
-  end
 end

@@ -1466,6 +1466,46 @@ eits tasks list --tag 5
 
 ---
 
+### GET /api/v1/tasks/:id
+
+Fetch a single task by ID. Read-only; no side effects.
+
+**Path params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | integer | yes | Task ID |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "id": 42,
+  "title": "Fix auth bug",
+  "task": {
+    "id": 42,
+    "title": "Fix auth bug",
+    "description": "OAuth flow is broken in Safari",
+    "state": "In Progress",
+    "state_id": 2,
+    "priority": "high",
+    "project_id": 1,
+    "due_at": null
+  },
+  "annotations": []
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/tasks/42
+eits tasks get 42
+```
+
+---
+
 ### POST /api/v1/tasks/search
 
 Search for tasks across projects with optional filtering.

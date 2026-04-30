@@ -69,6 +69,7 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 | `status` | string | no | One of: `working`, `idle`, `waiting`, `completed`, `failed` |
 | `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`, `"zombie_swept"`, `"billing_error"`, `"authentication_error"`, `"rate_limit_error"`, `"watchdog_timeout"`, `"retry_exhausted"`. Auto-cleared when transitioning away from waiting. Error values are normally set by the AgentWorker on systemic failure, not by API clients — they drive the red failure-tier badges in the session UI |
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
+| `read_only` | boolean | no | Session intent: `true` for read-only (review mode), `false` for work mode |
 
 **Response:** `200 OK`
 
@@ -232,6 +233,50 @@ curl localhost:5001/api/v1/sessions/42 \
 
 ---
 
+### GET /api/v1/sessions/:uuid/tasks
+
+List tasks linked to a session (path-based alias for `GET /api/v1/tasks?session_id=`).
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string | Session UUID or integer ID |
+
+**Query params (same as GET /api/v1/tasks):**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `limit` | integer | no | Max results (default 50) |
+| `state_id` | integer | no | Filter by workflow state ID |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "2 task(s)",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Add unit tests",
+      "state": "In Progress",
+      "state_id": 2,
+      "project_id": 1
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/sessions/abc-123/tasks
+curl localhost:5001/api/v1/sessions/42/tasks?limit=10
+```
+
+---
+
 ### POST /agents
 
 Spawn a new Claude Code agent. Creates an Agent + Session, starts an AgentWorker, and sends the initial instructions as the first message.
@@ -292,6 +337,103 @@ curl -X POST localhost:5001/api/v1/agents \
     "project_path": "/Users/me/projects/web",
     "parent_session_id": 1074
   }'
+```
+
+---
+
+### GET /api/v1/agents/activity
+
+Get activity rollup for an agent since a given datetime. Returns tasks, commits, and sessions created/updated since the cutoff, with summary counts.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `uuid` | string | yes | Agent UUID |
+| `since` | string | yes | ISO 8601 datetime (e.g. `2026-04-15T10:00:00Z`) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "agent_uuid": "agent-uuid",
+  "since": "2026-04-15T10:00:00Z",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Add unit tests",
+      "state": "In Progress",
+      "state_id": 2
+    }
+  ],
+  "commits": [
+    {
+      "hash": "abc123def456",
+      "message": "fix auth bug"
+    }
+  ],
+  "sessions": [
+    {
+      "uuid": "session-uuid",
+      "name": "fix auth",
+      "status": "working"
+    }
+  ],
+  "summary": {
+    "task_count": 1,
+    "commit_count": 1,
+    "session_count": 1
+  }
+}
+```
+
+**Example:**
+
+```bash
+curl 'localhost:5001/api/v1/agents/activity?uuid=abc-123&since=2026-04-15T10:00:00Z'
+eits agents activity abc-123 --since 24h
+```
+
+---
+
+### GET /api/v1/agents
+
+List agents with optional filtering by project, status, or activity recency.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `project_id` | integer | no | Filter to agents in a specific project |
+| `status` | string | no | Filter by status (e.g. `"working"`, `"idle"`) |
+| `active_since` | string | no | ISO 8601 datetime. Returns only agents with session activity at or after this time |
+| `limit` | integer | no | Max results (default 20) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "agents": [
+    {
+      "id": 1,
+      "uuid": "agent-uuid",
+      "name": "code-review-agent",
+      "status": "working",
+      "type": "general-purpose",
+      "created_at": "2026-04-10T10:00:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl 'localhost:5001/api/v1/agents?project_id=1&limit=10'
+curl 'localhost:5001/api/v1/agents?active_since=2026-04-15T10:00:00Z'
+eits agents list --active-since 24h
 ```
 
 ---
@@ -587,6 +729,49 @@ List all registered push subscriptions for the current user.
 
 ---
 
+### GET /api/v1/messages/search
+
+Search messages across all sessions with optional filtering.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `q` | string | yes | Search query (full-text search on message body) |
+| `session_id` | string or integer | no | Filter to messages from a specific session (UUID or integer ID) |
+| `limit` | integer | no | Max results (default 10, max 100) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "query": "authentication bug",
+  "count": 2,
+  "messages": [
+    {
+      "id": 123,
+      "session_id": 42,
+      "session_uuid": "session-uuid",
+      "session_name": "fix auth",
+      "role": "agent",
+      "body_excerpt": "Found the authentication bug in the oauth flow...",
+      "inserted_at": "2026-04-20T10:30:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl 'localhost:5001/api/v1/messages/search?q=authentication%20bug&limit=20'
+curl 'localhost:5001/api/v1/messages/search?q=oauth&session_id=42'
+eits messages search "auth bug" --limit 20
+```
+
+---
+
 ### GET /api/v1/dm
 
 List inbound messages (DMs) to a session with optional sender filtering.
@@ -670,14 +855,18 @@ Messages can only be delivered to sessions with `status` in `["working", "idle"]
 
 ```json
 {
-  "id": 123,
+  "success": true,
+  "reachable": true,
+  "message": "DM delivered to session 42",
+  "message_id": "123",
+  "message_uuid": "msg-uuid",
   "from_session_id": 40,
   "to_session_id": 42,
-  "body": "Looking at the error logs...",
-  "from_session_uuid": "abc-123",
   "inserted_at": "2026-03-17T10:30:00Z"
 }
 ```
+
+`reachable: true` indicates the target session is in a receivable status (`working` or `idle`). Future implementations may support queuing to `waiting` sessions.
 
 **Message body format sent to agent:**
 
@@ -868,6 +1057,43 @@ Create a new channel.
 
 ```bash
 eits channels create --name "dev-updates" --project 1 --description "Development updates"
+```
+
+---
+
+### GET /api/v1/channels/:channel_id/members
+
+List members of a channel with their session information.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `channel_id` | string | Channel ID |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "channel_id": 1,
+  "members": [
+    {
+      "session_id": 42,
+      "session_uuid": "session-uuid",
+      "session_name": "code-review",
+      "role": "member",
+      "joined_at": "2026-04-10T10:30:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/channels/1/members
+eits channels members 1
 ```
 
 ---
@@ -1188,6 +1414,58 @@ eits teams broadcast 1 --body "Deploying release v2.0 in 10 minutes"
 
 ---
 
+### GET /api/v1/tasks
+
+List tasks with optional filtering by project, session, agent, tag, or search query.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `project_id` | integer | no | Filter to tasks in a specific project |
+| `session_id` | string or integer | no | Filter to tasks for a specific session (UUID or integer ID) |
+| `created_by_session_id` | string or integer | no | Filter to tasks created by a specific session |
+| `agent_id` | string or integer | no | Filter to tasks assigned to an agent |
+| `tag_id` | integer | no | Filter to tasks with a specific tag ID |
+| `q` | string | no | Full-text search query (searches task titles, descriptions, body) |
+| `state_id` | integer | no | Filter by workflow state ID |
+| `limit` | integer | no | Max results (default 50) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "2 task(s)",
+  "tasks": [
+    {
+      "id": 1,
+      "uuid": "task-uuid",
+      "title": "Fix auth bug",
+      "state": "In Progress",
+      "state_id": 2,
+      "description": "OAuth flow is broken",
+      "project_id": 1,
+      "priority": "high",
+      "created_at": "2026-04-10T10:00:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl 'localhost:5001/api/v1/tasks?project_id=1&limit=20'
+curl 'localhost:5001/api/v1/tasks?tag_id=1'
+curl 'localhost:5001/api/v1/tasks?q=auth&state_id=2'
+curl 'localhost:5001/api/v1/tasks?session_id=42'
+eits tasks list --project 1
+eits tasks list --tag 5
+```
+
+---
+
 ### POST /api/v1/tasks/search
 
 Search for tasks across projects with optional filtering.
@@ -1277,6 +1555,44 @@ Get all sessions linked to a task.
 
 ```bash
 eits tasks sessions 1
+```
+
+---
+
+### GET /api/v1/tags
+
+List all tags in the system with optional name search.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `q` | string | no | Filter tags by name (case-insensitive substring match) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "tags": [
+    {
+      "id": 1,
+      "name": "bug"
+    },
+    {
+      "id": 2,
+      "name": "feature"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/tags
+curl 'localhost:5001/api/v1/tags?q=bug'
+eits tags list
 ```
 
 ---

@@ -116,9 +116,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TimerController do
   defp resolve_delay(%{"delay_ms" => raw}) when is_integer(raw), do: validate_delay(raw)
 
   defp resolve_delay(%{"delay_ms" => raw}) when is_binary(raw) do
-    case Integer.parse(raw) do
-      {n, ""} -> validate_delay(n)
-      _ -> {:error, :bad_request, "delay_ms must be an integer"}
+    case ToolHelpers.parse_int(raw) do
+      nil -> {:error, :bad_request, "delay_ms must be an integer"}
+      n -> validate_delay(n)
     end
   end
 

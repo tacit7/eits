@@ -2,6 +2,7 @@ defmodule EyeInTheSky.Messages.NotifyListener do
   use GenServer
   require Logger
   alias EyeInTheSky.{Events, Repo}
+  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Messages.Message
 
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -25,7 +26,7 @@ defmodule EyeInTheSky.Messages.NotifyListener do
 
   @impl true
   def handle_info({:notification, _pid, _ref, "messages_inserted", payload}, state) do
-    with {id, ""} <- Integer.parse(payload),
+    with id when is_integer(id) <- ToolHelpers.parse_int(payload),
          %Message{} = msg <- Repo.get(Message, id) do
       broadcast(msg)
     else

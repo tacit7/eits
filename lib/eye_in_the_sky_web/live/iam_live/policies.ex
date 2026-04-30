@@ -9,6 +9,8 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
   """
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.Policy
 
@@ -56,8 +58,11 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
   end
 
   def handle_event("toggle", %{"id" => id, "enabled" => enabled}, socket) do
-    case Integer.parse(id) do
-      {id_int, ""} ->
+    case parse_int(id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid policy ID.")}
+
+      id_int ->
         desired = enabled in ["true", "on", true]
         {_count, _} = IAM.bulk_toggle_enabled([id_int], desired)
 
@@ -65,14 +70,11 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
          socket
          |> put_flash(:info, "Policy #{if desired, do: "enabled", else: "disabled"}.")
          |> assign_policies()}
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid policy ID.")}
     end
   end
 
   def handle_event("delete", %{"id" => id}, socket) do
-    with {int_id, ""} <- Integer.parse(id),
+    with int_id when is_integer(int_id) <- parse_int(id),
          {:ok, %Policy{} = policy} <- IAM.get_policy(int_id),
          :ok <- refuse_system_delete(policy),
          {:ok, _} <- IAM.delete_policy(policy) do

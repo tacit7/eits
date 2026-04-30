@@ -2,6 +2,8 @@ defmodule EyeInTheSky.Tasks.WorkflowState do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias EyeInTheSky.Utils.ToolHelpers
+
   # Workflow state IDs matching the workflow_states table
   @todo_id 1
   @in_progress_id 2
@@ -43,15 +45,15 @@ defmodule EyeInTheSky.Tasks.WorkflowState do
   def resolve_alias(nil), do: {:error, :no_alias}
 
   def resolve_alias(input) when is_binary(input) do
-    case Integer.parse(input) do
-      {_, ""} ->
-        {:error, :no_alias}
-
-      _ ->
+    case ToolHelpers.parse_int(input) do
+      nil ->
         case Map.get(@aliases, String.downcase(input)) do
           nil -> {:error, :invalid_alias}
           name -> {:ok, name}
         end
+
+      _ ->
+        {:error, :no_alias}
     end
   end
 

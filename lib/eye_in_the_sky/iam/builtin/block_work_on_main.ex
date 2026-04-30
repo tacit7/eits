@@ -9,6 +9,8 @@ defmodule EyeInTheSky.IAM.Builtin.BlockWorkOnMain do
 
   @behaviour EyeInTheSky.IAM.BuiltinMatcher
 
+  require Logger
+
   alias EyeInTheSky.IAM.Context
   alias EyeInTheSky.IAM.Policy
 
@@ -43,7 +45,9 @@ defmodule EyeInTheSky.IAM.Builtin.BlockWorkOnMain do
         end
     end
   rescue
-    _ -> nil
+    e in ErlangError ->
+      Logger.warning("BlockWorkOnMain: failed to determine current branch in #{cwd}: #{inspect(e)}")
+      nil
   end
 
   defp protected_branches(%Policy{condition: %{} = cond}) do

@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   import EyeInTheSkyWeb.Helpers.FileHelpers,
     only: [detect_file_type: 1, language_class: 1, binary_file?: 1, build_file_tree: 2, build_file_listing: 2, build_file_listing: 3]
 
@@ -31,8 +33,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       |> assign(:error, nil)
       |> assign(:subscribed_editor_id, nil)
 
-    case Integer.parse(id) do
-      {project_id, ""} ->
+    case parse_int(id) do
+      nil ->
+        {:ok,
+         socket
+         |> assign(:page_title, "Project Not Found")
+         |> assign(:project, nil)
+         |> assign(:error, "Invalid project ID")
+         |> put_flash(:error, "Invalid project ID")}
+
+      project_id ->
         project = Projects.get_project!(project_id)
 
         socket =
@@ -64,14 +74,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           end
 
         {:ok, socket}
-
-      _ ->
-        {:ok,
-         socket
-         |> assign(:page_title, "Project Not Found")
-         |> assign(:project, nil)
-         |> assign(:error, "Invalid project ID")
-         |> put_flash(:error, "Invalid project ID")}
     end
   end
 

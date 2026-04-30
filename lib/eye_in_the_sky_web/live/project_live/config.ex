@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Config do
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Helpers.FileHelpers, only: [detect_file_type: 1]
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers
   import EyeInTheSkyWeb.Components.ConfigBrowser
@@ -11,11 +12,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    project_id =
-      case Integer.parse(id) do
-        {int, ""} -> int
-        _ -> nil
-      end
+    project_id = parse_int(id)
 
     socket =
       socket

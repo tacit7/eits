@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Notes, Tasks, Teams}
+  alias EyeInTheSky.{Notes, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -453,8 +453,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         :ok
     end
   end
-
-  defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
 
   defp parse_task_id(id) when is_binary(id), do: Helpers.parse_int(id) || id
   defp parse_task_id(id), do: id

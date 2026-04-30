@@ -454,8 +454,6 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
   end
 
-  defp resolve_agent_int_id(uuid), do: resolve_id(uuid, &Agents.get_agent_by_uuid/1)
-
   defp maybe_put_read_only(attrs, nil), do: attrs
   defp maybe_put_read_only(attrs, ""), do: attrs
   defp maybe_put_read_only(attrs, val) when val in [true, "true", "1", 1], do: Map.put(attrs, :read_only, true)

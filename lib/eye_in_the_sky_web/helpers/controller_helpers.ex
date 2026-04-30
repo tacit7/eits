@@ -87,4 +87,7 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
       _ -> :error
     end
   end
+
+  @doc "Resolves an agent UUID/integer to an integer agent ID. Returns nil if not found."
+  def resolve_agent_int_id(uuid), do: resolve_id(uuid, &EyeInTheSky.Agents.get_agent_by_uuid/1)
 end

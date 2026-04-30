@@ -230,6 +230,26 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
 
   defp anthropic_section(assigns) do
     ~H"""
+    <.anthropic_execution scope={@scope} />
+    <.divider />
+    <.anthropic_output scope={@scope} />
+    <.divider />
+    <.anthropic_scripting scope={@scope} />
+    <.divider />
+    <.anthropic_paths scope={@scope} />
+    <.divider />
+    <.anthropic_prompt scope={@scope} />
+    <.divider />
+    <.anthropic_debug scope={@scope} />
+    <.divider />
+    <.anthropic_safety scope={@scope} />
+    """
+  end
+
+  attr :scope, :string, required: true
+
+  defp anthropic_execution(assigns) do
+    ~H"""
     <.section title="Execution">
       <.row
         label="Permission mode"
@@ -270,9 +290,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.text_input key="anthropic.from_pr" scope={@scope} value="" placeholder="owner/repo#123" />
       </.row>
     </.section>
+    """
+  end
 
-    <.divider />
+  attr :scope, :string, required: true
 
+  defp anthropic_output(assigns) do
+    ~H"""
     <.section title="Output">
       <.row
         label="JSON schema"
@@ -282,9 +306,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.text_input key="anthropic.json_schema" scope={@scope} value="" placeholder="path or inline" />
       </.row>
     </.section>
+    """
+  end
 
-    <.divider />
+  attr :scope, :string, required: true
 
+  defp anthropic_scripting(assigns) do
+    ~H"""
     <.section title="Scripting">
       <.row
         label="Allowed tools"
@@ -306,9 +334,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.text_input key="anthropic.permission_prompt_tool" scope={@scope} value="" />
       </.row>
     </.section>
+    """
+  end
 
-    <.divider />
+  attr :scope, :string, required: true
 
+  defp anthropic_paths(assigns) do
+    ~H"""
     <.section title="Paths">
       <.row
         label="Add directory"
@@ -346,9 +378,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.text_input key="anthropic.agents_json" scope={@scope} value="" />
       </.row>
     </.section>
+    """
+  end
 
-    <.divider />
+  attr :scope, :string, required: true
 
+  defp anthropic_prompt(assigns) do
+    ~H"""
     <.section title="System prompt & agent type">
       <.row
         label="agent"
@@ -391,10 +427,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.text_input key="anthropic.append_system_prompt_file" scope={@scope} value="" />
       </.row>
     </.section>
+    """
+  end
 
-    <.divider />
+  attr :scope, :string, required: true
 
-    <.section title="Debug & safety">
+  defp anthropic_debug(assigns) do
+    ~H"""
+    <.section title="Debug">
       <.row
         label="Debug categories"
         help="--debug"
@@ -423,6 +463,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       >
         <.toggle key="anthropic.include_partial_messages" scope={@scope} checked={false} />
       </.row>
+    </.section>
+    """
+  end
+
+  attr :scope, :string, required: true
+
+  defp anthropic_safety(assigns) do
+    ~H"""
+    <.section title="Safety">
       <.row
         label="No session persistence"
         help="--no-session-persistence"

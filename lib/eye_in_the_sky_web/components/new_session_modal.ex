@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [models_for_provider: 1]
   import EyeInTheSkyWeb.Helpers.ModelHelpers, only: [normalize_model_alias: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  import EyeInTheSkyWeb.Components.CliFlags, only: [path_fields: 1, boolean_flags: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
   alias EyeInTheSky.Projects
@@ -486,92 +487,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           />
         </div>
 
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">Add Directory</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">
-              --add-dir
-            </span>
-          </label>
-          <input
-            type="text"
-            name="add_dir"
-            placeholder="/path/to/shared-lib"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">MCP Config File</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">
-              --mcp-config
-            </span>
-          </label>
-          <input
-            type="text"
-            name="mcp_config"
-            placeholder="./mcp-servers.json"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">Plugin Directory</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">
-              --plugin-dir
-            </span>
-          </label>
-          <input
-            type="text"
-            name="plugin_dir"
-            placeholder="./my-plugins"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">Settings File</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">
-              --settings
-            </span>
-          </label>
-          <input
-            type="text"
-            name="settings_file"
-            placeholder="./settings.json"
-            class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-          />
-        </div>
-
-        <div class="flex flex-col gap-1 pt-1">
-          <label class="label cursor-pointer justify-start gap-2 py-1">
-            <input
-              type="checkbox"
-              name="chrome"
-              value="true"
-              class="checkbox checkbox-sm checkbox-primary"
-            />
-            <span class="label-text text-xs">
-              Chrome integration
-              <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
-            </span>
-          </label>
-          <label class="label cursor-pointer justify-start gap-2 py-1">
-            <input
-              type="checkbox"
-              name="sandbox"
-              value="true"
-              class="checkbox checkbox-sm checkbox-primary"
-            />
-            <span class="label-text text-xs">
-              OS sandbox isolation
-              <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
-            </span>
-          </label>
-        </div>
+        <.path_fields />
+        <.boolean_flags />
       </div>
     </div>
     """

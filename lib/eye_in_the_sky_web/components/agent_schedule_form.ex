@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
+  import EyeInTheSkyWeb.Components.CliFlags, only: [path_fields: 1, boolean_flags: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [claude_models: 0]
   import EyeInTheSkyWeb.Live.Shared.JobsFormatters, only: [system_timezone: 0]
 
@@ -361,12 +362,14 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           allowed_tools={@config["allowed_tools"]}
         />
         <.path_fields
+          scope="schedule"
           add_dir={@config["add_dir"]}
           mcp_config={@config["mcp_config"]}
           plugin_dir={@config["plugin_dir"]}
           settings_file={@config["settings_file"]}
         />
         <.boolean_flags
+          scope="schedule"
           skip_permissions={@config["skip_permissions"]}
           chrome={@config["chrome"]}
           sandbox={@config["sandbox"]}
@@ -476,122 +479,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     """
   end
 
-  attr :add_dir, :string, required: true
-  attr :mcp_config, :string, required: true
-  attr :plugin_dir, :string, required: true
-  attr :settings_file, :string, required: true
 
-  defp path_fields(assigns) do
-    ~H"""
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text text-xs">Add Directory</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
-      </label>
-      <input
-        type="text"
-        name="schedule[add_dir]"
-        value={@add_dir}
-        placeholder="/path/to/shared-lib"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-      />
-    </div>
-
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text text-xs">MCP Config File</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
-      </label>
-      <input
-        type="text"
-        name="schedule[mcp_config]"
-        value={@mcp_config}
-        placeholder="./mcp-servers.json"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-      />
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text text-xs">Plugin Directory</span>
-          <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
-        </label>
-        <input
-          type="text"
-          name="schedule[plugin_dir]"
-          value={@plugin_dir}
-          placeholder="./my-plugins"
-          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-        />
-      </div>
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text text-xs">Settings File</span>
-          <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
-        </label>
-        <input
-          type="text"
-          name="schedule[settings_file]"
-          value={@settings_file}
-          placeholder="./settings.json"
-          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-        />
-      </div>
-    </div>
-    """
-  end
-
-  attr :skip_permissions, :boolean, required: true
-  attr :chrome, :boolean, required: true
-  attr :sandbox, :boolean, required: true
-
-  defp boolean_flags(assigns) do
-    ~H"""
-    <div class="flex flex-col gap-1 pt-1">
-      <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input
-          type="checkbox"
-          name="schedule[skip_permissions]"
-          value="true"
-          checked={@skip_permissions}
-          class="checkbox checkbox-sm checkbox-primary"
-        />
-        <span class="label-text text-xs">
-          Skip permissions
-          <span class="font-mono text-base-content/40 text-xs ml-1">
-            --dangerously-skip-permissions
-          </span>
-        </span>
-      </label>
-      <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input
-          type="checkbox"
-          name="schedule[chrome]"
-          value="true"
-          checked={@chrome}
-          class="checkbox checkbox-sm checkbox-primary"
-        />
-        <span class="label-text text-xs">
-          Chrome integration <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
-        </span>
-      </label>
-      <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input
-          type="checkbox"
-          name="schedule[sandbox]"
-          value="true"
-          checked={@sandbox}
-          class="checkbox checkbox-sm checkbox-primary"
-        />
-        <span class="label-text text-xs">
-          OS sandbox isolation
-          <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
-        </span>
-      </label>
-    </div>
-    """
-  end
 
   defp decode_job_config(raw) when is_map(raw), do: raw
 

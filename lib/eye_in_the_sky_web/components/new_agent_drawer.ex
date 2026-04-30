@@ -133,349 +133,379 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
             </.form_field>
             
     <!-- Advanced CLI Flags -->
-            <div class="collapse collapse-arrow bg-base-200 rounded-lg">
-              <input type="checkbox" class="min-h-0" />
-              <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
-                <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced
-              </div>
-              <div class="collapse-content px-3 pb-3 space-y-3">
-
-                <!-- Execution -->
-                <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Execution</p>
-
-                <div class="form-control">
-                  <label class="label"><span class="label-text text-xs">Permission Mode</span></label>
-                  <select name="permission_mode" class="select select-bordered select-sm w-full">
-                    <option value="">Default</option>
-                    <option value="acceptEdits">acceptEdits — auto-accept file edits</option>
-                    <option value="bypassPermissions">bypassPermissions — skip all prompts</option>
-                    <option value="dontAsk">dontAsk — never ask for confirmation</option>
-                    <option value="plan">plan — read-only, no file changes</option>
-                  </select>
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Max Turns</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="max_turns"
-                    min="1"
-                    placeholder="unlimited"
-                    class="input input-bordered input-sm w-full font-mono min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Fallback Model</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--fallback-model</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="fallback_model"
-                    placeholder="e.g., claude-sonnet-4-6"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">From PR</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--from-pr</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="from_pr"
-                    min="1"
-                    placeholder="PR number"
-                    class="input input-bordered input-sm w-full font-mono min-h-[44px]"
-                  />
-                </div>
-
-                <!-- Output / Print Mode -->
-                <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Output / Print Mode</p>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Output Format</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--output-format</span>
-                  </label>
-                  <select name="output_format" class="select select-bordered select-sm w-full">
-                    <option value="">Default (text)</option>
-                    <option value="text">text</option>
-                    <option value="json">json — structured results + metadata</option>
-                    <option value="stream-json">stream-json — real-time streaming</option>
-                  </select>
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Input Format</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--input-format</span>
-                  </label>
-                  <select name="input_format" class="select select-bordered select-sm w-full">
-                    <option value="">Default (text)</option>
-                    <option value="text">text</option>
-                    <option value="stream-json">stream-json</option>
-                  </select>
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">JSON Schema</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--json-schema</span>
-                  </label>
-                  <textarea
-                    name="json_schema"
-                    rows="3"
-                    placeholder='{"type":"object","properties":{"result":{"type":"string"}}}'
-                    class="textarea textarea-bordered textarea-sm w-full font-mono text-xs"
-                  ></textarea>
-                </div>
-
-                <!-- Scripting -->
-                <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Scripting</p>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Allowed Tools</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--allowedTools</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="allowed_tools"
-                    placeholder='Bash(git *) Read Edit'
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Permission Prompt Tool</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-prompt-tool</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="permission_prompt_tool"
-                    placeholder="mcp__server__tool_name"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <!-- Paths -->
-                <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Paths</p>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Add Directory</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="add_dir"
-                    placeholder="/path/to/shared-lib"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">MCP Config File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="mcp_config"
-                    placeholder="./mcp-servers.json"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Plugin Directory</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="plugin_dir"
-                    placeholder="./my-plugins"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Settings File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="settings_file"
-                    placeholder="./settings.json"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Agents JSON</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--agents</span>
-                  </label>
-                  <textarea
-                    name="agents_json"
-                    rows="3"
-                    placeholder='[{"name":"reviewer","system_prompt":"..."}]'
-                    class="textarea textarea-bordered textarea-sm w-full font-mono text-xs"
-                  ></textarea>
-                </div>
-
-                <!-- System Prompt -->
-                <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">System Prompt</p>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Agent Persona</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--agent</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="agent_flag"
-                    placeholder="named agent persona"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">System Prompt</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--system-prompt</span>
-                  </label>
-                  <textarea
-                    name="system_prompt"
-                    rows="3"
-                    placeholder="Replaces the default system prompt..."
-                    class="textarea textarea-bordered textarea-sm w-full text-xs"
-                  ></textarea>
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">System Prompt File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--system-prompt-file</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="system_prompt_file"
-                    placeholder="./system.md"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Append System Prompt</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--append-system-prompt</span>
-                  </label>
-                  <textarea
-                    name="append_system_prompt"
-                    rows="3"
-                    placeholder="Appended to the default system prompt..."
-                    class="textarea textarea-bordered textarea-sm w-full text-xs"
-                  ></textarea>
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Append System Prompt File</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--append-system-prompt-file</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="append_system_prompt_file"
-                    placeholder="./extra-rules.md"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <!-- Debug & Safety -->
-                <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Debug & Safety</p>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text text-xs">Debug Categories</span>
-                    <span class="label-text-alt text-base-content/40 font-mono text-xs">--debug</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="debug"
-                    placeholder="api hooks"
-                    class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-                  />
-                </div>
-
-                <div class="flex flex-col gap-1 pt-1">
-                  <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="bare" value="true" class="checkbox checkbox-sm checkbox-primary" />
-                    <span class="label-text text-xs">
-                      Bare mode — skip hook/skill/MCP discovery
-                      <span class="font-mono text-base-content/40 text-xs ml-1">--bare</span>
-                    </span>
-                  </label>
-                  <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="verbose" value="true" class="checkbox checkbox-sm checkbox-primary" />
-                    <span class="label-text text-xs">
-                      Verbose output
-                      <span class="font-mono text-base-content/40 text-xs ml-1">--verbose</span>
-                    </span>
-                  </label>
-                  <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="include_partial_messages" value="true" class="checkbox checkbox-sm checkbox-primary" />
-                    <span class="label-text text-xs">
-                      Include partial messages
-                      <span class="font-mono text-base-content/40 text-xs ml-1">--include-partial-messages</span>
-                    </span>
-                  </label>
-                  <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="no_session_persistence" value="true" class="checkbox checkbox-sm checkbox-primary" />
-                    <span class="label-text text-xs">
-                      No session persistence
-                      <span class="font-mono text-base-content/40 text-xs ml-1">--no-session-persistence</span>
-                    </span>
-                  </label>
-                  <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="chrome" value="true" class="checkbox checkbox-sm checkbox-primary" />
-                    <span class="label-text text-xs">
-                      Chrome integration
-                      <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
-                    </span>
-                  </label>
-                  <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="sandbox" value="true" class="checkbox checkbox-sm checkbox-primary" />
-                    <span class="label-text text-xs">
-                      OS sandbox isolation
-                      <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
-                    </span>
-                  </label>
-                  <label class="label cursor-pointer justify-start gap-2 py-1">
-                    <input type="checkbox" name="dangerously_skip_permissions" value="true" class="checkbox checkbox-sm checkbox-error" />
-                    <span class="label-text text-xs">
-                      <span class="text-error">Dangerously skip permissions</span>
-                      <span class="font-mono text-base-content/40 text-xs ml-1">--dangerously-skip-permissions</span>
-                    </span>
-                  </label>
-                </div>
-              </div>
-            </div>
+            <.advanced_section />
             
     <!-- Actions -->
             <.form_actions submit_text="Create Agent" cancel_event={@toggle_event} class="mt-4" />
           </form>
         </div>
       </div>
+    </div>
+    """
+  end
+
+  defp advanced_section(assigns) do
+    ~H"""
+    <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+      <input type="checkbox" class="min-h-0" />
+      <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
+        <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced
+      </div>
+      <div class="collapse-content px-3 pb-3 space-y-3">
+        <.advanced_execution />
+        <.advanced_output />
+        <.advanced_scripting />
+        <.advanced_paths />
+        <.advanced_system_prompt />
+        <.advanced_debug_safety />
+      </div>
+    </div>
+    """
+  end
+
+  defp advanced_execution(assigns) do
+    ~H"""
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Execution</p>
+
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Permission Mode</span></label>
+      <select name="permission_mode" class="select select-bordered select-sm w-full">
+        <option value="">Default</option>
+        <option value="acceptEdits">acceptEdits — auto-accept file edits</option>
+        <option value="bypassPermissions">bypassPermissions — skip all prompts</option>
+        <option value="dontAsk">dontAsk — never ask for confirmation</option>
+        <option value="plan">plan — read-only, no file changes</option>
+      </select>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Max Turns</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
+      </label>
+      <input
+        type="number"
+        name="max_turns"
+        min="1"
+        placeholder="unlimited"
+        class="input input-bordered input-sm w-full font-mono min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Fallback Model</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--fallback-model</span>
+      </label>
+      <input
+        type="text"
+        name="fallback_model"
+        placeholder="e.g., claude-sonnet-4-6"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">From PR</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--from-pr</span>
+      </label>
+      <input
+        type="number"
+        name="from_pr"
+        min="1"
+        placeholder="PR number"
+        class="input input-bordered input-sm w-full font-mono min-h-[44px]"
+      />
+    </div>
+    """
+  end
+
+  defp advanced_output(assigns) do
+    ~H"""
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Output / Print Mode</p>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Output Format</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--output-format</span>
+      </label>
+      <select name="output_format" class="select select-bordered select-sm w-full">
+        <option value="">Default (text)</option>
+        <option value="text">text</option>
+        <option value="json">json — structured results + metadata</option>
+        <option value="stream-json">stream-json — real-time streaming</option>
+      </select>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Input Format</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--input-format</span>
+      </label>
+      <select name="input_format" class="select select-bordered select-sm w-full">
+        <option value="">Default (text)</option>
+        <option value="text">text</option>
+        <option value="stream-json">stream-json</option>
+      </select>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">JSON Schema</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--json-schema</span>
+      </label>
+      <textarea
+        name="json_schema"
+        rows="3"
+        placeholder='{"type":"object","properties":{"result":{"type":"string"}}}'
+        class="textarea textarea-bordered textarea-sm w-full font-mono text-xs"
+      ></textarea>
+    </div>
+    """
+  end
+
+  defp advanced_scripting(assigns) do
+    ~H"""
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Scripting</p>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Allowed Tools</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--allowedTools</span>
+      </label>
+      <input
+        type="text"
+        name="allowed_tools"
+        placeholder='Bash(git *) Read Edit'
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Permission Prompt Tool</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-prompt-tool</span>
+      </label>
+      <input
+        type="text"
+        name="permission_prompt_tool"
+        placeholder="mcp__server__tool_name"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+    """
+  end
+
+  defp advanced_paths(assigns) do
+    ~H"""
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Paths</p>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Add Directory</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
+      </label>
+      <input
+        type="text"
+        name="add_dir"
+        placeholder="/path/to/shared-lib"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">MCP Config File</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
+      </label>
+      <input
+        type="text"
+        name="mcp_config"
+        placeholder="./mcp-servers.json"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Plugin Directory</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
+      </label>
+      <input
+        type="text"
+        name="plugin_dir"
+        placeholder="./my-plugins"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Settings File</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
+      </label>
+      <input
+        type="text"
+        name="settings_file"
+        placeholder="./settings.json"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Agents JSON</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--agents</span>
+      </label>
+      <textarea
+        name="agents_json"
+        rows="3"
+        placeholder='[{"name":"reviewer","system_prompt":"..."}]'
+        class="textarea textarea-bordered textarea-sm w-full font-mono text-xs"
+      ></textarea>
+    </div>
+    """
+  end
+
+  defp advanced_system_prompt(assigns) do
+    ~H"""
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">System Prompt</p>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Agent Persona</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--agent</span>
+      </label>
+      <input
+        type="text"
+        name="agent_flag"
+        placeholder="named agent persona"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">System Prompt</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--system-prompt</span>
+      </label>
+      <textarea
+        name="system_prompt"
+        rows="3"
+        placeholder="Replaces the default system prompt..."
+        class="textarea textarea-bordered textarea-sm w-full text-xs"
+      ></textarea>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">System Prompt File</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--system-prompt-file</span>
+      </label>
+      <input
+        type="text"
+        name="system_prompt_file"
+        placeholder="./system.md"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Append System Prompt</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--append-system-prompt</span>
+      </label>
+      <textarea
+        name="append_system_prompt"
+        rows="3"
+        placeholder="Appended to the default system prompt..."
+        class="textarea textarea-bordered textarea-sm w-full text-xs"
+      ></textarea>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Append System Prompt File</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--append-system-prompt-file</span>
+      </label>
+      <input
+        type="text"
+        name="append_system_prompt_file"
+        placeholder="./extra-rules.md"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+    """
+  end
+
+  defp advanced_debug_safety(assigns) do
+    ~H"""
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Debug & Safety</p>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Debug Categories</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--debug</span>
+      </label>
+      <input
+        type="text"
+        name="debug"
+        placeholder="api hooks"
+        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+      />
+    </div>
+
+    <div class="flex flex-col gap-1 pt-1">
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input type="checkbox" name="bare" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <span class="label-text text-xs">
+          Bare mode — skip hook/skill/MCP discovery
+          <span class="font-mono text-base-content/40 text-xs ml-1">--bare</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input type="checkbox" name="verbose" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <span class="label-text text-xs">
+          Verbose output
+          <span class="font-mono text-base-content/40 text-xs ml-1">--verbose</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input type="checkbox" name="include_partial_messages" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <span class="label-text text-xs">
+          Include partial messages
+          <span class="font-mono text-base-content/40 text-xs ml-1">--include-partial-messages</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input type="checkbox" name="no_session_persistence" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <span class="label-text text-xs">
+          No session persistence
+          <span class="font-mono text-base-content/40 text-xs ml-1">--no-session-persistence</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input type="checkbox" name="chrome" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <span class="label-text text-xs">
+          Chrome integration
+          <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input type="checkbox" name="sandbox" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <span class="label-text text-xs">
+          OS sandbox isolation
+          <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
+        </span>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2 py-1">
+        <input type="checkbox" name="dangerously_skip_permissions" value="true" class="checkbox checkbox-sm checkbox-error" />
+        <span class="label-text text-xs">
+          <span class="text-error">Dangerously skip permissions</span>
+          <span class="font-mono text-base-content/40 text-xs ml-1">--dangerously-skip-permissions</span>
+        </span>
+      </label>
     </div>
     """
   end

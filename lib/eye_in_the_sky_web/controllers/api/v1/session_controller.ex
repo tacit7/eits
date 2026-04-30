@@ -112,37 +112,27 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   defp build_update_attrs(params) do
     status = params["status"]
 
-    attrs =
-      %{}
-      |> Helpers.maybe_put(:status, status)
-      |> Helpers.maybe_put(:status_reason, params["status_reason"])
-      |> Helpers.maybe_put(:intent, params["intent"])
-      |> maybe_put_read_only(params["read_only"])
-      |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
-      |> Helpers.maybe_put(:name, params["name"])
-      |> Helpers.maybe_put(:description, params["description"])
-      |> Helpers.maybe_put(:project_id, parse_int(params["project_id"], nil))
-      |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
-
-    attrs =
-      if params["clear_entrypoint"] in [true, "true"] do
-        Map.put(attrs, :entrypoint, nil)
-      else
-        attrs
-      end
-
-    attrs =
-      if status && status != "waiting" && !params["status_reason"] do
-        Map.put(attrs, :status_reason, nil)
-      else
-        attrs
-      end
-
-    if status in Sessions.terminated_statuses() do
-      Map.put(attrs, :ended_at, params["ended_at"] || DateTime.utc_now())
-    else
-      attrs
-    end
+    %{}
+    |> Helpers.maybe_put(:status, status)
+    |> Helpers.maybe_put(:status_reason, params["status_reason"])
+    |> Helpers.maybe_put(:intent, params["intent"])
+    |> maybe_put_read_only(params["read_only"])
+    |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
+    |> Helpers.maybe_put(:name, params["name"])
+    |> Helpers.maybe_put(:description, params["description"])
+    |> Helpers.maybe_put(:project_id, parse_int(params["project_id"], nil))
+    |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
+    |> then(fn a ->
+      if params["clear_entrypoint"] in [true, "true"], do: Map.put(a, :entrypoint, nil), else: a
+    end)
+    |> then(fn a ->
+      if status && status != "waiting" && !params["status_reason"],
+        do: Map.put(a, :status_reason, nil), else: a
+    end)
+    |> then(fn a ->
+      if status in Sessions.terminated_statuses(),
+        do: Map.put(a, :ended_at, params["ended_at"] || DateTime.utc_now()), else: a
+    end)
   end
 
   @doc """

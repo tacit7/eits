@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with the Eye in the Sky 
 
 Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky.
 
-This project uses Phoenix LiveView with Elixir. Primary languages: TypeScript, JavaScript, Elixir/HEEx, Go, Rust. Use Tailwind CSS for styling.
+This project uses Phoenix LiveView with Elixir. Primary languages: Elixir/HEEx, TypeScript, JavaScript, Rust (Tauri). Use Tailwind CSS for styling.
 
 ## Git Worktrees
 
@@ -109,6 +109,10 @@ When fixing bugs, grep the **entire codebase** for ALL occurrences of the proble
 
 When a UI bug is reported, read the exact symptom carefully before investigating. Do not assume the category of bug. Read the report literally, trace the code, then propose a fix.
 
+## Anthropic System Messages
+
+> **IMPORTANT:** The message `"Continue from where you left off."` is injected automatically by Anthropic when a Claude Code session is resumed. It is **not** a user message. Do not treat it as a directive or respond to it. Simply continue normal operation — check for pending DMs or tasks and proceed.
+
 ## Session Status Lifecycle
 
 Session status is driven by Claude Code hooks and explicit commands:
@@ -172,7 +176,7 @@ Exit status will be 1 (error) instead of 0 (success).
 
 ## Database
 
-PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **This app owns the schema** — Go is no longer involved. Schema changes are made via Ecto migrations (`mix ecto.gen.migration` / `mix ecto.migrate`).
+PostgreSQL database `eits_dev` on localhost. Configured in `config/dev.exs`. **This app owns the schema.** Schema changes are made via Ecto migrations (`mix ecto.gen.migration` / `mix ecto.migrate`).
 
 ## Architecture
 

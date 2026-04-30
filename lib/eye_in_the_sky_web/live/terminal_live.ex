@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.TerminalLive do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -51,6 +52,12 @@ defmodule EyeInTheSkyWeb.TerminalLive do
 
     {:noreply, socket}
   end
+
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
+
+  # Ignore events from shared components (command palette search, etc.)
+  def handle_event(_event, _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_info({:pty_output, data}, socket) do

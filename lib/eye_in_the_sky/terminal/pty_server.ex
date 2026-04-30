@@ -8,6 +8,21 @@ defmodule EyeInTheSky.Terminal.PtyServer do
     `{:pty_output, data}` messages.
   - The process exits (and takes the OS child with it) when the LiveView
     disconnects or `stop/1` is called.
+
+  ## erlexec gotchas on macOS
+
+  - Pass the command as a **list** (not a string). A string triggers `m_shell=true`
+    in erlexec's C port, wrapping the command as `$SHELL -c "cmd"`. That causes
+    bash to be run as a sub-shell of sh -c, which exits immediately.
+
+  - Include `:stdin` in the opts. Without it, erlexec defaults stdin to /dev/null.
+    Bash reads EOF and exits cleanly (code 0) before accepting any input.
+
+  - `{:winsz, {rows, cols}}` is a valid exec:run option (2-element nested tuple),
+    but we call :exec.winsz/3 after spawn instead to keep the opts list simpler.
+
+  - When bash exits with code 0, erlexec sends `{:DOWN, os_pid, :process, lwp, :normal}`
+    (not `{:exit_status, 0}`). The `:normal` clause handles this case.
   """
 
   use GenServer, restart: :temporary
@@ -16,7 +31,7 @@ defmodule EyeInTheSky.Terminal.PtyServer do
 
   @default_cols 220
   @default_rows 50
-  @shell System.find_executable("bash") || "/bin/bash"
+  @shell_bin System.find_executable("bash") || "/bin/bash"
 
   # --- Public API ---
 
@@ -43,23 +58,35 @@ defmodule EyeInTheSky.Terminal.PtyServer do
     # Monitor the LiveView so we clean up when it dies.
     Process.monitor(subscriber)
 
+    home = System.get_env("HOME", "/tmp")
+
     env = [
       {"TERM", "xterm-256color"},
       {"LANG", "en_US.UTF-8"},
-      {"HOME", System.get_env("HOME", "/tmp")}
+      {"HOME", home},
+      {"PATH", System.get_env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")},
+      {"SHELL", @shell_bin},
+      {"USER", System.get_env("USER", "user")},
+      {"LOGNAME", System.get_env("LOGNAME", System.get_env("USER", "user"))}
     ]
 
+    # List form → direct exec (no sh -c wrapping).
+    # --norc --noprofile: skip init files that might exit early.
+    # -i: force interactive mode so bash shows a prompt and reads stdin.
+    shell_cmd = [@shell_bin, "--norc", "--noprofile", "-i"]
+
     opts = [
-      {:stdout, self()},
-      {:stderr, :stdout},
+      :stdin,             # CRITICAL: without this erlexec defaults stdin to /dev/null
+      {:stdout, self()},  # deliver PTY output as {:stdout, os_pid, data}
+      {:stderr, :stdout}, # merge stderr into stdout stream
       :pty,
       {:env, env},
       :monitor
     ]
 
-    case :exec.run(@shell, opts) do
-      {:ok, _pid, os_pid} ->
-        # Set initial window size after spawn — winsz is not a valid exec:run option
+    case :exec.run(shell_cmd, opts) do
+      {:ok, _erlang_pid, os_pid} ->
+        # Set initial window size — winsz is not a valid exec:run option
         :exec.winsz(os_pid, rows, cols)
         {:ok, %{subscriber: subscriber, os_pid: os_pid, cols: cols, rows: rows}}
 
@@ -87,8 +114,14 @@ defmodule EyeInTheSky.Terminal.PtyServer do
     {:noreply, state}
   end
 
-  # Process exited
+  # erlexec: OS process exited with non-zero status
   def handle_info({:DOWN, _ref, :process, _pid, {:exit_status, _code}}, state) do
+    send(state.subscriber, :pty_exited)
+    {:stop, :normal, state}
+  end
+
+  # erlexec: OS process exited cleanly (exit code 0 → :normal via erlexec's ospid_loop)
+  def handle_info({:DOWN, os_pid, :process, _lwp, :normal}, %{os_pid: os_pid} = state) do
     send(state.subscriber, :pty_exited)
     {:stop, :normal, state}
   end

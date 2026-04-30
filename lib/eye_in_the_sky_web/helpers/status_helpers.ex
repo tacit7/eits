@@ -132,21 +132,21 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   defp status_label("failed_retry_exhausted"), do: "Failed"
   defp status_label(s), do: s
 
-  defp status_to_badge("working"), do: "badge-success"
-  defp status_to_badge("compacting"), do: "badge-warning"
-  defp status_to_badge("idle"), do: "badge-ghost"
-  defp status_to_badge("idle_stale"), do: "badge-warning badge-outline"
-  defp status_to_badge("idle_dead"), do: "badge-error badge-outline"
-  defp status_to_badge("completed"), do: "badge-ghost"
-  defp status_to_badge("failed"), do: "badge-error"
+  def status_to_badge("working"), do: "badge-success"
+  def status_to_badge("compacting"), do: "badge-warning"
+  def status_to_badge("idle"), do: "badge-ghost"
+  def status_to_badge("idle_stale"), do: "badge-warning badge-outline"
+  def status_to_badge("idle_dead"), do: "badge-error badge-outline"
+  def status_to_badge("completed"), do: "badge-ghost"
+  def status_to_badge("failed"), do: "badge-error"
   # All systemic-failure tiers render red. Rate-limit uses an outline to hint
   # it is recoverable by waiting rather than a dead crash.
-  defp status_to_badge("failed_billing"), do: "badge-error"
-  defp status_to_badge("failed_auth"), do: "badge-error"
-  defp status_to_badge("failed_rate_limit"), do: "badge-error badge-outline"
-  defp status_to_badge("failed_timeout"), do: "badge-error"
-  defp status_to_badge("failed_retry_exhausted"), do: "badge-error"
-  defp status_to_badge(_), do: "badge-ghost"
+  def status_to_badge("failed_billing"), do: "badge-error"
+  def status_to_badge("failed_auth"), do: "badge-error"
+  def status_to_badge("failed_rate_limit"), do: "badge-error badge-outline"
+  def status_to_badge("failed_timeout"), do: "badge-error"
+  def status_to_badge("failed_retry_exhausted"), do: "badge-error"
+  def status_to_badge(_), do: "badge-ghost"
 
   defp render_no_project do
     assigns = %{}

@@ -230,7 +230,7 @@ export const VimNav = {
       isCommandActive(c)
     )
     if (hasDeeper) {
-      this.showWhichKey([...this.buffer], isLeader ? 0 : 300)
+      this.showWhichKey([...this.buffer], isLeader ? 500 : 300)
     } else {
       this.hideWhichKey()
     }

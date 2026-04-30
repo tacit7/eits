@@ -30,12 +30,13 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   """
   def codex_models do
     [
+      "gpt-5.5",
       "gpt-5.4",
-      "gpt-5.2-codex",
-      "gpt-5.1-codex-max",
       "gpt-5.4-mini",
       "gpt-5.3-codex",
+      "gpt-5.2-codex",
       "gpt-5.2",
+      "gpt-5.1-codex-max",
       "gpt-5.1-codex-mini",
       # backward compat for sessions spawned before the unified list
       "gpt-5.1",
@@ -59,7 +60,7 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   Claude defaults remain in the caller (SpawnValidator) to preserve backward-compat
   API behavior — spawning a Claude agent with no model still resolves to "haiku".
   """
-  def default_model("codex"), do: "gpt-5.4"
+  def default_model("codex"), do: "gpt-5.5"
   def default_model("gemini"), do: "gemini-2.5-flash"
 
   @doc """

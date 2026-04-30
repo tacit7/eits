@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   def claude_models do
     [
       {"claude-opus-4-7", "Opus 4.7"},
+      {"claude-opus-4-6", "Opus 4.6"},
       {"claude-opus-4-5-20251101", "Opus 4.5"},
       {"claude-opus-4-1-20250805", "Opus 4.1"},
       {"claude-sonnet-4-6", "Sonnet 4.6"},
@@ -26,7 +27,10 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models_with_meta do
     [
-      {"claude-opus-4-7", "Opus 4.7", "Most capable for complex work · 1M context", "text-warning"},
+      {"claude-opus-4-7", "Opus 4.7", "Most capable for complex work · 1M context",
+       "text-warning"},
+      {"claude-opus-4-6", "Opus 4.6", "Previous generation · 1M context · extended thinking",
+       "text-warning"},
       {"claude-opus-4-5-20251101", "Opus 4.5", "api", "text-warning"},
       {"claude-opus-4-1-20250805", "Opus 4.1", "api", "text-warning"},
       {"claude-sonnet-4-6", "Sonnet 4.6", "Best for everyday tasks", "text-info"},
@@ -40,12 +44,13 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def codex_models do
     [
+      {"gpt-5.5", "GPT-5.5"},
       {"gpt-5.4", "GPT-5.4"},
-      {"gpt-5.2-codex", "GPT-5.2 Codex"},
-      {"gpt-5.1-codex-max", "GPT-5.1 Codex Max"},
       {"gpt-5.4-mini", "GPT-5.4 Mini"},
       {"gpt-5.3-codex", "GPT-5.3 Codex"},
+      {"gpt-5.2-codex", "GPT-5.2 Codex"},
       {"gpt-5.2", "GPT-5.2"},
+      {"gpt-5.1-codex-max", "GPT-5.1 Codex Max"},
       {"gpt-5.1-codex-mini", "GPT-5.1 Codex Mini"}
     ]
   end
@@ -55,12 +60,14 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def codex_models_with_meta do
     [
-      {"gpt-5.4", "GPT-5.4", "Latest frontier agentic coding (default)", "text-warning"},
-      {"gpt-5.2-codex", "GPT-5.2 Codex", "Frontier Codex-optimized", "text-warning"},
-      {"gpt-5.1-codex-max", "GPT-5.1 Codex Max", "Deep reasoning, large context", "text-warning"},
-      {"gpt-5.4-mini", "GPT-5.4 Mini", "Cheaper 5.4 tier", "text-info"},
-      {"gpt-5.3-codex", "GPT-5.3 Codex", "Frontier agentic coding", "text-info"},
+      {"gpt-5.5", "GPT-5.5", "Newest frontier · complex coding, computer use (default)",
+       "text-warning"},
+      {"gpt-5.4", "GPT-5.4", "Flagship frontier for professional work", "text-warning"},
+      {"gpt-5.4-mini", "GPT-5.4 Mini", "Fast and cheap for subagents", "text-info"},
+      {"gpt-5.3-codex", "GPT-5.3 Codex", "Industry-leading coding model", "text-info"},
+      {"gpt-5.2-codex", "GPT-5.2 Codex", "Frontier Codex-optimized", "text-info"},
       {"gpt-5.2", "GPT-5.2", "Long-running agents", "text-info"},
+      {"gpt-5.1-codex-max", "GPT-5.1 Codex Max", "Deep reasoning, large context", "text-success"},
       {"gpt-5.1-codex-mini", "GPT-5.1 Codex Mini", "Cheaper and faster", "text-success"}
     ]
   end
@@ -82,7 +89,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   def gemini_models_with_meta do
     [
       {"gemini-2.5-pro", "Gemini 2.5 Pro", "Most capable Gemini · long context", "text-warning"},
-      {"gemini-2.5-flash", "Gemini 2.5 Flash", "Balanced speed and quality (default)", "text-info"},
+      {"gemini-2.5-flash", "Gemini 2.5 Flash", "Balanced speed and quality (default)",
+       "text-info"},
       {"gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite", "Cheapest and fastest", "text-success"}
     ]
   end
@@ -119,7 +127,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   @doc """
   Returns the default model slug for a provider.
   """
-  def default_model_for("codex"), do: "gpt-5.4"
+  def default_model_for("codex"), do: "gpt-5.5"
   def default_model_for("gemini"), do: "gemini-2.5-flash"
   def default_model_for(_), do: "claude-opus-4-7"
 
@@ -128,7 +136,9 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   including backward-compat short aliases. Falls back to the slug itself.
   """
   def model_display_name(slug) when is_binary(slug) do
-    case Enum.find(claude_models() ++ codex_models() ++ gemini_models(), fn {val, _} -> val == slug end) do
+    case Enum.find(claude_models() ++ codex_models() ++ gemini_models(), fn {val, _} ->
+           val == slug
+         end) do
       {_, label} -> label
       nil -> short_alias_display(slug)
     end

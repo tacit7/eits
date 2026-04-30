@@ -1,5 +1,6 @@
 # docs/ — Documentation Index
 
+- [TERMINAL_PTY.md](TERMINAL_PTY.md) — PTY terminal: erlexec gotchas, data flow, xterm.js hook, supervision, embedding guide
 - [SECURITY.md](SECURITY.md) — Auth, session handling, rate limiting, secrets, transport security
 - [REST_API.md](REST_API.md) — Full API endpoint reference
 - [SETUP.md](SETUP.md) — Project setup guide

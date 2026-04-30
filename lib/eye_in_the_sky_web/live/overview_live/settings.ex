@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
@@ -122,9 +124,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     # Convert seconds to milliseconds for timeout storage; 0 means no timeout
     value =
       if key == "cli_idle_timeout_ms" do
-        case Integer.parse(value) do
-          {secs, _} -> to_string(secs * 1000)
-          :error -> value
+        case parse_int(value) do
+          nil -> value
+          secs -> to_string(secs * 1000)
         end
       else
         value

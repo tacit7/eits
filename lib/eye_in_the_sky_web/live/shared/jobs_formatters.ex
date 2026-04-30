@@ -8,11 +8,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   # ---------------------------------------------------------------------------
 
   def format_schedule(%{schedule_type: "interval", schedule_value: val}) do
-    case Integer.parse(val) do
-      {s, _} when s >= 3600 -> "Every #{div(s, 3600)}h"
-      {s, _} when s >= 60 -> "Every #{div(s, 60)}m"
-      {s, _} -> "Every #{s}s"
-      _ -> val
+    case ToolHelpers.parse_int(val) do
+      nil -> val
+      s when s >= 3600 -> "Every #{div(s, 3600)}h"
+      s when s >= 60 -> "Every #{div(s, 60)}m"
+      s -> "Every #{s}s"
     end
   end
 
@@ -117,9 +117,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   def day_name(n) when is_integer(n), do: Map.get(@days_of_week, n, "?")
 
   def day_name(n) when is_binary(n) do
-    case Integer.parse(n) do
-      {num, _} -> Map.get(@days_of_week, num, "?")
-      _ -> "?"
+    case ToolHelpers.parse_int(n) do
+      nil -> "?"
+      num -> Map.get(@days_of_week, num, "?")
     end
   end
 

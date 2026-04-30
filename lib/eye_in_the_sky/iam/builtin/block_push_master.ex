@@ -12,6 +12,8 @@ defmodule EyeInTheSky.IAM.Builtin.BlockPushMaster do
 
   @behaviour EyeInTheSky.IAM.BuiltinMatcher
 
+  require Logger
+
   alias EyeInTheSky.IAM.Context
   alias EyeInTheSky.IAM.Policy
 
@@ -54,7 +56,9 @@ defmodule EyeInTheSky.IAM.Builtin.BlockPushMaster do
       _ -> false
     end
   rescue
-    _ -> false
+    e in ErlangError ->
+      Logger.warning("BlockPushMaster: failed to determine current branch in #{cwd}: #{inspect(e)}")
+      false
   end
 
   defp current_branch_protected?(_, _), do: false

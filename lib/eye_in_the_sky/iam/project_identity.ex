@@ -21,6 +21,8 @@ defmodule EyeInTheSky.IAM.ProjectIdentity do
   segment, UNC / mount-point awareness.
   """
 
+  require Logger
+
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Projects.Project
   alias EyeInTheSky.Sessions
@@ -85,7 +87,9 @@ defmodule EyeInTheSky.IAM.ProjectIdentity do
       _ -> nil
     end
   rescue
-    _ -> nil
+    e in [DBConnection.ConnectionError, Postgrex.Error] ->
+      Logger.warning("IAM.ProjectIdentity: DB error resolving session #{ref}: #{inspect(e)}")
+      nil
   end
 
   defp resolve_from_session(_), do: nil
@@ -98,7 +102,9 @@ defmodule EyeInTheSky.IAM.ProjectIdentity do
       _ -> nil
     end
   rescue
-    _ -> nil
+    e in [DBConnection.ConnectionError, Postgrex.Error] ->
+      Logger.warning("IAM.ProjectIdentity: DB error resolving path #{path}: #{inspect(e)}")
+      nil
   end
 
   defp resolve_final_symlink(path) do

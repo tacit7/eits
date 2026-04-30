@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
   import EyeInTheSkyWeb.Live.Shared.NotesHelpers
 
@@ -110,13 +111,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
 
     deleted =
       Enum.count(ids, fn id ->
-        case Integer.parse(id) do
-          {int_id, ""} ->
+        case parse_int(id) do
+          nil -> false
+          int_id ->
             note = Notes.get_note!(int_id)
             match?({:ok, _}, Notes.delete_note(note))
-
-          _ ->
-            false
         end
       end)
 

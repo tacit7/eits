@@ -4,6 +4,7 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   """
 
   alias EyeInTheSky.{Agents, Sessions}
+  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Agents.ModelConfig
 
   @doc """
@@ -44,9 +45,9 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   defp coerce_int_id(val, _field) when is_integer(val), do: {:ok, val}
 
   defp coerce_int_id(val, field) when is_binary(val) do
-    case Integer.parse(val) do
-      {int, ""} -> {:ok, int}
-      _ -> {:error, "invalid_parameter", "#{field} must be an integer"}
+    case ToolHelpers.parse_int(val) do
+      nil -> {:error, "invalid_parameter", "#{field} must be an integer"}
+      int -> {:ok, int}
     end
   end
 
@@ -61,15 +62,15 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   defp coerce_session_ref(val, _field) when is_integer(val), do: {:ok, val}
 
   defp coerce_session_ref(val, field) when is_binary(val) do
-    case Integer.parse(val) do
-      {int, ""} ->
-        {:ok, int}
-
-      _ ->
+    case ToolHelpers.parse_int(val) do
+      nil ->
         case Ecto.UUID.cast(val) do
           {:ok, uuid} -> {:ok, uuid}
           :error -> {:error, "invalid_parameter", "#{field} must be an integer or UUID"}
         end
+
+      int ->
+        {:ok, int}
     end
   end
 

@@ -145,6 +145,8 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   def terminate(_reason, %{os_pid: os_pid}) do
     :exec.stop(os_pid)
   rescue
-    _ -> :ok
+    e in ErlangError ->
+      Logger.warning("PtyServer: failed to stop OS process #{os_pid}: #{inspect(e)}")
+      :ok
   end
 end

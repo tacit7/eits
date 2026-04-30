@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   require Logger
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
-  import EyeInTheSkyWeb.Helpers.StatusHelpers, only: [status_to_badge: 1]
 
   alias EyeInTheSky.Canvases
   alias EyeInTheSky.Events
@@ -488,7 +487,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                 class="btn btn-ghost btn-sm justify-start gap-2 text-left w-full"
               >
                 <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
-                <span class={["badge badge-xs shrink-0", status_to_badge(s.status)]}>{s.status}</span>
+                <span class={["badge badge-xs shrink-0", session_status_class(s.status)]}>{s.status}</span>
               </button>
             <% end %>
             <%= if @filtered_sessions == [] do %>
@@ -607,4 +606,15 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     socket
   end
 
+  # Canvas-specific session badge colors. Differs from StatusHelpers.status_to_badge
+  # which targets agent display (where "completed" = inactive ghost). For canvas
+  # session pills, "working" = blue/primary (active), "completed" = green/success.
+  defp session_status_class("working"), do: "badge-primary"
+  defp session_status_class("idle"), do: "badge-ghost"
+  defp session_status_class("waiting"), do: "badge-warning"
+  defp session_status_class("completed"), do: "badge-success"
+  defp session_status_class("failed"), do: "badge-error"
+  defp session_status_class("compacting"), do: "badge-warning"
+  defp session_status_class("archived"), do: "badge-ghost"
+  defp session_status_class(_), do: "badge-ghost"
 end

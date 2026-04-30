@@ -157,13 +157,19 @@ Main chat interface. Manages channels, members, message sending, and routing.
 - `toggle_reaction` -- Add/remove emoji reaction
 - `create_agent` -- Spawn new agent and auto-add to channel
 - `create_channel` -- (TODO) Channel creation
+- `set_sender_filter` -- Filter messages by sender
+- `toggle_agent_drawer` -- Open/close members panel
 
 **Assigns**:
+- `active_channel` -- Current channel (passed to TopBar.Chat)
 - `channel_members` -- Current channel members with session info
 - `sessions_by_project` -- Available sessions grouped by project for the add-agent picker
 - `session_search` -- Search term for session filtering
+- `sender_filter` -- Current sender filter (nil = show all)
 - `working_agents` -- Map of session IDs currently processing
 - `active_agents` -- All active sessions (used for display info in Svelte)
+
+**Note**: Header strip (`ChannelHeader.channel_header`) removed; channel identity now in top bar.
 
 ### Channels (`lib/eye_in_the_sky_web/channels.ex`)
 
@@ -408,6 +414,24 @@ When an agent is processing a message in a channel, a Slack-style typing indicat
 
 ## Frontend Components
 
+### Top Bar (TopBar.Chat)
+
+Phoenix component handling the channel chat toolbar.
+
+**Attributes**:
+- `active_channel` — Current channel (displays `#name` left-anchored)
+- `sender_filter` — Filter messages by agent (dropdown)
+- `channel_members` — List for member count, add-agent picker
+- `sessions_by_project` — Available sessions grouped by project
+- `session_search` — Search term for session filtering
+
+**Features**:
+- Channel name `#name` displayed left-aligned (moved from removed header strip, saves ~72px vertical space)
+- Sender filter dropdown (all agents / specific member)
+- Members dropdown popover showing channel membership and add-agent picker
+- New agent button (spawns agent and auto-adds to channel)
+- Removed status badges (inline active/working counts) to fix Chrome spec violations
+
 ### AgentMessagesPanel.svelte
 
 Svelte component handling message display and input for `/chat`.
@@ -415,12 +439,17 @@ Svelte component handling message display and input for `/chat`.
 **Props**: `activeChannelId`, `messages`, `activeAgents`, `channelMembers`, `workingAgents`, `slashItems`, `live`
 
 **Features**:
-- Message list with provider icons, timestamps, date separators
+- Message list with provider icons (opacity 30, tooltip), timestamps, date separators
+- Turn-boundary spacing (mt-4) for grouping rhythm
+- Sender identity line: agent name (bold) + @session_id (muted mono) + timestamp
+- Removed per-message left borders; hover bg-base-content/[0.04] retained for interactivity
 - Typing indicator (bouncing dots above composer for working channel members)
-- Usage metadata display (cost, tokens, duration, turns)
+- Usage metadata display (cost, tokens, duration, turns) without border-t separator
+- Metrics footer opacity/contrast improved for legibility
 - @ mention autocomplete -- scoped to current channel members only
 - @all option broadcasts to all channel members
 - / slash command autocomplete -- grouped by type (skill, command, agent, prompt)
+- Cmd/Ctrl+1-9 keyboard shortcuts to switch channels (1=first, 9=last channel)
 - Message history navigation (up/down arrows, 50 message buffer)
 - Auto-scroll on new messages
 - Delete message button (hover reveal)

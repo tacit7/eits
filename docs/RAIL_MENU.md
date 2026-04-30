@@ -148,6 +148,7 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 **Lazy loader**: `maybe_load_teams/3`
 
 **UI features**:
+- **Flyout header icon**: hero-users icon links to `/teams` (global teams view)
 - Lists teams for the current project with member count (e.g. "Team Name (3 members)")
 - Direct links to team pages
 
@@ -254,9 +255,18 @@ defp dual_page_section?(section),
 **Header behavior**:
 - When a project route exists: icon + label wrapped in a single `<.link>` that navigates to the project-scoped route (e.g., `/projects/:id/sessions`, `/projects/:id/notes`)
 - When no project route exists: rendered as a plain `<div>` (icon + label not clickable)
-- Route-specific icons:
-  - **Tasks**: kanban icon (`lucide-kanban`)
-  - **Other sections**: list-bullet icon (`hero-list-bullet`)
+
+**Section icons** — determined by `section_icon/1` helper:
+- `:chat` → `hero-chat-bubble-left-ellipsis`
+- `:canvas` → `hero-squares-2x2`
+- `:usage` → `hero-chart-bar`
+- `:notifications` → `hero-bell`
+- `:skills` → `hero-bolt`
+- `:prompts` → `hero-document-text`
+- `:jobs` → `hero-clock`
+- `:files` → `hero-folder`
+- `:notes` → `hero-pencil-square`
+- `:sessions`, `:tasks`, `:agents` → `hero-list-bullet` (default fallback)
 
 Route mappings:
 - Sessions: `/projects/:id/sessions`
@@ -270,6 +280,7 @@ Route mappings:
 Helper functions:
 - `dual_page_section?/1` — determines if a section has both global and project-scoped pages
 - `project_route_for/2` — returns the project-scoped path if available, or nil
+- `section_icon/1` — returns the appropriate icon name for a given section
 
 ---
 

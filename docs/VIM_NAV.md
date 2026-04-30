@@ -5,6 +5,12 @@ Opt-in keyboard navigation for the EITS web app. Enable in **Settings → Genera
 Source of truth: `assets/js/hooks/vim_nav_commands.ts`
 In-app overlay: press `?` anywhere, or visit `/keybindings`.
 
+## Help overlays
+
+**Which-key overlay**: Press any prefix key (`Space`, `g`, `t`, `n`, etc.) to see available next keys and their actions in a floating overlay at the bottom-left. Sub-groups show as entries with a `+` prefix (e.g., `Space g → +go to page`); direct actions show without the `+`. When there are more than 8 entries, the overlay switches to a 2-column grid for better readability.
+
+**Full help (`?`)**: Opens a full-page overlay organized by named sections (Global, Go to page, Toggle rail, Create, Context). Each section displays commands in its category; sections with more than 6 commands use a 2-column grid. Space leader aliases (e.g., `Space g`, `Space t`, `Space n`) are excluded to avoid duplication with base `g`, `t`, `n` bindings.
+
 ---
 
 ## Global (always active)

@@ -110,6 +110,65 @@ When AgentWorker encounters a systemic error (billing/auth failure, API limits),
 
 ---
 
+## DM Message Delivery with Metadata
+
+AgentWorker consumes structured JSON metadata sent alongside DM message bodies, enabling agents to receive machine-readable context without JSON appearing in the UI.
+
+**Metadata Flow:**
+1. REST API accepts optional `metadata` object in `/api/v1/dm` request alongside `body`
+2. `MessagingController` auto-constructs metadata context:
+   - `sender_name`: resolved from `from_session_id`
+   - `from_session_uuid`, `to_session_uuid`: session UUIDs
+   - `response_required`: boolean flag
+3. Request metadata is merged with auto-constructed metadata (request values take precedence)
+4. `DMDelivery.deliver_and_persist` passes metadata as `dm_metadata` context option to `AgentManager`
+5. `RuntimeContext.build()` includes `dm_metadata` in the context map passed to Job
+6. `Job.normalize_context` preserves `dm_metadata` through queue normalization
+7. `ProviderStrategy.Claude` consumes metadata before starting/resuming the agent:
+   - Filters out auto-populated fields (sender_name, from_session_uuid, to_session_uuid, response_required)
+   - Appends remaining custom fields as JSON block to the message for the agent
+   - If only auto-fields present, message is unchanged (info already in body via DMDelivery)
+8. AgentWorker logs `using_metadata=true` when custom metadata is present
+
+**Field Handling:**
+- **Auto-populated fields** (sender_name, from_session_uuid, to_session_uuid, response_required) are already in the message body via DMDelivery. These are filtered out to prevent duplication.
+- **Custom fields** (e.g., `action`, `pr_number`, `target_branch`) are appended to the message as a `## Metadata` JSON block, providing structured context only to the agent.
+- **UI Display:** Only the `body` field is shown in the UI. Metadata is never exposed to users, enabling agents to receive machine-readable context privately.
+
+**Example Workflow:**
+```bash
+curl -X POST localhost:5001/api/v1/dm \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "from_session_id": 40,
+    "to_session_id": 42,
+    "body": "Please review the PR",
+    "metadata": {
+      "action": "review",
+      "pr_number": 149,
+      "target_branch": "main"
+    }
+  }'
+```
+
+Agent receives: "DM from:alice (session:...) Please review the PR" + appended JSON with auto-fields + custom `action`, `pr_number`, `target_branch`.
+
+**Backward Compatibility:**
+Legacy DMs without metadata work unchanged. The `metadata` parameter is optional; omitting it results in only auto-populated context.
+
+**Code locations:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — auto-construct and merge metadata
+- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — pass metadata to AgentManager
+- `lib/eye_in_the_sky/agents/runtime_context.ex` — include `dm_metadata` in context type
+- `lib/eye_in_the_sky/claude/job.ex` — preserve `dm_metadata` in `normalize_context`
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — log metadata usage
+- `lib/eye_in_the_sky/claude/provider_strategy/claude.ex` — `maybe_append_metadata/2` for custom field appending
+- `docs/REST_API.md` — `/api/v1/dm` endpoint reference with metadata examples
+
+**Commits:** 94215a51 (metadata field in REST API, DMDelivery, RuntimeContext), 625fa619 (Job.normalize_context preservation, ProviderStrategy.Claude consumption, agent-facing tests)
+
+---
+
 ## AgentWorker Abnormal Exit Handling
 
 When an AgentWorker process terminates abnormally (crash, non-zero exit), it marks the associated session as `failed` and fires Teams cleanup events.

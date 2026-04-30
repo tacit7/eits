@@ -124,12 +124,18 @@ mount/3 (single with chain)
 **Message styling:**
 - **User messages**: right-aligned bubble with bg-base-200, rounded-2xl, 3px padding
 - **Agent messages**: left-aligned plain text, text-base-content/90
-- **Agent model/cost badges**: Inline below agent message body (restored commit a3f4c3a1)
-  - Model name in monospace badge (e.g., `claude-opus-4-6`)
-  - Cost in USD (e.g., `$0.0045`) when metadata present
+- **Agent model/cost inline**: Rendered as dot-separated plain text (9px monospace, opacity-30) below agent message body (commit 8a8d576e)
+  - Format: `claude-opus-4-6 · $0.0045` (single line, no pills)
+  - Replaces prior per-metric badge pills with unified text rendering
 - **Tool events** (tool_result, tool_use): max-w-[70%] compact widget, no bubble, no timestamp
 - **DM indicator**: primary/20 border on user DM bubbles
-- **Spacing**: space-y-1 between messages (compact layout)
+
+**Turn spacing and sender grouping (commit 8a8d576e):**
+- **mt-5**: Applied when sender role changes (user → agent, agent → user)
+- **mt-1**: Applied for consecutive messages from the same sender
+- **mt-1**: Applied for tool events (tool_use, tool_result)
+- **Removed**: Previous space-y-3 container spacing; per-item margins now control rhythm
+- Provides clearer visual separation between turns while keeping same-sender messages compact
 
 **Message types:**
 - User messages (input)
@@ -853,6 +859,7 @@ The CLI now supports `eits dm inbox` as a convenient alias for listing DM messag
 eits dm inbox                    # List DMs in table format
 eits dm inbox --json            # Raw JSON output
 eits dm inbox --from <uuid>     # Filter by sender
+eits dm inbox --team-only       # Filter to team members only
 eits dm inbox --help            # Show command help
 ```
 
@@ -866,6 +873,10 @@ eits dm inbox --help            # Show command help
 **Features:**
 - `--json` flag for programmatic consumption
 - `--from` filter to show DMs from a specific session UUID only
+- `--team-only` filter (commit 2321695e) to show DMs only from sessions that share a team with the current agent
+  - Uses `EITS_AGENT_UUID` to discover teams via `GET /teams?member_agent_uuid=`
+  - Fetches members per team and filters `from_session_id` against the collected set
+  - Client-side filtering via jq
 - `--help` to display command reference
 - Strips redundant `DM from:` prefix from message body for cleaner display
 - UTC age calculation fixed on macOS (commit 1c0b5ba6 fixed `date -ju` parsing)
@@ -875,7 +886,70 @@ eits dm inbox --help            # Show command help
 - haiku, sonnet, opus appear before full model names (e.g., `claude-haiku-4-5`) for discoverability
 
 **Files:**
-- `scripts/eits` — inbox subcommand, _tbl_dm renderer, --json/--from flags, _age UTC fix
+- `scripts/eits` — inbox subcommand, _tbl_dm renderer, --json/--from/--team-only flags, _age UTC fix
+- `docs/EITS_CLI.md` — command reference
+
+---
+
+## CLI: eits dm --metadata
+
+**Commit:** `d7bdffd7`
+
+The `eits dm` command now accepts a `--metadata` flag for sending structured agent context alongside message text.
+
+**Usage:**
+```bash
+eits dm --to <session_uuid> --message "Task complete" \
+  --metadata '{"task_id": 42, "status": "done", "duration_ms": 1250}'
+```
+
+**Behavior:**
+- `--metadata` accepts a JSON string (shell-escaped or via heredoc)
+- JSON is parsed and merged into the DM request body
+- Server-side validation ensures valid JSON; invalid metadata returns 422
+- Metadata is stored in the message record and passed to AgentWorker as `dm_metadata` context
+- Never rendered in the UI; only visible to downstream agents
+
+**Integration with AgentWorker:**
+- `dm_metadata` appears in `RuntimeContext.build()` when processing a DM with metadata
+- AgentWorker logs whether metadata was used vs. body-only fallback
+- Enables agent-to-agent communication of structured data without polluting message display
+
+**Files:**
+- `scripts/eits` — argument parsing and JSON validation for --metadata flag
+- `docs/EITS_CLI.md` — command reference
+
+---
+
+## CLI: eits tasks complete --notify
+
+**Commit:** `2321695e`
+
+The `eits tasks complete` command now accepts a `--notify` flag to send a DM notification upon successful completion.
+
+**Usage:**
+```bash
+eits tasks complete <task_id> --message "All tests passing" \
+  --notify <recipient_session_uuid>
+```
+
+**Behavior:**
+- After a successful `tasks complete`, sends a DM to the specified recipient session
+- DM format: `"Task <task_id> complete: <message>"`
+- Uses the existing `cmd_dm` path for delivery
+- Useful for notifying upstream orchestrators or team members when a task finishes
+
+**Example:**
+```bash
+# Complete task 123 and notify the parent orchestrator
+eits tasks complete 123 --message "Feature implemented and tested" \
+  --notify b80b9a8d-5dd4-4246-9507-ee0d186d113b
+```
+
+Result: Task marked done, and the orchestrator receives a DM: `"Task 123 complete: Feature implemented and tested"`
+
+**Files:**
+- `scripts/eits` — --notify flag and DM dispatch logic
 - `docs/EITS_CLI.md` — command reference
 
 ---
@@ -1149,6 +1223,66 @@ Two dead-code wrappers were removed from `MessagingController`:
 **Files:**
 - `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex`
 - `lib/eye_in_the_sky/settings.ex`
+
+---
+
+## DM Response Fields: reachable and metadata
+
+**Commit:** `15d2eb16` (reachable), `94215a51` (metadata)
+
+The `/api/v1/dm` endpoint now includes two new fields in success responses:
+
+### reachable
+
+**Field type:** Boolean
+
+**Meaning:** Indicates whether the target session is in a receivable status and the DM was delivered immediately (not queued).
+
+**Values:**
+- `true` — session is in `working`, `idle`, or `waiting` status; message delivered to reachable session
+- `false` — (future) session is offline or in a non-receivable state; message queued or buffered
+
+**Current behavior:** All successful DM responses have `reachable: true` while only `completed` and `failed` statuses are rejected. Future iterations may support queue-to-unreachable sessions.
+
+### metadata
+
+**Field type:** Optional object (JSONB)
+
+**Meaning:** Structured context passed alongside the DM body, for agent-to-agent communication without JSON bleeding into the UI.
+
+**Usage:** Agents can send:
+- Message body: user-facing text (rendered in DM chat)
+- Metadata object: structured data (passed to agent worker, never rendered in UI)
+
+**Example request:**
+```json
+POST /api/v1/dm
+{
+  "to_session_id": "abc123",
+  "message": "Task complete",
+  "metadata": {
+    "task_id": 42,
+    "status": "done",
+    "duration_ms": 1250
+  }
+}
+```
+
+**Pipeline:**
+1. REST controller accepts optional `metadata` from request body
+2. `DMDelivery.deliver_and_persist` merges metadata into the message record
+3. On delivery to target session, `dm_metadata` is passed to `RuntimeContext.build()` and available to `AgentWorker` for processing
+4. AgentWorker logs whether metadata was used vs. body-only delivery
+5. DM LiveView templates render body only; metadata never exposed to UI
+
+**Backward compatibility:** Legacy DMs without metadata work unchanged. Metadata is optional.
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — request parsing
+- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — metadata propagation
+- `lib/eye_in_the_sky/agents/runtime_context.ex` — RuntimeContext.build() type signature and dm_metadata field
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — logging on metadata use
+- `docs/REST_API.md` — metadata field documentation and request examples
 
 ---
 

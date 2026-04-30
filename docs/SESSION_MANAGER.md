@@ -295,6 +295,65 @@ This dual approach ensures:
 
 ---
 
+## Session Intent (Read-Only Mode)
+
+The `read_only` field on sessions declares whether the session is in **review mode** (read-only, intent to observe) or **work mode** (default, intent to execute). This allows hooks and spawned agents to make smarter decisions about enforcement.
+
+**Semantics:**
+- `read_only: false` (default) — **Work mode.** Session is executing user requests, file edits, agent spawns. Pre-tool-use hooks enforce task gate (Stop hook checks that in-progress task is closed).
+- `read_only: true` — **Review mode.** Session is read-only: browsing, analyzing, documenting. Pre-tool-use hooks may skip enforcement (e.g., task gate is not mandatory).
+
+**Set at Creation:**
+```bash
+# Create a new session in review mode
+eits sessions create --session-id <uuid> --read-only
+
+# Create in work mode (default)
+eits sessions create --session-id <uuid>
+```
+
+**Set on Existing Session:**
+```bash
+# Switch to review mode (read-only)
+eits sessions set-intent review <uuid>
+
+# Switch to work mode (default)
+eits sessions set-intent work <uuid>
+
+# Defaults to EITS_SESSION_UUID when uuid is omitted
+eits sessions set-intent review
+eits sessions set-intent work
+```
+
+**API:**
+```bash
+# Set read_only via PATCH
+curl -X PATCH http://localhost:5001/api/v1/sessions/<uuid> \
+  -d '{"read_only": true}'
+
+# Check current intent in eits me output
+eits me
+# Shows Session Intent section:
+#   intent: review  (read-only — task enforcement skipped)
+#   intent: work    (default — pre-tool-use hooks enforce task)
+```
+
+**Response Format:**
+The `read_only` field is exposed in session API responses:
+```json
+{
+  "id": 3185,
+  "uuid": "8803d56d-dbbd-4916-9ff0-155378a64a47",
+  "status": "working",
+  "read_only": true
+}
+```
+
+**Hook Integration:**
+Pre-tool-use hooks (e.g., `eits-task-gate.sh`) can check the session's read_only intent and skip enforcement for review-mode sessions. This prevents spurious "task not closed" failures when browsing code or documenting work.
+
+---
+
 ## Sessions REST API
 
 The Sessions API at `PATCH /api/v1/sessions/:uuid` and related endpoints uses `Sessions.resolve(uuid)` to support both numeric session IDs and UUIDs:
@@ -306,7 +365,8 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 ```
 
 **Endpoints using `resolve_session/1`:**
-- `PATCH /api/v1/sessions/:uuid` — Update session status (lifecycle hooks)
+- `PATCH /api/v1/sessions/:uuid` — Update session status, read_only intent, and other fields (lifecycle hooks)
+  - Parameters: `status`, `status_reason`, `intent`, `read_only`, `entrypoint`, `name`, `description`
 - `POST /api/v1/sessions/:uuid/tool_event` — Record tool event
 - `POST /api/v1/sessions/:uuid/end` — End session with final status
 - `POST /api/v1/sessions/:uuid/complete` — Mark session completed and sync team member (NEW)

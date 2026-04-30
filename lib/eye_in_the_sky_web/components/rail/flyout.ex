@@ -38,16 +38,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <div
       data-flyout-panel
       data-vim-flyout-open={to_string(@open)}
-      class={[
-        "flex flex-col border-r border-base-content/8 bg-base-100 overflow-hidden flex-shrink-0 transition-[width] duration-150",
-        # w-0 is always the mobile base; md:w-[236px] overrides on desktop when open.
-        # w-[236px] overrides on mobile only when mobile_open is also true.
-        if(@open, do: "w-0 md:w-[236px]", else: "w-0"),
-        if(@open && @mobile_open, do: "w-[236px]"),
-        # On mobile, sit above the z-40 backdrop so the flyout is interactive.
-        # md:z-auto resets to normal stacking on desktop where the backdrop is hidden.
-        "z-50 md:z-auto"
-      ]}
+      class={
+        [
+          "flex flex-col border-r border-base-content/8 bg-base-100 overflow-hidden flex-shrink-0 transition-[width] duration-150",
+          # w-0 is always the mobile base; md:w-[236px] overrides on desktop when open.
+          # w-[236px] overrides on mobile only when mobile_open is also true.
+          if(@open, do: "w-0 md:w-[236px]", else: "w-0"),
+          if(@open && @mobile_open, do: "w-[236px]"),
+          # On mobile, sit above the z-40 backdrop so the flyout is interactive.
+          # md:z-auto resets to normal stacking on desktop where the backdrop is hidden.
+          "z-50 md:z-auto"
+        ]
+      }
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>
         <div class="px-2.5 py-2.5 border-b border-base-content/8 flex-shrink-0 flex items-center gap-1">
@@ -92,6 +94,54 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 </span>
                 <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
                   {section_label(@active_section)}
+                </span>
+              </.link>
+            <% @active_section == :usage -> %>
+              <.link
+                navigate="/usage"
+                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
+              >
+                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
+                  <.icon name="hero-chart-bar" class="size-3.5" />
+                </span>
+                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+                  Usage
+                </span>
+              </.link>
+            <% @active_section == :chat -> %>
+              <.link
+                navigate="/chat"
+                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
+              >
+                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
+                  <.icon name="hero-chat-bubble-left-ellipsis" class="size-3.5" />
+                </span>
+                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+                  Chat
+                </span>
+              </.link>
+            <% @active_section == :canvas -> %>
+              <.link
+                navigate="/canvases"
+                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
+              >
+                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
+                  <.icon name="hero-squares-2x2" class="size-3.5" />
+                </span>
+                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+                  Canvas
+                </span>
+              </.link>
+            <% @active_section == :skills -> %>
+              <.link
+                navigate={skills_route(@sidebar_project)}
+                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
+              >
+                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
+                  <.icon name="hero-bolt" class="size-3.5" />
+                </span>
+                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+                  Skills
                 </span>
               </.link>
             <% true -> %>
@@ -167,7 +217,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :prompts -> %>
               <.nav_links project={@sidebar_project} section={:prompts} />
             <% :chat -> %>
-              <.chat_content channels={@flyout_channels} active_channel_id={@active_channel_id} unread_counts={@unread_counts} myself={@myself} />
+              <.chat_content
+                channels={@flyout_channels}
+                active_channel_id={@active_channel_id}
+                unread_counts={@unread_counts}
+                myself={@myself}
+              />
             <% :notes -> %>
               <.notes_content notes={@flyout_notes} />
             <% :skills -> %>
@@ -213,7 +268,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     <%= if @sessions == [] do %>
       <div class="px-3 py-4 text-xs text-base-content/35 text-center">No sessions</div>
     <% end %>
-
     """
   end
 
@@ -241,7 +295,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp chat_content(assigns) do
     ~H"""
     <%= for channel <- @channels do %>
-      <% active = not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
+      <% active =
+        not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
       <% unread = Map.get(@unread_counts, channel.id, 0) %>
       <.link
         navigate={"/chat?channel_id=#{channel.id}"}
@@ -254,10 +309,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           )
         ]}
       >
-        <span class={["text-[13px] flex-shrink-0", if(active, do: "text-primary/60", else: "text-base-content/25")]}>
+        <span class={[
+          "text-[13px] flex-shrink-0",
+          if(active, do: "text-primary/60", else: "text-base-content/25")
+        ]}>
           #
         </span>
-        <span class={["truncate flex-1", if(unread > 0 && !active, do: "font-semibold text-base-content/85")]}>
+        <span class={[
+          "truncate flex-1",
+          if(unread > 0 && !active, do: "font-semibold text-base-content/85")
+        ]}>
           {channel.name}
         </span>
         <%= if unread > 0 && !active do %>
@@ -281,10 +342,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp tasks_content(assigns) do
     ~H"""
-
     <%= if @filter_open do %>
       <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
-        <div class="text-nano font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">State</div>
+        <div class="text-nano font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">
+          State
+        </div>
         <div class="flex flex-col gap-0.5">
           <.task_state_option label="All" value="all" current={@state_filter} myself={@myself} />
           <.task_state_option label="To Do" value="1" current={@state_filter} myself={@myself} />
@@ -303,7 +365,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         {if filtering, do: "No matching tasks", else: "No tasks"}
       </div>
     <% end %>
-
     """
   end
 
@@ -327,7 +388,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         )
       ]}
     >
-      <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", if(active, do: "bg-primary", else: "bg-transparent")]} />
+      <span class={[
+        "w-1.5 h-1.5 rounded-full flex-shrink-0",
+        if(active, do: "bg-primary", else: "bg-transparent")
+      ]} />
       {@label}
     </button>
     """
@@ -338,7 +402,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp task_row(assigns) do
     ~H"""
     <.link
-      navigate={if @task.project_id, do: "/projects/#{@task.project_id}/tasks?task_id=#{@task.id}", else: "/projects"}
+      navigate={
+        if @task.project_id,
+          do: "/projects/#{@task.project_id}/tasks?task_id=#{@task.id}",
+          else: "/projects"
+      }
       data-vim-flyout-item
       class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
     >
@@ -367,11 +435,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         data-vim-flyout-item
         class="flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
       >
-        <span class={["truncate", if(note.title && note.title != "", do: "font-medium text-base-content/80")]}>
+        <span class={[
+          "truncate",
+          if(note.title && note.title != "", do: "font-medium text-base-content/80")
+        ]}>
           {if label == "", do: "(empty)", else: label}
         </span>
         <span :if={preview && preview != ""} class="truncate text-base-content/40">{preview}</span>
-        <span class="text-micro text-base-content/30 uppercase tracking-wide">{note.parent_type}</span>
+        <span class="text-micro text-base-content/30 uppercase tracking-wide">
+          {note.parent_type}
+        </span>
       </.link>
     <% end %>
     <%= if @notes == [] do %>
@@ -444,17 +517,27 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             navigate={"/canvases/#{canvas.id}?focus=#{session.id}"}
             class="flex items-center gap-2 pl-7 py-1 flex-1 min-w-0 text-xs text-base-content/50 group-hover:text-base-content/80"
           >
-            <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", canvas_session_dot(session.status)]} />
+            <span class={[
+              "w-1.5 h-1.5 rounded-full flex-shrink-0",
+              canvas_session_dot(session.status)
+            ]} />
             <span class="truncate">{session.name || "unnamed"}</span>
           </.link>
           <.link
             navigate={"/dm/#{session.id}"}
-            class={["flex-shrink-0 px-3 py-1 transition-opacity hover:opacity-80", if(session.status == "working", do: "opacity-80", else: "opacity-30")]}
+            class={[
+              "flex-shrink-0 px-3 py-1 transition-opacity hover:opacity-80",
+              if(session.status == "working", do: "opacity-80", else: "opacity-30")
+            ]}
             title="Open DM"
           >
             <img
               src={DmHelpers.provider_icon(session.provider)}
-              class={["size-3.5", DmHelpers.provider_icon_class(session.provider), session.status == "working" && "animate-pulse"]}
+              class={[
+                "size-3.5",
+                DmHelpers.provider_icon_class(session.provider),
+                session.status == "working" && "animate-pulse"
+              ]}
               alt={session.provider || "agent"}
             />
           </.link>
@@ -483,31 +566,31 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp nav_links(%{section: :tasks} = assigns) do
     ~H"""
-      <.simple_link
-        href={"/projects/#{@project.id}/kanban"}
-        label={"#{@project.name} Board"}
-        icon="hero-squares-2x2"
-      />
+    <.simple_link
+      href={"/projects/#{@project.id}/kanban"}
+      label={"#{@project.name} Board"}
+      icon="hero-squares-2x2"
+    />
     """
   end
 
   defp nav_links(%{section: :prompts} = assigns) do
     ~H"""
-      <.simple_link
-        href={"/projects/#{@project.id}/prompts"}
-        label={"#{@project.name} Prompts"}
-        icon="hero-folder"
-      />
+    <.simple_link
+      href={"/projects/#{@project.id}/prompts"}
+      label={"#{@project.name} Prompts"}
+      icon="hero-folder"
+    />
     """
   end
 
   defp nav_links(%{section: :notes} = assigns) do
     ~H"""
-      <.simple_link
-        href={"/projects/#{@project.id}/notes"}
-        label={"#{@project.name} Notes"}
-        icon="hero-folder"
-      />
+    <.simple_link
+      href={"/projects/#{@project.id}/notes"}
+      label={"#{@project.name} Notes"}
+      icon="hero-folder"
+    />
     """
   end
 
@@ -584,9 +667,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp jobs_content(assigns) do
     ~H"""
     <div class="px-3 pt-2 pb-1 border-b border-base-content/8 flex items-center gap-3">
-      <.link navigate="/jobs" class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors">All Jobs</.link>
+      <.link
+        navigate="/jobs"
+        class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors"
+      >
+        All Jobs
+      </.link>
       <%= if @sidebar_project do %>
-        <.link navigate={"/projects/#{@sidebar_project.id}/jobs"} class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors">Project Jobs</.link>
+        <.link
+          navigate={"/projects/#{@sidebar_project.id}/jobs"}
+          class="text-xs text-base-content/50 hover:text-base-content/80 transition-colors"
+        >
+          Project Jobs
+        </.link>
       <% end %>
     </div>
 
@@ -601,7 +694,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           if(job.enabled, do: "bg-green-500", else: "bg-base-content/20")
         ]} />
         <span class="truncate font-medium flex-1">{job.name}</span>
-        <span class="text-micro text-base-content/30 flex-shrink-0 font-mono">{job.schedule_value}</span>
+        <span class="text-micro text-base-content/30 flex-shrink-0 font-mono">
+          {job.schedule_value}
+        </span>
       </.link>
     <% end %>
 
@@ -658,7 +753,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 name={if expanded, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
                 class="size-3 text-base-content/30 flex-shrink-0"
               />
-              <.icon name={if expanded, do: "hero-folder-open-mini", else: "hero-folder-mini"} class="size-3.5 text-base-content/40 flex-shrink-0" />
+              <.icon
+                name={if expanded, do: "hero-folder-open-mini", else: "hero-folder-mini"}
+                class="size-3.5 text-base-content/40 flex-shrink-0"
+              />
               <span class="truncate">{node.name}</span>
             </button>
           <% :file -> %>
@@ -677,7 +775,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <span class="truncate">{node.name}</span>
             </button>
           <% :warning -> %>
-            <div class="px-3 py-1 text-micro text-base-content/25 italic" style={"padding-left: #{indent + 8}px"}>{node.name}</div>
+            <div
+              class="px-3 py-1 text-micro text-base-content/25 italic"
+              style={"padding-left: #{indent + 8}px"}
+            >
+              {node.name}
+            </div>
           <% _ -> %>
         <% end %>
       <% end %>
@@ -742,6 +845,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
   defp agents_route(%{id: id}), do: "/projects/#{id}/agents"
   defp agents_route(_), do: "/agents"
+  defp skills_route(%{id: id}), do: "/projects/#{id}/skills"
+  defp skills_route(_), do: "/skills"
 
   # Returns the project-scoped route for a section, or nil if none exists
   # or no project is selected.
@@ -751,5 +856,4 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp project_route_for(:notes, %{id: id}), do: "/projects/#{id}/notes"
   defp project_route_for(:jobs, %{id: id}), do: "/projects/#{id}/jobs"
   defp project_route_for(_, _), do: nil
-
 end

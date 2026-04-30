@@ -646,8 +646,6 @@
                 <div class="flex-1 h-px bg-base-content/[0.04]"></div>
               </div>
             {:else}
-              </div>
-
               <div class="flex items-start gap-2.5">
                 {#if isSameSender}
                   <!-- Grouped: narrow gutter only, no icon or name -->
@@ -835,6 +833,7 @@
                     </div>
                   {/if}
                 </div>
+              </div>
 
             {/if}
           </div>

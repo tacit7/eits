@@ -245,22 +245,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     with {:ok, session} <- resolve_session(id_or_uuid) do
       attrs = %{status: "completed", ended_at: DateTime.utc_now()}
 
-      case Sessions.update_session(session, attrs) do
-        {:ok, updated} ->
-          EyeInTheSky.Events.session_completed(updated)
-          EyeInTheSky.Events.session_updated(updated)
-          member_synced = sync_member_status(updated.id, "done")
-
-          json(conn, %{
-            success: true,
-            session_id: updated.id,
-            session_status: updated.status,
-            member_synced: member_synced
-          })
-
-        {:error, _cs} ->
-          {:error, "Failed to complete session"}
-      end
+      do_session_status_change(conn, session, attrs, fn updated ->
+        EyeInTheSky.Events.session_completed(updated)
+        EyeInTheSky.Events.session_updated(updated)
+        sync_member_status(updated.id, "done")
+      end)
     else
       {:error, :not_found} -> {:error, :not_found, "Session not found"}
     end
@@ -274,22 +263,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     with {:ok, session} <- resolve_session(id_or_uuid) do
       attrs = %{status: "waiting"}
 
-      case Sessions.update_session(session, attrs) do
-        {:ok, updated} ->
-          EyeInTheSky.Events.agent_stopped(updated)
-          EyeInTheSky.Events.session_updated(updated)
-          member_synced = sync_member_status(updated.id, "blocked")
-
-          json(conn, %{
-            success: true,
-            session_id: updated.id,
-            session_status: updated.status,
-            member_synced: member_synced
-          })
-
-        {:error, _cs} ->
-          {:error, "Failed to set session to waiting"}
-      end
+      do_session_status_change(conn, session, attrs, fn updated ->
+        EyeInTheSky.Events.agent_stopped(updated)
+        EyeInTheSky.Events.session_updated(updated)
+        sync_member_status(updated.id, "blocked")
+      end)
     else
       {:error, :not_found} -> {:error, :not_found, "Session not found"}
     end
@@ -301,6 +279,23 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     e ->
       Logger.warning("sync_member_status failed for session #{session_id}: #{inspect(e)}")
       false
+  end
+
+  defp do_session_status_change(conn, session, attrs, side_effects_fn) do
+    case Sessions.update_session(session, attrs) do
+      {:ok, updated} ->
+        member_synced = side_effects_fn.(updated)
+
+        json(conn, %{
+          success: true,
+          session_id: updated.id,
+          session_status: updated.status,
+          member_synced: member_synced
+        })
+
+      {:error, _cs} ->
+        {:error, "Failed to update session"}
+    end
   end
 
   defp resolve_session(id_or_uuid), do: Sessions.resolve(id_or_uuid)

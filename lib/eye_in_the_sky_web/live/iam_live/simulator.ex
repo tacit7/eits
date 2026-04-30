@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
   alias EyeInTheSky.IAM.Context
   alias EyeInTheSky.IAM.Simulator
   alias EyeInTheSky.Utils.ToolHelpers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @default_form %{
     "event" => "pre_tool_use",
@@ -109,6 +110,9 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
     {:noreply, socket |> assign(:form, @default_form) |> assign(:result, nil)}
   end
 
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
+
   # ── helpers ───────────────────────────────────────────────────────────────
 
   # Unchecked checkboxes are absent from form params entirely; explicitly
@@ -152,7 +156,10 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
   defp blank_to_default(v, _default) when is_binary(v), do: v
 
   defp infer_resource_type("Bash"), do: :command
-  defp infer_resource_type(tool) when tool in ["Edit", "Write", "NotebookEdit", "Read", "MultiEdit"], do: :file
+
+  defp infer_resource_type(tool)
+       when tool in ["Edit", "Write", "NotebookEdit", "Read", "MultiEdit"], do: :file
+
   defp infer_resource_type(tool) when tool in ["WebFetch", "WebSearch"], do: :url
   defp infer_resource_type(_), do: :unknown
 
@@ -178,11 +185,46 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
             <h2 class="card-title text-lg">Input</h2>
 
             <div class="flex flex-wrap gap-2">
-              <button type="button" class="btn btn-xs btn-outline" phx-click="preset" phx-value-preset="rm_rf">rm -rf /</button>
-              <button type="button" class="btn btn-xs btn-outline" phx-click="preset" phx-value-preset="sudo">sudo apt</button>
-              <button type="button" class="btn btn-xs btn-outline" phx-click="preset" phx-value-preset="push_main">git push main</button>
-              <button type="button" class="btn btn-xs btn-outline" phx-click="preset" phx-value-preset="curl_sh">curl | sh</button>
-              <button type="button" class="btn btn-xs btn-outline" phx-click="preset" phx-value-preset="env_read">.env read</button>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline"
+                phx-click="preset"
+                phx-value-preset="rm_rf"
+              >
+                rm -rf /
+              </button>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline"
+                phx-click="preset"
+                phx-value-preset="sudo"
+              >
+                sudo apt
+              </button>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline"
+                phx-click="preset"
+                phx-value-preset="push_main"
+              >
+                git push main
+              </button>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline"
+                phx-click="preset"
+                phx-value-preset="curl_sh"
+              >
+                curl | sh
+              </button>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline"
+                phx-click="preset"
+                phx-value-preset="env_read"
+              >
+                .env read
+              </button>
             </div>
 
             <form phx-submit="simulate" phx-change="update_form" class="space-y-3">
@@ -190,53 +232,98 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
                 <label class="form-control">
                   <span class="label-text text-xs">Event</span>
                   <select name="form[event]" class="select select-bordered select-sm">
-                    <option value="pre_tool_use" selected={@form["event"] == "pre_tool_use"}>pre_tool_use</option>
-                    <option value="post_tool_use" selected={@form["event"] == "post_tool_use"}>post_tool_use</option>
+                    <option value="pre_tool_use" selected={@form["event"] == "pre_tool_use"}>
+                      pre_tool_use
+                    </option>
+                    <option value="post_tool_use" selected={@form["event"] == "post_tool_use"}>
+                      post_tool_use
+                    </option>
                     <option value="stop" selected={@form["event"] == "stop"}>stop</option>
                   </select>
                 </label>
 
                 <label class="form-control">
                   <span class="label-text text-xs">Agent type</span>
-                  <input type="text" name="form[agent_type]" value={@form["agent_type"]} class="input input-bordered input-sm" />
+                  <input
+                    type="text"
+                    name="form[agent_type]"
+                    value={@form["agent_type"]}
+                    class="input input-bordered input-sm"
+                  />
                 </label>
 
                 <label class="form-control">
                   <span class="label-text text-xs">Tool</span>
-                  <input type="text" name="form[tool]" value={@form["tool"]} class="input input-bordered input-sm" />
+                  <input
+                    type="text"
+                    name="form[tool]"
+                    value={@form["tool"]}
+                    class="input input-bordered input-sm"
+                  />
                 </label>
 
                 <label class="form-control">
                   <span class="label-text text-xs">Project ID (optional)</span>
-                  <input type="text" name="form[project_id]" value={@form["project_id"]} class="input input-bordered input-sm" placeholder="integer" />
+                  <input
+                    type="text"
+                    name="form[project_id]"
+                    value={@form["project_id"]}
+                    class="input input-bordered input-sm"
+                    placeholder="integer"
+                  />
                 </label>
 
                 <label class="form-control col-span-2">
                   <span class="label-text text-xs">Resource path</span>
-                  <input type="text" name="form[resource_path]" value={@form["resource_path"]} class="input input-bordered input-sm" placeholder="/path/to/file" />
+                  <input
+                    type="text"
+                    name="form[resource_path]"
+                    value={@form["resource_path"]}
+                    class="input input-bordered input-sm"
+                    placeholder="/path/to/file"
+                  />
                 </label>
 
                 <label class="form-control col-span-2">
                   <span class="label-text text-xs">Resource content</span>
-                  <textarea name="form[resource_content]" rows="4" class="textarea textarea-bordered textarea-sm font-mono text-xs" placeholder="command or file contents"><%= @form["resource_content"] %></textarea>
+                  <textarea
+                    name="form[resource_content]"
+                    rows="4"
+                    class="textarea textarea-bordered textarea-sm font-mono text-xs"
+                    placeholder="command or file contents"
+                  ><%= @form["resource_content"] %></textarea>
                 </label>
 
                 <label class="form-control col-span-2">
                   <span class="label-text text-xs">Session UUID (optional)</span>
-                  <input type="text" name="form[session_uuid]" value={@form["session_uuid"]} class="input input-bordered input-sm" />
+                  <input
+                    type="text"
+                    name="form[session_uuid]"
+                    value={@form["session_uuid"]}
+                    class="input input-bordered input-sm"
+                  />
                 </label>
 
                 <label class="form-control">
                   <span class="label-text text-xs">Fallback permission</span>
                   <select name="form[fallback_permission]" class="select select-bordered select-sm">
-                    <option value="allow" selected={@form["fallback_permission"] == "allow"}>allow</option>
-                    <option value="deny" selected={@form["fallback_permission"] == "deny"}>deny</option>
+                    <option value="allow" selected={@form["fallback_permission"] == "allow"}>
+                      allow
+                    </option>
+                    <option value="deny" selected={@form["fallback_permission"] == "deny"}>
+                      deny
+                    </option>
                   </select>
                 </label>
 
                 <label class="label cursor-pointer gap-2 justify-start mt-6">
-                  <input type="checkbox" name="form[skip_builtins]" value="true" class="checkbox checkbox-sm"
-                    checked={@form["skip_builtins"] in ["true", "on", true]} />
+                  <input
+                    type="checkbox"
+                    name="form[skip_builtins]"
+                    value="true"
+                    class="checkbox checkbox-sm"
+                    checked={@form["skip_builtins"] in ["true", "on", true]}
+                  />
                   <span class="label-text text-xs">Skip built-in matchers</span>
                 </label>
               </div>
@@ -270,7 +357,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
           <div class="card-body">
             <h2 class="card-title text-lg flex items-center gap-2">
               <.icon name="hero-queue-list" class="size-5" /> Trace
-              <span class="badge badge-ghost"><%= length(@result.traces) %></span>
+              <span class="badge badge-ghost">{length(@result.traces)}</span>
             </h2>
             <.trace_table traces={@result.traces} winner_id={@result.winner_id} />
           </div>
@@ -279,5 +366,4 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
     </div>
     """
   end
-
 end

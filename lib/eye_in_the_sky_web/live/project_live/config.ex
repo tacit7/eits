@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [read_file_for_display: 4]
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -134,6 +135,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
         {:noreply, socket}
     end
   end
+
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   # ── Private helpers ──────────────────────────────────────────────────────────
 

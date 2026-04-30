@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   alias EyeInTheSky.Notifications
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -72,6 +73,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
      |> assign(:filter, category)
      |> assign(:notifications, load_notifications(category))}
   end
+
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   defp load_notifications("all"), do: Notifications.list_notifications()
 

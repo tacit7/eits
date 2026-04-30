@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
   import EyeInTheSkyWeb.NoteLive.Helpers, only: [safe_return_to: 1]
 
   alias EyeInTheSky.Notes
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -91,6 +92,9 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       end
     end
   end
+
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_info(:clear_saved, socket) do

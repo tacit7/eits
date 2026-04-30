@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   import EyeInTheSkyWeb.Live.FileBrowserHelpers
 
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @claude_dir Path.expand("~/.claude")
 
@@ -103,11 +104,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
     end
   end
 
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
+
   defp validate_entry_name(name) do
     cond do
-      name == "" -> {:assign_error, "Name cannot be empty"}
-      String.contains?(name, "/") or String.contains?(name, "..") -> {:assign_error, "Invalid name"}
-      true -> :ok
+      name == "" ->
+        {:assign_error, "Name cannot be empty"}
+
+      String.contains?(name, "/") or String.contains?(name, "..") ->
+        {:assign_error, "Invalid name"}
+
+      true ->
+        :ok
     end
   end
 
@@ -134,14 +143,18 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
     case type do
       :dir ->
         case File.mkdir(full) do
-          :ok -> {:noreply, socket |> assign(:creating, nil) |> load_list_path(rel)}
-          {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to create directory: #{reason}")}
+          :ok ->
+            {:noreply, socket |> assign(:creating, nil) |> load_list_path(rel)}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to create directory: #{reason}")}
         end
 
       :file ->
         case File.write(full, "") do
           :ok ->
-            {:noreply, socket |> assign(:creating, nil) |> push_patch(to: ~p"/config?path=#{rel}")}
+            {:noreply,
+             socket |> assign(:creating, nil) |> push_patch(to: ~p"/config?path=#{rel}")}
 
           {:error, reason} ->
             {:noreply, put_flash(socket, :error, "Failed to create file: #{reason}")}

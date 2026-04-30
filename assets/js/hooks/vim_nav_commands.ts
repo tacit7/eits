@@ -16,7 +16,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -197,6 +197,12 @@ export const COMMANDS: Command[] = [
   // Space s — search
   { id: "leader.search.focus", label: "Focus search", keys: ["Space", "s", "s"], group: "global",
     action: { kind: "client", name: "page_search" }, scope: "feature:vim-search" },
+
+  // Space f — find (picker commands)
+  { id: "leader.find.sessions",        label: "Find session",         keys: ["Space", "f", "s"], group: "global",
+    action: { kind: "client", name: "find_sessions" } },
+  { id: "leader.find.recent_sessions", label: "Find recent session",  keys: ["Space", "f", "r", "s"], group: "global",
+    action: { kind: "client", name: "find_recent_sessions" } },
 
   // Space b — buffer/session actions
   { id: "leader.buffer.archive", label: "Archive session", keys: ["Space", "b", "a"], group: "context",

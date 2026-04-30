@@ -199,9 +199,11 @@ $INIT_NOTE
 # Create + start in one shot
 eits tasks begin --title \"Task name\"
 
-# Finish
-eits tasks annotate <task_id> --body \"What happened\"
-eits tasks update <task_id> --state 4
+# Finish (atomic: annotate + mark done in one round-trip)
+eits tasks complete <task_id> --message \"What happened\"
+# If complete fails, fall back to:
+#   eits tasks annotate <task_id> --body \"What happened\"
+#   eits tasks update <task_id> --state done
 
 # Log commits
 eits commits create --hash <hash>

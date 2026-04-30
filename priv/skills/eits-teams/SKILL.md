@@ -205,7 +205,7 @@ If `complete` fails, fall back:
 
 ```bash
 eits tasks annotate <task_id> --body "Summary"
-eits tasks update <task_id> --state 4
+eits tasks update <task_id> --state done
 ```
 
 **Stop hook enforces completion** — `.claude/hooks/eits-task-gate.sh` blocks exit if any task is in state 2 linked to the session.

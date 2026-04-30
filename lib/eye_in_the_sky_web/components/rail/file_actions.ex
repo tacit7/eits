@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
   import Phoenix.LiveView, only: [push_event: 3, put_flash: 3]
 
   alias EyeInTheSky.Projects.FileTree
+  alias EyeInTheSkyWeb.Components.Rail.Loader
 
   def handle_file_open(%{"path" => path}, socket) do
     project = socket.assigns.sidebar_project
@@ -128,5 +129,51 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
   def handle_file_collapse(%{"path" => path}, socket) do
     expanded = MapSet.delete(socket.assigns.flyout_file_expanded, path)
     {:noreply, assign(socket, :flyout_file_expanded, expanded)}
+  end
+
+  def handle_file_refresh(socket) do
+    project = socket.assigns.sidebar_project
+
+    socket =
+      if project && project.path do
+        expanded = socket.assigns.flyout_file_expanded
+
+        # Re-fetch children for every currently expanded path.
+        # Prune any that fail (dir deleted or unreadable since last expand).
+        refreshed_children =
+          expanded
+          |> Enum.reduce(%{}, fn path, acc ->
+            case FileTree.children(project.path, path) do
+              {:ok, nodes} -> Map.put(acc, path, nodes)
+              {:error, _} -> acc
+            end
+          end)
+
+        # Prune expanded set to only paths that successfully re-fetched.
+        valid_expanded =
+          expanded
+          |> Enum.filter(&Map.has_key?(refreshed_children, &1))
+          |> MapSet.new()
+
+        case FileTree.root(project.path) do
+          {:ok, nodes} ->
+            socket
+            |> assign(:flyout_file_nodes, nodes)
+            |> assign(:flyout_file_children, refreshed_children)
+            |> assign(:flyout_file_expanded, valid_expanded)
+            |> assign(:flyout_file_error, nil)
+
+          {:error, reason} ->
+            socket
+            |> assign(:flyout_file_nodes, [])
+            |> assign(:flyout_file_children, %{})
+            |> assign(:flyout_file_expanded, MapSet.new())
+            |> assign(:flyout_file_error, Loader.file_error_message(reason))
+        end
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 end

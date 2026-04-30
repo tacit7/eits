@@ -10,6 +10,9 @@ defmodule EyeInTheSkyWeb.Components.CliFlags do
   attr :mcp_config, :string, default: nil
   attr :plugin_dir, :string, default: nil
   attr :settings_file, :string, default: nil
+  attr :compact_paths, :boolean,
+    default: false,
+    doc: "When true, wraps plugin_dir + settings_file in a 2-column grid (matches agent_schedule_form layout)."
 
   def path_fields(assigns) do
     ~H"""
@@ -41,32 +44,34 @@ defmodule EyeInTheSkyWeb.Components.CliFlags do
       />
     </div>
 
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text text-xs">Plugin Directory</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
-      </label>
-      <input
-        type="text"
-        name={field_name(@scope, "plugin_dir")}
-        value={@plugin_dir}
-        placeholder="./my-plugins"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-      />
-    </div>
+    <div class={if @compact_paths, do: "grid grid-cols-2 gap-3", else: "contents"}>
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-xs">Plugin Directory</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
+        </label>
+        <input
+          type="text"
+          name={field_name(@scope, "plugin_dir")}
+          value={@plugin_dir}
+          placeholder="./my-plugins"
+          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        />
+      </div>
 
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text text-xs">Settings File</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
-      </label>
-      <input
-        type="text"
-        name={field_name(@scope, "settings_file")}
-        value={@settings_file}
-        placeholder="./settings.json"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-      />
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-xs">Settings File</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
+        </label>
+        <input
+          type="text"
+          name={field_name(@scope, "settings_file")}
+          value={@settings_file}
+          placeholder="./settings.json"
+          class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        />
+      </div>
     </div>
     """
   end

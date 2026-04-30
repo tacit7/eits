@@ -363,6 +363,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         />
         <.path_fields
           scope="schedule"
+          compact_paths
           add_dir={@config["add_dir"]}
           mcp_config={@config["mcp_config"]}
           plugin_dir={@config["plugin_dir"]}

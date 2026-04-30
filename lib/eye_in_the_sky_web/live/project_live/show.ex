@@ -24,16 +24,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           |> assign(:project, project)
           |> assign(:sidebar_tab, :overview)
           |> assign(:sidebar_project, project)
-          |> assign(:tasks, [])
-          |> assign(:active_sessions, [])
-          |> assign(:recent_notes, [])
-          |> assign(:agent_count, 0)
-          |> assign(:working_agent_count, 0)
-          |> assign(:session_count, 0)
-          |> assign(:recent_commits, [])
-          |> assign(:open_tasks, 0)
-          |> assign(:done_tasks, 0)
-          |> assign(:claude_files, [])
+          |> assign_empty_project_data()
 
         if connected?(socket) do
           tasks = Tasks.list_tasks_for_project(project_id)
@@ -67,20 +58,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         socket
         |> assign(:page_title, "Project Not Found")
         |> assign(:project, nil)
-        |> assign(:tasks, [])
-        |> assign(:active_sessions, [])
-        |> assign(:recent_notes, [])
-        |> assign(:agent_count, 0)
-        |> assign(:working_agent_count, 0)
-        |> assign(:session_count, 0)
-        |> assign(:recent_commits, [])
-        |> assign(:open_tasks, 0)
-        |> assign(:done_tasks, 0)
-        |> assign(:claude_files, [])
+        |> assign(:sidebar_tab, :overview)
+        |> assign(:sidebar_project, nil)
+        |> assign_empty_project_data()
         |> put_flash(:error, "Invalid project ID")
       end
 
     {:ok, socket}
+  end
+
+  defp assign_empty_project_data(socket) do
+    socket
+    |> assign(:tasks, [])
+    |> assign(:active_sessions, [])
+    |> assign(:recent_notes, [])
+    |> assign(:agent_count, 0)
+    |> assign(:working_agent_count, 0)
+    |> assign(:session_count, 0)
+    |> assign(:recent_commits, [])
+    |> assign(:open_tasks, 0)
+    |> assign(:done_tasks, 0)
+    |> assign(:claude_files, [])
   end
 
   @impl true

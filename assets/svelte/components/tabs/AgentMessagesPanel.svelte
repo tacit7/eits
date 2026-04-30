@@ -646,77 +646,6 @@
                 <div class="flex-1 h-px bg-base-content/[0.04]"></div>
               </div>
             {:else}
-              <!-- Hover actions: absolute overlay, not in flex flow -->
-              <div class="absolute top-2 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
-                <!-- Reaction picker -->
-                <div class="relative">
-                  <button
-                    class="p-1 rounded text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
-                    on:click|stopPropagation={() => openReactionPickerId = openReactionPickerId === message.id ? null : message.id}
-                    title="Add reaction"
-                  >
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.536-4.464a.75.75 0 1 0-1.061-1.061 3.5 3.5 0 0 1-4.95 0 .75.75 0 0 0-1.06 1.06 5 5 0 0 0 7.07 0ZM9 8.5c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S7.448 7 8 7s1 .672 1 1.5Zm3 1.5c.552 0 1-.672 1-1.5S12.552 7 12 7s-1 .672-1 1.5.448 1.5 1 1.5Z" clip-rule="evenodd"/></svg>
-                  </button>
-                  {#if openReactionPickerId === message.id}
-                    <div
-                      class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-xl shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
-                      on:click|stopPropagation
-                    >
-                      {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji}
-                        <button
-                          class="text-lg hover:bg-base-content/[0.08] rounded p-1 transition-colors cursor-pointer leading-none"
-                          on:click={() => { live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji }); openReactionPickerId = null }}
-                          title={emoji}
-                        >{emoji}</button>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
-                <!-- Reply in thread -->
-                <button
-                  class="p-1 rounded text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
-                  on:click={() => live.pushEvent('open_thread', { message_id: String(message.id) })}
-                  title="Reply in thread"
-                >
-                  <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-4 4V5Z" clip-rule="evenodd"/></svg>
-                </button>
-                <!-- Copy -->
-                <button
-                  class="p-1 rounded text-base-content/30 hover:text-base-content/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
-                  on:click={() => navigator.clipboard.writeText(message.body || '')}
-                  title="Copy message"
-                >
-                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                </button>
-                <!-- Overflow (contains destructive actions) -->
-                <div class="relative">
-                  <button
-                    class="p-1 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
-                    on:click|stopPropagation={() => openOverflowId = openOverflowId === message.id ? null : message.id}
-                    title="More actions"
-                  >
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
-                  </button>
-                  {#if openOverflowId === message.id}
-                    <div class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-lg shadow-lg py-0.5 w-32 z-20">
-                      <button
-                        type="button"
-                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
-                        on:click|stopPropagation={() => { inspectMessage = message; openOverflowId = null }}
-                      >
-                        Inspect
-                      </button>
-                      <div class="my-0.5 border-t border-base-content/5"></div>
-                      <button
-                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-error/80 hover:bg-error/[0.08] hover:text-error transition-colors cursor-pointer"
-                        on:click|stopPropagation={() => { live.pushEvent('delete_message', { id: String(message.id) }); openOverflowId = null }}
-                      >
-                        <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                        Delete
-                      </button>
-                    </div>
-                  {/if}
-                </div>
               </div>
 
               <div class="flex items-start gap-2.5">
@@ -835,6 +764,78 @@
                   </div>
                 </div>
               </div>
+              <!-- Hover actions: absolute overlay, not in flex flow -->
+              <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
+                <!-- Reaction picker -->
+                <div class="relative">
+                  <button
+                    class="p-1 rounded text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                    on:click|stopPropagation={() => openReactionPickerId = openReactionPickerId === message.id ? null : message.id}
+                    title="Add reaction"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.536-4.464a.75.75 0 1 0-1.061-1.061 3.5 3.5 0 0 1-4.95 0 .75.75 0 0 0-1.06 1.06 5 5 0 0 0 7.07 0ZM9 8.5c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S7.448 7 8 7s1 .672 1 1.5Zm3 1.5c.552 0 1-.672 1-1.5S12.552 7 12 7s-1 .672-1 1.5.448 1.5 1 1.5Z" clip-rule="evenodd"/></svg>
+                  </button>
+                  {#if openReactionPickerId === message.id}
+                    <div
+                      class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-xl shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
+                      on:click|stopPropagation
+                    >
+                      {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji}
+                        <button
+                          class="text-lg hover:bg-base-content/[0.08] rounded p-1 transition-colors cursor-pointer leading-none"
+                          on:click={() => { live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji }); openReactionPickerId = null }}
+                          title={emoji}
+                        >{emoji}</button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+                <!-- Reply in thread -->
+                <button
+                  class="p-1 rounded text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                  on:click={() => live.pushEvent('open_thread', { message_id: String(message.id) })}
+                  title="Reply in thread"
+                >
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-4 4V5Z" clip-rule="evenodd"/></svg>
+                </button>
+                <!-- Copy -->
+                <button
+                  class="p-1 rounded text-base-content/30 hover:text-base-content/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                  on:click={() => navigator.clipboard.writeText(message.body || '')}
+                  title="Copy message"
+                >
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                </button>
+                <!-- Overflow (contains destructive actions) -->
+                <div class="relative">
+                  <button
+                    class="p-1 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                    on:click|stopPropagation={() => openOverflowId = openOverflowId === message.id ? null : message.id}
+                    title="More actions"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
+                  </button>
+                  {#if openOverflowId === message.id}
+                    <div class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-lg shadow-lg py-0.5 w-32 z-20">
+                      <button
+                        type="button"
+                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
+                        on:click|stopPropagation={() => { inspectMessage = message; openOverflowId = null }}
+                      >
+                        Inspect
+                      </button>
+                      <div class="my-0.5 border-t border-base-content/5"></div>
+                      <button
+                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-error/80 hover:bg-error/[0.08] hover:text-error transition-colors cursor-pointer"
+                        on:click|stopPropagation={() => { live.pushEvent('delete_message', { id: String(message.id) }); openOverflowId = null }}
+                      >
+                        <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        Delete
+                      </button>
+                    </div>
+                  {/if}
+                </div>
+
             {/if}
           </div>
         {/each}

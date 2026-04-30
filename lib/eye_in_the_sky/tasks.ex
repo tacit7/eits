@@ -173,7 +173,7 @@ defmodule EyeInTheSky.Tasks do
       |> Repo.insert()
 
     case result do
-      {:ok, task} -> broadcast_change({:ok, task})
+      {:ok, task} -> EyeInTheSky.Events.task_updated(task)
       _ -> :ok
     end
 
@@ -206,7 +206,7 @@ defmodule EyeInTheSky.Tasks do
 
     case task |> Task.changeset(attrs) |> Repo.update() do
       {:ok, updated} ->
-        broadcast_change({:updated, updated})
+        EyeInTheSky.Events.task_updated(updated)
         {:ok, Repo.preload(updated, @full_task_preloads, force: true)}
 
       error ->
@@ -344,7 +344,7 @@ defmodule EyeInTheSky.Tasks do
     result = Repo.delete(task)
 
     case result do
-      {:ok, _} -> broadcast_change({:deleted, task})
+      {:ok, _} -> EyeInTheSky.Events.task_updated(task)
       _ -> :ok
     end
 
@@ -369,7 +369,7 @@ defmodule EyeInTheSky.Tasks do
       end)
 
     case result do
-      {:ok, deleted} -> broadcast_change({:deleted, deleted})
+      {:ok, deleted} -> EyeInTheSky.Events.task_updated(deleted)
       _ -> :ok
     end
 
@@ -400,9 +400,4 @@ defmodule EyeInTheSky.Tasks do
   # Delegates to Tasks.Associations sub-module
   defdelegate associate_task(task, params), to: EyeInTheSky.Tasks.Associations
 
-  # PubSub
-
-  defp broadcast_change({tag, task}) when tag in [:ok, :deleted, :updated] do
-    EyeInTheSky.Events.task_updated(task)
-  end
 end

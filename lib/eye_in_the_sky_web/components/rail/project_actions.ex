@@ -2,10 +2,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 2, assign: 3]
-  import Phoenix.LiveView, only: [start_async: 3, push_navigate: 2, put_flash: 3]
+  import Phoenix.LiveView, only: [start_async: 3, push_navigate: 2, push_event: 3, put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.{Events, Projects}
+  alias EyeInTheSkyWeb.Components.Rail.Loader
 
   def handle_select_project(%{"project_id" => id_str}, socket) do
     case parse_int(id_str) do
@@ -183,4 +184,77 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # Cancelled or failed: show inline path input fallback
   def handle_pick_folder(_result, socket),
     do: {:noreply, assign(socket, :new_project_path, "")}
+
+  # Only called when sidebar_project is nil (guarded in rail.ex handle_event clause).
+  # Restores the project from a localStorage-persisted project_id after cross-LiveView nav.
+  def handle_restore_project(id_str, socket) do
+    case parse_int(id_str) do
+      nil ->
+        {:noreply, socket}
+
+      id ->
+        case Projects.get_project(id) do
+          {:ok, project} ->
+            socket =
+              socket
+              |> assign(
+                :sidebar_project,
+                project
+              )
+              |> assign(
+                :flyout_sessions,
+                Loader.load_flyout_sessions(
+                  project,
+                  socket.assigns.session_sort,
+                  socket.assigns.session_name_filter
+                )
+              )
+
+            {:noreply, socket}
+
+          {:error, _} ->
+            # Project was deleted or inaccessible — clear the stale localStorage entry.
+            {:noreply, push_event(socket, "save_project", %{project_id: nil})}
+        end
+    end
+  end
+
+  # Full select_project flow: delegates to handle_select_project/2 for the project
+  # change, then reloads sessions + files and persists the selection to localStorage.
+  def handle_select_project_with_reload(params, socket) do
+    previous_project = socket.assigns.sidebar_project
+    {:noreply, socket2} = handle_select_project(params, socket)
+    new_project = socket2.assigns.sidebar_project
+
+    socket3 =
+      if new_project != previous_project do
+        socket2
+        |> assign(
+          :flyout_sessions,
+          Loader.load_flyout_sessions(
+            new_project,
+            socket2.assigns.session_sort,
+            socket2.assigns.session_name_filter
+          )
+        )
+        |> assign(:flyout_file_expanded, MapSet.new())
+        |> assign(:flyout_file_children, %{})
+        |> Loader.maybe_load_files(socket2.assigns.active_section)
+      else
+        socket2
+      end
+
+    project_id = new_project && new_project.id
+    socket4 = push_event(socket3, "save_project", %{project_id: project_id})
+    {:noreply, socket4 |> assign(:proj_picker_open, false) |> assign(:scope_type, :project)}
+  end
+
+  def handle_select_workspace(socket) do
+    {:noreply,
+     socket
+     |> assign(:proj_picker_open, false)
+     |> assign(:sidebar_project, nil)
+     |> assign(:scope_type, :workspace)
+     |> push_navigate(to: "/workspace/sessions")}
+  end
 end

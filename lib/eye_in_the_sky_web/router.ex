@@ -258,18 +258,20 @@ defmodule EyeInTheSkyWeb.Router do
     get "/agents/:id", AgentController, :show
 
     # Messages
-    get "/messages/search", MessagingController, :search_messages
+    get "/messages/search", MessageSearchController, :search
 
-    # Messaging
+    # Direct messages
     get "/dm", MessagingController, :list_dms
     post "/dm", MessagingController, :dm
-    get "/channels", MessagingController, :list_channels
-    post "/channels", MessagingController, :create_channel
-    get "/channels/:channel_id/messages", MessagingController, :list_channel_messages
-    post "/channels/:channel_id/messages", MessagingController, :send_channel_message
-    get "/channels/:channel_id/members", MessagingController, :list_channel_members
-    post "/channels/:channel_id/members", MessagingController, :join_channel
-    delete "/channels/:channel_id/members/:session_id", MessagingController, :leave_channel
+
+    # Channels
+    get "/channels", ChannelController, :index
+    post "/channels", ChannelController, :create
+    get "/channels/:channel_id/messages", ChannelMessageController, :index
+    post "/channels/:channel_id/messages", ChannelMessageController, :create
+    get "/channels/:channel_id/members", ChannelController, :list_members
+    post "/channels/:channel_id/members", ChannelController, :join
+    delete "/channels/:channel_id/members/:session_id", ChannelController, :leave
 
     # Teams
     get "/teams", TeamController, :index

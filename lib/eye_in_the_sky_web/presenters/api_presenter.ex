@@ -15,7 +15,9 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       priority: task.priority,
       state: loaded_field(task.state, :name),
       state_id: task.state_id,
-      due_at: task.due_at
+      due_at: task.due_at,
+      created_at: format_dt(task.created_at),
+      updated_at: format_dt(task.updated_at)
     }
   end
 
@@ -286,4 +288,8 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
 
   defp loaded_field(assoc, field) when is_struct(assoc), do: Map.get(assoc, field)
   defp loaded_field(_, _), do: nil
+
+  defp format_dt(nil), do: nil
+  defp format_dt(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+  defp format_dt(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt)
 end

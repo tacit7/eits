@@ -32,13 +32,16 @@ You are a documentation updater for the EITS Web project. You coordinate a team 
    - CLI changes -> EITS_CLI.md
 6. Group commits by target doc file. Skip docs that do not exist in docs/.
 7. Save your own session UUID (from $EITS_SESSION_UUID env var).
+7a. Capture the pre-run HEAD SHA before any agent commits: PRE_RUN_SHA=$(git rev-parse HEAD)
 8. Create an EITS team: eits teams create --name "doc-update-$(date +%Y%m%d)"
-9. For each doc that needs updating, spawn a team member agent with eits agents spawn with these sub-agent instructions (fill in the placeholders):
+9. Build a JSON array of agent entries and spawn all at once with spawn-batch:
+
+   For each doc that needs updating, add an entry to the array with instructions:
 
    You are updating docs/TARGET_DOC for the EITS Web project.
-   
+
    Commits to apply: COMMIT_SHA_LIST
-   
+
    Steps:
    1. Claim a task: eits tasks begin --title "Update TARGET_DOC"
    2. Run git show SHA for each commit to understand the changes.
@@ -47,12 +50,29 @@ You are a documentation updater for the EITS Web project. You coordinate a team 
    5. Write the updated file back.
    6. Complete your task: eits tasks complete TASK_ID --message "Updated TARGET_DOC"
    7. DM the orchestrator: eits dm --to ORCHESTRATOR_SESSION_UUID --message "done:TARGET_DOC"
-   
+
    Do not write to doc_update_suggestions.md.
 
-10. Poll eits teams status TEAM_ID every 30s until all members finish. Timeout after 10 minutes.
-11. Stage and commit all updated docs: git add docs/ && git commit -m "docs: apply doc updates $(date +%Y-%m-%d)"
-12. Write HEAD SHA to `docs/last_doc_run_commit`.
+   Then write the array to a temp file and spawn:
+
+   ```bash
+   cat > /tmp/doc-agents.json << 'EOF'
+   [
+     {"instructions": "...", "team_id": TEAM_ID},
+     {"instructions": "...", "team_id": TEAM_ID}
+   ]
+   EOF
+   EITS_URL=http://localhost:5001/api/v1 eits agents spawn-batch --file /tmp/doc-agents.json
+   ```
+
+10. Poll with an until loop until all members finish (timeout 10 min):
+    ```bash
+    until eits teams status TEAM_ID --summary 2>&1 | grep -q "0 working"; do sleep 15; done
+    ```
+11. Write PRE_RUN_SHA to docs/last_doc_run_commit, then stage and commit all updated docs in one shot:
+    echo "$PRE_RUN_SHA" > docs/last_doc_run_commit && git add docs/ && git commit -m "docs: apply doc updates $(date +%Y-%m-%d)"
+    This records the SHA of the last commit before this run, so the next run skips the doc commit cleanly.
+    Do not write the tracking file in a separate commit after the docs commit.
 
 Do not write suggestions. Apply actual updates. Only document what is in the commits.
 

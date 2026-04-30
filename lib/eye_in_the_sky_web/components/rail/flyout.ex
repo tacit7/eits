@@ -56,29 +56,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           <%!-- Icon + label: agents always links to /agents; dual-page sections link to project route when available --%>
           <%= cond do %>
             <% @active_section == :agents -> %>
-              <.link
-                navigate={agents_route(@sidebar_project)}
-                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
-              >
-                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
-                  <.custom_icon name="lucide-robot" class="size-3.5" />
-                </span>
-                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
-                  Agents
-                </span>
-              </.link>
+              <.section_header_link
+                route={agents_route(@sidebar_project)}
+                icon="lucide-robot"
+                label="Agents"
+                custom={true}
+              />
             <% @active_section == :teams -> %>
-              <.link
-                navigate={teams_route(@sidebar_project)}
-                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
-              >
-                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
-                  <.icon name="hero-users" class="size-3.5" />
-                </span>
-                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
-                  Teams
-                </span>
-              </.link>
+              <.section_header_link
+                route={teams_route(@sidebar_project)}
+                icon="hero-users"
+                label="Teams"
+              />
             <% dual_page_section?(@active_section) && project_route_for(@active_section, @sidebar_project) -> %>
               <.link
                 navigate={project_route_for(@active_section, @sidebar_project)}
@@ -97,53 +86,21 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 </span>
               </.link>
             <% @active_section == :usage -> %>
-              <.link
-                navigate="/usage"
-                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
-              >
-                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
-                  <.icon name="hero-chart-bar" class="size-3.5" />
-                </span>
-                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
-                  Usage
-                </span>
-              </.link>
+              <.section_header_link route="/usage" icon="hero-chart-bar" label="Usage" />
             <% @active_section == :chat -> %>
-              <.link
-                navigate="/chat"
-                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
-              >
-                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
-                  <.icon name="hero-chat-bubble-left-ellipsis" class="size-3.5" />
-                </span>
-                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
-                  Chat
-                </span>
-              </.link>
+              <.section_header_link
+                route="/chat"
+                icon="hero-chat-bubble-left-ellipsis"
+                label="Chat"
+              />
             <% @active_section == :canvas -> %>
-              <.link
-                navigate="/canvases"
-                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
-              >
-                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
-                  <.icon name="hero-squares-2x2" class="size-3.5" />
-                </span>
-                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
-                  Canvas
-                </span>
-              </.link>
+              <.section_header_link route="/canvases" icon="hero-squares-2x2" label="Canvas" />
             <% @active_section == :skills -> %>
-              <.link
-                navigate={skills_route(@sidebar_project)}
-                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
-              >
-                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
-                  <.icon name="hero-bolt" class="size-3.5" />
-                </span>
-                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
-                  Skills
-                </span>
-              </.link>
+              <.section_header_link
+                route={skills_route(@sidebar_project)}
+                icon="hero-bolt"
+                label="Skills"
+              />
             <% true -> %>
               <div class="flex-1 min-w-0 flex items-center gap-1.5">
                 <span class="flex-shrink-0 flex items-center justify-center text-base-content/20">
@@ -810,6 +767,31 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         [{node, depth}]
       end
     end)
+  end
+
+  attr :route, :string, required: true
+  attr :icon, :string, required: true
+  attr :label, :string, required: true
+  attr :custom, :boolean, default: false
+
+  defp section_header_link(assigns) do
+    ~H"""
+    <.link
+      navigate={@route}
+      class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
+    >
+      <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
+        <%= if @custom do %>
+          <.custom_icon name={@icon} class="size-3.5" />
+        <% else %>
+          <.icon name={@icon} class="size-3.5" />
+        <% end %>
+      </span>
+      <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+        {@label}
+      </span>
+    </.link>
+    """
   end
 
   defp section_label(:agents), do: "Agents"

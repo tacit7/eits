@@ -28,6 +28,8 @@ defmodule EyeInTheSkyWeb.MockupLive do
     end
   end
 
+  def handle_info(_, socket), do: {:noreply, socket}
+
   defp schedule_poll, do: Process.send_after(self(), :poll, @poll_interval)
 
   defp read_mockup do

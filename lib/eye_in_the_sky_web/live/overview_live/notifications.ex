@@ -41,6 +41,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
     {:noreply, assign(socket, :notifications, load_notifications(socket.assigns.filter))}
   end
 
+  def handle_info(_, socket), do: {:noreply, socket}
+
   @impl true
   def handle_event("mark_read", %{"id" => id}, socket) do
     case parse_int(id) do

@@ -97,6 +97,8 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
     {:noreply, assign(socket, saved: false, saved_timer: nil)}
   end
 
+  def handle_info(_, socket), do: {:noreply, socket}
+
   @impl true
   def render(assigns) do
     ~H"""

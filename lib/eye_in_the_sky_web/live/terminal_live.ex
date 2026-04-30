@@ -64,6 +64,8 @@ defmodule EyeInTheSkyWeb.TerminalLive do
      |> push_event("pty_output", %{data: Base.encode64("\r\n[process exited]\r\n")})}
   end
 
+  def handle_info(_, socket), do: {:noreply, socket}
+
   @impl true
   def render(assigns) do
     ~H"""

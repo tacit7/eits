@@ -52,6 +52,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
     {:noreply, socket}
   end
 
+  def handle_info(_, socket), do: {:noreply, socket}
+
   defp load_all_async(socket, range) do
     assign_async(
       socket,

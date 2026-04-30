@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
           if connected?(socket) do
             EyeInTheSky.Events.subscribe_teams()
             team = load_team_detail(team)
+
             socket
             |> assign(:team, team)
             |> assign(:team_id, team_id)
@@ -62,6 +63,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
   end
 
   def handle_info({:new_message, _message}, socket), do: {:noreply, socket}
+
+  def handle_info(_, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("select_agent", %{"id" => session_id_str}, socket) do

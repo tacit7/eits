@@ -50,6 +50,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
     {:noreply, put_flash(socket, level, msg)}
   end
 
+  def handle_info(_, socket), do: {:noreply, socket}
+
   # run_now is handled directly in the parent so "Job triggered" flash propagates
   # to @flash (component socket flash is not rendered here).
   @impl true

@@ -19,7 +19,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:show_all, false)
       |> assign(:teams, [])
 
-    socket = if connected?(socket), do: assign(socket, :teams, load_teams(socket, false, false)), else: socket
+    socket =
+      if connected?(socket),
+        do: assign(socket, :teams, load_teams(socket, false, false)),
+        else: socket
 
     {:ok, socket}
   end
@@ -41,7 +44,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:show_all, true)
       |> assign(:teams, [])
 
-    socket = if connected?(socket), do: assign(socket, :teams, load_teams(socket, false, true)), else: socket
+    socket =
+      if connected?(socket),
+        do: assign(socket, :teams, load_teams(socket, false, true)),
+        else: socket
 
     {:ok, socket}
   end
@@ -49,23 +55,40 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   @impl true
   def handle_params(%{"show_all" => "true"}, _uri, socket) do
     socket = assign(socket, :show_all, true)
-    socket = if connected?(socket), do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, true)), else: socket
+
+    socket =
+      if connected?(socket),
+        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, true)),
+        else: socket
+
     {:noreply, socket}
   end
 
   def handle_params(_params, _uri, socket) do
     socket = assign(socket, :show_all, false)
-    socket = if connected?(socket), do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, false)), else: socket
+
+    socket =
+      if connected?(socket),
+        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, false)),
+        else: socket
+
     {:noreply, socket}
   end
 
   @impl true
   def handle_info({event, _payload}, socket)
       when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left] do
-    {:noreply, assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all))}
+    {:noreply,
+     assign(
+       socket,
+       :teams,
+       load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all)
+     )}
   end
 
   def handle_info({:new_message, _message}, socket), do: {:noreply, socket}
+
+  def handle_info(_, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
@@ -81,7 +104,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       team_id ->
         team = Teams.get_team!(team_id)
         {:ok, _} = Teams.delete_team(team)
-        {:noreply, assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all))}
+
+        {:noreply,
+         assign(
+           socket,
+           :teams,
+           load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all)
+         )}
     end
   end
 
@@ -110,7 +139,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         </span>
         <%= if @project do %>
           <.link
-            navigate={if @show_all, do: ~p"/projects/#{@project.id}/teams", else: ~p"/projects/#{@project.id}/teams?show_all=true"}
+            navigate={
+              if @show_all,
+                do: ~p"/projects/#{@project.id}/teams",
+                else: ~p"/projects/#{@project.id}/teams?show_all=true"
+            }
             class={[
               "text-xs px-2 py-1 rounded transition-colors",
               if(@show_all,

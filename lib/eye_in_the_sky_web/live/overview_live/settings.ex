@@ -256,6 +256,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     {:noreply, assign(socket, :settings, settings)}
   end
 
+  def handle_info(_, socket), do: {:noreply, socket}
+
   defp flash_saved(socket, _key) do
     put_flash(socket, :info, "Saved")
   end
@@ -301,10 +303,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <%= if msg = @flash["error"] do %>
-        <div id="flash-error" role="alert" class="alert alert-error text-sm mb-4 max-w-4xl mx-auto">{msg}</div>
+        <div id="flash-error" role="alert" class="alert alert-error text-sm mb-4 max-w-4xl mx-auto">
+          {msg}
+        </div>
       <% end %>
       <%= if msg = @flash["info"] do %>
-        <div id="flash-info" role="alert" class="alert alert-info text-sm mb-4 max-w-4xl mx-auto">{msg}</div>
+        <div id="flash-info" role="alert" class="alert alert-info text-sm mb-4 max-w-4xl mx-auto">
+          {msg}
+        </div>
       <% end %>
       <div class="max-w-4xl mx-auto space-y-6">
         <div class="tabs tabs-bordered overflow-x-auto flex-nowrap whitespace-nowrap">

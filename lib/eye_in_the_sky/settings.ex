@@ -38,7 +38,8 @@ defmodule EyeInTheSky.Settings do
     "theme" => "dark",
     "palette_shortcut" => "auto",
     "use_anthropic_api_key" => "false",
-    "rate_limit_per_session" => "false"
+    "rate_limit_per_session" => "false",
+    "agent_notifications" => "false"
   }
 
   @doc "Get a single setting value, falling back to default."

@@ -171,6 +171,31 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
 
       <section>
         <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+          Notifications
+        </h2>
+        <div class="card bg-base-100 border border-base-300 shadow-sm">
+          <div class="card-body p-0 divide-y divide-base-300">
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Agent completion notifications</p>
+                <p class="text-xs text-base-content/50 mt-0.5">
+                  Show an in-app notification when an agent finishes. Off by default.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-primary"
+                checked={@settings["agent_notifications"] == "true"}
+                phx-click="toggle_setting"
+                phx-value-key="agent_notifications"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
           Keyboard
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">

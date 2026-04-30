@@ -277,7 +277,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     # sandbox teardown: the handle_info may still be executing when the test
     # process exits, crashing the GenServer and eventually the AgentSupervisor.
     # Notifications are tested directly in notifications_test.exs.
-    if Application.get_env(:eye_in_the_sky, :async_tasks_sync, false) do
+    # Skip when the user has not opted in to agent completion notifications.
+    if Application.get_env(:eye_in_the_sky, :async_tasks_sync, false) or
+         not EyeInTheSky.Settings.get_boolean("agent_notifications") do
       :ok
     else
       meta = Logger.metadata()

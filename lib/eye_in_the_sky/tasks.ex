@@ -26,7 +26,7 @@ defmodule EyeInTheSky.Tasks do
   defdelegate get_workflow_state!(id), to: EyeInTheSky.WorkflowStates
   defdelegate get_workflow_state_by_name(name), to: EyeInTheSky.WorkflowStates
 
-  defdelegate list_tags(), to: EyeInTheSky.TaskTags
+  defdelegate list_tags(opts \\ []), to: EyeInTheSky.TaskTags
   defdelegate get_tag!(id), to: EyeInTheSky.TaskTags
   defdelegate update_tag(tag, attrs), to: EyeInTheSky.TaskTags
   defdelegate get_or_create_tag(name), to: EyeInTheSky.TaskTags

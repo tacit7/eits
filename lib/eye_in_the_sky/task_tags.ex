@@ -9,8 +9,14 @@ defmodule EyeInTheSky.TaskTags do
 
   @doc """
   Returns the list of tags, optionally filtered by name search (case-insensitive substring).
+
+  Options:
+  - `:search` - case-insensitive substring filter on tag name
+  - `:limit` - cap results (default: 500)
   """
   def list_tags(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     query =
       case Keyword.get(opts, :search) do
         search when is_binary(search) and search != "" ->
@@ -20,7 +26,10 @@ defmodule EyeInTheSky.TaskTags do
           Tag
       end
 
-    Repo.all(query)
+    query
+    |> order_by([t], asc: t.name)
+    |> limit(^limit)
+    |> Repo.all()
   end
 
   @doc """
@@ -43,16 +52,20 @@ defmodule EyeInTheSky.TaskTags do
 
   @doc """
   Gets or creates a tag by name.
+
+  Uses an atomic upsert to avoid the TOCTOU race of SELECT-then-INSERT.
+  ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name is a no-op write that
+  forces the row into RETURNING even when the tag already exists, so no second
+  SELECT is needed in concurrent scenarios.
   """
   def get_or_create_tag(name) do
-    case Repo.get_by(Tag, name: name) do
-      nil ->
-        %Tag{}
-        |> Tag.changeset(%{name: name})
-        |> Repo.insert()
-
-      tag ->
-        {:ok, tag}
+    case Repo.insert_all(Tag, [%{name: name}],
+           on_conflict: {:replace, [:name]},
+           conflict_target: :name,
+           returning: true
+         ) do
+      {_n, [tag]} -> {:ok, tag}
+      _ -> {:error, :insert_failed}
     end
   end
 

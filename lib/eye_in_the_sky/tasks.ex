@@ -292,7 +292,7 @@ defmodule EyeInTheSky.Tasks do
     case result do
       {:ok, updated} ->
         EyeInTheSky.Events.task_updated(updated)
-        {:ok, updated}
+        {:ok, Repo.preload(updated, @full_task_preloads, force: true)}
 
       {:error, reason} ->
         {:error, reason}

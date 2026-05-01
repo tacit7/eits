@@ -383,6 +383,63 @@ Rules of thumb:
 
 ---
 
+## Exception Handling Best Practices
+
+**Problem:** Bare `rescue` clauses hide unexpected errors and make debugging difficult.
+
+**Pattern (commit b535769e):** Always rescue specific exception types. Narrow bare `rescue _` to expected exceptions only.
+
+**Specific exception types by layer:**
+
+| Layer | Exception Type | Reason |
+|-------|---|---|
+| Terminal/PTY | `ErlangError` | Raised by `:erlexec.stop/1` when process is dead |
+| System commands | `ErlangError` | Raised by `System.cmd/3` on exec failure |
+| Database | `DBConnection.ConnectionError` \| `Postgrex.Error` | Connection issues or query syntax errors |
+| File I/O | `File.Error` | Missing files, permission denied |
+
+**Before (Antipattern):**
+```elixir
+# ❌ Bare rescue hides real errors (typos, unexpected exceptions)
+try do
+  :erlexec.stop(pid)
+rescue
+  _ -> :ok  # Could be ArgumentError (typo), Badmatch, etc.
+end
+```
+
+**After (Safe):**
+```elixir
+# ✅ Specific rescue for expected error
+try do
+  :erlexec.stop(pid)
+rescue
+  ErlangError -> :ok  # Process was already dead, which is fine
+end
+
+# When multiple exceptions are possible, list all of them
+try do
+  Postgrex.query(conn, sql, params)
+rescue
+  DBConnection.ConnectionError ->
+    Logger.warning("DB connection lost")
+    {:error, :connection_lost}
+  Postgrex.Error ->
+    Logger.warning("Query failed")
+    {:error, :query_failed}
+end
+```
+
+**Examples from codebase (commit b535769e):**
+- `pty_server.ex` — rescue `ErlangError` when calling `:erlexec.stop/1` on a dead process
+- `block_work_on_main.ex` — rescue `ErlangError` from `System.cmd/3` failure + log warning
+- `block_push_master.ex` — rescue `ErlangError` from `System.cmd/3` failure + log warning
+- `project_identity.ex` — rescue `DBConnection.ConnectionError | Postgrex.Error` with logging
+
+**Rule:** Never use bare `rescue _`. Always specify the exception type(s) you expect. Add a `Logger.warning/1` for unexpected failures to enable debugging.
+
+---
+
 ## Context Safety Patterns
 
 **Problem:** User input flowing through contexts can crash the server if not validated.
@@ -778,6 +835,44 @@ Centered empty state with optional icon, title, and subtitle:
 
 ---
 
+### Rail Sub-Components
+
+**Pattern (commit 3b0ca35c):** The sidebar `Rail` component was refactored from a monolithic 967-line file into focused sub-components. Each panel owns its section's content, filtering logic, and action buttons.
+
+**Extracted sub-components:**
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `Rail.FilePanel` | `lib/eye_in_the_sky_web_web/components/rail/file_panel.ex` | File tree rendering, expand/collapse state, path display |
+| `Rail.Loader` | `lib/eye_in_the_sky_web_web/components/rail/loader.ex` | Agents list: filtering, sorting, search integration |
+| `Rail.ProjectActions` | `lib/eye_in_the_sky_web_web/components/rail/project_actions.ex` | Project section header, create/manage buttons |
+| `Rail.SectionActions` | `lib/eye_in_the_sky_web_web/components/rail/section_actions.ex` | Section-level actions: collapse, sort options |
+| `Rail.FileActions` | `lib/eye_in_the_sky_web_web/components/rail/file_actions.ex` | File-level actions: open, rename, delete dropdowns |
+| `Rail.FilterActions` | `lib/eye_in_the_sky_web_web/components/rail/filter_actions.ex` | Filter/search controls and display state |
+
+**Why this pattern:**
+- **Focused components:** Each sub-component handles one panel's lifecycle (mount, filtering, sorting, rendering)
+- **Reusability:** Panel logic can be tested and reused independently
+- **Maintainability:** Changes to file tree rendering don't affect agent filtering logic
+- **Separation of concerns:** Action buttons, filtering, and content rendering are separated
+
+**Usage in main Rail component:**
+
+```elixir
+# Main Rail orchestrates sub-components
+def render(assigns) do
+  ~H"""
+  <.file_panel project={@project} ... />
+  <.loader agents={@agents} selected_id={@selected_id} ... />
+  <.project_actions project={@project} ... />
+  """
+end
+```
+
+**Result:** Monolithic 967-line `Rail.ex` → 466 lines + 621 lines distributed across sub-modules.
+
+---
+
 ### DM Message Component Consolidation
 
 **Pattern (commit 10d75ff3):** When a message-rendering component is duplicated across 2+ contexts with size variations, extract it into a shared component with `compact` and `extra_id` attrs instead of maintaining parallel copies.
@@ -863,6 +958,37 @@ Contexts extracted from the monolithic `Tasks` context:
 | `ChecklistItems` | `lib/eye_in_the_sky_web/checklist_items.ex` | Checklist item CRUD scoped to tasks |
 
 These replace direct `Tasks.*` calls for tag/checklist/state operations in new code.
+
+### Context Extractions (Messages)
+
+The `Messages` context was refactored into sub-modules for clarity and testability (commit 6ee2d5b6):
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `Messages.Listings` | `lib/eye_in_the_sky/messages/listings.ex` | Query builders for message listing, filtering, pagination |
+| `Messages.Search` | `lib/eye_in_the_sky/messages/search.ex` | Full-text search via PgSearch, prefix-aware tsquery |
+
+The main `Messages` module now documents sub-module locations in its module doc:
+
+```elixir
+@moduledoc """
+The Messages context for managing agent-user messaging.
+
+Query/listing helpers live in `Messages.Listings`.
+Full-text search lives in `Messages.Search`.
+"""
+```
+
+**API Controllers** were also split for clarity (commit 6ee2d5b6):
+- `ChannelController` — channel CRUD operations
+- `ChannelMessageController` — message send/edit/delete for channels
+- `MessageSearchController` — full-text search endpoint
+
+**Why this pattern:**
+- **Query isolation:** Listing logic (`from`, `where`, `order_by`, preload) lives in one module, searchable and testable
+- **Search specialization:** Complex search logic (tsquery, rank, highlighting) is separate from standard CRUD
+- **API clarity:** Each controller owns one domain (channels, messages, search), not a single monolithic `MessagingController`
+- **Reusability:** Listing queries are shared between REST API, LiveView, and CLI commands
 
 ---
 
@@ -1943,13 +2069,32 @@ end
 
 **Problem:** Multiple controllers or contexts repeat the same parameter parsing logic (e.g., `Integer.parse/1` with error handling).
 
-**Solution:** Define the helper once in `ControllerHelpers` and reuse it across all callers.
+**Solution:** Define the helper once in a shared module and reuse it across all callers. There are two locations depending on the layer:
+- **Controller/LiveView layer:** `ControllerHelpers.parse_int/1` — located in `lib/eye_in_the_sky_web/helpers/controller_helpers.ex`
+- **Context/GenServer layer:** `ToolHelpers.parse_int/1` — located in `lib/eye_in_the_sky/utils/tool_helpers.ex`
 
-**Pattern (commit 63973f7f):**
+**Pattern (commits b535769e, e7cee36f):**
 
 ```elixir
 # ✅ Single definition in ControllerHelpers
 defmodule EyeInTheSkyWeb.ControllerHelpers do
+  def parse_int(raw) when is_integer(raw), do: raw
+
+  def parse_int(raw) when is_binary(raw) do
+    case Integer.parse(raw) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+  
+  # Moved from SessionController and TaskController (no more duplication)
+  def resolve_agent_int_id(raw) do
+    parse_int(raw) || raise ArgumentError, "invalid agent ID"
+  end
+end
+
+# ✅ Same pattern in ToolHelpers for context layer
+defmodule EyeInTheSky.Utils.ToolHelpers do
   def parse_int(raw) when is_integer(raw), do: raw
 
   def parse_int(raw) when is_binary(raw) do
@@ -1986,12 +2131,17 @@ defmodule TaskController do
 end
 ```
 
+**Consolidated locations (commit b535769e):**
+- Replaced 11 files using raw `Integer.parse/1` with calls to `ControllerHelpers.parse_int/1` (LiveView/controller layer) or `ToolHelpers.parse_int/1` (context/GenServer layer)
+- Removed `resolve_session_int_id` duplication — now calls `parse_int` internally
+- Moved `resolve_agent_int_id` to `ControllerHelpers` (commit e7cee36f) to eliminate duplicate definitions in SessionController and TaskController
+
 **When to extract:**
 - The same parsing logic appears in 2+ modules
 - It's a fundamental type conversion (int, uuid, slug)
 - It needs consistent error handling across the app
 
-**Rule:** Shared parameter parsing lives in `ControllerHelpers`. Don't duplicate `parse_int`, `parse_uuid`, or similar functions across controllers.
+**Rule:** Shared parameter parsing lives in `ControllerHelpers` (web layer) or `ToolHelpers` (context layer). Never duplicate `parse_int` or similar functions. Check the registry before writing a new parser.
 
 ---
 
@@ -2169,12 +2319,32 @@ end
 
 ### Examples in Codebase
 
-| Parent | Sub-module | Responsibility |
-|--------|-----------|-----------------|
-| `AgentManager` | `AgentManager.RecordBuilder` | UUID/project/worktree resolution, agent + session record creation |
-| `AgentDefinitions` | `AgentDefinitions.FrontmatterParser` | Parse frontmatter YAML from definition files |
-| `Codex.SDK` | `Codex.ToolMapper` | Map tool descriptions for Codex API requests |
-| `ProjectLive.Sessions` | `ProjectLive.Sessions.Selection` | Pure state derivation (indeterminate IDs, select-all toggles) |
+| Parent | Sub-module | Responsibility | Commit |
+|--------|-----------|-----------------|--------|
+| `AgentManager` | `AgentManager.RecordBuilder` | UUID/project/worktree resolution, agent + session record creation | — |
+| `AgentDefinitions` | `AgentDefinitions.FrontmatterParser` | Parse frontmatter YAML from definition files | — |
+| `Codex.SDK` | `Codex.ToolMapper` | Map tool descriptions for Codex API requests | 499b70b6 |
+| `ProjectLive.Sessions` | `ProjectLive.Sessions.Selection` | Pure state derivation (indeterminate IDs, select-all toggles) | 58d7bca8 |
+| `Messages` | `Messages.Listings` | Query builders for message listing, filtering, pagination | 6ee2d5b6 |
+| `Messages` | `Messages.Search` | Full-text search via PgSearch, prefix-aware tsquery | 6ee2d5b6 |
+| `Rail` | `Rail.FilePanel`, `Rail.Loader`, `Rail.ProjectActions`, etc. | Sidebar sub-components: file tree, agents, project actions, filters | 3b0ca35c |
+| `ProjectLive.Tasks` | `TasksBulkActions` (component) | Bulk task actions and flash message generation | 304d5885 |
+
+### Recent Large Extractions
+
+**Commit 304d5885 (Tasks refactoring):**
+- Extracted `Tasks.ex` from 578→365 lines, extracted action logic to `ProjectLive.TasksBulkActions` component and `TasksHelpers`
+- Extracted `AgentWorker.ex` from 639→501 lines, split into sub-modules (`queue_manager.ex`, `reconciliation.ex`)
+- Result: Focused modules, easier to test, clear separation of concerns
+
+**Commit 6ee2d5b6 (Messages refactoring):**
+- Extracted `Messages.ex` from 599→247 lines (Listings and Search sub-modules)
+- Split `MessagingController` from 610→208 lines (channels, messages, search controllers)
+- Result: Canonical query location, searchable logic, reusable across REST API and LiveView
+
+**Commit 3b0ca35c (Rail refactoring):**
+- Extracted `Rail.ex` from 967→466 lines (6 sub-components: FilePanel, Loader, ProjectActions, SectionActions, FileActions, FilterActions)
+- Result: Focused panel components, testable filtering/sorting logic, cleaner state management
 
 ### When to Extract
 
@@ -2182,8 +2352,9 @@ end
 - Logic is reused or would be reused from multiple callers
 - Logic has different test requirements (unit vs integration)
 - Module would benefit from sub-namespace organization
+- Multiple concerns are tangled (filtering, sorting, rendering, actions)
 
-**Rule:** Extract to sub-modules to keep contexts under 200 lines and each module focused on one job. Sub-modules are named `Parent.SubModule` and live in `lib/parent/sub_module.ex`.
+**Rule:** Extract to sub-modules to keep contexts under 200-300 lines and each module focused on one job. Sub-modules are named `Parent.SubModule` and live in `lib/parent/sub_module.ex`. Components extracted to UI live as `.ex` files in the `components/` directory with matching hierarchy (e.g., `Rail.FilePanel` → `components/rail/file_panel.ex`).
 
 ---
 

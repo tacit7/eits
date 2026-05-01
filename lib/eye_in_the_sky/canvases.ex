@@ -101,18 +101,37 @@ defmodule EyeInTheSky.Canvases do
   end
 
   def reset_canvas_layout(canvas_id) do
-    # Bypass update_window_layout/2 (which does a redundant Repo.get) since we
-    # already have each struct from list_canvas_sessions/1. Goes from 1+2N to 1+N queries.
-    canvas_id
-    |> list_canvas_sessions()
-    |> Enum.with_index()
-    |> Enum.each(fn {cs, i} ->
-      cs
-      |> CanvasSession.changeset(%{pos_x: 24 + i * 40, pos_y: 24 + i * 40, width: 320, height: 260})
-      |> Repo.update()
-    end)
+    sessions = list_canvas_sessions(canvas_id)
 
-    :ok
+    if sessions == [] do
+      :ok
+    else
+      # H5 fix: one unnest UPDATE-FROM replaces N individual Repo.update calls.
+      # Each row has a different (pos_x, pos_y) computed from its index, so
+      # a plain Repo.update_all with a single SET cannot be used.
+      {ids, xs, ys} =
+        sessions
+        |> Enum.with_index()
+        |> Enum.reduce({[], [], []}, fn {cs, i}, {id_acc, x_acc, y_acc} ->
+          {[cs.id | id_acc], [24 + i * 40 | x_acc], [24 + i * 40 | y_acc]}
+        end)
+
+      Repo.query!(
+        """
+        UPDATE canvas_sessions AS cs
+        SET pos_x = v.pos_x,
+            pos_y = v.pos_y,
+            width = 320,
+            height = 260,
+            updated_at = NOW()
+        FROM unnest($1::bigint[], $2::int[], $3::int[]) AS v(id, pos_x, pos_y)
+        WHERE cs.id = v.id
+        """,
+        [ids, xs, ys]
+      )
+
+      :ok
+    end
   end
 
   def count_sessions_per_canvas do

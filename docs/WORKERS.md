@@ -2,6 +2,45 @@
 
 This document describes the OTP workers (GenServers) that process async jobs and background tasks.
 
+## AgentWorker Architecture
+
+AgentWorker and related modules manage Claude/Codex subprocess lifecycle, queue processing, and session state. As of the 2026-04-30 refactor, these responsibilities are distributed across focused sub-modules to keep the main worker lean.
+
+### AgentWorker.Reconciliation: Stream and Event Management
+
+Extracted sub-module handling stream assembly, message dispatch, and session state updates.
+
+**Responsibilities:**
+- `maybe_dispatch_commands(message, state)` — routes tool-use messages to CmdDispatcher when appropriate
+- `maybe_sync_provider_conversation_id(state, conversation_id)` — syncs Codex thread_id or Claude conversation_id to session.uuid for resume
+- `maybe_mark_session_failed(session_id, reason)` — marks sessions failed and fires cleanup events (rarely called; most failures go through ErrorRecovery)
+- `broadcast_events(events, state)` — broadcasts stream assembly events (thinking, tool_use, result) to UI via PubSub
+- `start_job_trace(state)` — prepares trace logging for a new job
+- `clear_job_trace(state)` — finalizes and clears the trace
+- `emit(metric, metadata, state)` — emits telemetry for job completion and lifecycle events
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker/reconciliation.ex` — all reconciliation functions
+
+**Commits:** 3077ed6e (refactor: extract Reconciliation module)
+
+### AgentWorker.QueueManager: Message Queue Operations
+
+Sub-module managing job submission and queue handling.
+
+**Responsibilities:**
+- `submit(message, context, state)` — enqueues a message for processing by the running agent (exported from `process_submit/3`)
+  - Wraps message in a `Job`, normalizes context, appends to queue
+  - Returns `{:ok, queue_id}` or error
+- Manages the job queue state machine
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker/queue_manager.ex`
+
+**Commits:** 3077ed6e (refactor: extract QueueManager.submit from process_submit)
+
+---
+
 ## AgentWorker: Orphaned Claude Process Cleanup
 
 When the server restarts while a Claude subprocess is still running, that orphaned process holds the Claude session lock. The next attempt to start the same session gets a `"Session ID already in use"` error from the CLI.
@@ -107,6 +146,34 @@ When AgentWorker encounters a systemic error (billing/auth failure, API limits),
 - `lib/eye_in_the_sky/worker_events.ex` — PubSub event broadcasting
 
 **Commits:** 62933518 (systemic error handling + DB write + Teams cleanup), af425751 (deduplication fix)
+
+---
+
+## Team Member Bulk Updates
+
+Teams.mark_member_done_by_session now uses a single atomic bulk UPDATE instead of looping per-row.
+
+**Before (removed):**
+- Queried matching team members with `where: [session_id: session_id]`
+- For each member: individual `Repo.update/2` call
+- O(N) roundtrips, slow broadcasts
+
+**After (current):**
+- Single `Repo.update_all/2` with `returning: true`
+- One roundtrip for all members in the team
+- Returns full rows so broadcasts fire directly on the result set
+- Significantly faster for large teams
+
+**Agent Spawn Upsert:**
+- `find_or_create_agent/2` collapsed from 3 queries (SELECT → INSERT → SELECT) to 1
+- Uses `ON CONFLICT DO UPDATE SET uuid = EXCLUDED.uuid with returning: true`
+- Atomic upsert in a single roundtrip
+
+**Code locations:**
+- `lib/eye_in_the_sky/teams.ex` — `mark_member_done_by_session/2` with bulk UPDATE
+- `lib/eye_in_the_sky/agents.ex` — `find_or_create_agent/2` with ON CONFLICT upsert
+
+**Commits:** b8972bb4 (perf: bulk UPDATE and upsert optimization)
 
 ---
 
@@ -546,6 +613,88 @@ The RateLimit plug now recognizes orchestrator traffic and applies a separate, h
 - Tests: `test/eye_in_the_sky_web/plugs/rate_limit_test.exs`
 
 **Commits:** 017b0a3e (add eits queue status/flush + orchestrator rate-limit bump)
+
+---
+
+## Session Token/Cost Caching
+
+Sessions cache total token and cost metrics on the session row to avoid expensive aggregate scans.
+
+**Architecture:**
+1. **Cache columns:** `sessions.total_tokens` (integer) and `sessions.total_cost_usd` (float), both NOT NULL with DEFAULT 0 / 0.0
+2. **Atomic increment:** `Sessions.increment_usage_cache(session_id, tokens, cost)` does a single `UPDATE .. inc` on the session row
+3. **Cache-first reads:** `Messages.Aggregations.total_tokens_for_session/1` and `total_cost_for_session/1` read the cached value first (O(1))
+   - Fall back to full aggregate scan over messages only when cached value is nil (pre-migration sessions)
+4. **Update trigger:** `Messages.create_message/1` and `create_channel_message/1` call `maybe_increment_session_cache/1` after each successful insert when usage metadata is present
+   - Extracts `input_tokens`, `output_tokens`, and `total_cost_usd` from message metadata
+   - Calls `Sessions.increment_usage_cache/3` atomically
+
+**Benefits:**
+- O(1) latency for session usage queries (no table scans)
+- Backward compatible: pre-cache sessions fall back to aggregate scan automatically
+- Atomic updates prevent read-modify-write races
+
+**Code locations:**
+- `lib/eye_in_the_sky/sessions.ex` — `increment_usage_cache/3`
+- `lib/eye_in_the_sky/messages.ex` — `maybe_increment_session_cache/1` and helper extraction functions
+- `lib/eye_in_the_sky/messages/aggregations.ex` — `total_tokens_for_session/1`, `total_cost_for_session/1` with cache-first logic
+- `lib/eye_in_the_sky/sessions/session.ex` — field schema additions
+- Migration: `20260501110334_add_token_cost_cache_to_sessions.exs`
+
+**Commits:** 819b61e9 (add session token/cost cache columns and increment helper)
+
+---
+
+## Channel Message Error Handling
+
+Errors in message routing no longer crash LiveView when a session is deleted or message insert fails.
+
+**Before (removed):**
+- `route_to_members/5` in channel_helpers.ex called `Messages.send_message/1` and `AgentManager.send_message/2` directly
+- If session FK was violated (session deleted), `Ecto.ConstraintError` raised and killed the LiveView process
+- No error recovery — message loss
+
+**After (current):**
+1. `route_to_members/5` wraps `Messages.send_message/1` in a case statement
+   - `{:ok, _message}` — continues to `AgentManager.send_message/2` as normal
+   - `{:error, changeset}` — logs error with session_id and changeset errors, skips AgentManager call
+2. `Message.changeset/2` declares `foreign_key_constraint(:session_id, name: "messages_session_id_fkey")`
+   - Converts FK violations to `{:error, changeset}` instead of raising
+3. LiveView GenServer survives message errors; other messages in the batch continue
+
+**Code locations:**
+- `lib/eye_in_the_sky_web/live/chat_live/channel_helpers.ex` — `route_to_members/5` error handling
+- `lib/eye_in_the_sky/messages/message.ex` — foreign_key_constraint declaration
+
+**Commits:** 4b849cb9 (audit fixes: FK constraint + channel error handling)
+
+---
+
+## Database Index Optimization
+
+Index builds are now non-blocking and include critical missing indexes for faster queries.
+
+**Concurrent Index Builds:**
+- All CREATE INDEX statements use `concurrently: true` and `@disable_ddl_transaction true` flags
+- Prevents SHARE locks that block writes during the build
+- Indexes: sessions(project_id), messages(parent_message_id), sessions(last_activity_at), sessions(started_at), agents(pending_status)
+
+**New Indexes:**
+- `notes(parent_id) WHERE parent_type = 'task'` — partial index for task-scoped note queries (mirrors project scope index)
+- `iam_decisions(winning_policy_id) WHERE winning_policy_id IS NOT NULL` — accelerates policy audit queries
+- `iam_decisions(project_id) WHERE project_id IS NOT NULL` — accelerates project-scoped audit queries
+
+**Query Optimization:**
+- `Sessions.list_idle_sessions_older_than/1` replaced COALESCE fragment with explicit OR branches
+  - `(NOT NULL last_activity_at AND last_activity_at < cutoff) OR (NULL last_activity_at AND started_at < cutoff)`
+  - Allows PG to use both `last_activity_at` and `started_at` indexes instead of falling back to table scan
+
+**Code locations:**
+- Migration `20260501053649` — concurrent index creation and @disable_ddl_transaction flags
+- Migration `20260501120000` — notes task index and IAM FK indexes
+- `lib/eye_in_the_sky/sessions.ex` — `list_idle_sessions_older_than/1` query optimization
+
+**Commits:** 4b849cb9 (audit fixes: index optimization and query rewrites)
 
 ---
 

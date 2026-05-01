@@ -675,7 +675,7 @@
                     </div>
                   {:else}
                     <div
-                      class="w-6 h-6 mt-0.5 flex-shrink-0 rounded-md flex items-center justify-center"
+                      class="w-7 h-7 mt-0.5 flex-shrink-0 rounded-md flex items-center justify-center"
                       style="background-color: {sessionBg(message.session_uuid)};"
                     >
                       <img src={getProviderIcon(message)} class="w-3.5 h-3.5 flex-shrink-0 opacity-60" title="{message.provider || 'agent'}" alt={message.provider || 'Agent'} />

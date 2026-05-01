@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
-  alias EyeInTheSky.Repo
+  alias EyeInTheSky.ChannelMessages
 
   require Logger
 
@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
       # then append — avoids re-fetching the entire message list on every push.
       serialized =
         message
-        |> Repo.preload([:session, :reactions])
+        |> ChannelMessages.preload_for_serialization()
         |> ChatPresenter.serialize_message()
 
       messages = socket.assigns.messages ++ [serialized]

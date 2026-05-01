@@ -206,13 +206,15 @@ defmodule EyeInTheSky.Teams do
   """
   def mark_member_done_by_session(session_id, status \\ "done")
       when status in ["done", "failed", "idle", "blocked"] do
-    members =
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {count, updated} =
       TeamMember
       |> where([m], m.session_id == ^session_id)
-      |> Repo.all()
+      |> Repo.update_all([set: [status: status, last_activity_at: now]], returning: true)
 
-    Enum.each(members, &update_member_status(&1, status))
-    length(members)
+    Enum.each(updated, &broadcast(:member_updated, &1))
+    count
   end
 
   def leave_team(%TeamMember{} = member) do

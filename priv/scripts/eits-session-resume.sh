@@ -120,8 +120,10 @@ Call \`/eits-init\` if this session needs a name, otherwise continue your work.
 eits tasks begin --title \"Task name\"
 
 # Finish
-eits tasks annotate <task_id> --body \"What happened\"
-eits tasks update <task_id> --state 4
+eits tasks complete <task_id> --message \"What happened\"
+# If complete fails, fall back to:
+#   eits tasks annotate <task_id> --body \"What happened\"
+#   eits tasks update <task_id> --state done
 
 # Log commits
 eits commits create --hash <hash>

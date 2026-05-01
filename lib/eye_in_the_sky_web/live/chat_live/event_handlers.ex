@@ -36,8 +36,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
            provider: "claude",
            body: body
          }) do
-      {:ok, message} ->
-        EyeInTheSky.Events.channel_message(channel_id, message)
+      {:ok, _message} ->
         Channels.mark_as_read(channel_id, session_id)
         ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
         {:noreply, refresh_members_and_picker(socket)}
@@ -110,8 +109,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
            provider: "claude",
            body: body
          }) do
-      {:ok, message} ->
-        EyeInTheSky.Events.channel_message(channel_id, message)
+      {:ok, _message} ->
         active_thread = ChannelDataLoader.load_thread(parent_id)
         {:noreply, assign(socket, :active_thread, active_thread)}
 

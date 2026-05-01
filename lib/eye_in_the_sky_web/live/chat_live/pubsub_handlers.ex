@@ -29,29 +29,38 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
       "📨 Received new_message broadcast for channel #{socket.assigns.active_channel_id}"
     )
 
-    # Preload associations required by ChatPresenter.serialize_message,
-    # then append — avoids re-fetching the entire message list on every push.
-    serialized =
-      message
-      |> Repo.preload([:session, :reactions])
-      |> ChatPresenter.serialize_message()
+    # Guard against duplicate broadcasts (broadcast_and_return fires immediately;
+    # NotifyListener fires again via Postgres LISTEN/NOTIFY for the same insert).
+    already_present = Enum.any?(socket.assigns.messages, &(&1.id == message.id))
 
-    messages = socket.assigns.messages ++ [serialized]
+    if already_present do
+      Logger.info("📬 Skipping duplicate message id=#{message.id}")
+      {:noreply, socket}
+    else
+      # Preload associations required by ChatPresenter.serialize_message,
+      # then append — avoids re-fetching the entire message list on every push.
+      serialized =
+        message
+        |> Repo.preload([:session, :reactions])
+        |> ChatPresenter.serialize_message()
 
-    channels = load_channels(socket.assigns.project_id)
-    unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
+      messages = socket.assigns.messages ++ [serialized]
 
-    Logger.info("📬 Appended message id=#{message.id}, total=#{length(messages)}")
+      channels = load_channels(socket.assigns.project_id)
+      unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
 
-    Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
-      id: "app-rail",
-      unread_counts: unread_counts
-    )
+      Logger.info("📬 Appended message id=#{message.id}, total=#{length(messages)}")
 
-    {:noreply,
-     socket
-     |> assign(:messages, messages)
-     |> assign(:unread_counts, unread_counts)}
+      Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
+        id: "app-rail",
+        unread_counts: unread_counts
+      )
+
+      {:noreply,
+       socket
+       |> assign(:messages, messages)
+       |> assign(:unread_counts, unread_counts)}
+    end
   end
 
   # Private helpers

@@ -2766,12 +2766,20 @@ HELP
         echo "$resp" | jq -r '
           . as $t |
           (.members // []) as $members |
-          ($members | length) as $total |
-          ($members | map(select(.session_status == "working")) | length) as $working |
-          ($members | map(select(.session_status == "idle" or .session_status == "waiting")) | length) as $idle |
-          ($members | map(select(.member_status == "done")) | length) as $done |
-          ($members | map(select(.session_status == "failed")) | length) as $failed |
-          ($members | map(select(.member_status == "spawn_failed")) | length) as $spawn_failed |
+          ($members | map(
+            if .member_status == "spawn_failed" then "spawn_failed"
+            elif .member_status == "done" then "done"
+            elif .session_status == "failed" then "failed"
+            elif .session_status == "working" then "working"
+            else "idle"
+            end
+          )) as $buckets |
+          ($buckets | map(select(. == "working")) | length) as $working |
+          ($buckets | map(select(. == "idle")) | length) as $idle |
+          ($buckets | map(select(. == "done")) | length) as $done |
+          ($buckets | map(select(. == "failed")) | length) as $failed |
+          ($buckets | map(select(. == "spawn_failed")) | length) as $spawn_failed |
+          ($working + $idle + $done + $failed + $spawn_failed) as $total |
           "Team: \($t.name) (ID: \($t.id))",
           "Members: \($total) total — \($working) working, \($idle) idle, \($done) done\(if $failed > 0 then ", \($failed) session_failed" else "" end)\(if $spawn_failed > 0 then ", \($spawn_failed) spawn_failed" else "" end)",
           (if $total > 0 then

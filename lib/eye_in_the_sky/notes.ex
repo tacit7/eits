@@ -15,13 +15,6 @@ defmodule EyeInTheSky.Notes do
   defdelegate with_notes_count(tasks), to: NoteQueries
 
   @doc """
-  Returns the list of notes.
-  """
-  def list_notes do
-    Repo.all(Note)
-  end
-
-  @doc """
   Returns notes for a specific session.
   Matches on both integer ID (as string) and UUID for migration compatibility.
   """

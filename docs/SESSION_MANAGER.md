@@ -354,6 +354,40 @@ Pre-tool-use hooks (e.g., `eits-task-gate.sh`) can check the session's read_only
 
 ---
 
+## Session Usage Caching
+
+Session token and cost totals are cached on the `sessions` table for O(1) lookup when displaying per-session usage metrics.
+
+**Schema:**
+- `total_tokens` — integer, default 0
+- `total_cost_usd` — float, default 0.0
+
+**Atomic Increment:**
+Each time a message with usage metadata is inserted (`Messages.create_message` or `create_channel_message`), the helper `maybe_increment_session_cache/1` parses the message metadata and calls `Sessions.increment_usage_cache/3`:
+
+```elixir
+Sessions.increment_usage_cache(session_id, input_tokens + output_tokens, total_cost_usd)
+```
+
+This uses a raw SQL `UPDATE .. inc` for atomicity — no read-modify-write race.
+
+**Fallback Query:**
+Aggregation functions (`Messages.Aggregations.total_tokens_for_session/1` and `total_cost_for_session/1`) read the cached column first. When the value is `nil` (pre-cache sessions created before migration `20260501110334`), they fall back to a full aggregate scan over the messages table.
+
+**Behavior:**
+```elixir
+def total_tokens_for_session(session_id) do
+  case Repo.one(from s in Session, where: s.id == ^session_id, select: s.total_tokens) do
+    nil -> aggregate_tokens_for_session(session_id)
+    cached -> cached
+  end
+end
+```
+
+This allows zero-cost lookups for active sessions while maintaining backward compatibility with older data.
+
+---
+
 ## Sessions REST API
 
 The Sessions API at `PATCH /api/v1/sessions/:uuid` and related endpoints uses `Sessions.resolve(uuid)` to support both numeric session IDs and UUIDs:
@@ -378,7 +412,7 @@ This flexibility allows CLI scripts and hooks to use either the shorter numeric 
 
 ### Session Resume Response
 
-When a session is resumed via `POST /api/v1/sessions/:uuid/resume`, the response includes the agent UUID and project ID needed to set up the Claude Code environment:
+When a session is resumed via `POST /api/v1/sessions/:uuid/resume` or fetched via `GET /api/v1/sessions/:uuid`, the response includes the agent UUID, project ID, and worktree information needed to set up the Claude Code environment:
 
 ```json
 {
@@ -387,25 +421,35 @@ When a session is resumed via `POST /api/v1/sessions/:uuid/resume`, the response
   "agent_id": 42,
   "agent_uuid": "550e8400-e29b-41d4-a716-446655440000",
   "project_id": 1,
-  "status": "idle"
+  "status": "idle",
+  "worktree_path": "/path/to/project/.claude/worktrees/fix-auth-bug",
+  "branch_name": "worktree-fix-auth-bug"
 }
 ```
 
 **Key fields:**
 - `agent_uuid` — Claude agent UUID (for `EITS_AGENT_UUID` env var) — now correctly populated on resume (previously hardcoded to null)
 - `project_id` — Project integer ID (for project-scoped operations) — now correctly populated on resume (previously hardcoded to null)
+- `worktree_path` — Absolute path to git worktree (from `sessions.git_worktree_path`); `null` if session was not started in a worktree (commit 360e0fc1)
+- `branch_name` — Current git branch name resolved at request time via `git symbolic-ref --short HEAD` inside the worktree; `null` if `worktree_path` is null or the path no longer exists (commit 360e0fc1)
+
+The addition of `worktree_path` and `branch_name` eliminates orchestrator guessing on branch names before merge — the API now surfaces the exact branch the session is working on.
 
 This fix ensures the startup hook can properly populate `EITS_AGENT_UUID` and `EITS_PROJECT_ID` in the Claude Code environment when resuming a session.
 
 **Environment Variable: EITS_SESSION_ID**
 Spawned Claude processes set `EITS_SESSION_ID` to the **integer EITS session record ID**, not the UUID. This is critical for child agent spawning:
-- `EITS_SESSION_ID` = integer (e.g., `3185`) — set by provider (Claude/Codex) during agent startup; used for `--parent-session-id` 
+- `EITS_SESSION_ID` = integer (e.g., `3185`) — set by eits-session-startup.sh during agent startup; used for `--parent-session-id` 
 - `EITS_SESSION_UUID` = UUID (e.g., `8803d56d-dbbd-4916-9ff0-155378a64a47`) — set by provider; used for `--resume`
 - Provider conversation ID (Claude session UUID) is separate; stored in agents table for `--resume` handling
 
-**Critical fix (commit 3445c4b2):** The env var was incorrectly set to the UUID instead of the integer, causing spawn failures with jq parse errors when agents tried to spawn children. Now correctly set to `state.session_id` (integer).
+**Fixed in commit 2d49d0e2:** The startup hook was fetching session info (which includes `.id`) but only extracting `agent_id` and `agent_int_id` — the session's own integer ID was silently dropped. Now extracts `SESSION_INT_ID=.id` from `eits sessions get` and writes it to `CLAUDE_ENV_FILE` as `EITS_SESSION_ID`, matching what the resume hook already does.
 
-Agents that spawn children read `EITS_SESSION_ID` and pass it as `--parent-session-id` to `eits agents spawn`. The `--parent-session-id` parameter now accepts both integer and UUID formats (commit da967107).
+Agents that spawn children read `EITS_SESSION_ID` and pass it as `--parent-session-id` to `eits agents spawn`. The `--parent-session-id` parameter now accepts both integer strings and UUID formats (commit 2d49d0e2):
+- Integer: `eits agents spawn --parent-session-id 3185 ...`
+- UUID: `eits agents spawn --parent-session-id 8803d56d-dbbd-4916-9ff0-155378a64a47 ...`
+
+The change was necessary because `--argjson` in jq rejects non-JSON literals (UUIDs); now uses `--arg` so both formats pass through as strings — the server's `coerce_session_ref` already accepts both formats.
 
 **Integer Session ID Handling:**
 JSON decoding converts numeric `session_id` values to integers, but task linking functions only had clauses for nil and binary strings. Fixed by adding integer guards to `do_link_session/2` in `Tasks.Associations` and `maybe_link_session/2` in `TaskController`:
@@ -777,6 +821,36 @@ The `sort_agents/2` function supports sorting by:
 | `"status"` | Session status (working → idle → completed → archived) |
 | `"created"` | Session creation date (created_at) |
 | Any other value | Defaults to "recent" |
+
+---
+
+## Workspace Sessions Pagination
+
+The workspace sessions page (`WorkspaceLive.Sessions`) paginates results using InfiniteScroll to avoid loading all sessions unbounded on large workspaces.
+
+**Configuration:**
+- Page size: 50 sessions per page
+- Load trigger: InfiniteScroll sentinel element (`id="workspace-sessions-sentinel"`)
+- Handler: `load_more` event fetches the next page via offset
+
+**Implementation:**
+Mount fetches the first page plus one extra sentinel to detect if there are more pages:
+```elixir
+sessions = Sessions.list_sessions_for_scope(socket.assigns.scope, limit: @page_size + 1)
+{sessions, has_more} = split_page(sessions, @page_size)
+```
+
+When the InfiniteScroll sentinel reaches the viewport, the `load_more` handler fetches the next page:
+```elixir
+sessions = Sessions.list_sessions_for_scope(socket.assigns.scope, limit: @page_size + 1, offset: current_count)
+```
+
+**DB Support:**
+- `list_sessions_for_scope/2` (workspace clause) now accepts `offset` parameter
+- `list_project_sessions_with_agent/2` also supports `offset` for future pagination on project sessions
+
+**Rationale (commit e981117b):**
+Previously, mount was loading all sessions unbounded — project 1 had 1738 rows with full agent+agent_definition preloads and a 1738-ID IN clause for task titles. This caused slow initial render. Pagination with offset prevents DB and memory overhead on large workspaces.
 
 ---
 

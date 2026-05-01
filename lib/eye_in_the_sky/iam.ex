@@ -17,21 +17,29 @@ defmodule EyeInTheSky.IAM do
 
   # ── reads ───────────────────────────────────────────────────────────────────
 
-  @doc "List all policies, ordered by priority desc then id asc."
+  @doc "List all policies, ordered by priority desc then id asc. Capped at 500 rows."
   @spec list_policies() :: [Policy.t()]
   def list_policies do
     Policy
     |> order_by([p], desc: p.priority, asc: p.id)
+    |> limit(500)
     |> Repo.all()
   end
 
   @doc """
   List policies filtered by any of `:agent_type`, `:action`, `:effect`, or
   `:enabled`. A `nil` or empty-string filter is a no-op; other values are
-  exact-match.
+  exact-match. Capped at 500 rows by default; pass `limit: N` to override.
   """
   @spec list_policies(map() | keyword()) :: [Policy.t()]
   def list_policies(filters) when is_list(filters) or is_map(filters) do
+    {limit, filters} =
+      if is_list(filters) do
+        {Keyword.get(filters, :limit, 500), Keyword.delete(filters, :limit)}
+      else
+        {Map.get(filters, :limit, 500), Map.delete(filters, :limit)}
+      end
+
     filters
     |> Enum.reduce(Policy, fn
       {_key, nil}, q -> q
@@ -43,6 +51,7 @@ defmodule EyeInTheSky.IAM do
       {_, _}, q -> q
     end)
     |> order_by([p], desc: p.priority, asc: p.id)
+    |> limit(^limit)
     |> Repo.all()
   end
 

@@ -169,7 +169,9 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
       TabHelpers.load_tab_data(socket, "messages", session_id)
     else
-      TabHelpers.load_tab_data(socket, "messages", socket.assigns.session_id)
+      # Dead render: load messages only — skip usage stats (file read or 2 aggregate
+      # DB queries on all messages) that are discarded when the WebSocket connects.
+      TabHelpers.load_messages_only(socket, socket.assigns.session_id)
     end
   end
 

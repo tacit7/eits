@@ -11,6 +11,23 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   @default_context_window 200_000
   @default_message_limit 50
 
+  @doc """
+  Dead-render path: load only messages, skip usage stats and tab-specific data.
+
+  Usage stats require either a filesystem read (SessionReader) or two aggregate
+  DB queries (total_tokens_for_session + total_cost_for_session). On the dead
+  render these are wasted — the connected render will load them via load_tab_data.
+  """
+  def load_messages_only(socket, session_id) do
+    {messages, has_more} = load_message_data(socket, "messages", session_id)
+
+    socket
+    |> assign(:messages, messages)
+    |> assign(:has_more_messages, has_more)
+    |> assign(:context_used, 0)
+    |> assign(:context_window, 0)
+  end
+
   def load_tab_data(socket, tab, session_id) do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)

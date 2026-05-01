@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     socket =
       if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, false, false)),
+        do: assign(socket, :teams, load_teams(socket, false, false, "")),
         else: socket
 
     {:ok, socket}
@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     socket =
       if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, false, true)),
+        do: assign(socket, :teams, load_teams(socket, false, true, "")),
         else: socket
 
     {:ok, socket}
@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     socket =
       if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, true)),
+        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, true, socket.assigns.search_query)),
         else: socket
 
     {:noreply, socket}
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     socket =
       if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, false)),
+        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, false, socket.assigns.search_query)),
         else: socket
 
     {:noreply, socket}
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
      assign(
        socket,
        :teams,
-       load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all)
+       load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, socket.assigns.search_query)
      )}
   end
 
@@ -92,7 +92,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    {:noreply, assign(socket, :search_query, query)}
+    teams = load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, query)
+    {:noreply, socket |> assign(:search_query, query) |> assign(:teams, teams)}
   end
 
   @impl true
@@ -109,7 +110,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
          assign(
            socket,
            :teams,
-           load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all)
+           load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, socket.assigns.search_query)
          )}
     end
   end
@@ -121,12 +122,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     {:noreply,
      socket
      |> assign(:show_archived, show_archived)
-     |> assign(:teams, load_teams(socket, show_archived, socket.assigns.show_all))}
+     |> assign(:teams, load_teams(socket, show_archived, socket.assigns.show_all, socket.assigns.search_query))}
   end
 
   @impl true
   def render(assigns) do
-    assigns = assign(assigns, :filtered_teams, filter_teams(assigns.teams, assigns.search_query))
+    assigns = assign(assigns, :filtered_teams, assigns.teams)
 
     ~H"""
     <div class="overflow-y-auto px-4 sm:px-6 py-6" style="scrollbar-width: none;">
@@ -221,18 +222,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     """
   end
 
-  defp load_teams(socket, show_archived, show_all) do
+  defp load_teams(socket, show_archived, show_all, search_query) do
     project_id = if show_all, do: nil, else: socket.assigns[:project_id]
     opts = if show_archived, do: [status: "archived"], else: []
     opts = if project_id, do: Keyword.put(opts, :project_id, project_id), else: opts
+    opts = if search_query != "", do: Keyword.put(opts, :name, search_query), else: opts
     Teams.list_teams(opts)
-  end
-
-  defp filter_teams(teams, ""), do: teams
-
-  defp filter_teams(teams, query) do
-    q = String.downcase(query)
-    Enum.filter(teams, fn t -> String.contains?(String.downcase(t.name), q) end)
   end
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))

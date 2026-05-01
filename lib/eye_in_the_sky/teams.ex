@@ -34,6 +34,13 @@ defmodule EyeInTheSky.Teams do
       end
 
     query =
+      case Keyword.get(opts, :name) do
+        nil -> query
+        "" -> query
+        name -> where(query, [t], ilike(t.name, ^"%#{name}%"))
+      end
+
+    query =
       case Keyword.get(opts, :limit) do
         nil -> query
         n when n > 0 -> limit(query, ^n)

@@ -60,12 +60,15 @@ defmodule EyeInTheSky.ScheduledJobs do
     |> Repo.all()
   end
 
-  def list_orphaned_agent_jobs do
+  def list_orphaned_agent_jobs(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     from(j in ScheduledJob,
       join: p in assoc(j, :prompt),
       where: j.job_type == "spawn_agent",
       where: not is_nil(j.prompt_id),
-      where: p.active == false
+      where: p.active == false,
+      limit: ^limit
     )
     |> Repo.all()
   end

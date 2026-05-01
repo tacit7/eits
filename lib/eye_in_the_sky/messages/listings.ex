@@ -31,8 +31,8 @@ defmodule EyeInTheSky.Messages.Listings do
     |> where([m], m.session_id == ^session_id)
     |> order_by([m], desc: m.inserted_at, desc: m.id)
     |> limit(^limit)
+    |> preload(:attachments)
     |> Repo.all()
-    |> Repo.preload(:attachments)
     |> Enum.reverse()
     |> Deduplicator.deduplicate_by_source_uuid()
   end

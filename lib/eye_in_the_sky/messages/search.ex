@@ -13,7 +13,7 @@ defmodule EyeInTheSky.Messages.Search do
     - `:limit` - max results to return (default 10, max 100)
 
   Returns list of maps with keys: id, session_id, session_uuid, sender_role, body_excerpt, inserted_at.
-  Uses the GIN index on messages_body_fts for efficient FTS. Falls back to ILIKE on error.
+  Uses the GIN index on messages_body_fts for efficient FTS. Returns [] when no FTS match.
   """
   @spec search_messages(String.t(), keyword()) :: [map()]
   def search_messages(query, opts \\ [])
@@ -59,16 +59,10 @@ defmodule EyeInTheSky.Messages.Search do
         )
       )
 
-    results =
-      case Repo.all(fts_query) do
-        [] ->
-          pattern = "%#{query}%"
-          ilike_query = where(base, [m], ilike(m.body, ^pattern))
-          Repo.all(ilike_query)
-
-        rows ->
-          rows
-      end
+    # No ILIKE fallback: a %term% pattern requires a full table scan on messages
+    # (no trigram index). FTS returning [] is a real miss — don't hide it with
+    # a slow fallback that makes the empty case the most expensive case.
+    results = Repo.all(fts_query)
 
     Enum.map(results, fn row ->
       %{

@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
         data-vim-flyout-item
         class={[
           "flex items-center gap-2 px-3 py-2 text-sm transition-colors",
+          "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded",
           if(active,
             do: "text-primary bg-primary/8 font-medium",
             else: "text-base-content/60 hover:text-base-content/85 hover:bg-base-content/5"

@@ -108,7 +108,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                   class={[
                     "flex items-start gap-1.5",
                     col_idx == 0 &&
-                      "[&.vim-nav-focused]:bg-base-300 [&.vim-nav-focused]:ring-1 [&.vim-nav-focused]:ring-primary [&.vim-nav-focused]:rounded-xl"
+                      "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
                   ]}
                   data-task-id={task.uuid}
                   {if col_idx == 0,

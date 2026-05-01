@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                 <div
                   class={[
                     "py-2.5 px-3 flex flex-col gap-0.5 cursor-pointer rounded-lg transition-colors",
-                    "[&.vim-nav-focused]:bg-base-200 [&.vim-nav-focused]:ring-1 [&.vim-nav-focused]:ring-primary",
+                    "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50",
                     if(selected?, do: "bg-primary/5 border-l-2 border-primary", else: "hover:bg-base-200/40")
                   ]}
                   phx-click="select_agent"

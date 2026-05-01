@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.JobsSection do
       <.link
         navigate="/jobs"
         data-vim-flyout-item
-        class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+        class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
       >
         <span class={[
           "w-1.5 h-1.5 rounded-full flex-shrink-0",

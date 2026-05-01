@@ -56,6 +56,11 @@ defmodule EyeInTheSky.Sessions.Session do
     field :entrypoint, :string
     field :status_reason, :string
     field :read_only, :boolean, default: false
+    # Cached token and cost totals — incremented atomically on each message insert.
+    # Avoids full aggregate scans over the messages table for per-session usage display.
+    # Source of truth for display; fall back to aggregate query only when nil (pre-migration rows).
+    field :total_tokens, :integer, default: 0
+    field :total_cost_usd, :float, default: 0.0
     # Virtual field populated by context functions — never set by changesets.
     # Two callers:
     #   1. `Sessions.list_project_sessions_with_agent/2` — populated via

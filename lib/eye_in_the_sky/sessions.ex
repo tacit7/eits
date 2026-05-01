@@ -185,6 +185,25 @@ defmodule EyeInTheSky.Sessions do
   def delete_session(%Session{} = session), do: delete(session)
 
   @doc """
+  Atomically increments the cached token and cost totals on a session row.
+
+  Called after each message insert that carries usage metadata. Uses a raw
+  SQL UPDATE so the increment is a single round-trip with no read-modify-write
+  race. When `session_id` is nil or either delta is zero, this is a no-op.
+  """
+  @spec increment_usage_cache(integer() | nil, non_neg_integer(), float()) :: :ok
+  def increment_usage_cache(nil, _tokens, _cost), do: :ok
+
+  def increment_usage_cache(session_id, tokens, cost) do
+    Repo.update_all(
+      from(s in Session, where: s.id == ^session_id),
+      inc: [total_tokens: tokens, total_cost_usd: cost]
+    )
+
+    :ok
+  end
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for tracking session changes.
   """
   def change_session(%Session{} = session, attrs \\ %{}) do

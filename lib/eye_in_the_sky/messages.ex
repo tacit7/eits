@@ -19,6 +19,7 @@ defmodule EyeInTheSky.Messages do
   alias EyeInTheSky.Messages.StatusManager
   alias EyeInTheSky.QueryHelpers
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Sessions
   require Logger
 
   # ---------------------------------------------------------------------------
@@ -133,7 +134,14 @@ defmodule EyeInTheSky.Messages do
   @spec create_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
   def create_message(attrs \\ %{}) do
     attrs = message_defaults(attrs)
-    %Message{} |> Message.changeset(attrs) |> Repo.insert()
+
+    result = %Message{} |> Message.changeset(attrs) |> Repo.insert()
+
+    with {:ok, message} <- result do
+      maybe_increment_session_cache(message)
+    end
+
+    result
   end
 
   @spec create_channel_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
@@ -142,11 +150,18 @@ defmodule EyeInTheSky.Messages do
     cid = Map.get(attrs, :channel_id)
     has_number = Map.get(attrs, :channel_message_number)
 
-    if not is_nil(cid) && is_nil(has_number) do
-      ChannelMessageNumbering.create(cid, attrs)
-    else
-      %Message{} |> Message.changeset(attrs) |> Repo.insert()
+    result =
+      if not is_nil(cid) && is_nil(has_number) do
+        ChannelMessageNumbering.create(cid, attrs)
+      else
+        %Message{} |> Message.changeset(attrs) |> Repo.insert()
+      end
+
+    with {:ok, message} <- result do
+      maybe_increment_session_cache(message)
     end
+
+    result
   end
 
   @spec send_message(map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
@@ -244,4 +259,40 @@ defmodule EyeInTheSky.Messages do
   end
 
   defp broadcast_and_return(error), do: error
+
+  # Increments the session's cached token/cost totals when a message carries
+  # usage metadata. Silently skips when session_id or usage fields are absent.
+  defp maybe_increment_session_cache(%Message{session_id: nil}), do: :ok
+
+  defp maybe_increment_session_cache(%Message{session_id: session_id, metadata: metadata})
+       when is_map(metadata) do
+    usage = Map.get(metadata, "usage") || Map.get(metadata, :usage) || %{}
+    input = get_int(usage, "input_tokens") + get_int(usage, :input_tokens)
+    output = get_int(usage, "output_tokens") + get_int(usage, :output_tokens)
+    cost = get_float(metadata, "total_cost_usd") + get_float(metadata, :total_cost_usd)
+    Sessions.increment_usage_cache(session_id, input + output, cost)
+  end
+
+  defp maybe_increment_session_cache(_message), do: :ok
+
+  defp get_int(map, key) when is_map(map) do
+    case Map.get(map, key) do
+      v when is_integer(v) -> v
+      v when is_binary(v) -> String.to_integer(v)
+      _ -> 0
+    end
+  rescue
+    _ -> 0
+  end
+
+  defp get_float(map, key) when is_map(map) do
+    case Map.get(map, key) do
+      v when is_float(v) -> v
+      v when is_integer(v) -> v * 1.0
+      v when is_binary(v) -> String.to_float(v)
+      _ -> 0.0
+    end
+  rescue
+    _ -> 0.0
+  end
 end

@@ -295,6 +295,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           <div
             id="project-tasks-list"
             phx-update="stream"
+            data-vim-list
             class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
           >
             <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>

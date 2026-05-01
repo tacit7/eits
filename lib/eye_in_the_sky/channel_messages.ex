@@ -71,12 +71,16 @@ defmodule EyeInTheSky.ChannelMessages do
   end
 
   @doc """
-  Returns thread replies for a parent message.
+  Returns thread replies for a parent message. Default limit: 200.
+  Pass `limit: n` to override.
   """
-  def list_thread_replies(parent_message_id) do
+  def list_thread_replies(parent_message_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     Message
     |> where([m], m.parent_message_id == ^parent_message_id)
     |> order_by([m], asc: m.inserted_at)
+    |> limit(^limit)
     |> preload([:reactions, :attachments])
     |> Repo.all()
   end

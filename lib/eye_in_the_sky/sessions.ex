@@ -23,22 +23,30 @@ defmodule EyeInTheSky.Sessions do
   @doc """
   Returns the list of sessions, excluding archived by default.
   Pass `include_archived: true` to include archived sessions.
+  Pass `limit: n` to cap results (default: 1_000).
   """
   @spec list_sessions(keyword()) :: [Session.t()]
   def list_sessions(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 1_000)
+
     Session
     |> Archivable.include_archived(opts)
+    |> limit(^limit)
     |> Repo.all()
   end
 
   @doc """
   Returns the list of sessions for a specific agent, excluding archived by default.
   Pass `include_archived: true` to include archived sessions.
+  Pass `limit: n` to cap results (default: 200).
   """
   def list_sessions_for_agent(agent_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     Session
     |> where([s], s.agent_id == ^agent_id)
     |> order_by([s], desc: s.started_at)
+    |> limit(^limit)
     |> Archivable.include_archived(opts)
     |> Repo.all()
   end

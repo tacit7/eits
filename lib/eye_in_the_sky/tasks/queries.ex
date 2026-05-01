@@ -122,13 +122,17 @@ defmodule EyeInTheSky.Tasks.Queries do
   end
 
   @doc """
-  Returns the list of tasks for a specific team.
+  Returns the list of tasks for a specific team. Default limit: 500.
+  Pass `limit: n` to override.
   """
-  def list_tasks_for_team(team_id) do
+  def list_tasks_for_team(team_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     Task
     |> where([t], t.team_id == ^team_id)
     |> preload([:state, :tags])
     |> order_by([t], asc: t.id)
+    |> limit(^limit)
     |> Repo.all()
   end
 

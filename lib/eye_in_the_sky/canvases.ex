@@ -5,12 +5,14 @@ defmodule EyeInTheSky.Canvases do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Canvases.{Canvas, CanvasSession, CanvasTerminal}
 
-  def list_canvases do
-    Repo.all(from c in Canvas, order_by: [asc: c.inserted_at])
+  def list_canvases(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+    Repo.all(from c in Canvas, order_by: [asc: c.inserted_at], limit: ^limit)
   end
 
-  def list_canvases_preloaded do
-    Repo.all(from c in Canvas, order_by: [asc: c.inserted_at], preload: :canvas_sessions)
+  def list_canvases_preloaded(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+    Repo.all(from c in Canvas, order_by: [asc: c.inserted_at], preload: :canvas_sessions, limit: ^limit)
   end
 
   def get_canvas(id) do
@@ -35,11 +37,14 @@ defmodule EyeInTheSky.Canvases do
     end
   end
 
-  def list_canvas_sessions(canvas_id) do
+  def list_canvas_sessions(canvas_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     Repo.all(
       from cs in CanvasSession,
         where: cs.canvas_id == ^canvas_id,
-        order_by: [asc: cs.inserted_at]
+        order_by: [asc: cs.inserted_at],
+        limit: ^limit
     )
   end
 

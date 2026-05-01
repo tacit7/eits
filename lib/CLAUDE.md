@@ -37,6 +37,25 @@ Native PostgreSQL `uuid` type. Ecto handles encoding/decoding automatically — 
 
 If you need a helper that doesn't exist, add it to the right shared module and update this table.
 
+## New Context Function Checklist
+
+Before shipping any new function in a context module (`lib/eye_in_the_sky/*.ex`), verify:
+
+| # | Check | Why |
+|---|-------|-----|
+| 1 | `Repo.all` has `limit(N)` in the pipeline | Unbounded queries OOM under load |
+| 2 | No `Repo.*` call inside `Enum.each/map/flat_map/reduce` | N+1 round-trips |
+| 3 | No `Repo.preload` inside a loop or comprehension | N+1 preloads |
+| 4 | `DateTime.utc_now()` not `NaiveDateTime.utc_now()` | Schema is `:utc_datetime_usec` |
+| 5 | No `Enum.uniq_by` on a DB result; use `DISTINCT ON` query | Pulls excess rows |
+| 6 | No `Enum.find` on a `Repo.all` result; use `WHERE … LIMIT 1` | Loads entire table |
+| 7 | FK columns on new associations have a migration index | Slow join / cascade scans |
+| 8 | `fragment("COALESCE(…)")` not used in `where`; use explicit OR branches | Prevents index use |
+| 9 | Multi-step writes use `Ecto.Multi` or `Repo.transaction` | Race conditions |
+| 10 | `unique_constraint` in changeset matches a real DB unique index | Silent insert races |
+
+Run `mix audit.ecto` to catch items 1–6 automatically. Items 7–10 require manual review.
+
 ## PubSub
 
 All broadcasting and subscribing goes through `EyeInTheSky.Events` (`lib/eye_in_the_sky/events.ex`). **Never call `Phoenix.PubSub` directly.**

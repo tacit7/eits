@@ -3,7 +3,7 @@ defmodule EyeInTheSky.TaskTags do
   Context for managing tags and task-tag associations.
   """
 
-  import Ecto.Query, warn: false
+  import Ecto.Query
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Tasks.Tag
 
@@ -55,16 +55,23 @@ defmodule EyeInTheSky.TaskTags do
   def replace_task_tags(_task_id, []), do: :ok
 
   def replace_task_tags(task_id, tag_names) when is_list(tag_names) do
-    tag_rows =
-      Enum.flat_map(tag_names, fn tag_name ->
-        case get_or_create_tag(tag_name) do
-          {:ok, tag} -> [%{task_id: task_id, tag_id: tag.id}]
-          _ -> []
-        end
-      end)
+    # H6 fix: one upsert replaces N get_or_create_tag SELECTs (1-2 queries × N).
+    # ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name is a no-op write that
+    # forces the row into the RETURNING clause even when the tag already exists.
+    # This means no second SELECT is needed even in race conditions.
+    tag_inserts = Enum.map(tag_names, &%{name: &1})
+
+    {_count, tags} =
+      Repo.insert_all(Tag, tag_inserts,
+        on_conflict: {:replace, [:name]},
+        conflict_target: :name,
+        returning: [:id]
+      )
+
+    task_tag_rows = Enum.map(tags, &%{task_id: task_id, tag_id: &1.id})
 
     Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task_id))
-    Repo.insert_all("task_tags", tag_rows, on_conflict: :nothing)
+    Repo.insert_all("task_tags", task_tag_rows, on_conflict: :nothing)
   end
 
   @doc """

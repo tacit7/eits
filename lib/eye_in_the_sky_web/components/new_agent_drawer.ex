@@ -8,6 +8,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   import EyeInTheSkyWeb.CoreComponents,
     only: [form_actions: 1, form_field: 1, icon: 1, modal_header: 1]
 
+  import EyeInTheSkyWeb.Components.CliFlags,
+    only: [path_fields: 1, boolean_flags: 1]
+
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
     only: [claude_models: 0, codex_models: 0, gemini_models: 0]
 
@@ -300,59 +303,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   defp advanced_paths(assigns) do
     ~H"""
     <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Paths</p>
-
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text text-xs">Add Directory</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--add-dir</span>
-      </label>
-      <input
-        type="text"
-        name="add_dir"
-        placeholder="/path/to/shared-lib"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-      />
-    </div>
-
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text text-xs">MCP Config File</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--mcp-config</span>
-      </label>
-      <input
-        type="text"
-        name="mcp_config"
-        placeholder="./mcp-servers.json"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-      />
-    </div>
-
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text text-xs">Plugin Directory</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--plugin-dir</span>
-      </label>
-      <input
-        type="text"
-        name="plugin_dir"
-        placeholder="./my-plugins"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-      />
-    </div>
-
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text text-xs">Settings File</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--settings</span>
-      </label>
-      <input
-        type="text"
-        name="settings_file"
-        placeholder="./settings.json"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
-      />
-    </div>
-
+    <.path_fields />
     <div class="form-control">
       <label class="label">
         <span class="label-text text-xs">Agents JSON</span>
@@ -485,28 +436,8 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
           <span class="font-mono text-base-content/40 text-xs ml-1">--no-session-persistence</span>
         </span>
       </label>
-      <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input type="checkbox" name="chrome" value="true" class="checkbox checkbox-sm checkbox-primary" />
-        <span class="label-text text-xs">
-          Chrome integration
-          <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
-        </span>
-      </label>
-      <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input type="checkbox" name="sandbox" value="true" class="checkbox checkbox-sm checkbox-primary" />
-        <span class="label-text text-xs">
-          OS sandbox isolation
-          <span class="font-mono text-base-content/40 text-xs ml-1">--sandbox</span>
-        </span>
-      </label>
-      <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input type="checkbox" name="dangerously_skip_permissions" value="true" class="checkbox checkbox-sm checkbox-error" />
-        <span class="label-text text-xs">
-          <span class="text-error">Dangerously skip permissions</span>
-          <span class="font-mono text-base-content/40 text-xs ml-1">--dangerously-skip-permissions</span>
-        </span>
-      </label>
     </div>
+    <.boolean_flags skip_permissions={true} />
     """
   end
 end

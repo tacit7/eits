@@ -261,73 +261,27 @@ defmodule EyeInTheSky.Projects.FileTree do
     case File.lstat(entry_path) do
       {:ok, %{type: :symlink} = _stat} ->
         case File.stat(entry_path) do
-          {:ok, %{type: :directory}} ->
-            %{
-              name: name,
-              path: rel_path,
-              type: :directory,
-              symlink?: true,
-              expandable?: false,
-              editable?: false,
-              sensitive?: false
-            }
-
-          {:ok, %{type: :regular}} ->
-            %{
-              name: name,
-              path: rel_path,
-              type: :file,
-              symlink?: true,
-              expandable?: false,
-              editable?: false,
-              sensitive?: sensitive?(rel_path)
-            }
-
-          _ ->
-            %{
-              name: name,
-              path: rel_path,
-              type: :file,
-              symlink?: true,
-              expandable?: false,
-              editable?: false,
-              sensitive?: false
-            }
+          {:ok, %{type: :directory}} -> make_node(name, rel_path, :directory, true, false)
+          {:ok, %{type: :regular}}   -> make_node(name, rel_path, :file, true, false)
+          _                          -> make_node(name, rel_path, :file, true, false)
         end
 
-      {:ok, %{type: :directory}} ->
-        %{
-          name: name,
-          path: rel_path,
-          type: :directory,
-          symlink?: false,
-          expandable?: true,
-          editable?: false,
-          sensitive?: false
-        }
-
-      {:ok, %{type: :regular}} ->
-        %{
-          name: name,
-          path: rel_path,
-          type: :file,
-          symlink?: false,
-          expandable?: false,
-          editable?: true,
-          sensitive?: sensitive?(rel_path)
-        }
-
-      _ ->
-        %{
-          name: name,
-          path: rel_path,
-          type: :file,
-          symlink?: false,
-          expandable?: false,
-          editable?: false,
-          sensitive?: false
-        }
+      {:ok, %{type: :directory}} -> make_node(name, rel_path, :directory, false, false)
+      {:ok, %{type: :regular}}   -> make_node(name, rel_path, :file, false, true)
+      _                          -> make_node(name, rel_path, :file, false, false)
     end
+  end
+
+  defp make_node(name, path, type, symlink?, editable?) do
+    %{
+      name: name,
+      path: path,
+      type: type,
+      symlink?: symlink?,
+      expandable?: type == :directory and not symlink?,
+      editable?: editable?,
+      sensitive?: if(editable?, do: sensitive?(path), else: false)
+    }
   end
 
   defp ignored?(name) do

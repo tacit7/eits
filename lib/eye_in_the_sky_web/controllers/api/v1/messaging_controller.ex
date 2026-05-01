@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   def list_dms(conn, params) do
     session_raw = params["session"] || params["session_id"]
     from_raw = params["from"] || params["from_session_id"]
-    limit = min(String.to_integer(params["limit"] || "20"), 100)
+    limit = min(parse_int(params["limit"], 20), 100)
 
     if is_nil(session_raw) or session_raw == "" do
       {:error, :bad_request, "session is required"}

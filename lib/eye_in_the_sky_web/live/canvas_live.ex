@@ -7,7 +7,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   alias EyeInTheSky.Canvases
   alias EyeInTheSky.Events
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Terminal.PtySupervisor
+  alias EyeInTheSky.Terminal.PtyServer
   alias EyeInTheSkyWeb.Components.ChatWindowComponent
+  alias EyeInTheSkyWeb.Components.TerminalWindowComponent
 
   @impl true
   def mount(_params, _session, socket) do
@@ -33,7 +36,9 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      |> assign(:show_session_picker, false)
      |> assign(:session_search, "")
      |> assign(:filtered_sessions, [])
-     |> assign(:focus_session_id, nil)}
+     |> assign(:focus_session_id, nil)
+     |> assign(:canvas_terminals, [])
+     |> assign(:terminal_pty_map, %{})}
   end
 
   @impl true
@@ -213,6 +218,47 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
+  def handle_event("add_terminal", _params, socket) do
+    canvas_id = socket.assigns.active_canvas_id
+
+    if is_nil(canvas_id) do
+      {:noreply, socket}
+    else
+      offset = length(socket.assigns.canvas_sessions) + length(socket.assigns.canvas_terminals)
+
+      attrs = %{
+        pos_x: 24 + offset * 32,
+        pos_y: 24 + offset * 32,
+        width: 620,
+        height: 400
+      }
+
+      case Canvases.create_terminal(canvas_id, attrs) do
+        {:ok, ct} ->
+          {:ok, pty_pid} =
+            PtySupervisor.start_pty(subscriber: self(), subscriber_tag: ct.id)
+
+          {:noreply,
+           socket
+           |> assign(:canvas_terminals, socket.assigns.canvas_terminals ++ [ct])
+           |> assign(:terminal_pty_map, Map.put(socket.assigns.terminal_pty_map, ct.id, pty_pid))}
+
+        {:error, _} ->
+          {:noreply, socket}
+      end
+    end
+  end
+
+  def handle_event("terminal_moved", %{"id" => id_str, "x" => x, "y" => y}, socket) do
+    if id = parse_int(id_str), do: Canvases.update_terminal_layout(id, %{pos_x: x, pos_y: y})
+    {:noreply, socket}
+  end
+
+  def handle_event("terminal_resized", %{"id" => id_str, "w" => w, "h" => h}, socket) do
+    if id = parse_int(id_str), do: Canvases.update_terminal_layout(id, %{width: w, height: h})
+    {:noreply, socket}
+  end
+
   def handle_event(event, _params, socket) do
     Logger.warning("CanvasLive: unhandled event #{inspect(event)}")
     {:noreply, socket}
@@ -272,6 +318,31 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     {:noreply, remove_canvas_session(socket, cs_id)}
   end
 
+  # PTY output — tagged with terminal id
+  def handle_info({:pty_output, terminal_id, data}, socket) do
+    send_update(TerminalWindowComponent,
+      id: "terminal-window-#{terminal_id}",
+      pty_output: data
+    )
+
+    {:noreply, socket}
+  end
+
+  # PTY exited — remove terminal window and clean up
+  def handle_info({:pty_exited, terminal_id}, socket) do
+    {:noreply, remove_terminal(socket, terminal_id)}
+  end
+
+  # Component requested close
+  def handle_info({:remove_terminal_window, terminal_id}, socket) do
+    if pid = socket.assigns.terminal_pty_map[terminal_id] do
+      PtyServer.stop(pid)
+    end
+
+    Canvases.delete_terminal(terminal_id)
+    {:noreply, remove_terminal(socket, terminal_id)}
+  end
+
   def handle_info({:canvas_session_added, _payload}, socket) do
     new_sessions = Canvases.list_canvas_sessions(socket.assigns.active_canvas_id || -1)
     existing_ids = Enum.map(socket.assigns.canvas_sessions, & &1.id)
@@ -309,6 +380,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       <.canvas_area
         canvases={@canvases}
         canvas_sessions={@canvas_sessions}
+        canvas_terminals={@canvas_terminals}
+        terminal_pty_map={@terminal_pty_map}
         active_canvas_id={@active_canvas_id}
         focus_session_id={@focus_session_id}
       />
@@ -405,6 +478,14 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         <.icon name="hero-plus-mini" class="size-3.5" />
       </button>
       <button
+        :if={not is_nil(@active_canvas_id)}
+        phx-click="add_terminal"
+        class="btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
+        title="Add terminal to canvas"
+      >
+        <.icon name="hero-command-line" class="size-3.5" />
+      </button>
+      <button
         :if={@canvas_sessions != [] and not is_nil(@active_canvas_id)}
         phx-hook="CanvasLayoutHook"
         id="layout-auto"
@@ -430,7 +511,15 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           canvas_session={cs}
         />
       <% end %>
-      <%= if @canvas_sessions == [] and not is_nil(@active_canvas_id) do %>
+      <%= for ct <- @canvas_terminals do %>
+        <.live_component
+          module={TerminalWindowComponent}
+          id={"terminal-window-#{ct.id}"}
+          ct={ct}
+          pty_pid={@terminal_pty_map[ct.id]}
+        />
+      <% end %>
+      <%= if @canvas_sessions == [] and @canvas_terminals == [] and not is_nil(@active_canvas_id) do %>
         <div class="flex flex-col items-center justify-center h-full gap-2 select-none">
           <.icon name="hero-squares-2x2" class="w-10 h-10 text-base-content/20" />
           <span class="text-base-content/40 text-sm font-medium">No sessions on this canvas</span>
@@ -541,6 +630,11 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   defp base_canvas_assigns(socket, canvas_id) do
+    # Stop any running PTYs from the previous canvas
+    Enum.each(socket.assigns.terminal_pty_map, fn {_id, pid} ->
+      PtyServer.stop(pid)
+    end)
+
     socket
     |> assign(:active_canvas_id, canvas_id)
     |> assign(:canvas_sessions, [])
@@ -549,6 +643,14 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     |> assign(:show_session_picker, false)
     |> assign(:filtered_sessions, [])
     |> assign(:session_search, "")
+    |> assign(:canvas_terminals, [])
+    |> assign(:terminal_pty_map, %{})
+  end
+
+  defp remove_terminal(socket, terminal_id) do
+    socket
+    |> assign(:canvas_terminals, Enum.reject(socket.assigns.canvas_terminals, &(&1.id == terminal_id)))
+    |> assign(:terminal_pty_map, Map.delete(socket.assigns.terminal_pty_map, terminal_id))
   end
 
   defp activate_canvas(socket, canvas_id) do
@@ -567,12 +669,21 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         end
 
       sessions = apply_default_positions(sessions)
+      terminals = Canvases.list_terminals(canvas_id)
+
+      pty_map =
+        Map.new(terminals, fn ct ->
+          {:ok, pid} = PtySupervisor.start_pty(subscriber: self(), subscriber_tag: ct.id)
+          {ct.id, pid}
+        end)
 
       base_canvas_assigns(socket, canvas_id)
       |> assign(:page_title, canvas_name <> " — Canvas")
       |> assign(:canvas_sessions, sessions)
       |> assign(:subscribed_session_ids, session_ids)
       |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
+      |> assign(:canvas_terminals, terminals)
+      |> assign(:terminal_pty_map, pty_map)
     else
       base_canvas_assigns(socket, canvas_id)
       |> assign(:page_title, "Canvas")

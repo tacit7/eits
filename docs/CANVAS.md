@@ -47,6 +47,8 @@ Located at: `lib/eye_in_the_sky_web/live/canvas_live.ex`
 - `:creating_canvas` — boolean flag for new canvas form display
 - `:sidebar_tab` — set to `:canvas` to activate canvas sidebar section
 - `:focus_session_id` — session ID to focus/raise when canvas loads (set from `?focus=` URL param)
+- `:canvas_terminals` — list of CanvasTerminal records for active canvas
+- `:terminal_pty_map` — map of `terminal_id => pty_server_pid` for running terminals
 
 `mount/3` also subscribes to the global `agent:working` topic to receive working/stopped broadcasts for all sessions.
 
@@ -169,6 +171,15 @@ Events.subscribe_all(session_ids)  # Subscribe to events for all canvas sessions
 
 When events arrive, the handler calls `refresh_window/2` which calls `send_update/3` to update the `ChatWindowComponent` for that canvas session, keeping UI synchronized without full page refresh.
 
+### TerminalWindowComponent
+- **Located:** `lib/eye_in_the_sky_web/components/terminal_window_component.ex`
+- **Role:** Renders draggable, resizable terminal windows for each canvas terminal
+- **Props:** `ct` (CanvasTerminal struct with pos_x, pos_y, width, height), `pty_pid` (process ID of running PtyServer), `id` (component ID for routing)
+- **Events:** Emits `pty_input`, `pty_resize`, `close` to parent `CanvasLive`; receives `pty_output` via `send_update` from parent
+- **PTY Output Routing:** Routes PTY output to TerminalHook using scoped event names (`pty_output_<terminal_id>`) to prevent cross-terminal interference
+- **Drag/Resize:** Uses TerminalWindowHook for drag/resize chrome, distinct event names from chat windows (`terminal_moved`/`terminal_resized`) to avoid ID collisions
+- **Layout:** Title bar with terminal icon and close button; xterm.js container with ResizeObserver for responsive sizing
+
 ## JavaScript Hooks
 
 ### Canvas Layout Hook
@@ -209,11 +220,106 @@ When events arrive, the handler calls `refresh_window/2` which calls `send_updat
 - **Auto-scroll toggle:** Click button in chat window footer to enable/disable. When enabled (default), new messages scroll to bottom and ResizeObserver keeps tracking content growth. When disabled, stays in current position and shows unread message count pill; clicking pill re-enables auto-scroll and jumps to bottom.
 - **Chat submission:** Submit listener is delegated to the window root element (not the textarea) to capture events from nested components like the chat window. Scrolling to bottom is deferred by one rAF to allow DOM reflow to complete before measuring scroll position.
 
+### Terminal Hook
+- **File:** `assets/js/hooks/terminal_hook.js`
+- **Purpose:** Manages xterm.js terminal instance for canvas terminal windows
+- **Scoping:** Identical to PtyHook but scopes all events to terminal ID via `data-terminal-id` attribute to support multiple terminals on same canvas
+- **Events:**
+  - Pushed to server: `pty_input` (user typing), `pty_resize` (terminal resized)
+  - Received from server: `pty_output_<terminal_id>` (scoped event prevents cross-terminal data interference)
+- **Lifecycle:**
+  - On mount: Creates xterm.js Terminal, loads FitAddon and WebLinksAddon, opens in container element, sets up ResizeObserver for responsive sizing, establishes event handlers
+  - On data/resize: Pushes events to server via pushEvent (same event names as TerminalLive, routed by phx-target)
+  - On received output: Decodes base64-encoded data and writes to terminal
+  - On destroy: Disconnects ResizeObserver, disposes Terminal instance
+- **Theme:** Dark theme (zinc palette, background #09090b, foreground #e4e4e7)
+
+### Terminal Window Hook
+- **File:** `assets/js/hooks/terminal_window_hook.js`
+- **Purpose:** Handles drag, resize, and z-index management for terminal windows on canvas
+- **Distinct from ChatWindowHook:** Uses `data-terminal-id` and events `terminal_moved`/`terminal_resized` instead of `data-cs-id` and `window_moved`/`window_resized` to avoid ID collisions when both chat and terminal windows exist on same canvas
+- **Features:**
+  - Drag via data-drag-handle element (title bar)
+  - Resize via ResizeObserver on the window element
+  - Z-index management: clicking window raises it to front, manages both chat and terminal windows (`[data-chat-window], [data-terminal-window]`)
+  - Focus ring added/removed during z-index transitions
+  - Debounced persistence: 50ms for move, 400ms for resize
+- **Instance variables:** `_zIndex`, `_dragLeft`, `_dragTop`, `_width`, `_height` restored after LiveView patches
+- **Guards:** Checks for `_destroyed` flag before pushing events (guards against hook destruction race)
+
 ### Global Keydown Hook
 - **File:** `assets/js/hooks/global_keydown.js`
 - **Purpose:** Centralized keyboard event handling across all pages
 - **Registration:** Added to `Hooks` object in `assets/js/app.js`
 - **Prevents:** Duplicate keyboard handling in individual LiveViews (canvas, DM, etc.)
+
+## Terminal Management
+
+### Persisted Terminal Layout
+
+Terminal windows are persisted in the `canvas_terminals` table with layout metadata:
+- `canvas_id` — Canvas the terminal belongs to
+- `pos_x`, `pos_y` — Top-left corner position (pixels)
+- `width`, `height` — Window dimensions (clamped to 100px minimum on server, 120px on client)
+
+When a canvas is activated, all persisted terminals are loaded and PTY servers are started.
+
+### PTY Lifecycle in CanvasLive
+
+**Starting terminals:**
+1. `activate_canvas/2` calls `Canvases.list_terminals(canvas_id)` to load persisted terminals
+2. For each terminal, `start_pty_for_terminal/1` creates a PtyServer with `subscriber_tag: terminal.id`
+3. Server routes tagged PTY output to CanvasLive as `{:pty_output, terminal_id, data}`
+4. Terminal ID and PtyServer PID are stored in `socket.assigns.terminal_pty_map`
+5. TerminalWindowComponent is rendered with `id: "terminal-window-#{id}"`, `pty_pid: pid`, `ct: terminal`
+
+**Running terminals:**
+- TerminalHook manages xterm.js, sends input/resize events to server
+- TerminalWindowComponent routes events to running PtyServer
+- PtyServer output arrives as `{:pty_output, terminal_id, data}`
+- CanvasLive dispatches via `send_update(TerminalWindowComponent, id: "terminal-window-#{terminal_id}", pty_output: data)`
+- Component calls `push_event("pty_output_#{terminal_id}", ...)` to deliver to scoped hook listener
+
+**Cleanup:**
+- On canvas switch: All terminal PTYs stopped via `stop_all_terminals/1`
+- On terminal close (close button): Component sends `{:remove_terminal_window, terminal_id}` message
+- CanvasLive handler stops PTY server, deletes terminal from DB, removes from state
+- On PTY exit: `{:pty_exited, terminal_id}` message triggers cleanup via `remove_terminal/2`
+
+### Terminal Event Handlers
+
+**`add_terminal`**
+- Creates new CanvasTerminal record with default positions
+- Starts PTY with `subscriber_tag: terminal.id`
+- Adds to `canvas_terminals` and `terminal_pty_map`
+
+**`terminal_moved`**
+- Receives `{id, x, y}` from TerminalWindowHook drag handler
+- Updates terminal layout via `Canvases.update_terminal_layout/2`
+
+**`terminal_resized`**
+- Receives `{id, w, h}` from TerminalWindowHook resize observer
+- Updates terminal layout via `Canvases.update_terminal_layout/2`
+
+**`{:pty_output, terminal_id, data}`**
+- PubSub message from PtyServer (routed via `subscriber_tag`)
+- Dispatches output to TerminalWindowComponent via `send_update`
+
+**`{:pty_exited, terminal_id}`**
+- PtyServer process exited abnormally
+- Cleans up terminal state via `remove_terminal/2`
+
+**`{:remove_terminal_window, terminal_id}`**
+- Component requested close (user clicked close button)
+- Stops PtyServer, deletes terminal from DB, removes from state
+
+### Toolbar Support
+
+Canvas toolbar includes **"Add Terminal" button** that:
+- Creates new CanvasTerminal record
+- Starts PTY server with subscriber_tag
+- Adds to visible terminal list on canvas
+- Button wired to `add_terminal` event handler
 
 ## Component Integration
 
@@ -427,14 +533,22 @@ Clicking a session name or message link within the canvas should route back to `
 - **LiveView:** `lib/eye_in_the_sky_web/live/canvas_live.ex`
 - **Handlers:** `lib/eye_in_the_sky_web/live/agent_live/canvas_handlers.ex`
 - **Components:**
-  - `lib/eye_in_the_sky_web/components/chat_window_component.ex`
+  - `lib/eye_in_the_sky_web/components/chat_window_component.ex` (chat message windows)
+  - `lib/eye_in_the_sky_web/components/terminal_window_component.ex` (terminal windows)
   - `lib/eye_in_the_sky_web/components/rail.ex` and `lib/eye_in_the_sky_web/components/rail/flyout.ex` (canvas rail section)
   - `lib/eye_in_the_sky_web/components/agent_list.ex` (canvas buttons)
   - `lib/eye_in_the_sky_web/components/sidebar/all_projects_section.ex` (canvas tab)
 - **JavaScript Hooks:**
   - `assets/js/hooks/canvas_layout_hook.js` (layout presets)
-  - `assets/js/hooks/chat_window_hook.js` (window drag/resize, focus, scroll)
+  - `assets/js/hooks/chat_window_hook.js` (chat window drag/resize, focus, scroll)
+  - `assets/js/hooks/terminal_hook.js` (xterm.js terminal instance management)
+  - `assets/js/hooks/terminal_window_hook.js` (terminal window drag/resize chrome)
   - `assets/js/hooks/canvas_tab_hook.js` (keyboard shortcuts)
   - `assets/js/hooks/global_keydown.js` (centralized keyboard handling)
-- **Schema:** `lib/eye_in_the_sky/canvases/canvas.ex` and related Ecto context
+- **Schema:**
+  - `lib/eye_in_the_sky/canvases/canvas.ex` (Canvas schema)
+  - `lib/eye_in_the_sky/canvases/canvas_session.ex` (CanvasSession join schema)
+  - `lib/eye_in_the_sky/canvases/canvas_terminal.ex` (CanvasTerminal schema)
+- **Context:** `lib/eye_in_the_sky/canvases.ex` (Ecto context with terminal CRUD)
+- **Terminal:** `lib/eye_in_the_sky/terminal/pty_server.ex` (PTY server with subscriber_tag routing)
 - **PubSub:** `lib/eye_in_the_sky/events.ex` (subscription logic)

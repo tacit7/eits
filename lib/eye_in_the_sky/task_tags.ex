@@ -8,10 +8,19 @@ defmodule EyeInTheSky.TaskTags do
   alias EyeInTheSky.Tasks.Tag
 
   @doc """
-  Returns the list of tags.
+  Returns the list of tags, optionally filtered by name search (case-insensitive substring).
   """
-  def list_tags do
-    Repo.all(Tag)
+  def list_tags(opts \\ []) do
+    query =
+      case Keyword.get(opts, :search) do
+        search when is_binary(search) and search != "" ->
+          from(t in Tag, where: ilike(t.name, ^"%#{search}%"))
+
+        _ ->
+          Tag
+      end
+
+    Repo.all(query)
   end
 
   @doc """

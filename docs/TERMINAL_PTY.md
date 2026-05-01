@@ -131,8 +131,18 @@ With a tag: `{:pty_output, tag, data}`.
 ### erlexec opts — the working configuration
 
 ```elixir
+env = [
+  {"TERM", "xterm-256color"},
+  {"LANG", "en_US.UTF-8"},
+  {"HOME", System.get_env("HOME", "/tmp")},
+  {"PATH", System.get_env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")},
+  {"SHELL", @shell_bin},
+  {"USER", System.get_env("USER", "user")},
+  {"LOGNAME", System.get_env("LOGNAME", System.get_env("USER", "user"))}
+]
+
 opts = [
-  :stdin,             # REQUIRED: without this, stdin defaults to /dev/null
+  :stdin,             # CRITICAL: without this, stdin defaults to /dev/null
   {:stdout, self()},  # deliver PTY output as {:stdout, os_pid, data}
   {:stderr, :stdout}, # merge stderr into stdout stream
   :pty,               # allocate a PTY
@@ -345,15 +355,15 @@ User types "ls" in canvas terminal window
 
 ## erlexec Gotchas (all fixed)
 
-Five confirmed bugs. All must be present for terminals to work correctly.
+Five load-bearing bugs fixed in commits e7ed7f1b, a6c076cf, 3effe5cc. Each must be correct for terminals to work.
 
-### 1. String command → `m_shell=true` → bash exits immediately
+### 1. String command → `m_shell=true` → bash wrapped and exits
 
-String form triggers `m_shell=true` in erlexec's C port, wrapping the command as `$SHELL -c "..."`. Outer shell exits immediately.
+String form triggers `m_shell=true` in erlexec's C port, wrapping the command as `$SHELL -c "..."`. This runs bash as a sub-shell of sh -c, which exits immediately. The outer shell exits, killing bash before it can accept input.
 
-**Fix:** Pass command as a list: `[@shell_bin, "--norc", "--noprofile", "-i"]`
+**Fix:** Pass command as a **list** (not a string): `[@shell_bin, "--norc", "--noprofile", "-i"]`
 
-**Diagnostic:** `{:DOWN, os_pid, :process, pid, :normal}` with zero stdout messages immediately after spawn.
+**Diagnostic:** `{:DOWN, os_pid, :process, pid, :normal}` with zero stdout messages immediately after spawn (no prompt bytes).
 
 ---
 
@@ -369,17 +379,17 @@ Without `:stdin`, erlexec initializes `stream_fd[STDIN_FILENO]` to `/dev/null`. 
 
 ### 3. Missing `:normal` exit handler → clean bash exit unhandled
 
-erlexec sends `{:DOWN, os_pid, :process, lwp_pid, :normal}` for exit code 0. The `{:exit_status, code}` form only fires for non-zero exits.
+When bash exits with code 0, erlexec sends `{:DOWN, os_pid, :process, lwp_pid, :normal}` (not `{:exit_status, 0}`). Non-zero exits use the `{:exit_status, code}` form. Without a `:normal` handler, the exit message is unmatched and PtyServer lingers until the parent LiveView dies.
 
 **Fix:**
 ```elixir
 def handle_info({:DOWN, os_pid, :process, _lwp, :normal}, %{os_pid: os_pid} = state) do
-  notify_exit(state)
+  send(state.subscriber, :pty_exited)
   {:stop, :normal, state}
 end
 ```
 
-The `os_pid` pin in both message and state distinguishes this from the LiveView monitor's `:DOWN`.
+The `os_pid` pin in both message and state guard distinguishes this from the LiveView monitor's `:DOWN`.
 
 ---
 

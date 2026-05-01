@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
   attr :active_timer, :map, default: nil
   attr :session_uuid, :string, default: nil
   attr :show_iterm, :boolean, default: false
+  attr :notify_on_stop, :boolean, default: false
 
   def toolbar(assigns) do
     ~H"""
@@ -95,6 +96,20 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
           >
             <.icon name="hero-clipboard-document" class="size-3.5" /> Export as Markdown
+          </button>
+        </li>
+        <li><div class="divider my-0"></div></li>
+        <li>
+          <button
+            id="topbar-push-setup-btn"
+            phx-hook="PushSetup"
+            phx-update="ignore"
+            data-push-state="disabled"
+            data-notify-on-stop={if @notify_on_stop, do: "true", else: "false"}
+            title="Enable notifications"
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+          >
+            <.icon name="hero-bell" class="size-3.5" /> Notify
           </button>
         </li>
         <li><div class="divider my-0"></div></li>

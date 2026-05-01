@@ -109,6 +109,7 @@
             active_timer={assigns[:active_timer]}
             session_uuid={assigns[:session_uuid]}
             show_iterm={true}
+            notify_on_stop={assigns[:notify_on_stop] || false}
           />
         <% :notes -> %>
           <EyeInTheSkyWeb.TopBar.Notes.toolbar

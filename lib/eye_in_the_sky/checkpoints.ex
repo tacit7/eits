@@ -8,6 +8,7 @@ defmodule EyeInTheSky.Checkpoints do
 
   alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Checkpoints.Checkpoint
+  alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.Repo
 
   @doc """
@@ -234,38 +235,65 @@ defmodule EyeInTheSky.Checkpoints do
     })
   end
 
-  # Bug fix: was using list_recent_messages/2 (most recent N), which copies the
-  # wrong slice. Use get_conversation_thread/2 which fetches oldest-first with
-  # a limit, matching what message_index tracks.
-  #
-  # Bug fix: was using Enum.each which silently ignores insert errors. Now uses
-  # Enum.reduce_while and returns {:error, reason} on the first failure.
+  # H4 fix: replace per-row create_message calls (N inserts + N cache-increment UPDATEs)
+  # with a single Repo.insert_all + one aggregate increment_usage_cache call.
+  # Messages from the DB are already valid; changeset validation is unnecessary overhead.
   defp copy_messages_to_fork(source_session_id, dest_session_id, message_index) do
     messages_to_copy =
       Messages.get_conversation_thread(source_session_id, limit: message_index, offset: 0)
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    result =
-      Enum.reduce_while(messages_to_copy, :ok, fn msg, _acc ->
-        case Messages.create_message(%{
-               uuid: Ecto.UUID.generate(),
-               session_id: dest_session_id,
-               sender_role: msg.sender_role,
-               recipient_role: msg.recipient_role,
-               direction: msg.direction || "inbound",
-               body: msg.body,
-               status: "delivered",
-               provider: msg.provider || "claude",
-               metadata: msg.metadata || %{},
-               inserted_at: msg.inserted_at || now,
-               updated_at: now
-             }) do
-          {:ok, _} -> {:cont, :ok}
-          {:error, reason} -> {:halt, {:error, reason}}
-        end
+    rows =
+      Enum.map(messages_to_copy, fn msg ->
+        %{
+          uuid: Ecto.UUID.generate(),
+          session_id: dest_session_id,
+          sender_role: msg.sender_role,
+          recipient_role: msg.recipient_role,
+          direction: msg.direction || "inbound",
+          body: msg.body,
+          status: "delivered",
+          provider: msg.provider || "claude",
+          metadata: msg.metadata || %{},
+          inserted_at: msg.inserted_at || now,
+          updated_at: now
+        }
       end)
 
-    result
+    try do
+      Repo.insert_all(Message, rows)
+
+      # Aggregate token/cost from all copied messages and apply in one UPDATE.
+      {total_tokens, total_cost} =
+        Enum.reduce(messages_to_copy, {0, 0.0}, fn msg, {tok, cost} ->
+          metadata = msg.metadata || %{}
+          usage = Map.get(metadata, "usage") || Map.get(metadata, :usage) || %{}
+
+          input =
+            (Map.get(usage, "input_tokens") || Map.get(usage, :input_tokens) || 0) |> to_int()
+
+          output =
+            (Map.get(usage, "output_tokens") || Map.get(usage, :output_tokens) || 0) |> to_int()
+
+          msg_cost =
+            (Map.get(metadata, "total_cost_usd") || Map.get(metadata, :total_cost_usd) || 0.0)
+            |> to_float()
+
+          {tok + input + output, cost + msg_cost}
+        end)
+
+      Sessions.increment_usage_cache(dest_session_id, total_tokens, total_cost)
+      :ok
+    rescue
+      e in Postgrex.Error -> {:error, e}
+    end
   end
+
+  defp to_int(v) when is_integer(v), do: v
+  defp to_int(_), do: 0
+
+  defp to_float(v) when is_float(v), do: v
+  defp to_float(v) when is_integer(v), do: v / 1
+  defp to_float(_), do: 0.0
 end

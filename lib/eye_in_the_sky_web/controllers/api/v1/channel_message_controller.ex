@@ -82,7 +82,6 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
 
     case ChannelMessages.create_channel_message(attrs) do
       {:ok, msg} ->
-        EyeInTheSky.Events.channel_message(channel_id, msg)
         notify_channel_members(channel_id, int_id, body)
         ChannelFanout.fanout_all(channel_id, body, int_id)
 

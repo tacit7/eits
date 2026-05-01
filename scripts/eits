@@ -2635,6 +2635,21 @@ cmd_teams() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits teams <list|get|create|update|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"; return 0; }
   case "$sub" in
     list)
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'HELP'
+usage: eits teams list [--project <id>] [--status <active|inactive|all>] [--limit <n>]
+
+  --project/-p  Filter by project ID
+  --status      Filter by status: active, inactive, all (default excludes archived)
+  --limit/-l    Max teams to return (negative values ignored, returns all)
+
+Examples:
+  eits teams list
+  eits teams list --status active --limit 20
+  eits teams list --project 1
+HELP
+        return 0
+      }
       local project_id="" status="" limit=""
       while [[ $# -gt 0 ]]; do
         case "$1" in

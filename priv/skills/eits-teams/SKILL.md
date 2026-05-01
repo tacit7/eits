@@ -14,7 +14,7 @@ EITS teams coordinate multiple Claude agents in parallel. Membership is server-s
 ## CLI Reference
 
 ```bash
-eits teams list [--project <id>] [--status <status>]
+eits teams list [--project <id>] [--status <active|inactive|all>] [--limit <n>]
 eits teams get <id|name>
 eits teams create --name <name> [--description <desc>] [--project <id>]
 eits teams delete <id>

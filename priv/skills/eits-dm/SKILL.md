@@ -58,9 +58,11 @@ eits dm --to $UUID_2 --message "..."
 Useful when you know agents DM'd you but you can't check the web UI:
 
 ```bash
-eits dm list                          # inbox for current session (default limit 20)
-eits dm list --session <uuid|id>      # inbox for any session
-eits dm list --limit 50               # up to 100 max
+eits dm list                                        # inbox for current session (default limit 20)
+eits dm list --session <uuid|id>                    # inbox for any session
+eits dm list --limit 50                             # up to 100 max
+eits dm list --since "2026-04-30T12:00:00Z"         # only messages after timestamp
+eits dm list --from <session_id>                    # filter by sender
 ```
 
 Returns `{session_id, session_uuid, count, messages[]}`. Messages are ordered oldest-first.

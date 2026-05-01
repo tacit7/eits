@@ -171,6 +171,8 @@ defmodule EyeInTheSky.Channels do
       where: m.channel_id == ^channel_id,
       order_by: [asc: m.joined_at],
       select: %{
+        id: m.id,
+        agent_id: m.agent_id,
         agent_uuid: a.uuid,
         session_id: m.session_id,
         session_uuid: s.uuid,
@@ -180,6 +182,28 @@ defmodule EyeInTheSky.Channels do
       }
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Counts unread messages per channel for a session in a single grouped query.
+  Returns a map of %{channel_id => count}. Channels with no unread messages are absent (default to 0).
+  """
+  def count_unread_for_channels([], _session_id), do: %{}
+  def count_unread_for_channels(_channel_ids, nil), do: %{}
+
+  def count_unread_for_channels(channel_ids, session_id) do
+    alias EyeInTheSky.Messages.Message
+
+    from(m in Message,
+      left_join: cm in ChannelMember,
+      on: cm.channel_id == m.channel_id and cm.session_id == ^session_id,
+      where: m.channel_id in ^channel_ids,
+      where: is_nil(cm.last_read_at) or m.inserted_at > cm.last_read_at,
+      group_by: m.channel_id,
+      select: {m.channel_id, count(m.id)}
+    )
+    |> Repo.all()
+    |> Map.new()
   end
 
   @doc """

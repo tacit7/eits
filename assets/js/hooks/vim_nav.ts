@@ -403,6 +403,24 @@ export const VimNav = {
         const sessionId = item.dataset.sessionId
         if (!sessionId) return
         const event = action.name === "list_archive" ? "archive_session" : "delete_session"
+        // Save the target index so we can refocus after LiveView removes the row.
+        const savedIndex = this.listFocusIndex
+        // Watch for the item's removal from the DOM (LiveView stream_delete fires
+        // asynchronously after the server round-trip), then focus the item that
+        // slides into the saved position, or the new last item if at the end.
+        const obs = new MutationObserver(() => {
+          if (item.isConnected) return
+          obs.disconnect()
+          const items = this.currentListItems()
+          if (items.length === 0) {
+            this.listFocusIndex = -1
+            return
+          }
+          this.focusListItem(Math.min(savedIndex, items.length - 1))
+        })
+        obs.observe(document.body, { childList: true, subtree: true })
+        // Safety: disconnect after 3 s in case the server never removes the item.
+        setTimeout(() => obs.disconnect(), 3000)
         this.pushToList?.(event, { session_id: sessionId })
         return
       }

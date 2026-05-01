@@ -606,9 +606,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     socket
   end
 
-  # Canvas-specific session badge colors. Differs from StatusHelpers.status_to_badge
-  # which targets agent display (where "completed" = inactive ghost). For canvas
-  # session pills, "working" = blue/primary (active), "completed" = green/success.
+  # Canvas-specific session badge colors. Differs from status_badge_color/1 in
+  # core_components.ex (which uses :working=success/:waiting=info for agent
+  # display). For canvas session pills, "working"=primary (blue/active),
+  # "waiting"=warning (amber).
   defp session_status_class("working"), do: "badge-primary"
   defp session_status_class("idle"), do: "badge-ghost"
   defp session_status_class("waiting"), do: "badge-warning"

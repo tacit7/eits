@@ -260,9 +260,9 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
   defp member_avatar_class(_), do: "bg-base-300 text-base-content/30"
 
   defp task_state_dot(@state_todo), do: "bg-base-content/30"
-  defp task_state_dot(@state_in_progress), do: "bg-info"
-  defp task_state_dot(@state_done), do: "bg-success"
-  defp task_state_dot(@state_in_review), do: "bg-warning"
+  defp task_state_dot(@state_in_progress), do: "bg-blue-500"
+  defp task_state_dot(@state_done), do: "bg-green-500"
+  defp task_state_dot(@state_in_review), do: "bg-amber-400"
   defp task_state_dot(_), do: "bg-base-content/20"
 
   defp task_state_chip(@state_todo), do: "bg-base-300 text-base-content/40"

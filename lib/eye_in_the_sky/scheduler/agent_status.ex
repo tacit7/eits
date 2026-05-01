@@ -10,9 +10,12 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
   use GenServer
 
+  import Ecto.Query
+
   require Logger
 
   alias EyeInTheSky.{Agents, Events, Repo, Sessions, Tasks}
+  alias EyeInTheSky.Agents.Agent
   alias EyeInTheSky.Sessions.Session
 
   # 5 minutes in milliseconds
@@ -52,31 +55,47 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
     agents = Agents.list_agents_pending_status_check()
 
-    Enum.each(agents, fn agent -> update_agent_status(agent, now) end)
+    # Partition agents by desired new status in memory, then bulk-update each group.
+    # Replaces N individual Repo.update calls with at most 3 Repo.update_all calls.
+    {unknown, stale, idle} =
+      Enum.reduce(agents, {[], [], []}, fn agent, {u, s, i} ->
+        case desired_agent_status(agent, now) do
+          "unknown" -> {[agent | u], s, i}
+          "stale" -> {u, [agent | s], i}
+          "idle" -> {u, s, [agent | i]}
+          :skip -> {u, s, i}
+        end
+      end)
 
-    Logger.debug("Agent status update completed: #{length(agents)} agents checked")
+    bulk_update_agent_status(unknown, "unknown")
+    bulk_update_agent_status(stale, "stale")
+    bulk_update_agent_status(idle, "idle")
+
+    total = length(unknown) + length(stale) + length(idle)
+    Logger.debug("Agent status update completed: #{length(agents)} agents checked, #{total} updated")
   rescue
     DBConnection.ConnectionError -> Logger.warning("mark_stale_agents: DB unavailable, skipping")
   end
 
-  defp update_agent_status(agent, now) do
+  defp desired_agent_status(agent, now) do
     cond do
       # Unknown: no activity in over 1 day
-      too_old?(agent.last_activity_at, now) ->
-        Agents.update_agent(agent, %{status: "unknown"})
-
+      too_old?(agent.last_activity_at, now) -> "unknown"
       # Stale: inactive for more than 1 hour
-      stale?(agent.last_activity_at, now) ->
-        Agents.update_agent(agent, %{status: "stale"})
-
-      # Idle: active but created less than 1 hour ago
-      waiting?(agent.created_at, now) ->
-        Agents.update_agent(agent, %{status: "idle"})
-
-      # Active: recent activity or just created
-      true ->
-        :skip
+      stale?(agent.last_activity_at, now) -> "stale"
+      # Idle: created less than 1 hour ago
+      waiting?(agent.created_at, now) -> "idle"
+      true -> :skip
     end
+  end
+
+  # Single bulk UPDATE per status group + per-agent PubSub broadcast.
+  defp bulk_update_agent_status([], _status), do: :ok
+
+  defp bulk_update_agent_status(agents, status) do
+    ids = Enum.map(agents, & &1.id)
+    Repo.update_all(from(a in Agent, where: a.id in ^ids), set: [status: status])
+    Enum.each(agents, fn agent -> Events.agent_updated(%{agent | status: status}) end)
   end
 
   defp too_old?(nil, _now), do: false
@@ -102,7 +121,11 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     now = DateTime.utc_now()
     cutoff = DateTime.add(now, -@thirty_minutes, :second)
 
-    idle_sessions = Sessions.list_idle_sessions_older_than(cutoff)
+    # Preload agents in one batch — eliminates one get_agent/1 SELECT per idle session.
+    idle_sessions =
+      cutoff
+      |> Sessions.list_idle_sessions_older_than()
+      |> Repo.preload(:agent)
 
     archived_count =
       idle_sessions
@@ -125,17 +148,17 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   # Sweep them to 'failed' so the UI reflects reality.
   # Also mark the linked agent as failed to ensure UI status filters are correct.
   defp sweep_zombie_sessions do
-    import Ecto.Query
-
     cutoff = DateTime.utc_now() |> DateTime.add(-@thirty_minutes, :second)
 
+    # Join agents upfront — eliminates one get_agent/1 SELECT per zombie session.
     zombies =
       from(s in Session,
+        left_join: a in Agent, on: a.id == s.agent_id,
         where: s.status == "working",
         where:
           (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
             (is_nil(s.last_activity_at) and not is_nil(s.started_at) and s.started_at < ^cutoff),
-        select: s
+        preload: [agent: a]
       )
       |> Repo.all()
 
@@ -145,14 +168,8 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
           Logger.warning("Swept zombie session id=#{session.id} uuid=#{session.uuid} (stuck in working)")
           Events.session_status(session.id, updated.status)
 
-          if session.agent_id do
-            case Agents.get_agent(session.agent_id) do
-              {:ok, agent} ->
-                Agents.update_agent(agent, %{status: "failed"})
-
-              {:error, :not_found} ->
-                :ok
-            end
+          if session.agent do
+            Agents.update_agent(session.agent, %{status: "failed"})
           end
 
         {:error, reason} ->
@@ -174,15 +191,11 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   end
 
   defp archive_session_and_agent(session, now) do
-    # Archive the session
     Sessions.update_session(session, %{archived_at: now, status: "archived"})
 
-    # Archive the associated agent if present
-    if session.agent_id do
-      case Agents.get_agent(session.agent_id) do
-        {:ok, agent} -> Agents.archive_agent(agent, now)
-        {:error, :not_found} -> :ok
-      end
+    # session.agent is preloaded in archive_dead_idle_sessions/0 — no extra SELECT needed.
+    if session.agent do
+      Agents.archive_agent(session.agent, now)
     end
   end
 end

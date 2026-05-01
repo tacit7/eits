@@ -2428,16 +2428,21 @@ cmd_channels() {
         "$(json session_id "$session_id" body "$body" broadcast_to_team_id "$broadcast_team")"
       ;;
     messages)
-      # eits channels messages <channel_id> [--limit N]
+      # eits channels messages <channel_id> [--limit N] [--since <message_id>] [--before <message_id>]
       local channel_id="${1:-}"; need channel_id; shift
-      local limit="20"
+      local limit="20" since="" before=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --limit|-n) limit="$2"; shift 2 ;;
+          --since)    since="$2"; shift 2 ;;
+          --before)   before="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _curl "$BASE_URL/channels/$channel_id/messages?limit=$limit" | jq .
+      local qs="limit=$limit"
+      [[ -n "$since" ]]  && qs="${qs}&since=${since}"
+      [[ -n "$before" ]] && qs="${qs}&before=${before}"
+      _curl "$BASE_URL/channels/$channel_id/messages?${qs}" | jq .
       ;;
     join)
       # eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
@@ -2547,7 +2552,10 @@ Subcommands:
   mine     [--session <uuid|id>]                    List channels the current session is a member of
   send     <channel_id> --body <text> [--session <id>] [--broadcast-team <team_id>]
            Send a message; --broadcast-team fans out DMs to all team members after posting
-  messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
+  messages <channel_id> [--limit|-n <N>] [--since <id>] [--before <id>]
+                                                     Get messages (default 20, max 200)
+                                                     --since <id>: only messages after this ID (catch-up)
+                                                     --before <id>: only messages before this ID (load-older)
   members  <channel_id> [--json]                    List channel members (name, role, joined)
   join     <channel_id> [--session <uuid|id>] [--role <member|admin>]
            Join a channel (defaults to current session)

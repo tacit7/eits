@@ -12,24 +12,37 @@ defmodule EyeInTheSky.ChannelMessages do
 
   Options:
     - `:limit` — max number of messages to return, default 100
-    - `:before_id` — return only messages with id < before_id (cursor pagination)
+    - `:before_id` — return only messages with id < before_id (scroll-up / load-older)
+    - `:after_id` — return only messages with id > after_id (poll-forward / catch-up)
 
-  Results are returned in chronological order (oldest first).
+  When `:after_id` is set, results are ordered oldest-first (chronological catch-up).
+  Otherwise results are returned in chronological order (oldest first).
   """
   def list_messages_for_channel(channel_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 100)
     before_id = Keyword.get(opts, :before_id)
+    after_id = Keyword.get(opts, :after_id)
 
     Message
     |> where([m], m.channel_id == ^channel_id and is_nil(m.parent_message_id))
     |> then(fn q ->
       if before_id, do: where(q, [m], m.id < ^before_id), else: q
     end)
-    |> order_by([m], desc: m.inserted_at, desc: m.id)
+    |> then(fn q ->
+      if after_id do
+        q
+        |> where([m], m.id > ^after_id)
+        |> order_by([m], asc: m.id)
+      else
+        order_by(q, [m], desc: m.inserted_at, desc: m.id)
+      end
+    end)
     |> limit(^limit)
     |> preload([:reactions, :attachments, :session])
     |> Repo.all()
-    |> Enum.reverse()
+    |> then(fn msgs ->
+      if after_id, do: msgs, else: Enum.reverse(msgs)
+    end)
   end
 
   @doc """

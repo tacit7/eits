@@ -29,7 +29,10 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
 
   @doc """
   GET /api/v1/channels/:channel_id/messages - List recent messages for a channel.
-  Query params: limit (optional, default 20, max 200)
+  Query params:
+    - limit (optional, default 20, max 200)
+    - since (optional) — return only messages with id > since (integer message ID); useful for catch-up polling
+    - before (optional) — return only messages with id < before (scroll-up pagination)
   """
   def index(conn, %{"channel_id" => channel_id} = params) do
     limit =
@@ -38,7 +41,22 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
         _ -> 20
       end
 
-    messages = ChannelMessages.list_messages_for_channel(channel_id, limit: limit)
+    opts =
+      [limit: limit]
+      |> then(fn o ->
+        case parse_int(params["since"]) do
+          nil -> o
+          id -> Keyword.put(o, :after_id, id)
+        end
+      end)
+      |> then(fn o ->
+        case parse_int(params["before"]) do
+          nil -> o
+          id -> Keyword.put(o, :before_id, id)
+        end
+      end)
+
+    messages = ChannelMessages.list_messages_for_channel(channel_id, opts)
 
     json(conn, %{
       success: true,

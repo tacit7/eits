@@ -18,12 +18,14 @@ defmodule EyeInTheSky.Commits do
   end
 
   @doc """
-  Returns the list of commits for a specific agent.
+  Returns the list of commits for a specific agent. Default limit is 100.
+  Pass `limit: n` opt to override.
   """
-  def list_commits_for_agent(agent_id) do
+  def list_commits_for_agent(agent_id, opts \\ []) do
     Commit
     |> where([c], c.agent_id == ^agent_id)
     |> order_by([c], desc: c.created_at)
+    |> limit(^Keyword.get(opts, :limit, 100))
     |> Repo.all()
   end
 

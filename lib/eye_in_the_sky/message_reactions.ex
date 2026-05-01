@@ -56,22 +56,39 @@ defmodule EyeInTheSky.MessageReactions do
 
   @doc """
   Toggles a reaction (adds if not present, removes if present).
+
+  M1 fix: replaces SELECT-then-INSERT/DELETE with an attempt-insert-first pattern.
+  The unique index on (message_id, session_id, emoji) is the authority — we try
+  an INSERT and treat a conflict as "already exists, delete instead". No SELECT
+  needed; concurrent taps on the same emoji cannot produce duplicates.
   """
   def toggle_reaction(message_id, session_id, emoji) do
-    existing =
-      from(r in MessageReaction,
-        where: r.message_id == ^message_id and r.session_id == ^session_id and r.emoji == ^emoji
-      )
-      |> Repo.one()
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    if existing do
-      remove_reaction(message_id, session_id, emoji)
-      {:ok, :removed}
-    else
-      case add_reaction(message_id, session_id, emoji) do
-        {:ok, _reaction} -> {:ok, :added}
-        error -> error
-      end
+    attrs = %{
+      message_id: message_id,
+      session_id: session_id,
+      emoji: emoji,
+      inserted_at: now
+    }
+
+    result =
+      %MessageReaction{}
+      |> MessageReaction.changeset(attrs)
+      |> Repo.insert(on_conflict: :nothing, conflict_target: [:message_id, :session_id, :emoji])
+
+    case result do
+      {:ok, %MessageReaction{id: id}} when not is_nil(id) ->
+        # Insert succeeded — reaction was added.
+        {:ok, :added}
+
+      {:ok, %MessageReaction{id: nil}} ->
+        # on_conflict: :nothing fired — reaction already existed; remove it.
+        remove_reaction(message_id, session_id, emoji)
+        {:ok, :removed}
+
+      error ->
+        error
     end
   end
 end

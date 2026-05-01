@@ -11,13 +11,6 @@ defmodule EyeInTheSky.Logs do
   # Log functions
 
   @doc """
-  Returns the list of logs.
-  """
-  def list_logs do
-    Repo.all(Log)
-  end
-
-  @doc """
   Returns the list of logs for a specific session.
   """
   def list_logs_for_session(session_id, opts \\ []) do
@@ -42,12 +35,13 @@ defmodule EyeInTheSky.Logs do
   end
 
   @doc """
-  Filters logs by type.
+  Filters logs by type. Default limit is 500; pass `limit:` opt to override.
   """
-  def filter_logs_by_type(session_id, type) do
+  def filter_logs_by_type(session_id, type, opts \\ []) do
     Log
     |> where([l], l.session_id == ^session_id and l.type == ^type)
     |> order_by([l], desc: l.timestamp)
+    |> limit(^Keyword.get(opts, :limit, 500))
     |> Repo.all()
   end
 
@@ -70,29 +64,24 @@ defmodule EyeInTheSky.Logs do
   # SessionLog functions
 
   @doc """
-  Returns the list of session logs.
+  Returns the list of session logs for a specific session. Default limit is 500.
   """
-  def list_session_logs do
-    Repo.all(SessionLog)
-  end
-
-  @doc """
-  Returns the list of session logs for a specific session.
-  """
-  def list_session_logs_for_session(session_id) do
+  def list_session_logs_for_session(session_id, opts \\ []) do
     SessionLog
     |> where([sl], sl.session_id == ^session_id)
     |> order_by([sl], desc: sl.timestamp)
+    |> limit(^Keyword.get(opts, :limit, 500))
     |> Repo.all()
   end
 
   @doc """
-  Filters session logs by log level.
+  Filters session logs by log level. Default limit is 500.
   """
-  def filter_session_logs_by_level(session_id, log_level) do
+  def filter_session_logs_by_level(session_id, log_level, opts \\ []) do
     SessionLog
     |> where([sl], sl.session_id == ^session_id and sl.log_level == ^log_level)
     |> order_by([sl], desc: sl.timestamp)
+    |> limit(^Keyword.get(opts, :limit, 500))
     |> Repo.all()
   end
 

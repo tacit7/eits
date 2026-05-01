@@ -26,9 +26,6 @@ defmodule EyeInTheSky.Messages do
   # Session-scoped message loading (JSONL-aware)
   # ---------------------------------------------------------------------------
 
-  @spec list_messages() :: [Message.t()]
-  def list_messages, do: Repo.all(Message)
-
   @spec list_messages_for_session(integer()) :: [Message.t()]
   def list_messages_for_session(session_id), do: list_messages_for_session(session_id, nil)
 
@@ -77,6 +74,8 @@ defmodule EyeInTheSky.Messages do
   defdelegate truncate_messages_after_index(session_id, keep_count), to: Listings
   defdelegate find_unlinked_import_candidate(session_id, sender_role, body), to: Listings
   defdelegate find_recent_dm(session_id, body, opts \\ []), to: Listings
+  defdelegate recent_agent_bodies_for_session(session_id, opts \\ []), to: Listings
+  defdelegate unlinked_candidates_map_for_session(session_id), to: Listings
   defdelegate has_inbound_reply?(session_id, provider), to: Listings
   defdelegate has_inbound_claude_reply?(session_id), to: Listings
   defdelegate existing_source_uuids(session_id, source_uuids), to: Listings

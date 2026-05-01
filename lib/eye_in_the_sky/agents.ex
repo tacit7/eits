@@ -160,8 +160,17 @@ defmodule EyeInTheSky.Agents do
            conflict_target: :uuid,
            returning: true
          ) do
-      {:ok, agent} -> {:ok, agent}
-      {:error, _changeset} = err -> err
+      {:ok, agent} ->
+        # inserted_at == updated_at only on a fresh insert; the no-op uuid update
+        # touches updated_at on conflict, so we can reliably detect new rows here.
+        if DateTime.compare(agent.inserted_at, agent.updated_at) == :eq do
+          EyeInTheSky.Events.agent_created(agent)
+        end
+
+        {:ok, agent}
+
+      {:error, _changeset} = err ->
+        err
     end
   end
 

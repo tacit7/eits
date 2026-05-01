@@ -134,7 +134,8 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
   @doc """
   Full session detail shape for the show endpoint.
   `opts` accepts: agent_uuid (string), is_spawned (boolean),
-  tasks (list), recent_notes (list), recent_commits (list).
+  tasks (list), recent_notes (list), recent_commits (list),
+  worktree_path (string | nil), branch_name (string | nil).
   """
   def present_session_detail(session, opts \\ []) do
     tasks = Keyword.get(opts, :tasks, [])
@@ -155,6 +156,8 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       is_spawned: Keyword.get(opts, :is_spawned, false),
       read_only: session.read_only || false,
       initialized: true,
+      worktree_path: Keyword.get(opts, :worktree_path),
+      branch_name: Keyword.get(opts, :branch_name),
       tasks: Enum.map(tasks, &present_session_task/1),
       recent_notes: Enum.map(recent_notes, &present_session_note/1),
       recent_commits: Enum.map(recent_commits, &present_session_commit/1)

@@ -8,17 +8,12 @@ defmodule EyeInTheSkyWeb.Api.V1.TagController do
   Optional query param: q (name search, case-insensitive substring)
   """
   def index(conn, params) do
-    tags = TaskTags.list_tags()
+    opts = case params["q"] do
+      q when is_binary(q) and q != "" -> [search: q]
+      _ -> []
+    end
 
-    tags =
-      case params["q"] do
-        q when is_binary(q) and q != "" ->
-          q_lower = String.downcase(q)
-          Enum.filter(tags, fn t -> String.contains?(String.downcase(t.name), q_lower) end)
-
-        _ ->
-          tags
-      end
+    tags = TaskTags.list_tags(opts)
 
     json(conn, %{
       success: true,

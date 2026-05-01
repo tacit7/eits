@@ -8,17 +8,16 @@ defmodule EyeInTheSky.PushSubscriptions do
   require Logger
 
   def upsert(endpoint, auth, p256dh) do
-    case Repo.get_by(PushSubscription, endpoint: endpoint) do
-      nil ->
-        %PushSubscription{}
-        |> PushSubscription.changeset(%{endpoint: endpoint, auth: auth, p256dh: p256dh})
-        |> Repo.insert()
-
-      existing ->
-        existing
-        |> PushSubscription.changeset(%{auth: auth, p256dh: p256dh})
-        |> Repo.update()
-    end
+    # M2 fix: replace SELECT-then-insert/update race with a single atomic upsert.
+    # The unique index on `endpoint` is the conflict target; auth/p256dh are
+    # refreshed on conflict (browsers rotate keys on re-subscription).
+    %PushSubscription{}
+    |> PushSubscription.changeset(%{endpoint: endpoint, auth: auth, p256dh: p256dh})
+    |> Repo.insert(
+      on_conflict: [set: [auth: auth, p256dh: p256dh]],
+      conflict_target: :endpoint,
+      returning: true
+    )
   end
 
   def delete(endpoint) do

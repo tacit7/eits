@@ -257,11 +257,15 @@ defmodule EyeInTheSky.Sessions do
   @doc """
   Lists active sessions (not ended and not archived), excluding archived by default.
   Pass `include_archived: true` to include archived sessions.
+  Pass `limit: n` to cap results (default: 500).
   """
   def list_active_sessions(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     Session
     |> where([s], is_nil(s.ended_at))
     |> order_by([s], desc: s.started_at)
+    |> limit(^limit)
     |> Archivable.include_archived(opts)
     |> Repo.all()
   end
@@ -269,11 +273,15 @@ defmodule EyeInTheSky.Sessions do
   @doc """
   Lists active sessions for a specific project, with :agent preloaded.
   Excludes ended and archived sessions.
+  Pass `limit: n` to cap results (default: 500).
   """
-  def list_active_sessions_for_project(project_id) do
+  def list_active_sessions_for_project(project_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     Session
     |> where([s], s.project_id == ^project_id and is_nil(s.ended_at))
     |> order_by([s], desc: s.started_at)
+    |> limit(^limit)
     |> Archivable.include_archived([])
     |> preload(:agent)
     |> Repo.all()
@@ -283,11 +291,15 @@ defmodule EyeInTheSky.Sessions do
   Lists all sessions with agent preloaded for the overview page.
   Returns sessions ordered by most recent first, excluding archived by default.
   Pass `include_archived: true` to include archived sessions.
+  Pass `limit: n` to cap results (default: 500).
   """
   def list_sessions_with_agent(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     Session
     |> with_agent_preload()
     |> order_by([s], desc: s.started_at)
+    |> limit(^limit)
     |> Archivable.include_archived(opts)
     |> Repo.all()
   end

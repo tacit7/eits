@@ -87,10 +87,13 @@ defmodule EyeInTheSky.Messages.Listings do
     |> Enum.reverse()
   end
 
-  def list_pending_messages(session_id) do
+  def list_pending_messages(session_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     Message
     |> where([m], m.session_id == ^session_id and m.status == "pending")
     |> order_by([m], asc: m.inserted_at)
+    |> limit(^limit)
     |> Repo.all()
   end
 

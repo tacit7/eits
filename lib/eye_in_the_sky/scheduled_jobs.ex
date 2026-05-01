@@ -43,20 +43,25 @@ defmodule EyeInTheSky.ScheduledJobs do
   # ---------------------------------------------------------------------------
 
   def list_jobs(opts \\ []) do
+    limit_val = Keyword.get(opts, :limit, 500)
+
     opts
     |> list_jobs_filters()
     |> base_jobs_query()
     |> order_by([j], asc: j.origin, asc: j.name)
+    |> limit(^limit_val)
     |> Repo.all()
   end
 
   def list_spawn_agent_jobs_by_prompt_ids(prompt_ids) when is_list(prompt_ids) do
     base_jobs_query(prompt_ids: prompt_ids)
+    |> limit(500)
     |> Repo.all()
   end
 
   def list_filesystem_agent_jobs do
     base_jobs_query(job_type: "spawn_agent", prompt_id_nil: true, config_contains: "%agent_file_id%")
+    |> limit(500)
     |> Repo.all()
   end
 

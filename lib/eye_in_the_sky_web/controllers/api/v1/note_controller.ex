@@ -20,12 +20,10 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     notes =
       cond do
         params["session_id"] ->
-          raw = Notes.list_notes_for_session(params["session_id"], limit: limit)
-          if starred_only, do: Enum.filter(raw, & &1.starred), else: raw
+          Notes.list_notes_for_session(params["session_id"], limit: limit, starred: starred_only)
 
         params["task_id"] ->
-          raw = Notes.list_notes_for_task(params["task_id"])
-          if starred_only, do: Enum.filter(raw, & &1.starred), else: raw
+          Notes.list_notes_for_task(params["task_id"], starred: starred_only)
 
         true ->
           query = params["q"] || ""

@@ -81,5 +81,6 @@ defmodule EyeInTheSky.Messages.Message do
     |> validate_inclusion(:direction, ["inbound", "outbound"])
     |> validate_inclusion(:status, ["sent", "delivered", "failed", "pending", "processing"])
     |> unique_constraint(:source_uuid, name: "messages_source_uuid_index")
+    |> foreign_key_constraint(:session_id, name: "messages_session_id_fkey")
   end
 end

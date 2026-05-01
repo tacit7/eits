@@ -42,22 +42,28 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
             {mode, _mentioned_ids, _mention_all} =
               ChannelProtocol.parse_routing(body, member.session_id)
 
-            Messages.send_message(%{
-              session_id: member.session_id,
-              sender_role: "user",
-              recipient_role: "agent",
-              provider: "claude",
-              body: body
-            })
+            case Messages.send_message(%{
+                   session_id: member.session_id,
+                   sender_role: "user",
+                   recipient_role: "agent",
+                   provider: "claude",
+                   body: body
+                 }) do
+              {:ok, _message} ->
+                prompt = ChannelProtocol.build_prompt(mode, body, channel_ctx)
+                Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
 
-            prompt = ChannelProtocol.build_prompt(mode, body, channel_ctx)
-            Logger.info("Routing to session=#{member.session_id} mode=#{mode}")
+                AgentManager.send_message(member.session_id, prompt,
+                  model: "sonnet",
+                  channel_id: channel_id,
+                  content_blocks: content_blocks
+                )
 
-            AgentManager.send_message(member.session_id, prompt,
-              model: "sonnet",
-              channel_id: channel_id,
-              content_blocks: content_blocks
-            )
+              {:error, changeset} ->
+                Logger.error(
+                  "ChannelHelpers: failed to route message to session=#{member.session_id} errors=#{inspect(changeset.errors)}"
+                )
+            end
           end
         end)
     end

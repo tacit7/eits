@@ -10,11 +10,14 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
   alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions
 
+  @page_size 50
+
   @impl true
   def mount(_params, _session, socket) do
     workspace = socket.assigns.workspace
 
-    sessions = Sessions.list_sessions_for_scope(socket.assigns.scope)
+    sessions = Sessions.list_sessions_for_scope(socket.assigns.scope, limit: @page_size + 1)
+    {sessions, has_more} = split_page(sessions, @page_size)
     projects = Projects.list_projects_for_workspace(workspace.id)
 
     socket =
@@ -22,9 +25,32 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
       |> assign(:page_title, "#{workspace.name} — Sessions")
       |> assign(:projects, projects)
       |> assign(:show_new_session_drawer, false)
+      |> assign(:visible_count, @page_size)
+      |> assign(:has_more, has_more)
       |> stream(:session_list, sessions)
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("load_more", _params, socket) do
+    current_count = socket.assigns.visible_count
+
+    sessions =
+      Sessions.list_sessions_for_scope(socket.assigns.scope,
+        limit: @page_size + 1,
+        offset: current_count
+      )
+
+    {sessions, has_more} = split_page(sessions, @page_size)
+
+    socket =
+      socket
+      |> assign(:visible_count, current_count + @page_size)
+      |> assign(:has_more, has_more)
+      |> stream(:session_list, sessions)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -68,6 +94,18 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
         </div>
       </div>
 
+      <div
+        id="workspace-sessions-sentinel"
+        phx-hook="InfiniteScroll"
+        data-has-more={to_string(@has_more)}
+        data-page={@visible_count}
+        class="py-4 flex justify-center"
+      >
+        <%= if @has_more do %>
+          <span class="loading loading-spinner loading-sm text-base-content/30"></span>
+        <% end %>
+      </div>
+
       <.live_component
         module={EyeInTheSkyWeb.Components.NewSessionModal}
         id="new-session-modal-workspace"
@@ -80,5 +118,13 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
       />
     </div>
     """
+  end
+
+  defp split_page(sessions, page_size) do
+    if length(sessions) > page_size do
+      {Enum.take(sessions, page_size), true}
+    else
+      {sessions, false}
+    end
   end
 end

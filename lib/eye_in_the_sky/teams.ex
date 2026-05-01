@@ -131,14 +131,18 @@ defmodule EyeInTheSky.Teams do
       if session_ids == [] do
         %{}
       else
+        # DISTINCT ON (ts.session_id) with ORDER BY session_id, updated_at DESC
+        # picks the most-recent in-progress task per session in one pass,
+        # replacing the previous Elixir-side reduce that relied on PG sort order.
         from(t in EitsTask,
           join: ts in "task_sessions", on: ts.task_id == t.id,
           where: ts.session_id in ^session_ids and t.state_id == 2 and t.archived == false,
+          distinct: [asc: ts.session_id],
           order_by: [asc: ts.session_id, desc: t.updated_at],
           select: {ts.session_id, %{id: t.id, title: t.title, state_id: t.state_id}}
         )
         |> Repo.all()
-        |> Enum.reduce(%{}, fn {sid, task}, acc -> Map.put_new(acc, sid, task) end)
+        |> Map.new()
       end
 
     Enum.map(members, fn m ->
@@ -236,9 +240,9 @@ defmodule EyeInTheSky.Teams do
     )
     |> where([m, _other], m.session_id == ^session_id)
     |> where([_m, other], not is_nil(other.session_id))
+    |> distinct([_m, other], other.session_id)
     |> select([_m, other], other)
     |> Repo.all()
-    |> Enum.uniq_by(& &1.session_id)
   end
 
   # ── Helpers ────────────────────────────────────────────────

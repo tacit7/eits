@@ -318,7 +318,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         </div>
 
         <%!-- Current task strip --%>
-        <%= if @task_data.current_task do %>
+        <%= if is_struct(@task_data.current_task) do %>
           <div class="px-5 py-2 border-t border-base-content/5" id="dm-current-task">
             <div class="flex items-center gap-2">
               <span class="text-xs font-semibold uppercase tracking-wider text-base-content/30 flex-shrink-0">

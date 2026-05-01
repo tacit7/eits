@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
         tab,
         ["messages", "tasks"],
         socket.assigns[:current_task],
-        nil,
+        :not_loaded,
         fn -> Tasks.get_current_task_for_session(session_id) end
       )
 

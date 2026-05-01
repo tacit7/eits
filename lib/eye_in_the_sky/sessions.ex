@@ -239,6 +239,7 @@ defmodule EyeInTheSky.Sessions do
   """
   def list_project_sessions_with_agent(project_id, opts \\ []) do
     limit_val = Keyword.get(opts, :limit)
+    offset_val = Keyword.get(opts, :offset)
     active_only = Keyword.get(opts, :active_only, false)
 
     query =
@@ -248,6 +249,7 @@ defmodule EyeInTheSky.Sessions do
       |> Archivable.include_archived(opts)
 
     query = if active_only, do: where(query, [s], is_nil(s.ended_at)), else: query
+    query = if offset_val, do: offset(query, ^offset_val), else: query
     query = if limit_val, do: limit(query, ^limit_val), else: query
 
     sessions = Repo.all(query)
@@ -411,6 +413,7 @@ defmodule EyeInTheSky.Sessions do
 
   def list_sessions_for_scope(%EyeInTheSky.Scope{type: :workspace, workspace_id: wid}, opts) do
     limit_val = Keyword.get(opts, :limit)
+    offset_val = Keyword.get(opts, :offset)
     active_only = Keyword.get(opts, :active_only, false)
 
     query =
@@ -422,6 +425,7 @@ defmodule EyeInTheSky.Sessions do
 
     query = Archivable.include_archived(query, opts)
     query = if active_only, do: where(query, [s], is_nil(s.ended_at)), else: query
+    query = if offset_val, do: offset(query, ^offset_val), else: query
     query = if limit_val, do: limit(query, ^limit_val), else: query
 
     query

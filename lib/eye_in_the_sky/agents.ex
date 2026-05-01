@@ -154,26 +154,23 @@ defmodule EyeInTheSky.Agents do
   Uses on_conflict: :nothing to handle UUID uniqueness races without exceptions.
   """
   def find_or_create_agent(%{uuid: uuid} = attrs) do
-    case get_agent_by_uuid(uuid) do
-      {:ok, existing} ->
-        {:ok, existing}
-
-      {:error, :not_found} ->
-        %Agent{}
-        |> Agent.changeset(attrs)
-        |> Repo.insert(on_conflict: :nothing, conflict_target: :uuid)
-        |> case do
-          {:ok, %Agent{id: nil}} ->
-            # on_conflict: :nothing means no row returned; re-fetch the winner
-            get_agent_by_uuid(uuid)
-
-          {:ok, agent} ->
-            EyeInTheSky.Events.agent_created(agent)
-            {:ok, agent}
-
-          {:error, _changeset} = err ->
-            err
+    case Repo.insert(
+           Agent.changeset(%Agent{}, attrs),
+           on_conflict: [set: [uuid: uuid]],
+           conflict_target: :uuid,
+           returning: true
+         ) do
+      {:ok, agent} ->
+        # inserted_at == updated_at only on a fresh insert; the no-op uuid update
+        # touches updated_at on conflict, so we can reliably detect new rows here.
+        if DateTime.compare(agent.inserted_at, agent.updated_at) == :eq do
+          EyeInTheSky.Events.agent_created(agent)
         end
+
+        {:ok, agent}
+
+      {:error, _changeset} = err ->
+        err
     end
   end
 

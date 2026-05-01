@@ -502,6 +502,90 @@ describe("VimNav list navigation (j/k/Enter)", () => {
     expect(h.listFocusIndex).toBe(-1)
     items.forEach(el => expect(el.classList.contains("vim-nav-focused")).toBe(false))
   })
+
+  function makeSessionList(count: number): HTMLElement {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    for (let i = 0; i < count; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      item.setAttribute("data-session-id", String(i + 1))
+      item.textContent = `Session ${i + 1}`
+      list.appendChild(item)
+    }
+    document.body.appendChild(list)
+    return list
+  }
+
+  function withSessionsScope(fn: () => void) {
+    const marker = document.createElement("div")
+    marker.setAttribute("data-vim-page", "sessions")
+    document.body.appendChild(marker)
+    try { fn() } finally { marker.remove() }
+  }
+
+  it("archive refocuses next item when middle item is removed", async () => {
+    const list = makeSessionList(4)
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 1
+    h.focusListItem(1)
+
+    withSessionsScope(() => {
+      const cmd = COMMANDS.find(c => c.id === "session.archive")!
+      h.executeCommand(cmd)
+      expect(h.pushToList).toHaveBeenCalledWith("archive_session", { session_id: "2" })
+    })
+
+    // Simulate LiveView removing the archived row
+    list.children[1].remove()
+    await new Promise(r => setTimeout(r, 0))
+
+    // Should now focus index 1 (next item, formerly at index 2)
+    expect(h.listFocusIndex).toBe(1)
+    const items = document.querySelectorAll("[data-vim-list-item]")
+    expect(items[1].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("archive clamps to last item when the last item is archived", async () => {
+    const list = makeSessionList(3)
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 2
+    h.focusListItem(2)
+
+    withSessionsScope(() => {
+      const cmd = COMMANDS.find(c => c.id === "session.archive")!
+      h.executeCommand(cmd)
+    })
+
+    // Simulate LiveView removing the last row
+    list.children[2].remove()
+    await new Promise(r => setTimeout(r, 0))
+
+    // Should clamp to index 1 (new last item)
+    expect(h.listFocusIndex).toBe(1)
+    const items = document.querySelectorAll("[data-vim-list-item]")
+    expect(items[1].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("archive sets listFocusIndex to -1 when last item removed", async () => {
+    const list = makeSessionList(1)
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+
+    withSessionsScope(() => {
+      const cmd = COMMANDS.find(c => c.id === "session.archive")!
+      h.executeCommand(cmd)
+    })
+
+    list.children[0].remove()
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(h.listFocusIndex).toBe(-1)
+  })
 })
 
 describe("VimNav page search (/)", () => {

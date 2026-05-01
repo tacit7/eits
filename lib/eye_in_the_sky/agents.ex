@@ -18,6 +18,7 @@ defmodule EyeInTheSky.Agents do
   @spec list_agents(keyword()) :: [Agent.t()]
   def list_agents(opts \\ []) do
     Agent
+    |> EyeInTheSky.QueryBuilder.maybe_where(opts, :status)
     |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
     |> Repo.all()
   end
@@ -235,6 +236,7 @@ defmodule EyeInTheSky.Agents do
       distinct: true,
       preload: [:project]
     )
+    |> EyeInTheSky.QueryBuilder.maybe_where(opts, :status)
     |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
     |> Repo.all()
     |> Enum.map(&populate_project_name/1)
@@ -248,6 +250,7 @@ defmodule EyeInTheSky.Agents do
     |> where([a], a.project_id == ^project_id)
     |> preload([:project])
     |> order_by([a], asc: a.created_at)
+    |> EyeInTheSky.QueryBuilder.maybe_where(opts, :status)
     |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
     |> Repo.all()
     |> Enum.map(&populate_project_name/1)

@@ -17,7 +17,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
-  @tree_cache_ttl 300
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -54,20 +53,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
         socket =
           if project.path do
-            cache_key = {__MODULE__, :file_tree, project.id}
-            now = System.os_time(:second)
-
-            tree =
-              case :persistent_term.get(cache_key, nil) do
-                {cached_tree, built_at} when now - built_at < @tree_cache_ttl ->
-                  cached_tree
-
-                _ ->
-                  t = build_file_tree(project.path, project.path)
-                  :persistent_term.put(cache_key, {t, now})
-                  t
-              end
-
+            tree = build_file_tree(project.path, project.path)
             assign(socket, :file_tree, tree)
           else
             socket

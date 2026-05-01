@@ -859,9 +859,17 @@ The CLI now supports `eits dm inbox` as a convenient alias for listing DM messag
 eits dm inbox                    # List DMs in table format
 eits dm inbox --json            # Raw JSON output
 eits dm inbox --from <uuid>     # Filter by sender
+eits dm inbox --since <iso8601> # Only messages after timestamp (commit dcfd4508)
 eits dm inbox --team-only       # Filter to team members only
 eits dm inbox --help            # Show command help
 ```
+
+**--since filter (commit dcfd4508):**
+- Accepts ISO8601 timestamp (e.g., `2026-04-30T12:00:00Z`)
+- Returns only messages with `inserted_at > since`
+- Enables incremental polling: orchestrators can fetch new replies without diffing the full inbox client-side
+- Wired through both REST API (`GET /api/v1/dm?since=...`) and CLI
+- API returns `filter_since` in response metadata
 
 **Table Output (_tbl_dm renderer):**
 | Column | Description |
@@ -873,6 +881,7 @@ eits dm inbox --help            # Show command help
 **Features:**
 - `--json` flag for programmatic consumption
 - `--from` filter to show DMs from a specific session UUID only
+- `--since` filter (commit dcfd4508) for incremental inbox polling
 - `--team-only` filter (commit 2321695e) to show DMs only from sessions that share a team with the current agent
   - Uses `EITS_AGENT_UUID` to discover teams via `GET /teams?member_agent_uuid=`
   - Fetches members per team and filters `from_session_id` against the collected set
@@ -886,7 +895,9 @@ eits dm inbox --help            # Show command help
 - haiku, sonnet, opus appear before full model names (e.g., `claude-haiku-4-5`) for discoverability
 
 **Files:**
-- `scripts/eits` — inbox subcommand, _tbl_dm renderer, --json/--from/--team-only flags, _age UTC fix
+- `scripts/eits` — inbox subcommand, _tbl_dm renderer, --json/--from/--since/--team-only flags, _age UTC fix
+- `lib/eye_in_the_sky/messages/listings.ex` — `list_inbound_dms/3` filters by `since` parameter
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `list_dms/2` parses and applies ISO8601 `since` filter
 - `docs/EITS_CLI.md` — command reference
 
 ---
@@ -1099,10 +1110,19 @@ An ellipsis button in the toolbar opens an inline dropdown with session-level ac
 
 | Item | Event | Notes |
 |------|-------|-------|
+| Notify | `phx-hook="PushSetup"` | Bell button for push notification setup (commit 4ea00a18); also visible in mobile ActionMenu (commit d480a88e) |
 | Reload | `JS.dispatch("dm:reload-check", ...)` | Opens reload-confirm modal |
 | Export as Markdown | `export_markdown` | — |
 | Schedule Message | `open_schedule_timer` | — |
 | Cancel Schedule | `cancel_timer` | Only rendered when `dm_active_timer` is set |
+
+**Notify button (commits 4ea00a18, d480a88e):**
+- Integrated into topbar dropdown menu and mobile ActionMenu
+- Uses `PushSetup` hook for browser notification setup
+- Respects `notify_on_stop` flag from layout assigns
+- Shows bell icon (hero-bell) in dropdown and mobile menus
+- State attribute: `data-push-state` (disabled/enabled)
+- Mobile ActionMenu now includes `show_push_setup` and `notify_on_stop` parameters to ensure button renders on small screens
 
 **Breadcrumb generation:**
 - Section label derived from `sidebar_tab` atom (`:dm` → "DM")
@@ -1286,6 +1306,89 @@ POST /api/v1/dm
 
 ---
 
+## Message Search: ILIKE → pg_search
+
+**Commit:** `40c11471`
+
+Full-text search (FTS) replaced the leading-wildcard ILIKE pattern in `search_messages_for_session/2`.
+
+**Before:**
+```elixir
+Message
+|> where([m], m.session_id == ^session_id)
+|> where([m], ilike(m.body, ^"%#{query}%"))  # Full-table scan on messages.body
+|> order_by([m], asc: m.inserted_at)
+|> limit(100)
+|> Repo.all()
+```
+
+**After:**
+```elixir
+PgSearch.search(
+  table: "messages",
+  schema: Message,
+  query: query,
+  search_columns: ["body"],
+  sql_filter: "AND m.session_id = $2",
+  sql_params: [session_id],
+  fallback_query: fallback_query,  # Fallback to ILIKE on FTS failure
+  preload: [:attachments],
+  limit: 100
+)
+```
+
+**Benefits:**
+- FTS uses PostgreSQL GIN index on `messages` table (fast prefix matching)
+- Eliminates full-table scan from leading-wildcard ILIKE
+- Automatic fallback to ILIKE if FTS fails (existing pattern)
+- Session filter pushed to database (via `sql_filter` parameter)
+
+**File:**
+- `lib/eye_in_the_sky/messages/listings.ex` — `search_messages_for_session/2`
+
+---
+
+## DM Page Performance Optimizations
+
+**Commits:** `40c11471`, `1cf1fb88`
+
+Two performance improvements reduce unnecessary DB queries and computations on page load.
+
+### current_task Sentinel Fix (commit 40c11471)
+
+**Problem:** `current_task` was initialized to `nil`. On every visit to the Messages or Tasks tab, the `tab_helpers` sentinel check would see `nil` and re-trigger `Tasks.get_current_task_for_session`, loading the current task even when already cached.
+
+**Fix:** Changed sentinel from `nil` to `:not_loaded` atom.
+- `assign_task_defaults` initializes `current_task: :not_loaded` 
+- `tab_helpers` sentinel checks for `:not_loaded` instead of `nil`
+- `dm_page` template guard changed to `is_struct/1` to safely handle `:not_loaded` on dead render
+- Result: avoid redundant DB queries on tab navigation
+
+**Files:**
+- `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — initialize to `:not_loaded`
+- `lib/eye_in_the_sky_web/live/dm_live/tab_helpers.ex` — sentinel check
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — template guard
+
+### Dead Render Optimization (commit 1cf1fb88)
+
+**Problem:** `load_messages_on_mount` called `load_tab_data` on both dead (pre-connection) and connected renders. On dead render, `load_tab_data` would trigger `read_session_usage_stats` — either a filesystem read (SessionReader) or two aggregate DB queries (`total_tokens_for_session` + `total_cost_for_session`) over all messages in the session (up to 4.6k rows). This work was discarded when the WebSocket connected and the connected render ran `load_tab_data` again.
+
+**Fix:** Added `load_messages_only/2` to TabHelpers.
+- Dead render path: `load_messages_only(socket, session_id)` 
+  - Loads messages + sets context assigns
+  - Skips usage stats entirely (file read or aggregate DB queries)
+- Connected render path: `load_tab_data(socket, "messages", session_id)` (unchanged)
+  - Loads messages AND usage stats
+  - Stats are now persisted and used
+
+**Result:** Dead render is now lightweight; connected render handles the full load.
+
+**Files:**
+- `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex` — routing to correct load path
+- `lib/eye_in_the_sky_web/live/dm_live/tab_helpers.ex` — `load_messages_only/2` function
+
+---
+
 ## Performance Considerations
 
 **Streaming:**
@@ -1297,6 +1400,14 @@ POST /api/v1/dm
 - Debounced PubSub broadcasts (100ms) to reduce re-renders
 - Only affected rows re-rendered in agent list
 - New messages use stream append (not full re-render)
+
+**Search:**
+- FTS via pg_search with GIN index (commit 40c11471)
+- Fallback to ILIKE if FTS fails
+
+**Mount Optimization:**
+- `current_task` sentinel fix prevents redundant task queries on tab navigation (commit 40c11471)
+- Dead render skips expensive usage stats load (commit 1cf1fb88)
 
 **Limits:**
 - Max 1000 messages per session (paginated on scroll)

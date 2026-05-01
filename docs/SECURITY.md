@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-03-17
-Last updated: 2026-04-22 (IAM audit trail async implementation, EITS_API_KEY propagation with safe escaping, DM allowlist, teams status --wait fail-fast)
+Last updated: 2026-05-01 (FK constraint handling, IAM audit indexes, agent completion notifications opt-in)
 
 ## Authentication
 
@@ -257,6 +257,7 @@ Hammer v7 with ETS backend, applied to the `:webauthn` and `:api` pipelines.
 - All database access uses Ecto with parameterized queries — no raw SQL.
 - Input validation via Ecto changesets on all mutations.
 - PostgreSQL database (`eits_dev`) with standard connection pooling.
+- **Foreign key constraint handling**: Foreign key constraints are declared in changesets via `foreign_key_constraint/2` (e.g., `messages_session_id_fkey`). This ensures constraint violations return `{:error, changeset}` instead of raising `Ecto.ConstraintError` and crashing the GenServer. Errors are logged and handled gracefully at the call site.
 
 ### WebAuthn Challenge Serialization
 
@@ -373,6 +374,17 @@ Hook scripts write environment variables to `CLAUDE_ENV_FILE` for downstream hoo
 - **API key escaping**: `eits-session-startup.sh` uses `printf %q` (POSIX shell quoting) when writing `EITS_API_KEY` to the env file. This prevents metacharacters, spaces, and special characters from corrupting the shell syntax or being interpreted as command separators.
 - **Error surfacing**: `eits-post-compact.sh` surfaces context-save failures to stderr instead of silently swallowing them. If API key is missing or invalid, the operator sees the error message: `"post-compact: failed to save context for session <uuid> (check EITS_API_KEY is set)"`
 - **Fail-fast on permanent errors**: `eits teams status --wait` (used for polling team member status) fails immediately on HTTP 404/401/403 instead of retrying forever. Transient errors (429, 5xx) still retry with 5-second backoff. This prevents blocking waits when a team no longer exists or credentials are invalid.
+
+## User Privacy Settings
+
+### Agent Completion Notifications
+
+Agent completion notifications are **opt-in** (default OFF) to respect user preferences and privacy:
+
+- **Setting**: `agent_notifications` in the Settings UI (Settings > General > Notifications)
+- **Default**: `"false"` — no notifications sent until explicitly enabled
+- **Implementation**: `notify_agent_complete/2` in `AgentWorkerEvents` checks `EyeInTheSky.Settings.get_boolean("agent_notifications")` before spawning the notification task
+- **Scope**: User-level preference stored in the settings table; applies to all agent completions for that user
 
 ## Dev-Only Features
 
@@ -538,6 +550,7 @@ IAM converts policy decisions into JSON responses per the Claude Code hook proto
   - `duration_us`: Evaluation latency in microseconds
   - `raw_payload`: Full hook payload for debugging
   - `inserted_at`: UTC timestamp
+- **Indexing**: FK indexes on `winning_policy_id` and `project_id` enable fast audit queries by policy or project. Partial indexes exclude NULL FK values for better selectivity.
 
 ### Policy CRUD LiveView
 

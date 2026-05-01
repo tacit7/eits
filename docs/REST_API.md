@@ -6,6 +6,26 @@ All endpoints accept and return JSON. Set `Content-Type: application/json` on re
 
 ## Endpoints
 
+### GET /api/v1/health
+
+Lightweight health check endpoint for monitoring service availability.
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "ok"
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/health
+```
+
+---
+
 ### POST /sessions
 
 Register a new session. Creates a ChatAgent (chat identity) and Agent (execution session). Broadcasts `{:agent_updated, agent}` on PubSub `"agents"` topic.
@@ -268,7 +288,9 @@ List tasks linked to a session (path-based alias for `GET /api/v1/tasks?session_
       "title": "Add unit tests",
       "state": "In Progress",
       "state_id": 2,
-      "project_id": 1
+      "project_id": 1,
+      "created_at": "2026-04-10T10:00:00Z",
+      "updated_at": "2026-04-15T14:30:00Z"
     }
   ]
 }
@@ -349,14 +371,14 @@ curl -X POST localhost:5001/api/v1/agents \
 
 ### GET /api/v1/agents/activity
 
-Get activity rollup for an agent since a given datetime. Returns tasks, commits, and sessions created/updated since the cutoff, with summary counts.
+Get activity rollup for an agent since a given datetime. Returns tasks (categorized by state), commits, and sessions created/updated since the cutoff, with summary counts.
 
 **Query params:**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `uuid` | string | yes | Agent UUID |
-| `since` | string | yes | ISO 8601 datetime (e.g. `2026-04-15T10:00:00Z`) |
+| `agent_uuid` | string | yes | Agent UUID |
+| `since` | string | no | Duration string (e.g. `24h`, `7d`, `1m`) or ISO 8601 datetime. Defaults to `"24h"` when omitted |
 
 **Response:** `200 OK`
 
@@ -365,29 +387,45 @@ Get activity rollup for an agent since a given datetime. Returns tasks, commits,
   "success": true,
   "agent_uuid": "agent-uuid",
   "since": "2026-04-15T10:00:00Z",
-  "tasks": [
-    {
-      "id": 1,
-      "title": "Add unit tests",
-      "state": "In Progress",
-      "state_id": 2
-    }
-  ],
+  "window_start": "2026-04-14T10:00:00Z",
+  "tasks": {
+    "done": [
+      {
+        "id": 1,
+        "title": "Add unit tests",
+        "state": "Done",
+        "state_id": 4
+      }
+    ],
+    "in_review": [],
+    "in_progress": [
+      {
+        "id": 2,
+        "title": "Fix auth bug",
+        "state": "In Progress",
+        "state_id": 2
+      }
+    ],
+    "stale": []
+  },
   "commits": [
     {
       "hash": "abc123def456",
-      "message": "fix auth bug"
+      "message": "fix auth bug",
+      "window_start": "2026-04-14T10:00:00Z",
+      "session_id": 42
     }
   ],
   "sessions": [
     {
       "uuid": "session-uuid",
+      "id": 42,
       "name": "fix auth",
       "status": "working"
     }
   ],
   "summary": {
-    "task_count": 1,
+    "task_count": 2,
     "commit_count": 1,
     "session_count": 1
   }
@@ -397,7 +435,8 @@ Get activity rollup for an agent since a given datetime. Returns tasks, commits,
 **Example:**
 
 ```bash
-curl 'localhost:5001/api/v1/agents/activity?uuid=abc-123&since=2026-04-15T10:00:00Z'
+curl 'localhost:5001/api/v1/agents/activity?agent_uuid=abc-123&since=24h'
+curl 'localhost:5001/api/v1/agents/activity?agent_uuid=abc-123&since=2026-04-15T10:00:00Z'
 eits agents activity abc-123 --since 24h
 ```
 
@@ -780,7 +819,7 @@ eits messages search "auth bug" --limit 20
 
 ### GET /api/v1/dm
 
-List inbound messages (DMs) to a session with optional sender filtering.
+List inbound messages (DMs) to a session with optional sender and time filtering.
 
 **Query params:**
 
@@ -788,6 +827,7 @@ List inbound messages (DMs) to a session with optional sender filtering.
 |-------|------|----------|-------------|
 | `session` or `session_id` | string or integer | yes | Recipient session ID (UUID or integer) |
 | `from` or `from_session_id` | string or integer | no | Filter by sender session ID (UUID or integer) |
+| `since` | string | no | ISO 8601 datetime; returns only messages with `inserted_at` after this time |
 | `limit` | integer | no | Max results (default 20, max 100) |
 
 **Response:** `200 OK`
@@ -829,6 +869,8 @@ With `from` filter:
 curl localhost:5001/api/v1/dm?session=42&limit=10
 curl localhost:5001/api/v1/dm?session=abc-123&from=40
 curl localhost:5001/api/v1/dm?session_id=42&from_session_id=sender-uuid
+curl localhost:5001/api/v1/dm?session=42&since=2026-03-17T10:00:00Z
+eits dm inbox --session 42 --since 2026-03-17T10:00:00Z
 ```
 
 ---
@@ -1069,7 +1111,7 @@ eits channels create --name "dev-updates" --project 1 --description "Development
 
 ### GET /api/v1/channels/:channel_id/members
 
-List members of a channel with their session information.
+List members of a channel with their session and agent information.
 
 **URL params:**
 
@@ -1088,6 +1130,7 @@ List members of a channel with their session information.
       "session_id": 42,
       "session_uuid": "session-uuid",
       "session_name": "code-review",
+      "agent_uuid": "agent-uuid",
       "role": "member",
       "joined_at": "2026-04-10T10:30:00Z"
     }
@@ -1358,6 +1401,44 @@ Cancel the active timer for a session.
 
 ---
 
+### GET /api/v1/teams
+
+List teams with optional filtering by status and result limit.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `status` | string | no | Filter by status: `"active"` (default, excludes archived), `"all"` (includes archived teams). Returns 400 on invalid input |
+| `limit` | integer | no | Max results per page. Must be positive; returns 400 on negative or zero values |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "teams": [
+    {
+      "id": 1,
+      "name": "Platform Team",
+      "description": "Core platform development",
+      "created_at": "2026-04-10T10:00:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl 'localhost:5001/api/v1/teams?status=active&limit=20'
+curl 'localhost:5001/api/v1/teams?status=all'
+eits teams list
+eits teams list --limit 50
+```
+
+---
+
 ### PATCH /api/v1/teams/:id
 
 Update team metadata.
@@ -1422,7 +1503,7 @@ eits teams broadcast 1 --body "Deploying release v2.0 in 10 minutes"
 
 ### GET /api/v1/tasks
 
-List tasks with optional filtering by project, session, agent, tag, or search query.
+List tasks with optional filtering by project, session, agent, tag, search query, or time window.
 
 **Query params:**
 
@@ -1435,6 +1516,8 @@ List tasks with optional filtering by project, session, agent, tag, or search qu
 | `tag_id` | integer | no | Filter to tasks with a specific tag ID |
 | `q` | string | no | Full-text search query (searches task titles, descriptions, body) |
 | `state_id` | integer | no | Filter by workflow state ID |
+| `since` | string | no | ISO 8601 datetime; returns tasks whose `updated_at` falls after this time |
+| `stale_since` | string | no | ISO 8601 datetime; returns non-terminal tasks not updated since this cutoff |
 | `limit` | integer | no | Max results (default 50) |
 
 **Response:** `200 OK`
@@ -1453,7 +1536,8 @@ List tasks with optional filtering by project, session, agent, tag, or search qu
       "description": "OAuth flow is broken",
       "project_id": 1,
       "priority": "high",
-      "created_at": "2026-04-10T10:00:00Z"
+      "created_at": "2026-04-10T10:00:00Z",
+      "updated_at": "2026-04-15T14:30:00Z"
     }
   ]
 }
@@ -1466,6 +1550,8 @@ curl 'localhost:5001/api/v1/tasks?project_id=1&limit=20'
 curl 'localhost:5001/api/v1/tasks?tag_id=1'
 curl 'localhost:5001/api/v1/tasks?q=auth&state_id=2'
 curl 'localhost:5001/api/v1/tasks?session_id=42'
+curl 'localhost:5001/api/v1/tasks?since=2026-04-15T00:00:00Z'
+curl 'localhost:5001/api/v1/tasks?stale_since=2026-04-10T00:00:00Z'
 eits tasks list --project 1
 eits tasks list --tag 5
 ```
@@ -1498,7 +1584,9 @@ Fetch a single task by ID. Read-only; no side effects.
     "state": "In Progress",
     "state_id": 2,
     "priority": "high",
-    "due_at": null
+    "due_at": null,
+    "created_at": "2026-04-10T10:00:00Z",
+    "updated_at": "2026-04-15T14:30:00Z"
   },
   "annotations": []
 }
@@ -1539,7 +1627,9 @@ Search for tasks across projects with optional filtering.
       "state": "In Progress",
       "state_id": 2,
       "project_id": 1,
-      "description": "OAuth flow is broken"
+      "description": "OAuth flow is broken",
+      "created_at": "2026-04-10T10:00:00Z",
+      "updated_at": "2026-04-15T14:30:00Z"
     }
   ]
 }

@@ -13,7 +13,7 @@ export EITS_API_KEY=<your-key>
 
 # Injected automatically by EITS hooks — set manually if needed
 export EITS_SESSION_UUID=<session-uuid>
-export EITS_SESSION_ID=<session-id>          # numeric session ID (fallback for --to/--from/--session)
+export EITS_SESSION_ID=<session-id>          # numeric session ID, exported by startup hook (preferred for --to/--from/--parent-session-id)
 export EITS_AGENT_UUID=<agent-uuid>
 export EITS_PROJECT_ID=<project-id>
 ```
@@ -322,7 +322,7 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Sandbox**: `--yolo` bypasses sandbox restrictions. `--provider codex` defaults `bypass_sandbox` to true (can be overridden with explicit flags if needed).
 
-**Session linking**: `--parent-session-id` accepts integer session ID or UUID, linking the spawned agent's session to a parent.
+**Session linking**: `--parent-session-id` accepts integer session ID (preferred) or UUID, linking the spawned agent's session to a parent. Prefer `$EITS_SESSION_ID` (integer) for compatibility.
 
 **Pre-flight validation**: `--dry-run` validates inputs without hitting the spawn endpoint. Validates team exists (if `--team-name` provided), parent session exists (if `--parent-session-id` provided), and instructions file is readable (if `--instructions-file` provided). Prints the fully-resolved curl command that would be sent. Exits 0 on success, 1 on any validation failure.
 
@@ -384,17 +384,20 @@ eits jobs delete <id>
 ## dm
 
 ```bash
-eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--json]
-eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--json]
+eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--json]
+eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--json]
 # List inbound DMs for a session (CLI-side inbox polling)
 # inbox is an alias for list
 # --from: filter by sender (optional)
+# --since: return only messages inserted after ISO8601 timestamp (optional)
 
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
 # Send a direct message to an agent session
 ```
 
 Both `--from` and `--to` accept either an integer session ID or a session UUID. `--from` defaults to `$EITS_SESSION_UUID` or `$EITS_SESSION_ID`.
+
+`--since` filters messages by insertion timestamp (ISO8601 format, e.g., `2026-04-30T12:00:00Z`). Useful for orchestrators polling for new replies without diffing the full inbox.
 
 ---
 
@@ -461,7 +464,7 @@ eits notifications create --title <t> [--body <b>] \
 ## teams
 
 ```bash
-eits teams list [--project <id>] [--status <s>]
+eits teams list [--project <id>] [--status <active|inactive|all>] [--limit <n>]
 
 eits teams get <id>
 
@@ -491,6 +494,10 @@ eits teams broadcast <team_id> --body <text> [--from <session_id|uuid>]
 
 eits teams my-teams                            # List teams where current agent is a member
 ```
+
+**`teams list` filters**:
+- `--status <active|inactive|all>`: Filter by team status. Default excludes archived teams. Use `all` to include archived.
+- `--limit <n>`: Max teams to return (default: all). Negative values are ignored and return all teams.
 
 `teams broadcast` accepts `--message` as an alias for `--body` (for backward compatibility).
 

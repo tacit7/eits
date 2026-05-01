@@ -7,7 +7,9 @@ In-app overlay: press `?` anywhere, or visit `/keybindings`.
 
 ## Help overlays
 
-**Which-key overlay**: Press any prefix key (`Space`, `g`, `t`, `n`, etc.) to see available next keys and their actions in a floating overlay at the bottom-left. Sub-groups show as entries with a `+` prefix (e.g., `Space g → +go to page`); direct actions show without the `+`. When there are more than 8 entries, the overlay switches to a 2-column grid for better readability.
+**Which-key overlay**: Press any prefix key (`Space`, `g`, `t`, `n`, etc.) to see available next keys and their actions in a floating overlay centered on screen. There is a 500ms delay before the overlay appears to prevent flicker during normal typing. Sub-groups show as entries with a `+` prefix (e.g., `Space g → +go to page`); direct actions show without the `+`. When there are more than 8 entries, the overlay switches to a 2-column grid for better readability.
+
+**Sub-command help (`?` with active prefix)**: While a prefix is active (e.g., you've typed `Space` and are waiting to type the next key), press `?` to show scoped help for that prefix with relative key sequences instead of the full layout.
 
 **Full help (`?`)**: Opens a full-page overlay organized by named sections (Global, Go to page, Toggle rail, Create, Context). Each section displays commands in its category; sections with more than 6 commands use a 2-column grid. Space leader aliases (e.g., `Space g`, `Space t`, `Space n`) are excluded to avoid duplication with base `g`, `t`, `n` bindings.
 
@@ -111,10 +113,12 @@ Active when a flyout panel is open (`feature:vim-flyout` scope).
 
 | Keys | Action |
 |---|---|
-| `A` | Archive focused session |
-| `D` | Delete focused session |
+| `A` | Archive focused session (refocuses next/previous item) |
+| `D` | Delete focused session (refocuses next/previous item) |
 | `y u` | Copy session UUID to clipboard |
 | `y i` | Copy session integer ID to clipboard |
+
+When a focused session is archived or deleted, vim-nav automatically refocuses to the next item in the list, or the last item if deleting at the end. This behavior uses a MutationObserver to detect when the focused element is removed from the DOM.
 
 ---
 
@@ -155,6 +159,13 @@ Active when a flyout panel is open (`feature:vim-flyout` scope).
 | `Space q` | Close flyout |
 | `Space :` | Command palette |
 | `Space ?` | Keybinding help |
+
+### Find — `Space f`
+
+| Keys | Action |
+|---|---|
+| `Space f s` | Find session (palette picker) |
+| `Space f r s` | Find recent session (from visit history) |
 
 ### Search — `Space s`
 

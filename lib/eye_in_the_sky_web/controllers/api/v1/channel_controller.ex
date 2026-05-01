@@ -59,6 +59,40 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
     end
   end
 
+  @doc """
+  GET /api/v1/channels/mine - List channels the current session is a member of.
+  Query params: session_id (required) — UUID or integer session ID.
+  """
+  def mine(conn, params) do
+    raw = params["session_id"] || ""
+
+    with {:session_raw, raw} when raw != "" <- {:session_raw, raw},
+         {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(raw)} do
+      channels = Channels.list_channels_for_session(int_id)
+
+      json(conn, %{
+        success: true,
+        message: "#{length(channels)} channel(s) found",
+        channels:
+          Enum.map(channels, fn c ->
+            %{
+              id: c.id,
+              uuid: c.uuid,
+              name: c.name,
+              description: c.description,
+              channel_type: c.channel_type,
+              project_id: c.project_id,
+              role: c.role,
+              joined_at: if(c.joined_at, do: to_string(c.joined_at))
+            }
+          end)
+      })
+    else
+      {:session_raw, ""} -> {:error, :bad_request, "session_id is required"}
+      {:session, _} -> {:error, :not_found, "Session not found"}
+    end
+  end
+
   @doc "GET /api/v1/channels - List available chat channels."
   def index(conn, params) do
     channels =

@@ -273,6 +273,7 @@ defmodule EyeInTheSkyWeb.Router do
 
     # Channels
     get "/channels", ChannelController, :index
+    get "/channels/mine", ChannelController, :mine
     post "/channels", ChannelController, :create
     get "/channels/:channel_id/messages", ChannelMessageController, :index
     post "/channels/:channel_id/messages", ChannelMessageController, :create

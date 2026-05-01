@@ -152,6 +152,30 @@ defmodule EyeInTheSky.Channels do
   end
 
   @doc """
+  Returns channels that a session is a member of, ordered by join time.
+  """
+  def list_channels_for_session(session_id) do
+    from(m in ChannelMember,
+      join: c in Channel,
+      on: c.id == m.channel_id,
+      where: m.session_id == ^session_id and is_nil(c.archived_at),
+      order_by: [asc: m.joined_at],
+      limit: 200,
+      select: %{
+        id: c.id,
+        uuid: c.uuid,
+        name: c.name,
+        description: c.description,
+        channel_type: c.channel_type,
+        project_id: c.project_id,
+        role: m.role,
+        joined_at: m.joined_at
+      }
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Lists all members of a channel.
   """
   def list_members(channel_id) do

@@ -54,6 +54,26 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       assert is_list(resp["teams"])
     end
 
+    test "negative limit returns 200 and treats as no limit", %{conn: conn} do
+      create_team()
+      conn = get(conn, ~p"/api/v1/teams?limit=-5")
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert is_list(resp["teams"])
+    end
+
+    test "status=all includes archived teams", %{conn: conn} do
+      team = create_team()
+      Teams.delete_team(team)
+
+      conn = get(conn, ~p"/api/v1/teams?status=all")
+      resp = json_response(conn, 200)
+
+      ids = Enum.map(resp["teams"], & &1["id"])
+      assert team.id in ids
+    end
+
     test "excludes archived teams by default", %{conn: conn} do
       team = create_team()
       Teams.delete_team(team)

@@ -11,12 +11,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams
   def index(conn, params) do
+    limit =
+      case parse_int(params["limit"]) do
+        n when is_integer(n) and n > 0 -> n
+        _ -> nil
+      end
+
     opts =
       []
       |> maybe_opt(:project_id, params["project_id"])
       |> maybe_opt(:status, params["status"])
       |> maybe_opt(:member_agent_uuid, params["member_agent_uuid"])
-      |> maybe_opt(:limit, parse_int(params["limit"]))
+      |> maybe_opt(:limit, limit)
 
     teams = Teams.list_teams(opts)
 

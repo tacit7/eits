@@ -35,7 +35,8 @@ defmodule EyeInTheSky.Teams do
     query =
       case Keyword.get(opts, :limit) do
         nil -> query
-        n -> limit(query, ^n)
+        n when n > 0 -> limit(query, ^n)
+        _ -> query
       end
 
     query =

@@ -55,6 +55,7 @@ defmodule EyeInTheSky.Messages.Listings do
   @spec list_inbound_dms(integer(), pos_integer(), keyword()) :: [Message.t()]
   def list_inbound_dms(session_id, limit \\ 20, opts \\ []) when is_integer(session_id) do
     from_id = Keyword.get(opts, :from_session_id)
+    since = Keyword.get(opts, :since)
 
     query =
       Message
@@ -64,6 +65,13 @@ defmodule EyeInTheSky.Messages.Listings do
     query =
       if from_id do
         where(query, [m], m.from_session_id == ^from_id)
+      else
+        query
+      end
+
+    query =
+      if since do
+        where(query, [m], m.inserted_at > ^since)
       else
         query
       end

@@ -139,7 +139,11 @@ defmodule EyeInTheSky.AgentDefinitions do
         |> Enum.filter(&String.ends_with?(&1, ".md"))
         |> Enum.reject(&(&1 == "README.md"))
 
-      ctx = %{scope: scope, project_id: project_id, now: now}
+      # Pre-fetch all existing definitions for this scope/project in one query to
+      # avoid an N+1 SELECT inside the Enum.map below.
+      existing_map = fetch_existing_map(scope, project_id)
+
+      ctx = %{scope: scope, project_id: project_id, now: now, existing_map: existing_map}
 
       synced_slugs =
         Enum.map(md_files, fn filename ->
@@ -156,7 +160,20 @@ defmodule EyeInTheSky.AgentDefinitions do
     end
   end
 
-  defp sync_file(file_path, slug, %{scope: _, project_id: _, now: _} = ctx) do
+  # Returns a %{slug => AgentDefinition} map for all existing definitions in scope.
+  defp fetch_existing_map("global", _project_id) do
+    from(d in AgentDefinition, where: d.scope == "global")
+    |> Repo.all()
+    |> Map.new(&{&1.slug, &1})
+  end
+
+  defp fetch_existing_map("project", project_id) do
+    from(d in AgentDefinition, where: d.scope == "project" and d.project_id == ^project_id)
+    |> Repo.all()
+    |> Map.new(&{&1.slug, &1})
+  end
+
+  defp sync_file(file_path, slug, %{scope: _, project_id: _, now: _, existing_map: _} = ctx) do
     case sync_one(file_path, slug, ctx) do
       {:ok, _defn} -> slug
       {:error, _reason} -> nil
@@ -169,17 +186,17 @@ defmodule EyeInTheSky.AgentDefinitions do
     :erlang.phash2({:agent_def_sync, scope, project_id})
   end
 
-  defp sync_one(file_path, slug, %{scope: scope, project_id: project_id, now: now}) do
+  defp sync_one(file_path, slug, %{scope: scope, project_id: project_id, now: now, existing_map: existing_map}) do
     case File.read(file_path) do
       {:error, _} -> {:error, :missing}
-      {:ok, content} -> sync_one_content(file_path, content, slug, %{scope: scope, project_id: project_id, now: now})
+      {:ok, content} -> sync_one_content(file_path, content, slug, %{scope: scope, project_id: project_id, now: now, existing_map: existing_map})
     end
   end
 
-  defp sync_one_content(file_path, content, slug, %{scope: scope, project_id: project_id, now: now}) do
+  defp sync_one_content(file_path, content, slug, %{scope: scope, project_id: project_id, now: now, existing_map: existing_map}) do
     checksum = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
 
-    existing = find_existing(slug, scope, project_id)
+    existing = Map.get(existing_map, slug)
 
     case existing do
       %AgentDefinition{checksum: ^checksum} = defn ->
@@ -213,17 +230,6 @@ defmodule EyeInTheSky.AgentDefinitions do
         )
         |> Repo.insert()
     end
-  end
-
-  defp find_existing(slug, "global", _project_id) do
-    Repo.one(from d in AgentDefinition, where: d.slug == ^slug and d.scope == "global")
-  end
-
-  defp find_existing(slug, "project", project_id) do
-    Repo.one(
-      from d in AgentDefinition,
-        where: d.slug == ^slug and d.scope == "project" and d.project_id == ^project_id
-    )
   end
 
   defp mark_missing(scope, project_id, synced_slugs, now) do

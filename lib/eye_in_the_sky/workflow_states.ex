@@ -18,18 +18,25 @@ defmodule EyeInTheSky.WorkflowStates do
 
   @doc """
   Reorder workflow states by a list of IDs in desired order.
-  The position unique constraint is DEFERRABLE INITIALLY DEFERRED, so uniqueness
-  is checked at commit rather than per-statement — no temp negative positions needed.
+
+  A single UPDATE … FROM unnest() replaces the previous per-row loop, reducing
+  N round-trips to 1. The position unique constraint is DEFERRABLE INITIALLY
+  DEFERRED, so uniqueness is checked at commit — no temp negative positions needed.
   """
   def reorder_workflow_states(ordered_ids) when is_list(ordered_ids) do
-    Repo.transaction(fn ->
+    {ids, positions} =
       ordered_ids
       |> Enum.with_index(1)
-      |> Enum.each(fn {id, idx} ->
-        from(ws in WorkflowState, where: ws.id == ^id)
-        |> Repo.update_all(set: [position: idx])
-      end)
-    end)
+      |> Enum.map(fn {id, idx} -> {id, idx} end)
+      |> Enum.unzip()
+
+    sql = """
+    UPDATE workflow_states SET position = data.position
+    FROM (SELECT unnest($1::int[]) AS id, unnest($2::int[]) AS position) AS data
+    WHERE workflow_states.id = data.id
+    """
+
+    Repo.transaction(fn -> Repo.query!(sql, [ids, positions]) end)
   end
 
   @doc """

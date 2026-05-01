@@ -22,7 +22,7 @@ defmodule EyeInTheSky.QueryHelpers do
       [%Log{}, ...]
   """
   def for_session_direct(queryable, session_id, opts \\ []) do
-    limit_val = Keyword.get(opts, :limit)
+    limit_val = Keyword.get(opts, :limit, 500)
     order = Keyword.get(opts, :order_by, asc: :inserted_at)
     preloads = Keyword.get(opts, :preload, [])
 
@@ -62,7 +62,7 @@ defmodule EyeInTheSky.QueryHelpers do
       [%Note{}, ...]
   """
   def for_session_join(queryable, session_id, join_table, opts \\ []) do
-    limit_val = Keyword.get(opts, :limit)
+    limit_val = Keyword.get(opts, :limit, 500)
     order = Keyword.get(opts, :order_by, asc: :inserted_at)
     preloads = Keyword.get(opts, :preload, [])
     entity_key = Keyword.get(opts, :entity_key, :task_id)

@@ -189,8 +189,8 @@ defmodule EyeInTheSky.Projects do
         Logger.info("resolve_project: created project id=#{project.id} for path=#{path}")
         {:ok, project.id, project.name}
 
-      {:error, _changeset} ->
-        # Race condition: try lookup again
+      {:error, %Ecto.Changeset{errors: [path: {_, [constraint: :unique, constraint_name: _]}]}} ->
+        # Race condition: another process inserted the same path — retry the lookup.
         case get_project_by_path(path) do
           {:error, :not_found} ->
             {:error, "project_creation_failed", "failed to create project for path: #{path}"}
@@ -198,6 +198,9 @@ defmodule EyeInTheSky.Projects do
           {:ok, project} ->
             {:ok, project.id, project.name}
         end
+
+      {:error, changeset} ->
+        {:error, changeset}
     end
   end
 

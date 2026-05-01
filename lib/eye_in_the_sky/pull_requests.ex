@@ -5,11 +5,17 @@ defmodule EyeInTheSky.PullRequests do
   alias EyeInTheSky.Repo
 
   @doc """
-  List all pull requests for a session.
+  List pull requests for a session. Default limit: 200.
+  Pass `limit: n` to override.
   """
-  def list_prs_for_session(session_id) do
+  def list_prs_for_session(session_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     Repo.all(
-      from pr in PullRequest, where: pr.session_id == ^session_id, order_by: [desc: pr.created_at]
+      from pr in PullRequest,
+        where: pr.session_id == ^session_id,
+        order_by: [desc: pr.created_at],
+        limit: ^limit
     )
   end
 

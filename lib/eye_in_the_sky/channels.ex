@@ -179,17 +179,23 @@ defmodule EyeInTheSky.Channels do
   end
 
   @doc """
-  Lists all members of a channel.
+  Lists all members of a channel. Default limit: 500.
+  Pass `limit: n` to override.
   """
-  def list_members(channel_id) do
+  def list_members(channel_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     from(m in ChannelMember,
       where: m.channel_id == ^channel_id,
-      order_by: [asc: m.joined_at]
+      order_by: [asc: m.joined_at],
+      limit: ^limit
     )
     |> Repo.all()
   end
 
-  def list_members_with_sessions(channel_id) do
+  def list_members_with_sessions(channel_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     from(m in ChannelMember,
       left_join: s in EyeInTheSky.Sessions.Session,
       on: s.id == m.session_id,
@@ -197,6 +203,7 @@ defmodule EyeInTheSky.Channels do
       on: a.id == m.agent_id,
       where: m.channel_id == ^channel_id,
       order_by: [asc: m.joined_at],
+      limit: ^limit,
       select: %{
         id: m.id,
         agent_id: m.agent_id,

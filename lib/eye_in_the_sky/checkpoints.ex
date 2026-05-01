@@ -13,11 +13,15 @@ defmodule EyeInTheSky.Checkpoints do
 
   @doc """
   Lists all checkpoints for a session, ordered oldest first.
+  Pass `limit: n` to cap results (default: 200).
   """
-  def list_checkpoints_for_session(session_id) do
+  def list_checkpoints_for_session(session_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     Checkpoint
     |> where([c], c.session_id == ^session_id)
     |> order_by([c], asc: c.inserted_at)
+    |> limit(^limit)
     |> Repo.all()
   end
 

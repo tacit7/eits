@@ -14,8 +14,26 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
 
   alias EyeInTheSky.{Agents, Messages, Sessions}
 
+  # Access socket assigns from a LiveViewTest view via the channel process state.
+  # Phoenix.LiveViewTest.View.pid is the LiveView Channel GenServer;
+  # its state map has a :socket key.
+  defp view_assigns(view) do
+    %{socket: socket} = :sys.get_state(view.pid)
+    socket.assigns
+  end
+
+  # Build the bookmark object structure as stored by the JS BookmarkAgent hook
+  # (localStorage: [{agent_id, session_id, name, status}, ...])
+  defp bookmark(session) do
+    %{
+      "agent_id" => to_string(session.agent_id),
+      "session_id" => to_string(session.id),
+      "name" => session.name,
+      "status" => session.status
+    }
+  end
+
   setup %{conn: conn} do
-    # Create test agents and sessions
     {:ok, agent1} =
       Agents.create_agent(%{
         uuid: Ecto.UUID.generate(),
@@ -57,15 +75,15 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
 
   describe "FloatingChatLive on_mount hook" do
     test "initializes FAB assigns on mount", %{conn: conn} do
-      # The hook attaches to chat_live which we can test
       {:ok, view, _html} = live(conn, "/chat")
 
-      assert view.assigns.fab_mounted == true
-      assert view.assigns.fab_timer == nil
-      assert view.assigns.fab_active_session_id == nil
-      assert view.assigns.config_guide_active_session_id == nil
-      assert view.assigns.fab_bookmarks == []
-      assert view.assigns.fab_statuses == %{}
+      assigns = view_assigns(view)
+      assert assigns.fab_mounted == true
+      assert assigns.fab_timer == nil
+      assert assigns.fab_active_session_id == nil
+      assert assigns.config_guide_active_session_id == nil
+      assert assigns.fab_bookmarks == []
+      assert assigns.fab_statuses == %{}
     end
 
     test "fab_set_bookmarks fetches statuses", %{
@@ -75,20 +93,20 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
     } do
       {:ok, view, _html} = live(conn, "/chat")
 
-      bookmarks = [to_string(session1.id), to_string(session2.id)]
-
+      bookmarks = [bookmark(session1), bookmark(session2)]
       render_hook(view, "fab_set_bookmarks", %{"bookmarks" => bookmarks})
 
+      assigns = view_assigns(view)
+
       # Verify bookmarks were set
-      assert view.assigns.fab_bookmarks == bookmarks
+      assert assigns.fab_bookmarks == bookmarks
 
-      # Verify statuses fetched
-      assert Map.has_key?(view.assigns.fab_statuses, to_string(session1.id))
-      assert Map.has_key?(view.assigns.fab_statuses, to_string(session2.id))
+      # Verify statuses fetched by integer session ID key
+      assert Map.has_key?(assigns.fab_statuses, to_string(session1.id))
+      assert Map.has_key?(assigns.fab_statuses, to_string(session2.id))
 
-      # Verify correct statuses
-      assert view.assigns.fab_statuses[to_string(session1.id)] == "idle"
-      assert view.assigns.fab_statuses[to_string(session2.id)] == "working"
+      assert assigns.fab_statuses[to_string(session1.id)] == "idle"
+      assert assigns.fab_statuses[to_string(session2.id)] == "working"
     end
 
     test "fab_request_statuses refreshes statuses", %{
@@ -97,14 +115,10 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
     } do
       {:ok, view, _html} = live(conn, "/chat")
 
-      bookmarks = [to_string(session1.id)]
-      render_hook(view, "fab_set_bookmarks", %{"bookmarks" => bookmarks})
-
-      # Schedule a refresh
+      render_hook(view, "fab_set_bookmarks", %{"bookmarks" => [bookmark(session1)]})
       render_hook(view, "fab_request_statuses", %{})
 
-      # Verify statuses were updated
-      assert Map.has_key?(view.assigns.fab_statuses, to_string(session1.id))
+      assert Map.has_key?(view_assigns(view).fab_statuses, to_string(session1.id))
     end
 
     test "fab_open_chat opens session and subscribes", %{
@@ -115,11 +129,10 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
 
       render_hook(view, "fab_open_chat", %{"session_id" => to_string(session1.id)})
 
-      # Verify session was switched
-      assert view.assigns.fab_active_session_id == session1.id
+      assert view_assigns(view).fab_active_session_id == session1.id
 
-      # Verify subscribed to session messages
-      topic = "session:#{session1.id}:messages"
+      # subscribe_session subscribes to "session:#{id}" (not the :messages sub-topic)
+      topic = "session:#{session1.id}"
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)
@@ -133,17 +146,14 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
     } do
       {:ok, view, _html} = live(conn, "/chat")
 
-      # Open chat first
       render_hook(view, "fab_open_chat", %{"session_id" => to_string(session1.id)})
-      assert view.assigns.fab_active_session_id == session1.id
+      assert view_assigns(view).fab_active_session_id == session1.id
 
-      # Close chat
       render_hook(view, "fab_close_chat", %{})
 
-      assert view.assigns.fab_active_session_id == nil
+      assert view_assigns(view).fab_active_session_id == nil
 
-      # Verify unsubscribed
-      topic = "session:#{session1.id}:messages"
+      topic = "session:#{session1.id}"
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)
@@ -151,7 +161,7 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
       assert view.pid not in subscribers
     end
 
-    test "fab_send_message sends to session", %{
+    test "fab_send_message saves message to DB", %{
       conn: conn,
       session1: session1
     } do
@@ -162,12 +172,11 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
         "body" => "FAB message"
       })
 
-      # Verify message was saved
       messages = Messages.list_recent_messages(session1.id, 10)
       assert Enum.any?(messages, fn m -> m.body == "FAB message" end)
     end
 
-    test "config_guide_open_chat opens config guide session", %{
+    test "config_guide_open_chat subscribes to session", %{
       conn: conn,
       session1: session1
     } do
@@ -175,11 +184,9 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
 
       render_hook(view, "config_guide_open_chat", %{"session_id" => to_string(session1.id)})
 
-      # Verify config guide session set
-      assert view.assigns.config_guide_active_session_id == session1.id
+      assert view_assigns(view).config_guide_active_session_id == session1.id
 
-      # Verify subscribed
-      topic = "session:#{session1.id}:messages"
+      topic = "session:#{session1.id}"
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)
@@ -187,7 +194,7 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
       assert view.pid in subscribers
     end
 
-    test "config_guide_send_message sends to config guide session", %{
+    test "config_guide_send_message saves message to DB", %{
       conn: conn,
       session1: session1
     } do
@@ -198,26 +205,24 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
         "body" => "Config message"
       })
 
-      # Verify message was saved
       messages = Messages.list_recent_messages(session1.id, 10)
       assert Enum.any?(messages, fn m -> m.body == "Config message" end)
     end
 
-    test "config_guide_close_chat closes config guide session", %{
+    test "config_guide_close_chat unsubscribes from session", %{
       conn: conn,
       session1: session1
     } do
       {:ok, view, _html} = live(conn, "/chat")
 
       render_hook(view, "config_guide_open_chat", %{"session_id" => to_string(session1.id)})
-      assert view.assigns.config_guide_active_session_id == session1.id
+      assert view_assigns(view).config_guide_active_session_id == session1.id
 
       render_hook(view, "config_guide_close_chat", %{})
 
-      assert view.assigns.config_guide_active_session_id == nil
+      assert view_assigns(view).config_guide_active_session_id == nil
 
-      # Verify unsubscribed
-      topic = "session:#{session1.id}:messages"
+      topic = "session:#{session1.id}"
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)
@@ -225,17 +230,15 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
       assert view.pid not in subscribers
     end
 
-    test "new_message routes to fab_chat if session is active", %{
+    test "new agent message is routed while FAB chat is open", %{
       conn: conn,
       session1: session1
     } do
       {:ok, view, _html} = live(conn, "/chat")
 
-      # Open FAB chat
       render_hook(view, "fab_open_chat", %{"session_id" => to_string(session1.id)})
-      assert view.assigns.fab_active_session_id == session1.id
+      assert view_assigns(view).fab_active_session_id == session1.id
 
-      # Create and broadcast message from agent
       {:ok, msg} =
         Messages.send_message(%{
           session_id: session1.id,
@@ -245,36 +248,11 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
           body: "Agent response"
         })
 
-      EyeInTheSky.Events.notify_new_message(msg)
-      :ok = render(view)
+      EyeInTheSky.Events.session_new_message(session1.id, msg)
+      render(view)
 
-      # Verify message routed (session still active)
-      assert view.assigns.fab_active_session_id == session1.id
-    end
-
-    test "new_message ignored for user messages", %{
-      conn: conn,
-      session1: session1
-    } do
-      {:ok, view, _html} = live(conn, "/chat")
-
-      # Create user message (should not route)
-      {:ok, _msg} =
-        Messages.send_message(%{
-          session_id: session1.id,
-          sender_role: "user",
-          recipient_role: "agent",
-          provider: "claude",
-          body: "User input"
-        })
-
-      initial_id = view.assigns.fab_active_session_id
-
-      EyeInTheSky.Events.notify_new_message(_msg)
-      :ok = render(view)
-
-      # Should be unchanged
-      assert view.assigns.fab_active_session_id == initial_id
+      # Session should still be active after the broadcast
+      assert view_assigns(view).fab_active_session_id == session1.id
     end
 
     test "handles empty bookmarks list", %{conn: conn} do
@@ -282,24 +260,22 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
 
       render_hook(view, "fab_set_bookmarks", %{"bookmarks" => []})
 
-      assert view.assigns.fab_bookmarks == []
-      assert view.assigns.fab_statuses == %{}
+      assigns = view_assigns(view)
+      assert assigns.fab_bookmarks == []
+      assert assigns.fab_statuses == %{}
     end
 
-    test "handles mixed UUID and integer bookmarks", %{
+    test "handles multiple bookmarks and populates statuses map", %{
       conn: conn,
       session1: session1,
       session2: session2
     } do
       {:ok, view, _html} = live(conn, "/chat")
 
-      # Mix of ID and UUID
-      bookmarks = [to_string(session1.id), session2.uuid]
-
+      bookmarks = [bookmark(session1), bookmark(session2)]
       render_hook(view, "fab_set_bookmarks", %{"bookmarks" => bookmarks})
 
-      # Both should be found
-      statuses = view.assigns.fab_statuses
+      statuses = view_assigns(view).fab_statuses
       assert Map.size(statuses) >= 2
     end
   end

@@ -273,7 +273,14 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   defp fetch_bookmark_statuses([]), do: %{}
 
   defp fetch_bookmark_statuses(bookmarks) do
-    ids = for id when is_binary(id) or is_integer(id) <- bookmarks, do: to_string(id)
+    ids =
+      Enum.map(bookmarks, fn
+        b when is_binary(b) -> b
+        b when is_integer(b) -> to_string(b)
+        %{"session_id" => sid} when is_binary(sid) -> sid
+        _ -> nil
+      end)
+      |> Enum.reject(&is_nil/1)
 
     if ids == [] do
       %{}

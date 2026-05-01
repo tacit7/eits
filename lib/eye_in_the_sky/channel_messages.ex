@@ -46,12 +46,19 @@ defmodule EyeInTheSky.ChannelMessages do
   end
 
   @doc """
-  Creates a channel message.
+  Creates a channel message and broadcasts it via PubSub.
   """
   def create_channel_message(attrs) do
-    attrs
-    |> Map.put(:uuid, Ecto.UUID.generate())
-    |> EyeInTheSky.Messages.create_channel_message()
+    result =
+      attrs
+      |> Map.put(:uuid, Ecto.UUID.generate())
+      |> EyeInTheSky.Messages.create_channel_message()
+
+    with {:ok, msg} <- result do
+      EyeInTheSky.Events.channel_message(msg.channel_id, msg)
+    end
+
+    result
   end
 
   @doc """

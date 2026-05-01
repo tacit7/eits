@@ -6,33 +6,15 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
   alias EyeInTheSky.Claude.ChannelProtocol
 
   def calculate_unread_counts(channels, session_id) do
-    Enum.reduce(channels, %{}, fn channel, acc ->
-      count = Channels.count_unread_messages(channel.id, session_id)
-      Map.put(acc, channel.id, count)
-    end)
+    channel_ids = Enum.map(channels, & &1.id)
+    counts = Channels.count_unread_for_channels(channel_ids, session_id)
+    Map.new(channels, fn channel -> {channel.id, Map.get(counts, channel.id, 0)} end)
   end
 
   def load_channel_members(nil), do: []
 
   def load_channel_members(channel_id) do
-    Channels.list_members(channel_id)
-    |> Enum.map(fn member ->
-      session_data =
-        case Sessions.get_session(member.session_id) do
-          {:ok, s} -> s
-          _ -> nil
-        end
-
-      %{
-        id: member.id,
-        session_id: member.session_id,
-        agent_id: member.agent_id,
-        role: member.role,
-        joined_at: member.joined_at,
-        session_name: if(session_data, do: session_data.name),
-        session_uuid: if(session_data, do: session_data.uuid)
-      }
-    end)
+    Channels.list_members_with_sessions(channel_id)
   end
 
   @doc """

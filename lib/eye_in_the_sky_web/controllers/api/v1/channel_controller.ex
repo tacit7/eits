@@ -124,6 +124,14 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
 
       case Channels.add_member(channel.id, agent_id, session.id, role) do
         {:ok, member} ->
+          Task.start(fn ->
+            EyeInTheSky.Messaging.DMDelivery.deliver_and_persist(
+              session.id,
+              nil,
+              channel_orientation_message(channel)
+            )
+          end)
+
           conn
           |> put_status(:created)
           |> json(%{
@@ -181,6 +189,26 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
             end)
         })
     end
+  end
+
+  defp channel_orientation_message(channel) do
+    """
+    You have joined channel **#{channel.name}** (ID: `#{channel.id}`).
+
+    Your env var `EITS_CHANNEL_ID=#{channel.id}` is set for this session.
+
+    Key commands:
+    - `eits channels messages #{channel.id}` — fetch recent messages
+    - `eits channels send #{channel.id} "<text>"` — post a message
+    - `eits channels mine` — list channels you belong to
+
+    Mention routing:
+    - `@<session_id>` — direct reply to a specific session
+    - `@all` — broadcast to all channel members
+    - No mention — ambient message (no auto-routing)
+
+    [NO_RESPONSE]
+    """
   end
 
   defp validate_name(""), do: {:error, :bad_request, "name is required"}

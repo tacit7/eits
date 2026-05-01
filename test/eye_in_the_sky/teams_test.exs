@@ -44,6 +44,24 @@ defmodule EyeInTheSky.TeamsTest do
     member
   end
 
+  describe "list_teams/1" do
+    test "negative limit does not crash and returns results" do
+      create_team()
+      create_team()
+      result = Teams.list_teams(limit: -5)
+      assert is_list(result)
+      assert length(result) >= 2
+    end
+
+    test "status: all returns archived teams" do
+      team = create_team()
+      {:ok, _} = Teams.delete_team(team)
+      result = Teams.list_teams(status: "all")
+      ids = Enum.map(result, & &1.id)
+      assert team.id in ids
+    end
+  end
+
   describe "list_broadcast_targets/1" do
     test "returns empty list when session belongs to no teams" do
       session = create_session()

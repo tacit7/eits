@@ -140,7 +140,10 @@ defmodule EyeInTheSky.Channels do
 
     %ChannelMember{}
     |> ChannelMember.changeset(attrs)
-    |> Repo.insert()
+    |> Repo.insert(
+      on_conflict: :nothing,
+      conflict_target: [:channel_id, :session_id]
+    )
   end
 
   @doc """

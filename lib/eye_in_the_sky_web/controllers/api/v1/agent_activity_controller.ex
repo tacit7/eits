@@ -92,7 +92,8 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentActivityController do
           completed_at: t.completed_at,
           updated_at: t.updated_at
         },
-        order_by: [desc: t.updated_at]
+        order_by: [desc: t.updated_at],
+        limit: 500
       )
       |> Repo.all()
 
@@ -143,7 +144,8 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentActivityController do
         session_id: c.session_id,
         inserted_at: c.created_at
       },
-      order_by: [desc: c.created_at]
+      order_by: [desc: c.created_at],
+      limit: 500
     )
     |> Repo.all()
     |> Enum.map(fn c -> Map.update!(c, :inserted_at, &format_dt/1) end)
@@ -159,7 +161,8 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentActivityController do
         name: s.name,
         status: s.status
       },
-      order_by: [desc: s.inserted_at]
+      order_by: [desc: s.inserted_at],
+      limit: 500
     )
     |> Repo.all()
   end

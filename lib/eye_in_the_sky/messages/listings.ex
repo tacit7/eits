@@ -194,6 +194,7 @@ defmodule EyeInTheSky.Messages.Listings do
     Message
     |> where([m], m.session_id == ^session_id and is_nil(m.source_uuid) and m.inserted_at >= ^cutoff)
     |> order_by([m], desc: m.inserted_at)
+    |> limit(5_000)
     |> Repo.all()
     |> Enum.reduce(%{}, fn msg, acc ->
       # Ordered desc, so the first occurrence per key is the most recent.

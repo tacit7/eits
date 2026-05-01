@@ -83,13 +83,26 @@ defmodule EyeInTheSky.ChannelMessages do
 
   @doc """
   Creates a thread reply.
+
+  Both the insert and the thread count increment run in a single transaction so a
+  failed increment cannot leave thread_reply_count and last_thread_reply_at stale.
   """
   def create_thread_reply(parent_message_id, attrs) do
     attrs = Map.put(attrs, :parent_message_id, parent_message_id)
 
-    with {:ok, message} <- create_channel_message(attrs) do
-      increment_thread_count(parent_message_id)
-      {:ok, message}
+    Repo.transaction(fn ->
+      case create_channel_message(attrs) do
+        {:ok, message} ->
+          increment_thread_count(parent_message_id)
+          message
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+    |> case do
+      {:ok, message} -> {:ok, message}
+      {:error, changeset} -> {:error, changeset}
     end
   end
 

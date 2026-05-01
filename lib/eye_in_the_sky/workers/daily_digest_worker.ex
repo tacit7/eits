@@ -84,7 +84,8 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
           started_at: s.started_at,
           ended_at: s.ended_at
         },
-        order_by: [desc: s.started_at]
+        order_by: [desc: s.started_at],
+        limit: 200
     )
   end
 
@@ -97,7 +98,8 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
         on: p.id == t.project_id,
         where: t.state_id == ^state_done and t.updated_at >= ^since,
         select: %{title: t.title, project: p.name},
-        order_by: [asc: t.title]
+        order_by: [asc: t.title],
+        limit: 200
     )
   end
 
@@ -112,7 +114,8 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
           message: c.commit_message,
           session: s.name
         },
-        order_by: [desc: c.created_at]
+        order_by: [desc: c.created_at],
+        limit: 200
     )
   end
 

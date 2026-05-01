@@ -58,11 +58,16 @@ defmodule EyeInTheSky.Sessions do
   Used by the scheduler to auto-archive dead idle sessions.
   """
   def list_idle_sessions_older_than(cutoff) do
+    # Two OR branches so PG can use the sessions(:last_activity_at) and
+    # sessions(:started_at) indexes added in 20260501053649. A single
+    # coalesce(last_activity_at, started_at) expression prevents index use.
     from(s in Session,
       where: s.status in ["idle", "waiting"],
       where: is_nil(s.archived_at),
       where: not is_nil(s.started_at),
-      where: fragment("coalesce(?, ?) < ?", s.last_activity_at, s.started_at, ^cutoff)
+      where:
+        (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
+          (is_nil(s.last_activity_at) and s.started_at < ^cutoff)
     )
     |> Repo.all()
   end

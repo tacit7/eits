@@ -101,12 +101,15 @@ defmodule EyeInTheSky.Canvases do
   end
 
   def reset_canvas_layout(canvas_id) do
-    sessions = list_canvas_sessions(canvas_id)
-
-    sessions
+    # Bypass update_window_layout/2 (which does a redundant Repo.get) since we
+    # already have each struct from list_canvas_sessions/1. Goes from 1+2N to 1+N queries.
+    canvas_id
+    |> list_canvas_sessions()
     |> Enum.with_index()
     |> Enum.each(fn {cs, i} ->
-      update_window_layout(cs.id, %{pos_x: 24 + i * 40, pos_y: 24 + i * 40, width: 320, height: 260})
+      cs
+      |> CanvasSession.changeset(%{pos_x: 24 + i * 40, pos_y: 24 + i * 40, width: 320, height: 260})
+      |> Repo.update()
     end)
 
     :ok

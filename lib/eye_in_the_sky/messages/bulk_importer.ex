@@ -41,13 +41,26 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     uuids = Enum.map(messages_with_uuid, & &1.uuid)
     existing = Messages.existing_source_uuids(session_id, uuids)
 
+    # H3 fix: pre-fetch dedup data once before the per-message loop.
+    # Replaces up to 3 per-message SELECTs with 2 batch queries + in-memory MapSet/Map lookups.
+    #
+    # dedup_agent_bodies: used for dm_already_recorded? (user msgs) and
+    #   agent_reply_already_recorded? (non-user msgs). Window = 60s for live
+    #   imports (conservative vs. the original 30s/60s split), 86400s for file imports.
+    #
+    # unlinked_candidates: keyed by {sender_role, body}; used in place of
+    #   find_unlinked_import_candidate per-message SELECTs. Most-recent row wins.
+    dedup_seconds = if Keyword.get(opts, :importing_from_file?, false), do: 86_400, else: 60
+
     context = %{
       session_id: session_id,
       now: now,
       provider: provider,
       metadata_fn: metadata_fn,
       existing_source_uuids: existing,
-      import_opts: opts
+      import_opts: opts,
+      dedup_agent_bodies: Messages.recent_agent_bodies_for_session(session_id, seconds: dedup_seconds),
+      unlinked_candidates: Messages.unlinked_candidates_map_for_session(session_id)
     }
 
     # Separate messages into actions: updates (link existing), inserts (create new), skips
@@ -168,7 +181,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       provider: provider,
       metadata_fn: metadata_fn,
       existing_source_uuids: existing_source_uuids,
-      import_opts: import_opts
+      dedup_agent_bodies: dedup_agent_bodies,
+      unlinked_candidates: unlinked_candidates
     } = context
 
     cond do
@@ -176,26 +190,20 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       MapSet.member?(existing_source_uuids, msg.uuid) ->
         {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
 
+      # H3 fix: was dm_already_recorded?/3 (per-message SELECT); now MapSet lookup.
       # Avoid double-rendering DMs. When a DM arrives, DMDelivery persists it
       # as sender_role: "agent" (inbound) and forwards it to the local CLI as
-      # a user prompt; the session file then replays that prompt as
-      # role: "user". The find_unlinked_import_candidate lookup below only matches on
-      # sender_role, so the inbound "agent" row is invisible to it and a
-      # second outbound/user row gets created with the same body, making the
-      # DM render twice in the chat (once received, once "sent"). Skip the
-      # import when a recent inbound DM with the same body already exists.
-      msg.role == "user" and dm_already_recorded?(session_id, msg.content, import_opts) ->
+      # a user prompt; the session file then replays that prompt as role: "user".
+      # Skip the import when a recent inbound DM with the same body already exists.
+      msg.role == "user" and MapSet.member?(dedup_agent_bodies, msg.content) ->
         {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
 
-      # Avoid double-rendering the final agent message. MapSet check (cheap) fires first
-      # to catch in-batch duplicates before hitting the DB. DB check (agent_reply_already_recorded?)
-      # catches two races:
-      #   1. Concurrent race: record_incoming_reply committed < 30 s ago (e.g. from on_result_received)
-      #   2. Historical sync: same session imported via mount Task after agent finished (window = 86 400 s)
-      # User messages are intentionally excluded — repeated user turns are legitimate.
+      # H3 fix: was agent_reply_already_recorded?/3 (per-message SELECT); now MapSet lookup.
+      # seen_agent_bodies (in-batch, cheap) fires first; dedup_agent_bodies (pre-fetched DB
+      # window) fires second to catch cross-batch races. User messages are excluded.
       msg.role != "user" and
           (MapSet.member?(seen_agent_bodies, msg.content) or
-             agent_reply_already_recorded?(session_id, msg.content, import_opts)) ->
+             MapSet.member?(dedup_agent_bodies, msg.content)) ->
         {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
 
       true ->
@@ -210,8 +218,10 @@ defmodule EyeInTheSky.Messages.BulkImporter do
             do: MapSet.put(seen_agent_bodies, msg.content),
             else: seen_agent_bodies
 
-        case Messages.find_unlinked_import_candidate(session_id, sender_role, msg.content) do
-          {:ok, existing} ->
+        # H3 fix: was Messages.find_unlinked_import_candidate/3 (per-message SELECT);
+        # now a Map.get on the pre-fetched unlinked_candidates map.
+        case Map.get(unlinked_candidates, {sender_role, msg.content}) do
+          %Messages.Message{} = existing ->
             # Message exists but has no source_uuid; link it
             update_attrs = %{source_uuid: msg.uuid, updated_at: now}
 
@@ -220,7 +230,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
 
             {[{existing, update_attrs} | upd_acc], ins_acc, skip_count, new_seen}
 
-          :not_found ->
+          nil ->
             # New message; prepare for batch insert
             new_message = %{
               uuid: Ecto.UUID.generate(),
@@ -244,37 +254,6 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     e in Postgrex.Error ->
       Logger.warning("BulkImporter: Postgrex error processing message: #{inspect(e)}")
       {upd_acc, ins_acc, skip_count + 1, seen_agent_bodies}
-  end
-
-  defp dm_already_recorded?(session_id, body, opts) do
-    seconds = if Keyword.get(opts, :importing_from_file?, false), do: 86_400, else: 60
-
-    case Messages.find_recent_dm(session_id, body, seconds: seconds) do
-      nil -> false
-      _msg -> true
-    end
-  end
-
-  # Checks whether an agent reply with the same body was already persisted in
-  # this session. Used to prevent BulkImporter from inserting a duplicate when
-  # record_incoming_reply (AgentWorker on_result_received) already committed
-  # the same content under a different source_uuid (SDK result UUID vs JSONL UUID).
-  #
-  # Two windows:
-  #   - Live sync (importing_from_file? false): 30 s — covers the
-  #     AgentWorker → agent_stopped → BulkImporter pipeline (< 10 s typically).
-  #   - File import (importing_from_file? true): 86 400 s (24 h) — covers
-  #     mount-time syncs that run long after the session finished. record_incoming_reply
-  #     only saves final responses, so a 24 h body-match within a session is
-  #     safe; tool-call messages with identical bodies are caught earlier by
-  #     seen_agent_bodies (in-batch MapSet) or existing_source_uuids (fast path).
-  defp agent_reply_already_recorded?(session_id, body, opts) do
-    seconds = if Keyword.get(opts, :importing_from_file?, false), do: 86_400, else: 30
-
-    case Messages.find_recent_dm(session_id, body, seconds: seconds) do
-      nil -> false
-      _msg -> true
-    end
   end
 
   defp message_roles("user"), do: {"user", "agent", "outbound"}

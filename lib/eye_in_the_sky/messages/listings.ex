@@ -154,6 +154,53 @@ defmodule EyeInTheSky.Messages.Listings do
     )
   end
 
+  @doc """
+  H3 batch pre-fetch: returns a MapSet of agent-message bodies in this session
+  within the given number of seconds. Used by BulkImporter to replace per-message
+  dm_already_recorded? and agent_reply_already_recorded? SELECTs.
+  """
+  @spec recent_agent_bodies_for_session(integer(), keyword()) :: MapSet.t()
+  def recent_agent_bodies_for_session(session_id, opts \\ []) do
+    seconds = Keyword.get(opts, :seconds, 60)
+
+    cutoff =
+      DateTime.utc_now()
+      |> DateTime.add(-seconds, :second)
+      |> DateTime.truncate(:second)
+
+    Message
+    |> where(
+      [m],
+      m.session_id == ^session_id and m.sender_role == "agent" and m.inserted_at >= ^cutoff
+    )
+    |> select([m], m.body)
+    |> Repo.all()
+    |> MapSet.new()
+  end
+
+  @doc """
+  H3 batch pre-fetch: returns a map of {sender_role, body} -> Message for messages
+  in this session that have no source_uuid and were inserted within the last 24h.
+  Used by BulkImporter to replace per-message find_unlinked_import_candidate SELECTs.
+  The most recent message wins when multiple rows share the same key.
+  """
+  @spec unlinked_candidates_map_for_session(integer()) :: %{{String.t(), String.t()} => Message.t()}
+  def unlinked_candidates_map_for_session(session_id) do
+    cutoff =
+      DateTime.utc_now()
+      |> DateTime.add(-86_400, :second)
+      |> DateTime.truncate(:second)
+
+    Message
+    |> where([m], m.session_id == ^session_id and is_nil(m.source_uuid) and m.inserted_at >= ^cutoff)
+    |> order_by([m], desc: m.inserted_at)
+    |> Repo.all()
+    |> Enum.reduce(%{}, fn msg, acc ->
+      # Ordered desc, so the first occurrence per key is the most recent.
+      Map.put_new(acc, {msg.sender_role, msg.body}, msg)
+    end)
+  end
+
   @spec has_inbound_reply?(integer(), String.t()) :: boolean()
   def has_inbound_reply?(session_id, provider) when is_binary(provider) do
     Message

@@ -1439,7 +1439,7 @@ Options:
   --worktree <branch>          Git worktree branch to create for the agent
   --stash-if-dirty             Auto-stash uncommitted changes before worktree create
   --effort-level <level>       Effort level hint
-  --parent-session-id <n>      Parent session integer ID (links spawned session)
+  --parent-session-id <n>      Parent session integer ID or UUID (links spawned session)
   --parent-agent-id <n>        Parent agent ID
   --team-name <name>           Join this team on spawn (by name)
   --team-id <id>               Join this team on spawn (by integer ID; resolved to name)
@@ -1607,7 +1607,7 @@ USAGE
         --arg     agent             "$agent_name" \
         --arg     name              "$session_name" \
         --argjson project_id        "${project_id:-null}" \
-        --argjson parent_session_id "${parent_session_id:-null}" \
+        --arg     parent_session_id "${parent_session_id:-}" \
         --argjson parent_agent_id   "${parent_agent_id:-null}" \
         --argjson bypass_sandbox    "$bypass_sandbox" \
         --argjson stash_if_dirty    "$stash_if_dirty" \
@@ -1622,7 +1622,7 @@ USAGE
          + (if $agent             != "" then {agent: $agent}                           else {} end)
          + (if $name              != "" then {name: $name}                             else {} end)
          + (if $project_id        != null then {project_id: $project_id}               else {} end)
-         + (if $parent_session_id != null then {parent_session_id: $parent_session_id} else {} end)
+         + (if $parent_session_id != ""   then {parent_session_id: $parent_session_id} else {} end)
          + (if $parent_agent_id   != null then {parent_agent_id: $parent_agent_id}     else {} end)
          + (if $bypass_sandbox           then {bypass_sandbox: true}                   else {} end)
          + (if $stash_if_dirty           then {stash_if_dirty: true}                   else {} end)')

@@ -133,28 +133,27 @@ eits tasks create --title "Research X" --description "Details" --team <team_id>
 
 ### 4. Get orchestrator IDs
 
-Spawning requires **integer** IDs, not UUIDs:
+`$EITS_SESSION_ID` (integer) is set reliably by the startup hook — use it directly. `--parent-session-id` accepts both integer and UUID. `ORC_AGENT_ID` still requires a psql lookup (no env var):
 
 ```bash
-ORC_SESSION_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.id')
 ORC_AGENT_ID=$(psql -d eits_dev -t -c "SELECT a.id FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$EITS_SESSION_UUID'" | tr -d ' ')
 ```
 
 ### 5. Spawn agents
 
-Always include `parent_session_id` and `parent_agent_id` for proper session hierarchy:
+Always include `parent_session_id` and `parent_agent_id` for proper session hierarchy. Prefer `$EITS_SESSION_ID` (integer) for `--parent-session-id` — both int and UUID work, but integer is canonical:
 
 ```bash
 eits agents spawn \
-  --instructions "Your task. team_id: <team_id>. When done, DM back: eits dm --to <ORC_SESSION_UUID> --message 'done'" \
+  --instructions "Your task. team_id: <team_id>. When done, DM back: eits dm --to $EITS_SESSION_ID --message 'done'" \
   --model sonnet \
   --team-name my-team \
   --member-name researcher \
-  --parent-session-id $ORC_SESSION_ID \
+  --parent-session-id $EITS_SESSION_ID \
   --parent-agent-id $ORC_AGENT_ID
 ```
 
-**Always embed the orchestrator's UUID literally in instructions** — agents use it to DM back. Use `$EITS_SESSION_UUID` (UUID), never the integer ID.
+**Embed the orchestrator's integer session ID in DM-back instructions** — `$EITS_SESSION_ID` is shorter and unambiguous. UUID also works if you prefer.
 
 Spawn all agents in parallel. Each gets a unique `--member-name`.
 
@@ -236,20 +235,19 @@ eits teams join <team_id> --name "orchestrator" --role lead --session $EITS_SESS
 eits tasks create --title "Research Claude CLI flags" --team <team_id>
 eits tasks create --title "Write README from research" --team <team_id>
 
-# 4. Get IDs
-ORC_SESSION_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.id')
+# 4. Get IDs — $EITS_SESSION_ID is integer, set by startup hook
 ORC_AGENT_ID=$(psql -d eits_dev -t -c "SELECT a.id FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$EITS_SESSION_UUID'" | tr -d ' ')
 
-# 5. Spawn agents
+# 5. Spawn agents — prefer $EITS_SESSION_ID (int) for --parent-session-id
 eits agents spawn \
-  --instructions "Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. DM back to $EITS_SESSION_UUID when done." \
+  --instructions "Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. DM back to $EITS_SESSION_ID when done." \
   --model sonnet --team-name docs-team --member-name researcher \
-  --parent-session-id $ORC_SESSION_ID --parent-agent-id $ORC_AGENT_ID
+  --parent-session-id $EITS_SESSION_ID --parent-agent-id $ORC_AGENT_ID
 
 eits agents spawn \
-  --instructions "Wait for /tmp/research.md, then write docs/README.md. team_id: <team_id>. DM back to $EITS_SESSION_UUID when done." \
+  --instructions "Wait for /tmp/research.md, then write docs/README.md. team_id: <team_id>. DM back to $EITS_SESSION_ID when done." \
   --model sonnet --team-name docs-team --member-name writer \
-  --parent-session-id $ORC_SESSION_ID --parent-agent-id $ORC_AGENT_ID
+  --parent-session-id $EITS_SESSION_ID --parent-agent-id $ORC_AGENT_ID
 
 # 6. Monitor
 eits teams status <team_id>

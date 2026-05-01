@@ -125,7 +125,7 @@ eits agents spawn --instructions "..." [options]
   --stash-if-dirty             auto-stash uncommitted changes before worktree create
   --model <m>                  model shorthand: opus, sonnet, haiku; or codex/gemini models
   --provider <p>               claude (default), codex, gemini
-  --parent-session-id <n>      integer session ID (not UUID) to link as parent
+  --parent-session-id <n>      session ID to link as parent — integer ($EITS_SESSION_ID) preferred, UUID also accepted
   --dry-run                    validate + print curl without hitting API
 eits agents update <uuid> [--status <s>]
 ```

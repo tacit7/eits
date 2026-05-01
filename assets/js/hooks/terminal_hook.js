@@ -54,14 +54,14 @@ export const TerminalHook = {
     term.open(this.el)
     fitAddon.fit()
 
-    // Send input to server (same event name as TerminalLive — routed by phx-target)
+    // pushEventTo targets the LiveComponent (phx-target={@myself} on this element).
+    // pushEvent would go to the parent LiveView (CanvasLive) and be ignored.
     term.onData(data => {
-      this.pushEvent("pty_input", { data })
+      this.pushEventTo(this.el, "pty_input", { data })
     })
 
-    // Notify server of resize
     term.onResize(({ cols, rows }) => {
-      this.pushEvent("pty_resize", { cols, rows })
+      this.pushEventTo(this.el, "pty_resize", { cols, rows })
     })
 
     // Resize observer keeps terminal filling its container

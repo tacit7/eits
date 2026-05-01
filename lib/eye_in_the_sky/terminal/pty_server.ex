@@ -9,6 +9,13 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   - The process exits (and takes the OS child with it) when the LiveView
     disconnects or `stop/1` is called.
 
+  ## subscriber_tag option
+
+  Pass `subscriber_tag: any_term` to tag output messages. When set, output is
+  delivered as `{:pty_output, tag, data}` instead of `{:pty_output, data}`.
+  This lets a parent LiveView hosting multiple terminals route output to the
+  correct component by matching on the tag.
+
   ## erlexec gotchas on macOS
 
   - Pass the command as a **list** (not a string). A string triggers `m_shell=true`
@@ -43,7 +50,11 @@ defmodule EyeInTheSky.Terminal.PtyServer do
     subscriber = Keyword.fetch!(opts, :subscriber)
     cols = Keyword.get(opts, :cols, @default_cols)
     rows = Keyword.get(opts, :rows, @default_rows)
-    GenServer.start_link(__MODULE__, {subscriber, cols, rows})
+    # Optional tag — when set, output is sent as {:pty_output, tag, data}
+    # instead of {:pty_output, data}. Lets a parent route output to the
+    # right component when hosting multiple terminals.
+    tag = Keyword.get(opts, :subscriber_tag, nil)
+    GenServer.start_link(__MODULE__, {subscriber, cols, rows, tag})
   end
 
   @doc "Write data (keystrokes / paste) into the PTY."
@@ -58,7 +69,7 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   # --- Callbacks ---
 
   @impl true
-  def init({subscriber, cols, rows}) do
+  def init({subscriber, cols, rows, tag}) do
     # Monitor the LiveView so we clean up when it dies.
     Process.monitor(subscriber)
 
@@ -96,7 +107,7 @@ defmodule EyeInTheSky.Terminal.PtyServer do
       {:ok, _erlang_pid, os_pid} ->
         # Set initial window size — winsz is not a valid exec:run option
         :exec.winsz(os_pid, rows, cols)
-        {:ok, %{subscriber: subscriber, os_pid: os_pid, cols: cols, rows: rows}}
+        {:ok, %{subscriber: subscriber, os_pid: os_pid, cols: cols, rows: rows, tag: tag}}
 
       {:error, reason} ->
         Logger.error("PtyServer: failed to spawn shell: #{inspect(reason)}")
@@ -116,21 +127,26 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   end
 
   @impl true
-  # PTY output from erlexec
-  def handle_info({:stdout, _os_pid, data}, %{subscriber: sub} = state) do
+  # PTY output from erlexec — route with tag when present
+  def handle_info({:stdout, _os_pid, data}, %{subscriber: sub, tag: nil} = state) do
     send(sub, {:pty_output, data})
+    {:noreply, state}
+  end
+
+  def handle_info({:stdout, _os_pid, data}, %{subscriber: sub, tag: tag} = state) do
+    send(sub, {:pty_output, tag, data})
     {:noreply, state}
   end
 
   # erlexec: OS process exited with non-zero status
   def handle_info({:DOWN, _ref, :process, _pid, {:exit_status, _code}}, state) do
-    send(state.subscriber, :pty_exited)
+    notify_exit(state)
     {:stop, :normal, state}
   end
 
   # erlexec: OS process exited cleanly (exit code 0 → :normal via erlexec's ospid_loop)
   def handle_info({:DOWN, os_pid, :process, _lwp, :normal}, %{os_pid: os_pid} = state) do
-    send(state.subscriber, :pty_exited)
+    notify_exit(state)
     {:stop, :normal, state}
   end
 
@@ -145,8 +161,11 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   def terminate(_reason, %{os_pid: os_pid}) do
     :exec.stop(os_pid)
   rescue
-    e in ErlangError ->
-      Logger.warning("PtyServer: failed to stop OS process #{os_pid}: #{inspect(e)}")
-      :ok
+    _ -> :ok
   end
+
+  # --- Private ---
+
+  defp notify_exit(%{subscriber: sub, tag: nil}), do: send(sub, :pty_exited)
+  defp notify_exit(%{subscriber: sub, tag: tag}), do: send(sub, {:pty_exited, tag})
 end

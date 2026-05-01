@@ -3,7 +3,7 @@ defmodule EyeInTheSky.Canvases do
   import Ecto.Query
 
   alias EyeInTheSky.Repo
-  alias EyeInTheSky.Canvases.{Canvas, CanvasSession}
+  alias EyeInTheSky.Canvases.{Canvas, CanvasSession, CanvasTerminal}
 
   def list_canvases do
     Repo.all(from c in Canvas, order_by: [asc: c.inserted_at])
@@ -116,5 +116,31 @@ defmodule EyeInTheSky.Canvases do
     from(cs in CanvasSession, group_by: cs.canvas_id, select: {cs.canvas_id, count(cs.id)})
     |> Repo.all()
     |> Enum.into(%{})
+  end
+
+  # --- Terminal Windows ---
+
+  def list_terminals(canvas_id) do
+    Repo.all(from ct in CanvasTerminal, where: ct.canvas_id == ^canvas_id, order_by: [asc: ct.inserted_at])
+  end
+
+  def create_terminal(canvas_id, attrs \\ %{}) do
+    %CanvasTerminal{}
+    |> CanvasTerminal.changeset(Map.put(attrs, :canvas_id, canvas_id))
+    |> Repo.insert()
+  end
+
+  def delete_terminal(id) do
+    case Repo.get(CanvasTerminal, id) do
+      nil -> {:error, :not_found}
+      ct -> Repo.delete(ct)
+    end
+  end
+
+  def update_terminal_layout(id, attrs) do
+    case Repo.get(CanvasTerminal, id) do
+      nil -> {:error, :not_found}
+      ct -> ct |> CanvasTerminal.changeset(attrs) |> Repo.update()
+    end
   end
 end

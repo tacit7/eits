@@ -168,7 +168,7 @@
     white-space: nowrap;
   }
 
-  .unread-badge {
+  .unread-count {
     background: var(--nx-accent);
     color: #fff;
     font-family: 'IBM Plex Mono', monospace;
@@ -178,6 +178,31 @@
     border-radius: 10px;
     min-width: 18px;
     text-align: center;
+    flex-shrink: 0;
+  }
+
+  .unread-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--nx-accent);
+    flex-shrink: 0;
+  }
+
+  /* active-dot and error-dot wired when LiveView passes agent_statuses and channel_errors props */
+  .active-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+  }
+
+  .error-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ef4444;
     flex-shrink: 0;
   }
 
@@ -248,8 +273,10 @@
             <span class="channel-label">{channel.name}</span>
           </div>
 
-          {#if getUnreadCount(channel.id) > 0}
-            <span class="unread-badge">{getUnreadCount(channel.id)}</span>
+          {#if getUnreadCount(channel.id) >= 5}
+            <span class="unread-count">{getUnreadCount(channel.id)}</span>
+          {:else if getUnreadCount(channel.id) > 0}
+            <span class="unread-dot" title="{getUnreadCount(channel.id)} unread"></span>
           {/if}
         </div>
       {/each}

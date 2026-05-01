@@ -169,7 +169,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           }
         />
       <% else %>
-        <div class="divide-y divide-base-content/8">
+        <div class="divide-y divide-base-content/8" data-vim-list>
           <%= for team <- @filtered_teams do %>
             <div class="py-1 group flex items-center gap-1">
               <.link
@@ -178,7 +178,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                     do: ~p"/projects/#{@project.id}/teams/#{team.id}",
                     else: ~p"/projects/#{team.project_id}/teams/#{team.id}"
                 }
-                class="flex-1 py-2 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0"
+                class="flex-1 py-2 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0 [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
+                data-vim-list-item
               >
                 <.status_dot status={team_status_atom(team.members)} size="sm" />
                 <div class="flex-1 min-w-0">

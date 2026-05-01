@@ -79,9 +79,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
       <div class="max-w-6xl mx-auto">
         <%= if @prompts != [] do %>
           <!-- Prompts List -->
-          <div class="space-y-4">
+          <div class="space-y-4" data-vim-list>
             <%= for prompt <- @prompts do %>
-              <.link navigate={~p"/projects/#{@project.id}/prompts/#{prompt.uuid}"} class="block">
+              <.link navigate={~p"/projects/#{@project.id}/prompts/#{prompt.uuid}"} class="block rounded-2xl [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50" data-vim-list-item>
                 <div class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-md transition-all">
                   <div class="card-body">
                     <div class="flex items-start justify-between">

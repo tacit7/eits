@@ -61,7 +61,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
 
       <%!-- Row body --%>
       <div
-        class="flex items-center gap-4 py-3 pr-2 pl-2 hover:bg-base-200/40 rounded-lg cursor-pointer"
+        class="flex items-center gap-4 py-3 pr-2 pl-2 hover:bg-base-200/40 rounded-lg cursor-pointer [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
+        data-vim-list-item
         phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
         phx-keyup={if !@select_mode, do: @on_click}
         phx-key="Enter"

@@ -35,7 +35,6 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimit do
   """
 
   import Plug.Conn
-  require Logger
 
   @rules %{
     ["auth", "login", "challenge"] => {10, :timer.minutes(1)},
@@ -159,25 +158,7 @@ defmodule EyeInTheSkyWeb.Plugs.RateLimit do
   end
 
   defp lookup_session_id(uuid) do
-    with {:ok, bin} <- Ecto.UUID.dump(uuid),
-         {:ok, %{rows: rows}} <-
-           EyeInTheSky.Repo.query("SELECT id FROM sessions WHERE uuid = $1 LIMIT 1", [bin]) do
-      case rows do
-        [[id]] ->
-          {:ok, id}
-
-        [] ->
-          Logger.warning(
-            "rate_limit: x-eits-session #{uuid} not found, falling back to IP bucket"
-          )
-
-          :error
-      end
-    else
-      _ -> :error
-    end
-  rescue
-    DBConnection.ConnectionError -> :error
+    EyeInTheSky.Sessions.get_session_id_by_uuid(uuid)
   end
 
   defp ip_string(conn) do

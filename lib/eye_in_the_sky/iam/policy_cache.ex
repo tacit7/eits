@@ -13,10 +13,14 @@ defmodule EyeInTheSky.IAM.PolicyCache do
 
   use GenServer
 
+  require Logger
+
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.Repo
 
   import Ecto.Query
+
+  @load_limit 5_000
 
   @table :iam_policy_cache
   @telemetry_hit [:eye_in_the_sky, :iam, :cache, :hit]
@@ -71,8 +75,18 @@ defmodule EyeInTheSky.IAM.PolicyCache do
   # ── private ─────────────────────────────────────────────────────────────────
 
   defp load_from_db do
-    Policy
-    |> where([p], p.enabled == true)
-    |> Repo.all()
+    policies =
+      Policy
+      |> where([p], p.enabled == true)
+      |> limit(@load_limit)
+      |> Repo.all()
+
+    if length(policies) >= @load_limit do
+      Logger.warning(
+        "IAM policy_cache: LIMIT reached (#{@load_limit}) — some policies may not be evaluated"
+      )
+    end
+
+    policies
   end
 end

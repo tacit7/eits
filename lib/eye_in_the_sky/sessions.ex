@@ -11,6 +11,7 @@ defmodule EyeInTheSky.Sessions do
 
   require Logger
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Scopes.Archivable
   alias EyeInTheSky.Sessions.Loader
@@ -170,26 +171,40 @@ defmodule EyeInTheSky.Sessions do
 
   @doc """
   Ends a session by setting ended_at timestamp.
+  Broadcasts agent_stopped and session_updated events.
   """
   def end_session(%Session{} = session, opts \\ %{}) do
     attrs = %{ended_at: DateTime.utc_now()}
     attrs = if s = opts[:summary], do: Map.put(attrs, :description, s), else: attrs
     attrs = if s = opts[:final_status], do: Map.put(attrs, :status, s), else: attrs
-    update_session(session, attrs)
+
+    with {:ok, updated} <- update_session(session, attrs) do
+      Events.agent_stopped(updated)
+      Events.session_updated(updated)
+      {:ok, updated}
+    end
   end
 
   @doc """
   Archives a session (soft delete).
+  Broadcasts session_updated event.
   """
   def archive_session(%Session{} = session) do
-    update_session(session, %{archived_at: DateTime.utc_now()})
+    with {:ok, updated} <- update_session(session, %{archived_at: DateTime.utc_now()}) do
+      Events.session_updated(updated)
+      {:ok, updated}
+    end
   end
 
   @doc """
   Unarchives a session.
+  Broadcasts session_updated event.
   """
   def unarchive_session(%Session{} = session) do
-    update_session(session, %{archived_at: nil})
+    with {:ok, updated} <- update_session(session, %{archived_at: nil}) do
+      Events.session_updated(updated)
+      {:ok, updated}
+    end
   end
 
   @doc """

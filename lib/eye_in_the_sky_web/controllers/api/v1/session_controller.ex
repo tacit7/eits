@@ -311,8 +311,6 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
       case Sessions.update_session(session, attrs) do
         {:ok, updated} ->
-          EyeInTheSky.Events.agent_stopped(updated)
-          EyeInTheSky.Events.session_updated(updated)
           handle_terminal_status(updated, status)
           json(conn, %{success: true, message: "Session ended", status: updated.status})
 
@@ -331,7 +329,6 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     with {:ok, session} <- resolve_session(uuid) do
       case Sessions.archive_session(session) do
         {:ok, updated} ->
-          EyeInTheSky.Events.session_updated(updated)
           json(conn, %{success: true, uuid: updated.uuid, archived: true})
 
         {:error, _} ->
@@ -349,7 +346,6 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     with {:ok, session} <- resolve_session(uuid) do
       case Sessions.unarchive_session(session) do
         {:ok, updated} ->
-          EyeInTheSky.Events.session_updated(updated)
           json(conn, %{success: true, uuid: updated.uuid, archived: false})
 
         {:error, _} ->

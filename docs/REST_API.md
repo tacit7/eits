@@ -1483,6 +1483,8 @@ Fetch a single task by ID. Read-only; no side effects.
   "success": true,
   "id": 42,
   "title": "Fix auth bug",
+  "project_id": 1,
+  "state_id": 2,
   "task": {
     "id": 42,
     "title": "Fix auth bug",
@@ -1490,7 +1492,6 @@ Fetch a single task by ID. Read-only; no side effects.
     "state": "In Progress",
     "state_id": 2,
     "priority": "high",
-    "project_id": 1,
     "due_at": null
   },
   "annotations": []

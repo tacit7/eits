@@ -10,6 +10,7 @@ defmodule EyeInTheSky.Agents do
   import Ecto.Query, warn: false
   alias EyeInTheSky.Agents.Agent
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Sessions.Session
 
   @doc """
   Returns the list of agents.
@@ -29,23 +30,14 @@ defmodule EyeInTheSky.Agents do
   included but are not consumed by any caller.
   """
   def list_agents_with_sessions do
+    # L3 fix: cap sessions preload to 10 most-recent per agent.
+    # An unbounded preload on 200 agents could load thousands of session rows.
+    recent_sessions = from(s in Session, order_by: [desc: s.started_at], limit: 10)
+
     Agent
-    |> preload([:sessions])
+    |> preload(sessions: ^recent_sessions)
     |> order_by([a], desc: a.created_at)
     |> limit(200)
-    |> Repo.all()
-    |> Enum.map(&populate_project_name/1)
-  end
-
-  @doc """
-  Returns the list of active agents.
-  Active agents are those whose status is not "completed" or "failed".
-  """
-  def list_active_agents do
-    Agent
-    |> where([a], a.status not in ["completed", "failed"])
-    |> preload([:project])
-    |> order_by([a], desc: a.created_at)
     |> Repo.all()
     |> Enum.map(&populate_project_name/1)
   end
@@ -189,6 +181,10 @@ defmodule EyeInTheSky.Agents do
   @doc """
   Returns agents whose status is not "completed" or "failed".
   Used by the scheduler to check agents that may need status updates.
+
+  Intentionally has no LIMIT — the scheduler must process every non-terminal
+  agent on each 5-minute tick to keep status accurate. If the agent count grows
+  to tens of thousands, revisit with cursor-based pagination in the scheduler.
   """
   def list_agents_pending_status_check do
     Agent

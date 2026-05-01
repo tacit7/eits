@@ -19,7 +19,6 @@ defmodule EyeInTheSky.Agents.Agent do
     field :status, :string
     field :bookmarked, :boolean, default: false
     field :git_worktree_path, :string
-    field :session_id, :integer
 
     belongs_to :project, EyeInTheSky.Projects.Project
 

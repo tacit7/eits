@@ -283,31 +283,4 @@ defmodule EyeInTheSky.Channels do
     |> Repo.all()
   end
 
-  @doc """
-  Counts unread messages for a session in a channel.
-  """
-  def count_unread_messages(_channel_id, nil), do: 0
-
-  def count_unread_messages(channel_id, session_id) do
-    alias EyeInTheSky.Messages.Message
-
-    member =
-      case get_member(channel_id, session_id) do
-        {:ok, m} -> m
-        {:error, :not_found} -> nil
-      end
-
-    if member && member.last_read_at do
-      from(m in Message,
-        where: m.channel_id == ^channel_id and m.inserted_at > ^member.last_read_at
-      )
-      |> Repo.aggregate(:count)
-    else
-      # Never read, count all messages
-      from(m in Message,
-        where: m.channel_id == ^channel_id
-      )
-      |> Repo.aggregate(:count)
-    end
-  end
 end

@@ -153,7 +153,7 @@ eits teams update-member <team_id> [--status <s>]
 
 ```bash
 eits channels list [--project <id>]
-eits channels send <channel_id> --body <text> [--session <uuid|id>]   # channel_id is positional integer, NOT --channel flag
+eits channels send <channel_id> --body <text> [--session <uuid|id>]   # channel_id is positional integer; --session defaults to $EITS_SESSION_UUID — omit it
 eits channels messages <channel_id> [--limit <n>]
 eits channels join <channel_id>
 eits channels leave <channel_id>

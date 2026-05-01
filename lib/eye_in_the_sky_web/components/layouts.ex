@@ -19,21 +19,24 @@ defmodule EyeInTheSkyWeb.Layouts do
 
   def top_bar_breadcrumb(assigns) do
     ~H"""
-    <%= if @sidebar_tab == :dm do %>
-      <input
-        id="top-bar-session-name"
-        type="text"
-        value={@dm_session_name || ""}
-        placeholder="Session name"
-        phx-blur="update_session_name"
-        phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
-        phx-key="Enter"
-        class="text-xs font-semibold text-base-content/75 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 min-w-[8rem] max-w-[24rem] w-auto placeholder:text-base-content/25 transition-colors"
-      />
-    <% else %>
-      <span class="text-xs font-semibold text-base-content/75 px-1 flex-shrink-0">
-        {top_bar_section_label(@sidebar_tab)}
-      </span>
+    <%= cond do %>
+      <% @sidebar_tab == :dm -> %>
+        <input
+          id="top-bar-session-name"
+          type="text"
+          value={@dm_session_name || ""}
+          placeholder="Session name"
+          phx-blur="update_session_name"
+          phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
+          phx-key="Enter"
+          class="text-xs font-semibold text-base-content/75 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 min-w-[8rem] max-w-[24rem] w-auto placeholder:text-base-content/25 transition-colors"
+        />
+      <% @sidebar_tab == :chat -> %>
+        <%!-- chat toolbar renders #channel-name itself; no label here --%>
+      <% true -> %>
+        <span class="text-xs font-semibold text-base-content/75 px-1 flex-shrink-0">
+          {top_bar_section_label(@sidebar_tab)}
+        </span>
     <% end %>
     """
   end

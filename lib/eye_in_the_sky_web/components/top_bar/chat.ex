@@ -16,7 +16,7 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- Identity: channel name only — no status indicators (chrome spec) --%>
+    <%!-- Identity: #channel name only — breadcrumb "Chat" comes from top_bar_breadcrumb --%>
     <span class="flex items-center gap-0.5 font-semibold text-[12px] text-base-content/75 shrink-0">
       <span class="text-primary/50 font-semibold mr-0.5">#</span>
       <%= if @active_channel do %>

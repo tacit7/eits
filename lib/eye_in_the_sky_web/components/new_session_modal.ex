@@ -121,7 +121,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
           <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} phx_target={assigns[:target]} />
 
-          <form id="new-session-form" phx-submit={@submit_event} class="flex flex-col gap-4">
+          <form id="new-session-form" phx-submit={@submit_event} phx-target={assigns[:target]} class="flex flex-col gap-4">
             <input type="hidden" name="submit_action" value="launch" id="new-session-submit-action" phx-update="ignore" />
             <.provider_field selected_provider={@selected_provider} myself={@myself} />
             <.agent_combobox

@@ -22,7 +22,9 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
     end)
   end
 
+  def handle_info({:agent_created, _}, socket), do: {:noreply, socket}
   def handle_info({:agent_updated, _}, socket), do: {:noreply, socket}
+  def handle_info({:agent_deleted, _}, socket), do: {:noreply, socket}
 
   def handle_info({:new_message, message}, socket) do
     Logger.info(

@@ -130,6 +130,9 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:workflow_states, [])
     |> assign(:current_task, :not_loaded)
     |> assign(:queued_prompts, [])
+    |> assign(:tasks, [])
+    |> assign(:commits, [])
+    |> assign(:notes, [])
   end
 
   defp assign_upload_config(socket) do

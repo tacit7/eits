@@ -217,7 +217,7 @@ defmodule EyeInTheSky.Teams do
       |> where([m], m.session_id == ^session_id)
       |> Repo.update_all([set: [status: status, last_activity_at: now]], returning: true)
 
-    Enum.each(updated, &broadcast(:member_updated, &1))
+    Enum.each(updated || [], &broadcast(:member_updated, &1))
     count
   end
 

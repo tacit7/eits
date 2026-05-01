@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
-    plug Plug.Logger, log: :error  # suppress per-request debug logs for API; errors still logged
+    # plug Plug.Logger, log: :error  # disabled — log: :error logs ALL requests at error level, not just errors
     plug EyeInTheSkyWeb.Plugs.RateLimit, default: {60, :timer.minutes(1)}
     plug EyeInTheSkyWeb.Plugs.RequireAuth
   end
@@ -68,14 +68,14 @@ defmodule EyeInTheSkyWeb.Router do
   # Unauthenticated JSON pipeline for inbound webhooks (auth handled per-controller)
   pipeline :accepts_json do
     plug :accepts, ["json"]
-    plug Plug.Logger, log: :error  # suppress per-request debug logs; errors still logged
+    # plug Plug.Logger, log: :error  # disabled — log: :error logs ALL requests at error level, not just errors
   end
 
   # Session-aware JSON pipeline without CSRF — safe for WebAuthn endpoints
   # (registration is token-gated; login uses WebAuthn challenge binding)
   pipeline :webauthn do
     plug :accepts, ["json"]
-    plug Plug.Logger, log: :error  # suppress per-request debug logs; errors still logged
+    # plug Plug.Logger, log: :error  # disabled — log: :error logs ALL requests at error level, not just errors
     plug :fetch_session
     plug EyeInTheSkyWeb.Plugs.RateLimit
   end
@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.Router do
   # a valid authenticated session. Returns JSON 401 (not redirect) on auth failure.
   pipeline :browser_json do
     plug :accepts, ["json"]
-    plug Plug.Logger, log: :error  # suppress per-request debug logs; errors still logged
+    # plug Plug.Logger, log: :error  # disabled — log: :error logs ALL requests at error level, not just errors
     plug :fetch_session
     plug EyeInTheSkyWeb.Plugs.JsonSessionAuth
     plug EyeInTheSkyWeb.Plugs.RateLimit

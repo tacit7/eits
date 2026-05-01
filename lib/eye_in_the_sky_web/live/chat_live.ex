@@ -86,12 +86,20 @@ defmodule EyeInTheSkyWeb.ChatLive do
         thread_id: params["thread_id"]
       })
 
+    serialized_channels = ChatPresenter.serialize_channels(channels)
+
+    active_channel =
+      Enum.find(serialized_channels, fn c ->
+        to_string(c.id) == to_string(channel_id)
+      end)
+
     socket =
       socket
       |> assign(:page_title, "Chat")
       |> assign(:project_id, project_id)
       |> assign(:all_projects, data.all_projects)
-      |> assign(:channels, ChatPresenter.serialize_channels(channels))
+      |> assign(:channels, serialized_channels)
+      |> assign(:active_channel, active_channel)
       |> assign(:active_channel_id, channel_id)
       |> assign(:messages, data.messages)
       |> assign(:has_more_messages, length(data.messages) == 100)
@@ -134,13 +142,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def render(assigns) do
-    active_channel =
-      Enum.find(assigns.channels, fn c ->
-        to_string(c.id) == to_string(assigns.active_channel_id)
-      end)
-
-    assigns = assign(assigns, :active_channel, active_channel)
-
     ~H"""
     <div class="flex h-[var(--app-viewport-height)] bg-base-100">
       <div class="flex-1 flex flex-col min-w-0">

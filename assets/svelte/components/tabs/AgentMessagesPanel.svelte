@@ -221,8 +221,10 @@
     if (!body) return ''
     const escaped = escapeHtml(body)
     return escaped.replace(/@(all|\d+)/g, (match, token) => {
-      const label = token === 'all' ? '@all' : `@${token}`
-      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">${label}</span>`
+      if (token === 'all') {
+        return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-warning/10 text-warning/80">@all</span>`
+      }
+      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">@${token}</span>`
     })
   }
 
@@ -241,8 +243,10 @@
     const html = marked.parse(body)
     const clean = DOMPurify.sanitize(html, DOMPURIFY_CONFIG)
     return clean.replace(/@(all|\d+)/g, (match, token) => {
-      const label = token === 'all' ? '@all' : `@${token}`
-      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">${label}</span>`
+      if (token === 'all') {
+        return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-warning/10 text-warning/80">@all</span>`
+      }
+      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">@${token}</span>`
     })
   }
 
@@ -610,6 +614,7 @@
     class="flex-1 overflow-y-auto px-4 py-2"
     style="scrollbar-width: none; -ms-overflow-style: none;"
   >
+  <div class="max-w-[960px]">
     {#if hasMoreMessages && !searchQuery}
       <div class="flex justify-center py-3">
         <button
@@ -645,7 +650,7 @@
           {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
           {@const isSameSender = prevMessage && !isTurnBoundary && prevMessage.sender_role !== 'system' && message.sender_role !== 'system' && prevMessage.session_id === message.session_id && prevMessage.sender_role === message.sender_role}
           <div
-            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-4' : ''} {isSameSender ? 'pt-0.5' : ''} {message.sender_role === 'system' ? 'py-0.5' : 'py-4 hover:bg-base-content/[0.07]'}"
+            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-6' : isSameSender ? 'mt-0.5' : 'mt-3'} {message.sender_role === 'system' ? 'py-0.5' : 'py-3 hover:bg-base-content/[0.07]'}"
           >
             {#if message.sender_role === 'system'}
               <!-- System message — centered annotation, off main reading axis -->
@@ -683,7 +688,7 @@
                   {/if}
                 {/if}
 
-                <div class="min-w-0 flex-1">
+                <div class="relative min-w-0 flex-1">
                   {#if !isSameSender}
                     <!-- Identity line: no flex-wrap; hover actions removed from this flow -->
                     <div class="flex items-baseline gap-2">
@@ -696,21 +701,17 @@
                           on:click={() => navigateToDm(message.session_id)}
                           title="{[message.provider, agent?.model].filter(Boolean).join(' · ') || 'Open DM'}"
                         >
-                          {agent?.name || message.session_name || `@${message.session_id}`}
+                          {agent?.name || message.session_name || `session ${message.session_id}`}
                         </button>
-                        {#if message.session_name}
-                          <span class="text-[11px] text-base-content/40">{message.session_name}</span>
-                        {:else}
-                          <span class="font-mono text-[11px] text-base-content/30">@{message.session_id}</span>
-                        {/if}
+                        <span class="font-mono text-[11px] text-base-content/35">·&nbsp;{message.session_id}</span>
                       {:else}
                         <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                       {/if}
 
-                      <span class="text-[11px] text-base-content/55">{formatTime(message.inserted_at)}</span>
+                      <span class="text-[11px] text-base-content/30">&nbsp;·&nbsp;</span><span class="text-[11px] text-base-content/60">{formatTime(message.inserted_at)}</span>
 
                       {#if message.number}
-                        <span class="font-mono text-[11px] text-base-content/[0.15] opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
+                        <span class="font-mono text-[11px] text-base-content/20 opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
                       {/if}
                     </div>
                   {/if}
@@ -727,26 +728,33 @@
                     </div>
 
                     <!-- Usage metadata for agent messages -->
-                    {#if message.sender_role === 'agent' && message.metadata && message.metadata.total_cost_usd}
-                      <div class="mt-2 flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/35 min-w-0 overflow-hidden flex-wrap">
-                        {#if message.metadata.total_cost_usd}
-                          <span title="Total cost">${message.metadata.total_cost_usd.toFixed(4)}</span>
-                        {/if}
-                        {#if message.metadata.usage?.input_tokens}
-                          <span class="mx-1.5 text-base-content/20">·</span>
-                          <span title="Input tokens">{message.metadata.usage.input_tokens} in</span>
-                        {/if}
-                        {#if message.metadata.usage?.output_tokens}
-                          <span class="mx-1.5 text-base-content/20">·</span>
-                          <span title="Output tokens">{message.metadata.usage.output_tokens} out</span>
-                        {/if}
+                    <!-- Default: duration + turns visible. Hover: cost + tokens expand in (opacity, no layout shift). -->
+                    {#if message.sender_role === 'agent' && message.metadata && (message.metadata.total_cost_usd || message.metadata.duration_ms || message.metadata.num_turns)}
+                      <div class="mt-1 flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/40 min-w-0 flex-wrap">
+                        <!-- Hover-only: cost + tokens + trailing separator -->
+                        <span class="inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                          {#if message.metadata.total_cost_usd}
+                            <span title="Total cost">${message.metadata.total_cost_usd.toFixed(4)}</span>
+                          {/if}
+                          {#if message.metadata.usage?.input_tokens}
+                            <span class="mx-1.5 text-base-content/20">·</span>
+                            <span title="Input tokens">{message.metadata.usage.input_tokens} in</span>
+                          {/if}
+                          {#if message.metadata.usage?.output_tokens}
+                            <span class="mx-1.5 text-base-content/20">·</span>
+                            <span title="Output tokens">{message.metadata.usage.output_tokens} out</span>
+                          {/if}
+                          {#if message.metadata.duration_ms || message.metadata.num_turns}
+                            <span class="mx-1.5 text-base-content/20">·</span>
+                          {/if}
+                        </span>
+                        <!-- Always visible: duration + turns -->
                         {#if message.metadata.duration_ms}
-                          <span class="mx-1.5 text-base-content/20">·</span>
                           <span title="Duration">{(message.metadata.duration_ms / 1000).toFixed(1)}s</span>
                         {/if}
                         {#if message.metadata.num_turns}
                           <span class="mx-1.5 text-base-content/20">·</span>
-                          <span title="Number of turns">{message.metadata.num_turns} turns</span>
+                          <span title="Number of turns">{message.metadata.num_turns} {message.metadata.num_turns === 1 ? 'turn' : 'turns'}</span>
                         {/if}
                       </div>
                     {/if}
@@ -780,10 +788,9 @@
                       </button>
                     {/if}
                   </div>
-                </div>
-              </div>
-              <!-- Hover actions: absolute overlay, not in flex flow -->
-              <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
+
+                  <!-- Hover actions: scoped to content column -->
+                  <div class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
                 <!-- Reaction picker -->
                 <div class="relative">
                   <button
@@ -853,6 +860,8 @@
                     </div>
                   {/if}
                 </div>
+                  </div>
+                </div>
               </div>
 
             {/if}
@@ -875,6 +884,7 @@
         {/if}
       </div>
     {/if}
+  </div><!-- end max-w constraint -->
   </div>
 
   <!-- Jump to bottom -->
@@ -910,10 +920,11 @@
   {/if}
 
   <!-- Composer (matches DM page card style) -->
-  <div class="flex-shrink-0 pt-2">
+  <div class="flex-shrink-0 pt-2 px-4 pb-3">
+  <div class="max-w-[960px]">
     <form
       on:submit|preventDefault={handleSubmit}
-      class="relative bg-base-200 rounded-xl border border-base-content/[0.15] shadow-sm p-4 flex flex-col"
+      class="relative bg-base-100 rounded-xl border border-base-300 p-3 flex flex-col"
     >
       <div class="flex gap-2">
         <div class="relative flex-1">
@@ -923,7 +934,7 @@
             on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
             on:keydown={handleInputKeydown}
             placeholder="Message agents…"
-            class="textarea textarea-bordered w-full text-sm rounded-lg bg-base-100 border-base-content/10 placeholder:text-base-content/25 focus:border-primary/30 transition-colors resize-none overflow-y-auto text-base-content"
+            class="textarea w-full text-sm rounded-lg bg-transparent border-0 placeholder:text-base-content/25 focus:ring-0 focus:outline-none transition-colors resize-none overflow-y-auto text-base-content p-0"
             rows="1"
             style="max-height: 7.5rem; line-height: 1.5rem;"
             autocomplete="off"
@@ -985,7 +996,7 @@
 
         <button
           type="submit"
-          class="btn btn-sm btn-primary min-h-0 h-11 px-5"
+          class="btn btn-sm btn-primary min-h-0 h-9 px-3"
           disabled={!inputValue || inputValue.trim() === ''}
           aria-label="Send message"
         >
@@ -1003,7 +1014,8 @@
         <span class="text-[11px] text-base-content/25 font-mono">⏎ send · ⇧⏎ newline</span>
       </div>
     </form>
-  </div>
+  </div><!-- end max-w constraint -->
+  </div><!-- end composer wrapper -->
   </div><!-- end main chat column -->
 
   <!-- Thread panel (slides in when a thread is open) -->

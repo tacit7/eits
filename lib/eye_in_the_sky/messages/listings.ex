@@ -13,14 +13,7 @@ defmodule EyeInTheSky.Messages.Listings do
     Message
     |> where([m], m.channel_id == ^channel_id)
     |> order_by([m], asc: m.inserted_at)
-    |> Repo.all()
-  end
-
-  @spec list_messages_for_project(integer()) :: [Message.t()]
-  def list_messages_for_project(project_id) do
-    Message
-    |> where([m], m.project_id == ^project_id)
-    |> order_by([m], asc: m.inserted_at)
+    |> limit(500)
     |> Repo.all()
   end
 

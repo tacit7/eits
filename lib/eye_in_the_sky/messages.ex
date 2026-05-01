@@ -69,7 +69,6 @@ defmodule EyeInTheSky.Messages do
   # ---------------------------------------------------------------------------
 
   defdelegate list_messages_for_channel(channel_id), to: Listings
-  defdelegate list_messages_for_project(project_id), to: Listings
   defdelegate list_recent_messages(session_id, limit \\ 50), to: Listings
   defdelegate list_inbound_dms(session_id, limit \\ 20, opts \\ []), to: Listings
   defdelegate list_pending_messages(session_id), to: Listings

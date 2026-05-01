@@ -1,13 +1,20 @@
 # Terminal PTY System
 
-Full-stack embedded terminal built on erlexec + xterm.js, exposed at `/terminal`. One bash process per browser session, bidirectional via Phoenix LiveView WebSocket.
+Full-stack embedded terminal built on erlexec + xterm.js. Two surfaces exist:
+
+- **`/terminal`** — standalone single-terminal LiveView page (`TerminalLive`)
+- **Canvas** — draggable/resizable terminal windows on the canvas page, multiple per canvas (`TerminalWindowComponent`)
+
+Both surfaces share `PtyServer` and `PtySupervisor`. The wiring layer differs.
 
 ---
 
 ## Architecture Overview
 
+### Standalone Terminal (`/terminal`)
+
 ```
-Browser (xterm.js)
+Browser (xterm.js / PtyHook)
     │  keystrokes → pushEvent("pty_input")
     │  pty_output ← handleEvent("pty_output")
     ▼
@@ -16,15 +23,36 @@ TerminalLive (LiveView)
     │  handle_info({:pty_output, data}) → push_event("pty_output")
     ▼
 PtyServer (GenServer)
-    │  :exec.send(os_pid, data)  ← writes to PTY master
-    │  {:stdout, os_pid, data}   → forwarded to TerminalLive
+    │  :exec.send(os_pid, data)
+    │  {:stdout, os_pid, data} → forwarded to TerminalLive
     ▼
-erlexec (Erlang port driver)
-    │  PTY master fd
-    ▼
-bash process (OS)
-    PTY slave fd (stdin + stdout + stderr)
+erlexec → bash (OS process)
 ```
+
+### Canvas Terminal Windows
+
+```
+Browser (xterm.js / TerminalHook)
+    │  keystrokes → pushEventTo(el, "pty_input")   ← must use pushEventTo
+    │  pty_output_<id> ← handleEvent("pty_output_<id>")
+    ▼
+TerminalWindowComponent (LiveComponent)
+    │  handle_event("pty_input") → PtyServer.write/2
+    │  update(%{pty_output: data}) → push_event("pty_output_<ct.id>")
+    ▲
+CanvasLive (LiveView, parent)
+    │  handle_info({:pty_output, id, data})
+    │    → send_update(TerminalWindowComponent, id: "terminal-window-<id>", pty_output: data)
+    │  handle_info({:pty_exited, id}) → remove_terminal
+    │  handle_info({:remove_terminal_window, id}) → PtyServer.stop, delete DB row
+    ▼
+PtyServer (GenServer, subscriber_tag: ct.id)
+    │  {:stdout, os_pid, data} → send(subscriber, {:pty_output, tag, data})
+    ▼
+erlexec → bash (OS process)
+```
+
+**Key difference:** Canvas terminals use `subscriber_tag` so `CanvasLive` can route output from multiple PTYs to the correct `TerminalWindowComponent` by matching on the tag.
 
 ---
 
@@ -32,11 +60,17 @@ bash process (OS)
 
 | File | Role |
 |------|------|
-| `lib/eye_in_the_sky/terminal/pty_server.ex` | GenServer owning one PTY session |
+| `lib/eye_in_the_sky/terminal/pty_server.ex` | GenServer owning one PTY; `subscriber_tag` for multi-terminal routing |
 | `lib/eye_in_the_sky/terminal/pty_supervisor.ex` | DynamicSupervisor for PtyServer instances |
-| `lib/eye_in_the_sky_web/live/terminal_live.ex` | LiveView: event bridge between WebSocket and PTY |
-| `assets/js/hooks/pty_hook.js` | xterm.js initialization, resize, input/output wiring |
-| `test/eye_in_the_sky/terminal/pty_server_test.exs` | Integration test: echo smoke test |
+| `lib/eye_in_the_sky_web/live/terminal_live.ex` | Standalone LiveView (`/terminal`) |
+| `lib/eye_in_the_sky_web/live/canvas_live.ex` | Canvas LiveView; manages terminal lifecycle, PTY map |
+| `lib/eye_in_the_sky_web/components/terminal_window_component.ex` | LiveComponent for canvas terminal windows |
+| `lib/eye_in_the_sky/canvases/canvas_terminal.ex` | Ecto schema for persisted terminal layout |
+| `priv/repo/migrations/…add_canvas_terminals.exs` | Migration: canvas_terminals table |
+| `assets/js/hooks/pty_hook.js` | xterm.js hook for standalone terminal (pushEvent to LiveView) |
+| `assets/js/hooks/terminal_hook.js` | xterm.js hook for canvas windows (pushEventTo LiveComponent) |
+| `assets/js/hooks/terminal_window_hook.js` | Drag/resize chrome for canvas terminal windows |
+| `test/eye_in_the_sky/terminal/pty_server_test.exs` | Integration regression: echo smoke test |
 
 ---
 
@@ -48,7 +82,7 @@ bash process (OS)
 # pinned to 2.2.4 in mix.lock
 ```
 
-erlexec is an Erlang library that manages OS processes via a C port driver. It supports PTY allocation, stdin/stdout piping, process monitoring, and window resize (`SIGWINCH`).
+erlexec manages OS processes via a C port driver. Supports PTY allocation, stdin/stdout piping, process monitoring, and window resize (`SIGWINCH`).
 
 ---
 
@@ -60,26 +94,37 @@ erlexec is an Erlang library that manages OS processes via a C port driver. It s
 PtySupervisor.start_pty(opts)
     → DynamicSupervisor.start_child(PtyServer, opts)
     → PtyServer.init/1
-        → Process.monitor(subscriber_pid)   # monitor TerminalLive
-        → :exec.run(shell_cmd, exec_opts)   # spawn bash with PTY
-        → :exec.winsz(os_pid, rows, cols)   # set initial window size
+        → Process.monitor(subscriber_pid)
+        → :exec.run(shell_cmd, exec_opts)
+        → :exec.winsz(os_pid, rows, cols)
     → {:ok, pid}
 ```
 
-On LiveView disconnect or `PtyServer.stop/1`:
+### Options
+
+```elixir
+PtySupervisor.start_pty(
+  subscriber: pid,          # required: process receiving {:pty_output, data} messages
+  subscriber_tag: term,     # optional: when set, output is {:pty_output, tag, data}
+  cols: 220,                # default: 220
+  rows: 50                  # default: 50
+)
 ```
-terminate/2
-    → :exec.stop(os_pid)   # sends SIGTERM to bash, cleans up PTY fds
-```
+
+**`subscriber_tag`** — enables multi-terminal setups. `CanvasLive` passes `ct.id` (integer) as the tag so it can pattern-match on `{:pty_output, id, data}` and route each chunk to the right `TerminalWindowComponent`.
+
+Without a tag: `{:pty_output, data}` (backward-compatible, used by `TerminalLive`).
+With a tag: `{:pty_output, tag, data}`.
 
 ### State
 
 ```elixir
 %{
-  subscriber: pid,    # TerminalLive process — receives {:pty_output, data}
-  os_pid: integer,    # OS PID of the bash process (used by erlexec API)
-  cols: integer,      # current PTY width in columns
-  rows: integer       # current PTY height in rows
+  subscriber: pid,    # process receiving output messages
+  tag: term | nil,   # subscriber_tag (nil = untagged mode)
+  os_pid: integer,   # OS PID of the bash process
+  cols: integer,
+  rows: integer
 }
 ```
 
@@ -88,16 +133,16 @@ terminate/2
 ```elixir
 opts = [
   :stdin,             # REQUIRED: without this, stdin defaults to /dev/null
-  {:stdout, self()},  # deliver PTY output as {:stdout, os_pid, data} messages
+  {:stdout, self()},  # deliver PTY output as {:stdout, os_pid, data}
   {:stderr, :stdout}, # merge stderr into stdout stream
-  :pty,               # allocate a PTY (pseudo-terminal)
+  :pty,               # allocate a PTY
   :pty_echo,          # REQUIRED: enable ECHO termios flag so typed chars echo back
-  {:env, env},        # environment variables for bash
-  :monitor            # send {:DOWN, ...} when process exits
+  {:env, env},
+  :monitor
 ]
 ```
 
-**Every option here is load-bearing.** See the gotchas section below.
+**Every option is load-bearing.** See the gotchas section.
 
 ### Shell command
 
@@ -105,96 +150,54 @@ opts = [
 shell_cmd = [@shell_bin, "--norc", "--noprofile", "-i"]
 ```
 
-- **List form** (not a string) — avoids erlexec's `m_shell=true` C port flag
-- `--norc --noprofile` — skip user init files that might exit or behave unexpectedly
-- `-i` — force interactive mode so bash shows a prompt and reads stdin
-
-### Environment
-
-```elixir
-env = [
-  {"TERM", "xterm-256color"},
-  {"LANG", "en_US.UTF-8"},
-  {"HOME", System.get_env("HOME", "/tmp")},
-  {"PATH", System.get_env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")},
-  {"SHELL", @shell_bin},
-  {"USER", System.get_env("USER", "user")},
-  {"LOGNAME", System.get_env("LOGNAME", ...)}
-]
-```
-
-`TERM=xterm-256color` is critical — without it many CLI tools disable color output and readline breaks.
+- **List form** — avoids erlexec's `m_shell=true` C port flag
+- `--norc --noprofile` — skip user init files
+- `-i` — force interactive mode
 
 ### Message handlers
 
 | Message | Source | Action |
 |---------|--------|--------|
-| `{:write, data}` cast | TerminalLive | `:exec.send(os_pid, data)` — writes to PTY master |
-| `{:resize, cols, rows}` cast | TerminalLive | `:exec.winsz(os_pid, rows, cols)` — sends SIGWINCH |
-| `{:stdout, os_pid, data}` | erlexec port | `send(subscriber, {:pty_output, data})` |
-| `{:DOWN, os_pid, :process, _lwp, :normal}` | erlexec | bash exited code 0 → notify subscriber, stop GenServer |
-| `{:DOWN, _ref, :process, _pid, {:exit_status, code}}` | erlexec | bash exited non-zero → notify subscriber, stop GenServer |
-| `{:DOWN, _ref, :process, subscriber_pid, _}` | OTP monitor | LiveView died → stop GenServer (no subscriber to notify) |
+| `{:write, data}` cast | subscriber | `:exec.send(os_pid, data)` |
+| `{:resize, cols, rows}` cast | subscriber | `:exec.winsz(os_pid, rows, cols)` |
+| `{:stdout, os_pid, data}` | erlexec | `send(sub, {:pty_output, data})` or `{:pty_output, tag, data}` |
+| `{:DOWN, os_pid, :process, _lwp, :normal}` | erlexec | bash exit 0 → notify, stop |
+| `{:DOWN, _ref, :process, _pid, {:exit_status, n}}` | erlexec | bash exit N → notify, stop |
+| `{:DOWN, _ref, :process, subscriber_pid, _}` | OTP monitor | LiveView died → stop |
+
+Exit notification: `send(sub, :pty_exited)` (no tag) or `send(sub, {:pty_exited, tag})` (tagged).
 
 ---
 
 ## PtySupervisor — `lib/eye_in_the_sky/terminal/pty_supervisor.ex`
 
-`DynamicSupervisor` with `:one_for_one` strategy and `restart: :temporary` on PtyServer children. Temporary means a crashed PtyServer is NOT restarted — the LiveView will receive `:pty_exited` and display `[process exited]`.
-
-Started in the application supervision tree (`lib/eye_in_the_sky/application.ex`).
-
-```elixir
-# application.ex — supervisor tree entry
-EyeInTheSky.Terminal.PtySupervisor
-```
-
-API:
-```elixir
-PtySupervisor.start_pty(subscriber: pid, cols: 220, rows: 50)
-# Returns {:ok, pty_server_pid}
-```
+`DynamicSupervisor` with `restart: :temporary` children. A crashed PtyServer is NOT restarted — subscriber receives `:pty_exited` / `{:pty_exited, tag}`.
 
 ---
 
-## TerminalLive — `lib/eye_in_the_sky_web/live/terminal_live.ex`
+## Standalone Terminal — `TerminalLive`
 
-Route: `GET /terminal` (inside the `:app` live_session).
+Route: `GET /terminal`.
 
 ### Mount
 
 ```elixir
-def mount(_params, _session, socket) do
-  if connected?(socket) do
-    {:ok, pty_pid} = PtySupervisor.start_pty(subscriber: self(), cols: 220, rows: 50)
-    {:ok, assign(socket, pty_pid: pty_pid, page_title: "Terminal")}
-  else
-    {:ok, assign(socket, pty_pid: nil, page_title: "Terminal")}
-  end
+if connected?(socket) do
+  {:ok, pty_pid} = PtySupervisor.start_pty(subscriber: self(), cols: 220, rows: 50)
+  assign(socket, pty_pid: pty_pid)
 end
 ```
 
-`connected?/1` guard prevents spawning a PTY during the dead render (mount runs twice in LiveView — once for the initial HTTP response, once after WebSocket connects).
+`connected?` guard — mount runs twice in LiveView. Only start the PTY after WebSocket connects.
 
-### Events from client
+### Events / Messages
 
-| Event | Params | Handler |
-|-------|--------|---------|
-| `pty_input` | `%{"data" => string}` | `PtyServer.write(pid, data)` |
-| `pty_resize` | `%{"cols" => int, "rows" => int}` | `PtyServer.resize(pid, cols, rows)` |
-| `set_notify_on_stop` | any | `NotificationHelpers.set_notify_on_stop/2` |
-| any other | any | ignored (catch-all prevents crashes from command palette events) |
-
-### Messages from PtyServer
-
-| Message | Action |
-|---------|--------|
-| `{:pty_output, data}` | `push_event("pty_output", %{data: Base.encode64(data)})` |
-| `:pty_exited` | assign `pty_pid: nil`, push exit message to xterm.js |
-
-### Why base64?
-
-`push_event` serializes payload as JSON. PTY output is raw binary — it can contain null bytes, invalid UTF-8 sequences, and control characters that break JSON. `Base.encode64/1` converts the binary to a safe ASCII string; the client decodes it with `atob()`.
+| Event | Handler |
+|-------|---------|
+| `pty_input` | `PtyServer.write(pid, data)` |
+| `pty_resize` | `PtyServer.resize(pid, cols, rows)` |
+| `{:pty_output, data}` | `push_event("pty_output", %{data: Base64.encode64(data)})` |
+| `:pty_exited` | `assign(pty_pid: nil)`, push exit message |
 
 ### Terminate
 
@@ -204,194 +207,210 @@ def terminate(_reason, %{assigns: %{pty_pid: pid}}) when is_pid(pid) do
 end
 ```
 
-Ensures bash is killed when the user navigates away or the WebSocket drops.
-
 ---
 
-## PtyHook — `assets/js/hooks/pty_hook.js`
+## Canvas Terminal Windows
 
-Phoenix LiveView hook attached to `#terminal-container` via `phx-hook="PtyHook"`. The container has `phx-update="ignore"` so LiveView never touches its DOM after mount.
+### Database
 
-### xterm.js configuration
+`canvas_terminals` table stores layout per terminal window:
+
+```elixir
+schema "canvas_terminals" do
+  belongs_to :canvas, Canvas
+  field :pos_x,  :integer, default: 0
+  field :pos_y,  :integer, default: 0
+  field :width,  :integer, default: 620
+  field :height, :integer, default: 400
+  timestamps()
+end
+```
+
+Context functions in `EyeInTheSky.Canvases`:
+- `list_terminals(canvas_id)` — load all terminals for a canvas
+- `create_terminal(canvas_id, attrs)` — insert new row
+- `delete_terminal(id)` — remove row
+- `update_terminal_layout(id, attrs)` — persist drag/resize
+
+### CanvasLive
+
+Assigns:
+
+```elixir
+:canvas_terminals   # [%CanvasTerminal{}, ...]
+:terminal_pty_map   # %{ct.id => pty_pid}
+```
+
+On canvas activate: loads terminals from DB, starts one `PtyServer` per terminal with `subscriber_tag: ct.id`.
+
+On canvas switch: stops all running PTYs via `base_canvas_assigns/2`, which iterates `terminal_pty_map` and calls `PtyServer.stop/1`.
+
+#### Event handlers
+
+| Event | Action |
+|-------|--------|
+| `"add_terminal"` | `create_terminal`, `start_pty(subscriber_tag: ct.id)`, update assigns |
+| `"terminal_moved"` | `update_terminal_layout(id, %{pos_x: x, pos_y: y})` |
+| `"terminal_resized"` | `update_terminal_layout(id, %{width: w, height: h})` |
+
+Note: terminal window events use `"terminal_moved"` / `"terminal_resized"` — **not** `"window_moved"` / `"window_resized"`. This avoids ID collisions with chat windows (which share the same canvas and the same event handler, but use `canvas_session` IDs from a different table).
+
+#### Info handlers
+
+| Message | Action |
+|---------|--------|
+| `{:pty_output, id, data}` | `send_update(TerminalWindowComponent, id: "terminal-window-#{id}", pty_output: data)` |
+| `{:pty_exited, id}` | `remove_terminal(socket, id)` |
+| `{:remove_terminal_window, id}` | `PtyServer.stop(pid)`, `delete_terminal(id)`, `remove_terminal(socket, id)` |
+
+### TerminalWindowComponent
+
+LiveComponent (`id: "terminal-window-<ct.id>"`).
+
+`update/2` has two clauses:
+
+```elixir
+# PTY output path — push to xterm.js hook
+def update(%{pty_output: data} = assigns, socket) do
+  {:ok,
+   socket
+   |> assign(assigns)
+   |> push_event("pty_output_#{socket.assigns.ct.id}", %{data: Base.encode64(data)})}
+end
+
+# Normal assign update
+def update(assigns, socket) do
+  {:ok, assign(socket, assigns)}
+end
+```
+
+`handle_event("close", ...)` sends `{:remove_terminal_window, socket.assigns.ct.id}` to the parent LiveView (integer, not component id string).
+
+### JS Hooks
+
+#### `TerminalHook` — `assets/js/hooks/terminal_hook.js`
+
+Mounted on the xterm.js container inside `TerminalWindowComponent`. Uses **`pushEventTo`** (not `pushEvent`) to target the LiveComponent:
 
 ```js
-new Terminal({
-  cursorBlink: true,
-  fontSize: 13,
-  fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
-  scrollback: 5000,
-  allowProposedApi: true,
-  theme: { /* zinc palette */ }
+term.onData(data => {
+  this.pushEventTo(this.el, "pty_input", { data })
+})
+
+term.onResize(({ cols, rows }) => {
+  this.pushEventTo(this.el, "pty_resize", { cols, rows })
 })
 ```
 
-Addons loaded:
-- `FitAddon` — resizes the terminal to fill its container element
-- `WebLinksAddon` — makes URLs in terminal output clickable
-
-### Input path
-
-```
-User keystroke
-  → xterm.js captures via hidden <textarea> (xterm-helper-textarea)
-  → term.onData(data => ...)
-  → this.pushEvent("pty_input", { data })
-  → LiveView WebSocket → TerminalLive.handle_event
-```
-
-`data` is a string that may contain single characters, escape sequences (arrow keys: `\x1b[A`), or paste content.
-
-### Output path
-
-```
-TerminalLive.push_event("pty_output", %{data: base64})
-  → LiveView WebSocket
-  → this.handleEvent("pty_output", ({ data }) => ...)
-  → atob(data) → Uint8Array
-  → term.write(bytes)
-```
-
-`term.write()` accepts `Uint8Array` — this handles binary correctly regardless of encoding, including raw control sequences, ANSI colors, and UTF-8 multibyte characters.
-
-### Resize
-
-```
-Container size changes (window resize, CSS layout shift)
-  → ResizeObserver fires
-  → fitAddon.fit()
-  → xterm.js recalculates cols/rows
-  → term.onResize({ cols, rows }) fires
-  → this.pushEvent("pty_resize", { cols, rows })
-  → TerminalLive → PtyServer.resize → :exec.winsz
-```
-
-`ResizeObserver` on `this.el` catches all layout-driven size changes, not just `window.resize` events.
-
-### Cleanup
+Receives output on a scoped event name:
 
 ```js
-destroyed() {
-  this._resizeObserver?.disconnect()
-  this._term?.dispose()
-}
+const terminalId = this.el.dataset.terminalId   // ct.id integer
+this.handleEvent(`pty_output_${terminalId}`, ({ data }) => {
+  term.write(Uint8Array.from(atob(data), c => c.charCodeAt(0)))
+})
 ```
 
-Called by LiveView when the hook element is removed from the DOM (navigation away). Disposes xterm.js canvas and DOM nodes.
+`data-terminal-id={@ct.id}` on the div ensures the JS event name matches the Elixir `push_event` name.
+
+#### `TerminalWindowHook` — `assets/js/hooks/terminal_window_hook.js`
+
+Drag + resize + z-index chrome. Mirrors `ChatWindowHook` but pushes `"terminal_moved"` / `"terminal_resized"` events (distinct names from chat windows). Restores JS-tracked position/size in `updated()` after LiveView patches the style attribute.
 
 ---
 
-## Data Flow Diagram (complete)
+## Data Flow — Canvas Terminal (complete)
 
 ```
-User types "ls"
+User types "ls" in canvas terminal window
 │
-├─ xterm.js term.onData("l") fires
-├─ pushEvent("pty_input", { data: "l" })
-├─ [WebSocket frame]
-├─ TerminalLive.handle_event("pty_input", %{"data" => "l"})
-├─ PtyServer.write(pid, "l")   [GenServer.cast]
-├─ :exec.send(os_pid, "l")     [writes "l" to PTY master fd]
+├─ TerminalHook: term.onData("l")
+├─ pushEventTo(this.el, "pty_input", { data: "l" })   ← targets LiveComponent
+├─ [WebSocket]
+├─ TerminalWindowComponent.handle_event("pty_input", %{"data" => "l"})
+├─ PtyServer.write(pid, "l")
+├─ :exec.send(os_pid, "l")
 │
-│  PTY driver echoes "l" back (ECHO termios flag):
+│  PTY ECHO (termios ECHO flag):
 ├─ erlexec delivers {:stdout, os_pid, <<"l">>}
-├─ PtyServer.handle_info → send(subscriber, {:pty_output, <<"l">>})
-├─ TerminalLive.handle_info → push_event("pty_output", %{data: "bA=="})
-├─ [WebSocket frame]
-├─ PtyHook.handleEvent("pty_output") → term.write(Uint8Array[108])
-└─ xterm.js renders "l" at cursor position
-
-User presses Enter:
-├─ onData("\r") fires (carriage return, not LF — PTY convention)
-├─ bash reads line, executes "ls"
-├─ bash writes directory listing to PTY slave stdout
-├─ erlexec streams output as multiple {:stdout, os_pid, chunk} messages
-└─ each chunk → TerminalLive → push_event → xterm.js renders
+├─ PtyServer → send(canvas_live_pid, {:pty_output, ct.id, <<"l">>})
+├─ CanvasLive.handle_info → send_update(TerminalWindowComponent, pty_output: <<"l">>)
+├─ TerminalWindowComponent.update → push_event("pty_output_42", %{data: "bA=="})
+├─ [WebSocket]
+├─ TerminalHook.handleEvent("pty_output_42") → term.write(Uint8Array[108])
+└─ xterm.js renders "l"
 ```
 
 ---
 
-## erlexec Gotchas (confirmed bugs, all fixed)
+## erlexec Gotchas (all fixed)
 
-These were discovered through debugging. All four must be present for the terminal to work correctly.
+Five confirmed bugs. All must be present for terminals to work correctly.
 
 ### 1. String command → `m_shell=true` → bash exits immediately
 
-**Wrong:**
-```elixir
-:exec.run("/bin/bash", opts)          # string form
-```
+String form triggers `m_shell=true` in erlexec's C port, wrapping the command as `$SHELL -c "..."`. Outer shell exits immediately.
 
-**Why it fails:** A string argument sets `m_shell=true` in erlexec's C port. This wraps the command as `$SHELL -c "/bin/bash"`. The outer shell runs bash non-interactively and exits immediately.
+**Fix:** Pass command as a list: `[@shell_bin, "--norc", "--noprofile", "-i"]`
 
-**Correct:**
-```elixir
-:exec.run(["/bin/bash", "--norc", "--noprofile", "-i"], opts)   # list form
-```
-
-**Diagnostic:** Server logs show `{:DOWN, os_pid, :process, pid, :normal}` with zero stdout messages immediately after spawn.
+**Diagnostic:** `{:DOWN, os_pid, :process, pid, :normal}` with zero stdout messages immediately after spawn.
 
 ---
 
 ### 2. Missing `:stdin` → stdin is `/dev/null` → bash exits on EOF
 
-**Wrong:**
-```elixir
-opts = [{:stdout, self()}, :pty, ...]   # :stdin omitted
-```
+Without `:stdin`, erlexec initializes `stream_fd[STDIN_FILENO]` to `/dev/null`. Bash reads EOF and exits immediately. `:exec.send/2` silently no-ops.
 
-**Why it fails:** Without `:stdin`, erlexec's C port initializes `stream_fd[STDIN_FILENO]` to `{REDIRECT_NULL, REDIRECT_NONE}` (source: `exec_impl.cpp` lines 372–376). Bash reads EOF from `/dev/null` and exits cleanly (code 0) before you can type anything. Additionally, `:exec.send/2` silently fails — it cannot write to a process whose stdin was never connected.
+**Fix:** Add `:stdin` as first element in opts.
 
-**Correct:**
-```elixir
-opts = [:stdin, {:stdout, self()}, :pty, ...]
-```
-
-**Diagnostic:** Server logs show bash prompt bytes (~292b) immediately followed by a clean exit. No user interaction between spawn and exit.
+**Diagnostic:** Bash prompt bytes appear (~292b) then immediate clean exit.
 
 ---
 
 ### 3. Missing `:normal` exit handler → clean bash exit unhandled
 
-**Wrong:**
-```elixir
-def handle_info({:DOWN, _ref, :process, _pid, {:exit_status, code}}, state) do
-  # only handles non-zero exits
-end
-```
+erlexec sends `{:DOWN, os_pid, :process, lwp_pid, :normal}` for exit code 0. The `{:exit_status, code}` form only fires for non-zero exits.
 
-**Why it fails:** erlexec sends `{:DOWN, os_pid, :process, lwp_pid, :normal}` when the OS process exits with code 0 (via `ospid_loop` in erlexec's Erlang layer). The `{:exit_status, code}` form only fires for non-zero exits. Without the `:normal` clause, clean bash exits are silently dropped by the catch-all `handle_info(_msg, state)`.
-
-**Correct:**
+**Fix:**
 ```elixir
 def handle_info({:DOWN, os_pid, :process, _lwp, :normal}, %{os_pid: os_pid} = state) do
-  send(state.subscriber, :pty_exited)
+  notify_exit(state)
   {:stop, :normal, state}
 end
 ```
 
-Note the `os_pid` pattern match on both the message and the state — this distinguishes the OS process exit from the LiveView monitor's `:DOWN` message.
+The `os_pid` pin in both message and state distinguishes this from the LiveView monitor's `:DOWN`.
 
 ---
 
 ### 4. Missing `:pty_echo` → typed characters invisible
 
-**Wrong:**
-```elixir
-opts = [:stdin, {:stdout, self()}, :pty, ...]   # :pty_echo omitted
-```
+erlexec allocates PTYs with the `ECHO` termios flag **off** by default. Input reaches bash (commands execute) but characters are never echoed back to xterm.js.
 
-**Why it fails:** erlexec allocates PTYs with the `ECHO` termios flag **disabled** by default. The ECHO flag controls whether the PTY driver echoes received input back to the master fd. Without it:
-- Keystrokes reach bash via `:exec.send` ✓
-- Bash executes commands ✓  
-- But characters are never echoed back, so xterm.js never renders them ✗
-- Result: cursor blinks, commands silently execute, screen appears frozen
+**Fix:** Add `:pty_echo` to opts.
 
-**Correct:**
-```elixir
-opts = [:stdin, {:stdout, self()}, :pty, :pty_echo, ...]
-```
+**Diagnostic:** Press Enter — new prompt appears (bash is running), but typed characters never render.
 
-**Diagnostic:** Press Enter in the terminal — if a new prompt appears, bash is running but echo is off. Typed characters are invisible but commands execute.
+---
+
+### 5. `pushEvent` vs `pushEventTo` in LiveComponent hooks
+
+`this.pushEvent(...)` in a LiveView hook always routes to the **parent LiveView**. When the hook element lives inside a LiveComponent (with `phx-target={@myself}`), input events need to target the component.
+
+**Fix:** `this.pushEventTo(this.el, "pty_input", { data })` — routes via the `phx-target` attribute on `this.el`.
+
+**Diagnostic:** Typing does nothing. No `pty_input` events reach the component. The parent LiveView logs an unhandled event warning.
+
+---
+
+## PtyHook vs TerminalHook
+
+| | `PtyHook` | `TerminalHook` |
+|--|-----------|----------------|
+| Used by | `TerminalLive` (standalone) | `TerminalWindowComponent` (canvas) |
+| Event target | `pushEvent` → LiveView | `pushEventTo(this.el)` → LiveComponent |
+| Output event | `"pty_output"` (shared) | `"pty_output_<ct.id>"` (scoped per terminal) |
+| Multiple instances | No (one per page) | Yes (many per canvas) |
 
 ---
 
@@ -401,43 +420,25 @@ opts = [:stdin, {:stdout, self()}, :pty, :pty_echo, ...]
 mix test test/eye_in_the_sky/terminal/pty_server_test.exs
 ```
 
-The test:
-1. Starts a PtyServer with `self()` as subscriber
-2. Drains initial output (bash prompt)
-3. Sends `"echo pty_echo_smoke\n"` via `PtyServer.write/2`
-4. Collects output for up to 2 seconds
-5. Asserts both the echoed input (`echo pty_echo_smoke`) and the command output (`pty_echo_smoke\r\n`) appear
+- Starts a PtyServer, drains initial prompt
+- Sends `"echo pty_echo_smoke\n"` via `PtyServer.write/2`
+- Asserts echoed input and command output both appear
 
-This regression catches bugs 2 and 4 simultaneously — if `:stdin` is missing, nothing echoes; if `:pty_echo` is missing, the echo assertion fails.
-
-```elixir
-assert output =~ "echo pty_echo_smoke"   # echo of typed input
-assert output =~ "pty_echo_smoke\r\n"    # command output (CRLF in PTY mode)
-```
-
-Note `async: false` — PTY tests touch OS-level file descriptors and must not run concurrently.
+Tests `async: false` — PTY tests touch OS file descriptors, must not run concurrently.
 
 ---
 
 ## Window Resize Flow
 
 ```
-xterm.js FitAddon.fit()
-  → measures container pixel size
-  → calculates cols/rows based on character cell dimensions
-  → fires term.onResize({ cols, rows })
-  → pushEvent("pty_resize", { cols, rows })
-  → TerminalLive.handle_event("pty_resize")
-  → PtyServer.resize(pid, cols, rows)
-  → handle_cast({:resize, cols, rows})
-  → :exec.winsz(os_pid, rows, cols)   # NOTE: rows first, then cols
+Container size changes
+  → ResizeObserver → fitAddon.fit()
+  → term.onResize({ cols, rows })
+  → pushEvent / pushEventTo "pty_resize"
+  → PtyServer.resize → :exec.winsz(os_pid, rows, cols)
 ```
 
-`:exec.winsz/3` sends `SIGWINCH` to the child process. Bash and readline respond by re-rendering the current prompt at the new width.
-
-**Important:** `:exec.winsz(os_pid, rows, cols)` — rows comes first, cols second. This is the opposite of the conventional (cols, rows) ordering.
-
-Initial window size is set via `:exec.winsz` after spawn. `{:winsz, {rows, cols}}` is documented as a valid `exec:run` option in some erlexec versions but was unreliable — calling it post-spawn is more reliable.
+**Note:** `:exec.winsz(os_pid, rows, cols)` — rows first, cols second (opposite of conventional ordering).
 
 ---
 
@@ -445,49 +446,33 @@ Initial window size is set via `:exec.winsz` after spawn. `{:winsz, {rows, cols}
 
 ```
 Application
-└── PtySupervisor (DynamicSupervisor, :one_for_one)
+└── PtySupervisor (DynamicSupervisor)
     └── PtyServer (restart: :temporary)
-        └── bash (OS process, managed by erlexec C port)
+        └── bash (OS process)
 ```
 
-**PtyServer restart: :temporary** — if PtyServer crashes, it is NOT restarted. The LiveView receives `:pty_exited`, displays `[process exited]`, and sets `pty_pid: nil`. The user must navigate away and back to get a new session.
+**On LiveView disconnect:**
+1. `TerminalLive.terminate/2` → `PtyServer.stop/1`
+2. `PtyServer.terminate/2` → `:exec.stop(os_pid)`
+3. bash receives SIGHUP and exits
 
-**Cleanup chain on LiveView disconnect:**
-1. Phoenix detects WebSocket close
-2. `TerminalLive.terminate/2` fires → `PtyServer.stop(pid)`
-3. `PtyServer.terminate/2` fires → `:exec.stop(os_pid)` → SIGTERM to bash
-4. erlexec C port closes PTY master fd
-5. bash receives SIGHUP (controlling terminal closed) and exits
+**On canvas switch (CanvasLive):**
+`base_canvas_assigns/2` iterates `terminal_pty_map` and stops all PTYs before loading the new canvas.
 
-**Cleanup chain on bash exit:**
-1. erlexec detects OS process exit
-2. Sends `{:DOWN, os_pid, :process, lwp, :normal}` (exit 0) or `{:DOWN, _, :process, _, {:exit_status, n}}` (exit N)
-3. `PtyServer.handle_info` → `send(subscriber, :pty_exited)` → `{:stop, :normal, state}`
-4. `PtyServer.terminate/2` → `:exec.stop(os_pid)` (no-op, already dead)
-5. `TerminalLive.handle_info(:pty_exited)` → push exit message, set `pty_pid: nil`
+**On terminal close (canvas):**
+`{:remove_terminal_window, id}` → `PtyServer.stop(pid)` → `delete_terminal(id)` → remove from assigns.
 
----
-
-## Adding a New Terminal Surface
-
-To embed the PTY in a component other than `TerminalLive` (e.g., a panel, modal, or canvas window), the pattern is:
-
-1. **Start a PtyServer** with `subscriber: self()` and desired dimensions
-2. **Add handle_event** for `pty_input` and `pty_resize` — delegate to `PtyServer.write/2` and `PtyServer.resize/3`
-3. **Add handle_info** for `{:pty_output, data}` — `push_event("pty_output", %{data: Base.encode64(data)})`
-4. **Add handle_info** for `:pty_exited` — handle UI state
-5. **Add catch-all handle_event** — prevents crashes from command palette and other global events
-6. **Stop PtyServer in terminate/2** — prevents orphaned bash processes
-7. **Mount PtyHook** on a container element with `phx-hook="PtyHook"` and `phx-update="ignore"`
-
-The xterm.js hook (`PtyHook`) is reusable as-is. The container element needs a stable `id` and must not be touched by LiveView after mount (`phx-update="ignore"`).
+**On bash exit:**
+1. erlexec sends `:DOWN` message
+2. PtyServer notifies subscriber (`:pty_exited` or `{:pty_exited, tag}`)
+3. `PtyServer.terminate/2` → `:exec.stop` (no-op, already dead)
+4. LiveView/CanvasLive handles `:pty_exited`
 
 ---
 
 ## Known Limitations
 
-- **One session per LiveView** — no multiplexing. Each `/terminal` page load is one bash process.
-- **No session persistence** — navigating away kills the bash process. Working directory and shell history are lost.
-- **No scrollback sync** — scrollback buffer lives only in xterm.js on the client. If the page reloads, history is gone.
-- **bash only** — `@shell_bin` hardcodes bash. No shell selection UI.
-- **No pty_echo from commands** — the ECHO flag echoes typed input. Command output (e.g., `ls`) is delivered via `{:stdout, ...}` messages regardless of echo state.
+- **No session persistence** — navigating away or closing the window kills bash. Working directory and history are lost.
+- **No scrollback sync** — scrollback buffer is client-side only. Page reload loses history.
+- **bash only** — no shell selection UI.
+- **One PTY per `PtyServer`** — each terminal window is its own GenServer and bash process.

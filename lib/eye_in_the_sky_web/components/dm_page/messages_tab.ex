@@ -140,6 +140,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
     is_same_sender = assigns.prev_role != nil && assigns.prev_role == assigns.message.sender_role
     is_new_turn = assigns.prev_role != nil && assigns.prev_role != assigns.message.sender_role
+    is_empty_tool_result =
+      stream_type == "tool_result" and String.trim(assigns.message.body || "") == ""
 
     assigns =
       assigns
@@ -148,8 +150,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       |> assign(:is_tool_event, is_tool_event)
       |> assign(:is_same_sender, is_same_sender)
       |> assign(:is_new_turn, is_new_turn)
+      |> assign(:is_empty_tool_result, is_empty_tool_result)
 
     ~H"""
+    <%= if !@is_empty_tool_result do %>
     <div
       id={"dm-message-#{@message.id}"}
       class={[
@@ -215,6 +219,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         </div>
       <% end %>
     </div>
+    <% end %>
     """
   end
 

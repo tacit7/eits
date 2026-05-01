@@ -177,9 +177,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   def handle_event("open_session_picker", _params, socket) do
-    canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
-    all = Sessions.list_sessions_filtered(limit: 100)
-    filtered = Enum.reject(all, &(&1.id in canvas_session_ids))
+    filtered = load_session_picker_results(socket, "")
 
     {:noreply,
      socket
@@ -193,13 +191,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   def handle_event("search_sessions", %{"query" => q}, socket) do
-    canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
-    q_down = String.downcase(q)
-
-    filtered =
-      Sessions.list_sessions_filtered(limit: 50)
-      |> Enum.reject(&(&1.id in canvas_session_ids))
-      |> Enum.filter(&String.contains?(String.downcase(&1.name || ""), q_down))
+    filtered = load_session_picker_results(socket, q)
 
     {:noreply,
      socket
@@ -590,6 +582,12 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   # --- Helpers ---
+
+  defp load_session_picker_results(socket, query) do
+    canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
+    Sessions.list_sessions_filtered(name_filter: query, limit: 50)
+    |> Enum.reject(&(&1.id in canvas_session_ids))
+  end
 
   defp remove_canvas_session(socket, cs_id) do
     cs = cs_id && Enum.find(socket.assigns.canvas_sessions, &(&1.id == cs_id))

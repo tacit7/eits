@@ -6,6 +6,7 @@ defmodule EyeInTheSky.Messages.Listings do
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.QueryHelpers
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Search.PgSearch
 
   @spec list_messages_for_channel(String.t()) :: [Message.t()]
   def list_messages_for_channel(channel_id) do
@@ -40,13 +41,23 @@ defmodule EyeInTheSky.Messages.Listings do
   def search_messages_for_session(session_id, query) when is_binary(query) and query != "" do
     pattern = "%#{query}%"
 
-    Message
-    |> where([m], m.session_id == ^session_id)
-    |> where([m], ilike(m.body, ^pattern))
-    |> order_by([m], asc: m.inserted_at)
-    |> limit(100)
-    |> Repo.all()
-    |> Repo.preload(:attachments)
+    fallback_query =
+      Message
+      |> where([m], m.session_id == ^session_id)
+      |> where([m], ilike(m.body, ^pattern))
+      |> order_by([m], asc: m.inserted_at)
+
+    PgSearch.search(
+      table: "messages",
+      schema: Message,
+      query: query,
+      search_columns: ["body"],
+      sql_filter: "AND m.session_id = $2",
+      sql_params: [session_id],
+      fallback_query: fallback_query,
+      preload: [:attachments],
+      limit: 100
+    )
     |> Deduplicator.deduplicate_by_source_uuid()
   end
 

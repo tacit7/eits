@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:selected_task, nil)
     |> assign(:task_notes, [])
     |> assign(:workflow_states, [])
-    |> assign(:current_task, nil)
+    |> assign(:current_task, :not_loaded)
     |> assign(:queued_prompts, [])
   end
 

@@ -138,6 +138,7 @@ defmodule EyeInTheSky.Codex.CLI do
         {"EITS_AGENT_UUID", opts[:eits_agent_uuid]},
         {"EITS_AGENT_ID", opts[:eits_agent_id]},
         {"EITS_PROJECT_ID", opts[:eits_project_id]},
+        {"EITS_CHANNEL_ID", opts[:eits_channel_id]},
         {"EITS_MODEL", opts[:eits_model]},
         {"EITS_URL",
          opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")}

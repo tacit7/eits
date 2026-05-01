@@ -74,6 +74,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
       eits_agent_uuid: state.agent_id,
       eits_agent_id: state.agent_id,
       eits_project_id: state.project_id,
+      eits_channel_id: context[:channel_id],
       eits_model: context[:model],
       eits_url: System.get_env("EITS_URL", "http://localhost:5001/api/v1")
     ]

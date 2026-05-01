@@ -2374,7 +2374,7 @@ USAGE
 
 cmd_channels() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <create|list|send|messages|join|leave>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits channels <create|list|mine|send|messages|join|leave|members>"; return 0; }
   case "$sub" in
     create)
       # eits channels create --name <name> [--project <id>] [--description <text>] [--type <public|private>]
@@ -2471,6 +2471,40 @@ cmd_channels() {
       need session_id
       _delete "/channels/$channel_id/members/$session_id"
       ;;
+    mine)
+      # eits channels mine [--session <uuid|id>] [--json]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits channels mine [--session <uuid|id>] [--json]"; return 0; }
+      local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" _json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --session|-s) session_id="$2"; shift 2 ;;
+          --json)       _json=1;         shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      need session_id
+      local _resp; _resp=$(_curl "$BASE_URL/channels/mine?session_id=$session_id")
+      if [[ $_json -eq 1 ]]; then
+        echo "$_resp" | jq .
+      else
+        local count; count=$(echo "$_resp" | jq '[.channels[]?] | length')
+        printf '%-6s  %-28s  %-8s  %s\n' "ID" "NAME" "ROLE" "TYPE"
+        printf '%-6s  %-28s  %-8s  %s\n' "------" "----------------------------" "--------" "------"
+        echo "$_resp" | jq -r '.channels[]? | [
+          (.id | tostring),
+          (.name // "-"),
+          (.role // "-"),
+          (.channel_type // "-")
+        ] | @tsv' | while IFS=$'\t' read -r id name role ctype; do
+          printf '%-6s  %-28s  %-8s  %s\n' \
+            "$(_trunc "$id" 6)" \
+            "$(_trunc "$name" 28)" \
+            "$(_trunc "$role" 8)" \
+            "$ctype"
+        done
+        [[ -n "$count" ]] && printf '\n%s channel(s)\n' "$count"
+      fi
+      ;;
     members)
       # eits channels members <channel_id> [--json]
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits channels members <channel_id> [--json]"; return 0; }
@@ -2510,6 +2544,7 @@ Subcommands:
   create   --name <name> [--project <id>] [--description <text>] [--type <public|private>]
            Create a new channel
   list     [--project <id>]                         List channels (optionally filter by project)
+  mine     [--session <uuid|id>]                    List channels the current session is a member of
   send     <channel_id> --body <text> [--session <id>] [--broadcast-team <team_id>]
            Send a message; --broadcast-team fans out DMs to all team members after posting
   messages <channel_id> [--limit|-n <N>]            Get last N messages (default 20, max 200)
@@ -2526,6 +2561,8 @@ Examples:
   eits channels list --project 1
   eits channels send 1 --body "hello"
   eits channels send 1 --body "@all deploy done" --broadcast-team 296
+  eits channels mine
+  eits channels mine --json
   eits channels messages 1
   eits channels messages 1 -n 5
   eits channels members 1

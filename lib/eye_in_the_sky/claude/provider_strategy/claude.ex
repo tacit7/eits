@@ -69,14 +69,20 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
   Injects session-specific EITS context and eits CLI workflow instructions.
   Accepts any struct with the fields: eits_session_uuid, session_id, agent_id, project_id.
   """
-  @spec eits_init_prompt(map()) :: String.t()
-  def eits_init_prompt(state) do
+  @spec eits_init_prompt(map(), keyword()) :: String.t()
+  def eits_init_prompt(state, opts \\ []) do
+    channel_line =
+      case opts[:channel_id] do
+        nil -> ""
+        id -> "\n- EITS_CHANNEL_ID=#{id}"
+      end
+
     """
     EITS context:
     - EITS_SESSION_UUID=#{state.eits_session_uuid}
     - EITS_SESSION_ID=#{state.session_id}
     - EITS_AGENT_ID=#{state.agent_id}
-    - EITS_PROJECT_ID=#{state.project_id}
+    - EITS_PROJECT_ID=#{state.project_id}#{channel_line}
 
     Use the eits CLI script for all EITS operations:
 
@@ -111,6 +117,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       use_script: true,
       eits_session_id: state.session_id,
       eits_agent_id: state.agent_id,
+      eits_channel_id: context[:channel_id],
       eits_workflow: eits_workflow,
       worktree: state.worktree,
       agent: context[:agent]
@@ -118,7 +125,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
 
     base_opts =
       if eits_workflow != "0" do
-        Keyword.put(base_opts, :append_system_prompt, eits_init_prompt(state))
+        Keyword.put(base_opts, :append_system_prompt, eits_init_prompt(state, channel_id: context[:channel_id]))
       else
         base_opts
       end

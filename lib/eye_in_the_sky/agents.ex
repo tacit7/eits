@@ -22,13 +22,17 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
-  Returns the list of agents with their sessions and tasks preloaded for display.
+  Returns agents with their sessions preloaded, capped at 200 rows.
   Sorted by creation date (most recent first).
+
+  Only `:sessions` is preloaded — `:tasks` and `:project` were previously
+  included but are not consumed by any caller.
   """
   def list_agents_with_sessions do
     Agent
-    |> preload([:sessions, :tasks, :project])
+    |> preload([:sessions])
     |> order_by([a], desc: a.created_at)
+    |> limit(200)
     |> Repo.all()
     |> Enum.map(&populate_project_name/1)
   end

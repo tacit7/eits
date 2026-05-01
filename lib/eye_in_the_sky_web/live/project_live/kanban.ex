@@ -291,7 +291,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   @impl true
   def handle_info({:agent_deleted, _}, socket), do: {:noreply, socket}
 
-  @impl true
   def handle_info({:checklist_updated, task}, socket) do
     {:noreply, socket |> assign(:selected_task, task) |> KanbanFilters.load_tasks()}
   end

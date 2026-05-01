@@ -15,7 +15,10 @@ defmodule EyeInTheSky.Contexts.AgentContext do
   @doc false
   def changeset(agent_context, attrs) do
     agent_context
-    |> cast(attrs, [:agent_id, :project_id, :context])
+    |> cast(attrs, [:agent_id, :project_id, :context, :updated_at])
     |> validate_required([:agent_id, :project_id, :context])
+    |> unique_constraint([:agent_id, :project_id],
+      name: :agent_context_agent_id_project_id_index
+    )
   end
 end

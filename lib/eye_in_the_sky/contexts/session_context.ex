@@ -17,7 +17,8 @@ defmodule EyeInTheSky.Contexts.SessionContext do
   @doc false
   def changeset(session_context, attrs) do
     session_context
-    |> cast(attrs, [:agent_id, :session_id, :context, :metadata])
+    |> cast(attrs, [:agent_id, :session_id, :context, :metadata, :created_at, :updated_at])
     |> validate_required([:agent_id, :session_id, :context])
+    |> unique_constraint(:session_id, name: :session_context_session_id_index)
   end
 end

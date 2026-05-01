@@ -5,7 +5,6 @@ defmodule EyeInTheSky.Contexts do
 
   import Ecto.Query, warn: false
   alias EyeInTheSky.Contexts.{AgentContext, SessionContext}
-  alias EyeInTheSky.QueryHelpers
   alias EyeInTheSky.Repo
 
   # SessionContext functions
@@ -25,18 +24,23 @@ defmodule EyeInTheSky.Contexts do
   end
 
   @doc """
-  Creates or updates session context.
+  Creates or updates session context. Uses the unique index on session_id as the
+  conflict target so concurrent writers cannot produce duplicates.
   """
   def upsert_session_context(attrs) do
-    QueryHelpers.upsert(
-      SessionContext,
-      fn ->
-        case get_session_context(attrs.session_id) do
-          {:ok, ctx} -> ctx
-          {:error, :not_found} -> nil
-        end
-      end,
+    now = DateTime.utc_now()
+
+    attrs_with_timestamps =
       attrs
+      |> Map.put_new(:created_at, now)
+      |> Map.put(:updated_at, now)
+
+    %SessionContext{}
+    |> SessionContext.changeset(attrs_with_timestamps)
+    |> Repo.insert(
+      on_conflict: {:replace, [:context, :metadata, :agent_id, :updated_at]},
+      conflict_target: [:session_id],
+      returning: true
     )
   end
 
@@ -53,18 +57,20 @@ defmodule EyeInTheSky.Contexts do
   end
 
   @doc """
-  Creates or updates agent context.
+  Creates or updates agent context. Uses the composite unique index on (agent_id, project_id)
+  as the conflict target so concurrent writers cannot produce duplicates.
   """
   def upsert_agent_context(attrs) do
-    QueryHelpers.upsert(
-      AgentContext,
-      fn ->
-        case get_agent_context(attrs.agent_id, attrs.project_id) do
-          {:ok, context} -> context
-          {:error, :not_found} -> nil
-        end
-      end,
-      attrs
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs_with_timestamp = Map.put(attrs, :updated_at, now)
+
+    %AgentContext{}
+    |> AgentContext.changeset(attrs_with_timestamp)
+    |> Repo.insert(
+      on_conflict: {:replace, [:context, :updated_at]},
+      conflict_target: [:agent_id, :project_id],
+      returning: true
     )
   end
 end

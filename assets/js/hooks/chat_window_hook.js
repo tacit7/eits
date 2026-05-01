@@ -45,8 +45,18 @@ export const ChatWindowHook = {
     this._zIndex = "1"
     this.el.dataset.savedZIndex = "1"
 
-    // Restore last-known position/size/z from localStorage (set by layout buttons, drag, resize, and focus).
     const csId = this.el.dataset.csId
+    this._initLayout(csId)
+
+    const handle = this.el.querySelector("[data-drag-handle]")
+    this._initDrag(handle)
+    this._initResize()
+    this._initWindowControls()
+    this._initFocus()
+    this._initAutoScroll()
+  },
+
+  _initLayout(csId) {
     const saved = loadWindowLayout(csId)
     if (saved) {
       // Guard against corrupt values (e.g. layout computed when canvas area was collapsed)
@@ -89,111 +99,112 @@ export const ChatWindowHook = {
       this._dragLeft = x
       this._dragTop  = y
     })
+  },
 
-    // --- Drag + Snap ---
-    const handle = this.el.querySelector("[data-drag-handle]")
-    if (handle) {
-      let startX, startY, startLeft, startTop
-      let dragPersistTimer = null
-      let activeSnap = null
-      let canvas = null
-      let snapPreview = null
+  _initDrag(handle) {
+    if (!handle) return
 
-      const onMouseMove = (e) => {
-        const dx = e.clientX - startX
-        const dy = e.clientY - startY
-        this._dragLeft = startLeft + dx
-        this._dragTop  = startTop  + dy
-        this.el.style.left = `${this._dragLeft}px`
-        this.el.style.top  = `${this._dragTop}px`
+    let startX, startY, startLeft, startTop
+    let dragPersistTimer = null
+    let activeSnap = null
+    let canvas = null
+    let snapPreview = null
 
-        if (canvas && snapPreview) {
-          const rect = canvas.getBoundingClientRect()
-          activeSnap = getSnapZone(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height)
-          if (activeSnap) {
-            snapPreview.style.display = "block"
-            snapPreview.style.left    = `${activeSnap.left}px`
-            snapPreview.style.top     = `${activeSnap.top}px`
-            snapPreview.style.width   = `${activeSnap.width}px`
-            snapPreview.style.height  = `${activeSnap.height}px`
-          } else {
-            snapPreview.style.display = "none"
-          }
+    const onMouseMove = (e) => {
+      const dx = e.clientX - startX
+      const dy = e.clientY - startY
+      this._dragLeft = startLeft + dx
+      this._dragTop  = startTop  + dy
+      this.el.style.left = `${this._dragLeft}px`
+      this.el.style.top  = `${this._dragTop}px`
+
+      if (canvas && snapPreview) {
+        const rect = canvas.getBoundingClientRect()
+        activeSnap = getSnapZone(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height)
+        if (activeSnap) {
+          snapPreview.style.display = "block"
+          snapPreview.style.left    = `${activeSnap.left}px`
+          snapPreview.style.top     = `${activeSnap.top}px`
+          snapPreview.style.width   = `${activeSnap.width}px`
+          snapPreview.style.height  = `${activeSnap.height}px`
+        } else {
+          snapPreview.style.display = "none"
         }
       }
-
-      const onMouseUp = () => {
-        this._dragging = false
-        document.removeEventListener("mousemove", onMouseMove)
-        document.removeEventListener("mouseup", onMouseUp)
-        if (snapPreview) snapPreview.style.display = "none"
-
-        const snap = activeSnap
-        activeSnap = null
-
-        clearTimeout(dragPersistTimer)
-        dragPersistTimer = setTimeout(() => {
-          if (this._destroyed) return
-          let x = parseInt(this.el.style.left, 10) || 0
-          let y = parseInt(this.el.style.top, 10)  || 0
-
-          if (snap && !this._minimized) {
-            x = snap.left
-            y = snap.top
-            this.el.style.left   = `${x}px`
-            this.el.style.top    = `${y}px`
-            this.el.style.width  = `${snap.width}px`
-            this.el.style.height = `${snap.height}px`
-            this.pushEvent("window_resized", {
-              id: this.el.dataset.csId, w: snap.width, h: snap.height
-            })
-          } else if (snap && this._minimized) {
-            x = snap.left
-            y = snap.top
-            this.el.style.left = `${x}px`
-            this.el.style.top  = `${y}px`
-          }
-
-          this.pushEvent("window_moved", {
-            id: this.el.dataset.csId, x, y
-          })
-          saveWindowLayout(this.el.dataset.csId, x, y,
-            parseInt(this.el.style.width, 10) || this._width || 0,
-            parseInt(this.el.style.height, 10) || this._height || 0)
-        }, 50)
-      }
-
-      handle.addEventListener("mousedown", (e) => {
-        // Let buttons inside the handle handle their own clicks (minimize, maximize, close).
-        if (e.target.closest('button')) return
-        e.preventDefault()
-        this._dragging = true
-        startX    = e.clientX
-        startY    = e.clientY
-        startLeft = parseInt(this.el.style.left, 10) || 0
-        startTop  = parseInt(this.el.style.top, 10)  || 0
-        // Initialize to current position so updated() never writes undefinedpx
-        // if a LiveView patch fires before the first mousemove event.
-        this._dragLeft = startLeft
-        this._dragTop  = startTop
-
-        canvas      = this.el.closest("[data-canvas-area]")
-        snapPreview = canvas ? getOrCreateSnapPreview(canvas) : null
-
-        this._raiseToFront()
-
-        document.addEventListener("mousemove", onMouseMove)
-        document.addEventListener("mouseup", onMouseUp)
-      })
     }
 
+    const onMouseUp = () => {
+      this._dragging = false
+      document.removeEventListener("mousemove", onMouseMove)
+      document.removeEventListener("mouseup", onMouseUp)
+      if (snapPreview) snapPreview.style.display = "none"
+
+      const snap = activeSnap
+      activeSnap = null
+
+      clearTimeout(dragPersistTimer)
+      dragPersistTimer = setTimeout(() => {
+        if (this._destroyed) return
+        let x = parseInt(this.el.style.left, 10) || 0
+        let y = parseInt(this.el.style.top, 10)  || 0
+
+        if (snap && !this._minimized) {
+          x = snap.left
+          y = snap.top
+          this.el.style.left   = `${x}px`
+          this.el.style.top    = `${y}px`
+          this.el.style.width  = `${snap.width}px`
+          this.el.style.height = `${snap.height}px`
+          this.pushEvent("window_resized", {
+            id: this.el.dataset.csId, w: snap.width, h: snap.height
+          })
+        } else if (snap && this._minimized) {
+          x = snap.left
+          y = snap.top
+          this.el.style.left = `${x}px`
+          this.el.style.top  = `${y}px`
+        }
+
+        this.pushEvent("window_moved", {
+          id: this.el.dataset.csId, x, y
+        })
+        saveWindowLayout(this.el.dataset.csId, x, y,
+          parseInt(this.el.style.width, 10) || this._width || 0,
+          parseInt(this.el.style.height, 10) || this._height || 0)
+      }, 50)
+    }
+
+    handle.addEventListener("mousedown", (e) => {
+      // Let buttons inside the handle handle their own clicks (minimize, maximize, close).
+      if (e.target.closest('button')) return
+      e.preventDefault()
+      this._dragging = true
+      startX    = e.clientX
+      startY    = e.clientY
+      startLeft = parseInt(this.el.style.left, 10) || 0
+      startTop  = parseInt(this.el.style.top, 10)  || 0
+      // Initialize to current position so updated() never writes undefinedpx
+      // if a LiveView patch fires before the first mousemove event.
+      this._dragLeft = startLeft
+      this._dragTop  = startTop
+
+      canvas      = this.el.closest("[data-canvas-area]")
+      snapPreview = canvas ? getOrCreateSnapPreview(canvas) : null
+
+      this._raiseToFront()
+
+      document.addEventListener("mousemove", onMouseMove)
+      document.addEventListener("mouseup", onMouseUp)
+    })
+  },
+
+  _initResize() {
     // Track current dimensions so updated() can restore them after a LiveView
     // patch (which re-writes the style attr from DB values and would otherwise
     // snap the window back to its last-saved size mid-interaction).
     this._width  = this.el.offsetWidth
     this._height = this.el.offsetHeight
 
-    // --- Resize (native browser handle) ---
     const observer = new ResizeObserver(() => {
       // Update tracked dims immediately — don't wait for the persist debounce —
       // so updated() restores correctly if a message is sent mid-resize.
@@ -215,7 +226,9 @@ export const ChatWindowHook = {
     })
     observer.observe(this.el)
     this._windowResizeObserver = observer
+  },
 
+  _initWindowControls() {
     const minimizeBtn = this.el.querySelector("[data-minimize-btn]")
     if (minimizeBtn) {
       if (this._minimized == null) this._minimized = false
@@ -271,7 +284,9 @@ export const ChatWindowHook = {
         }
       })
     }
+  },
 
+  _initFocus() {
     // --- Click-to-focus: raise window on any mousedown ---
     this.el.addEventListener("mousedown", () => { this._raiseToFront() })
 
@@ -294,8 +309,9 @@ export const ChatWindowHook = {
         })
       }
     })
+  },
 
-    // --- Auto-scroll ---
+  _initAutoScroll() {
     this._autoScroll = true
     this._newMsgCount = 0
     const chatBody = this.el.querySelector("[data-chat-body]")
@@ -439,12 +455,11 @@ export const ChatWindowHook = {
         this._newMsgCount = (this._newMsgCount || 0) + 1
         if (newMsgPill) {
           const n = this._newMsgCount
-          newMsgPill.textContent = `\u2193 ${n} new message${n > 1 ? "s" : ""}`
+          newMsgPill.textContent = `↓ ${n} new message${n > 1 ? "s" : ""}`
           newMsgPill.classList.remove("hidden")
         }
       }
     })
-
   },
 
   _raiseToFront() {
@@ -554,7 +569,7 @@ export const ChatWindowHook = {
         const pill = this.el.querySelector("[data-new-msg-pill]")
         if (pill) {
           const n = this._newMsgCount
-          pill.textContent = `\u2193 ${n} new message${n > 1 ? "s" : ""}`
+          pill.textContent = `↓ ${n} new message${n > 1 ? "s" : ""}`
           pill.classList.remove("hidden")
         }
       }

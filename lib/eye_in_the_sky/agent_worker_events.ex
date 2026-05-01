@@ -21,6 +21,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   alias EyeInTheSky.{Agents, Messages, Sessions}
 
   alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
+  alias EyeInTheSky.Claude.{ChannelFanout, ChannelProtocol}
   alias EyeInTheSky.Events
 
   # --- Lifecycle Events ---
@@ -163,6 +164,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
     else
       save_result(session_id, provider, text, metadata, channel_id, source_uuid)
+      maybe_fanout_mentions(channel_id, text, session_id)
     end
 
     :ok
@@ -219,6 +221,26 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       {:ok, _message} -> :ok
       {:error, reason} -> Logger.warning("[#{session_id}] DB save failed: #{inspect(reason)}")
     end
+  end
+
+  # If an agent reply is posted to a channel and contains @mentions, route only
+  # to the mentioned sessions as :direct. Skips non-mentioned members entirely to
+  # prevent ambient chain reactions.
+  defp maybe_fanout_mentions(nil, _text, _session_id), do: :ok
+
+  defp maybe_fanout_mentions(channel_id, text, session_id) do
+    {_mode, mentioned_ids, mention_all} = ChannelProtocol.parse_routing(text, -1)
+
+    if mention_all or mentioned_ids != [] do
+      if mention_all do
+        # Agent used @all — full fanout so every member is prompted
+        ChannelFanout.fanout_all(channel_id, text, session_id)
+      else
+        ChannelFanout.fanout_mentions_only(channel_id, text, session_id)
+      end
+    end
+
+    :ok
   end
 
   # Synchronous — fast DB write where ordering matters. Running in a Task risks

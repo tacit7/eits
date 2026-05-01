@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{AsyncTask, ChannelMessages, Sessions, Teams}
+  alias EyeInTheSky.Claude.ChannelFanout
   alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -65,6 +66,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
       {:ok, msg} ->
         EyeInTheSky.Events.channel_message(channel_id, msg)
         notify_channel_members(channel_id, int_id, body)
+        ChannelFanout.fanout_all(channel_id, body, int_id)
 
         if team_id = parse_int(params["broadcast_to_team_id"]) do
           broadcast_to_team(channel_id, int_id, team_id, body)

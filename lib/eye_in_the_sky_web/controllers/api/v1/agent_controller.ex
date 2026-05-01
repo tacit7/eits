@@ -19,13 +19,6 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
     limit = parse_int(params["limit"], 20)
 
     with {:ok, agents} <- resolve_agents(params, limit) do
-      agents =
-        if params["status"] do
-          Enum.filter(agents, &(&1.status == params["status"]))
-        else
-          agents
-        end
-
       json(conn, %{
         success: true,
         agents: Enum.map(agents, &ApiPresenter.present_agent/1)
@@ -36,19 +29,24 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
     end
   end
 
-  defp resolve_agents(%{"active_since" => since_str}, limit) do
+  defp resolve_agents(%{"active_since" => since_str} = params, limit) do
     case DateTime.from_iso8601(since_str) do
-      {:ok, since_dt, _} -> {:ok, Agents.list_agents_active_since(since_dt, limit: limit)}
+      {:ok, since_dt, _} -> {:ok, Agents.list_agents_active_since(since_dt, build_query_opts(params, limit))}
       _ -> {:error, :invalid_since}
     end
   end
 
-  defp resolve_agents(%{"project_id" => project_id}, limit) do
-    {:ok, Agents.list_agents_by_project(parse_int(project_id, nil), limit: limit)}
+  defp resolve_agents(%{"project_id" => project_id} = params, limit) do
+    {:ok, Agents.list_agents_by_project(parse_int(project_id, nil), build_query_opts(params, limit))}
   end
 
-  defp resolve_agents(_params, limit) do
-    {:ok, Agents.list_agents(limit: limit)}
+  defp resolve_agents(params, limit) do
+    {:ok, Agents.list_agents(build_query_opts(params, limit))}
+  end
+
+  defp build_query_opts(params, limit) do
+    opts = [limit: limit]
+    if params["status"], do: [status: params["status"]] ++ opts, else: opts
   end
 
   @doc """

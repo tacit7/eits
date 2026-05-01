@@ -14,9 +14,10 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
   require Logger
 
-  alias EyeInTheSky.{Agents, Events, Repo, Sessions, Tasks}
+  alias EyeInTheSky.{Agents, Events, Repo, Sessions}
   alias EyeInTheSky.Agents.Agent
   alias EyeInTheSky.Sessions.Session
+  alias EyeInTheSky.Tasks.Task
 
   # 5 minutes in milliseconds
   @interval 5 * 60 * 1000
@@ -127,9 +128,13 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       |> Sessions.list_idle_sessions_older_than()
       |> Repo.preload(:agent)
 
+    # H1 fix: one grouped query replaces N individual active_task_count_for_session SELECTs.
+    session_ids = Enum.map(idle_sessions, & &1.id)
+    active_task_session_ids = bulk_sessions_with_active_tasks(session_ids)
+
     archived_count =
       idle_sessions
-      |> Enum.filter(&no_active_tasks?/1)
+      |> Enum.reject(&MapSet.member?(active_task_session_ids, &1.id))
       |> Enum.reduce(0, fn session, count ->
         archive_session_and_agent(session, now)
         count + 1
@@ -143,12 +148,31 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       Logger.warning("archive_dead_idle_sessions: DB unavailable, skipping")
   end
 
+  # Returns a MapSet of session IDs that have at least one active (non-Done, non-archived) task.
+  # One grouped query replaces N individual active_task_count_for_session SELECTs.
+  # state_id 3 = Done (see workflow_states table).
+  defp bulk_sessions_with_active_tasks([]), do: MapSet.new()
+
+  defp bulk_sessions_with_active_tasks(session_ids) do
+    from(ts in "task_sessions",
+      join: t in Task,
+      on: t.id == ts.task_id,
+      where: ts.session_id in ^session_ids,
+      where: t.state_id != 3 and t.archived == false,
+      distinct: true,
+      select: ts.session_id
+    )
+    |> Repo.all()
+    |> MapSet.new()
+  end
+
   # Sessions stuck in 'working' with no heartbeat for >30 minutes are zombies.
   # Their AgentWorker died without firing on_sdk_errored or on_session_failed.
   # Sweep them to 'failed' so the UI reflects reality.
   # Also mark the linked agent as failed to ensure UI status filters are correct.
   defp sweep_zombie_sessions do
-    cutoff = DateTime.utc_now() |> DateTime.add(-@thirty_minutes, :second)
+    now = DateTime.utc_now()
+    cutoff = DateTime.add(now, -@thirty_minutes, :second)
 
     # Join agents upfront — eliminates one get_agent/1 SELECT per zombie session.
     zombies =
@@ -162,32 +186,38 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       )
       |> Repo.all()
 
-    Enum.each(zombies, fn session ->
-      case Sessions.update_session(session, %{status: "failed", status_reason: "zombie_swept"}) do
-        {:ok, updated} ->
-          Logger.warning("Swept zombie session id=#{session.id} uuid=#{session.uuid} (stuck in working)")
-          Events.session_status(session.id, updated.status)
+    if zombies == [] do
+      :ok
+    else
+      zombie_ids = Enum.map(zombies, & &1.id)
+      agent_ids = zombies |> Enum.map(& &1.agent_id) |> Enum.reject(&is_nil/1) |> Enum.uniq()
 
-          if session.agent do
-            Agents.update_agent(session.agent, %{status: "failed"})
-          end
+      # H2 fix: single Repo.update_all replaces N individual Sessions.update_session calls.
+      # returning: [:id, :uuid] gives us enough to log and broadcast; no second SELECT needed.
+      {_count, updated_sessions} =
+        Repo.update_all(
+          from(s in Session, where: s.id in ^zombie_ids),
+          [set: [status: "failed", status_reason: "zombie_swept", updated_at: now]],
+          returning: [:id, :uuid]
+        )
 
-        {:error, reason} ->
-          Logger.warning("Failed to sweep zombie session id=#{session.id}: #{inspect(reason)}")
+      Enum.each(updated_sessions, fn s ->
+        Logger.warning("Swept zombie session id=#{s.id} uuid=#{s.uuid} (stuck in working)")
+        Events.session_status(s.id, "failed")
+      end)
+
+      # H2 fix: single Repo.update_all replaces M individual Agents.update_agent calls.
+      if agent_ids != [] do
+        Repo.update_all(
+          from(a in Agent, where: a.id in ^agent_ids),
+          set: [status: "failed", updated_at: now]
+        )
       end
-    end)
 
-    if zombies != [] do
       Logger.info("Zombie sweep: marked #{length(zombies)} sessions as failed")
     end
   rescue
     DBConnection.ConnectionError -> Logger.warning("sweep_zombie_sessions: DB unavailable, skipping")
-  end
-
-  # Returns true when a session has no linked tasks, or all linked tasks are done/archived.
-  # state_id 3 = Done (see workflow_states table)
-  defp no_active_tasks?(session) do
-    Tasks.active_task_count_for_session(session.id) == 0
   end
 
   defp archive_session_and_agent(session, now) do

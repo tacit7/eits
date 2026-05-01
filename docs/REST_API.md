@@ -189,6 +189,8 @@ Fetch session detail with related resources (tasks, notes, commits).
   "description": "fixing the oauth flow",
   "is_spawned": true,
   "initialized": true,
+  "worktree_path": "/path/to/project/.claude/worktrees/fix-auth-bug",
+  "branch_name": "worktree-fix-auth-bug",
   "tasks": [
     {
       "id": 1,
@@ -216,6 +218,10 @@ Fetch session detail with related resources (tasks, notes, commits).
   ]
 }
 ```
+
+**Notes:**
+- `worktree_path` — absolute path stored in `sessions.git_worktree_path`; `null` if the session was not started in a worktree.
+- `branch_name` — resolved at request time via `git symbolic-ref --short HEAD` inside the worktree path; `null` if `worktree_path` is null or the path no longer exists.
 
 **Example:**
 

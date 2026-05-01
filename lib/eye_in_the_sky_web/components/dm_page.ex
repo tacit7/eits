@@ -232,6 +232,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           active_tab={@active_tab}
           reload_label="Reload from file"
           show_iterm={true}
+          show_push_setup={true}
+          notify_on_stop={@notify_on_stop}
           active_timer={@overlay_data.active_timer}
           schedule_btn_id="dm-schedule-timer-btn"
           cancel_btn_id="dm-cancel-timer-btn"

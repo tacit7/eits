@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   Query params:
     - session (required): integer session ID or UUID
     - limit (optional): max messages to return, default 20
+    - since (optional): ISO8601 timestamp; return only messages inserted after this time
   """
   def list_dms(conn, params) do
     session_raw = params["session"] || params["session_id"]
@@ -26,14 +27,17 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       {:error, :bad_request, "session is required"}
     else
       with {:ok, session} <- Sessions.resolve(session_raw),
-           {:ok, from_id} <- resolve_optional_session_id(from_raw) do
-        messages = Messages.list_inbound_dms(session.id, limit, from_session_id: from_id)
+           {:ok, from_id} <- resolve_optional_session_id(from_raw),
+           {:ok, since_dt} <- parse_since(params["since"]) do
+        opts = [from_session_id: from_id, since: since_dt]
+        messages = Messages.list_inbound_dms(session.id, limit, opts)
 
         json(conn, %{
           session_id: session.id,
           session_uuid: session.uuid,
           count: length(messages),
           filter_from: from_raw,
+          filter_since: params["since"],
           messages:
             Enum.map(messages, fn msg ->
               %{
@@ -50,6 +54,16 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
         {:error, :not_found} -> {:error, :not_found, "session not found"}
         {:error, :bad_request, reason} -> {:error, :bad_request, reason}
       end
+    end
+  end
+
+  defp parse_since(nil), do: {:ok, nil}
+  defp parse_since(""), do: {:ok, nil}
+
+  defp parse_since(raw) do
+    case DateTime.from_iso8601(raw) do
+      {:ok, dt, _offset} -> {:ok, dt}
+      {:error, _} -> {:error, :bad_request, "since must be a valid ISO8601 timestamp"}
     end
   end
 

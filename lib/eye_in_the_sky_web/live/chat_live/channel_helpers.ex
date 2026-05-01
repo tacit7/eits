@@ -35,10 +35,16 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
 
       channel ->
         channel_ctx = %{id: channel.id, name: channel.name}
-        agent_members = Channels.list_members(channel_id)
 
-        Enum.each(agent_members, fn member ->
-          unless ChannelProtocol.skip?(member.session_id, sender_session_id) do
+        # Parallelize fanout: each member gets its own DB insert + AgentManager
+        # call in a supervised task. Previously serial (N × insert latency);
+        # now concurrent (~1 × insert latency for any channel size).
+        # max_concurrency caps connection-pool pressure; on_timeout: :kill_task
+        # prevents a slow agent from blocking delivery to the rest.
+        Channels.list_members(channel_id)
+        |> Enum.reject(fn m -> ChannelProtocol.skip?(m.session_id, sender_session_id) end)
+        |> Task.async_stream(
+          fn member ->
             {mode, _mentioned_ids, _mention_all} =
               ChannelProtocol.parse_routing(body, member.session_id)
 
@@ -64,8 +70,12 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
                   "ChannelHelpers: failed to route message to session=#{member.session_id} errors=#{inspect(changeset.errors)}"
                 )
             end
-          end
-        end)
+          end,
+          max_concurrency: 10,
+          timeout: 5_000,
+          on_timeout: :kill_task
+        )
+        |> Stream.run()
     end
   end
 

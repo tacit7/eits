@@ -28,7 +28,14 @@ defmodule EyeInTheSky.Teams do
     query =
       case Keyword.get(opts, :status) do
         nil -> where(query, [t], t.status != "archived")
+        "all" -> query
         status -> where(query, [t], t.status == ^status)
+      end
+
+    query =
+      case Keyword.get(opts, :limit) do
+        nil -> query
+        n -> limit(query, ^n)
       end
 
     query =

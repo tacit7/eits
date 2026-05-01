@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       |> maybe_opt(:project_id, params["project_id"])
       |> maybe_opt(:status, params["status"])
       |> maybe_opt(:member_agent_uuid, params["member_agent_uuid"])
+      |> maybe_opt(:limit, parse_int(params["limit"]))
 
     teams = Teams.list_teams(opts)
 

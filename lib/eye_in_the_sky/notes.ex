@@ -17,18 +17,21 @@ defmodule EyeInTheSky.Notes do
   @doc """
   Returns notes for a specific session.
   Matches on both integer ID (as string) and UUID for migration compatibility.
+  Options: `:limit`, `:offset`, `:starred` (boolean, default false)
   """
   def list_notes_for_session(session_id, opts \\ []) do
     with {:ok, session} <- resolve_session(session_id) do
       session_int_str = to_string(session.id)
       limit_val = Keyword.get(opts, :limit)
       offset_val = Keyword.get(opts, :offset)
+      starred_only = Keyword.get(opts, :starred, false)
 
       query =
         Note
         |> scope_by_parent("session", session_int_str, session.uuid)
         |> order_by([n], desc: n.created_at)
 
+      query = if starred_only, do: where(query, [n], n.starred == true), else: query
       query = if limit_val, do: limit(query, ^limit_val), else: query
       query = if offset_val, do: offset(query, ^offset_val), else: query
 
@@ -59,17 +62,24 @@ defmodule EyeInTheSky.Notes do
   Accepts either an integer task ID or a UUID string.
   Returns [] if the task does not exist (preserves prior behavior).
   Resolves the task via the Tasks context, then matches notes on both integer ID (as string) and UUID.
+  Options: `:starred` (boolean, default false)
   """
-  def list_notes_for_task(task_id) do
+  def list_notes_for_task(task_id, opts \\ []) do
     case resolve_task_ids(task_id) do
       nil ->
         []
 
       {int_id, uuid} ->
-        Note
-        |> scope_by_parent("task", to_string(int_id), uuid)
-        |> order_by([n], desc: n.created_at)
-        |> Repo.all()
+        starred_only = Keyword.get(opts, :starred, false)
+
+        query =
+          Note
+          |> scope_by_parent("task", to_string(int_id), uuid)
+          |> order_by([n], desc: n.created_at)
+
+        query = if starred_only, do: where(query, [n], n.starred == true), else: query
+
+        Repo.all(query)
     end
   end
 

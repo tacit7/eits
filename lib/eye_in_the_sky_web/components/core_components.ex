@@ -1184,6 +1184,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_badge_color(:completed), do: "badge-success"
   defp status_badge_color(:failed), do: "badge-error"
   defp status_badge_color(:stopped), do: "badge-ghost"
+  defp status_badge_color(:archived), do: "badge-ghost"
   defp status_badge_color(s) when is_binary(s) do
     case s do
       "working" -> "badge-success"

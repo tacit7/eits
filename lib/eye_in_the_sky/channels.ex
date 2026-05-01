@@ -18,7 +18,7 @@ defmodule EyeInTheSky.Channels do
   def list_channels(opts \\ []) do
     include_archived = Keyword.get(opts, :include_archived, false)
 
-    query = from c in Channel, order_by: [asc: c.inserted_at]
+    query = from c in Channel, order_by: [asc: c.inserted_at], limit: 500
 
     query =
       if include_archived do
@@ -241,12 +241,20 @@ defmodule EyeInTheSky.Channels do
   Returns `{:ok, channel}` or `{:error, :not_found}`.
   """
   def find_global_channel(session) do
-    channels =
-      if session.project_id,
-        do: list_channels_for_project(session.project_id),
-        else: list_channels()
+    # Direct query instead of loading all channels then Enum.find-ing #global.
+    query =
+      from c in Channel,
+        where: c.name == "#global" and is_nil(c.archived_at),
+        limit: 1
 
-    case Enum.find(channels, fn c -> c.name == "#global" end) do
+    query =
+      if session.project_id do
+        where(query, [c], c.project_id == ^session.project_id or is_nil(c.project_id))
+      else
+        query
+      end
+
+    case Repo.one(query) do
       nil -> {:error, :not_found}
       channel -> {:ok, channel}
     end

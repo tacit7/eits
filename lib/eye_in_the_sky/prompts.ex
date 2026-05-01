@@ -15,6 +15,7 @@ defmodule EyeInTheSky.Prompts do
   def list_prompts(opts \\ []) do
     project_id = Keyword.get(opts, :project_id)
     include_inactive = Keyword.get(opts, :include_inactive, false)
+    limit_val = Keyword.get(opts, :limit, 500)
 
     query = from(p in Prompt)
 
@@ -33,6 +34,7 @@ defmodule EyeInTheSky.Prompts do
 
     query
     |> order_by([p], desc: p.updated_at)
+    |> limit(^limit_val)
     |> Repo.all()
   end
 
@@ -168,22 +170,28 @@ defmodule EyeInTheSky.Prompts do
   end
 
   @doc """
-  Lists global prompts (no project_id).
+  Lists global prompts (no project_id). Default limit: 500.
   """
-  def list_global_prompts do
+  def list_global_prompts(opts \\ []) do
+    limit_val = Keyword.get(opts, :limit, 500)
+
     Prompt
     |> where([p], is_nil(p.project_id) and p.active == true)
     |> order_by([p], desc: p.updated_at)
+    |> limit(^limit_val)
     |> Repo.all()
   end
 
   @doc """
-  Lists project-specific prompts.
+  Lists project-specific prompts. Default limit: 500.
   """
-  def list_project_prompts(project_id) do
+  def list_project_prompts(project_id, opts \\ []) do
+    limit_val = Keyword.get(opts, :limit, 500)
+
     Prompt
     |> where([p], p.project_id == ^project_id and p.active == true)
     |> order_by([p], desc: p.updated_at)
+    |> limit(^limit_val)
     |> Repo.all()
   end
 

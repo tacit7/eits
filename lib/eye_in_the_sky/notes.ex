@@ -205,12 +205,21 @@ defmodule EyeInTheSky.Notes do
   Toggles the starred status of a note.
   """
   def toggle_starred(note_id) do
-    case get_note(note_id) do
-      {:error, :not_found} ->
+    # Single UPDATE … SET starred = NOT starred RETURNING * avoids the
+    # SELECT-then-UPDATE two-query race (prior pattern: get_note/update_note).
+    case Repo.query(
+           "UPDATE notes SET starred = NOT starred WHERE id = $1 RETURNING *",
+           [note_id]
+         ) do
+      {:ok, %{rows: []}} ->
         {:error, :not_found}
 
-      {:ok, note} ->
-        update_note(note, %{starred: !note.starred})
+      {:ok, %{rows: [row], columns: cols}} ->
+        note = Repo.load(Note, Enum.zip(cols, row))
+        {:ok, note}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

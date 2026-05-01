@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
     <.link
       navigate={"/dm/#{@session.id}"}
       data-vim-flyout-item
-      class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+      class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
     >
       <.status_dot status={@session.status} size="xs" />
       <span class="truncate font-medium text-xs">{@session.name || "unnamed"}</span>

@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.CanvasSection do
       <.link
         navigate={"/canvases/#{canvas.id}"}
         data-vim-flyout-item
-        class="flex items-center gap-2 px-3 py-1.5 text-sm text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+        class="flex items-center gap-2 px-3 py-1.5 text-sm text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
       >
         <.icon name="hero-squares-2x2" class="size-3 flex-shrink-0 text-base-content/30" />
         <span class="truncate font-medium text-xs">{canvas.name}</span>

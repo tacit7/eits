@@ -380,6 +380,43 @@ defmodule EyeInTheSky.Sessions do
   def terminated_statuses, do: ~w(completed failed)
 
   @doc """
+  Broadcasts session_updated event (no DB change).
+  """
+  def broadcast_session_updated(session), do: Events.session_updated(session)
+
+  @doc """
+  Broadcasts session_completed and session_updated events (no DB change).
+  """
+  def broadcast_session_completed(session) do
+    Events.session_completed(session)
+    Events.session_updated(session)
+  end
+
+  @doc """
+  Broadcasts agent_stopped and session_updated events (no DB change).
+  """
+  def broadcast_session_waiting(session) do
+    Events.agent_stopped(session)
+    Events.session_updated(session)
+  end
+
+  @doc """
+  Broadcasts appropriate side-effect events based on status change (no DB change).
+  Fires agent_stopped or agent_working depending on status, then session_updated.
+  """
+  def broadcast_status_side_effects(session, status) do
+    if status do
+      if status in ["completed", "failed", "waiting", "idle"] do
+        Events.agent_stopped(session)
+      else
+        Events.agent_working(session)
+      end
+    end
+
+    Events.session_updated(session)
+  end
+
+  @doc """
   Extracts and validates model information from a nested model object.
 
   Delegates to ModelInfo.extract_model_info/1.

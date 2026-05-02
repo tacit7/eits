@@ -186,6 +186,17 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Sets a session to idle status and fires agent_stopped event.
+  Used by cancel/stop handlers in the web layer.
+  """
+  def set_session_idle(%Session{} = session) do
+    with {:ok, updated} <- update_session(session, %{status: "idle"}) do
+      Events.agent_stopped(updated)
+      {:ok, updated}
+    end
+  end
+
+  @doc """
   Ends a session by setting ended_at timestamp.
   Broadcasts agent_stopped and session_updated events.
   """

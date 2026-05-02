@@ -101,13 +101,12 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
     with {:ok, agent} <- Agents.get_agent_by_uuid(agent_uuid),
          [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
       results =
-        hashes
-        |> Enum.with_index()
-        |> Enum.map(fn {hash, idx} ->
+        Enum.zip(hashes, messages)
+        |> Enum.map(fn {hash, message} ->
           Commits.create_commit(%{
             session_id: session.id,
             commit_hash: hash,
-            commit_message: Enum.at(messages, idx)
+            commit_message: message
           })
         end)
 

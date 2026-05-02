@@ -81,19 +81,26 @@ defmodule EyeInTheSky.TaskTags do
     # ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name is a no-op write that
     # forces the row into the RETURNING clause even when the tag already exists.
     # This means no second SELECT is needed even in race conditions.
+    #
+    # Wrapped in a transaction so the delete + insert are atomic: a concurrent
+    # reader cannot see the task with an empty tag list between the two statements.
     tag_inserts = Enum.map(tag_names, &%{name: &1})
 
-    {_count, tags} =
-      Repo.insert_all(Tag, tag_inserts,
-        on_conflict: {:replace, [:name]},
-        conflict_target: :name,
-        returning: [:id]
-      )
+    Repo.transaction(fn ->
+      {_count, tags} =
+        Repo.insert_all(Tag, tag_inserts,
+          on_conflict: {:replace, [:name]},
+          conflict_target: :name,
+          returning: [:id]
+        )
 
-    task_tag_rows = Enum.map(tags, &%{task_id: task_id, tag_id: &1.id})
+      task_tag_rows = Enum.map(tags, &%{task_id: task_id, tag_id: &1.id})
 
-    Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task_id))
-    Repo.insert_all("task_tags", task_tag_rows, on_conflict: :nothing)
+      Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task_id))
+      Repo.insert_all("task_tags", task_tag_rows, on_conflict: :nothing)
+    end)
+
+    :ok
   end
 
   @doc """

@@ -125,27 +125,4 @@ defmodule EyeInTheSky.QueryHelpers do
     |> Repo.one() || 0
   end
 
-  @doc """
-  Upsert pattern: Get existing record or create new one.
-
-  Calls get_fn to fetch existing record. If nil, inserts. Otherwise updates.
-
-  ## Examples
-
-      iex> upsert(SessionContext, fn -> get_context(session_id) end, %{session_id: "123", context: "..."})
-      {:ok, %SessionContext{}}
-  """
-  def upsert(schema, get_fn, attrs) when is_function(get_fn, 0) do
-    case get_fn.() do
-      nil ->
-        struct(schema)
-        |> schema.changeset(attrs)
-        |> Repo.insert()
-
-      existing ->
-        existing
-        |> schema.changeset(attrs)
-        |> Repo.update()
-    end
-  end
 end

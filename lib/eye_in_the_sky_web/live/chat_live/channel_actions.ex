@@ -206,16 +206,13 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
   end
 
   defp broadcast_system_event(channel_id, body) do
-    {:ok, sys_msg} =
-      EyeInTheSky.ChannelMessages.send_channel_message(%{
-        channel_id: channel_id,
-        session_id: nil,
-        sender_role: "system",
-        recipient_role: "agent",
-        provider: "system",
-        body: body
-      })
-
-    EyeInTheSky.Events.channel_message(channel_id, sys_msg)
+    EyeInTheSky.ChannelMessages.send_channel_message(%{
+      channel_id: channel_id,
+      session_id: nil,
+      sender_role: "system",
+      recipient_role: "agent",
+      provider: "system",
+      body: body
+    })
   end
 end

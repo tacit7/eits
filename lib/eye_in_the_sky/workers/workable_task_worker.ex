@@ -33,26 +33,26 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
       case execute(job) do
         {:ok, :no_work} ->
           ScheduledJobs.record_run_complete(run, "completed", result: "No workable tasks")
-          broadcast()
+          EyeInTheSky.Events.jobs_updated()
           :ok
 
         {:ok, output} ->
           ScheduledJobs.record_run_complete(run, "completed", result: output)
-          broadcast()
+          EyeInTheSky.Events.jobs_updated()
           notify(output)
           :ok
 
         {:error, reason} ->
           reason_str = if is_binary(reason), do: reason, else: inspect(reason)
           ScheduledJobs.record_run_complete(run, "failed", result: reason_str)
-          broadcast()
+          EyeInTheSky.Events.jobs_updated()
           notify_error(reason_str)
           {:error, reason}
       end
     rescue
       e ->
         ScheduledJobs.record_run_complete(run, "failed", result: Exception.message(e))
-        broadcast()
+        EyeInTheSky.Events.jobs_updated()
         notify_error(Exception.message(e))
         reraise e, __STACKTRACE__
     end
@@ -212,10 +212,6 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
 
         {:error, reason}
     end
-  end
-
-  defp broadcast do
-    EyeInTheSky.Events.jobs_updated()
   end
 
   defp notify(output) do

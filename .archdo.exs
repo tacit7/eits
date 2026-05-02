@@ -14,9 +14,15 @@
     infrastructure: []
   },
 
-  # Severity overrides (uncomment to customize)
-  # overrides: [
-  #   {:"5.6", :ignore},           # Accept default supervisor restarts
-  #   {:"6.4", severity: :info},    # Downgrade long files to info
-  # ]
+  # Severity overrides
+  overrides: [
+    # application.ex starting EyeInTheSkyWeb.Endpoint is intentional Phoenix OTP structure
+    # (the Application module is the entry point that boots all children including the web stack)
+    {:"1.1", :ignore},
+    # Process.exit(pid, :kill) in sdk.ex/codex/sdk.ex/gemini/stream_handler.ex are
+    # intentional streaming kill paths — force-terminating LLM stream processes on timeout/cancel.
+    {:"5.39", :ignore},
+    # spawn_link in cli/port.ex is the Erlang port bridge process — supervised at call site.
+    {:"5.1", :ignore}
+  ]
 ]

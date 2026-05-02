@@ -291,6 +291,9 @@ These operations no longer have a race window: the server-side toggle is atomic.
 **Insert-first patterns**:
 - `MessageReactions.toggle_reaction/3`: Attempts `INSERT with on_conflict: :nothing` on the unique index `(message_id, session_id, emoji)`. If the row already exists (conflict fires, id is nil), the operation deletes instead. This prevents duplicate reaction rows under concurrent taps on the same emoji.
 
+**User registration race (SELECT + INSERT → single INSERT with on_conflict)**:
+- `Accounts.get_or_create_user/1`: Collapsed the `get_user_by_username` + `INSERT` race using `Repo.insert(on_conflict: :nothing, conflict_target: :username, returning: true)`. Concurrent logins for the same new user no longer produce `{:error, changeset}` from the unique constraint on username — both callers receive `{:ok, user}`. When a conflict fires, the query returns a zeroed `User` struct with `id: nil`; a fallback `get_user_by_username` retrieves the existing row. This eliminates the race window entirely.
+
 **Upsert races (SELECT + write → single upsert)**:
 - `PushSubscriptions.upsert/3`: Replaced `Repo.get_by` + conditional insert/update with single atomic `Repo.insert(on_conflict: [set: [auth, p256dh]], conflict_target: :endpoint)`. One round-trip regardless of new/existing row.
 - `TaskTags.get_or_create_tag/1`: Replaced `Repo.get_by` + conditional insert with atomic `Repo.insert_all(..., on_conflict: {:replace, [:name]}, conflict_target: :name)`. ON CONFLICT DO UPDATE forces the row into RETURNING even when it already exists, so no second SELECT is needed.
@@ -325,6 +328,12 @@ List operations that previously used unbounded `Repo.all()` now have explicit de
 **Messages**:
 - `Messages.Listings.list_pending_messages/0`: Default limit 200
 
+**Channels**:
+- `Channels.list_channels_for_project/1`: Default limit 500
+
+**Canvases**:
+- `Canvases.list_terminals/0`: Default limit 200 (with optional `:limit` override)
+
 **IAM**:
 - `IAM.list_policies/0`: Default limit 500
 - `IAM.list_policies/1`: Default limit 500 (with opt-in `:limit` override)
@@ -356,6 +365,25 @@ All limit parameters accept `:limit` to override the default, but the applicatio
 - Added missing unique index `idx_subagent_prompts_slug_project (slug, project_id) WHERE project_id IS NOT NULL`
 - Renamed `subagent_prompts_slug_index` → `idx_subagent_prompts_slug_global` to match changeset `unique_constraint/2` declarations
 - These fixes ensure constraint error translation works correctly in the Prompt changeset
+
+### Performance Indexing (Round 9)
+
+Three new CONCURRENTLY-built compound indexes optimize common query patterns on high-volume tables:
+
+**`notifications(inserted_at, id)`**:
+- **Problem**: `list_notifications/0` queries scan 12k+ notification rows, then perform an `Incremental Sort` (expensive in-memory sort of secondary key) because the compound index `(inserted_at, id)` was missing.
+- **Solution**: Add compound index on `(inserted_at, id)` to provide both insertion order and stable tiebreaker in one index pass.
+- **Benefit**: Eliminates sort overhead; queries now scan pre-sorted index entries.
+
+**`messages(session_id, inserted_at)`**:
+- **Problem**: Session-scoped time queries (`list_messages_for_session(session_id)` with recent-first ordering) were using the wrong index. The planner picked the `(channel_id, inserted_at)` index, forcing a full-time-window scan (275k+ rows) followed by filtering on `session_id`, resulting in poor selectivity.
+- **Solution**: Add compound index on `(session_id, inserted_at)` to match the actual query predicate order.
+- **Benefit**: Index is selective by session first, then scanned in time order — no full table time window scan.
+
+**`commit_tasks(task_id)`**:
+- **Problem**: When tasks are deleted (via `ON DELETE CASCADE`), Postgres must find all referencing rows in `commit_tasks`. The table has a composite unique index on `(commit_id, task_id)`, but a plain `task_id` lookup cannot use it efficiently.
+- **Solution**: Add single-column index on `task_id` for fast reverse FK scans.
+- **Benefit**: `ON DELETE CASCADE` operations complete faster; FK reverse-scans no longer require index scan of composite index with leading column mismatch.
 
 ## Secure Headers
 

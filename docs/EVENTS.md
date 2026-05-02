@@ -1,17 +1,17 @@
 # Events
 
-`EyeInTheSkyWeb.Events` (`lib/eye_in_the_sky_web/events.ex`) is the single gateway for all Phoenix.PubSub broadcasts and subscriptions in the app.
+`EyeInTheSky.Events` (`lib/eye_in_the_sky/events.ex`) is the single gateway for all Phoenix.PubSub broadcasts and subscriptions in the app.
 
 **Rule: never call `Phoenix.PubSub` directly.** Always use a named function from this module.
 
 ```elixir
 # GOOD
-EyeInTheSkyWeb.Events.agent_updated(agent)
-EyeInTheSkyWeb.Events.subscribe_session(session_id)
+EyeInTheSky.Events.agent_updated(agent)
+EyeInTheSky.Events.subscribe_session(session_id)
 
 # BAD
-Phoenix.PubSub.broadcast(EyeInTheSkyWeb.PubSub, "agents", {:agent_updated, agent})
-Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
+Phoenix.PubSub.broadcast(EyeInTheSky.PubSub, "agents", {:agent_updated, agent})
+Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session:#{session_id}")
 ```
 
 ---
@@ -21,21 +21,23 @@ Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
 | Topic | Subscribe helper | Broadcasters | Subscribers |
 |---|---|---|---|
 | `"agents"` | `subscribe_agents/0` | `Agents`, `SessionController` | Sidebar, DMLive, session pages |
-| `"agent:working"` | `subscribe_agent_working/0` | `WorkerEvents`, `SessionWorker`, `SessionController` | ChatLive, DMLive |
-| `"session:<id>"` | `subscribe_session/1` | `Messages`, `Messages.Broadcaster`, `SessionWorker`, `SessionController`, `MessagingController`, `GiteaWebhookController` | DMLive, FabHook |
+| `"agent:working"` | `subscribe_agent_working/0` | `Events` (normalized handler) | ChatLive, DMLive |
+| `"session:<id>"` | `subscribe_session/1` | `Messages`, `Messages.Broadcaster`, `SessionWorker`, `SessionController`, `MessagingController`, `GiteaWebhookController` | DMLive, FloatingChatLive |
 | `"session:<id>:status"` | `subscribe_session_status/1` | `SessionWorker` | DMLive |
+| `"session:<id>:timer"` | `subscribe_session_timer/1` | `OrchestratorTimers` | DMLive |
 | `"dm:<id>:stream"` | `subscribe_dm_stream/1` | `AgentWorker`, `WorkerEvents` | DMLive |
 | `"dm:<id>:queue"` | `subscribe_dm_queue/1` | `WorkerEvents` | DMLive |
+| `"codex:<id>:raw"` | `subscribe_codex_raw/1` | `AgentWorker` | DMLive (Codex JSONL stream) |
 | `"channel:<id>:messages"` | `subscribe_channel_messages/1` | `Messages`, `Messages.Broadcaster`, `ChatLive`, `MessagingController` | ChatLive |
 | `"tasks"` | `subscribe_tasks/0` | `Tasks`, `Tasks.Poller` | Overview, DMLive |
 | `"tasks:<project_id>"` | `subscribe_project_tasks/1` | `Tasks` | Kanban |
-| `"notifications"` | `subscribe_notifications/0` | `Notifications` | FabHook |
+| `"notifications"` | `subscribe_notifications/0` | `Notifications` | FloatingChatLive |
 | `"teams"` | `subscribe_teams/0` | `Teams` | TeamLive |
 | `"settings"` | `subscribe_settings/0` | `Settings` | OverviewSettings |
 | `"scheduled_jobs"` | `subscribe_scheduled_jobs/0` | Workers, `JobHelper` | JobsLive |
 | `"session_lifecycle"` | `subscribe_session_lifecycle/0` | `WorkerEvents` | Teams.Subscriber |
-| `"tool_approvals"` | `subscribe_tool_approvals/0` | _(not yet implemented)_ | _(not yet implemented)_ |
-| `"canvas:<id>"` | `subscribe_canvas/1` | `Canvases`, `CanvasOverlayComponent` | CanvasOverlayComponent, ChatWindowComponent |
+| `"projects"` | `subscribe_projects/0` | `Projects`, `project_updated/1` | Sidebar |
+| `"canvas:<id>"` | `subscribe_canvas/1` | `Canvases`, `Agents` | CanvasLive |
 
 ---
 
@@ -52,14 +54,12 @@ Phoenix.PubSub.subscribe(EyeInTheSkyWeb.PubSub, "session:#{session_id}")
 
 ### `"agent:working"`
 
-Two payload shapes exist for historical reasons — see [Known inconsistency](#known-inconsistency) below.
+All callers use the normalized single-struct form.
 
-| Payload | Source | Meaning |
-|---|---|---|
-| `{:agent_working, session_ref, session_int_id}` | Workers | Agent started processing (string ref + integer id) |
-| `{:agent_stopped, session_ref, session_int_id}` | Workers | Agent went idle/errored (string ref + integer id) |
-| `{:agent_working, session}` | REST API | Agent started processing (session struct) |
-| `{:agent_stopped, session}` | REST API | Agent stopped (session struct) |
+| Payload | Meaning |
+|---|---|
+| `{:agent_working, %Session{}}` | Agent started processing |
+| `{:agent_stopped, %Session{}}` | Agent went idle/errored |
 
 ### `"session:<id>"` _(id = integer session PK)_
 
@@ -77,6 +77,15 @@ Two payload shapes exist for historical reasons — see [Known inconsistency](#k
 | Payload | Meaning |
 |---|---|
 | `{:session_status, session_id, status}` | Status changed to `:working` or `:idle` |
+
+### `"session:<id>:timer"` _(id = integer session PK)_
+
+Orchestrator timer events for automatic session nudges and timeouts.
+
+| Payload | Meaning |
+|---|---|
+| `{:timer_tick, session_id, elapsed}` | Timer tick with elapsed duration |
+| `{:timer_complete, session_id}` | Timer expired (session auto-idle or transition) |
 
 ### `"dm:<id>:stream"` _(id = integer session PK)_
 
@@ -96,6 +105,14 @@ Two payload shapes exist for historical reasons — see [Known inconsistency](#k
 | Payload | Meaning |
 |---|---|
 | `{:queue_updated, queue}` | Queued prompt list changed |
+
+### `"codex:<id>:raw"` _(id = integer session PK)_
+
+Raw Codex JSONL stream lines for Codex agents. Use this to access the full JSONL event stream (unprocessed from agent runner).
+
+| Payload | Meaning |
+|---|---|
+| `{:codex_raw_line, line}` | Raw JSONL line from Codex event stream |
 
 ### `"channel:<id>:messages"`
 
@@ -144,6 +161,12 @@ Two payload shapes exist for historical reasons — see [Known inconsistency](#k
 | Payload | Meaning |
 |---|---|
 | `:jobs_updated` | Any job run started or completed |
+
+### `"projects"`
+
+| Payload | Meaning |
+|---|---|
+| `{:project_updated, project}` | Project record updated (bookmark toggled, etc.) |
 
 ### `"session_lifecycle"`
 
@@ -218,17 +241,6 @@ def subscribe_my_topic, do: sub("my_topic")
 4. Write a test in `test/eye_in_the_sky_web/events_test.exs` following the existing pattern.
 
 Do not hardcode the topic string in any caller — it lives in Events only.
-
----
-
-## Known inconsistency
-
-The `"agent:working"` topic has two payload shapes inherited from the migration:
-
-- **Workers** (`WorkerEvents`, `SessionWorker`) broadcast `{:agent_working, session_ref, session_int_id}` — a string UUID and an integer ID.
-- **REST API** (`SessionController`) broadcasts `{:agent_working, session}` — a session struct.
-
-Subscribers must handle both. This will be normalized in a future pass.
 
 ---
 

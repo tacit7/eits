@@ -126,7 +126,27 @@ When a focused session is archived or deleted, vim-nav automatically refocuses t
 
 | Keys | Action |
 |---|---|
+| `j` / `k` | Navigate task list |
+| `Enter` | Open focused task detail drawer |
 | `f f` | Toggle filter drawer |
+
+---
+
+## Prompts page — `route_suffix:/prompts`
+
+| Keys | Action |
+|---|---|
+| `j` / `k` | Navigate prompts list |
+| `Enter` | Open focused prompt |
+
+---
+
+## Teams page — `route_suffix:/teams`
+
+| Keys | Action |
+|---|---|
+| `j` / `k` | Navigate teams list |
+| `Enter` | Open focused team detail page |
 
 ---
 
@@ -252,3 +272,16 @@ Scoped commands only fire when their scope condition is met.
 | `route_suffix:/tasks` | `window.location.pathname` ends with `/tasks` |
 | `route_suffix:/chat` | ends with `/chat` |
 | `route_suffix:/dm` | ends with `/dm` |
+| `page:tasks` | `/tasks` page (j/k navigation, filter toggle) |
+| `page:prompts` | `/prompts` page (j/k navigation) |
+| `page:teams` | `/teams` page (j/k navigation) |
+
+---
+
+## Visual styling
+
+All list items with `data-vim-list-item` now use a consistent focused ring style: `ring-2 ring-primary/50`. This applies to:
+- List items on sessions, tasks, prompts, teams, notes, kanban, and agents pages
+- Flyout section items (sessions, notes, teams, agents, canvas, tasks, jobs, chat)
+
+When a list item or flyout item is focused via `j`/`k` or direct vim-nav focus, the ring indicator displays consistently across all pages.

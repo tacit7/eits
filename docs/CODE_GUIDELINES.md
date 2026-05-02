@@ -2578,14 +2578,51 @@ def list_messages(channel_id, opts \\ []) do
   )
   |> Repo.all()
 end
+
+# lib/eye_in_the_sky/channels.ex
+def list_channels_for_project(project_id, opts \\ []) do
+  include_archived = Keyword.get(opts, :include_archived, false)
+  limit = Keyword.get(opts, :limit, 500)
+  
+  query =
+    if is_nil(project_id) do
+      Channel
+    else
+      from(c in Channel, where: is_nil(c.project_id) or c.project_id == ^project_id)
+    end
+  
+  query =
+    if include_archived do
+      query
+    else
+      from(c in query, where: is_nil(c.archived_at))
+    end
+  
+  query
+  |> limit(^limit)
+  |> Repo.all()
+end
+
+# lib/eye_in_the_sky/canvases.ex
+def list_terminals(canvas_id, opts \\ []) do
+  limit = Keyword.get(opts, :limit, 200)
+
+  from(ct in CanvasTerminal,
+    where: ct.canvas_id == ^canvas_id,
+    order_by: [asc: ct.inserted_at],
+    limit: ^limit
+  )
+  |> Repo.all()
+end
 ```
 
 **Why:**
 - Prevents "fetch all N million rows" accidents
 - Enables pagination (caller can override with custom limit)
 - Query performance is predictable
+- Default limits vary by table volatility: high-volume tables (messages, terminals) get 200; standard tables (channels) get 500
 
-**Rule:** Every `list_*` function has `limit: 500` (or lower for high-volume tables). Allow callers to override via options: `Keyword.get(opts, :limit, 500)`.
+**Rule:** Every `list_*` function has a default limit (500, or lower for high-volume tables). Allow callers to override via options: `Keyword.get(opts, :limit, 500)` (adjust default as needed).
 
 ---
 
@@ -2614,7 +2651,9 @@ end
 
 ### Solution 1: Try INSERT with on_conflict (Most Common)
 
-Use `Repo.insert(..., on_conflict: :nothing)` to atomically handle duplicates. If the unique constraint fires, treat it as "already exists":
+Use `Repo.insert(..., on_conflict: :nothing)` to atomically handle duplicates. Use `returning: true` to get the conflicting row back if it already existed.
+
+#### Pattern A: Toggle or Remove (Insert-then-Action)
 
 ```elixir
 # ✅ CORRECT: Single-roundtrip upsert
@@ -2648,10 +2687,52 @@ def toggle_reaction(message_id, session_id, emoji) do
 end
 ```
 
-**Why this works:**
-- Single database round-trip (atomic)
-- No race window between SELECT and INSERT
+#### Pattern B: Ensure and Fetch (Insert-or-Return Canonical)
+
+**Canonical pattern for `get_or_create` operations.** Use `returning: true` with `on_conflict: :nothing` to get the existing row if the unique constraint fires:
+
+```elixir
+# ✅ CORRECT: Collapse concurrent registration race
+def get_or_create_user(username) do
+  result =
+    %User{}
+    |> User.changeset(%{username: username, display_name: username})
+    |> Repo.insert(
+      on_conflict: :nothing,
+      conflict_target: :username,
+      returning: true
+    )
+
+  case result do
+    {:ok, %User{id: nil}} ->
+      # on_conflict: :nothing fired — row already existed; fetch it
+      get_user_by_username(username)
+
+    {:ok, user} ->
+      # Insert succeeded — new user created
+      case EyeInTheSky.Workspaces.create_default_workspace_for_user(user) do
+        {:ok, _workspace} ->
+          {:ok, user}
+
+        {:error, reason} ->
+          Logger.error("accounts: failed to create workspace for user #{user.id}: #{inspect(reason)}")
+          # User creation succeeded; workspace setup can be retried later
+          {:ok, user}
+      end
+
+    error ->
+      error
+  end
+end
+```
+
+**Why this pattern works:**
+- Single database round-trip (atomic) — no SELECT-then-INSERT race window
+- Concurrent requests for the same unique value both succeed: first creates the row, second gets `id: nil` and fetches via the fallback
+- Both callers get a consistent `{:ok, user}` response instead of one getting `{:error, changeset}`
 - The unique constraint is the authority
+
+**Key detail:** When `on_conflict: :nothing` fires, Postgres returns a struct with all defaults (id: nil, etc.). Detect this with `id: nil` and fetch the existing row via a fallback query.
 
 ### Solution 2: UPDATE with Atomic Operations (For Status Toggles)
 
@@ -2838,8 +2919,9 @@ This flags:
 
 ### Audit Rounds and Standards
 
-The codebase has undergone 8 audit rounds (commits 2ee6803c, 03649456, 6541aed2, etc.) establishing these standards:
+The codebase has undergone 9 audit rounds (commits 2ee6803c, 03649456, 6541aed2, cc7396f2, etc.) establishing these standards:
 
+- **R9:** TOCTOU get_or_create_user upsert-with-returning pattern, list_channels_for_project/list_terminals limits, perf indexes
 - **R8:** Unbounded list limits, TOCTOU race collapses, invalid index rebuilds
 - **R7:** Tag creation upsert races, checklist 2-query collapses, job_runs indexes, slug constraint names
 - **R6:** Unbounded query caps, missing FK indexes, hardcoded state_id

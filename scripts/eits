@@ -909,10 +909,10 @@ TASKS_HELP
       _delete "/tasks/$id/sessions/$session_id"
       ;;
     complete)
-      # eits tasks complete <id> [<message>] [--message <text>] [--notify <session_uuid_or_id>]
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks complete <id> --message <text> [--notify <session_uuid_or_id>]  [PREFERRED close path: atomic annotate + done in one call]"; return 0; }
+      # eits tasks complete <id> [<message>] [--message <text>] [--notify <session_uuid_or_id>] [--commit <sha>]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits tasks complete <id> --message <text> [--notify <session_uuid_or_id>] [--commit <sha>]  [PREFERRED close path: atomic annotate + done in one call]"; return 0; }
       local id="${1:-}"; need id; shift
-      local message="" notify=""
+      local message="" notify="" commit_hash=""
       # Check if next arg is not a flag and treat it as the message
       if [[ $# -gt 0 && "$1" != --* ]]; then
         message="$1"
@@ -922,6 +922,7 @@ TASKS_HELP
         case "$1" in
           --message|-m) message="$2"; shift 2 ;;
           --notify)     notify="$2";  shift 2 ;;
+          --commit|-c)  commit_hash="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -967,6 +968,11 @@ TASKS_HELP
         break
       done
       [[ $_comp_ok -eq 1 ]] || { echo "complete failed after retries — task $id may need manual completion" >&2; return 1; }
+      # --commit: track commit atomically with task close
+      if [[ -n "$commit_hash" && $_comp_ok -eq 1 ]]; then
+        cmd_commits create --hash "$commit_hash" >/dev/null 2>&1 || \
+          echo "warning: task closed but commit $commit_hash could not be tracked" >&2
+      fi
       # --notify: send a DM to the given session after successful complete
       if [[ -n "$notify" && $_comp_ok -eq 1 ]]; then
         cmd_dm --to "$notify" --message "Task $id complete: $message" >/dev/null 2>&1 || true

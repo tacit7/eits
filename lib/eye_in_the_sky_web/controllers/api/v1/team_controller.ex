@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     attrs =
       params
       |> Map.take(["name", "description"])
-      |> Map.new(fn {k, v} -> {String.to_atom(k), v} end)
+      |> Map.new(fn {k, v} -> {String.to_existing_atom(k), v} end)
 
     if map_size(attrs) == 0 do
       {:error, :bad_request, "at least one of name or description is required"}

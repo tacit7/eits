@@ -189,6 +189,13 @@ When a focused session is archived or deleted, vim-nav automatically refocuses t
 | `Space f s` | Find session (palette picker) |
 | `Space f r s` | Find recent session (from visit history) |
 | `Space f t` | Find task (palette picker) |
+| `Space f n` | Find note (palette picker) |
+
+### Project picker — `Space p`
+
+| Keys | Action |
+|---|---|
+| `Space p p` | Switch project (palette picker) |
 
 ### Search — `Space s`
 

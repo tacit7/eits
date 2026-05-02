@@ -136,11 +136,12 @@ Keyboard events are managed via the `GlobalKeydown` hook registered in `assets/j
 #### Toolbar Controls
 - **`+` button** — Opens Add Session submenu directly via command palette (jumps to session picker without full search). Implemented via `palette:open-command` event with `commandId=canvas-add-session`.
 - **Delete canvas button** — Wired event handler to delete canvas from toolbar.
-- **Tidy button** — Cascades all windows into clean layout via `Canvases.tidy/1`, which resets positions and applies consistent spacing.
+- **Tidy button** — Cascades all windows into clean layout via `Canvases.reset_canvas_layout/1`. This optimized function (H5 fix) uses a single SQL `UPDATE-FROM` with `unnest` to reset all session positions in one round-trip, replacing N individual Repo.update calls. Each session gets a computed position (24 + i*40 pixels offset) from its index in a single batched query.
 
 #### Session Picker Performance
-- **`open_session_picker`** — Caps unscoped `Sessions.list_sessions()` calls with `Sessions.list_sessions_filtered(limit: 100)` to prevent loading all sessions into memory when opening the picker.
-- **`search_sessions`** — Caps session list with `Sessions.list_sessions_filtered(limit: 50)` to avoid expensive queries when filtering results. Search filtering is applied client-side on the capped results.
+- **`load_session_picker_results/2`** — Helper function that consolidates session picker loading logic. Filters out sessions already pinned to the current canvas and applies DB-side name filtering if a query is provided. Calls `Sessions.list_sessions_filtered(name_filter: query, limit: 50)` to cap and filter results in the database (not in Elixir), significantly reducing query results and memory overhead.
+- **`open_session_picker`** — Calls `load_session_picker_results(socket, "")` to load unfiltered sessions capped at 50, excluding already-pinned sessions.
+- **`search_sessions`** — Receives user query string and calls `load_session_picker_results(socket, q)` to filter sessions by name in the database with same 50-session cap. Filtering is now DB-side via ilike query on session name, not client-side Elixir filtering.
 
 #### Tab Operations
 - **Double-click tab** — Rename canvas inline. Updates page title on successful rename.
@@ -393,6 +394,17 @@ The "New Canvas" button in the agent list dropdown uses **client-side JS command
   - `JS.show(to: "#new-canvas-form-#{@agent.id}")` — Shows form
   - `JS.focus(to: "#new-canvas-input-#{@agent.id}")` — Focus canvas name input
 - **Submission**: Form submits `add_to_new_canvas` event via `phx-submit`
+
+## Query Optimization & Limits
+
+Canvas queries enforce explicit limits to prevent unbounded result sets from consuming excessive memory:
+
+- **`list_canvases/1`** — Lists all canvases with default limit of 500. Accepts optional `opts` with `:limit` key to override.
+- **`list_canvases_preloaded/1`** — Lists all canvases with `:canvas_sessions` preloaded in a single query (avoiding N+1 load). Default limit 500, configurable via opts.
+- **`list_canvas_sessions/2`** — Lists all sessions for a given canvas with default limit of 200. Preloading sessions with their join data prevents N+1 queries when accessing session details.
+- **`reset_canvas_layout/1`** — Optimized to use single `UPDATE-FROM` with `unnest($1::bigint[], $2::int[], $3::int[])` instead of N individual Repo.update calls. Batch-builds three parallel lists (ids, xs, ys) in one Enum.reduce pass, then executes one parameterized query. Reduces 1+2N queries to just 1 round-trip.
+
+All list functions with limits accept an optional `opts` keyword list for backward compatibility; callers can override limits if needed.
 
 ## State Management & Data Flow
 

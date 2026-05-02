@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
     case Sessions.update_session(session, update_attrs) do
       {:ok, updated} ->
-        EyeInTheSky.Events.session_updated(updated)
+        Sessions.broadcast_session_updated(updated)
 
         agent_uuid = Helpers.resolve_agent_uuid(updated.agent_id)
 
@@ -239,8 +239,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       attrs = %{status: "completed", ended_at: DateTime.utc_now()}
 
       do_session_status_change(conn, session, attrs, fn updated ->
-        EyeInTheSky.Events.session_completed(updated)
-        EyeInTheSky.Events.session_updated(updated)
+        Sessions.broadcast_session_completed(updated)
         sync_member_status(updated.id, "done")
       end)
     else
@@ -260,7 +259,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       attrs = %{status: "idle", ended_at: nil}
 
       do_session_status_change(conn, session, attrs, fn updated ->
-        EyeInTheSky.Events.session_updated(updated)
+        Sessions.broadcast_session_updated(updated)
         false
       end)
     else
@@ -277,8 +276,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       attrs = %{status: "waiting"}
 
       do_session_status_change(conn, session, attrs, fn updated ->
-        EyeInTheSky.Events.agent_stopped(updated)
-        EyeInTheSky.Events.session_updated(updated)
+        Sessions.broadcast_session_waiting(updated)
         sync_member_status(updated.id, "blocked")
       end)
     else
@@ -440,15 +438,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   end
 
   defp trigger_status_side_effects(updated, status) do
-    if status do
-      if status in ["completed", "failed", "waiting", "idle"] do
-        EyeInTheSky.Events.agent_stopped(updated)
-      else
-        EyeInTheSky.Events.agent_working(updated)
-      end
-    end
-
-    EyeInTheSky.Events.session_updated(updated)
+    Sessions.broadcast_status_side_effects(updated, status)
 
     if status in Sessions.terminated_statuses() do
       handle_terminal_status(updated, status)

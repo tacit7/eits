@@ -249,6 +249,26 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   end
 
   @doc """
+  POST /api/v1/sessions/:uuid/reopen - Reopen a completed or failed session.
+  Clears ended_at and sets status to idle so the session can accept new task
+  updates and DMs. Useful when a resume hook fails to reset status, or when
+  an orchestrator needs to post work against an already-ended session.
+  Accepts integer session ID or UUID string.
+  """
+  def reopen(conn, %{"uuid" => id_or_uuid}) do
+    with {:ok, session} <- resolve_session(id_or_uuid) do
+      attrs = %{status: "idle", ended_at: nil}
+
+      do_session_status_change(conn, session, attrs, fn updated ->
+        EyeInTheSky.Events.session_updated(updated)
+        false
+      end)
+    else
+      {:error, :not_found} -> {:error, :not_found, "Session not found"}
+    end
+  end
+
+  @doc """
   POST /api/v1/sessions/:id/waiting - Mark session waiting; syncs team member to "blocked".
   Accepts integer session ID or UUID string.
   """

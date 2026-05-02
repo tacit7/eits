@@ -140,7 +140,12 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
       conn
       |> put_status(http_status)
-      |> json(%{commits: created, duplicates: duplicates, errors: errors})
+      |> json(%{
+        commits: created,
+        duplicates: duplicates,
+        errors: errors,
+        already_tracked: duplicates != [] and created == [] and errors == []
+      })
     else
       {:error, :not_found} ->
         {:error, :not_found, "Agent not found"}

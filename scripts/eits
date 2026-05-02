@@ -270,7 +270,7 @@ _tbl_commits() {
 
 cmd_sessions() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|set-intent|end|complete|waiting|archive|unarchive|context|tasks|notes>"; echo "  list -q/--search <q>   full-text search sessions by name/description"; echo "  set-intent <review|work>  declare read-only intent (review) or work mode"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|set-intent|end|complete|waiting|reopen|archive|unarchive|context|tasks|notes>"; echo "  list -q/--search <q>   full-text search sessions by name/description"; echo "  set-intent <review|work>  declare read-only intent (review) or work mode"; return 0; }
   case "$sub" in
     list)
       # eits sessions list [-q|--search <q>] [-n|--name <partial>] [--status <s>] [-p|--project <id>] [--agent <uuid>] [--parent <id|uuid>] [-l|--limit <n>] [--mine] [--include-archived] [--with-tasks] [-j|--json]
@@ -500,6 +500,16 @@ SET_INTENT_HELP
       [[ -n "$uuid" ]] || die "session UUID required (pass as argument or set EITS_SESSION_UUID)"
       _post "/sessions/$uuid/waiting" '{}'
       ;;
+    reopen)
+      # eits sessions reopen [<uuid|self>]  -- defaults to EITS_SESSION_UUID
+      # Clears ended_at, sets status to idle. Use when resume hook fails or when
+      # an orchestrator needs to post against an already-ended session.
+      local uuid="${1:-${EITS_SESSION_UUID:-}}"
+      [[ -n "$uuid" ]] || die "session UUID required (pass as argument or set EITS_SESSION_UUID)"
+      [[ "$uuid" == "self" ]] && uuid="${EITS_SESSION_UUID:-}"
+      [[ -n "$uuid" ]] || die "'self' requires EITS_SESSION_UUID to be set"
+      _post "/sessions/$uuid/reopen" '{}'
+      ;;
     archive)
       # eits sessions archive <uuid>                                          (single)
       # eits sessions archive --status <status> [--project <id>] [--dry-run] (bulk)
@@ -590,6 +600,7 @@ Examples:
 CTX_HELP
         return 0; }
       local uuid="${1:-}"; need uuid; shift || true
+      [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "'self' requires EITS_SESSION_UUID to be set"; }
       local text="" from_stdin=0 metadata=""
       while [[ $# -gt 0 ]]; do
         case "$1" in

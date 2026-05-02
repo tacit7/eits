@@ -216,19 +216,16 @@ defmodule EyeInTheSky.Sessions do
   Archives a session (soft delete).
   Broadcasts session_updated event.
   """
-  def archive_session(%Session{} = session) do
-    with {:ok, updated} <- update_session(session, %{archived_at: DateTime.utc_now()}) do
-      Events.session_updated(updated)
-      {:ok, updated}
-    end
-  end
+  def archive_session(%Session{} = session), do: set_archived(session, DateTime.utc_now())
 
   @doc """
   Unarchives a session.
   Broadcasts session_updated event.
   """
-  def unarchive_session(%Session{} = session) do
-    with {:ok, updated} <- update_session(session, %{archived_at: nil}) do
+  def unarchive_session(%Session{} = session), do: set_archived(session, nil)
+
+  defp set_archived(%Session{} = session, value) do
+    with {:ok, updated} <- update_session(session, %{archived_at: value}) do
       Events.session_updated(updated)
       {:ok, updated}
     end

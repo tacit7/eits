@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
@@ -265,39 +264,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   end
 
   defp load_db_info do
-    db_config = Application.get_env(:eye_in_the_sky, EyeInTheSky.Repo)
-    db_name = db_config[:database] || "unknown"
-
-    size =
-      case Repo.query("SELECT pg_database_size(current_database())") do
-        {:ok, %{rows: [[s]]}} -> s
-        _ -> 0
-      end
-
-    table_counts = load_table_counts()
-
-    %{
-      path: db_name,
-      size: size,
-      table_counts: table_counts
-    }
-  end
-
-  defp load_table_counts do
-    sql = """
-    SELECT 'sessions', COUNT(*) FROM sessions
-    UNION ALL SELECT 'agents', COUNT(*) FROM agents
-    UNION ALL SELECT 'tasks', COUNT(*) FROM tasks
-    UNION ALL SELECT 'notes', COUNT(*) FROM notes
-    UNION ALL SELECT 'messages', COUNT(*) FROM messages
-    UNION ALL SELECT 'projects', COUNT(*) FROM projects
-    UNION ALL SELECT 'commits', COUNT(*) FROM commits
-    UNION ALL SELECT 'prompts', COUNT(*) FROM subagent_prompts
-    """
-
-    case Repo.query!(sql) do
-      %{rows: rows} -> Enum.map(rows, fn [table, count] -> {table, count} end)
-    end
+    Settings.db_info()
   end
 
   @impl true

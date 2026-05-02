@@ -509,6 +509,9 @@ defmodule EyeInTheSky.Sessions do
     |> attach_current_task_titles()
   end
 
+  @doc "Preloads the :project association on a session struct."
+  def preload_project(%Session{} = session), do: Repo.preload(session, :project)
+
   defp project_sessions_base_query(project_id) do
     from(s in Session, where: s.project_id == ^project_id)
   end

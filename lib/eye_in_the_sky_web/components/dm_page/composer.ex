@@ -73,6 +73,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           phx-hook="CommandHistory"
           id="message-input"
           data-session-uuid={@session_uuid}
+          data-vim-composer
         ></textarea>
       </div>
 

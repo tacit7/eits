@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Projects
-  alias EyeInTheSky.Repo
+  alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.ControllerHelpers
 
   def create_new_session(params, socket) do
@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions do
 
     case AgentManager.create_agent(opts) do
       {:ok, %{session: session}} ->
-        session = Repo.preload(session, :project)
+        session = Sessions.preload_project(session)
 
         socket =
           socket

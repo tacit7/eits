@@ -184,6 +184,36 @@ defmodule EyeInTheSky.Settings do
   @doc "Returns the default values map."
   def defaults, do: @defaults
 
+  @doc "Returns database info: name, size in bytes, and per-table row counts."
+  def db_info do
+    db_config = Application.get_env(:eye_in_the_sky, EyeInTheSky.Repo)
+    db_name = db_config[:database] || "unknown"
+
+    size =
+      case Repo.query("SELECT pg_database_size(current_database())") do
+        {:ok, %{rows: [[s]]}} -> s
+        _ -> 0
+      end
+
+    sql = """
+    SELECT 'sessions', COUNT(*) FROM sessions
+    UNION ALL SELECT 'agents', COUNT(*) FROM agents
+    UNION ALL SELECT 'tasks', COUNT(*) FROM tasks
+    UNION ALL SELECT 'notes', COUNT(*) FROM notes
+    UNION ALL SELECT 'messages', COUNT(*) FROM messages
+    UNION ALL SELECT 'projects', COUNT(*) FROM projects
+    UNION ALL SELECT 'commits', COUNT(*) FROM commits
+    UNION ALL SELECT 'prompts', COUNT(*) FROM subagent_prompts
+    """
+
+    table_counts =
+      case Repo.query!(sql) do
+        %{rows: rows} -> Enum.map(rows, fn [table, count] -> {table, count} end)
+      end
+
+    %{path: db_name, size: size, table_counts: table_counts}
+  end
+
   defp parse_float(val) when is_binary(val) do
     case Float.parse(val) do
       {f, _} -> f

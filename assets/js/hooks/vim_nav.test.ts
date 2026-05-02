@@ -10,6 +10,10 @@ function makeHook(opts: { enabled?: boolean; projectPath?: string } = {}) {
   const inst: any = Object.create(VimNav)
   inst.el = el
   inst.pushEvent = vi.fn()
+  // Own-property init ensures test isolation — prototype mutable state (buffer, count)
+  // can otherwise bleed between tests if a prior test mutates the prototype array.
+  inst.buffer = []
+  inst.count = 0
   return inst
 }
 
@@ -1556,5 +1560,131 @@ describe("Space f t find-task palette command", () => {
     expect(listener).toHaveBeenCalledTimes(1)
     const detail = (listener.mock.calls[0][0] as CustomEvent).detail
     expect(detail.commandId).toBe("list-tasks")
+  })
+})
+
+describe("VimNav numeric count prefix", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    document.body.innerHTML = ""
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    document.body.innerHTML = ""
+  })
+
+  function makeList(itemCount: number): HTMLElement {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    for (let i = 0; i < itemCount; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      item.textContent = `Item ${i}`
+      list.appendChild(item)
+    }
+    document.body.appendChild(list)
+    return list
+  }
+
+  function pressKey(h: any, key: string): void {
+    const evt = new KeyboardEvent("keydown", { key })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    h.handleKey(evt)
+  }
+
+  it("j without prefix still moves 1", () => {
+    makeList(5)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    pressKey(h, "j")
+    expect(h.listFocusIndex).toBe(1)
+  })
+
+  it("3j moves focus 3 items down from current position", () => {
+    makeList(10)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    pressKey(h, "3")
+    expect(h.count).toBe(3)
+    pressKey(h, "j")
+    expect(h.listFocusIndex).toBe(3)
+  })
+
+  it("5k moves focus 5 items up", () => {
+    makeList(10)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 7
+    pressKey(h, "5")
+    pressKey(h, "k")
+    expect(h.listFocusIndex).toBe(2)
+  })
+
+  it("count is reset to 0 after executing a command", () => {
+    makeList(5)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    pressKey(h, "3")
+    expect(h.count).toBe(3)
+    pressKey(h, "j")
+    expect(h.count).toBe(0)
+  })
+
+  it("count accumulates across multiple digit presses (typing 1 then 2 gives count 12)", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    pressKey(h, "1")
+    pressKey(h, "2")
+    expect(h.count).toBe(12)
+  })
+
+  it("12j moves 12 items, clamped to list length", () => {
+    makeList(5)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    pressKey(h, "1")
+    pressKey(h, "2")
+    pressKey(h, "j")
+    expect(h.listFocusIndex).toBe(4)
+  })
+
+  it("5G jumps to the 5th item (index 4)", () => {
+    makeList(10)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    pressKey(h, "5")
+    pressKey(h, "G")
+    expect(h.listFocusIndex).toBe(4)
+  })
+
+  it("count resets when Escape is pressed", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    pressKey(h, "3")
+    expect(h.count).toBe(3)
+    pressKey(h, "Escape")
+    expect(h.count).toBe(0)
+  })
+
+  it("count resets after 2s inactivity", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    pressKey(h, "5")
+    expect(h.count).toBe(5)
+    vi.advanceTimersByTime(2000)
+    expect(h.count).toBe(0)
+  })
+
+  it("statusbar shows count when count > 0", () => {
+    const h = makeHook()
+    h.mounted()
+    pressKey(h, "3")
+    expect(h.statusbarEl?.textContent).toContain("3")
+    h.destroyed()
   })
 })

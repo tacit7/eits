@@ -147,8 +147,15 @@ defmodule EyeInTheSky.Canvases do
 
   # --- Terminal Windows ---
 
-  def list_terminals(canvas_id) do
-    Repo.all(from ct in CanvasTerminal, where: ct.canvas_id == ^canvas_id, order_by: [asc: ct.inserted_at])
+  def list_terminals(canvas_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
+    from(ct in CanvasTerminal,
+      where: ct.canvas_id == ^canvas_id,
+      order_by: [asc: ct.inserted_at],
+      limit: ^limit
+    )
+    |> Repo.all()
   end
 
   def create_terminal(canvas_id, attrs \\ %{}) do

@@ -32,9 +32,11 @@ defmodule EyeInTheSky.Channels do
 
   @doc """
   Returns the list of channels for a specific project, including global channels (project_id is NULL).
+  Default limit: 500. Pass `limit: n` to override.
   """
   def list_channels_for_project(project_id, opts \\ []) do
     include_archived = Keyword.get(opts, :include_archived, false)
+    limit = Keyword.get(opts, :limit, 500)
 
     query =
       if is_nil(project_id) do
@@ -52,7 +54,9 @@ defmodule EyeInTheSky.Channels do
         from c in query, where: is_nil(c.archived_at)
       end
 
-    Repo.all(query)
+    query
+    |> limit(^limit)
+    |> Repo.all()
   end
 
   @doc """

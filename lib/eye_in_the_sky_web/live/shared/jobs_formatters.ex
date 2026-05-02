@@ -106,8 +106,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
         dow |> String.split(",") |> Enum.map_join(", ", &day_name/1)
 
       String.contains?(dow, "-") ->
-        [from, to] = String.split(dow, "-", parts: 2)
-        "#{day_name(from)}-#{day_name(to)}"
+        [start_day, end_day] = String.split(dow, "-", parts: 2)
+        "#{day_name(start_day)}-#{day_name(end_day)}"
 
       true ->
         day_name(dow)

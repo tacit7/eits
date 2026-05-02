@@ -475,6 +475,96 @@ export const VimNav = {
         )
         return
       }
+      if (action.name === "list_group_prev" || action.name === "list_group_next") {
+        const items = this.currentListItems()
+        if (items.length === 0) return
+        const separators = [...document.querySelectorAll<HTMLElement>("[data-vim-list-group]")]
+        if (separators.length === 0) {
+          // Fallback: no group separators — behave like gg / G
+          if (action.name === "list_group_prev") this.focusListItem(0)
+          else this.focusListItem(items.length - 1)
+          return
+        }
+        const currentEl = items[this.listFocusIndex < 0 ? 0 : this.listFocusIndex]
+        if (action.name === "list_group_next") {
+          // Find the next separator after the current element, then focus the first
+          // list item whose DOM position is after that separator.
+          const nextSep = separators.find(sep =>
+            currentEl.compareDocumentPosition(sep) & Node.DOCUMENT_POSITION_FOLLOWING
+          )
+          if (!nextSep) { this.focusListItem(items.length - 1); return }
+          const firstAfter = items.find(item =>
+            nextSep.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING
+          )
+          if (firstAfter) this.focusListItem(items.indexOf(firstAfter))
+          else this.focusListItem(items.length - 1)
+        } else {
+          // list_group_prev: find the separator immediately before the current element,
+          // then focus the first list item after the separator before that one (or item 0).
+          const sepsBeforeCurrent = separators.filter(sep =>
+            currentEl.compareDocumentPosition(sep) & Node.DOCUMENT_POSITION_PRECEDING
+          )
+          if (sepsBeforeCurrent.length === 0) { this.focusListItem(0); return }
+          // The group containing the current item starts right after the last separator before it.
+          const ownSep = sepsBeforeCurrent[sepsBeforeCurrent.length - 1]
+          // If we're already at the first item of our group (nothing between ownSep and currentEl),
+          // jump to the group before ownSep.
+          const itemsBetween = items.filter(item =>
+            (ownSep.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+            (item.compareDocumentPosition(currentEl) & Node.DOCUMENT_POSITION_FOLLOWING)
+          )
+          if (itemsBetween.length > 0) {
+            // Not at group head — go to the first item of our own group
+            this.focusListItem(items.indexOf(itemsBetween[0]))
+          } else {
+            // Already at group head — jump to the group before ownSep
+            const sepsBefore = sepsBeforeCurrent.slice(0, -1)
+            if (sepsBefore.length === 0) { this.focusListItem(0); return }
+            const prevSep = sepsBefore[sepsBefore.length - 1]
+            const firstAfterPrev = items.find(item =>
+              prevSep.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING
+            )
+            if (firstAfterPrev) this.focusListItem(items.indexOf(firstAfterPrev))
+            else this.focusListItem(0)
+          }
+        }
+        return
+      }
+      if (action.name === "list_item_delete" || action.name === "list_item_archive") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const itemType = item.dataset.vimItemType
+        const itemId = item.dataset.vimItemId
+        const isArchive = action.name === "list_item_archive"
+        // Determine event name based on entity type (or fall back to session for untagged items)
+        let event: string
+        let payload: Record<string, unknown>
+        if (itemType && itemId) {
+          event = isArchive ? `archive_${itemType}` : `delete_${itemType}`
+          payload = { item_type: itemType, item_id: itemId }
+          // Keep session_id for backwards compat when type is session
+          if (itemType === "session") payload.session_id = itemId
+        } else {
+          // Backwards compat: untagged item — fall back to session behavior
+          const sessionId = item.dataset.sessionId
+          if (!sessionId) return
+          event = isArchive ? "archive_session" : "delete_session"
+          payload = { session_id: sessionId }
+        }
+        // TODO: LiveView handlers needed for archive_note/delete_note/archive_task/delete_task
+        const savedIndex = this.listFocusIndex
+        const obs = new MutationObserver(() => {
+          if (item.isConnected) return
+          obs.disconnect()
+          const items = this.currentListItems()
+          if (items.length === 0) { this.listFocusIndex = -1; return }
+          this.focusListItem(Math.min(savedIndex, items.length - 1))
+        })
+        obs.observe(document.body, { childList: true, subtree: true })
+        setTimeout(() => obs.disconnect(), 3000)
+        this.pushToList?.(event, payload)
+        return
+      }
     }
   },
 

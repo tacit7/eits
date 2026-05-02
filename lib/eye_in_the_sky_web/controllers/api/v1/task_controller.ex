@@ -339,8 +339,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       {:ok, int_id} -> {:ok, int_id}
       {:error, _msg} -> {:error, :invalid_session}
     end
-  rescue
-    Ecto.Query.CastError -> {:error, :invalid_session}
   end
 
   @doc """

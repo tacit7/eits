@@ -96,6 +96,8 @@ Active on any page with `data-vim-list`.
 | `j` | Next item |
 | `k` | Previous item |
 | `Enter` | Open focused item |
+| `g g` | Jump to first item |
+| `G` | Jump to last item |
 
 ---
 
@@ -186,6 +188,7 @@ When a focused session is archived or deleted, vim-nav automatically refocuses t
 |---|---|
 | `Space f s` | Find session (palette picker) |
 | `Space f r s` | Find recent session (from visit history) |
+| `Space f t` | Find task (palette picker) |
 
 ### Search — `Space s`
 

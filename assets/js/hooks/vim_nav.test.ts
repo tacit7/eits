@@ -1431,3 +1431,130 @@ describe("rail coverage: g and t bindings for all rail items", () => {
     expect(tP.id).toBe("toggle.prompts")
   })
 })
+
+describe("gg/G list jump commands", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  function makeList(itemCount: number): HTMLElement {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    for (let i = 0; i < itemCount; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      item.textContent = `Item ${i}`
+      list.appendChild(item)
+    }
+    document.body.appendChild(list)
+    return list
+  }
+
+  it("list.top command exists with keys [g,g] and scope feature:vim-list", () => {
+    const cmd = COMMANDS.find(c => c.id === "list.top")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["g", "g"])
+    expect(cmd.scope).toBe("feature:vim-list")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("list_top")
+  })
+
+  it("list.bottom command exists with keys [G] and scope feature:vim-list", () => {
+    const cmd = COMMANDS.find(c => c.id === "list.bottom")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["G"])
+    expect(cmd.scope).toBe("feature:vim-list")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("list_bottom")
+  })
+
+  it("gg focuses the first item", () => {
+    makeList(4)
+    const h = makeHook()
+    h.listFocusIndex = 3
+    const cmd = COMMANDS.find(c => c.id === "list.top")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(0)
+    const items = document.querySelectorAll("[data-vim-list-item]")
+    expect(items[0].classList.contains("vim-nav-focused")).toBe(true)
+    expect(items[3].classList.contains("vim-nav-focused")).toBe(false)
+  })
+
+  it("gg when already at bottom goes to first item", () => {
+    makeList(5)
+    const h = makeHook()
+    h.listFocusIndex = 4
+    const cmd = COMMANDS.find(c => c.id === "list.top")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(0)
+  })
+
+  it("G focuses the last item", () => {
+    makeList(4)
+    const h = makeHook()
+    h.listFocusIndex = 0
+    const cmd = COMMANDS.find(c => c.id === "list.bottom")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(3)
+    const items = document.querySelectorAll("[data-vim-list-item]")
+    expect(items[3].classList.contains("vim-nav-focused")).toBe(true)
+    expect(items[0].classList.contains("vim-nav-focused")).toBe(false)
+  })
+
+  it("G when already at top goes to last item", () => {
+    makeList(5)
+    const h = makeHook()
+    h.listFocusIndex = 0
+    const cmd = COMMANDS.find(c => c.id === "list.bottom")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(4)
+  })
+
+  it("gg is a no-op when no data-vim-list exists", () => {
+    const h = makeHook()
+    h.listFocusIndex = -1
+    const cmd = COMMANDS.find(c => c.id === "list.top")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(-1)
+  })
+
+  it("G is a no-op when no data-vim-list exists", () => {
+    const h = makeHook()
+    h.listFocusIndex = -1
+    const cmd = COMMANDS.find(c => c.id === "list.bottom")!
+    h.executeCommand(cmd)
+    expect(h.listFocusIndex).toBe(-1)
+  })
+
+  it("G is not in PREFIXES (single key, not a prefix)", () => {
+    expect(PREFIXES.has("G")).toBe(false)
+  })
+
+  it("g remains in PREFIXES for both nav and gg", () => {
+    expect(PREFIXES.has("g")).toBe(true)
+  })
+})
+
+describe("Space f t find-task palette command", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  it("leader.find.tasks command exists with keys [Space,f,t]", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.find.tasks")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["Space", "f", "t"])
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("find_tasks")
+  })
+
+  it("find_tasks dispatches palette:open-command with commandId list-tasks", () => {
+    const palette = document.createElement("div")
+    palette.id = "command-palette"
+    document.body.appendChild(palette)
+    const listener = vi.fn()
+    palette.addEventListener("palette:open-command", listener)
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.find.tasks")!
+    h.executeCommand(cmd)
+    expect(listener).toHaveBeenCalledTimes(1)
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail
+    expect(detail.commandId).toBe("list-tasks")
+  })
+})

@@ -387,6 +387,18 @@ export const VimNav = {
         this.focusListItem(prev)
         return
       }
+      if (action.name === "list_top") {
+        const items = this.currentListItems()
+        if (items.length === 0) return
+        this.focusListItem(0)
+        return
+      }
+      if (action.name === "list_bottom") {
+        const items = this.currentListItems()
+        if (items.length === 0) return
+        this.focusListItem(items.length - 1)
+        return
+      }
       if (action.name === "list_open") {
         const item = this.currentListItems()[this.listFocusIndex]
         item?.click()
@@ -454,6 +466,12 @@ export const VimNav = {
       if (action.name === "find_recent_sessions") {
         document.getElementById("command-palette")?.dispatchEvent(
           new CustomEvent("palette:open-command", { detail: { commandId: "recent-sessions" } })
+        )
+        return
+      }
+      if (action.name === "find_tasks") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "list-tasks" } })
         )
         return
       }

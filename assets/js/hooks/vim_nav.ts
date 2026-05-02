@@ -83,9 +83,9 @@ function createStatusbar(): HTMLElement {
   return el
 }
 
-function updateStatusbar(el: HTMLElement, mode: Mode): void {
+function updateStatusbar(el: HTMLElement, mode: Mode, count = 0): void {
   if (mode === "normal") {
-    el.textContent = "[ NORMAL ]"
+    el.textContent = count > 0 ? `[ NORMAL ] ${count}` : "[ NORMAL ]"
     el.style.color = "var(--color-base-content)"
     el.style.opacity = "0.55"
   } else {
@@ -116,6 +116,8 @@ export const VimNav = {
   _onHelpClose: null as ((e: KeyboardEvent) => void) | null,
   _onPageLoad: null as ((e: Event) => void) | null,
   listFocusIndex: -1 as number,
+  count: 0 as number,
+  countTimer: null as ReturnType<typeof setTimeout> | null,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -153,6 +155,7 @@ export const VimNav = {
     if (this._onFocusout) document.removeEventListener("focusout", this._onFocusout)
     if (this._onPageLoad) window.removeEventListener("phx:page-loading-stop", this._onPageLoad)
     if (this.sequenceTimer) clearTimeout(this.sequenceTimer)
+    if (this.countTimer) clearTimeout(this.countTimer)
     this.hideHelp()
     this.hideWhichKey()
     this.clearListFocus()
@@ -170,7 +173,7 @@ export const VimNav = {
 
   setMode(mode: Mode) {
     this.mode = mode
-    if (this.statusbarEl) updateStatusbar(this.statusbarEl, mode)
+    if (this.statusbarEl) updateStatusbar(this.statusbarEl, mode, this.count)
   },
 
   handleKey(event: KeyboardEvent) {
@@ -194,7 +197,24 @@ export const VimNav = {
 
     const key = keyFromEvent(event)
 
+    // Numeric count prefix: accumulate digits when buffer is empty
+    if (/^[0-9]$/.test(key) && this.buffer.length === 0) {
+      this.count = this.count * 10 + parseInt(key, 10)
+      if (this.countTimer) clearTimeout(this.countTimer)
+      this.countTimer = setTimeout(() => {
+        this.count = 0
+        if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, 0)
+        this.countTimer = null
+      }, 2000)
+      if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, this.count)
+      event.preventDefault()
+      return
+    }
+
     if (key === "Escape") {
+      this.count = 0
+      if (this.countTimer) { clearTimeout(this.countTimer); this.countTimer = null }
+      if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, 0)
       if (this.flyoutFocused) {
         this.clearListFocus()
         return
@@ -336,6 +356,12 @@ export const VimNav = {
   },
 
   executeCommand(cmd: Command) {
+    const times = this.count > 0 ? this.count : 1
+    const rawCount = this.count
+    this.count = 0
+    if (this.countTimer) { clearTimeout(this.countTimer); this.countTimer = null }
+    if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, 0)
+
     const { action } = cmd
     if (action.kind === "navigate") {
       const target = this.buildPath(action.path, action.relative)
@@ -376,14 +402,14 @@ export const VimNav = {
       if (action.name === "list_next") {
         const items = this.currentListItems()
         if (items.length === 0) return
-        const next = Math.min(this.listFocusIndex + 1, items.length - 1)
+        const next = Math.min(this.listFocusIndex + times, items.length - 1)
         this.focusListItem(next)
         return
       }
       if (action.name === "list_prev") {
         const items = this.currentListItems()
         if (items.length === 0) return
-        const prev = Math.max(this.listFocusIndex - 1, 0)
+        const prev = Math.max(this.listFocusIndex - times, 0)
         this.focusListItem(prev)
         return
       }
@@ -396,7 +422,11 @@ export const VimNav = {
       if (action.name === "list_bottom") {
         const items = this.currentListItems()
         if (items.length === 0) return
-        this.focusListItem(items.length - 1)
+        if (rawCount > 0 && rawCount <= items.length) {
+          this.focusListItem(rawCount - 1)
+        } else {
+          this.focusListItem(items.length - 1)
+        }
         return
       }
       if (action.name === "list_open") {

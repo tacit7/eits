@@ -166,6 +166,73 @@ When Claude Code calls a tool:
 
 ---
 
+## Query Limits and Safety Guards
+
+All IAM database queries are bounded with explicit `LIMIT` clauses to prevent unbounded table scans and memory exhaustion in misconfigured environments with excessive policies.
+
+### `list_policies/0` — Default 500 row limit
+
+```elixir
+def list_policies do
+  Policy
+  |> order_by([p], desc: p.priority, asc: p.id)
+  |> limit(500)
+  |> Repo.all()
+end
+```
+
+Used by the IAM admin LiveView and policy simulator. Capped at 500 rows by default.
+
+### `list_policies/1` — Default 500 row limit with opt-in override
+
+```elixir
+def list_policies(filters) when is_list(filters) or is_map(filters) do
+  {limit, filters} =
+    if is_list(filters) do
+      {Keyword.get(filters, :limit, 500), Keyword.delete(filters, :limit)}
+    else
+      {Map.get(filters, :limit, 500), Map.delete(filters, :limit)}
+    end
+  # ... apply filters ...
+  |> limit(^limit)
+  |> Repo.all()
+end
+```
+
+Filtered policy queries default to 500 rows. Callers can override by passing `limit: N` in the filters map/keyword list. This guards against misconfigured environments where the number of policies exceeds safe limits.
+
+### Policy Cache: 5000 row load limit
+
+The `EITS.IAM.PolicyCache` GenServer loads policies from the database with a hard `@load_limit` of 5000 rows:
+
+```elixir
+@load_limit 5_000
+
+defp load_from_db do
+  policies =
+    Policy
+    |> where([p], p.enabled == true)
+    |> limit(@load_limit)
+    |> Repo.all()
+
+  if length(policies) >= @load_limit do
+    Logger.warning(
+      "IAM policy_cache: LIMIT reached (#{@load_limit}) — some policies may not be evaluated"
+    )
+  end
+
+  policies
+end
+```
+
+- Loads enabled policies in memory for the cache
+- If the limit is hit, a warning is logged to alert operators that some policies may not be evaluated
+- Prevents unbounded memory growth from excessive policy counts
+
+**Note**: The cache limit is higher than the list_policies queries (5000 vs 500) because the cache is a single in-memory data structure, while list_policies is exposed to user-facing admin tools and should be more restrictive.
+
+---
+
 ## Migration: `20260417230411_add_builtin_matcher_to_iam_policies`
 
 Adds the `builtin_matcher` column:

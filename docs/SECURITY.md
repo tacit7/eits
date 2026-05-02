@@ -2,8 +2,8 @@
 
 Security architecture and controls for the Eye in the Sky web application.
 
-Last audited: 2026-03-17
-Last updated: 2026-05-01 (FK constraint handling, IAM audit indexes, agent completion notifications opt-in)
+Last audited: 2026-05-01
+Last updated: 2026-05-01 (TOCTOU race fixes, unbounded query limits, invalid index cleanup, schema hygiene)
 
 ## Authentication
 
@@ -274,6 +274,88 @@ Challenges are serialized to JSON (not Erlang `binary_to_term`) before storing i
 - Max 10 files per upload, 50MB per file.
 - Files stored with UUID filenames (original name discarded for storage).
 - Upload paths in message bodies use relative paths from web root, not absolute filesystem paths.
+
+## Database Security
+
+### TOCTOU (Time-Of-Check-Time-Of-Use) Race Prevention
+
+The application prevents SELECT-then-write races by collapsing multi-query operations into single atomic updates. This eliminates windows where concurrent requests can observe stale state.
+
+**Toggle operations (2-query → 1-query)**:
+- `Notes.toggle_starred/1`: Replaced `get_note` + `update_note` with single `UPDATE ... SET starred = NOT starred RETURNING *`
+- `ChecklistItems.toggle_checklist_item/1`: Replaced `Repo.get` + `Repo.update` with single `UPDATE ... SET completed = NOT completed RETURNING *`
+- `ChecklistItems.delete_checklist_item/1`: Replaced `Repo.get` + `Repo.delete` with single `DELETE ... RETURNING id`
+
+These operations no longer have a race window: the server-side toggle is atomic.
+
+**Insert-first patterns**:
+- `MessageReactions.toggle_reaction/3`: Attempts `INSERT with on_conflict: :nothing` on the unique index `(message_id, session_id, emoji)`. If the row already exists (conflict fires, id is nil), the operation deletes instead. This prevents duplicate reaction rows under concurrent taps on the same emoji.
+
+**Upsert races (SELECT + write → single upsert)**:
+- `PushSubscriptions.upsert/3`: Replaced `Repo.get_by` + conditional insert/update with single atomic `Repo.insert(on_conflict: [set: [auth, p256dh]], conflict_target: :endpoint)`. One round-trip regardless of new/existing row.
+- `TaskTags.get_or_create_tag/1`: Replaced `Repo.get_by` + conditional insert with atomic `Repo.insert_all(..., on_conflict: {:replace, [:name]}, conflict_target: :name)`. ON CONFLICT DO UPDATE forces the row into RETURNING even when it already exists, so no second SELECT is needed.
+- `Contexts.upsert_session_context/1`: Replaced `QueryHelpers.upsert` (which used `get_session_context` + insert/update) with atomic `Repo.insert(on_conflict: {:replace, [...]}, conflict_target: [:session_id])`.
+- `Contexts.upsert_agent_context/1`: Replaced `QueryHelpers.upsert` with atomic `Repo.insert(on_conflict: {:replace, [:]}, conflict_target: [:agent_id, :project_id])`.
+
+All upserts use the corresponding unique index as the `conflict_target`, ensuring atomicity and preventing duplicate rows under concurrent writes.
+
+### Unbounded Query Mitigation
+
+List operations that previously used unbounded `Repo.all()` now have explicit default limits to prevent full table scans on large datasets:
+
+**Sessions**:
+- `Sessions.list_active_sessions/0`: Default limit 500
+- `Sessions.list_sessions_with_agent/1`: Default limit 500
+- `Sessions.list_active_sessions_for_project/1`: Default limit 500
+
+**Prompts**:
+- `Prompts.list_prompts/0`: Default limit 500
+- `Prompts.list_global_prompts/0`: Default limit 500
+- `Prompts.list_project_prompts/1`: Default limit 500
+
+**Tasks**:
+- `TaskTags.list_tags/1`: Default limit 500 (with optional `:search` filter and `:limit` override)
+
+**Jobs**:
+- `ScheduledJobs.list_jobs/0`: Default limit 500
+- `ScheduledJobs.list_spawn_agent_jobs_by_prompt_ids/1`: Default limit 500
+- `ScheduledJobs.list_filesystem_agent_jobs/0`: Default limit 500
+- `ScheduledJobs.list_orphaned_agent_jobs/0`: Default limit 200 (called in LiveView mount)
+
+**Messages**:
+- `Messages.Listings.list_pending_messages/0`: Default limit 200
+
+**IAM**:
+- `IAM.list_policies/0`: Default limit 500
+- `IAM.list_policies/1`: Default limit 500 (with opt-in `:limit` override)
+- `IAM.PolicyCache.load_from_db/0`: Hard limit 5000 with `Logger.warning` if limit is reached, preventing unbounded cache scans on cache miss
+
+All limit parameters accept `:limit` to override the default, but the application enforces ceilings to prevent accidental queries on millions of rows.
+
+### Index Maintenance and Cleanup
+
+**Invalid index rebuild** (Round 8):
+- `notes_parent_id_bigint_project_idx` was marked INVALID (`indisvalid=false, indisready=false`), likely from a failed DDL. Zombie indexes impose write overhead (updates rewrite invalid index entries) with zero read benefit. Migration rebuilds the index to restore it to VALID state.
+
+**Parent foreign key indexes** (Round 4):
+- Added partial indexes on `sessions.parent_session_id` (WHERE NOT NULL) and `agents.parent_agent_id` (WHERE NOT NULL) for fork/checkpoint tree traversal. The partial index skips the vast majority of non-fork rows, improving query performance on tree operations.
+
+**Job run indexes** (Round 7):
+- Added compound index on `job_runs (job_id, started_at DESC)` for DISTINCT ON queries in `last_run_status_map` and `last_run_per_job` (prevents seq scan on 5000+ rows)
+- Added partial index on `job_runs WHERE status = 'running'` for `list_running_job_ids` queries
+
+**Zombie sweep optimization** (Round 5):
+- Added two partial indexes on `sessions` filtered to `status = 'working'`:
+  - Optimizes the OR condition on `last_activity_at`/`started_at` in zombie sweep logic
+  - Converts full table scan to index scan on active sessions only
+
+**Stale column removal**:
+- Dropped `agents.session_id` column (271 stale rows, no foreign key, no index, never cast via changeset, zero code readers). Column cleanup improves schema hygiene and reduces write overhead.
+
+**Constraint name fixes** (Round 7):
+- Added missing unique index `idx_subagent_prompts_slug_project (slug, project_id) WHERE project_id IS NOT NULL`
+- Renamed `subagent_prompts_slug_index` → `idx_subagent_prompts_slug_global` to match changeset `unique_constraint/2` declarations
+- These fixes ensure constraint error translation works correctly in the Prompt changeset
 
 ## Secure Headers
 

@@ -888,6 +888,102 @@ Project-scoped routes use `mount_project/2` helper and `handle_params/3` guards 
 
 ---
 
+## Rate Limiting
+
+Rate limiting is handled by the `EyeInTheSkyWeb.Plugs.RateLimit` plug, which enforces per-IP, per-session, and endpoint-specific limits. The plug delegates session lookups to the Sessions context for proper encapsulation.
+
+**Architecture:**
+- The plug checks a request against configured rules (WebAuthn endpoints) or a configurable default
+- For per-session buckets (Phase 2, feature-flagged), session validation is delegated to `Sessions.get_session_id_by_uuid/1`
+- This separation prevents raw database queries in the plug layer and maintains context boundaries
+
+**Session Lookup in RateLimit Plug:**
+```elixir
+defp lookup_session_id(uuid) do
+  EyeInTheSky.Sessions.get_session_id_by_uuid(uuid)
+end
+```
+
+The `get_session_id_by_uuid/1` function validates that the UUID corresponds to an existing session and returns its integer ID. If the session does not exist, the lookup fails and the plug falls back to IP-based rate limiting.
+
+---
+
+## Session Query Limits
+
+All session listing functions accept optional `limit` and `offset` parameters to prevent unbounded queries:
+
+**Default Limits:**
+| Function | Default Limit | Parameter |
+|----------|---------------|-----------|
+| `list_sessions/1` | 1,000 | `limit: n` |
+| `list_sessions_for_agent/2` | 200 | `limit: n` |
+| `list_project_sessions_with_agent/2` | None (callers must pass) | `limit: n`, `offset: n` |
+| `list_sessions_for_scope/2` | None (callers must pass) | `limit: n`, `offset: n` |
+
+**Usage:**
+```elixir
+# Default limit (1000)
+Sessions.list_sessions()
+
+# Custom limit
+Sessions.list_sessions(limit: 500)
+
+# With offset for pagination
+Sessions.list_sessions_for_scope(scope, limit: 50, offset: 100)
+```
+
+All callers should use explicit limits or accept the function's default. Never call a listing function without considering result size.
+
+---
+
+## Zombie Session Sweep with Partial Indexes
+
+The zombie sweep scheduler detects sessions stuck in `working` status for >30 minutes with no activity, marking them as `failed`. The query uses partial indexes on `sessions(:last_activity_at)` and `sessions(:started_at)` for efficiency.
+
+**Query Structure:**
+```elixir
+def list_idle_sessions_older_than(cutoff) do
+  from(s in Session,
+    where: s.status in ["idle", "waiting"],
+    where: is_nil(s.archived_at),
+    where: not is_nil(s.started_at),
+    where:
+      (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
+        (is_nil(s.last_activity_at) and s.started_at < ^cutoff)
+  )
+  |> Repo.all()
+end
+```
+
+**Index Design:**
+Two separate OR branches allow PostgreSQL to use:
+1. **`sessions(:last_activity_at)` index** — for sessions with recent activity
+2. **`sessions(:started_at)` index** — for sessions that never received an activity update
+
+A single `coalesce(last_activity_at, started_at)` expression would prevent index use and force a full table scan.
+
+The partial indexes filter on `status IN ["idle", "waiting"]` and `archived_at IS NULL` to avoid scanning completed or archived sessions.
+
+---
+
+## PubSub Broadcasts for Session Updates
+
+PubSub broadcasts for session status updates are now emitted from the Sessions context (`lib/eye_in_the_sky/sessions.ex`) rather than the controller layer. This keeps broadcast logic co-located with the data modifications that trigger them.
+
+**Broadcast Pattern:**
+When `Sessions.update_session/2` modifies a session's status, it broadcasts the updated session on the topic `"session:<session_id>"`:
+
+```elixir
+EyeInTheSky.Events.broadcast_session_updated(session)
+```
+
+This ensures all listeners (LiveViews, dashboards, status monitors) receive consistent updates regardless of whether the status change originates from a controller, hook, or background job.
+
+**Key Consequence:**
+Session updates initiated directly via `Sessions.update_session/2` (e.g., from the zombie sweep scheduler or status update hooks) now automatically broadcast without explicit controller handling. Callers no longer need to manage broadcasts separately — the context handles it atomically.
+
+---
+
 ## IEx Debugging
 
 ```elixir

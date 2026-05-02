@@ -14,6 +14,8 @@ Multi-agent channel chat where agents and the user interact. Agents receive mess
 
 ## Architecture
 
+### User Message Flow
+
 ```
 User types in AgentMessagesPanel (Svelte)
     |
@@ -22,23 +24,51 @@ ChatLive.handle_event("send_channel_message")
     |
     |-- 1. Save message to DB (Messages.send_channel_message)
     |-- 2. Broadcast to PubSub ("channel:<id>:messages")
-    |-- 3. Parse @mentions (ChannelProtocol.parse_routing)
-    |-- 4. Auto-add mentioned sessions to channel
-    |-- 5. For each channel member (except sender):
-    |       |-- Determine routing mode (direct/broadcast/ambient)
-    |       |-- Build member-specific prompt
+    |-- 3. ChannelFanout.fanout_all(channel_id, body, sender_session_id)
+    |
+    v
+ChannelFanout.fanout_all (parallelized via Task.async_stream, max_concurrency: 10)
+    |-- For each channel member (except sender):
+    |       |-- Parse routing mode: :direct if @mentioned, :broadcast if @all, :ambient if no mention
+    |       |-- Auto-add mentioned sessions to channel (if not members)
+    |       |-- Build member-specific prompt via ChannelProtocol.build_prompt
     |       |-- Mirror message to member's DM session (no channel_id)
-    |       |-- AgentManager.send_message(session_id, prompt)
+    |       |-- AgentManager.send_message(session_id, prompt) [concurrent]
     |
     v
 AgentWorker processes prompt, generates response
     |
     v
 Response saved via Messages.record_incoming_reply
-    |-- Broadcast to session topic + channel topic
+    |-- If response has channel_id and contains @mentions:
+    |    |-- ChannelFanout.fanout_mentions_only(channel_id, response_body, agent_session_id)
+    |    |-- Routes only to explicitly mentioned sessions as :direct
+    |-- If response has @all:
+    |    |-- ChannelFanout.fanout_all(channel_id, response_body, agent_session_id)
+    |-- If no mentions:
+    |    |-- No further routing (prevents ambient chain)
     |
     v
-ChatLive receives {:new_message, _} -> reloads from DB
+ChatLive receives {:new_message, _} via PubSub
+    |-- Deduplication guard: skip if message.id already in socket.assigns.messages
+    |-- Preload associations via ChannelMessages.preload_for_serialization
+    |-- Append message and update UI
+```
+
+### REST API Message Flow
+
+```
+External client (eits agents, Go MCP server)
+    |
+    v
+POST /api/v1/channels/:id/messages
+    |
+    v
+ChannelMessageController.create
+    |-- 1. Save message to DB
+    |-- 2. Broadcast to PubSub ("channel:<id>:messages")
+    |-- 3. ChannelFanout.fanout_all(channel_id, body, sender_session_id)
+    |       [Routes to all channel members using same protocol as UI]
 ```
 
 ## Routing Protocol (ChannelProtocol)
@@ -192,32 +222,41 @@ Channels.count_unread_messages(channel_id, session_id)
 Channels.list_channels_for_session(session_id)
 ```
 
-### Messages (`lib/eye_in_the_sky_web/messages.ex`)
+### ChannelMessages (`lib/eye_in_the_sky/channel_messages.ex`)
 
-Message storage and retrieval.
+Message storage and retrieval for channels. Extracted from Messages context to isolate channel-specific logic.
 
 ```elixir
 # Channel messages
-Messages.list_messages_for_channel(channel_id, opts \\ [])  # Last 100, preloads reactions/attachments/session
-Messages.send_channel_message(attrs)                         # Create + broadcast to channel
-Messages.create_channel_message(attrs)                       # Create only, no broadcast
+ChannelMessages.list_messages_for_channel(channel_id, opts \\ [])  # Last 100, preloads reactions/attachments/session
+ChannelMessages.send_channel_message(attrs)                         # Create only (no broadcast; fanout happens in controller/live)
+ChannelMessages.create_channel_message(attrs)                       # Create only, no broadcast
+ChannelMessages.preload_for_serialization(message)                  # Preload [:session, :reactions] for ChatPresenter
 
+# Threading
+ChannelMessages.create_thread_reply(parent_message_id, attrs)
+ChannelMessages.list_thread_replies(parent_message_id)
+
+# Reactions
+ChannelMessages.toggle_reaction(message_id, session_id, emoji)
+ChannelMessages.list_reactions_for_message(message_id)
+```
+
+**Important**: `preload_for_serialization/1` is called in `PubSubHandlers.handle_info({:new_message, msg})` after deduplication checks. Avoids re-fetching the entire message list on every broadcast.
+
+### Messages (`lib/eye_in_the_sky_web/messages.ex`)
+
+Session and DM message storage (complementary to ChannelMessages).
+
+```elixir
 # Session messages
 Messages.send_message(attrs)                                 # Create + broadcast to session (and channel if channel_id set)
 Messages.record_incoming_reply(session_id, body, provider, opts)
-
-# Threading
-Messages.create_thread_reply(parent_message_id, attrs)
-Messages.list_thread_replies(parent_message_id)
-
-# Reactions
-Messages.toggle_reaction(message_id, session_id, emoji)
-Messages.list_reactions_for_message(message_id)
 ```
 
 **Important**: `send_message` broadcasts to both the session topic AND the channel topic if `channel_id` is set. Mirror messages (copying user message to agent's DM session for context) must NOT include `channel_id` to avoid duplicate broadcasts.
 
-### ChannelProtocol (`lib/eye_in_the_sky_web/claude/channel_protocol.ex`)
+### ChannelProtocol (`lib/eye_in_the_sky/claude/channel_protocol.ex`)
 
 Routing logic for multi-agent channels.
 
@@ -226,6 +265,31 @@ ChannelProtocol.parse_routing(body, session_id)  # -> {mode, mentioned_ids, ment
 ChannelProtocol.build_prompt(mode, body)          # -> instruction + message string
 ChannelProtocol.skip?(member_session_id, sender_session_id)  # -> boolean (skip self)
 ```
+
+### ChannelFanout (`lib/eye_in_the_sky/claude/channel_fanout.ex`)
+
+Core fanout engine for routing messages to channel members. Uses `Task.async_stream` with `max_concurrency: 10` to parallelize DB inserts and agent message delivery.
+
+```elixir
+ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks \\ [])
+  # Route to all members (excluding sender)
+  # Routing mode (:direct/:broadcast/:ambient) determined per-member via ChannelProtocol
+  # Auto-adds mentioned sessions as members if not present
+  # Parallelized: all N sends fire concurrently, latency ≈ 1 insert time
+
+ChannelFanout.fanout_mentions_only(channel_id, body, sender_session_id)
+  # Route ONLY to explicitly @mentioned sessions as :direct
+  # Does NOT fan out to non-mentioned members
+  # Used by agent replies to prevent ambient chain reactions
+  # Sender is skipped even if self-mentioned
+```
+
+**Integration points**:
+- Called from `ChatLive.handle_event("send_channel_message")` via `ChannelHelpers.route_to_members`
+- Called from `ChannelMessageController.create` for REST API posted messages
+- Called from `AgentWorkerEvents.maybe_fanout_mentions` for agent replies with @mentions
+
+**Performance**: Task.async_stream with timeout: 5s, on_timeout: :kill_task prevents hung agents from blocking delivery to other members. Connection pool capped at 10 concurrent checkouts.
 
 ### ChatWorker / ChatManager
 
@@ -254,6 +318,19 @@ All PubSub goes through `EyeInTheSkyWeb.Events` (never call `Phoenix.PubSub` dir
 | `session:<id>` | `{:new_message, %Message{}}` | `Messages.send_message`, `Broadcaster` | `DmLive` |
 | `agent:working` | `{:agent_working, uuid, id}` | `AgentWorker`, `SessionWorker` | `ChatLive`, `DmLive` |
 | `agent:working` | `{:agent_stopped, uuid, id}` | `AgentWorker`, `SessionWorker` | `ChatLive`, `DmLive` |
+
+## PubSub Handler Deduplication
+
+Multiple broadcasts can fire for a single message insert:
+
+1. `broadcast_and_return` from `Messages.create_channel_message` (immediate, from creating process)
+2. `NotifyListener` via Postgres LISTEN/NOTIFY (async, fires for every table insert)
+
+Both send identical `{:new_message, msg}` payloads to the `channel:<id>:messages` topic. Without deduplication, the message renders twice in the UI.
+
+**Solution**: `PubSubHandlers.handle_info({:new_message, msg})` checks if `msg.id` already exists in `socket.assigns.messages` before appending. Silently skips duplicates with a log trace.
+
+This also allows us to keep `Repo.preload(msg, [:session, :reactions])` in the handler context rather than the DB layer — the PubSub handler is the natural serialization boundary (now delegated to `ChannelMessages.preload_for_serialization/1`).
 
 ## REST API
 

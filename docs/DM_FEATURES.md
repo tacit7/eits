@@ -628,13 +628,13 @@ The `Deduplicator` module and `BulkImporter` guard against duplicate delivery us
 
 ## Tool Result Message UI
 
-**Commits:** `76d6d61e`, `677a0c78`
+**Commits:** `76d6d61e`, `677a0c78`, `e192700e`
 
 Tool result messages in the DM chat have special UI treatment to reduce visual clutter.
 
 **Display rules:**
 - **Output closed by default**: `<details>` element renders without the `open` attribute, so tool output is collapsed
-- **Empty output skipped**: When body is blank/whitespace, the widget is not rendered at all
+- **Empty output skipped**: When body is blank/whitespace, the widget is not rendered at all (commit `e192700e`)
 - **Max-width constraint**: Tool widgets limited to 70% of container width for mobile/desktop readability
 - **No timestamp**: Tool event messages don't show hover timestamps
 

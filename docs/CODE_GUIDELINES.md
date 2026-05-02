@@ -2429,3 +2429,480 @@ export const SessionsDropdownGuard = {
 
 **Rule:** Use MutationObserver + focus tracking for state that must survive stream patches. Do not use to work around missing `beforeUpdate` — if the hook element's attributes change, the standard callbacks will fire.
 
+
+---
+
+## Database Query Patterns (Ecto)
+
+### Golden Rule: Push Filters to the Database
+
+**Never filter in Elixir after calling `Repo.all` or `Repo.one`.**
+
+Filters belong in the database query. Moving filters from SQL to Elixir creates hidden N+1 queries, unbounded result sets, and performance cliffs at scale.
+
+#### ❌ Wrong: Filter in Elixir
+```elixir
+# lib/eye_in_the_sky_web/live/project_live/teams.ex
+# This fetches ALL teams, then filters in Elixir
+teams = Teams.list_teams(project_id)
+  |> Enum.filter(&String.contains?(String.downcase(&1.name), String.downcase(search_query)))
+```
+
+**Why this is bad:**
+- Loads all teams into memory (unbounded)
+- Ignores database indexes
+- Pagination is impossible
+- Query gets worse as data grows
+
+#### ✅ Correct: Filter in Database
+```elixir
+# lib/eye_in_the_sky/teams.ex
+def list_teams(project_id, opts \\ []) do
+  search_query = Keyword.get(opts, :search, "")
+  
+  from(t in Team,
+    where: t.project_id == ^project_id,
+    where: ilike(t.name, ^"%#{search_query}%"),
+    order_by: t.name,
+    limit: 500
+  )
+  |> Repo.all()
+end
+
+# lib/eye_in_the_sky_web/live/project_live/teams.ex
+teams = Teams.list_teams(project_id, search: @search_query)
+```
+
+**Benefits:**
+- Uses database indexes on `name`
+- Unbounded results are impossible (query has a limit)
+- Pagination is simple (add `offset`)
+- Same code works with 100 or 1M teams
+
+### Move Repo Calls out of Controllers / Plugs / PubSub Handlers
+
+**Database operations belong in contexts, not in controllers, plugs, or LiveView PubSub handlers.**
+
+Mixing data access with request handling makes it hard to test, reuse logic, and reason about transaction boundaries.
+
+#### ❌ Wrong: Repo in Controller
+```elixir
+# lib/eye_in_the_sky_web/controllers/api/v1/teams_controller.ex
+def show(conn, %{"id" => id}) do
+  # Repo call in controller
+  team = Repo.preload(Teams.get_team(id), :members)
+  render(conn, :show, team: team)
+end
+
+# lib/eye_in_the_sky_web/live/project_live/teams.ex
+# PubSub handler with Repo call
+def handle_info({:team, :updated, team}, socket) do
+  # This is wrong — DB access in event handler
+  team = Repo.preload(team, :members)
+  {:noreply, assign(socket, :team, team)}
+end
+```
+
+#### ✅ Correct: Repo in Context
+```elixir
+# lib/eye_in_the_sky/teams.ex
+def get_team(id, opts \\ []) do
+  preload = Keyword.get(opts, :preload, [])
+  
+  from(t in Team, where: t.id == ^id)
+  |> maybe_preload(preload)
+  |> Repo.one()
+end
+
+defp maybe_preload(query, []), do: query
+defp maybe_preload(query, preloads), do: Repo.preload(query, preloads)
+
+# lib/eye_in_the_sky_web/controllers/api/v1/teams_controller.ex
+def show(conn, %{"id" => id}) do
+  team = Teams.get_team(id, preload: :members)
+  render(conn, :show, team: team)
+end
+
+# lib/eye_in_the_sky_web/live/project_live/teams.ex
+def handle_info({:team, :updated, id}, socket) do
+  team = Teams.get_team(id, preload: :members)
+  {:noreply, assign(socket, :team, team)}
+end
+```
+
+**Benefits:**
+- Contexts own all data access (single source of truth)
+- Controllers are thin; easy to test
+- PubSub handlers stay simple
+- Preloading strategy is centralized
+
+**Rule:** All `Repo.*` calls live in context modules (`lib/eye_in_the_sky/*.ex`). Controllers, plugs, and LiveView event handlers call context functions; they never call `Repo` directly.
+
+### Unbounded Query Caps (Required)
+
+**Every `list_*` function must have a default limit.** Use `limit: 500` for most data, `limit: 200` for high-volume tables like messages.
+
+```elixir
+# lib/eye_in_the_sky/teams.ex
+def list_teams(project_id, opts \\ []) do
+  limit = Keyword.get(opts, :limit, 500)
+  
+  from(t in Team,
+    where: t.project_id == ^project_id,
+    order_by: t.name,
+    limit: ^limit
+  )
+  |> Repo.all()
+end
+
+# lib/eye_in_the_sky/sessions.ex
+def list_sessions_with_agent(agent_id, opts \\ []) do
+  limit = Keyword.get(opts, :limit, 500)
+  
+  from(s in Session,
+    where: s.agent_id == ^agent_id,
+    order_by: [desc: s.inserted_at],
+    limit: ^limit
+  )
+  |> Repo.all()
+end
+
+# lib/eye_in_the_sky/messages/listings.ex
+def list_messages(channel_id, opts \\ []) do
+  limit = Keyword.get(opts, :limit, 200)  # Messages are high-volume
+  
+  from(m in Message,
+    where: m.channel_id == ^channel_id,
+    order_by: [desc: m.inserted_at],
+    limit: ^limit
+  )
+  |> Repo.all()
+end
+```
+
+**Why:**
+- Prevents "fetch all N million rows" accidents
+- Enables pagination (caller can override with custom limit)
+- Query performance is predictable
+
+**Rule:** Every `list_*` function has `limit: 500` (or lower for high-volume tables). Allow callers to override via options: `Keyword.get(opts, :limit, 500)`.
+
+---
+
+## Concurrency Safety: SELECT-then-Write Races (TOCTOU)
+
+**Never SELECT then conditionally INSERT/UPDATE/DELETE.** This pattern loses races under concurrent load.
+
+### Problem: The Race Window
+```elixir
+# ❌ WRONG: This has a race condition
+def toggle_reaction(message_id, session_id, emoji) do
+  # User A reads
+  existing = Repo.one(from r in MessageReaction, where: r.message_id == ^message_id and r.session_id == ^session_id and r.emoji == ^emoji)
+  
+  if existing do
+    # Context switch: User B inserts the same emoji
+    # User A deletes, User B's insert is lost OR User A's delete fails
+    Repo.delete(existing)
+  else
+    # Context switch: User B inserts the same emoji
+    # User A inserts, violates unique constraint
+    Repo.insert(%MessageReaction{message_id: message_id, session_id: session_id, emoji: emoji})
+  end
+end
+```
+
+### Solution 1: Try INSERT with on_conflict (Most Common)
+
+Use `Repo.insert(..., on_conflict: :nothing)` to atomically handle duplicates. If the unique constraint fires, treat it as "already exists":
+
+```elixir
+# ✅ CORRECT: Single-roundtrip upsert
+def toggle_reaction(message_id, session_id, emoji) do
+  now = DateTime.utc_now() |> DateTime.truncate(:second)
+  
+  attrs = %{
+    message_id: message_id,
+    session_id: session_id,
+    emoji: emoji,
+    inserted_at: now
+  }
+  
+  result = %MessageReaction{}
+    |> MessageReaction.changeset(attrs)
+    |> Repo.insert(on_conflict: :nothing, conflict_target: [:message_id, :session_id, :emoji])
+  
+  case result do
+    {:ok, %MessageReaction{id: id}} when not is_nil(id) ->
+      # Insert succeeded — new reaction added
+      {:ok, :added}
+    
+    {:ok, %MessageReaction{id: nil}} ->
+      # on_conflict: :nothing fired — reaction already existed; remove it
+      delete_reaction(message_id, session_id, emoji)
+      {:ok, :removed}
+    
+    error ->
+      error
+  end
+end
+```
+
+**Why this works:**
+- Single database round-trip (atomic)
+- No race window between SELECT and INSERT
+- The unique constraint is the authority
+
+### Solution 2: UPDATE with Atomic Operations (For Status Toggles)
+
+For status fields that toggle (e.g., `starred = NOT starred`), use `UPDATE ... SET field = NOT field RETURNING *`:
+
+```elixir
+# ✅ CORRECT: Atomic toggle
+def toggle_starred(note_id) do
+  case Repo.query(
+    "UPDATE notes SET starred = NOT starred WHERE id = $1 RETURNING *",
+    [note_id]
+  ) do
+    {:ok, %{rows: []}} ->
+      {:error, :not_found}
+    
+    {:ok, %{rows: [row], columns: cols}} ->
+      note = Repo.load(Note, Enum.zip(cols, row))
+      {:ok, note}
+    
+    {:error, reason} ->
+      {:error, reason}
+  end
+end
+```
+
+**Why this works:**
+- Single UPDATE statement (atomic)
+- No SELECT needed
+- RETURNING gets the new value without a second query
+
+### Solution 3: DELETE with RETURNING (For Removals)
+
+Collapse SELECT + DELETE into single DELETE ... RETURNING:
+
+```elixir
+# ✅ CORRECT: Atomic delete with confirmation
+def delete_checklist_item(id) do
+  case Repo.query(
+    "DELETE FROM checklist_items WHERE id = $1 RETURNING *",
+    [id]
+  ) do
+    {:ok, %{rows: []}} ->
+      {:error, :not_found}
+    
+    {:ok, %{rows: [row], columns: cols}} ->
+      item = Repo.load(ChecklistItem, Enum.zip(cols, row))
+      {:ok, item}
+    
+    {:error, reason} ->
+      {:error, reason}
+  end
+end
+```
+
+**Rule:** Avoid SELECT-then-write. Use `on_conflict`, atomic UPDATE/DELETE operations, or a single upsert statement. All writes should be single round-trips.
+
+---
+
+## Batch Operations vs N+1 Queries
+
+### N+1: The Hidden Performance Cliff
+
+```elixir
+# ❌ WRONG: N+1 query
+agents = Repo.all(Agent)  # 1 query
+agent_statuses = agents
+  |> Enum.map(&get_status/1)  # N queries (one per agent)
+  |> Enum.into(%{})
+
+defp get_status(agent) do
+  from(s in Status, where: s.agent_id == ^agent.id, order_by: [desc: s.inserted_at], limit: 1)
+  |> Repo.one()
+end
+```
+
+**Why this is bad:**
+- For 1K agents, this runs 1,001 queries
+- Response time: O(N), not O(log N)
+- Completely scalable at small data, breaks at medium/large
+
+### Solution 1: Join Query (Most Common)
+
+```elixir
+# ✅ CORRECT: Single query with join
+def agents_with_latest_status(project_id) do
+  from(a in Agent,
+    left_join: s in subquery(
+      from(s in Status, order_by: [s.agent_id, desc: s.inserted_at], distinct: s.agent_id, select: s)
+    ),
+    on: s.agent_id == a.id,
+    where: a.project_id == ^project_id,
+    select: {a, s}
+  )
+  |> Repo.all()
+  |> Enum.into(%{}, fn {a, s} -> {a.id, {a, s}} end)
+end
+```
+
+### Solution 2: Batch Load (For Separate Concerns)
+
+When the join is too complex, batch-load in groups:
+
+```elixir
+# ✅ CORRECT: Batch load in 2 queries
+def agents_with_latest_status(project_id) do
+  agents = Repo.all(from a in Agent, where: a.project_id == ^project_id)
+  agent_ids = Enum.map(agents, & &1.id)
+  
+  statuses = from(s in Status,
+    where: s.agent_id in ^agent_ids,
+    order_by: [s.agent_id, desc: s.inserted_at],
+    distinct: s.agent_id
+  )
+  |> Repo.all()
+  |> Enum.group_by(& &1.agent_id)
+  
+  Enum.map(agents, fn a ->
+    latest = statuses[a.id] |> List.first()
+    {a, latest}
+  end)
+end
+```
+
+**Benefits over N+1:**
+- 2 queries instead of 1,001
+- Fast even with 10K agents
+- Easy to understand
+
+**Rule:** Before calling `Enum.map(&Repo.get_by(...))`, check if you can:
+1. Join the tables in one query
+2. Batch-load related data in groups
+3. Use `Repo.preload(..., in_parallel: true)` for multiple preloads
+
+---
+
+## Ecto Audit Tooling and Practices
+
+### The Ecto Audit Checklist
+
+Before merging a context module or changeset, run through this checklist to catch common query and concurrency bugs:
+
+1. **Query limits:** Every `list_*` has a default limit (500, or lower for high-volume tables)
+2. **Filter location:** All filtering is in SQL (`where` clauses), not Elixir (`Enum.filter`)
+3. **Preload strategy:** Preloads are explicit and documented; no hidden N+1 queries
+4. **Select clarity:** When using `select:`, ensure you're not silently dropping fields
+5. **Race conditions:** No SELECT-then-write patterns; use `on_conflict`, atomic operations, or batch inserts
+6. **Index alignment:** Queries match the available indexes; check `EXPLAIN ANALYZE` for seq scans
+7. **Context-owned DB access:** All `Repo.*` calls are in contexts, not controllers/plugs/PubSub handlers
+8. **Foreign key constraints:** All FK columns have corresponding indexes (avoids sequential scans on DELETE/UPDATE)
+
+### Running the Ecto Audit Check
+
+```bash
+# Run all Ecto audits
+mix ecto.audit
+
+# Run a specific module audit
+mix ecto.audit --module EyeInTheSky.Teams
+
+# Generate a detailed report
+mix ecto.audit --report detailed
+```
+
+The audit tool scans:
+- Unbounded `Repo.all/from` queries
+- Missing preload strategies
+- N+1-prone query patterns
+- Race condition patterns (SELECT-then-write)
+- Foreign key columns without indexes
+
+### Credo Check: Ecto Patterns
+
+A Credo check enforces audit best practices:
+
+```bash
+mix credo --checks Credo.Check.EctoQueryBounds
+```
+
+This flags:
+- `from(...) |> Repo.all()` without a limit
+- `Enum.filter` after `Repo.all`
+- `map(&Repo.one_by(...))` patterns
+- Hardcoded `project_id` checks in changeset validations
+
+### Audit Rounds and Standards
+
+The codebase has undergone 8 audit rounds (commits 2ee6803c, 03649456, 6541aed2, etc.) establishing these standards:
+
+- **R8:** Unbounded list limits, TOCTOU race collapses, invalid index rebuilds
+- **R7:** Tag creation upsert races, checklist 2-query collapses, job_runs indexes, slug constraint names
+- **R6:** Unbounded query caps, missing FK indexes, hardcoded state_id
+- **R5:** Controller limits, channel transaction safety, agent_defs N+1 fixes
+- **R4:** Scheduler N+1, bulk importer dedup, canvas layout update, task tag batch upsert, message copy bulk insert
+- **Early rounds:** Foundational query limits, Repo placement, audit tooling setup
+
+Consult the commit log for context module fixes in your area.
+
+**Rule:** Before submitting a context module for review, run the audit checklist manually and fix any findings. Use `mix ecto.audit` and the Credo check for automated detection.
+
+---
+
+## Context Module Structure (Best Practices)
+
+### Organizing a Context
+
+Contexts own all data access for a domain (e.g., Teams, Agents, Messages). Structure them as:
+
+1. **Public functions:** Query builders and mutations (`list_*`, `get_*`, `create_*`, `update_*`, `delete_*`)
+2. **Type specs:** `@spec` annotations for all public functions
+3. **Sub-modules:** Extracted helpers for large contexts (see Module Extraction section)
+
+```elixir
+defmodule EyeInTheSky.Teams do
+  alias EyeInTheSky.Repo
+  alias EyeInTheSky.Teams.Team
+  
+  import Ecto.Query
+  
+  # Public API
+  
+  @spec list_teams(String.t(), Keyword.t()) :: [Team.t()]
+  def list_teams(project_id, opts \\ []) do
+    search = Keyword.get(opts, :search, "")
+    limit = Keyword.get(opts, :limit, 500)
+    
+    from(t in Team,
+      where: t.project_id == ^project_id,
+      where: ilike(t.name, ^"%#{search}%"),
+      order_by: t.name,
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+  
+  @spec get_team(String.t()) :: Team.t() | nil
+  def get_team(id) do
+    Repo.get(Team, id)
+  end
+  
+  @spec create_team(map()) :: {:ok, Team.t()} | {:error, Changeset.t()}
+  def create_team(attrs) do
+    %Team{}
+    |> Team.changeset(attrs)
+    |> Repo.insert()
+  end
+  
+  # Private helpers
+  
+  # ...
+end
+```
+
+**Rule:** Public functions have `@spec` annotations. Filters and limits are parameterized in the function signature, with sensible defaults. Extraction to sub-modules happens at 50+ lines of domain logic.
+

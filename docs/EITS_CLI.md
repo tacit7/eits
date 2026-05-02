@@ -425,17 +425,27 @@ eits channels list [--project <id>]
 eits channels create --name <name> [--project <id>] [--description <text>] \
   [--type <public|private>]
 
+eits channels mine [--session <uuid|id>] [--json]
+
 eits channels send <channel_id> --body <text> [--session <uuid|id>] \
   [--broadcast-team <team_id>]
 
-eits channels messages <channel_id> [--limit|-n <N>]    # Default 20, max 200
+eits channels messages <channel_id> [--limit|-n <N>] [--since <message_id>] [--before <message_id>]
 
 eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
 
 eits channels leave <channel_id> [--session <uuid|id>]
+
+eits channels members <channel_id> [--json]
 ```
 
-`--broadcast-team` fans out a follow-up DM to all team members after posting the channel message.
+**Subcommand details:**
+
+- `mine`: List channels the current session is a member of. Defaults to `$EITS_SESSION_UUID`. Returns table format (ID, NAME, ROLE, TYPE) or `--json` for raw output.
+- `messages`: Get messages from a channel. Default limit is 20, max 200. Use `--since <message_id>` for forward pagination (catch-up), or `--before <message_id>` for backward pagination (load-older).
+- `send`: Post a message. `--broadcast-team` fans out a follow-up DM to all team members after posting the channel message.
+
+**Environment injection**: When spawned agents are launched from a channel context (e.g., via Claude provider or Codex with channel binding), `EITS_CHANNEL_ID` is automatically injected into the spawned process environment.
 
 ---
 

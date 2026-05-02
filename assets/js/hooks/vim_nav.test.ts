@@ -1732,3 +1732,276 @@ describe("VimNav numeric count prefix", () => {
     h.destroyed()
   })
 })
+
+describe("{/} group jump commands", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  function makeList(count: number): HTMLElement[] {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const items: HTMLElement[] = []
+    for (let i = 0; i < count; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      item.textContent = `Item ${i}`
+      list.appendChild(item)
+      items.push(item)
+    }
+    document.body.appendChild(list)
+    return items
+  }
+
+  function makeListWithGroups(): { items: HTMLElement[]; seps: HTMLElement[] } {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const items: HTMLElement[] = []
+    const seps: HTMLElement[] = []
+
+    const sep1 = document.createElement("li")
+    sep1.setAttribute("data-vim-list-group", "")
+    sep1.textContent = "Group A"
+    list.appendChild(sep1)
+    seps.push(sep1)
+
+    for (let i = 0; i < 3; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      list.appendChild(item)
+      items.push(item)
+    }
+
+    const sep2 = document.createElement("li")
+    sep2.setAttribute("data-vim-list-group", "")
+    sep2.textContent = "Group B"
+    list.appendChild(sep2)
+    seps.push(sep2)
+
+    for (let i = 3; i < 6; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      list.appendChild(item)
+      items.push(item)
+    }
+
+    document.body.appendChild(list)
+    return { items, seps }
+  }
+
+  it("list.group_prev and list.group_next commands registered with feature:vim-list scope", () => {
+    const prev = COMMANDS.find(c => c.id === "list.group_prev")!
+    const next = COMMANDS.find(c => c.id === "list.group_next")!
+    expect(prev).toBeDefined()
+    expect(next).toBeDefined()
+    expect(prev.keys).toEqual(["{"])
+    expect(next.keys).toEqual(["}"])
+    expect(prev.scope).toBe("feature:vim-list")
+    expect(next.scope).toBe("feature:vim-list")
+  })
+
+  it("} with no separators falls back to list_bottom (last item)", () => {
+    const items = makeList(5)
+    const h = makeHook()
+    h.listFocusIndex = 1
+    h.executeCommand(COMMANDS.find(c => c.id === "list.group_next")!)
+    expect(h.listFocusIndex).toBe(4)
+    expect(items[4].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("{ with no separators falls back to list_top (first item)", () => {
+    const items = makeList(5)
+    const h = makeHook()
+    h.listFocusIndex = 3
+    h.executeCommand(COMMANDS.find(c => c.id === "list.group_prev")!)
+    expect(h.listFocusIndex).toBe(0)
+    expect(items[0].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("{/} are no-ops when no list exists", () => {
+    const h = makeHook()
+    h.listFocusIndex = -1
+    expect(() => h.executeCommand(COMMANDS.find(c => c.id === "list.group_next")!)).not.toThrow()
+    expect(() => h.executeCommand(COMMANDS.find(c => c.id === "list.group_prev")!)).not.toThrow()
+    expect(h.listFocusIndex).toBe(-1)
+  })
+
+  it("} jumps to first item of next group (past separator)", () => {
+    const { items } = makeListWithGroups()
+    const h = makeHook()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.group_next")!)
+    // items[3] is the first item of group B
+    expect(h.listFocusIndex).toBe(3)
+    expect(items[3].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("{ from middle of group B jumps to first item of group B", () => {
+    const { items } = makeListWithGroups()
+    const h = makeHook()
+    h.listFocusIndex = 4
+    h.focusListItem(4)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.group_prev")!)
+    // First item of group B is items[3]
+    expect(h.listFocusIndex).toBe(3)
+    expect(items[3].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("{ from first item of group B jumps to first item of group A", () => {
+    const { items } = makeListWithGroups()
+    const h = makeHook()
+    h.listFocusIndex = 3
+    h.focusListItem(3)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.group_prev")!)
+    // First item of group A is items[0]
+    expect(h.listFocusIndex).toBe(0)
+    expect(items[0].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("} from last group stays at last item when no next separator", () => {
+    const { items } = makeListWithGroups()
+    const h = makeHook()
+    h.listFocusIndex = 4
+    h.focusListItem(4)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.group_next")!)
+    // No next separator after group B — clamps to last item
+    expect(h.listFocusIndex).toBe(5)
+    expect(items[5].classList.contains("vim-nav-focused")).toBe(true)
+  })
+
+  it("{ and } are not in PREFIXES (single keys)", () => {
+    expect(PREFIXES.has("{")).toBe(false)
+    expect(PREFIXES.has("}")).toBe(false)
+  })
+})
+
+describe("generic dd/aa list item delete and archive", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+
+  function makeTypedList(types: Array<{ type: string; id: string }>): HTMLElement[] {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const items: HTMLElement[] = []
+    for (const { type, id } of types) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      item.setAttribute("data-vim-item-type", type)
+      item.setAttribute("data-vim-item-id", id)
+      list.appendChild(item)
+      items.push(item)
+    }
+    document.body.appendChild(list)
+    return items
+  }
+
+  function makeUntaggedSessionList(count: number): HTMLElement[] {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const items: HTMLElement[] = []
+    for (let i = 0; i < count; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      item.setAttribute("data-session-id", String(i + 1))
+      list.appendChild(item)
+      items.push(item)
+    }
+    document.body.appendChild(list)
+    return items
+  }
+
+  it("list.delete and list.archive commands registered with feature:vim-list scope", () => {
+    const del = COMMANDS.find(c => c.id === "list.delete")!
+    const arc = COMMANDS.find(c => c.id === "list.archive")!
+    expect(del).toBeDefined()
+    expect(arc).toBeDefined()
+    expect(del.keys).toEqual(["d", "d"])
+    expect(arc.keys).toEqual(["a", "a"])
+    expect(del.scope).toBe("feature:vim-list")
+    expect(arc.scope).toBe("feature:vim-list")
+  })
+
+  it("d is in PREFIXES when data-vim-list exists", () => {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    document.body.appendChild(list)
+    expect(matchesKnownBindingOrPrefix([], "d")).toBe(true)
+  })
+
+  it("list_item_delete pushes delete_task for a task item", () => {
+    makeTypedList([{ type: "task", id: "42" }])
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.delete")!)
+    expect(h.pushToList).toHaveBeenCalledWith("delete_task", { item_type: "task", item_id: "42" })
+  })
+
+  it("list_item_archive pushes archive_task for a task item", () => {
+    makeTypedList([{ type: "task", id: "7" }])
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.archive")!)
+    expect(h.pushToList).toHaveBeenCalledWith("archive_task", { item_type: "task", item_id: "7" })
+  })
+
+  it("list_item_delete pushes delete_note for a note item", () => {
+    makeTypedList([{ type: "note", id: "99" }])
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.delete")!)
+    expect(h.pushToList).toHaveBeenCalledWith("delete_note", { item_type: "note", item_id: "99" })
+  })
+
+  it("list_item_archive pushes archive_session and includes session_id for session item", () => {
+    makeTypedList([{ type: "session", id: "55" }])
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.archive")!)
+    expect(h.pushToList).toHaveBeenCalledWith("archive_session", {
+      item_type: "session", item_id: "55", session_id: "55"
+    })
+  })
+
+  it("list_item_delete falls back to delete_session with session_id for untagged item", () => {
+    makeUntaggedSessionList(2)
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.delete")!)
+    expect(h.pushToList).toHaveBeenCalledWith("delete_session", { session_id: "1" })
+  })
+
+  it("list_item_archive is a no-op when no item is focused", () => {
+    makeTypedList([{ type: "task", id: "1" }])
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = -1
+    h.executeCommand(COMMANDS.find(c => c.id === "list.archive")!)
+    expect(h.pushToList).not.toHaveBeenCalled()
+  })
+
+  it("list_item_delete refocuses after item removal", async () => {
+    const items = makeTypedList([
+      { type: "task", id: "1" },
+      { type: "task", id: "2" },
+      { type: "task", id: "3" },
+    ])
+    const h = makeHook()
+    h.pushToList = vi.fn()
+    h.listFocusIndex = 1
+    h.focusListItem(1)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.delete")!)
+    items[1].remove()
+    await new Promise(r => setTimeout(r, 0))
+    expect(h.listFocusIndex).toBe(1)
+    const remaining = document.querySelectorAll("[data-vim-list-item]")
+    expect(remaining[1].classList.contains("vim-nav-focused")).toBe(true)
+  })
+})

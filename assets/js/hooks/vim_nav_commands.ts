@@ -16,7 +16,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -304,6 +304,18 @@ export const COMMANDS: Command[] = [
   { id: "leader.create.kanban_task", label: "New Kanban Task", keys: ["Space", "n", "k"], group: "create",
     action: { kind: "push_event", event: "toggle_new_task_drawer", payload: {}, target: "active_view" },
     scope: "route_suffix:/kanban" },
+
+  // group jump (context: any list)
+  { id: "list.group_prev", label: "Previous group", keys: ["{"], group: "context",
+    action: { kind: "client", name: "list_group_prev" }, scope: "feature:vim-list" },
+  { id: "list.group_next", label: "Next group",     keys: ["}"], group: "context",
+    action: { kind: "client", name: "list_group_next" }, scope: "feature:vim-list" },
+
+  // generic delete / archive (context: any list)
+  { id: "list.delete",  label: "Delete item",  keys: ["d", "d"], group: "context",
+    action: { kind: "client", name: "list_item_delete" },  scope: "feature:vim-list" },
+  { id: "list.archive", label: "Archive item", keys: ["a", "a"], group: "context",
+    action: { kind: "client", name: "list_item_archive" }, scope: "feature:vim-list" },
 ]
 
 // All valid first keys in multi-key sequences

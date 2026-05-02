@@ -110,9 +110,35 @@ defmodule EyeInTheSky.Settings do
     :ok
   end
 
-  @doc "Set multiple settings at once."
+  @doc """
+  Set multiple settings at once.
+
+  Runs all upserts in a single transaction and fires one `settings_changed`
+  broadcast per key — replacing the previous N-query / N-broadcast pattern.
+  """
   def put_many(settings) when is_map(settings) do
-    Enum.each(settings, fn {k, v} -> put(k, v) end)
+    pairs =
+      Enum.map(settings, fn {k, v} -> {@prefix <> to_string(k), to_string(v)} end)
+
+    Repo.transaction(fn ->
+      Enum.each(pairs, fn {meta_key, val} ->
+        Repo.query!(
+          """
+          INSERT INTO meta (key, value, updated_at)
+          VALUES ($1, $2, CURRENT_TIMESTAMP)
+          ON CONFLICT(key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP
+          """,
+          [meta_key, val]
+        )
+      end)
+    end)
+
+    # One broadcast per key after the transaction commits.
+    Enum.each(pairs, fn {meta_key, val} ->
+      key = String.replace_prefix(meta_key, @prefix, "")
+      EyeInTheSky.Events.settings_changed(key, val)
+    end)
+
     :ok
   end
 

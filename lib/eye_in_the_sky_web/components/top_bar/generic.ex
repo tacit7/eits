@@ -23,6 +23,7 @@ defmodule EyeInTheSkyWeb.TopBar.Generic do
       value={@search_query}
       on_change="search"
       class="flex-1 max-w-xs"
+      vim_search={true}
     />
     """
   end

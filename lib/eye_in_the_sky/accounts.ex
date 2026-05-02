@@ -23,36 +23,42 @@ defmodule EyeInTheSky.Accounts do
   end
 
   def get_or_create_user(username) do
-    case get_user_by_username(username) do
-      {:error, :not_found} ->
-        result =
-          %User{}
-          |> User.changeset(%{username: username, display_name: username})
-          |> Repo.insert()
+    # Use on_conflict: :nothing to collapse the TOCTOU race: if two concurrent
+    # requests register the same username simultaneously, the second INSERT is a
+    # no-op and returning: true gives us the existing row, so both callers get
+    # {:ok, user} instead of one getting {:error, changeset}.
+    result =
+      %User{}
+      |> User.changeset(%{username: username, display_name: username})
+      |> Repo.insert(
+        on_conflict: :nothing,
+        conflict_target: :username,
+        returning: true
+      )
 
-        case result do
-          {:ok, user} ->
-            case EyeInTheSky.Workspaces.create_default_workspace_for_user(user) do
-              {:ok, _workspace} ->
-                {:ok, user}
-
-              {:error, reason} ->
-                Logger.error(
-                  "accounts: failed to create default workspace for user #{user.id}: #{inspect(reason)}"
-                )
-
-                # User creation succeeded; workspace creation failing is not a reason
-                # to roll back the user. The user can still log in; workspace setup
-                # can be retried on first project creation.
-                {:ok, user}
-            end
-
-          error ->
-            error
-        end
+    case result do
+      {:ok, %User{id: nil}} ->
+        # on_conflict: :nothing returned a zeroed struct — row already existed.
+        get_user_by_username(username)
 
       {:ok, user} ->
-        {:ok, user}
+        case EyeInTheSky.Workspaces.create_default_workspace_for_user(user) do
+          {:ok, _workspace} ->
+            {:ok, user}
+
+          {:error, reason} ->
+            Logger.error(
+              "accounts: failed to create default workspace for user #{user.id}: #{inspect(reason)}"
+            )
+
+            # User creation succeeded; workspace creation failing is not a reason
+            # to roll back the user. The user can still log in; workspace setup
+            # can be retried on first project creation.
+            {:ok, user}
+        end
+
+      error ->
+        error
     end
   end
 

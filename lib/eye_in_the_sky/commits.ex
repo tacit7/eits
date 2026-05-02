@@ -9,11 +9,14 @@ defmodule EyeInTheSky.Commits do
   alias EyeInTheSky.Repo
 
   @doc """
-  Returns the list of commits.
+  Returns the list of commits. Default limit: 500.
+  Pass `limit: n` to override.
   """
   def list_commits(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     Commit
-    |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
+    |> limit(^limit)
     |> Repo.all()
   end
 

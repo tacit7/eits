@@ -12,17 +12,19 @@ defmodule EyeInTheSky.Projects do
   alias EyeInTheSky.Repo
 
   @doc """
-  Returns the list of projects.
+  Returns the list of projects. Capped at 500 rows.
   """
   def list_projects do
     Project
     |> order_by([p], asc: p.name)
+    |> limit(500)
     |> Repo.all()
   end
 
   @doc """
   Returns active projects ordered for sidebar display:
   bookmarked first, then case-insensitive name, then id for stability.
+  Capped at 500 rows.
   """
   def list_projects_for_sidebar do
     Project
@@ -32,6 +34,7 @@ defmodule EyeInTheSky.Projects do
       asc: fragment("lower(?)", p.name),
       asc: p.id
     )
+    |> limit(500)
     |> Repo.all()
   end
 
@@ -114,11 +117,13 @@ defmodule EyeInTheSky.Projects do
 
   @doc """
   Returns all projects belonging to a workspace, ordered case-insensitively by name.
+  Capped at 500 rows.
   """
   def list_projects_for_workspace(workspace_id) do
     Project
     |> where([p], p.workspace_id == ^workspace_id)
     |> order_by([p], asc: fragment("lower(?)", p.name))
+    |> limit(500)
     |> Repo.all()
   end
 

@@ -13,13 +13,16 @@ defmodule EyeInTheSky.Agents do
   alias EyeInTheSky.Sessions.Session
 
   @doc """
-  Returns the list of agents.
+  Returns the list of agents. Default limit: 500.
+  Pass `limit: n` to override.
   """
   @spec list_agents(keyword()) :: [Agent.t()]
   def list_agents(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
     Agent
     |> EyeInTheSky.QueryBuilder.maybe_where(opts, :status)
-    |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
+    |> limit(^limit)
     |> Repo.all()
   end
 

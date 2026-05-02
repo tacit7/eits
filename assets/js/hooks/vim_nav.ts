@@ -505,6 +505,18 @@ export const VimNav = {
         )
         return
       }
+      if (action.name === "find_notes") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "list-notes" } })
+        )
+        return
+      }
+      if (action.name === "find_projects") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "list-projects" } })
+        )
+        return
+      }
     }
   },
 

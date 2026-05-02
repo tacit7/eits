@@ -1561,6 +1561,50 @@ describe("Space f t find-task palette command", () => {
     const detail = (listener.mock.calls[0][0] as CustomEvent).detail
     expect(detail.commandId).toBe("list-tasks")
   })
+
+  it("leader.find.notes command exists with keys [Space,f,n]", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.find.notes")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["Space", "f", "n"])
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("find_notes")
+  })
+
+  it("find_notes dispatches palette:open-command with commandId list-notes", () => {
+    const palette = document.createElement("div")
+    palette.id = "command-palette"
+    document.body.appendChild(palette)
+    const listener = vi.fn()
+    palette.addEventListener("palette:open-command", listener)
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.find.notes")!
+    h.executeCommand(cmd)
+    expect(listener).toHaveBeenCalledTimes(1)
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail
+    expect(detail.commandId).toBe("list-notes")
+  })
+
+  it("leader.project.picker command exists with keys [Space,p,p]", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.project.picker")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["Space", "p", "p"])
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("find_projects")
+  })
+
+  it("find_projects dispatches palette:open-command with commandId list-projects", () => {
+    const palette = document.createElement("div")
+    palette.id = "command-palette"
+    document.body.appendChild(palette)
+    const listener = vi.fn()
+    palette.addEventListener("palette:open-command", listener)
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.project.picker")!
+    h.executeCommand(cmd)
+    expect(listener).toHaveBeenCalledTimes(1)
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail
+    expect(detail.commandId).toBe("list-projects")
+  })
 })
 
 describe("VimNav numeric count prefix", () => {

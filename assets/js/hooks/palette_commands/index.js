@@ -4,6 +4,7 @@ import { taskCommands } from "./tasks.js"
 import { noteCommands } from "./notes.js"
 import { sessionCommands } from "./sessions.js"
 import { canvasCommands } from "./canvas.js"
+import { projectCommands } from "./projects.js"
 
 export function getCommands(hook) {
   return [
@@ -13,5 +14,6 @@ export function getCommands(hook) {
     ...noteCommands(hook),
     ...sessionCommands(hook),
     ...canvasCommands(hook),
+    ...projectCommands(hook),
   ]
 }

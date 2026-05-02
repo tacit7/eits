@@ -110,9 +110,7 @@ defmodule EyeInTheSky.Claude.MessageFormatter do
          timestamp
        )
        when is_list(content) do
-    content
-    |> Enum.filter(&match?(%{"type" => "tool_result"}, &1))
-    |> Enum.map(fn block ->
+    for block <- content, match?(%{"type" => "tool_result"}, block) do
       tool_use_id = block["tool_use_id"] || ""
       result_content = block["content"] || ""
       body = if is_binary(result_content), do: result_content, else: Jason.encode!(result_content)
@@ -126,7 +124,7 @@ defmodule EyeInTheSky.Claude.MessageFormatter do
         usage: nil,
         stream_type: "tool_result"
       }
-    end)
+    end
   end
 
   defp extract_tool_result_messages(_, _), do: []

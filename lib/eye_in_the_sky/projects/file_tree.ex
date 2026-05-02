@@ -204,13 +204,11 @@ defmodule EyeInTheSky.Projects.FileTree do
     case File.ls(abs_path) do
       {:ok, entries} ->
         nodes =
-          entries
-          |> Enum.reject(&ignored?/1)
-          |> Enum.map(fn name ->
+          for name <- entries, not ignored?(name) do
             entry_path = Path.join(abs_path, name)
             rel_path = Path.relative_to(entry_path, real_root)
             build_node(name, entry_path, rel_path)
-          end)
+          end
           |> Enum.sort_by(fn node ->
             {if(node.type == :directory, do: 0, else: 1), String.downcase(node.name)}
           end)

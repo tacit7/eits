@@ -41,16 +41,12 @@ defmodule EyeInTheSky.Agents.Activity do
       |> Repo.all()
 
     done =
-      tasks
-      |> Enum.filter(&(&1.state_id == done_id))
-      |> Enum.map(fn t ->
+      for t <- tasks, t.state_id == done_id do
         %{id: t.id, title: t.title, completed_at: format_dt(t.completed_at)}
-      end)
+      end
 
     in_review =
-      tasks
-      |> Enum.filter(&(&1.state_id == in_review_id))
-      |> Enum.map(&format_active_task/1)
+      for t <- tasks, t.state_id == in_review_id, do: format_active_task(t)
 
     ip_tasks = Enum.filter(tasks, &(&1.state_id == in_progress_id))
 

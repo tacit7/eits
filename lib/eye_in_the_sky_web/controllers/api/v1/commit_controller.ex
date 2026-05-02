@@ -114,27 +114,17 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
       # on_conflict: :nothing returns {:ok, %Commit{id: nil}} on hash collision.
       # Split into created (id present), duplicate (id nil), and errors (changeset failures).
       created =
-        results
-        |> Enum.filter(fn
-          {:ok, %{id: id}} when not is_nil(id) -> true
-          _ -> false
-        end)
-        |> Enum.map(fn {:ok, commit} ->
+        for {:ok, %{id: id} = commit} <- results, not is_nil(id) do
           commit |> ApiPresenter.present_commit() |> Map.put(:status, "created")
-        end)
+        end
 
       duplicates =
-        results
-        |> Enum.filter(fn
-          {:ok, %{id: nil}} -> true
-          _ -> false
-        end)
-        |> Enum.map(fn {:ok, commit} -> %{commit_hash: commit.commit_hash, status: "duplicate"} end)
+        for {:ok, %{id: nil} = commit} <- results do
+          %{commit_hash: commit.commit_hash, status: "duplicate"}
+        end
 
       errors =
-        results
-        |> Enum.filter(&match?({:error, _}, &1))
-        |> Enum.map(fn {:error, changeset} -> translate_errors(changeset) end)
+        for {:error, changeset} <- results, do: translate_errors(changeset)
 
       http_status = if errors == [], do: :created, else: :multi_status
 

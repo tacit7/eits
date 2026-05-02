@@ -49,6 +49,13 @@ export const CommandPalette = {
       }
     })
 
+    this.handleEvent("palette:tasks-result", ({ tasks }) => {
+      if (this._paletteTasksResolve) {
+        this._paletteTasksResolve(tasks)
+        this._paletteTasksResolve = null
+      }
+    })
+
     this._globalKeyHandler = (e) => {
       if (this._matchesModifier(e) && e.key.toLowerCase() === "k") {
         const inEditor = document.activeElement?.closest(".cm-editor, .monaco-editor, [data-palette-no-intercept]")

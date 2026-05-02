@@ -47,6 +47,28 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     {:halt, push_event(socket, "palette:recent-sessions-result", %{sessions: results})}
   end
 
+  # ---------------------------------------------------------------------------
+  # palette:tasks
+  # ---------------------------------------------------------------------------
+
+  def handle_palette_event("palette:tasks", params, socket) do
+    project_id = Projects.parse_project_id(params["project_id"])
+
+    tasks =
+      if project_id do
+        Tasks.list_tasks_for_project(project_id, limit: 20)
+      else
+        Tasks.list_tasks(limit: 20)
+      end
+
+    results =
+      Enum.map(tasks, fn t ->
+        %{id: t.id, title: t.title, state_id: t.state_id, state_name: t.state && t.state.name, project_id: t.project_id}
+      end)
+
+    {:halt, push_event(socket, "palette:tasks-result", %{tasks: results})}
+  end
+
   def handle_palette_event(_event, _params, socket), do: {:cont, socket}
 
   # ---------------------------------------------------------------------------

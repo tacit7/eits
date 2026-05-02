@@ -149,7 +149,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       else: Sessions.get_session_by_uuid(raw)
   end
 
-  @receivable_statuses ~w(working idle)
+  # waiting = sdk-cli session ended and queued for resume; DM will be delivered on next wakeup
+  @receivable_statuses ~w(working idle waiting)
 
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:from, {:ok, from_session}} <- {:from, resolve_session_target(%{raw: from_raw, kind: :from})},
@@ -204,7 +205,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
         {:error, :not_found, "Target session not found"}
 
       {:to_receivable, false} ->
-        {:error, :unprocessable_entity, "Target session is not active and cannot receive DMs"}
+        {:error, :unprocessable_entity, "Target session is terminated (completed or failed) and cannot receive DMs"}
     end
   end
 

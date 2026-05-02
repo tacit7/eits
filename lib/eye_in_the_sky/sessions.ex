@@ -398,16 +398,17 @@ defmodule EyeInTheSky.Sessions do
   @doc """
   Broadcasts session_completed and session_updated events (no DB change).
   """
-  def broadcast_session_completed(session) do
-    Events.session_completed(session)
-    Events.session_updated(session)
-  end
+  def broadcast_session_completed(session),
+    do: broadcast_with_session_updated(session, &Events.session_completed/1)
 
   @doc """
   Broadcasts agent_stopped and session_updated events (no DB change).
   """
-  def broadcast_session_waiting(session) do
-    Events.agent_stopped(session)
+  def broadcast_session_waiting(session),
+    do: broadcast_with_session_updated(session, &Events.agent_stopped/1)
+
+  defp broadcast_with_session_updated(session, event_fn) do
+    event_fn.(session)
     Events.session_updated(session)
   end
 

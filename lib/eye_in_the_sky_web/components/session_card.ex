@@ -174,14 +174,15 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
   # Extracts the agent definition display name from a session, guarding against
   # unloaded associations and nil values.
   defp agent_display_name(session) do
-    with agent when not is_nil(agent) <- Map.get(session, :agent),
-         false <- match?(%Ecto.Association.NotLoaded{}, agent),
-         defn when is_map(defn) <- Map.get(agent, :agent_definition),
-         false <- match?(%Ecto.Association.NotLoaded{}, defn),
-         name when not is_nil(name) <- Map.get(defn, :display_name) do
-      name
-    else
-      _ -> nil
+    case Map.get(session, :agent) do
+      nil -> nil
+      %Ecto.Association.NotLoaded{} -> nil
+      agent ->
+        case Map.get(agent, :agent_definition) do
+          nil -> nil
+          %Ecto.Association.NotLoaded{} -> nil
+          defn -> Map.get(defn, :display_name)
+        end
     end
   end
 

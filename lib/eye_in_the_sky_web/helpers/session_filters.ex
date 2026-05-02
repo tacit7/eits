@@ -157,19 +157,19 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
         )
 
       "last_message" ->
-        Enum.sort_by(
-          sessions,
-          fn s -> sort_datetime(s.last_activity_at || s.started_at) end,
-          {:desc, NaiveDateTime}
-        )
+        sort_by_last_message(sessions)
 
       _ ->
-        Enum.sort_by(
-          sessions,
-          fn s -> sort_datetime(s.last_activity_at || s.started_at) end,
-          {:desc, NaiveDateTime}
-        )
+        sort_by_last_message(sessions)
     end
+  end
+
+  defp sort_by_last_message(sessions) do
+    Enum.sort_by(
+      sessions,
+      fn s -> sort_datetime(s.last_activity_at || s.started_at) end,
+      {:desc, NaiveDateTime}
+    )
   end
 
   @doc """

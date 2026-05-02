@@ -54,10 +54,11 @@ defmodule EyeInTheSky.IAM.Builtin.SanitizeApiKeys do
           {acc, n, ks}
         else
           {String.replace(acc, re, "[REDACTED:#{kind}]"), n + length(hits),
-           ks ++ ["#{kind} (#{length(hits)})"]}
+           ["#{kind} (#{length(hits)})" | ks]}
         end
       end)
 
+    kinds = Enum.reverse(kinds)
     summary = if kinds == [], do: nil, else: "Redacted: #{Enum.join(kinds, ", ")}"
     {redacted, count, summary}
   end

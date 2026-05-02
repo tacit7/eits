@@ -465,6 +465,14 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     agent_int_id =
       if params["agent_id"], do: resolve_agent_int_id(params["agent_id"]), else: nil
 
+    parent_session_int_id =
+      if params["parent_session_id"] do
+        case Sessions.resolve(params["parent_session_id"]) do
+          {:ok, s} -> s.id
+          _ -> nil
+        end
+      end
+
     include_archived = params["include_archived"] in ["true", "1", true]
     name = if params["name"] && params["name"] != "", do: params["name"]
 
@@ -472,6 +480,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     |> maybe_put_session_opt(:project_id, params["project_id"] && parse_int(params["project_id"], nil))
     |> maybe_put_session_opt(:status_filter, params["status"])
     |> maybe_put_session_opt(:agent_id, agent_int_id)
+    |> maybe_put_session_opt(:parent_session_id, parent_session_int_id)
     |> maybe_put_session_opt(:include_archived, include_archived && true)
     |> maybe_put_session_opt(:name_filter, name)
     |> Keyword.put(:limit, parse_int(params["limit"], 20))

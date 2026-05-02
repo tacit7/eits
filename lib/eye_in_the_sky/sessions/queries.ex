@@ -74,6 +74,15 @@ defmodule EyeInTheSky.Sessions.Queries do
         base_query
       end
 
+    parent_session_id = Keyword.get(opts, :parent_session_id, nil)
+
+    base_query =
+      if parent_session_id do
+        where(base_query, [s], s.parent_session_id == ^parent_session_id)
+      else
+        base_query
+      end
+
     name_filter = Keyword.get(opts, :name_filter, nil)
 
     base_query =

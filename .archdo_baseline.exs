@@ -188,7 +188,6 @@
 1.27|lib/eye_in_the_sky_web/live/project_live/teams.ex|handle_event/3
 1.27|lib/eye_in_the_sky_web/live/terminal_live.ex|handle_event/3
 1.27|lib/eye_in_the_sky_web/live/workspace_live/sessions_live.ex|handle_event/3
-1.28|lib/eye_in_the_sky_web/live/shared/jobs_formatters.ex|70c81ef
 1.29|lib/eye_in_the_sky_web/components/core_components.ex|444597
 1.29|lib/eye_in_the_sky_web/components/session_card.ex|444597
 1.29|lib/eye_in_the_sky_web/live/floating_chat_live.ex|1ece375

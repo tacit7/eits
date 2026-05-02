@@ -16,12 +16,12 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
     case execute(job) do
       {:ok, output} ->
         ScheduledJobs.record_run_complete(run, "completed", result: output)
-        broadcast()
+        EyeInTheSky.Events.jobs_updated()
         :ok
 
       {:error, reason} ->
         ScheduledJobs.record_run_complete(run, "failed", result: reason)
-        broadcast()
+        EyeInTheSky.Events.jobs_updated()
         {:error, reason}
     end
   end
@@ -62,8 +62,4 @@ defmodule EyeInTheSky.Workers.MixTaskWorker do
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(s), do: s
-
-  defp broadcast do
-    EyeInTheSky.Events.jobs_updated()
-  end
 end

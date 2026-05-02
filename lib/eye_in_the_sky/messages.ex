@@ -243,14 +243,10 @@ defmodule EyeInTheSky.Messages do
   end
 
   defp broadcast_and_return({:ok, message}) do
-    try do
-      if message.channel_id do
-        EyeInTheSky.Events.channel_message(message.channel_id, message)
-      else
-        EyeInTheSky.Events.session_new_message(message.session_id, message)
-      end
-    rescue
-      e -> Logger.error("broadcast failed for message #{message.id}: #{Exception.message(e)}")
+    if message.channel_id do
+      EyeInTheSky.Events.channel_message(message.channel_id, message)
+    else
+      EyeInTheSky.Events.session_new_message(message.session_id, message)
     end
 
     {:ok, message}
@@ -276,21 +272,25 @@ defmodule EyeInTheSky.Messages do
   defp get_int(map, key) when is_map(map) do
     case Map.get(map, key) do
       v when is_integer(v) -> v
-      v when is_binary(v) -> String.to_integer(v)
+      v when is_binary(v) ->
+        case Integer.parse(v) do
+          {n, _} -> n
+          :error -> 0
+        end
       _ -> 0
     end
-  rescue
-    _ -> 0
   end
 
   defp get_float(map, key) when is_map(map) do
     case Map.get(map, key) do
       v when is_float(v) -> v
       v when is_integer(v) -> v * 1.0
-      v when is_binary(v) -> String.to_float(v)
+      v when is_binary(v) ->
+        case Float.parse(v) do
+          {f, _} -> f
+          :error -> 0.0
+        end
       _ -> 0.0
     end
-  rescue
-    _ -> 0.0
   end
 end

@@ -444,14 +444,14 @@ eits agents activity abc-123 --since 24h
 
 ### GET /api/v1/agents
 
-List agents with optional filtering by project, status, or activity recency.
+List agents with optional filtering by project, status, or activity recency. Status filtering is pushed to the database query for efficient filtering.
 
 **Query params:**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `project_id` | integer | no | Filter to agents in a specific project |
-| `status` | string | no | Filter by status (e.g. `"working"`, `"idle"`) |
+| `status` | string | no | Filter by status (e.g. `"working"`, `"idle"`); pushed to DB query |
 | `active_since` | string | no | ISO 8601 datetime. Returns only agents with session activity at or after this time |
 | `limit` | integer | no | Max results (default 20) |
 
@@ -648,6 +648,49 @@ curl -X PATCH localhost:5001/api/v1/notes/10 \
 curl -X PATCH localhost:5001/api/v1/notes/10 \
   -H 'Content-Type: application/json' \
   -d '{"parent_type":"task","parent_id":"42"}'
+```
+
+---
+
+### GET /api/v1/notes
+
+List notes attached to a session or task with optional starred filtering. Starred filtering is pushed to the database query for efficient filtering.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | string | no | Filter to notes attached to a specific session (UUID or integer ID) |
+| `task_id` | integer | no | Filter to notes attached to a specific task |
+| `starred` | integer | no | Filter by starred status; pass `1` to return only starred notes, `0` for unstarred (filtering pushed to DB query) |
+| `q` | string | no | Full-text search query (searches note title and body) |
+| `limit` | integer | no | Max results (default 50) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "notes": [
+    {
+      "id": 10,
+      "parent_type": "session",
+      "parent_id": "42",
+      "title": "Key finding",
+      "body": "Found the root cause in session_controller.ex...",
+      "starred": 1,
+      "created_at": "2026-03-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl 'localhost:5001/api/v1/notes?session_id=42&starred=1'
+curl 'localhost:5001/api/v1/notes?task_id=1'
+curl 'localhost:5001/api/v1/notes?session_id=42&q=authentication'
 ```
 
 ---
@@ -1034,13 +1077,15 @@ eits channels list --project 1
 
 ### GET /api/v1/channels/:channel_id/messages
 
-Get recent messages for a channel.
+Get recent messages for a channel with optional pagination.
 
 **Query params:**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `limit` | integer | no | Number of messages (default 20, max 200) |
+| `since` | integer | no | Return only messages with id > since (message ID); useful for forward catch-up polling |
+| `before` | integer | no | Return only messages with id < before; used for scroll-up pagination |
 
 **Response:** `200 OK`
 
@@ -1149,7 +1194,7 @@ eits channels members 1
 
 ### POST /api/v1/channels/:id/members
 
-Add a member to a channel.
+Add a member to a channel. On success, delivers an orientation DM to the joining agent with channel ID, key eits commands, and mention routing rules.
 
 **Request body:**
 
@@ -1167,6 +1212,12 @@ Add a member to a channel.
   "notifications": "all"
 }
 ```
+
+**Orientation DM:** The endpoint immediately starts a task to deliver a DM to the joining session containing:
+- Channel name and ID
+- Key channel commands (`eits channels messages`, `eits channels send`, `eits channels mine`)
+- Mention routing rules (`@<session_id>`, `@all`, ambient messages)
+- DM body ends with `[NO_RESPONSE]` so the agent does not auto-acknowledge
 
 ---
 
@@ -1698,13 +1749,13 @@ eits tasks sessions 1
 
 ### GET /api/v1/tags
 
-List all tags in the system with optional name search.
+List all tags in the system with optional name search. Name search is pushed to the database query via ilike for efficient filtering.
 
 **Query params:**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `q` | string | no | Filter tags by name (case-insensitive substring match) |
+| `q` | string | no | Filter tags by name (case-insensitive ilike substring match); pushed to DB query |
 
 **Response:** `200 OK`
 

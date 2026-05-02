@@ -9,6 +9,10 @@ defmodule EyeInTheSky.Application do
   def start(_type, _args) do
     Oban.Telemetry.attach_default_logger(:info)
 
+    # Create the ETS table for Settings before the Repo starts so any early
+    # Settings.get/1 call (plug, env module) has a table to write to.
+    EyeInTheSky.Settings.init_cache()
+
     # Tauri integration: if launched by the Tauri wrapper, ELIXIRKIT_PUBSUB
     # will be set to the Rust-side PubSub URL. Otherwise run in standalone mode.
     elixirkit_pubsub = System.get_env("ELIXIRKIT_PUBSUB")

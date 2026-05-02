@@ -4,12 +4,25 @@ defmodule EyeInTheSky.Settings do
 
   Keys are namespaced with "settings." prefix to avoid collisions
   with other meta entries (e.g. api_key_anthropic).
+
+  ## Caching
+
+  `get/1` checks an ETS table (`:settings_cache`) before hitting the DB.
+  Cache entries expire after `@cache_ttl_ms` (60 s). `put/1`, `put_many/1`,
+  and `reset/1` evict affected keys immediately so readers see the new value
+  within one TTL window at most.
+
+  The ETS table must be created before the Repo starts; call
+  `EyeInTheSky.Settings.init_cache/0` from `Application.start/2`.
   """
 
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Utils.ToolHelpers
 
   @prefix "settings."
+  @cache_table :settings_cache
+  # 60 seconds — settings change at most a few times per day
+  @cache_ttl_ms 60_000
 
   # --- Defaults ---
 
@@ -42,13 +55,38 @@ defmodule EyeInTheSky.Settings do
     "agent_notifications" => "false"
   }
 
+  @doc """
+  Creates the ETS cache table. Must be called once during application start
+  before the supervision tree (and therefore the Repo) comes up.
+  Safe to call multiple times — no-ops if the table already exists.
+  """
+  def init_cache do
+    case :ets.whereis(@cache_table) do
+      :undefined ->
+        :ets.new(@cache_table, [:named_table, :set, :public, read_concurrency: true])
+
+      _ ->
+        @cache_table
+    end
+  end
+
   @doc "Get a single setting value, falling back to default."
   def get(key) when is_binary(key) do
     meta_key = @prefix <> key
 
-    case Repo.query("SELECT value FROM meta WHERE key = $1", [meta_key]) do
-      {:ok, %{rows: [[value]]}} -> value
-      _ -> Map.get(@defaults, key)
+    case cache_get(meta_key) do
+      {:hit, value} ->
+        value
+
+      :miss ->
+        value =
+          case Repo.query("SELECT value FROM meta WHERE key = $1", [meta_key]) do
+            {:ok, %{rows: [[v]]}} -> v
+            _ -> Map.get(@defaults, key)
+          end
+
+        cache_put(meta_key, value)
+        value
     end
   rescue
     DBConnection.ConnectionError -> Map.get(@defaults, key)
@@ -105,6 +143,7 @@ defmodule EyeInTheSky.Settings do
       [meta_key, val]
     )
 
+    cache_evict(meta_key)
     EyeInTheSky.Events.settings_changed(key, val)
 
     :ok
@@ -133,8 +172,9 @@ defmodule EyeInTheSky.Settings do
       end)
     end)
 
-    # One broadcast per key after the transaction commits.
+    # Evict cache entries and broadcast after the transaction commits.
     Enum.each(pairs, fn {meta_key, val} ->
+      cache_evict(meta_key)
       key = String.replace_prefix(meta_key, @prefix, "")
       EyeInTheSky.Events.settings_changed(key, val)
     end)
@@ -150,6 +190,7 @@ defmodule EyeInTheSky.Settings do
     meta_key = @prefix <> key
     Repo.query!("DELETE FROM meta WHERE key = $1", [meta_key])
 
+    cache_evict(meta_key)
     EyeInTheSky.Events.settings_changed(key, Map.get(@defaults, key))
 
     :ok
@@ -212,6 +253,34 @@ defmodule EyeInTheSky.Settings do
       end
 
     %{path: db_name, size: size, table_counts: table_counts}
+  end
+
+  # ---------------------------------------------------------------------------
+  # ETS cache helpers
+  # ---------------------------------------------------------------------------
+
+  defp cache_get(meta_key) do
+    now = System.monotonic_time(:millisecond)
+
+    case :ets.lookup(@cache_table, meta_key) do
+      [{^meta_key, value, expires_at}] when expires_at > now -> {:hit, value}
+      _ -> :miss
+    end
+  rescue
+    ArgumentError -> :miss
+  end
+
+  defp cache_put(meta_key, value) do
+    expires_at = System.monotonic_time(:millisecond) + @cache_ttl_ms
+    :ets.insert(@cache_table, {meta_key, value, expires_at})
+  rescue
+    ArgumentError -> :ok
+  end
+
+  defp cache_evict(meta_key) do
+    :ets.delete(@cache_table, meta_key)
+  rescue
+    ArgumentError -> :ok
   end
 
   defp parse_float(val) when is_binary(val) do

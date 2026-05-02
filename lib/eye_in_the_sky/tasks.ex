@@ -383,6 +383,25 @@ defmodule EyeInTheSky.Tasks do
     Task.changeset(task, attrs)
   end
 
+  @doc """
+  Returns `{:ok, session}` for the session currently holding the task, or `{:error, :none}`.
+  Used to enrich conflict errors on claim so callers know who the current owner is.
+  """
+  def get_current_session_for_task(task_id) do
+    query =
+      from ts in "task_sessions",
+        join: s in EyeInTheSky.Sessions.Session,
+        on: s.id == ts.session_id,
+        where: ts.task_id == ^task_id,
+        select: s,
+        limit: 1
+
+    case Repo.one(query) do
+      nil -> {:error, :none}
+      session -> {:ok, session}
+    end
+  end
+
   defdelegate search_tasks(query, project_id \\ nil, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
   # Delegates to TaskSessions context (session-linking operations)

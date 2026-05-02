@@ -207,7 +207,7 @@ _tbl_sessions() {
       "$id" \
       "$(_age "$ts")"
   done
-  [[ -n "$count" ]] && printf '\n%s session(s)\n' "$count"
+  if [[ -n "$count" ]]; then printf '\n%s session(s)\n' "$count"; fi
 }
 
 _tbl_tasks() {
@@ -225,7 +225,7 @@ _tbl_tasks() {
       "$(_trunc "$title" 44)" \
       "$id"
   done
-  [[ -n "$count" ]] && printf '\n%s task(s)\n' "$count"
+  if [[ -n "$count" ]]; then printf '\n%s task(s)\n' "$count"; fi
 }
 
 _tbl_notes() {
@@ -245,7 +245,7 @@ _tbl_notes() {
       "$(_trunc "$preview" 40)" \
       "$id"
   done
-  [[ -n "$count" ]] && printf '\n%s note(s)\n' "$count"
+  if [[ -n "$count" ]]; then printf '\n%s note(s)\n' "$count"; fi
 }
 
 _tbl_commits() {
@@ -263,7 +263,7 @@ _tbl_commits() {
       "$(_trunc "$msg" 52)" \
       "$(_age "$ts")"
   done
-  [[ -n "$count" ]] && printf '\n%s commit(s)\n' "$count"
+  if [[ -n "$count" ]]; then printf '\n%s commit(s)\n' "$count"; fi
 }
 
 # ── sessions ──────────────────────────────────────────────────────────────────
@@ -745,7 +745,7 @@ TASKS_HELP
            | .count = (.tasks | length)')
       fi
       if [[ $_json -eq 1 ]]; then echo "$_resp" | jq .; else _tbl_tasks "$_resp"; fi
-      [[ $_silent_scope -eq 1 ]] && echo "(scoped to current session — pass --all to see all tasks)" >&2
+      if [[ $_silent_scope -eq 1 ]]; then echo "(scoped to current session — pass --all to see all tasks)" >&2; fi
       ;;
     get)
       local id="${1:-}"; need id
@@ -2174,7 +2174,7 @@ _tbl_dm() {
       "$(_trunc "$_body" 52)" \
       "$(_age "$ts")"
   done
-  [[ -n "$count" ]] && printf '\n%s message(s)\n' "$count"
+  if [[ -n "$count" ]]; then printf '\n%s message(s)\n' "$count"; fi
 }
 
 cmd_dm() {
@@ -2529,7 +2529,7 @@ cmd_channels() {
             "$(_trunc "$role" 8)" \
             "$ctype"
         done
-        [[ -n "$count" ]] && printf '\n%s channel(s)\n' "$count"
+        if [[ -n "$count" ]]; then printf '\n%s channel(s)\n' "$count"; fi
       fi
       ;;
     members)
@@ -2560,7 +2560,7 @@ cmd_channels() {
             "$(_trunc "$role" 8)" \
             "${joined:0:19}"
         done
-        [[ -n "$count" ]] && printf '\n%s member(s)\n' "$count"
+        if [[ -n "$count" ]]; then printf '\n%s member(s)\n' "$count"; fi
       fi
       ;;
     *)

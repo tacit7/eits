@@ -141,15 +141,12 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
   defp list_tree_files(base_path, current_path, ignored_dirs, max_depth, current_depth) do
     case File.ls(current_path) do
       {:ok, files} ->
-        files
-        |> Enum.filter(fn file ->
-          full_path = Path.join(current_path, file)
-
-          (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
-            file not in ignored_dirs and
-            (File.dir?(full_path) or !binary_file?(full_path))
-        end)
-        |> Enum.map(&build_tree_entry(base_path, current_path, &1, max_depth, current_depth))
+        for file <- files,
+            full_path = Path.join(current_path, file),
+            (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+              file not in ignored_dirs and
+              (File.dir?(full_path) or !binary_file?(full_path)),
+            do: build_tree_entry(base_path, current_path, file, max_depth, current_depth)
         |> Enum.sort_by(&{&1.type != :directory, &1.name})
 
       {:error, _reason} ->
@@ -271,22 +268,11 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     case File.ls(dir) do
       {:ok, files} ->
         file_list =
-          files
-          |> Enum.filter(fn file ->
-            file_path = Path.join(dir, file)
-
-            hidden_ok =
-              !ignore_hidden or
-                !String.starts_with?(file, ".") or
-                file in [".claude", ".git"]
-
-            hidden_ok and
-              file not in ignored_dirs and
-              (File.dir?(file_path) or !binary_file?(file_path))
-          end)
-          |> Enum.map(fn file ->
-            file_path = Path.join(dir, file)
-
+          for file <- files,
+              file_path = Path.join(dir, file),
+              (!ignore_hidden or !String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+                file not in ignored_dirs and
+                (File.dir?(file_path) or !binary_file?(file_path)) do
             size =
               case File.stat(file_path) do
                 {:ok, %{size: s}} -> s
@@ -299,7 +285,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
               is_dir: File.dir?(file_path),
               size: size
             }
-          end)
+          end
           |> Enum.sort_by(&{!&1.is_dir, &1.name})
 
         {:ok, file_list}

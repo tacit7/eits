@@ -54,7 +54,7 @@ Each rate-limit evaluation emits a `[:eits, :rate_limit, :check]` telemetry even
 
 ```bash
 eits sessions list [--search <q>] [--name <partial>] [--status <s>] \
-  [--project <id>] [--agent <uuid>] [--mine] \
+  [--project <id>] [--agent <uuid>] [--parent <id|uuid>] [--mine] \
   [--limit <n>] [--include-archived] [--with-tasks]
 
 eits sessions get <uuid>
@@ -84,11 +84,22 @@ eits sessions notes <uuid> [<note_id>] [--full] [--starred] \
 # --full: dump full bodies for all notes
 # --starred: filter to starred notes only
 # --add: create a new note on this session
+
+eits sessions reopen [<uuid|self>]
+# Clears ended_at, sets status to idle.
+# Defaults to $EITS_SESSION_UUID when uuid omitted.
+# 'self' is substituted with $EITS_SESSION_UUID at call time.
+# Use when resume hook fails or when an orchestrator needs to post work
+# against an already-ended session.
 ```
 
 `--status` filters by session status: `working`, `idle`, `waiting`, `completed`, `failed`.
 
+`--parent <id|uuid>` filters child sessions by parent session ID. Accepts integer ID or UUID. Independent of other filters.
+
 `--mine` is mutually exclusive with `--agent`, `--search`, `--status`, `--project`.
+
+`--parent` is independent and can combine with any other filter.
 
 `sessions get <uuid>` returns a rich response that includes the session, linked tasks, notes (last 5, body truncated), and commits (last 5) in a single call.
 
@@ -124,6 +135,7 @@ eits tasks create --title <t> [--description <d>] [--project <id>] \
 eits tasks begin --title <t> [--description <d>] [--project <id>] \
   [--priority <p>] [--quiet|-q]
 # Or claim a pre-created task instead of creating new
+# On conflict (already_claimed), shows the holding session ID, UUID, and name
 eits tasks begin --id <task_id>
 
 # Update
@@ -144,9 +156,12 @@ eits tasks complete <id> <message>  # Annotate + mark done + DM lead (preferred)
 eits tasks start <id>          # DEPRECATED: use claim instead
 eits tasks done <id>           # DEPRECATED: use complete instead
 
-# Complete with message
+# Complete with message (canonical close: annotate + mark Done in one call)
 eits tasks complete <id> <message>
 eits tasks complete <id> --message <text>
+eits tasks complete <id> --message <text> --commit <sha>
+# --commit: track a commit atomically with task close (eliminates a separate eits commits create round-trip)
+# --notify <session_uuid_or_id>: DM a session after successful close
 
 # Delete
 eits tasks delete <id>
@@ -171,6 +186,10 @@ eits tasks tag <task_id> <tag_id>
 eits tasks states
 ```
 
+### Exit codes
+
+`tasks list` and other table-printing commands are safe to use in scripts with `set -euo pipefail`. The `[[ cond ]] && cmd` pattern was replaced with `if/fi` guards so empty-result branches no longer exit 1 under pipefail. This applies to `_tbl_tasks`, `_tbl_sessions`, `_tbl_notes`, `_tbl_commits`, `channels list`, and `channels members`.
+
 ### Workflow states
 
 | ID | Name        |
@@ -187,11 +206,13 @@ eits tasks states
 eits tasks begin --title "Implement X"              # create + start in one shot
 eits tasks update 42 --state-name in-review        # move to review when ready
 eits tasks complete 42 "Implemented feature X"     # CANONICAL close: annotate + mark Done + DM lead
+eits tasks complete 42 --message "done" --commit $SHA  # close + track commit atomically
 ```
 
 **Option 2: Claim pre-created task (orchestrator-assigned)**
 ```bash
 eits tasks begin --id 42                           # claim task 42 (no title required)
+                                                   # conflict: shows holding session ID, UUID, name
 eits tasks update 42 --state-name in-review        # move to review when ready
 eits tasks complete 42 "Implemented feature X"     # CANONICAL close
 ```
@@ -353,6 +374,8 @@ eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] .
 # --agent defaults to $EITS_AGENT_UUID; falls back to session lookup when unset
 # If no --hash provided, uses current HEAD (git rev-parse HEAD)
 # If no --message provided, uses git log -1 --format=%s
+# Response includes top-level boolean: already_tracked=true when ALL submitted hashes were duplicates
+# (easier to check than inspecting array lengths)
 ```
 
 `--mine`, `--session`, and `--agent` are mutually exclusive.

@@ -94,46 +94,45 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
 
   def handle_bulk_move(%{"state_id" => state_id_str}, socket, reload_fn) do
     state_id = parse_int(state_id_str, 0)
-    now = DateTime.utc_now()
 
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.update_task(task, %{state_id: state_id, updated_at: now})
-    end)
+    uuids =
+      socket.assigns.selected_tasks
+      |> Enum.reject(&is_nil/1)
+      |> Enum.to_list()
+
+    Tasks.batch_update_task_state(uuids, state_id)
 
     {:noreply, socket |> assign(:selected_tasks, MapSet.new()) |> reload_fn.()}
   end
 
   def handle_bulk_archive(socket, reload_fn) do
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.archive_task(task)
-    end)
+    uuids =
+      socket.assigns.selected_tasks
+      |> Enum.reject(&is_nil/1)
+      |> Enum.to_list()
+
+    {archived, _} = Tasks.batch_archive_tasks(uuids)
 
     {:noreply,
      socket
      |> assign(:selected_tasks, MapSet.new())
      |> reload_fn.()
-     |> put_flash(:info, "Tasks archived")}
+     |> put_flash(:info, "Archived #{archived} task#{if archived != 1, do: "s"}")}
   end
 
   def handle_bulk_delete(socket, reload_fn) do
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.delete_task_with_associations(task)
-    end)
+    uuids =
+      socket.assigns.selected_tasks
+      |> Enum.reject(&is_nil/1)
+      |> Enum.to_list()
+
+    {deleted, _} = Tasks.batch_delete_tasks_with_associations(uuids)
 
     {:noreply,
      socket
      |> assign(:selected_tasks, MapSet.new())
      |> reload_fn.()
-     |> put_flash(:info, "Tasks deleted")}
+     |> put_flash(:info, "Deleted #{deleted} task#{if deleted != 1, do: "s"}")}
   end
 
   # ---------------------------------------------------------------------------
@@ -151,19 +150,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
         {:noreply, put_flash(socket, :error, "Invalid state")}
 
       true ->
-        results =
-          Enum.map(ids, fn task_id ->
-            case Tasks.get_task_by_uuid_or_id(task_id) do
-              {:ok, task} -> match?({:ok, _}, Tasks.update_task_state(task, state_id))
-              {:error, :not_found} -> false
-            end
-          end)
-
-        moved = Enum.count(results, & &1)
+        id_list = MapSet.to_list(ids)
+        total = length(id_list)
+        {moved, _} = Tasks.batch_update_task_state(id_list, state_id)
         state_name = Tasks.get_workflow_state!(state_id).name
 
         {flash_level, flash_msg} =
-          build_bulk_flash(moved, length(results),
+          build_bulk_flash(moved, total,
             verb: "Moved",
             entity: "task",
             destination: state_name
@@ -182,18 +175,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
     if MapSet.size(ids) == 0 do
       {:noreply, assign(socket, :show_archive_confirm, false)}
     else
-      results =
-        Enum.map(ids, fn task_id ->
-          case Tasks.get_task_by_uuid_or_id(task_id) do
-            {:ok, task} -> match?({:ok, _}, Tasks.archive_task(task))
-            {:error, :not_found} -> false
-          end
-        end)
-
-      archived = Enum.count(results, & &1)
+      id_list = MapSet.to_list(ids)
+      total = length(id_list)
+      {archived, _} = Tasks.batch_archive_tasks(id_list)
 
       {flash_level, flash_msg} =
-        build_bulk_flash(archived, length(results), verb: "Archived", entity: "task")
+        build_bulk_flash(archived, total, verb: "Archived", entity: "task")
 
       {:noreply,
        socket
@@ -206,13 +193,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
   end
 
   def handle_tasks_delete_selected(ids, socket, reload_fn) do
-    deleted =
-      Enum.count(ids, fn task_id ->
-        case Tasks.get_task_by_uuid_or_id(task_id) do
-          {:ok, task} -> match?({:ok, _}, Tasks.delete_task_with_associations(task))
-          {:error, :not_found} -> false
-        end
-      end)
+    id_list = MapSet.to_list(ids)
+    {deleted, _} = Tasks.batch_delete_tasks_with_associations(id_list)
 
     {:noreply,
      socket

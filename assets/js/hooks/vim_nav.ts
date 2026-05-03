@@ -83,9 +83,9 @@ function createStatusbar(): HTMLElement {
   return el
 }
 
-function updateStatusbar(el: HTMLElement, mode: Mode): void {
+function updateStatusbar(el: HTMLElement, mode: Mode, count = 0): void {
   if (mode === "normal") {
-    el.textContent = "[ NORMAL ]"
+    el.textContent = count > 0 ? `[ NORMAL ] ${count}` : "[ NORMAL ]"
     el.style.color = "var(--color-base-content)"
     el.style.opacity = "0.55"
   } else {
@@ -116,6 +116,8 @@ export const VimNav = {
   _onHelpClose: null as ((e: KeyboardEvent) => void) | null,
   _onPageLoad: null as ((e: Event) => void) | null,
   listFocusIndex: -1 as number,
+  count: 0 as number,
+  countTimer: null as ReturnType<typeof setTimeout> | null,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -153,6 +155,7 @@ export const VimNav = {
     if (this._onFocusout) document.removeEventListener("focusout", this._onFocusout)
     if (this._onPageLoad) window.removeEventListener("phx:page-loading-stop", this._onPageLoad)
     if (this.sequenceTimer) clearTimeout(this.sequenceTimer)
+    if (this.countTimer) clearTimeout(this.countTimer)
     this.hideHelp()
     this.hideWhichKey()
     this.clearListFocus()
@@ -170,7 +173,7 @@ export const VimNav = {
 
   setMode(mode: Mode) {
     this.mode = mode
-    if (this.statusbarEl) updateStatusbar(this.statusbarEl, mode)
+    if (this.statusbarEl) updateStatusbar(this.statusbarEl, mode, this.count)
   },
 
   handleKey(event: KeyboardEvent) {
@@ -189,12 +192,51 @@ export const VimNav = {
     }
 
     // Phase 2: normal mode
+    // Ctrl-D / Ctrl-U: half-page scroll on lists (handled before the modifier guard).
+    if (event.ctrlKey && !event.metaKey && !event.altKey && !isEditableTarget(event.target)) {
+      const key = event.key.toLowerCase()
+      if ((key === "d" || key === "u") && (document.querySelector("[data-vim-list]") || isFlyoutOpen())) {
+        event.preventDefault()
+        const items = this.currentListItems()
+        if (items.length > 0) {
+          const listEl = this.currentList()
+          const containerHeight = listEl ? listEl.clientHeight : window.innerHeight
+          const itemHeight = items[0].offsetHeight || 48
+          const halfPage = Math.max(1, Math.floor(containerHeight / itemHeight / 2))
+          const startIndex = this.listFocusIndex < 0 ? 0 : this.listFocusIndex
+          if (key === "d") {
+            this.focusListItem(Math.min(startIndex + halfPage, items.length - 1))
+          } else {
+            this.focusListItem(Math.max(startIndex - halfPage, 0))
+          }
+        }
+        return
+      }
+    }
+
     if (event.metaKey || event.ctrlKey || event.altKey) return
     if (isEditableTarget(event.target)) return
 
     const key = keyFromEvent(event)
 
+    // Numeric count prefix: accumulate digits when buffer is empty
+    if (/^[0-9]$/.test(key) && this.buffer.length === 0) {
+      this.count = this.count * 10 + parseInt(key, 10)
+      if (this.countTimer) clearTimeout(this.countTimer)
+      this.countTimer = setTimeout(() => {
+        this.count = 0
+        if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, 0)
+        this.countTimer = null
+      }, 2000)
+      if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, this.count)
+      event.preventDefault()
+      return
+    }
+
     if (key === "Escape") {
+      this.count = 0
+      if (this.countTimer) { clearTimeout(this.countTimer); this.countTimer = null }
+      if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, 0)
       if (this.flyoutFocused) {
         this.clearListFocus()
         return
@@ -336,6 +378,12 @@ export const VimNav = {
   },
 
   executeCommand(cmd: Command) {
+    const times = this.count > 0 ? this.count : 1
+    const rawCount = this.count
+    this.count = 0
+    if (this.countTimer) { clearTimeout(this.countTimer); this.countTimer = null }
+    if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, 0)
+
     const { action } = cmd
     if (action.kind === "navigate") {
       const target = this.buildPath(action.path, action.relative)
@@ -376,20 +424,44 @@ export const VimNav = {
       if (action.name === "list_next") {
         const items = this.currentListItems()
         if (items.length === 0) return
-        const next = Math.min(this.listFocusIndex + 1, items.length - 1)
+        const next = Math.min(this.listFocusIndex + times, items.length - 1)
         this.focusListItem(next)
         return
       }
       if (action.name === "list_prev") {
         const items = this.currentListItems()
         if (items.length === 0) return
-        const prev = Math.max(this.listFocusIndex - 1, 0)
+        const prev = Math.max(this.listFocusIndex - times, 0)
         this.focusListItem(prev)
+        return
+      }
+      if (action.name === "list_top") {
+        const items = this.currentListItems()
+        if (items.length === 0) return
+        this.focusListItem(0)
+        return
+      }
+      if (action.name === "list_bottom") {
+        const items = this.currentListItems()
+        if (items.length === 0) return
+        if (rawCount > 0 && rawCount <= items.length) {
+          this.focusListItem(rawCount - 1)
+        } else {
+          this.focusListItem(items.length - 1)
+        }
         return
       }
       if (action.name === "list_open") {
         const item = this.currentListItems()[this.listFocusIndex]
         item?.click()
+        return
+      }
+      if (action.name === "list_open_tab") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const anchor = (item.tagName === "A" ? item : item.querySelector<HTMLAnchorElement>("a[href]")) as HTMLAnchorElement | null
+        const href = anchor?.getAttribute("href")
+        if (href) window.open(href, "_blank", "noopener,noreferrer")
         return
       }
       if (action.name === "page_search") {
@@ -455,6 +527,114 @@ export const VimNav = {
         document.getElementById("command-palette")?.dispatchEvent(
           new CustomEvent("palette:open-command", { detail: { commandId: "recent-sessions" } })
         )
+        return
+      }
+      if (action.name === "find_tasks") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "list-tasks" } })
+        )
+        return
+      }
+      if (action.name === "find_notes") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "list-notes" } })
+        )
+        return
+      }
+      if (action.name === "find_projects") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "list-projects" } })
+        )
+        return
+      }
+      if (action.name === "list_group_prev" || action.name === "list_group_next") {
+        const items = this.currentListItems()
+        if (items.length === 0) return
+        const separators = [...document.querySelectorAll<HTMLElement>("[data-vim-list-group]")]
+        if (separators.length === 0) {
+          // Fallback: no group separators — behave like gg / G
+          if (action.name === "list_group_prev") this.focusListItem(0)
+          else this.focusListItem(items.length - 1)
+          return
+        }
+        const currentEl = items[this.listFocusIndex < 0 ? 0 : this.listFocusIndex]
+        if (action.name === "list_group_next") {
+          // Find the next separator after the current element, then focus the first
+          // list item whose DOM position is after that separator.
+          const nextSep = separators.find(sep =>
+            currentEl.compareDocumentPosition(sep) & Node.DOCUMENT_POSITION_FOLLOWING
+          )
+          if (!nextSep) { this.focusListItem(items.length - 1); return }
+          const firstAfter = items.find(item =>
+            nextSep.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING
+          )
+          if (firstAfter) this.focusListItem(items.indexOf(firstAfter))
+          else this.focusListItem(items.length - 1)
+        } else {
+          // list_group_prev: find the separator immediately before the current element,
+          // then focus the first list item after the separator before that one (or item 0).
+          const sepsBeforeCurrent = separators.filter(sep =>
+            currentEl.compareDocumentPosition(sep) & Node.DOCUMENT_POSITION_PRECEDING
+          )
+          if (sepsBeforeCurrent.length === 0) { this.focusListItem(0); return }
+          // The group containing the current item starts right after the last separator before it.
+          const ownSep = sepsBeforeCurrent[sepsBeforeCurrent.length - 1]
+          // If we're already at the first item of our group (nothing between ownSep and currentEl),
+          // jump to the group before ownSep.
+          const itemsBetween = items.filter(item =>
+            (ownSep.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+            (item.compareDocumentPosition(currentEl) & Node.DOCUMENT_POSITION_FOLLOWING)
+          )
+          if (itemsBetween.length > 0) {
+            // Not at group head — go to the first item of our own group
+            this.focusListItem(items.indexOf(itemsBetween[0]))
+          } else {
+            // Already at group head — jump to the group before ownSep
+            const sepsBefore = sepsBeforeCurrent.slice(0, -1)
+            if (sepsBefore.length === 0) { this.focusListItem(0); return }
+            const prevSep = sepsBefore[sepsBefore.length - 1]
+            const firstAfterPrev = items.find(item =>
+              prevSep.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING
+            )
+            if (firstAfterPrev) this.focusListItem(items.indexOf(firstAfterPrev))
+            else this.focusListItem(0)
+          }
+        }
+        return
+      }
+      if (action.name === "list_item_delete" || action.name === "list_item_archive") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const itemType = item.dataset.vimItemType
+        const itemId = item.dataset.vimItemId
+        const isArchive = action.name === "list_item_archive"
+        // Determine event name based on entity type (or fall back to session for untagged items)
+        let event: string
+        let payload: Record<string, unknown>
+        if (itemType && itemId) {
+          event = isArchive ? `archive_${itemType}` : `delete_${itemType}`
+          payload = { item_type: itemType, item_id: itemId }
+          // Keep session_id for backwards compat when type is session
+          if (itemType === "session") payload.session_id = itemId
+        } else {
+          // Backwards compat: untagged item — fall back to session behavior
+          const sessionId = item.dataset.sessionId
+          if (!sessionId) return
+          event = isArchive ? "archive_session" : "delete_session"
+          payload = { session_id: sessionId }
+        }
+        // TODO: LiveView handlers needed for archive_note/delete_note/archive_task/delete_task
+        const savedIndex = this.listFocusIndex
+        const obs = new MutationObserver(() => {
+          if (item.isConnected) return
+          obs.disconnect()
+          const items = this.currentListItems()
+          if (items.length === 0) { this.listFocusIndex = -1; return }
+          this.focusListItem(Math.min(savedIndex, items.length - 1))
+        })
+        obs.observe(document.body, { childList: true, subtree: true })
+        setTimeout(() => obs.disconnect(), 3000)
+        this.pushToList?.(event, payload)
         return
       }
     }

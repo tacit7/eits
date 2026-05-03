@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpers do
   import Phoenix.LiveView, only: [put_flash: 3]
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.{Events, Notes, Sessions}
+  alias EyeInTheSky.{Notes, Sessions}
 
   def handle_update_session_name(%{"value" => value}, socket) do
     session = socket.assigns.session
@@ -76,8 +76,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpers do
     # Update session status so stale agent_working PubSub events don't revive the UI
     case Sessions.get_session(session_id) do
       {:ok, session} ->
-        Sessions.update_session(session, %{status: "idle"})
-        Events.agent_stopped(session)
+        Sessions.set_session_idle(session)
 
       _ ->
         :ok

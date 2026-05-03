@@ -186,6 +186,17 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Sets a session to idle status and fires agent_stopped event.
+  Used by cancel/stop handlers in the web layer.
+  """
+  def set_session_idle(%Session{} = session) do
+    with {:ok, updated} <- update_session(session, %{status: "idle"}) do
+      Events.agent_stopped(updated)
+      {:ok, updated}
+    end
+  end
+
+  @doc """
   Ends a session by setting ended_at timestamp.
   Broadcasts agent_stopped and session_updated events.
   """
@@ -205,19 +216,16 @@ defmodule EyeInTheSky.Sessions do
   Archives a session (soft delete).
   Broadcasts session_updated event.
   """
-  def archive_session(%Session{} = session) do
-    with {:ok, updated} <- update_session(session, %{archived_at: DateTime.utc_now()}) do
-      Events.session_updated(updated)
-      {:ok, updated}
-    end
-  end
+  def archive_session(%Session{} = session), do: set_archived(session, DateTime.utc_now())
 
   @doc """
   Unarchives a session.
   Broadcasts session_updated event.
   """
-  def unarchive_session(%Session{} = session) do
-    with {:ok, updated} <- update_session(session, %{archived_at: nil}) do
+  def unarchive_session(%Session{} = session), do: set_archived(session, nil)
+
+  defp set_archived(%Session{} = session, value) do
+    with {:ok, updated} <- update_session(session, %{archived_at: value}) do
       Events.session_updated(updated)
       {:ok, updated}
     end
@@ -227,6 +235,14 @@ defmodule EyeInTheSky.Sessions do
   Deletes a session (hard delete).
   """
   def delete_session(%Session{} = session), do: delete(session)
+
+  @doc """
+  Deletes multiple sessions by their integer IDs in a single query.
+  Returns `{deleted_count, nil}`.
+  """
+  def batch_delete_sessions(ids) when is_list(ids) do
+    Repo.delete_all(from s in Session, where: s.id in ^ids)
+  end
 
   @doc """
   Atomically increments the cached token and cost totals on a session row.
@@ -313,7 +329,7 @@ defmodule EyeInTheSky.Sessions do
   - `limit: n` — cap result count at the DB level
   """
   def list_project_sessions_with_agent(project_id, opts \\ []) do
-    limit_val = Keyword.get(opts, :limit)
+    limit_val = Keyword.get(opts, :limit, 500)
     offset_val = Keyword.get(opts, :offset)
     active_only = Keyword.get(opts, :active_only, false)
 
@@ -378,6 +394,44 @@ defmodule EyeInTheSky.Sessions do
   Returns statuses that indicate a session can no longer send or receive messages.
   """
   def terminated_statuses, do: ~w(completed failed)
+
+  @doc """
+  Broadcasts session_updated event (no DB change).
+  """
+  def broadcast_session_updated(session), do: Events.session_updated(session)
+
+  @doc """
+  Broadcasts session_completed and session_updated events (no DB change).
+  """
+  def broadcast_session_completed(session),
+    do: broadcast_with_session_updated(session, &Events.session_completed/1)
+
+  @doc """
+  Broadcasts agent_stopped and session_updated events (no DB change).
+  """
+  def broadcast_session_waiting(session),
+    do: broadcast_with_session_updated(session, &Events.agent_stopped/1)
+
+  defp broadcast_with_session_updated(session, event_fn) do
+    event_fn.(session)
+    Events.session_updated(session)
+  end
+
+  @doc """
+  Broadcasts appropriate side-effect events based on status change (no DB change).
+  Fires agent_stopped or agent_working depending on status, then session_updated.
+  """
+  def broadcast_status_side_effects(session, status) do
+    if status do
+      if status in ["completed", "failed", "waiting", "idle"] do
+        Events.agent_stopped(session)
+      else
+        Events.agent_working(session)
+      end
+    end
+
+    Events.session_updated(session)
+  end
 
   @doc """
   Extracts and validates model information from a nested model object.

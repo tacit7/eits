@@ -865,6 +865,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :debounce, :string, default: "300"
   attr :autocomplete, :string, default: "off"
   attr :class, :string, default: ""
+  attr :vim_search, :boolean, default: false
 
   def search_bar(assigns) do
     ~H"""
@@ -891,6 +892,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         placeholder={@placeholder}
         phx-debounce={@debounce}
         autocomplete={@autocomplete}
+        data-vim-search={if @vim_search, do: "", else: nil}
         class={"input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 " <>
           "focus:border-primary/30 focus:bg-base-100 transition-colors " <>
           if(@size == "xs",

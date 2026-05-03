@@ -1181,21 +1181,23 @@ The DM page overlay (timer controls, task detail) now includes an action menu bu
 
 ## DM Receivable Statuses
 
-**Commit:** `eb55f37c`
+**Commits:** `eb55f37c` (idle added), `870f3e3a` (waiting added)
 
-The `/api/v1/dm` endpoint now accepts messages from sessions in the `idle` status in addition to `working` and `waiting`.
+The `/api/v1/dm` endpoint accepts messages destined for sessions in any non-terminal status.
 
-**Allowed statuses:**
+**Allowed statuses (`@receivable_statuses`):**
 - `working` — agent actively processing
-- `idle` — agent waiting for input (newly added)
-- `waiting` — agent queued for resources
+- `idle` — agent waiting for input
+- `waiting` — sdk-cli session ended and queued for resume; DM is persisted and delivered on next wakeup. Blocking this status caused false 422s when agents tried to reach headless sessions between turns.
 
-**Rejected statuses:**
-- `completed` — session terminated; cannot send DMs
-- `failed` — session errored; cannot send DMs
+**Rejected statuses (terminal):**
+- `completed` — session finished; cannot receive DMs
+- `failed` — session errored; cannot receive DMs
+
+**Error message on rejection:** `"Target session is terminated (completed or failed) and cannot receive DMs"`
 
 **File:**
-- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `do_dm/4` status allowlist
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `@receivable_statuses` module attribute and `do_dm/4`
 
 ---
 
@@ -1226,6 +1228,41 @@ defp session_belongs_to?(_session_id, _current_user), do: true
 This allows access in both auth-enabled (any user) and auth-disabled (`current_user=nil`) modes. Future ownership enforcement requires adding `user_id` to the sessions table.
 
 **File:** `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex`
+
+---
+
+## Sessions.set_session_idle/1 Owns agent_stopped Event
+
+**Commit:** `a8725252`
+
+`Events.agent_stopped/1` is no longer fired directly from `DmSessionHelpers`. The call was moved into `Sessions.set_session_idle/1`, a new function in the Sessions context that atomically updates status to `"idle"` and fires the event with the updated session struct.
+
+**Before:**
+```elixir
+# dm_session_helpers.ex — cancel/stop handler
+Sessions.update_session(session, %{status: "idle"})
+Events.agent_stopped(session)  # fired with stale pre-update struct
+```
+
+**After:**
+```elixir
+# Sessions context
+def set_session_idle(%Session{} = session) do
+  with {:ok, updated} <- update_session(session, %{status: "idle"}) do
+    Events.agent_stopped(updated)  # updated struct guaranteed
+    {:ok, updated}
+  end
+end
+
+# dm_session_helpers.ex — cancel/stop handler
+Sessions.set_session_idle(session)
+```
+
+**Why it matters:** The old pattern fired `agent_stopped` with the pre-update struct, so subscribers received stale status data. `set_session_idle/1` ensures the event always carries the post-update session. The `Events` alias was removed from `DmSessionHelpers` as it is no longer needed there.
+
+**Files:**
+- `lib/eye_in_the_sky/sessions.ex` — `set_session_idle/1` added
+- `lib/eye_in_the_sky_web/live/shared/dm_session_helpers.ex` — `Events` alias removed; calls `Sessions.set_session_idle/1`
 
 ---
 

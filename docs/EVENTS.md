@@ -16,13 +16,60 @@ Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session:#{session_id}")
 
 ---
 
+## Architectural rule: context modules own event firing
+
+The web layer (controllers, LiveView action modules) must not call `Events` directly. State-change broadcasts are the responsibility of the context module that owns the data.
+
+| Context | Broadcast responsibility |
+|---|---|
+| `Sessions` | All session status events (`session_updated`, `session_completed`, `agent_stopped`, `agent_working`) |
+| `Projects` | `project_updated` (fired inside `Projects.set_bookmarked/2`) |
+
+This means controllers and LiveView handlers call context functions and never import or alias `Events` for broadcast purposes.
+
+### Sessions broadcast helpers
+
+`EyeInTheSky.Sessions` exposes these broadcast functions:
+
+```elixir
+Sessions.broadcast_session_updated(session)
+# Fires: session_updated
+
+Sessions.broadcast_session_completed(session)
+# Fires: session_completed + session_updated
+
+Sessions.broadcast_session_waiting(session)
+# Fires: agent_stopped + session_updated
+
+Sessions.broadcast_status_side_effects(session, status)
+# Fires: agent_stopped (for completed/failed/waiting/idle) or agent_working,
+#        then session_updated
+
+Sessions.set_session_idle(session)
+# DB write: sets status to "idle"
+# Fires: agent_stopped (via broadcast_session_waiting internals)
+# Returns: {:ok, updated_session}
+```
+
+`broadcast_session_completed/1` and `broadcast_session_waiting/1` are implemented via a private helper `broadcast_with_session_updated/2` that takes the event function and always appends a `session_updated` broadcast, eliminating the pattern of calling two `Events.*` functions in sequence.
+
+### set_session_idle/1
+
+`Sessions.set_session_idle/1` was introduced to fix a stale-struct bug: previously the web layer called `Sessions.update_session/2` and then `Events.agent_stopped(session)` with the pre-update struct. The new function performs the DB write and fires `agent_stopped` with the updated session in a single call. Cancel/stop handlers in the web layer use this instead of the two-step pattern.
+
+### channel_message double-broadcast fix
+
+`ChannelActions.broadcast_system_event/2` previously called `ChannelMessages.send_channel_message/1` and then explicitly called `Events.channel_message/2`. `send_channel_message` already broadcasts via `broadcast_and_return` internally, so the explicit call caused every system message (agent join/leave) to be broadcast twice. The redundant `Events.channel_message` call has been removed.
+
+---
+
 ## Topics
 
 | Topic | Subscribe helper | Broadcasters | Subscribers |
 |---|---|---|---|
-| `"agents"` | `subscribe_agents/0` | `Agents`, `SessionController` | Sidebar, DMLive, session pages |
+| `"agents"` | `subscribe_agents/0` | `Agents`, `Sessions` | Sidebar, DMLive, session pages |
 | `"agent:working"` | `subscribe_agent_working/0` | `Events` (normalized handler) | ChatLive, DMLive |
-| `"session:<id>"` | `subscribe_session/1` | `Messages`, `Messages.Broadcaster`, `SessionWorker`, `SessionController`, `MessagingController`, `GiteaWebhookController` | DMLive, FloatingChatLive |
+| `"session:<id>"` | `subscribe_session/1` | `Messages`, `Messages.Broadcaster`, `SessionWorker`, `Sessions`, `MessagingController`, `GiteaWebhookController` | DMLive, FloatingChatLive |
 | `"session:<id>:status"` | `subscribe_session_status/1` | `SessionWorker` | DMLive |
 | `"session:<id>:timer"` | `subscribe_session_timer/1` | `OrchestratorTimers` | DMLive |
 | `"dm:<id>:stream"` | `subscribe_dm_stream/1` | `AgentWorker`, `WorkerEvents` | DMLive |
@@ -36,7 +83,7 @@ Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session:#{session_id}")
 | `"settings"` | `subscribe_settings/0` | `Settings` | OverviewSettings |
 | `"scheduled_jobs"` | `subscribe_scheduled_jobs/0` | Workers, `JobHelper` | JobsLive |
 | `"session_lifecycle"` | `subscribe_session_lifecycle/0` | `WorkerEvents` | Teams.Subscriber |
-| `"projects"` | `subscribe_projects/0` | `Projects`, `project_updated/1` | Sidebar |
+| `"projects"` | `subscribe_projects/0` | `Projects` | Sidebar |
 | `"canvas:<id>"` | `subscribe_canvas/1` | `Canvases`, `Agents` | CanvasLive |
 
 ---
@@ -50,7 +97,7 @@ Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session:#{session_id}")
 | `{:agent_created, agent}` | `Agents` | Agent identity record inserted |
 | `{:agent_updated, agent}` | `Agents`, `SessionController` | Agent/session record updated |
 | `{:agent_deleted, agent}` | `Agents` | Agent identity record removed |
-| `{:agent_stopped, session}` | `SessionController` | Session terminal state (REST API form) |
+| `{:agent_stopped, session}` | `Sessions` | Session terminal state; fired via `broadcast_session_waiting/1` or `set_session_idle/1` |
 
 ### `"agent:working"`
 

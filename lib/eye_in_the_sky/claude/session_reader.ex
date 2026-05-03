@@ -30,9 +30,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
   defp discover_sessions_in_project(project_path, escaped_project_name) do
     case File.ls(project_path) do
       {:ok, files} ->
-        files
-        |> Enum.filter(&String.ends_with?(&1, ".jsonl"))
-        |> Enum.map(fn filename ->
+        for filename <- files, String.ends_with?(filename, ".jsonl") do
           session_id = String.replace_suffix(filename, ".jsonl", "")
           file_path = Path.join(project_path, filename)
           file_stat = File.stat!(file_path)
@@ -50,7 +48,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
             file_size: file_stat.size,
             discovered: true
           }
-        end)
+        end
 
       {:error, _} ->
         []
@@ -237,9 +235,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
   defp extract_tool_events(%{"message" => %{"content" => content}} = entry) do
     ts = Map.get(entry, "timestamp")
 
-    content
-    |> Enum.filter(&match?(%{"type" => "tool_use"}, &1))
-    |> Enum.map(fn %{"name" => name, "id" => tool_id} = item ->
+    for %{"type" => "tool_use", "name" => name, "id" => tool_id} = item <- content do
       input = Map.get(item, "input", %{})
 
       %{
@@ -248,7 +244,7 @@ defmodule EyeInTheSky.Claude.SessionReader do
         message: MessageFormatter.format_tool_call(name, input),
         timestamp: ts
       }
-    end)
+    end
   end
 
   defp extract_tool_events(_), do: []

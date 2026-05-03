@@ -49,6 +49,27 @@ export const CommandPalette = {
       }
     })
 
+    this.handleEvent("palette:tasks-result", ({ tasks }) => {
+      if (this._paletteTasksResolve) {
+        this._paletteTasksResolve(tasks)
+        this._paletteTasksResolve = null
+      }
+    })
+
+    this.handleEvent("palette:notes-result", ({ notes }) => {
+      if (this._paletteNotesResolve) {
+        this._paletteNotesResolve(notes)
+        this._paletteNotesResolve = null
+      }
+    })
+
+    this.handleEvent("palette:projects-result", ({ projects }) => {
+      if (this._paletteProjectsResolve) {
+        this._paletteProjectsResolve(projects)
+        this._paletteProjectsResolve = null
+      }
+    })
+
     this._globalKeyHandler = (e) => {
       if (this._matchesModifier(e) && e.key.toLowerCase() === "k") {
         const inEditor = document.activeElement?.closest(".cm-editor, .monaco-editor, [data-palette-no-intercept]")

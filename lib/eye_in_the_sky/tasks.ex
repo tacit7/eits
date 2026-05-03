@@ -383,7 +383,95 @@ defmodule EyeInTheSky.Tasks do
     Task.changeset(task, attrs)
   end
 
+  @doc """
+  Returns `{:ok, session}` for the session currently holding the task, or `{:error, :none}`.
+  Used to enrich conflict errors on claim so callers know who the current owner is.
+  """
+  def get_current_session_for_task(task_id) do
+    query =
+      from ts in "task_sessions",
+        join: s in EyeInTheSky.Sessions.Session,
+        on: s.id == ts.session_id,
+        where: ts.task_id == ^task_id,
+        select: s,
+        limit: 1
+
+    case Repo.one(query) do
+      nil -> {:error, :none}
+      session -> {:ok, session}
+    end
+  end
+
+  @doc """
+  Bulk-archives tasks by UUID strings or stringified integer IDs.
+  Returns {archived_count, nil}.
+  """
+  def batch_archive_tasks([]), do: {0, nil}
+
+  def batch_archive_tasks(id_strings) when is_list(id_strings) do
+    {uuids, int_ids} = split_uuid_and_int_ids(id_strings)
+
+    Repo.update_all(
+      from(t in Task,
+        where: t.uuid in ^uuids or t.id in ^int_ids),
+      set: [archived: true, updated_at: DateTime.utc_now()]
+    )
+  end
+
+  @doc """
+  Bulk-deletes tasks and their join-table associations in one transaction.
+  Accepts UUID strings or stringified integer IDs.
+  Returns {deleted_count, nil}.
+  """
+  def batch_delete_tasks_with_associations([]), do: {0, nil}
+
+  def batch_delete_tasks_with_associations(id_strings) when is_list(id_strings) do
+    {uuids, int_ids} = split_uuid_and_int_ids(id_strings)
+
+    task_ids_query =
+      from(t in Task,
+        where: t.uuid in ^uuids or t.id in ^int_ids,
+        select: t.id)
+
+    result =
+      Repo.transaction(fn ->
+        task_ids = Repo.all(task_ids_query)
+
+        Repo.delete_all(from(tt in "task_tags",    where: tt.task_id in ^task_ids))
+        Repo.delete_all(from(ts in "task_sessions", where: ts.task_id in ^task_ids))
+        Repo.delete_all(from(ct in "commit_tasks",  where: ct.task_id in ^task_ids))
+
+        {deleted, _} =
+          Repo.delete_all(from(t in Task, where: t.id in ^task_ids))
+
+        deleted
+      end)
+
+    case result do
+      {:ok, count} -> {count, nil}
+      {:error, _}  -> {0, nil}
+    end
+  end
+
   defdelegate search_tasks(query, project_id \\ nil, opts \\ []), to: EyeInTheSky.Tasks.Queries
+
+  @doc """
+  Bulk-updates state for tasks by UUID strings or stringified integer IDs.
+  Returns {updated_count, nil}.
+  """
+  def batch_update_task_state([], _state_id), do: {0, nil}
+
+  def batch_update_task_state(id_strings, state_id) when is_list(id_strings) do
+    {uuids, int_ids} = split_uuid_and_int_ids(id_strings)
+
+    now = DateTime.utc_now()
+
+    Repo.update_all(
+      from(t in EyeInTheSky.Tasks.Task,
+        where: t.uuid in ^uuids or t.id in ^int_ids),
+      set: [state_id: state_id, updated_at: now]
+    )
+  end
 
   # Delegates to TaskSessions context (session-linking operations)
   defdelegate link_session_to_task(task_id, session_id), to: EyeInTheSky.TaskSessions
@@ -399,5 +487,17 @@ defmodule EyeInTheSky.Tasks do
 
   # Delegates to Tasks.Associations sub-module
   defdelegate associate_task(task, params), to: EyeInTheSky.Tasks.Associations
+
+  # Splits a list of UUID strings or stringified integer IDs into two lists.
+  # Returns {uuids, int_ids}.
+  defp split_uuid_and_int_ids(id_strings) do
+    Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
+      id_str = to_string(id_str)
+      case Integer.parse(id_str) do
+        {int_id, ""} -> {us, [int_id | is]}
+        _ -> {[id_str | us], is}
+      end
+    end)
+  end
 
 end

@@ -28,12 +28,12 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
           resource: {"note", note.id}
         )
 
-        broadcast()
+        EyeInTheSky.Events.jobs_updated()
         :ok
 
       {:error, reason} ->
         ScheduledJobs.record_run_complete(run, "failed", result: inspect(reason))
-        broadcast()
+        EyeInTheSky.Events.jobs_updated()
         {:error, reason}
     end
   end
@@ -166,7 +166,4 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
     end)
   end
 
-  defp broadcast do
-    EyeInTheSky.Events.jobs_updated()
-  end
 end

@@ -65,6 +65,7 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
         value={@search_query || ""}
         on_change="search"
         class="flex-1 max-w-xs"
+        vim_search={true}
       />
       <%= if @sidebar_project do %>
         <div class="flex items-center bg-base-200/40 rounded-lg p-0.5">

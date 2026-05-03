@@ -324,7 +324,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       {:session, {:error, :invalid_session}} -> {:error, :bad_request, "session_id is invalid"}
       {:session, _} -> {:error, :bad_request, "session_id is required"}
       {:task, {:error, :not_found}} -> {:error, :not_found, "Task not found"}
-      {:claim, {:error, :already_claimed}} -> {:error, :conflict, "Task is already in progress"}
+      {:claim, {:error, :already_claimed}} ->
+        owner_hint =
+          case Tasks.get_current_session_for_task(parse_int(task_id, 0)) do
+            {:ok, s} ->
+              " — currently held by session #{s.id} (#{s.uuid}#{if s.name, do: ", \"#{s.name}\"", else: ""})"
+            _ ->
+              ""
+          end
+        {:error, :conflict, "Task is already in progress#{owner_hint}"}
       {:claim, {:error, :task_not_claimable}} -> {:error, :conflict, "Task cannot be claimed from its current state"}
       {:claim, {:error, :task_not_found}} -> {:error, :not_found, "Task not found"}
       {:claim, {:error, changeset}} -> {:error, changeset}

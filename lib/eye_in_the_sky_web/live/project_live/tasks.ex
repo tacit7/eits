@@ -131,6 +131,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: handle_delete_task(params, socket, &load_tasks/1)
 
   @impl true
+  def handle_event("archive_task", params, socket),
+    do: handle_archive_task(params, socket, &load_tasks/1)
+
+  @impl true
   def handle_event("toggle_select_task", %{"task_id" => task_id}, socket),
     do: handle_toggle_select_task(to_string(task_id), socket)
 

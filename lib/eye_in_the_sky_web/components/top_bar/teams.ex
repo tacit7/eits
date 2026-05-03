@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.TopBar.Teams do
       value={@search_query || ""}
       on_change="search"
       class="w-44"
+      vim_search={true}
     />
     <div class="w-px h-4 bg-base-content/10 mx-0.5" />
     <button

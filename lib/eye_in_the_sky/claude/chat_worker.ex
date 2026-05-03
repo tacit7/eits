@@ -136,9 +136,8 @@ defmodule EyeInTheSky.Claude.ChatWorker do
         channel_ctx = %{id: channel.id, name: channel.name}
         members = Channels.list_members(channel_id)
 
-        members
-        |> Enum.reject(fn m -> ChannelProtocol.skip?(m.session_id, sender_session_id) end)
-        |> Enum.map(fn member ->
+        for member <- members,
+            not ChannelProtocol.skip?(member.session_id, sender_session_id) do
           {mode, _mentioned_ids, _mention_all} =
             ChannelProtocol.parse_routing(message, member.session_id)
 
@@ -159,7 +158,7 @@ defmodule EyeInTheSky.Claude.ChatWorker do
           end
 
           {member.session_id, result}
-        end)
+        end
     end
   end
 

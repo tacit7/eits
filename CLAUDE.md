@@ -154,6 +154,31 @@ eits commits create --hash <hash>
 
 **DM targets support both UUID and numeric session ID.** Pass either format to `dm --to`.
 
+## eits CLI Gotchas
+
+**`EITS_PROJECT_ID` is NOT injected into spawned agent environments.** Claude sessions do not receive it as an OS env var (Codex sessions do). Always include it explicitly in the `--instructions` string:
+
+```bash
+eits agents spawn --agent my-agent --instructions "Your task here. EITS_PROJECT_ID=1" ...
+```
+
+The CLI now warns at spawn time if `EITS_PROJECT_ID` is missing from instructions and no `--project-id` flag was provided.
+
+**Always use `--interpolate-env` when instructions reference `$EITS_SESSION_ID` or other env vars.** Spawned agents do not inherit the orchestrator's shell environment, so `$EITS_SESSION_ID` in instructions will be the literal string — not the integer `3902`. Use `--interpolate-env` to expand all `$VAR` references at spawn time:
+
+```bash
+eits agents spawn --agent my-agent --interpolate-env \
+  --instructions "Your task. DM results to session $EITS_SESSION_ID. EITS_PROJECT_ID=$EITS_PROJECT_ID"
+```
+
+With `--interpolate-env`, `$EITS_SESSION_ID` becomes `3902` and `$EITS_PROJECT_ID` becomes `1` before the instructions are sent — the agent receives resolved integers, not variable names. **Always use integer session IDs (not UUIDs) in DM-back instructions** — integers are shorter, unambiguous, and less likely to be mangled.
+
+**`eits agents defs` descriptions are truncated to 500 chars.** Use `--json` if you need the full description for a specific agent.
+
+**`eits dm inbox --unread` does not exist.** No `is_read` field in the backend. Filter by `--since <ISO8601>` or `--from <uuid>` instead.
+
+**`eits teams status` UUID column is not truncated** — full UUIDs display correctly. Copy-paste for DM targeting is safe.
+
 ## REST API
 
 JSON API at `/api/v1` for Claude Code hooks and external integrations. See [docs/REST_API.md](docs/REST_API.md) for full endpoint reference, request/response formats, and PubSub broadcast details.

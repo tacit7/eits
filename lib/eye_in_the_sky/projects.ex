@@ -8,6 +8,7 @@ defmodule EyeInTheSky.Projects do
   require Logger
 
   import Ecto.Query, warn: false
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Projects.Project
   alias EyeInTheSky.Repo
 
@@ -136,9 +137,19 @@ defmodule EyeInTheSky.Projects do
         {:error, :not_found}
 
       {:ok, project} ->
-        project
-        |> Project.changeset(%{bookmarked: bookmarked})
-        |> Repo.update()
+        result =
+          project
+          |> Project.changeset(%{bookmarked: bookmarked})
+          |> Repo.update()
+
+        case result do
+          {:ok, updated} ->
+            Events.project_updated(updated)
+            {:ok, updated}
+
+          error ->
+            error
+        end
     end
   end
 

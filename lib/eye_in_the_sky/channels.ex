@@ -316,7 +316,8 @@ defmodule EyeInTheSky.Channels do
           not is_nil(m.session_id) and
           m.session_id != ^exclude_session_id and
           s.status not in ^terminated,
-      order_by: [asc: m.joined_at]
+      order_by: [asc: m.joined_at],
+      limit: 500
     )
     |> Repo.all()
   end

@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
 
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSkyWeb.Components.DmHelpers
   alias EyeInTheSkyWeb.DmLive.SlashCommands
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
@@ -73,6 +74,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           phx-hook="CommandHistory"
           id="message-input"
           data-session-uuid={@session_uuid}
+          data-vim-composer
         ></textarea>
       </div>
 
@@ -176,7 +178,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                 id="effort-selector-button"
               >
                 <.icon name="hero-adjustments-horizontal" class="size-3.5" />
-                <span class="font-medium">{effort_display_name(@selected_effort)}</span>
+                <span class="font-medium">{DmHelpers.effort_display_name(@selected_effort)}</span>
                 <.icon name="hero-chevron-down-mini" class="size-3.5" />
               </button>
               <%= if @active_overlay == :effort_menu do %>
@@ -396,12 +398,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   end
 
   defp model_display_name(slug), do: EyeInTheSkyWeb.Helpers.ModelHelpers.model_display_name(slug)
-
-  defp effort_display_name("low"), do: "Low"
-  defp effort_display_name("medium"), do: "Medium"
-  defp effort_display_name("high"), do: "High"
-  defp effort_display_name("max"), do: "Max"
-  defp effort_display_name(_), do: "Medium"
 
   defp format_number(n) when is_integer(n) do
     n

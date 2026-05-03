@@ -231,8 +231,11 @@ defmodule EyeInTheSky.Agents do
   @doc """
   Returns agents that have had session activity at or after `since_dt`.
   Matches agents with sessions where last_activity_at >= since OR inserted_at >= since.
+  Default limit: 200. Pass `limit: n` to override.
   """
   def list_agents_active_since(%DateTime{} = since_dt, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     from(a in Agent,
       join: s in assoc(a, :sessions),
       where: s.last_activity_at >= ^since_dt or s.inserted_at >= ^since_dt,
@@ -240,21 +243,24 @@ defmodule EyeInTheSky.Agents do
       preload: [:project]
     )
     |> EyeInTheSky.QueryBuilder.maybe_where(opts, :status)
-    |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
+    |> limit(^limit)
     |> Repo.all()
     |> Enum.map(&populate_project_name/1)
   end
 
   @doc """
-  Lists agents by project ID.
+  Lists agents by project ID. Default limit: 200.
+  Pass `limit: n` to override.
   """
   def list_agents_by_project(project_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 200)
+
     Agent
     |> where([a], a.project_id == ^project_id)
     |> preload([:project])
     |> order_by([a], asc: a.created_at)
     |> EyeInTheSky.QueryBuilder.maybe_where(opts, :status)
-    |> EyeInTheSky.QueryBuilder.maybe_limit(opts)
+    |> limit(^limit)
     |> Repo.all()
     |> Enum.map(&populate_project_name/1)
   end

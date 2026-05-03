@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   import Phoenix.LiveView, only: [start_async: 3, push_navigate: 2, push_event: 3, put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.{Events, Projects}
+  alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.Components.Rail.Loader
 
   def handle_select_project(%{"project_id" => id_str}, socket) do
@@ -98,8 +98,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     with id when is_binary(id) <- Map.get(params, "id"),
          value when value in ["true", "false"] <- Map.get(params, "bookmarked"),
          project_id when not is_nil(project_id) <- parse_int(id),
-         {:ok, project} <- Projects.set_bookmarked(project_id, value == "true") do
-      Events.project_updated(project)
+         {:ok, _project} <- Projects.set_bookmarked(project_id, value == "true") do
       {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
     else
       _ -> {:noreply, socket}

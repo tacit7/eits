@@ -515,12 +515,13 @@ IndexHealth provides query access to Postgres index validity for the messages ta
 
 Generates and sends daily digest notifications.
 
-**Location:** `lib/eye_in_the_sky_web/workers/daily_digest_worker.ex`
+**Location:** `lib/eye_in_the_sky/workers/daily_digest_worker.ex`
 
 **Responsibilities:**
 - Daily scheduled job (configurable time, defaults to 9 AM)
 - Aggregates recent sessions, tasks, and notes
 - Broadcasts digest via PubSub or sends notifications
+- Calls `EyeInTheSky.Events.jobs_updated()` directly on success and failure (no private `broadcast/0` helper)
 
 **Configuration:**
 - Enabled/disabled via config
@@ -530,18 +531,21 @@ Generates and sends daily digest notifications.
 - Logs errors; does not crash the worker
 - Retries on transient failures (DB connection, etc.)
 
+**Commits:** b0885aa0 (inline broadcast: remove private broadcast/0, call Events.jobs_updated() directly)
+
 ---
 
 ## WorkableTaskWorker
 
 Processes individual workable tasks assigned to this worker.
 
-**Location:** `lib/eye_in_the_sky_web/workers/workable_task_worker.ex`
+**Location:** `lib/eye_in_the_sky/workers/workable_task_worker.ex`
 
 **Responsibilities:**
 - Receives task details from JobDispatcherWorker or MCP tool
 - Spawns Claude agent with task description and model
 - Updates task status on completion
+- Calls `EyeInTheSky.Events.jobs_updated()` directly on all exit paths (no private `broadcast/0` helper)
 
 **Key Improvements:**
 - **Safe project lookup:** Validates `project_id` exists before processing
@@ -559,6 +563,8 @@ case Tasks.get_task_safe(task_id) do
   {:error, reason} -> log_error(reason)
 end
 ```
+
+**Commits:** b0885aa0 (inline broadcast: remove private broadcast/0, call Events.jobs_updated() directly)
 
 ---
 
@@ -695,6 +701,48 @@ Index builds are now non-blocking and include critical missing indexes for faste
 - `lib/eye_in_the_sky/sessions.ex` — `list_idle_sessions_older_than/1` query optimization
 
 **Commits:** 4b849cb9 (audit fixes: index optimization and query rewrites)
+
+---
+
+## Oban Worker PubSub Convention
+
+Worker modules call `EyeInTheSky.Events.jobs_updated()` directly at each exit point. There is no private `broadcast/0` helper in any worker.
+
+**Affected modules:**
+- `WorkableTaskWorker` — 4 call sites (success, no-work, error, rescued exception)
+- `DailyDigestWorker` — 2 call sites (success, error)
+- `SpawnAgentWorker` — 2 call sites (success, error)
+- `MixTaskWorker` — 2 call sites (success, error)
+
+**Why removed:** The one-liner `defp broadcast do EyeInTheSky.Events.jobs_updated() end` added an indirection layer with no reuse benefit. Direct calls are clearer and eliminate the need to trace the helper.
+
+**Commits:** b0885aa0 (refactor: inline broadcast() calls in worker modules), 9f97fc08 (merge)
+
+---
+
+## Tasks.Poller DB Optimization
+
+`EyeInTheSky.Tasks.Poller` is a GenServer that detects task table mutations and broadcasts change events. Two optimizations reduce DB load significantly.
+
+**Merged query:**
+- Before: two separate queries per poll cycle — `SELECT MAX(updated_at) FROM tasks` and `SELECT COUNT(*) FROM tasks` — each a full sequential scan.
+- After: single `SELECT MAX(updated_at), COUNT(*) FROM tasks` via `get_task_snapshot/0` — one round-trip per cycle.
+
+**Increased poll interval:**
+- Before: `@poll_interval 2_000` (2 seconds)
+- After: `@poll_interval 5_000` (5 seconds)
+- Combined effect: 2.5x fewer DB executions per minute. At 2s with two queries, Postgres was logging ~1.24M calls each in `pg_stat_statements`.
+
+**New indexes (migration `20260502064045`):**
+- `tasks_updated_at_index ON tasks (updated_at DESC)` — turns the `MAX(updated_at)` from a sequential scan into a 1-block backward index scan.
+- `sessions_active_started_at_idx ON sessions (started_at DESC) WHERE archived_at IS NULL` — partial index matching the dominant `list_sessions` query filter; the existing non-partial `sessions_started_at_index` had 0 scans because queries always include `WHERE archived_at IS NULL`.
+- Both indexes are created `CONCURRENTLY` with `@disable_ddl_transaction true` to avoid locking hot tables.
+
+**Code locations:**
+- `lib/eye_in_the_sky/tasks/poller.ex` — `get_task_snapshot/0`, `@poll_interval`
+- `priv/repo/migrations/20260502064045_add_tasks_updated_at_and_sessions_active_indexes.exs`
+
+**Commits:** a891c595 (Reduce Tasks.Poller DB load: merge queries, increase interval, add indexes)
 
 ---
 

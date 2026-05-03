@@ -20,12 +20,12 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
           session_id: opts[:session_id]
         )
 
-        broadcast()
+        EyeInTheSky.Events.jobs_updated()
         :ok
 
       {:error, reason} ->
         ScheduledJobs.record_run_complete(run, "failed", result: reason)
-        broadcast()
+        EyeInTheSky.Events.jobs_updated()
         {:error, reason}
     end
   end
@@ -99,10 +99,6 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
   end
 
   defp parse_float(val) when is_number(val), do: val
-
-  defp broadcast do
-    EyeInTheSky.Events.jobs_updated()
-  end
 
   defp server_base_url do
     Application.get_env(:eye_in_the_sky, :server_base_url, "http://localhost:5001")

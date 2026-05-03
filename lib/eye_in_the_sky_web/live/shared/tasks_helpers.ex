@@ -112,7 +112,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     end
   end
 
-  def handle_delete_task(%{"task_id" => task_id}, socket, reload_fn) do
+  def handle_delete_task(params, socket, reload_fn) do
+    task_id = extract_task_id(params)
     task = Tasks.get_task_by_uuid_or_id!(task_id)
 
     case Tasks.delete_task_with_associations(task) do
@@ -128,7 +129,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     end
   end
 
-  def handle_archive_task(%{"task_id" => task_id}, socket, reload_fn) do
+  def handle_archive_task(params, socket, reload_fn) do
+    task_id = extract_task_id(params)
     task = Tasks.get_task_by_uuid_or_id!(task_id)
 
     case Tasks.archive_task(task) do
@@ -350,6 +352,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  defp extract_task_id(%{"task_id" => id}), do: id
+  defp extract_task_id(%{"item_id" => id}), do: id
+  defp extract_task_id(_), do: nil
 
   defp task_id(task), do: task.uuid || to_string(task.id)
 

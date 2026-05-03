@@ -101,40 +101,29 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
     with {:ok, agent} <- Agents.get_agent_by_uuid(agent_uuid),
          [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
       results =
-        hashes
-        |> Enum.with_index()
-        |> Enum.map(fn {hash, idx} ->
+        Enum.zip(hashes, messages)
+        |> Enum.map(fn {hash, message} ->
           Commits.create_commit(%{
             session_id: session.id,
             commit_hash: hash,
-            commit_message: Enum.at(messages, idx)
+            commit_message: message
           })
         end)
 
       # on_conflict: :nothing returns {:ok, %Commit{id: nil}} on hash collision.
       # Split into created (id present), duplicate (id nil), and errors (changeset failures).
       created =
-        results
-        |> Enum.filter(fn
-          {:ok, %{id: id}} when not is_nil(id) -> true
-          _ -> false
-        end)
-        |> Enum.map(fn {:ok, commit} ->
+        for {:ok, %{id: id} = commit} <- results, not is_nil(id) do
           commit |> ApiPresenter.present_commit() |> Map.put(:status, "created")
-        end)
+        end
 
       duplicates =
-        results
-        |> Enum.filter(fn
-          {:ok, %{id: nil}} -> true
-          _ -> false
-        end)
-        |> Enum.map(fn {:ok, commit} -> %{commit_hash: commit.commit_hash, status: "duplicate"} end)
+        for {:ok, %{id: nil} = commit} <- results do
+          %{commit_hash: commit.commit_hash, status: "duplicate"}
+        end
 
       errors =
-        results
-        |> Enum.filter(&match?({:error, _}, &1))
-        |> Enum.map(fn {:error, changeset} -> translate_errors(changeset) end)
+        for {:error, changeset} <- results, do: translate_errors(changeset)
 
       http_status = if errors == [], do: :created, else: :multi_status
 

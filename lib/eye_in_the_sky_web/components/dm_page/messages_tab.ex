@@ -19,9 +19,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   def messages_tab(assigns) do
     messages_with_context =
       assigns.messages
-      |> Enum.with_index()
-      |> Enum.map(fn {msg, idx} ->
-        prev_role = if idx > 0, do: Enum.at(assigns.messages, idx - 1).sender_role, else: nil
+      |> Enum.zip([nil | assigns.messages])
+      |> Enum.map(fn {msg, prev} ->
+        prev_role = if prev, do: prev.sender_role, else: nil
         {msg, prev_role}
       end)
 

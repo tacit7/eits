@@ -148,6 +148,47 @@ curl -X POST localhost:5001/api/v1/sessions/abc-123/complete \
 
 ---
 
+### POST /sessions/:id/reopen
+
+Reopen a completed or failed session. Clears `ended_at` and sets `status` to `idle` so the session can accept new task updates and DMs.
+
+Accepts integer session ID or UUID string.
+
+Use when a resume hook fails to reset status, or when an orchestrator needs to post work against an already-ended session.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session ID (UUID or integer) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "session_id": 42,
+  "session_status": "idle",
+  "member_synced": false
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/sessions/42/reopen \
+  -H 'Content-Type: application/json'
+
+curl -X POST localhost:5001/api/v1/sessions/abc-123/reopen \
+  -H 'Content-Type: application/json'
+
+# CLI
+eits sessions reopen abc-123
+eits sessions reopen self   # uses EITS_SESSION_UUID
+```
+
+---
+
 ### POST /sessions/:id/waiting
 
 Mark a session as waiting (paused/blocked) with automatic team member status sync.
@@ -551,7 +592,19 @@ Distinguishes created commits from duplicates. Duplicate hashes (detected via `o
   "duplicates": [
     {"commit_hash": "existing123", "status": "duplicate"}
   ],
-  "errors": []
+  "errors": [],
+  "already_tracked": false
+}
+```
+
+`already_tracked` is `true` when all submitted hashes were duplicates (i.e. `duplicates` is non-empty and both `commits` and `errors` are empty). Lets callers detect the already-tracked case without inspecting array lengths.
+
+```json
+{
+  "commits": [],
+  "duplicates": [{"commit_hash": "abc123", "status": "duplicate"}],
+  "errors": [],
+  "already_tracked": true
 }
 ```
 
@@ -1290,6 +1343,7 @@ List sessions with optional filtering. Supports full-text search, name filters, 
 | `project_id` | integer | no | Filter by project ID |
 | `status` | string | no | Filter by status (`working`, `idle`, `waiting`, `completed`, `failed`) |
 | `name` | string | no | Filter by session name (case-insensitive ilike match) |
+| `parent_session_id` | string or integer | no | Filter to child sessions of a given parent session (UUID or integer ID). Independent of other filters |
 | `with_tasks` | boolean | no | When `true`, embeds task list per session (id, title, state_id, state) |
 | `include_archived` | boolean | no | Include archived sessions (default false) |
 | `limit` | integer | no | Max results (default 20) |
@@ -1327,6 +1381,8 @@ List sessions with optional filtering. Supports full-text search, name filters, 
 eits sessions list --name "auth" --with-tasks
 eits sessions list --project 1 --include-archived
 eits sessions list --name "deploy"
+eits sessions list --parent 42
+eits sessions list --parent abc-123-uuid
 ```
 
 ---

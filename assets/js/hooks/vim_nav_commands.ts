@@ -16,7 +16,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -316,6 +316,10 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "list_item_delete" },  scope: "feature:vim-list" },
   { id: "list.archive", label: "Archive item", keys: ["a", "a"], group: "context",
     action: { kind: "client", name: "list_item_archive" }, scope: "feature:vim-list" },
+
+  // open in new tab (context: any list)
+  { id: "list.open_tab", label: "Open in new tab", keys: ["o"], group: "context",
+    action: { kind: "client", name: "list_open_tab" }, scope: "feature:vim-list" },
 ]
 
 // All valid first keys in multi-key sequences

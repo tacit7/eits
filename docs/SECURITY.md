@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-05-01
-Last updated: 2026-05-01 (TOCTOU race fixes, unbounded query limits, invalid index cleanup, schema hygiene)
+Last updated: 2026-05-02 (IAM sanitize modules prepend+reverse, archdo linter added)
 
 ## Authentication
 
@@ -542,6 +542,8 @@ IAM provides fine-grained policy control over Claude Code and API operations, ev
 
 **Builtin matchers**: For policy detection that needs Elixir code (command parsing, path resolution, git-state inspection, API key redaction), policies can specify a `builtin_matcher` key that dispatches to a dedicated module in `EyeInTheSky.IAM.Builtin`. Matchers are registered in `BuiltinMatcher.Registry` — unknown keys are rejected at the changeset layer. Evaluation is wrapped in error handling (fail-closed: does not match on error) and telemetry.
 
+**Sanitize matchers (`sanitize_api_keys`, `sanitize_prompt_api_keys`)**: The redaction accumulator uses prepend + `Enum.reverse/1` instead of list append (`acc ++ [item]`). This keeps each reduction step O(1) rather than O(n) — the reversal happens once after the fold, not on every match.
+
 **Seeded system policies** (12 builtin matchers, 13 system policies):
 
 | Key | Builtin Matcher | Action | Event | Effect | Purpose |
@@ -682,6 +684,22 @@ DM delivery enforces an allowlist of receivable session statuses:
 - **Purpose**: Prevents zombie agent sessions from receiving messages after their work is complete and data cleanup begins
 
 The allowlist approach (vs. a blocklist) is more defensive: unknown future statuses are blocked by default rather than accidentally receivable.
+
+## Architectural Linting (archdo)
+
+The project uses [archdo](https://github.com/archdo/archdo) (pinned ref `1e651d57`) as an architectural linter to flag structural anti-patterns at the module level.
+
+**Configuration**: `.archdo.exs` at the project root defines three layers and their allowed dependency directions:
+
+| Layer | Pattern | May depend on |
+|-------|---------|---------------|
+| `interface` | `EyeInTheSkyWeb.*` | `domain`, `infrastructure` |
+| `domain` | `EyeInTheSky.*` (excluding Repo/Mailer) | `infrastructure` |
+| `infrastructure` | `EyeInTheSky.{Repo,Mailer}` | (none) |
+
+**Baseline**: `.archdo_baseline.exs` records 1402 fingerprints (1963 original diagnostics) captured 2026-05-02. Baseline violations are accepted as pre-existing; only new violations added after the baseline was captured are flagged as regressions. Fingerprints are line-number independent so formatting changes do not churn them.
+
+**Relevant rules**: Archdo rule `6.50` (quadratic list concatenation via `acc++`) was the trigger for the sanitize module fix above. New violations against the baseline fail CI.
 
 ## Known Gaps
 

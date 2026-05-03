@@ -94,14 +94,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
 
   def handle_bulk_move(%{"state_id" => state_id_str}, socket, reload_fn) do
     state_id = parse_int(state_id_str, 0)
-    now = DateTime.utc_now()
 
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.update_task(task, %{state_id: state_id, updated_at: now})
-    end)
+    uuids =
+      socket.assigns.selected_tasks
+      |> Enum.reject(&is_nil/1)
+      |> Enum.to_list()
+
+    Tasks.batch_update_task_state(uuids, state_id)
 
     {:noreply, socket |> assign(:selected_tasks, MapSet.new()) |> reload_fn.()}
   end
@@ -151,19 +150,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
         {:noreply, put_flash(socket, :error, "Invalid state")}
 
       true ->
-        results =
-          Enum.map(ids, fn task_id ->
-            case Tasks.get_task_by_uuid_or_id(task_id) do
-              {:ok, task} -> match?({:ok, _}, Tasks.update_task_state(task, state_id))
-              {:error, :not_found} -> false
-            end
-          end)
-
-        moved = Enum.count(results, & &1)
+        id_list = MapSet.to_list(ids)
+        total = length(id_list)
+        {moved, _} = Tasks.batch_update_task_state(id_list, state_id)
         state_name = Tasks.get_workflow_state!(state_id).name
 
         {flash_level, flash_msg} =
-          build_bulk_flash(moved, length(results),
+          build_bulk_flash(moved, total,
             verb: "Moved",
             entity: "task",
             destination: state_name

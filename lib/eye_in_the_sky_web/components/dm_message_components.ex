@@ -19,7 +19,6 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
   use EyeInTheSkyWeb, :html
 
-  alias EyeInTheSkyWeb.Components.DmHelpers
   import EyeInTheSkyWeb.Components.DmHelpers
 
   # ---------------------------------------------------------------------------
@@ -409,7 +408,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
     ~H"""
     <img
-      src={DmHelpers.provider_icon(@provider)}
+      src={provider_icon(@provider)}
       class="size-4 mt-1 flex-shrink-0 animate-pulse"
       alt={String.capitalize(@provider)}
       width="16"

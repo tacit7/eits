@@ -404,6 +404,31 @@ defmodule EyeInTheSky.Tasks do
 
   defdelegate search_tasks(query, project_id \\ nil, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
+  @doc """
+  Bulk-updates state for tasks by UUID strings or stringified integer IDs.
+  Returns {updated_count, nil}.
+  """
+  def batch_update_task_state([], _state_id), do: {0, nil}
+
+  def batch_update_task_state(id_strings, state_id) when is_list(id_strings) do
+    {uuids, int_ids} =
+      Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
+        id_str = to_string(id_str)
+        case Integer.parse(id_str) do
+          {int_id, ""} -> {us, [int_id | is]}
+          _ -> {[id_str | us], is}
+        end
+      end)
+
+    now = DateTime.utc_now()
+
+    Repo.update_all(
+      from(t in EyeInTheSky.Tasks.Task,
+        where: t.uuid in ^uuids or t.id in ^int_ids),
+      set: [state_id: ^state_id, updated_at: ^now]
+    )
+  end
+
   # Delegates to TaskSessions context (session-linking operations)
   defdelegate link_session_to_task(task_id, session_id), to: EyeInTheSky.TaskSessions
   defdelegate task_linked_to_session?(task_id, session_id), to: EyeInTheSky.TaskSessions

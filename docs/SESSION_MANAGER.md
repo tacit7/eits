@@ -405,6 +405,7 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 - `POST /api/v1/sessions/:uuid/end` — End session with final status
 - `POST /api/v1/sessions/:uuid/complete` — Mark session completed and sync team member (NEW)
 - `POST /api/v1/sessions/:uuid/waiting` — Mark session waiting with optional status_reason and sync team member (NEW)
+- `POST /api/v1/sessions/:uuid/reopen` — Clear ended_at and set status to idle (NEW)
 - `GET /api/v1/sessions/:uuid/context` — Load session context
 - `POST /api/v1/sessions/:uuid/context` — Upsert context
 
@@ -528,6 +529,26 @@ curl -X POST http://localhost:5001/api/v1/sessions/8803d56d-dbbd-4916-9ff0-15537
 - Optional `status_reason` param
 - Auto-clears `status_reason` if transitioning away from `waiting` without an explicit reason
 - CLI: `eits sessions waiting` defaults to `EITS_SESSION_UUID`
+
+### POST /api/v1/sessions/:id/reopen
+
+Clears `ended_at` and sets status to `idle`. Use when a resume hook fails to reset status, or when an orchestrator needs to post work against an already-ended session:
+
+```bash
+curl -X POST http://localhost:5001/api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47/reopen
+```
+
+**Response:**
+```json
+{
+  "status": "idle",
+  "member_synced": false
+}
+```
+
+- Accepts integer ID or UUID
+- Fires `session_updated` broadcast after the DB write
+- CLI: `eits sessions reopen [uuid|self]`
 
 ---
 
@@ -808,6 +829,21 @@ The `filter_agents_by_status/2` function supports the following filters:
 - `"completed"` branch is restored and functional for AgentLive sessions (even though project sessions page uses only "working"/"archived")
 - The function is shared across both pages, so both filter names must be supported
 
+### Parent Session Filter
+
+`GET /api/v1/sessions` accepts a `parent_session_id` parameter (integer or UUID) to return only child sessions spawned by a specific parent. This is independent of all other filters (`--mine`, `--agent`, `--status`, `--project`):
+
+```bash
+# CLI
+eits sessions list --parent <id|uuid>
+
+# API
+GET /api/v1/sessions?parent_session_id=3185
+GET /api/v1/sessions?parent_session_id=8803d56d-dbbd-4916-9ff0-155378a64a47
+```
+
+Useful for lightweight parallel workflows where an orchestrator needs to inspect only the sessions it spawned without requiring a team.
+
 ### Sort Options
 
 The `sort_agents/2` function supports sorting by:
@@ -968,19 +1004,56 @@ The partial indexes filter on `status IN ["idle", "waiting"]` and `archived_at I
 
 ## PubSub Broadcasts for Session Updates
 
-PubSub broadcasts for session status updates are now emitted from the Sessions context (`lib/eye_in_the_sky/sessions.ex`) rather than the controller layer. This keeps broadcast logic co-located with the data modifications that trigger them.
+PubSub broadcasts for session status updates are emitted from the Sessions context (`lib/eye_in_the_sky/sessions.ex`), not the controller layer. This keeps broadcast logic co-located with the data modifications that trigger them and keeps the web layer free of direct domain event calls.
 
-**Broadcast Pattern:**
-When `Sessions.update_session/2` modifies a session's status, it broadcasts the updated session on the topic `"session:<session_id>"`:
+### Broadcast Functions
+
+All broadcast helpers live in `EyeInTheSky.Sessions`:
+
+| Function | Events fired | Use case |
+|---|---|---|
+| `broadcast_session_updated(session)` | `session_updated` | Generic status update; called after PATCH |
+| `broadcast_session_completed(session)` | `session_completed` + `session_updated` | Session marked completed |
+| `broadcast_session_waiting(session)` | `agent_stopped` + `session_updated` | Session parked to waiting |
+| `broadcast_status_side_effects(session, status)` | `agent_stopped` or `agent_working` + `session_updated` | Status PATCH with arbitrary new status |
+
+`broadcast_session_completed` and `broadcast_session_waiting` are implemented via a private helper `broadcast_with_session_updated/2` that accepts the primary event function and always appends `session_updated` (commit ffda2181):
 
 ```elixir
-EyeInTheSky.Events.broadcast_session_updated(session)
+defp broadcast_with_session_updated(session, event_fn) do
+  event_fn.(session)
+  Events.session_updated(session)
+end
 ```
 
-This ensures all listeners (LiveViews, dashboards, status monitors) receive consistent updates regardless of whether the status change originates from a controller, hook, or background job.
+### set_session_idle/1
 
-**Key Consequence:**
-Session updates initiated directly via `Sessions.update_session/2` (e.g., from the zombie sweep scheduler or status update hooks) now automatically broadcast without explicit controller handling. Callers no longer need to manage broadcasts separately — the context handles it atomically.
+`Sessions.set_session_idle/1` updates session status to `"idle"` and fires `Events.agent_stopped` on the updated struct in one call. Previously, the web layer called `update_session` then fired `agent_stopped` with the stale pre-update struct. Use this in cancel/stop handlers:
+
+```elixir
+Sessions.set_session_idle(session)
+# replaces:
+# Sessions.update_session(session, %{status: "idle"})
+# Events.agent_stopped(session)  # was stale!
+```
+
+### Archive / Unarchive
+
+`archive_session/1` and `unarchive_session/1` both delegate to a private `set_archived/2` that accepts either a `DateTime` value or `nil`. Both fire `session_updated` after the DB write:
+
+```elixir
+def archive_session(%Session{} = session), do: set_archived(session, DateTime.utc_now())
+def unarchive_session(%Session{} = session), do: set_archived(session, nil)
+
+defp set_archived(%Session{} = session, value) do
+  with {:ok, updated} <- update_session(session, %{archived_at: value}) do
+    Events.session_updated(updated)
+    {:ok, updated}
+  end
+end
+```
+
+**Key consequence:** All callers (controller, hooks, background jobs) use these context functions and never call `EyeInTheSky.Events` directly. The context owns the full broadcast contract for session state changes.
 
 ---
 

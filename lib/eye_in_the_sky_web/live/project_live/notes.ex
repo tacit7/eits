@@ -77,6 +77,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     do: handle_delete_note(params, socket, &load_notes/1)
 
   @impl true
+  def handle_event("archive_note", _params, socket) do
+    {:noreply, put_flash(socket, :error, "Notes do not support archiving")}
+  end
+
+  @impl true
   def handle_event("toggle_select_note", %{"note_id" => note_id}, socket) do
     note_id = to_string(note_id)
 

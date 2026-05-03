@@ -40,8 +40,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           done_tasks = Enum.count(tasks, & &1.completed_at)
           claude_files = scan_claude_files(project.path)
 
+          recent_tasks =
+            tasks
+            |> Enum.sort_by(& &1.created_at, {:desc, DateTime})
+            |> Enum.take(5)
+
           socket
           |> assign(:tasks, tasks)
+          |> assign(:recent_tasks, recent_tasks)
           |> assign(:active_sessions, active_sessions)
           |> assign(:recent_notes, recent_notes)
           |> assign(:agent_count, agent_count)
@@ -70,6 +76,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
   defp assign_empty_project_data(socket) do
     socket
     |> assign(:tasks, [])
+    |> assign(:recent_tasks, [])
     |> assign(:active_sessions, [])
     |> assign(:recent_notes, [])
     |> assign(:agent_count, 0)
@@ -201,7 +208,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
               <div class="card-body p-4">
                 <h2 class="card-title text-base mb-2">Recent Tasks</h2>
                 <div class="space-y-1">
-                  <%= for task <- @tasks |> Enum.sort_by(& &1.created_at, :desc) |> Enum.take(5) do %>
+                  <%= for task <- @recent_tasks do %>
                     <div class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
                       <div class="flex-shrink-0">
                         <%= if task.completed_at do %>

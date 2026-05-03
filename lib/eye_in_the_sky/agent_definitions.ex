@@ -31,6 +31,7 @@ defmodule EyeInTheSky.AgentDefinitions do
     |> where([d], is_nil(d.missing_at))
     |> maybe_filter_project(project_id)
     |> order_by([d], desc: d.scope, asc: d.slug)
+    |> limit(500)
     |> Repo.all()
   end
 
@@ -43,6 +44,7 @@ defmodule EyeInTheSky.AgentDefinitions do
     |> where([d], is_nil(d.missing_at))
     |> where([d], d.project_id == ^project_id or d.scope == "global")
     |> order_by([d], desc: d.scope, asc: d.slug)
+    |> limit(500)
     |> Repo.all()
   end
 

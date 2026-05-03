@@ -107,18 +107,18 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
   end
 
   def handle_bulk_archive(socket, reload_fn) do
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.archive_task(task)
-    end)
+    uuids =
+      socket.assigns.selected_tasks
+      |> Enum.reject(&is_nil/1)
+      |> Enum.to_list()
+
+    {archived, _} = Tasks.batch_archive_tasks(uuids)
 
     {:noreply,
      socket
      |> assign(:selected_tasks, MapSet.new())
      |> reload_fn.()
-     |> put_flash(:info, "Tasks archived")}
+     |> put_flash(:info, "Archived #{archived} task#{if archived != 1, do: "s"}")}
   end
 
   def handle_bulk_delete(socket, reload_fn) do
@@ -182,18 +182,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
     if MapSet.size(ids) == 0 do
       {:noreply, assign(socket, :show_archive_confirm, false)}
     else
-      results =
-        Enum.map(ids, fn task_id ->
-          case Tasks.get_task_by_uuid_or_id(task_id) do
-            {:ok, task} -> match?({:ok, _}, Tasks.archive_task(task))
-            {:error, :not_found} -> false
-          end
-        end)
-
-      archived = Enum.count(results, & &1)
+      id_list = MapSet.to_list(ids)
+      total = length(id_list)
+      {archived, _} = Tasks.batch_archive_tasks(id_list)
 
       {flash_level, flash_msg} =
-        build_bulk_flash(archived, length(results), verb: "Archived", entity: "task")
+        build_bulk_flash(archived, total, verb: "Archived", entity: "task")
 
       {:noreply,
        socket

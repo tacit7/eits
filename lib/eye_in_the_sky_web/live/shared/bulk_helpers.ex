@@ -122,18 +122,18 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
   end
 
   def handle_bulk_delete(socket, reload_fn) do
-    socket.assigns.selected_tasks
-    |> Enum.reject(&is_nil/1)
-    |> Enum.each(fn uuid ->
-      task = Tasks.get_task_by_uuid!(uuid)
-      Tasks.delete_task_with_associations(task)
-    end)
+    uuids =
+      socket.assigns.selected_tasks
+      |> Enum.reject(&is_nil/1)
+      |> Enum.to_list()
+
+    {deleted, _} = Tasks.batch_delete_tasks_with_associations(uuids)
 
     {:noreply,
      socket
      |> assign(:selected_tasks, MapSet.new())
      |> reload_fn.()
-     |> put_flash(:info, "Tasks deleted")}
+     |> put_flash(:info, "Deleted #{deleted} task#{if deleted != 1, do: "s"}")}
   end
 
   # ---------------------------------------------------------------------------
@@ -206,13 +206,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.BulkHelpers do
   end
 
   def handle_tasks_delete_selected(ids, socket, reload_fn) do
-    deleted =
-      Enum.count(ids, fn task_id ->
-        case Tasks.get_task_by_uuid_or_id(task_id) do
-          {:ok, task} -> match?({:ok, _}, Tasks.delete_task_with_associations(task))
-          {:error, :not_found} -> false
-        end
-      end)
+    id_list = MapSet.to_list(ids)
+    {deleted, _} = Tasks.batch_delete_tasks_with_associations(id_list)
 
     {:noreply,
      socket

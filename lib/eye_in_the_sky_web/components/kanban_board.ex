@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
             data-column-id={state.id}
           >
             <%!-- Column header --%>
-            <div class="mb-2">
+            <div class="mb-2" data-vim-list-group>
               <div
                 class="h-0.5 rounded-full mx-1 mb-2"
                 style={"background-color: #{state_dot_color(state.color)}"}

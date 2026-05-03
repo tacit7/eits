@@ -42,9 +42,9 @@ defmodule EyeInTheSky.Teams do
 
     query =
       case Keyword.get(opts, :limit) do
-        nil -> query
+        nil -> limit(query, 500)
         n when n > 0 -> limit(query, ^n)
-        _ -> query
+        _ -> limit(query, 500)
       end
 
     query =
@@ -125,6 +125,7 @@ defmodule EyeInTheSky.Teams do
       |> where([m], m.team_id == ^team_id)
       |> preload([:agent, :session])
       |> order_by([m], asc: m.joined_at)
+      |> limit(500)
       |> Repo.all()
 
     attach_claimed_tasks(members)

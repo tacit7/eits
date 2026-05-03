@@ -128,8 +128,40 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     end
   end
 
+  def handle_delete_task(%{"item_id" => item_id}, socket, reload_fn) do
+    task = Tasks.get_task_by_uuid_or_id!(item_id)
+
+    case Tasks.delete_task_with_associations(task) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:show_task_detail_drawer, false)
+         |> assign(:selected_task, nil)
+         |> reload_fn.()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete task")}
+    end
+  end
+
   def handle_archive_task(%{"task_id" => task_id}, socket, reload_fn) do
     task = Tasks.get_task_by_uuid_or_id!(task_id)
+
+    case Tasks.archive_task(task) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:show_task_detail_drawer, false)
+         |> assign(:selected_task, nil)
+         |> reload_fn.()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to archive task")}
+    end
+  end
+
+  def handle_archive_task(%{"item_id" => item_id}, socket, reload_fn) do
+    task = Tasks.get_task_by_uuid_or_id!(item_id)
 
     case Tasks.archive_task(task) do
       {:ok, _} ->

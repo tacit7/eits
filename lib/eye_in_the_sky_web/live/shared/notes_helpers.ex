@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpers do
   end
 
   def handle_delete_note(params, socket, reload_fn) do
-    note_id = params["note_id"] || params["note-id"] || params["value"]
+    note_id = params["note_id"] || params["note-id"] || params["value"] || params["item_id"]
 
     case Notes.get_note(note_id) do
       {:error, :not_found} ->

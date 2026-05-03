@@ -49,11 +49,9 @@ defmodule EyeInTheSky.IAM.Builtin.BlockRmRf do
   defp extract_rm_targets(cmd) do
     case Regex.run(~r/\brm\b(.*?)(?:$|;|&&|\|\|)/s, cmd, capture: :all_but_first) do
       [args] ->
-        args
-        |> String.split(~r/\s+/, trim: true)
-        |> Enum.reject(&String.starts_with?(&1, "-"))
-        |> Enum.map(&String.trim(&1, "\""))
-        |> Enum.map(&String.trim(&1, "'"))
+        for arg <- String.split(args, ~r/\s+/, trim: true),
+            not String.starts_with?(arg, "-"),
+            do: arg |> String.trim("\"") |> String.trim("'")
 
       _ ->
         []

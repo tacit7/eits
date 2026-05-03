@@ -438,6 +438,44 @@ end
 
 **Rule:** Never use bare `rescue _`. Always specify the exception type(s) you expect. Add a `Logger.warning/1` for unexpected failures to enable debugging.
 
+### No rescue-as-control-flow
+
+**Problem:** Using `rescue` to catch `ArgumentError` from `String.to_integer/1` or `String.to_float/1` is control-flow via exceptions. It silences real bugs (typos, mismatched types) and is slower than parse-based matching.
+
+**❌ Antipattern:**
+```elixir
+def get_int(params, key) do
+  try do
+    String.to_integer(params[key])
+  rescue
+    ArgumentError -> nil
+  end
+end
+```
+
+**✅ Correct — use Integer.parse/Float.parse:**
+```elixir
+def get_int(params, key) do
+  case Integer.parse(params[key] || "") do
+    {n, ""} -> n
+    _ -> nil
+  end
+end
+
+def get_float(params, key) do
+  case Float.parse(params[key] || "") do
+    {f, ""} -> f
+    _ -> nil
+  end
+end
+```
+
+`Integer.parse/1` and `Float.parse/1` return `{value, remainder}` on success and `:error` on failure. Requiring `remainder == ""` rejects trailing garbage (`"42abc"`). No exceptions, no hidden control flow.
+
+**Also applies to UUID/ID pre-validation:** Use `Ecto.UUID.cast/1` to validate UUID format before running a DB query, instead of catching `Ecto.Query.CastError` in a rescue clause.
+
+**Rule:** Never rescue `ArgumentError` for type coercion. Use `Integer.parse`, `Float.parse`, or `Ecto.UUID.cast` instead.
+
 ---
 
 ## Context Safety Patterns
@@ -448,30 +486,42 @@ end
 
 ### 1. Atom Conversion (Parser Context)
 
-**❌ Unsafe:**
+**❌ Unsafe — `String.to_atom` from user input:**
 ```elixir
 # Parser gets raw JSON from external source
 def parse_message(raw_json) do
   map = Jason.decode!(raw_json)
   atom_map = for {k, v} <- map, into: %{}, do: {String.to_atom(k), v}
-  # CRASH: User can pass any string as key, creating unbounded atoms
+  # CRASH risk: user can pass any string as key, creating unbounded atoms
 end
+
+# Also unsafe — controller/LiveView converting request params to atoms:
+sort_field = String.to_atom(params[“sort”])  # ❌ never do this
 ```
 
-**✅ Safe:**
+**✅ Safe — known internal values only:**
 ```elixir
 def parse_message(raw_json) do
   map = Jason.decode!(raw_json)
-  # Option 1: Use whitelist
+  # Option 1: whitelist string keys
   allowed_keys = [“type”, “content”, “timestamp”]
-  filtered = Map.take(map, allowed_keys)
+  Map.take(map, allowed_keys)
 
-  # Option 2: Keep as strings, not atoms
-  filtered
+  # Option 2: keep as strings throughout
 end
+
+# When converting a known internal param (e.g., sort field from a trusted enum):
+sort_field = String.to_existing_atom(params[“sort”])  # ✅ crashes on unknown, safe
 ```
 
-**Guideline:** Never convert untrusted strings to atoms. The atom table has no max size and can’t be garbage collected.
+**`String.to_atom` vs `String.to_existing_atom`:**
+
+| Function | When to use |
+|----------|-------------|
+| `String.to_atom/1` | Only for compile-time constants you control. Never for user input. |
+| `String.to_existing_atom/1` | For internal param values that must already be atoms (e.g., sort keys, status filters). Raises on unknown atoms — that is the desired behavior. |
+
+**Rule:** Never call `String.to_atom/1` on user-supplied input. Use `String.to_existing_atom/1` when converting a known enum value from a request param. The atom table is not garbage-collected; unbounded atom creation crashes the VM.
 
 ---
 
@@ -570,6 +620,146 @@ query = Task |> maybe_where(“title”, “bug fix”) |> Repo.all()
 ```
 
 **Guideline:** Validate field names against an explicit whitelist before interpolating into SQL. Never trust user input for column names.
+
+---
+
+## Elixir Performance Patterns
+
+### Enum.zip over Enum.at-in-loop
+
+**Problem:** Calling `Enum.at(list, idx)` inside `Enum.with_index` or any loop is O(n) per access — O(n²) total. On large lists this degrades badly.
+
+**❌ Antipattern:**
+```elixir
+hashes
+|> Enum.with_index()
+|> Enum.map(fn {hash, idx} ->
+  %{hash: hash, message: Enum.at(messages, idx)}
+end)
+```
+
+**✅ Correct — zip the two lists first:**
+```elixir
+Enum.zip(hashes, messages)
+|> Enum.map(fn {hash, message} ->
+  %{hash: hash, message: message}
+end)
+```
+
+`Enum.zip/2` traverses both lists once. Use it whenever you need to pair two same-length lists. For more than two lists, use `Enum.zip_with/3`.
+
+**Rule:** Never call `Enum.at/2` inside a loop. Zip or use `Enum.with_index` only when the index itself is needed (not as a lookup key into another list).
+
+---
+
+### List building: prepend + reverse, not acc++
+
+**Problem:** `acc ++ [item]` is O(n) — it copies the entire accumulator on every append. In a reduce over n items this is O(n²).
+
+**❌ Antipattern:**
+```elixir
+Enum.reduce(items, [], fn item, acc ->
+  acc ++ [transform(item)]
+end)
+```
+
+**✅ Correct — prepend then reverse once:**
+```elixir
+items
+|> Enum.reduce([], fn item, acc ->
+  [transform(item) | acc]
+end)
+|> Enum.reverse()
+```
+
+Prepending (`[item | acc]`) is O(1). A single `Enum.reverse/1` at the end is O(n), keeping the whole operation O(n).
+
+**Note:** `Enum.map/2` and list comprehensions handle this automatically. Only use the manual prepend+reverse pattern inside `Enum.reduce` when you actually need the accumulator for stateful logic.
+
+**Rule:** Never use `acc ++ [item]` in a reduce. Prepend with `[item | acc]` and reverse at the end.
+
+---
+
+## Context Boundary Rules
+
+### All list queries must have a default limit
+
+**Problem:** Context functions that call `Repo.all(query)` without a limit return every matching row. A caller that forgets to pass `limit:` gets an unbounded result set.
+
+**❌ Antipattern:**
+```elixir
+def list_notes_for_session(session_id, opts \\ []) do
+  Note
+  |> where([n], n.session_id == ^session_id)
+  |> Repo.all()
+  # No limit — returns all rows if caller omits :limit
+end
+```
+
+**✅ Correct — bake a default limit into the function:**
+```elixir
+def list_notes_for_session(session_id, opts \\ []) do
+  limit = Keyword.get(opts, :limit, 500)
+
+  Note
+  |> where([n], n.session_id == ^session_id)
+  |> limit(^limit)
+  |> Repo.all()
+end
+```
+
+The default of 500 is a safe cap. Callers can override with `limit: n` when they need more or less. The important thing is that the function is never unbounded by default.
+
+**Rule:** Every context function that lists multiple rows must apply a default `limit`. Use `500` as the standard cap unless the domain has a lower natural bound. Never rely on the caller to pass a limit.
+
+---
+
+### No Repo calls in the web layer
+
+**Problem:** Controllers and LiveViews that call `Repo` directly bypass context validation and make the web layer responsible for data-access logic. This makes queries hard to find, test, and reuse.
+
+**❌ Antipattern — Repo in a LiveView:**
+```elixir
+defmodule EyeInTheSkyWeb.OverviewLive.Settings do
+  alias EyeInTheSky.Repo
+
+  def handle_event("load_db_info", _, socket) do
+    result = Repo.query!("SELECT pg_database_size(current_database())")
+    {:noreply, assign(socket, db_size: result)}
+  end
+end
+```
+
+**❌ Antipattern — Repo in a controller:**
+```elixir
+defmodule EyeInTheSkyWeb.Api.V1.AgentActivityController do
+  alias EyeInTheSky.Repo
+
+  def index(conn, params) do
+    rows = Repo.all(from a in AgentActivity, where: ...)
+    json(conn, rows)
+  end
+end
+```
+
+**✅ Correct — extract to context module:**
+```elixir
+# lib/eye_in_the_sky/settings.ex
+def db_info do
+  {:ok, result} = Repo.query("SELECT pg_database_size(current_database())")
+  result
+end
+
+# lib/eye_in_the_sky/agents/activity.ex
+def list_activity(opts \\ []) do
+  limit = Keyword.get(opts, :limit, 500)
+  AgentActivity |> limit(^limit) |> Repo.all()
+end
+```
+
+The LiveView and controller call the context function — they never touch `Repo` directly.
+
+**Rule:** Controllers and LiveViews must not `alias` or call `Repo`. All database access goes through context modules in `lib/eye_in_the_sky/`. If a query doesn't fit an existing context, create a sub-module (e.g., `Agents.Activity`) rather than putting the query in the web layer.
 
 ---
 

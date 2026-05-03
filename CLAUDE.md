@@ -154,6 +154,22 @@ eits commits create --hash <hash>
 
 **DM targets support both UUID and numeric session ID.** Pass either format to `dm --to`.
 
+## eits CLI Gotchas
+
+**`EITS_PROJECT_ID` is NOT injected into spawned agent environments.** Claude sessions do not receive it as an OS env var (Codex sessions do). Always include it explicitly in the `--instructions` string:
+
+```bash
+eits agents spawn --agent my-agent --instructions "Your task here. EITS_PROJECT_ID=1" ...
+```
+
+The CLI now warns at spawn time if `EITS_PROJECT_ID` is missing from instructions and no `--project-id` flag was provided.
+
+**`eits agents defs` descriptions are truncated to 500 chars.** Use `--json` if you need the full description for a specific agent.
+
+**`eits dm inbox --unread` does not exist.** No `is_read` field in the backend. Filter by `--since <ISO8601>` or `--from <uuid>` instead.
+
+**`eits teams status` UUID column is not truncated** — full UUIDs display correctly. Copy-paste for DM targeting is safe.
+
 ## REST API
 
 JSON API at `/api/v1` for Claude Code hooks and external integrations. See [docs/REST_API.md](docs/REST_API.md) for full endpoint reference, request/response formats, and PubSub broadcast details.

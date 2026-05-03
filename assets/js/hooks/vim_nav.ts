@@ -192,6 +192,28 @@ export const VimNav = {
     }
 
     // Phase 2: normal mode
+    // Ctrl-D / Ctrl-U: half-page scroll on lists (handled before the modifier guard).
+    if (event.ctrlKey && !event.metaKey && !event.altKey && !isEditableTarget(event.target)) {
+      const key = event.key.toLowerCase()
+      if ((key === "d" || key === "u") && (document.querySelector("[data-vim-list]") || isFlyoutOpen())) {
+        event.preventDefault()
+        const items = this.currentListItems()
+        if (items.length > 0) {
+          const listEl = this.currentList()
+          const containerHeight = listEl ? listEl.clientHeight : window.innerHeight
+          const itemHeight = items[0].offsetHeight || 48
+          const halfPage = Math.max(1, Math.floor(containerHeight / itemHeight / 2))
+          const startIndex = this.listFocusIndex < 0 ? 0 : this.listFocusIndex
+          if (key === "d") {
+            this.focusListItem(Math.min(startIndex + halfPage, items.length - 1))
+          } else {
+            this.focusListItem(Math.max(startIndex - halfPage, 0))
+          }
+        }
+        return
+      }
+    }
+
     if (event.metaKey || event.ctrlKey || event.altKey) return
     if (isEditableTarget(event.target)) return
 
@@ -432,6 +454,14 @@ export const VimNav = {
       if (action.name === "list_open") {
         const item = this.currentListItems()[this.listFocusIndex]
         item?.click()
+        return
+      }
+      if (action.name === "list_open_tab") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const anchor = (item.tagName === "A" ? item : item.querySelector<HTMLAnchorElement>("a[href]")) as HTMLAnchorElement | null
+        const href = anchor?.getAttribute("href")
+        if (href) window.open(href, "_blank", "noopener,noreferrer")
         return
       }
       if (action.name === "page_search") {

@@ -2005,3 +2005,209 @@ describe("generic dd/aa list item delete and archive", () => {
     expect(remaining[1].classList.contains("vim-nav-focused")).toBe(true)
   })
 })
+
+describe("ctrl-d/ctrl-u half-page scroll", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  function makeList(count: number, itemHeight = 48): HTMLElement[] {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    // jsdom doesn't lay out, so we mock clientHeight via Object.defineProperty
+    Object.defineProperty(list, "clientHeight", { value: itemHeight * 10, configurable: true })
+    const items: HTMLElement[] = []
+    for (let i = 0; i < count; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      // offsetHeight is 0 in jsdom — set it so half-page calculation is deterministic
+      Object.defineProperty(item, "offsetHeight", { value: itemHeight, configurable: true })
+      list.appendChild(item)
+      items.push(item)
+    }
+    document.body.appendChild(list)
+    return items
+  }
+
+  function pressCtrl(h: any, key: "d" | "u"): void {
+    const evt = new KeyboardEvent("keydown", { key, ctrlKey: true })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    h.handleKey(evt)
+  }
+
+  it("ctrl-d moves focus down by half the visible page count", () => {
+    // clientHeight = 480, itemHeight = 48 → 10 visible → halfPage = 5
+    makeList(20)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    pressCtrl(h, "d")
+    expect(h.listFocusIndex).toBe(5)
+  })
+
+  it("ctrl-u moves focus up by half the visible page count", () => {
+    makeList(20)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 10
+    pressCtrl(h, "u")
+    expect(h.listFocusIndex).toBe(5)
+  })
+
+  it("ctrl-d clamps at the last item", () => {
+    makeList(8)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 6
+    pressCtrl(h, "d")
+    expect(h.listFocusIndex).toBe(7)
+  })
+
+  it("ctrl-u clamps at 0", () => {
+    makeList(8)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 2
+    pressCtrl(h, "u")
+    expect(h.listFocusIndex).toBe(0)
+  })
+
+  it("ctrl-d with no list does nothing", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    // No list in DOM
+    pressCtrl(h, "d")
+    expect(h.listFocusIndex).toBe(0)
+  })
+
+  it("ctrl-d when listFocusIndex is -1 starts from item 0", () => {
+    makeList(20)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = -1
+    pressCtrl(h, "d")
+    expect(h.listFocusIndex).toBe(5)
+  })
+
+  it("ctrl-u when listFocusIndex is -1 starts from item 0 and clamps to 0", () => {
+    makeList(20)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = -1
+    pressCtrl(h, "u")
+    expect(h.listFocusIndex).toBe(0)
+  })
+
+  it("ctrl-d in insert mode does nothing", () => {
+    makeList(20)
+    const h = makeHook()
+    h.mode = "insert"
+    h.listFocusIndex = 0
+    pressCtrl(h, "d")
+    // insert mode returns early before the ctrl check
+    expect(h.listFocusIndex).toBe(0)
+  })
+
+  it("ctrl-d on an editable target does nothing", () => {
+    makeList(10)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    const input = document.createElement("input")
+    document.body.appendChild(input)
+    const evt = new KeyboardEvent("keydown", { key: "d", ctrlKey: true })
+    Object.defineProperty(evt, "target", { value: input, configurable: true })
+    h.handleKey(evt)
+    expect(h.listFocusIndex).toBe(0)
+  })
+})
+
+describe("o open in new tab", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  function makeListWithLinks(): { items: HTMLElement[]; links: HTMLAnchorElement[] } {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const items: HTMLElement[] = []
+    const links: HTMLAnchorElement[] = []
+    for (let i = 0; i < 3; i++) {
+      const item = document.createElement("li")
+      item.setAttribute("data-vim-list-item", "")
+      const a = document.createElement("a")
+      a.href = `/sessions/${i}`
+      a.textContent = `Session ${i}`
+      item.appendChild(a)
+      list.appendChild(item)
+      items.push(item)
+      links.push(a)
+    }
+    document.body.appendChild(list)
+    return { items, links }
+  }
+
+  it("list.open_tab command is registered with feature:vim-list scope and key o", () => {
+    const cmd = COMMANDS.find(c => c.id === "list.open_tab")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["o"])
+    expect(cmd.scope).toBe("feature:vim-list")
+    expect(cmd.action).toEqual({ kind: "client", name: "list_open_tab" })
+  })
+
+  it("o opens href of child anchor in new tab", () => {
+    const { items } = makeListWithLinks()
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null)
+    const h = makeHook()
+    h.listFocusIndex = 1
+    h.focusListItem(1)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.open_tab")!)
+    expect(windowOpenSpy).toHaveBeenCalledWith("/sessions/1", "_blank", "noopener,noreferrer")
+    windowOpenSpy.mockRestore()
+  })
+
+  it("o uses href from item that is itself an anchor", () => {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const a = document.createElement("a")
+    a.setAttribute("data-vim-list-item", "")
+    a.href = "/projects/5/sessions"
+    list.appendChild(a)
+    document.body.appendChild(list)
+
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null)
+    const h = makeHook()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.open_tab")!)
+    expect(windowOpenSpy).toHaveBeenCalledWith("/projects/5/sessions", "_blank", "noopener,noreferrer")
+    windowOpenSpy.mockRestore()
+  })
+
+  it("o does nothing when listFocusIndex is -1", () => {
+    makeListWithLinks()
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null)
+    const h = makeHook()
+    h.listFocusIndex = -1
+    h.executeCommand(COMMANDS.find(c => c.id === "list.open_tab")!)
+    expect(windowOpenSpy).not.toHaveBeenCalled()
+    windowOpenSpy.mockRestore()
+  })
+
+  it("o does nothing when focused item has no anchor", () => {
+    const list = document.createElement("ul")
+    list.setAttribute("data-vim-list", "")
+    const item = document.createElement("li")
+    item.setAttribute("data-vim-list-item", "")
+    item.textContent = "plain text"
+    list.appendChild(item)
+    document.body.appendChild(list)
+
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null)
+    const h = makeHook()
+    h.listFocusIndex = 0
+    h.focusListItem(0)
+    h.executeCommand(COMMANDS.find(c => c.id === "list.open_tab")!)
+    expect(windowOpenSpy).not.toHaveBeenCalled()
+    windowOpenSpy.mockRestore()
+  })
+})

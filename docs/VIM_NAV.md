@@ -96,14 +96,19 @@ Active on any page with `data-vim-list`.
 | `j` | Next item |
 | `k` | Previous item |
 | `Enter` | Open focused item |
+| `o` | Open focused item in new tab |
 | `g g` | Jump to first item |
 | `G` | Jump to last item |
+| `Ctrl-d` | Scroll down half a page |
+| `Ctrl-u` | Scroll up half a page |
 | `{` | Jump to previous group separator |
 | `}` | Jump to next group separator |
 | `d d` | Delete focused item (generic; reads `data-vim-item-type` + `data-vim-item-id`) |
 | `a a` | Archive focused item (generic; reads `data-vim-item-type` + `data-vim-item-id`) |
 
 **Numeric count prefix**: Type a number before `j`, `k`, or `G` to repeat the motion (`3j` moves down 3, `5k` moves up 5, `10G` jumps to item 10). The accumulated count is shown in the status bar. Pressing `Escape` or waiting 2s clears the count.
+
+**Half-page scroll (`Ctrl-d`/`Ctrl-u`)**: Moves focus by approximately half the visible list height. The step size is calculated from the list container's `clientHeight` divided by the first item's `offsetHeight`. Falls back to 1 if items have zero height (e.g., in jsdom). These bindings work in normal mode only and are ignored in insert mode or when the cursor is in an editable field.
 
 **Group jump (`{`/`}`)**: Navigates between `data-vim-list-group` separator elements when present. Falls back to `gg`/`G` behavior when no separators exist in the DOM.
 

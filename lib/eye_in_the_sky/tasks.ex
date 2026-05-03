@@ -425,6 +425,48 @@ defmodule EyeInTheSky.Tasks do
     )
   end
 
+  @doc """
+  Bulk-deletes tasks and their join-table associations in one transaction.
+  Accepts UUID strings or stringified integer IDs.
+  Returns {deleted_count, nil}.
+  """
+  def batch_delete_tasks_with_associations([]), do: {0, nil}
+
+  def batch_delete_tasks_with_associations(id_strings) when is_list(id_strings) do
+    {uuids, int_ids} =
+      Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
+        id_str = to_string(id_str)
+        case Integer.parse(id_str) do
+          {int_id, ""} -> {us, [int_id | is]}
+          _ -> {[id_str | us], is}
+        end
+      end)
+
+    task_ids_query =
+      from(t in Task,
+        where: t.uuid in ^uuids or t.id in ^int_ids,
+        select: t.id)
+
+    result =
+      Repo.transaction(fn ->
+        task_ids = Repo.all(task_ids_query)
+
+        Repo.delete_all(from(tt in "task_tags",    where: tt.task_id in ^task_ids))
+        Repo.delete_all(from(ts in "task_sessions", where: ts.task_id in ^task_ids))
+        Repo.delete_all(from(ct in "commit_tasks",  where: ct.task_id in ^task_ids))
+
+        {deleted, _} =
+          Repo.delete_all(from(t in Task, where: t.id in ^task_ids))
+
+        deleted
+      end)
+
+    case result do
+      {:ok, count} -> {count, nil}
+      {:error, _}  -> {0, nil}
+    end
+  end
+
   defdelegate search_tasks(query, project_id \\ nil, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
   @doc """
@@ -448,7 +490,7 @@ defmodule EyeInTheSky.Tasks do
     Repo.update_all(
       from(t in EyeInTheSky.Tasks.Task,
         where: t.uuid in ^uuids or t.id in ^int_ids),
-      set: [state_id: ^state_id, updated_at: ^now]
+      set: [state_id: state_id, updated_at: now]
     )
   end
 

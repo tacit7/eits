@@ -1616,6 +1616,17 @@ USAGE
           die "--interpolate-env requires envsubst (gettext) or perl"
         fi
       fi
+
+      # Warn if EITS_PROJECT_ID is missing from instructions and not provided via --project-id
+      if [[ -z "$project_id" ]]; then
+        if ! echo "$instructions" | grep -qi "EITS_PROJECT_ID"; then
+          printf 'warning: instructions do not contain EITS_PROJECT_ID and no --project-id flag was provided.\n' >&2
+          printf '         Spawned agents will have null project context and may fail.\n' >&2
+          printf '         Either: (1) add "EITS_PROJECT_ID=<id>" to instructions, or\n' >&2
+          printf '                 (2) use --project-id <n> flag.\n' >&2
+        fi
+      fi
+
       local payload
       payload=$(jq -n \
         --arg     instructions      "$instructions" \
@@ -1868,8 +1879,8 @@ BATCH_HELP
               if (length($0)>0) {print; exit}
             }
           ' "$_file")
-          # Strip surrounding quotes, take first sentence only (up to first period or 120 chars)
-          _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-120 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          # Strip surrounding quotes, take first sentence only (up to first period or 500 chars)
+          _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-500 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           [[ -z "$_name" ]] && _name=$(basename "$_file" .md)
           # Filter
           if [[ -n "$_query" ]] && ! echo "$_name" | grep -qi "$_query"; then continue; fi

@@ -14,6 +14,7 @@ defmodule EyeInTheSky.ChecklistItems do
     ChecklistItem
     |> where([c], c.task_id == ^task_id)
     |> order_by([c], asc: c.position, asc: c.id)
+    |> limit(200)
     |> Repo.all()
   end
 

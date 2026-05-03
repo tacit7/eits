@@ -98,6 +98,16 @@ Active on any page with `data-vim-list`.
 | `Enter` | Open focused item |
 | `g g` | Jump to first item |
 | `G` | Jump to last item |
+| `{` | Jump to previous group separator |
+| `}` | Jump to next group separator |
+| `d d` | Delete focused item (generic; reads `data-vim-item-type` + `data-vim-item-id`) |
+| `a a` | Archive focused item (generic; reads `data-vim-item-type` + `data-vim-item-id`) |
+
+**Numeric count prefix**: Type a number before `j`, `k`, or `G` to repeat the motion (`3j` moves down 3, `5k` moves up 5, `10G` jumps to item 10). The accumulated count is shown in the status bar. Pressing `Escape` or waiting 2s clears the count.
+
+**Group jump (`{`/`}`)**: Navigates between `data-vim-list-group` separator elements when present. Falls back to `gg`/`G` behavior when no separators exist in the DOM.
+
+**Generic delete/archive (`dd`/`aa`)**: Reads `data-vim-item-type` and `data-vim-item-id` from the focused item and fires `delete_<type>` / `archive_<type>` events via `pushToList`. Items without these attributes fall back to session behavior (`data-session-id`). Session items also include `session_id` in the payload for backwards compatibility. These attributes are set on `session_card`, `task_card/list_row`, and `notes_list` components.
 
 ---
 
@@ -276,7 +286,7 @@ Scoped commands only fire when their scope condition is met.
 | Scope | Active when |
 |---|---|
 | `feature:vim-list` | `[data-vim-list]` exists in DOM |
-| `feature:vim-search` | `[data-vim-search]` exists in DOM |
+| `feature:vim-search` | `[data-vim-search]` exists in DOM (wired on tasks, teams, skills, kanban, agents, and generic top-bar search inputs) |
 | `feature:vim-flyout` | `[data-vim-flyout-open]` attribute is present |
 | `page:sessions` | `[data-vim-page="sessions"]` exists in DOM |
 | `route_suffix:/tasks` | `window.location.pathname` ends with `/tasks` |

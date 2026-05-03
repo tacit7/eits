@@ -402,6 +402,29 @@ defmodule EyeInTheSky.Tasks do
     end
   end
 
+  @doc """
+  Bulk-archives tasks by UUID strings or stringified integer IDs.
+  Returns {archived_count, nil}.
+  """
+  def batch_archive_tasks([]), do: {0, nil}
+
+  def batch_archive_tasks(id_strings) when is_list(id_strings) do
+    {uuids, int_ids} =
+      Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
+        id_str = to_string(id_str)
+        case Integer.parse(id_str) do
+          {int_id, ""} -> {us, [int_id | is]}
+          _ -> {[id_str | us], is}
+        end
+      end)
+
+    Repo.update_all(
+      from(t in Task,
+        where: t.uuid in ^uuids or t.id in ^int_ids),
+      set: [archived: true, updated_at: DateTime.utc_now()]
+    )
+  end
+
   defdelegate search_tasks(query, project_id \\ nil, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
   # Delegates to TaskSessions context (session-linking operations)

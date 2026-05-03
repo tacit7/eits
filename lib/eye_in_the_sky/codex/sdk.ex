@@ -235,7 +235,7 @@ defmodule EyeInTheSky.Codex.SDK do
     new_acc = acc <> text
 
     new_parts =
-      if text == "", do: state.accumulated_parts, else: state.accumulated_parts ++ [{:text, text}]
+      if text == "", do: state.accumulated_parts, else: [{:text, text} | state.accumulated_parts]
 
     send(caller_pid, {:claude_message, sdk_ref, message})
     {:continue, %{state | accumulated_text: new_acc, accumulated_parts: new_parts}}
@@ -259,7 +259,7 @@ defmodule EyeInTheSky.Codex.SDK do
       new_parts =
         if summary == "",
           do: state.accumulated_parts,
-          else: state.accumulated_parts ++ [{:tool, summary}]
+          else: [{:tool, summary} | state.accumulated_parts]
 
       {:continue, %{state | accumulated_parts: new_parts}}
     end
@@ -275,7 +275,7 @@ defmodule EyeInTheSky.Codex.SDK do
     %{sdk_ref: sdk_ref, caller_pid: caller_pid, accumulated_text: acc} = state
 
     final_session_id = data[:session_id] || state[:session_id]
-    result_text = build_result_text(state.accumulated_parts, acc)
+    result_text = build_result_text(Enum.reverse(state.accumulated_parts), acc)
 
     metadata = %{
       session_id: final_session_id,

@@ -19,6 +19,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSkyWeb.Components.DmHelpers
   import EyeInTheSkyWeb.Components.DmHelpers
 
   # ---------------------------------------------------------------------------
@@ -407,35 +408,14 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     assigns = assign(assigns, :provider, provider)
 
     ~H"""
-    <%= cond do %>
-      <% @provider == "codex" -> %>
-        <img
-          src="/images/openai.svg"
-          class="size-4 mt-1 flex-shrink-0 animate-pulse"
-          alt="Codex"
-          width="16"
-          height="16"
-          loading="lazy"
-        />
-      <% @provider == "gemini" -> %>
-        <img
-          src="/images/gemini.svg"
-          class="size-4 mt-1 flex-shrink-0 animate-pulse"
-          alt="Gemini"
-          width="16"
-          height="16"
-          loading="lazy"
-        />
-      <% true -> %>
-        <img
-          src="/images/claude.svg"
-          class="size-4 mt-1 flex-shrink-0 animate-pulse"
-          alt="Claude"
-          width="16"
-          height="16"
-          loading="lazy"
-        />
-    <% end %>
+    <img
+      src={DmHelpers.provider_icon(@provider)}
+      class="size-4 mt-1 flex-shrink-0 animate-pulse"
+      alt={String.capitalize(@provider)}
+      width="16"
+      height="16"
+      loading="lazy"
+    />
     """
   end
 end

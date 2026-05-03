@@ -237,6 +237,14 @@ defmodule EyeInTheSky.Sessions do
   def delete_session(%Session{} = session), do: delete(session)
 
   @doc """
+  Deletes multiple sessions by their integer IDs in a single query.
+  Returns `{deleted_count, nil}`.
+  """
+  def batch_delete_sessions(ids) when is_list(ids) do
+    Repo.delete_all(from s in Session, where: s.id in ^ids)
+  end
+
+  @doc """
   Atomically increments the cached token and cost totals on a session row.
 
   Called after each message insert that carries usage metadata. Uses a raw

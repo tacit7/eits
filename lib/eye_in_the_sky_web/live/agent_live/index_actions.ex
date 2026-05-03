@@ -155,24 +155,8 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
   end
 
   def handle_delete_selected(_params, socket) do
-    ids = socket.assigns.selected_ids
-
-    results =
-      Enum.map(ids, fn id ->
-        with {:ok, session} <- Sessions.get_session(id),
-             {:ok, _} <- Sessions.delete_session(session) do
-          :ok
-        else
-          {:error, :not_found} ->
-            :error
-
-          {:error, reason} ->
-            Logger.warning("bulk delete: failed to delete session #{id}: #{inspect(reason)}")
-            :error
-        end
-      end)
-
-    deleted = Enum.count(results, &(&1 == :ok))
+    ids = MapSet.to_list(socket.assigns.selected_ids)
+    {deleted, _} = Sessions.batch_delete_sessions(ids)
 
     socket =
       socket

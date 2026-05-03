@@ -329,7 +329,7 @@ defmodule EyeInTheSky.Sessions do
   - `limit: n` — cap result count at the DB level
   """
   def list_project_sessions_with_agent(project_id, opts \\ []) do
-    limit_val = Keyword.get(opts, :limit)
+    limit_val = Keyword.get(opts, :limit, 500)
     offset_val = Keyword.get(opts, :offset)
     active_only = Keyword.get(opts, :active_only, false)
 

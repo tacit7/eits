@@ -2372,3 +2372,153 @@ describe("hint mode (f key)", () => {
     expect(h.hintMode).toBe(false)
   })
 })
+
+describe("ctrl-n/ctrl-p single-step list navigation", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  function makeList(count: number): HTMLElement[] {
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const items: HTMLElement[] = []
+    for (let i = 0; i < count; i++) {
+      const li = document.createElement("li")
+      li.setAttribute("data-vim-list-item", "")
+      Object.defineProperty(li, "offsetHeight", { value: 48, configurable: true })
+      ul.appendChild(li)
+      items.push(li)
+    }
+    document.body.appendChild(ul)
+    return items
+  }
+
+  function press(h: any, key: "n" | "p"): void {
+    const evt = new KeyboardEvent("keydown", { key, ctrlKey: true })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    h.handleKey(evt)
+  }
+
+  it("ctrl-n moves focus to the next item", () => {
+    makeList(5)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 1
+    press(h, "n")
+    expect(h.listFocusIndex).toBe(2)
+  })
+
+  it("ctrl-p moves focus to the previous item", () => {
+    makeList(5)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 3
+    press(h, "p")
+    expect(h.listFocusIndex).toBe(2)
+  })
+
+  it("ctrl-n clamps at last item", () => {
+    makeList(3)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 2
+    press(h, "n")
+    expect(h.listFocusIndex).toBe(2)
+  })
+
+  it("ctrl-p clamps at 0", () => {
+    makeList(3)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    press(h, "p")
+    expect(h.listFocusIndex).toBe(0)
+  })
+
+  it("ctrl-n with listFocusIndex -1 starts from item 0", () => {
+    makeList(5)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = -1
+    press(h, "n")
+    expect(h.listFocusIndex).toBe(1)
+  })
+
+  it("ctrl-n does nothing when no list exists", () => {
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    press(h, "n")
+    expect(h.listFocusIndex).toBe(0)
+  })
+})
+
+describe("y t yank focused item title", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  function makeListWithTitles(titles: string[]): HTMLElement[] {
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const items: HTMLElement[] = []
+    for (const title of titles) {
+      const li = document.createElement("li")
+      li.setAttribute("data-vim-list-item", "")
+      li.setAttribute("data-vim-item-title", title)
+      ul.appendChild(li)
+      items.push(li)
+    }
+    document.body.appendChild(ul)
+    return items
+  }
+
+  const yankTitleCmd = { id: "list.yank_title", label: "Copy title", keys: ["y", "t"], group: "context" as const, action: { kind: "client" as const, name: "list_yank_title" as const }, scope: "feature:vim-list" }
+
+  it("copies data-vim-item-title of focused item to clipboard", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
+
+    makeListWithTitles(["Alpha", "Beta", "Gamma"])
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 1
+
+    h.executeCommand(yankTitleCmd)
+
+    expect(writeText).toHaveBeenCalledWith("Beta")
+  })
+
+  it("does nothing when no item is focused (listFocusIndex -1)", () => {
+    const writeText = vi.fn()
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
+
+    makeListWithTitles(["Alpha"])
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = -1
+
+    h.executeCommand(yankTitleCmd)
+
+    expect(writeText).not.toHaveBeenCalled()
+  })
+
+  it("does nothing when focused item has no data-vim-item-title", () => {
+    const writeText = vi.fn()
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
+
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    // no data-vim-item-title set
+    ul.appendChild(li)
+    document.body.appendChild(ul)
+
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+
+    h.executeCommand(yankTitleCmd)
+
+    expect(writeText).not.toHaveBeenCalled()
+  })
+})

@@ -65,6 +65,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
         data-vim-list-item
         data-vim-item-type="task"
         data-vim-item-id={@task.id}
+        data-vim-item-title={@task.title}
         phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
         phx-keyup={if !@select_mode, do: @on_click}
         phx-key="Enter"

@@ -16,7 +16,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab" | "session_nav_next" | "session_nav_prev" | "hint_mode_enter"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "list_yank_title" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab" | "session_nav_next" | "session_nav_prev" | "hint_mode_enter"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -188,6 +188,8 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "list_yank_uuid" }, scope: "page:sessions" },
   { id: "session.yank_id",   label: "Copy int ID",      keys: ["y", "i"], group: "context",
     action: { kind: "client", name: "list_yank_id" },   scope: "page:sessions" },
+  { id: "list.yank_title",   label: "Copy title",       keys: ["y", "t"], group: "context",
+    action: { kind: "client", name: "list_yank_title" }, scope: "feature:vim-list" },
 
   // ── Space leader (Phase A) ──────────────────────────────────────────────────
   // Single-key after Space

@@ -325,14 +325,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       {:session, _} -> {:error, :bad_request, "session_id is required"}
       {:task, {:error, :not_found}} -> {:error, :not_found, "Task not found"}
       {:claim, {:error, :already_claimed}} ->
-        owner_hint =
-          case Tasks.get_current_session_for_task(parse_int(task_id, 0)) do
-            {:ok, s} ->
-              " — currently held by session #{s.id} (#{s.uuid}#{if s.name, do: ", \"#{s.name}\"", else: ""})"
-            _ ->
-              ""
-          end
-        {:error, :conflict, "Task is already in progress#{owner_hint}"}
+        hint = format_claim_owner_hint(task_id)
+        {:error, :conflict, "Task is already in progress#{hint}"}
       {:claim, {:error, :task_not_claimable}} -> {:error, :conflict, "Task cannot be claimed from its current state"}
       {:claim, {:error, :task_not_found}} -> {:error, :not_found, "Task not found"}
       {:claim, {:error, changeset}} -> {:error, changeset}
@@ -498,6 +492,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     case Helpers.resolve_session_int_id(sid) do
       {:ok, id} -> id
       _ -> nil
+    end
+  end
+
+  defp format_claim_owner_hint(task_id_str) do
+    case Tasks.get_current_session_for_task(parse_int(task_id_str, 0)) do
+      {:ok, s} ->
+        name_part = if s.name, do: ", \"#{s.name}\"", else: ""
+        " — currently held by session #{s.id} (#{s.uuid}#{name_part})"
+      _ ->
+        ""
     end
   end
 

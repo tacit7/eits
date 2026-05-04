@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  import EyeInTheSkyWeb.Helpers.FileHelpers, only: [path_within?: 2]
 
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
@@ -29,6 +30,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   @valid_tabs ~w(general editor auth workflow pricing system)
 
   @known_editors ~w(code cursor vim nano zed)
+
+  @allowed_editor_roots [Path.expand("~/.claude")]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -97,12 +100,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("open_in_editor", %{"path" => path}, socket) when byte_size(path) > 0 do
     editor = Settings.get("preferred_editor") || "code"
 
+    allowed? = Enum.any?(@allowed_editor_roots, &path_within?(path, &1))
+
     cond do
       editor not in @known_editors ->
         {:noreply, put_flash(socket, :error, "Editor #{inspect(editor)} is not allowed")}
 
       not File.exists?(path) ->
         {:noreply, put_flash(socket, :error, "Path does not exist")}
+
+      not allowed? ->
+        {:noreply, put_flash(socket, :error, "Path is outside allowed directories")}
 
       true ->
         Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->

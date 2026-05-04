@@ -35,7 +35,8 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher.Registry do
     "warn_destructive_sql" => Builtin.WarnDestructiveSql,
     "sanitize_api_keys" => Builtin.SanitizeApiKeys,
     "sanitize_prompt_api_keys" => Builtin.SanitizePromptApiKeys,
-    "workflow_business_hours_only" => Builtin.WorkflowBusinessHoursOnly
+    "workflow_business_hours_only" => Builtin.WorkflowBusinessHoursOnly,
+    "warn_git_amend" => Builtin.WarnGitAmend
   }
 
   @doc "Return all known registry keys."

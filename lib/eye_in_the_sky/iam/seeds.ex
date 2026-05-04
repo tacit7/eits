@@ -138,6 +138,17 @@ defmodule EyeInTheSky.IAM.Seeds do
       condition: %{"time_between" => ["09:00", "17:00"]}
     },
     %{
+      system_key: "warn_git_amend",
+      name: "Warn on git commit --amend / rebase -i",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "warn_git_amend",
+      priority: 70,
+      enabled: true,
+      message:
+        "History-rewriting git operation detected (amend/rebase -i). If this commit was already pushed, a force-push will be required."
+    },
+    %{
       system_key: "builtin.workflow_stop_gate",
       name: "Session end gate (example)",
       effect: "instruct",

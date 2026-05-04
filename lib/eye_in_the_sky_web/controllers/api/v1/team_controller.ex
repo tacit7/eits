@@ -48,8 +48,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           description: team.description,
           status: team.status,
           project_id: team.project_id,
-          created_at: to_string(team.created_at),
-          archived_at: if(team.archived_at, do: to_string(team.archived_at)),
+          created_at: DateTime.to_iso8601(team.created_at),
+          archived_at: if(team.archived_at, do: DateTime.to_iso8601(team.archived_at)),
           members: Enum.map(members, &ApiPresenter.present_member/1)
         })
     end

@@ -107,6 +107,7 @@ defmodule EyeInTheSky.Teams do
     |> tap_broadcast(:team_updated)
   end
 
+  @doc "Soft delete: sets status=\"archived\" and archived_at; does not remove the DB row."
   def delete_team(%Team{} = team) do
     team
     |> Team.changeset(%{

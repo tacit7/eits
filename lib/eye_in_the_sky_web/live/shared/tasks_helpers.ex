@@ -84,11 +84,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     due_at = if params["due_at"] != "", do: params["due_at"], else: nil
     tags_string = params["tags"] || ""
 
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
+    tag_names = parse_tag_names(tags_string)
 
     case Tasks.update_task(task, %{
            title: title,
@@ -179,11 +175,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     priority = parse_form_int(params["priority"], 1)
     tags_string = params["tags"] || ""
 
-    tag_names =
-      tags_string
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
+    tag_names = parse_tag_names(tags_string)
 
     now = DateTime.utc_now()
 
@@ -372,4 +364,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   end
 
   defp parse_form_int(_, default), do: default
+
+  defp parse_tag_names(tags_string) do
+    tags_string
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
 end

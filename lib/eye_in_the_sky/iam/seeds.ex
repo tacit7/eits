@@ -375,6 +375,19 @@ defmodule EyeInTheSky.IAM.Seeds do
       enabled: false,
       message: "Command uses a different package manager than the configured preference. Set the packageManager condition to enable this policy.",
       condition: %{}
+    },
+    %{
+      system_key: "require_commit_before_stop",
+      name: "Warn on uncommitted changes at session end",
+      effect: "instruct",
+      action: "*",
+      agent_type: "*",
+      event: "Stop",
+      builtin_matcher: "require_commit_before_stop",
+      priority: 70,
+      enabled: false,
+      message:
+        "Session ending with uncommitted changes. Run `git status` to review, then commit or stash before closing."
     }
   ]
 

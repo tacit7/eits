@@ -102,3 +102,75 @@ describe('CommandPalette arrow-key wrap-around via updateActiveClass', () => {
     expect(buttons[0].getAttribute('aria-selected')).toBe('false')
   })
 })
+
+describe('CommandPalette ctrl-j/ctrl-k navigation', () => {
+  function fireKeydown(hook, key, ctrlKey = false) {
+    const e = new KeyboardEvent('keydown', { key, ctrlKey, bubbles: true, cancelable: true })
+    hook.onInputKeydown(e)
+    return e
+  }
+
+  it('ctrl-j moves selection forward by one', () => {
+    const { hook, buttons } = makeHook(3)
+
+    const e = fireKeydown(hook, 'j', true)
+
+    expect(e.defaultPrevented).toBe(true)
+    expect(hook.activeIndex).toBe(1)
+    expect(buttons[1].classList.contains('bg-base-content/8')).toBe(true)
+    expect(buttons[0].classList.contains('bg-base-content/8')).toBe(false)
+  })
+
+  it('ctrl-k moves selection backward by one', () => {
+    const { hook, buttons } = makeHook(3)
+    hook.activeIndex = 2
+    buttons[0].classList.remove('bg-base-content/8', 'text-base-content')
+    buttons[0].classList.add('hover:bg-base-content/5', 'text-base-content/80')
+    buttons[0].setAttribute('aria-selected', 'false')
+    buttons[2].classList.remove('hover:bg-base-content/5', 'text-base-content/80')
+    buttons[2].classList.add('bg-base-content/8', 'text-base-content')
+    buttons[2].setAttribute('aria-selected', 'true')
+
+    const e = fireKeydown(hook, 'k', true)
+
+    expect(e.defaultPrevented).toBe(true)
+    expect(hook.activeIndex).toBe(1)
+    expect(buttons[1].classList.contains('bg-base-content/8')).toBe(true)
+    expect(buttons[2].classList.contains('bg-base-content/8')).toBe(false)
+  })
+
+  it('ctrl-j wraps from last to first', () => {
+    const { hook, buttons } = makeHook(3)
+    hook.activeIndex = 2
+    buttons[0].classList.remove('bg-base-content/8', 'text-base-content')
+    buttons[0].classList.add('hover:bg-base-content/5', 'text-base-content/80')
+    buttons[0].setAttribute('aria-selected', 'false')
+    buttons[2].classList.remove('hover:bg-base-content/5', 'text-base-content/80')
+    buttons[2].classList.add('bg-base-content/8', 'text-base-content')
+    buttons[2].setAttribute('aria-selected', 'true')
+
+    fireKeydown(hook, 'j', true)
+
+    expect(hook.activeIndex).toBe(0)
+    expect(buttons[0].classList.contains('bg-base-content/8')).toBe(true)
+  })
+
+  it('ctrl-k wraps from first to last', () => {
+    const { hook, buttons } = makeHook(3)
+
+    fireKeydown(hook, 'k', true)
+
+    expect(hook.activeIndex).toBe(2)
+    expect(buttons[2].classList.contains('bg-base-content/8')).toBe(true)
+  })
+
+  it('plain j/k without ctrl do not navigate', () => {
+    const { hook } = makeHook(3)
+
+    fireKeydown(hook, 'j', false)
+    expect(hook.activeIndex).toBe(0)
+
+    fireKeydown(hook, 'k', false)
+    expect(hook.activeIndex).toBe(0)
+  })
+})

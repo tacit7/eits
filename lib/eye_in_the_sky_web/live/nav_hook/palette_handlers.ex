@@ -277,44 +277,28 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
   def handle_task_nav_event(_event, _params, socket), do: {:cont, socket}
 
-  defp find_adjacent_task(tasks, current_uuid, direction) do
-    current_idx = Enum.find_index(tasks, fn t -> t.uuid == current_uuid end)
+  defp find_adjacent(list, current_uuid, direction) do
+    current_idx = Enum.find_index(list, fn item -> item.uuid == current_uuid end)
 
     case direction do
       "next" ->
-        cond do
-          current_idx != nil && current_idx < length(tasks) - 1 ->
-            Enum.at(tasks, current_idx + 1).uuid
-
-          current_idx == nil ->
-            case tasks do
-              [first | _] -> first.uuid
-              [] -> nil
-            end
-
-          true ->
-            case tasks do
-              [first | _] -> first.uuid
-              [] -> nil
-            end
+        if current_idx != nil && current_idx < length(list) - 1 do
+          Enum.at(list, current_idx + 1).uuid
+        else
+          case list do
+            [first | _] -> first.uuid
+            [] -> nil
+          end
         end
 
       "prev" ->
-        cond do
-          current_idx != nil && current_idx > 0 ->
-            Enum.at(tasks, current_idx - 1).uuid
-
-          current_idx == nil ->
-            case Enum.reverse(tasks) do
-              [last | _] -> last.uuid
-              [] -> nil
-            end
-
-          true ->
-            case Enum.reverse(tasks) do
-              [last | _] -> last.uuid
-              [] -> nil
-            end
+        if current_idx != nil && current_idx > 0 do
+          Enum.at(list, current_idx - 1).uuid
+        else
+          case Enum.reverse(list) do
+            [last | _] -> last.uuid
+            [] -> nil
+          end
         end
 
       _ ->
@@ -322,54 +306,12 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     end
   end
 
+  defp find_adjacent_task(tasks, current_uuid, direction) do
+    find_adjacent(tasks, current_uuid, direction)
+  end
+
   defp find_adjacent_session(sessions, current_uuid, direction) do
-    # Find index of current session
-    current_idx = Enum.find_index(sessions, fn s -> s.uuid == current_uuid end)
-
-    case direction do
-      "next" ->
-        cond do
-          current_idx != nil && current_idx < length(sessions) - 1 ->
-            Enum.at(sessions, current_idx + 1).uuid
-
-          current_idx == nil ->
-            # Not on a session page, return first (most recent)
-            case sessions do
-              [first | _] -> first.uuid
-              [] -> nil
-            end
-
-          true ->
-            # At the end, wrap around to first
-            case sessions do
-              [first | _] -> first.uuid
-              [] -> nil
-            end
-        end
-
-      "prev" ->
-        cond do
-          current_idx != nil && current_idx > 0 ->
-            Enum.at(sessions, current_idx - 1).uuid
-
-          current_idx == nil ->
-            # Not on a session page, return last (oldest)
-            case Enum.reverse(sessions) do
-              [last | _] -> last.uuid
-              [] -> nil
-            end
-
-          true ->
-            # At the beginning, wrap around to last
-            case Enum.reverse(sessions) do
-              [last | _] -> last.uuid
-              [] -> nil
-            end
-        end
-
-      _ ->
-        nil
-    end
+    find_adjacent(sessions, current_uuid, direction)
   end
 
   defp do_create_chat(session_uuid, params, socket) do

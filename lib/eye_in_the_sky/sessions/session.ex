@@ -61,6 +61,11 @@ defmodule EyeInTheSky.Sessions.Session do
     # Source of truth for display; fall back to aggregate query only when nil (pre-migration rows).
     field :total_tokens, :integer, default: 0
     field :total_cost_usd, :float, default: 0.0
+    # JSONB column. Stores ONLY local overrides for this session — never the
+    # fully-merged effective settings. Reading code should call
+    # EyeInTheSky.Settings.JsonSettings.effective_settings/2 with the agent's
+    # settings to compute the merged view. See lib/eye_in_the_sky/settings/.
+    field :settings, :map, default: %{}
     # Virtual field populated by context functions — never set by changesets.
     # Two callers:
     #   1. `Sessions.list_project_sessions_with_agent/2` — populated via
@@ -121,7 +126,8 @@ defmodule EyeInTheSky.Sessions.Session do
       :parent_session_id,
       :entrypoint,
       :status_reason,
-      :read_only
+      :read_only,
+      :settings
     ])
     |> validate_required([:agent_id, :started_at])
     |> validate_inclusion(:status, [

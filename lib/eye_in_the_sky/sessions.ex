@@ -18,6 +18,7 @@ defmodule EyeInTheSky.Sessions do
   alias EyeInTheSky.Sessions.ModelInfo
   alias EyeInTheSky.Sessions.Queries
   alias EyeInTheSky.Sessions.Session
+  alias EyeInTheSky.Settings.JsonSettings
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers
 
@@ -182,6 +183,63 @@ defmodule EyeInTheSky.Sessions do
 
     session
     |> Session.changeset(attrs)
+    |> Repo.update()
+  end
+
+  # ---------------------------------------------------------------------------
+  # JSONB settings overrides (sessions.settings)
+  #
+  # The session.settings column persists ONLY local overrides. Effective
+  # settings are computed at read time via JsonSettings.effective_settings/2
+  # (defaults ⊕ agent overrides ⊕ session overrides).
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Read a single override via dotted key (no defaults applied). Returns nil
+  when the key is absent — caller decides whether to fall back to agent or
+  app defaults.
+  """
+  def get_setting(%Session{} = session, dotted_key) when is_binary(dotted_key) do
+    JsonSettings.get_setting(session.settings || %{}, dotted_key)
+  end
+
+  @doc """
+  Coerce + persist a single override on this session.
+  Returns `{:ok, session}` or `{:error, reason}` (changeset or coerce error atom).
+  """
+  def put_setting(%Session{} = session, dotted_key, value) do
+    case JsonSettings.coerce_value(value, dotted_key, :session) do
+      {:ok, coerced} ->
+        updated_settings = JsonSettings.put_setting(session.settings || %{}, dotted_key, coerced)
+        persist_settings(session, updated_settings)
+
+      {:error, _reason} = err ->
+        err
+    end
+  end
+
+  @doc """
+  Remove a single override. Falls back to inherited value (agent or default).
+  """
+  def delete_setting(%Session{} = session, dotted_key) do
+    updated_settings = JsonSettings.delete_setting(session.settings || %{}, dotted_key)
+    persist_settings(session, updated_settings)
+  end
+
+  @doc "Drop an entire namespace of overrides (e.g. \"anthropic\")."
+  def reset_settings_namespace(%Session{} = session, namespace) do
+    updated_settings = JsonSettings.reset_namespace(session.settings || %{}, namespace)
+    persist_settings(session, updated_settings)
+  end
+
+  @doc "Clear all overrides on this session."
+  def reset_settings(%Session{} = session) do
+    persist_settings(session, %{})
+  end
+
+  defp persist_settings(%Session{} = session, settings) when is_map(settings) do
+    session
+    |> Session.changeset(%{settings: settings})
     |> Repo.update()
   end
 

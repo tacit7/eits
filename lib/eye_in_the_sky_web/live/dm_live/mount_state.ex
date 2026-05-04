@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
 
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Settings.JsonSettings
   alias EyeInTheSky.{Projects, Tasks}
   alias EyeInTheSkyWeb.Helpers.PubSubHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
@@ -85,6 +86,14 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   end
 
   defp assign_ui_flags(socket, session) do
+    agent = socket.assigns[:agent]
+    agent_overrides = (agent && agent.settings) || %{}
+    session_overrides = session.settings || %{}
+    effective = JsonSettings.effective_settings(agent_overrides, session_overrides)
+
+    # NOTE: read keys directly from `effective` — Schema.defaults guarantees
+    # every general.* key is populated, so a literal `false` is preserved.
+    # Avoid `get_in(...) || default` because `false || true == true`.
     socket
     |> assign(:active_tab, "messages")
     |> assign(:session_ref, nil)
@@ -92,12 +101,12 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:selected_model, session.model || "opus")
     |> assign(:selected_effort, "medium")
     |> assign(:active_overlay, nil)
-    |> assign(:show_live_stream, true)
+    |> assign(:show_live_stream, get_in(effective, ["general", "show_live_stream"]))
     |> assign(:slash_items, SlashItems.build())
     |> assign(:diff_cache, %{})
     |> assign(:reload_timer, nil)
-    |> assign(:thinking_enabled, false)
-    |> assign(:max_budget_usd, nil)
+    |> assign(:thinking_enabled, get_in(effective, ["general", "thinking_enabled"]))
+    |> assign(:max_budget_usd, get_in(effective, ["general", "max_budget_usd"]))
     |> assign(:session_cli_opts, [])
     |> assign(:compacting, session.status == "compacting")
     |> assign(:message_search_query, "")
@@ -105,9 +114,12 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:reloading, false)
     |> assign(:active_timer, nil)
     |> assign(:codex_raw_lines, [])
-    |> assign(:notify_on_stop, false)
+    |> assign(:notify_on_stop, get_in(effective, ["general", "notify_on_stop"]))
     |> assign(:dm_settings_scope, "session")
     |> assign(:dm_settings_subtab, "general")
+    |> assign(:dm_settings_effective, effective)
+    |> assign(:dm_settings_session_overrides, session_overrides)
+    |> assign(:dm_settings_agent_overrides, agent_overrides)
   end
 
   defp assign_stream_defaults(socket) do

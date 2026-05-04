@@ -182,7 +182,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="Session halts once spend exceeds this"
         override={"max_budget_usd" in @overrides}
       >
-        <.num_input key="max_budget_usd" scope={@scope} value={@session_state.max_budget_usd} />
+        <.num_input key="general.max_budget_usd" scope={@scope} value={@session_state.max_budget_usd} />
       </.row>
     </.section>
 
@@ -194,7 +194,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="Show streaming tokens as the agent responds"
         override={"show_live_stream" in @overrides}
       >
-        <.toggle key="show_live_stream" scope={@scope} checked={true} />
+        <.toggle key="general.show_live_stream" scope={@scope} checked={@session_state[:show_live_stream] != false} />
       </.row>
       <.row
         label="Thinking"
@@ -202,7 +202,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         override={"thinking_enabled" in @overrides}
       >
         <.toggle
-          key="thinking_enabled"
+          key="general.thinking_enabled"
           scope={@scope}
           checked={@session_state.thinking_enabled || false}
         />
@@ -217,7 +217,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="Desktop notification when the agent goes idle"
         override={"notify_on_stop" in @overrides}
       >
-        <.toggle key="notify_on_stop" scope={@scope} checked={@notify_on_stop} />
+        <.toggle key="general.notify_on_stop" scope={@scope} checked={@notify_on_stop} />
       </.row>
     </.section>
     """

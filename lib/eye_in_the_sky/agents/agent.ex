@@ -41,6 +41,10 @@ defmodule EyeInTheSky.Agents.Agent do
     # needs this value.
     field :project_name, :string
     field :last_activity_at, :utc_datetime_usec
+    # JSONB column. Stores ONLY local overrides at the agent default level.
+    # Effective settings are computed at read time via
+    # EyeInTheSky.Settings.JsonSettings.effective_settings/2.
+    field :settings, :map, default: %{}
   end
 
   @doc false
@@ -60,7 +64,8 @@ defmodule EyeInTheSky.Agents.Agent do
       :parent_session_id,
       :last_activity_at,
       :agent_definition_id,
-      :definition_checksum_at_spawn
+      :definition_checksum_at_spawn,
+      :settings
     ])
     |> maybe_generate_uuid()
     |> validate_required([])

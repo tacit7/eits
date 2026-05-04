@@ -11,6 +11,7 @@ defmodule EyeInTheSky.Agents do
   alias EyeInTheSky.Agents.Agent
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Sessions.Session
+  alias EyeInTheSky.Settings.JsonSettings
 
   @doc """
   Returns the list of agents. Default limit: 500.
@@ -298,5 +299,53 @@ defmodule EyeInTheSky.Agents do
 
   defp base_agent_query do
     from(a in Agent, preload: [:project, :agent_definition])
+  end
+
+  # ---------------------------------------------------------------------------
+  # JSONB settings overrides (agents.settings)
+  #
+  # Stores agent-level defaults that apply to every session spawned from this
+  # agent unless overridden at the session level. See
+  # EyeInTheSky.Settings.JsonSettings.effective_settings/2.
+  # ---------------------------------------------------------------------------
+
+  @doc "Read a single override on this agent (no defaults applied)."
+  def get_setting(%Agent{} = agent, dotted_key) when is_binary(dotted_key) do
+    JsonSettings.get_setting(agent.settings || %{}, dotted_key)
+  end
+
+  @doc "Coerce + persist a single agent-level override."
+  def put_setting(%Agent{} = agent, dotted_key, value) do
+    case JsonSettings.coerce_value(value, dotted_key, :agent) do
+      {:ok, coerced} ->
+        updated_settings = JsonSettings.put_setting(agent.settings || %{}, dotted_key, coerced)
+        persist_settings(agent, updated_settings)
+
+      {:error, _reason} = err ->
+        err
+    end
+  end
+
+  @doc "Remove a single override. Effective value falls back to app default."
+  def delete_setting(%Agent{} = agent, dotted_key) do
+    updated_settings = JsonSettings.delete_setting(agent.settings || %{}, dotted_key)
+    persist_settings(agent, updated_settings)
+  end
+
+  @doc "Drop an entire namespace of overrides."
+  def reset_settings_namespace(%Agent{} = agent, namespace) do
+    updated_settings = JsonSettings.reset_namespace(agent.settings || %{}, namespace)
+    persist_settings(agent, updated_settings)
+  end
+
+  @doc "Clear all agent-level overrides."
+  def reset_settings(%Agent{} = agent) do
+    persist_settings(agent, %{})
+  end
+
+  defp persist_settings(%Agent{} = agent, settings) when is_map(settings) do
+    agent
+    |> Agent.changeset(%{settings: settings})
+    |> Repo.update()
   end
 end

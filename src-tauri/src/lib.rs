@@ -254,8 +254,16 @@ pub fn run() {
                 _ => {}
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error building tauri application")
+        .run(|app_handle, event| {
+            // macOS: dock icon clicked with no visible windows → show the hidden window.
+            if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
+                if !has_visible_windows {
+                    show_window(app_handle);
+                }
+            }
+        });
 }
 
 fn show_window(app_handle: &tauri::AppHandle) {

@@ -249,6 +249,16 @@ Unlike Claude's delta-based `StreamAssembler`, the Codex version handles complet
 
 The assembler implements the same interface as Claude's (`new/0`, `reset/1`, `buffer/1`, `handle_message/2`, `handle_tool_delta/2`, `handle_tool_block_stop/1`) so the worker dispatches uniformly.
 
+#### Performance: Prepend + Reverse Pattern
+
+The assembler accumulates parts using a prepend + reverse pattern for O(n) performance instead of O(n²):
+
+- Parts are accumulated via prepending: `[{:text, text} | state.accumulated_parts]` (O(1))
+- On turn completion, the list is reversed: `Enum.reverse(state.accumulated_parts)` (O(n))
+- This avoids repeated list concatenation (`++`), which requires scanning the entire accumulated list on each append
+
+This pattern is applied consistently for both text blocks and tool blocks, ensuring O(n) performance even with large accumulated parts.
+
 ### DM LiveView Streaming UI
 
 The DM page renders stream events provider-aware:
@@ -274,6 +284,36 @@ The `stream_thinking` assign:
 - Is cleared on each new stream via `handle_stream_clear/1` (sets to `nil`)
 - Allows the UI to display inline reasoning while the agent thinks
 - Works for both complete blocks (Codex) and character-by-character deltas (Claude)
+
+#### Message Rendering Optimization
+
+The `messages_tab` component renders messages with context about the previous sender to detect role changes. Previously, it used `Enum.at/2` to look up the previous message by index, creating O(n²) complexity:
+
+```elixir
+# Old O(n²) pattern
+messages_with_context =
+  assigns.messages
+  |> Enum.with_index()
+  |> Enum.map(fn {msg, idx} ->
+    prev_role = if idx > 0, do: Enum.at(assigns.messages, idx - 1).sender_role, else: nil
+    {msg, prev_role}
+  end)
+```
+
+This was optimized to O(n) using `Enum.zip/2` with a prepended `nil`:
+
+```elixir
+# New O(n) pattern
+messages_with_context =
+  assigns.messages
+  |> Enum.zip([nil | assigns.messages])
+  |> Enum.map(fn {msg, prev} ->
+    prev_role = if prev, do: prev.sender_role, else: nil
+    {msg, prev_role}
+  end)
+```
+
+By zipping the message list with a copy that's shifted by one position (with `nil` prepended), each message is paired with its predecessor in linear time. This pattern is useful for any sequential context lookups in Enum operations.
 
 ### Raw Output Broadcasting
 

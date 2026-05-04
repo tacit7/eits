@@ -688,9 +688,26 @@ DM from:<agent_name> (session:<uuid>) <message body>
 - User DM bubbles have primary/20 border for visual distinction
 
 **Implementation files:**
-- `lib/eye_in_the_sky_web/components/dm_helpers.ex` — parsing functions
+- `lib/eye_in_the_sky_web/components/dm_helpers.ex` — parsing functions and shared component helpers
 - `lib/eye_in_the_sky_web/components/dm_message_components.ex` — chip rendering
 - `lib/eye_in_the_sky/agents/cmd_dispatcher/dm_handler.ex` — DM body construction
+
+---
+
+## DM Component Helper Centralization
+
+**Commits:** `92aaf35d`, `5dfb1e53`, `f3f68c8c`
+
+`DmHelpers` is the single source of truth for shared DM component helpers, eliminating duplication across composer and message components.
+
+**Centralized helpers:**
+- `provider_icon/1` — Returns the icon path for a provider (Claude, Codex, Gemini). Previously duplicated in `stream_provider_avatar` component with inline cond logic; now unified via `DmHelpers.provider_icon()`.
+- `effort_display_name/1` — Maps effort atoms (low, medium, high, max) to display strings. Previously duplicated in both `Composer` and `DmHelpers`; now single source in `DmHelpers`.
+
+**Deduplication strategy:**
+- Component helpers that are used in multiple modules are extracted to `dm_helpers.ex`
+- Components import the module and call helpers directly (no alias needed when importing)
+- Reduces maintenance burden and ensures consistent rendering across the DM UI
 
 ---
 

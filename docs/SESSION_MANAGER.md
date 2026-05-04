@@ -944,6 +944,30 @@ The `get_session_id_by_uuid/1` function validates that the UUID corresponds to a
 
 ---
 
+## Batch Session Deletion
+
+The `Sessions.batch_delete_sessions/1` function deletes multiple sessions in a single query, replacing the previous N+1 pattern:
+
+**Signature:**
+```elixir
+def batch_delete_sessions(ids) when is_list(ids) do
+  Repo.delete_all(from s in Session, where: s.id in ^ids)
+end
+```
+
+**Returns:** `{deleted_count, nil}` tuple from `Repo.delete_all/1`
+
+**Usage:**
+```elixir
+ids = [123, 456, 789]
+{deleted, _} = Sessions.batch_delete_sessions(ids)
+# deleted = 3
+```
+
+**Performance:** Consolidates N individual delete queries into a single SQL statement using an IN clause. Used by bulk selection delete handlers in `AgentLive.IndexActions` and `ProjectLive.Sessions.Actions`.
+
+---
+
 ## Session Query Limits
 
 All session listing functions accept optional `limit` and `offset` parameters to prevent unbounded queries:
@@ -953,7 +977,7 @@ All session listing functions accept optional `limit` and `offset` parameters to
 |----------|---------------|-----------|
 | `list_sessions/1` | 1,000 | `limit: n` |
 | `list_sessions_for_agent/2` | 200 | `limit: n` |
-| `list_project_sessions_with_agent/2` | None (callers must pass) | `limit: n`, `offset: n` |
+| `list_project_sessions_with_agent/2` | 500 | `limit: n`, `offset: n` |
 | `list_sessions_for_scope/2` | None (callers must pass) | `limit: n`, `offset: n` |
 
 **Usage:**
@@ -969,6 +993,16 @@ Sessions.list_sessions_for_scope(scope, limit: 50, offset: 100)
 ```
 
 All callers should use explicit limits or accept the function's default. Never call a listing function without considering result size.
+
+### Nil Limit Safety
+
+Query helper functions in `EyeInTheSky.QueryHelpers` (`for_session_direct/3` and `for_session_join/4`) treat `nil` limits as the default 500:
+
+```elixir
+limit_val = Keyword.get(opts, :limit) || 500
+```
+
+This prevents callers from accidentally passing `limit: nil` and fetching unbounded results. The nil-coalescing pattern ensures that missing or explicitly-nil limit options both default to 500.
 
 ---
 

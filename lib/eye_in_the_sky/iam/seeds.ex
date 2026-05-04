@@ -302,6 +302,16 @@ defmodule EyeInTheSky.IAM.Seeds do
       message: "Background process detected (&). Ensure cleanup on session end — orphan processes may bind ports or consume resources."
     },
     %{
+      system_key: "block_secrets_write",
+      name: "Block writes to secret key/cert files",
+      effect: "deny",
+      action: "*",
+      builtin_matcher: "block_secrets_write",
+      priority: 95,
+      enabled: true,
+      message: "Writing to private key or certificate files is blocked (.pem, .key, id_rsa, ~/.ssh/*, etc.)."
+    },
+    %{
       system_key: "builtin.workflow_stop_gate",
       name: "Session end gate (example)",
       effect: "instruct",

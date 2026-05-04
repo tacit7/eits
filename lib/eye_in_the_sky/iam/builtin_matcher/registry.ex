@@ -51,7 +51,8 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher.Registry do
     "warn_schema_alteration" => Builtin.WarnSchemaAlteration,
     "warn_package_publish" => Builtin.WarnPackagePublish,
     "warn_global_package_install" => Builtin.WarnGlobalPackageInstall,
-    "warn_background_process" => Builtin.WarnBackgroundProcess
+    "warn_background_process" => Builtin.WarnBackgroundProcess,
+    "block_secrets_write" => Builtin.BlockSecretsWrite
   }
 
   @doc "Return all known registry keys."

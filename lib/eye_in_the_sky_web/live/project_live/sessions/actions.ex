@@ -235,32 +235,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       {:noreply, assign(socket, :show_archive_confirm, false)}
     else
       project_id = socket.assigns.project.id
+      ids = socket.assigns.selected_ids |> Enum.map(&Selection.normalize_id/1)
 
-      results =
-        Enum.map(socket.assigns.selected_ids, fn id ->
-          with {:ok, session} <- fetch_project_session(project_id, id),
-               :ok <- archive_project_session(session) do
-            {:ok, session.uuid}
-          else
-            {:error, :not_found} -> :error
-            {:error, reason} ->
-              Logger.warning("bulk archive: failed for session #{id}: #{inspect(reason)}")
-              :error
-          end
-        end)
+      # Fetch sessions to get UUIDs for evict-dm-history event.
+      # Filter to verify ownership.
+      sessions = Sessions.list_sessions_by_ids(ids) |> Enum.filter(&(&1.project_id == project_id))
 
-      archived_uuids = for {:ok, uuid} <- results, do: uuid
-      archived = length(archived_uuids)
+      # Batch archive in a single query (ownership check built-in).
+      {archived, _} = Sessions.batch_archive_sessions_for_project(ids, project_id)
+
+      # Extract UUIDs from fetched sessions for the evict event.
+      uuids = Enum.map(sessions, & &1.uuid)
 
       {flash_level, flash_msg} =
-        BulkHelpers.build_bulk_flash(archived, length(results), verb: "Archived", entity: "session")
+        BulkHelpers.build_bulk_flash(archived, length(ids), verb: "Archived", entity: "session")
 
       socket =
         socket
         |> assign(:show_archive_confirm, false)
         |> Selection.clear_selection()
         |> Loader.load_agents()
-        |> push_event("evict-dm-history", %{uuids: archived_uuids})
+        |> push_event("evict-dm-history", %{uuids: uuids})
         |> put_flash(flash_level, flash_msg)
 
       {:noreply, socket}
@@ -277,20 +272,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     end)
   end
 
-  defp fetch_project_session(project_id, raw_id) do
-    id = Selection.normalize_id(raw_id)
-
-    with {:ok, session} <- Sessions.get_session(id) do
-      if session.project_id == project_id, do: {:ok, session}, else: {:error, :not_found}
-    end
-  end
-
-  defp archive_project_session(session) do
-    case Sessions.archive_session(session) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
-  end
 
   def delete_selected(_params, socket) do
     ids = MapSet.to_list(socket.assigns.selected_ids)

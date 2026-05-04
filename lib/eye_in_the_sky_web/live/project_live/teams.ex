@@ -103,15 +103,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         {:noreply, socket}
 
       team_id ->
-        team = Teams.get_team!(team_id)
-        {:ok, _} = Teams.delete_team(team)
+        case Teams.get_team(team_id) do
+          {:ok, team} ->
+            {:ok, _} = Teams.delete_team(team)
 
-        {:noreply,
-         assign(
-           socket,
-           :teams,
-           load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, socket.assigns.search_query)
-         )}
+            {:noreply,
+             assign(
+               socket,
+               :teams,
+               load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, socket.assigns.search_query)
+             )}
+
+          _ ->
+            {:noreply, put_flash(socket, :error, "Team not found")}
+        end
     end
   end
 

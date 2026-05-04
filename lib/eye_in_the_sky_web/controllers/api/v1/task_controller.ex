@@ -277,7 +277,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def complete(conn, %{"id" => id} = params) do
     message = trim_param(params["message"] || "")
 
-    with false <- message == "",
+    with true <- message != "",
          {:ok, task} <- Tasks.get_task(id),
          {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
       maybe_mark_member_done(params["session_id"])
@@ -289,7 +289,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         task: ApiPresenter.present_task(updated)
       })
     else
-      true ->
+      false ->
         {:error, "message is required"}
 
       {:error, :not_found} ->

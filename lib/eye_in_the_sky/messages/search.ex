@@ -11,6 +11,7 @@ defmodule EyeInTheSky.Messages.Search do
   Options:
     - `:session_id` - integer session ID to scope results (optional)
     - `:limit` - max results to return (default 10, max 100)
+    - `:include_archived` - include messages from archived sessions (default false)
 
   Returns list of maps with keys: id, session_id, session_uuid, sender_role, body_excerpt, inserted_at.
   Uses the GIN index on messages_body_fts for efficient FTS. Returns [] when no FTS match.
@@ -21,6 +22,7 @@ defmodule EyeInTheSky.Messages.Search do
   def search_messages(query, opts) when is_binary(query) and query != "" do
     limit = min(Keyword.get(opts, :limit, 10), 100)
     session_id = Keyword.get(opts, :session_id)
+    include_archived = Keyword.get(opts, :include_archived, false)
 
     base =
       from(m in Message,
@@ -40,6 +42,13 @@ defmodule EyeInTheSky.Messages.Search do
           inserted_at: m.inserted_at
         }
       )
+
+    base =
+      if include_archived do
+        base
+      else
+        where(base, [_m, s], is_nil(s.archived_at))
+      end
 
     base =
       if session_id do

@@ -149,6 +149,59 @@ defmodule EyeInTheSky.IAM.Seeds do
         "History-rewriting git operation detected (amend/rebase -i). If this commit was already pushed, a force-push will be required."
     },
     %{
+      system_key: "warn_all_files_staged",
+      name: "Warn on broad git add",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "warn_all_files_staged",
+      priority: 60,
+      enabled: true,
+      message:
+        "Broad git add detected (add . / -A / --all). Verify the staged diff matches your intent before committing."
+    },
+    %{
+      system_key: "block_force_push",
+      name: "Block git push --force",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_force_push",
+      priority: 95,
+      enabled: true,
+      message: "Force-pushing is blocked. Use --force-with-lease on shared branches, or add the branch to allowBranches."
+    },
+    %{
+      system_key: "warn_git_stash_drop",
+      name: "Warn on git stash drop / clear",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "warn_git_stash_drop",
+      priority: 65,
+      enabled: true,
+      message:
+        "git stash drop/clear permanently discards stashed changes. Confirm you no longer need them."
+    },
+    %{
+      system_key: "warn_large_file_write",
+      name: "Warn on large file write",
+      effect: "instruct",
+      action: "*",
+      builtin_matcher: "warn_large_file_write",
+      priority: 55,
+      enabled: true,
+      message: "Large file write detected (>100 KB). Confirm this is intentional."
+    },
+    %{
+      system_key: "sanitize_connection_strings",
+      name: "Sanitize connection strings in output",
+      effect: "instruct",
+      action: "*",
+      event: "PostToolUse",
+      builtin_matcher: "sanitize_connection_strings",
+      priority: 100,
+      enabled: true,
+      message: "Tool output contains a connection string with embedded credentials."
+    },
+    %{
       system_key: "builtin.workflow_stop_gate",
       name: "Session end gate (example)",
       effect: "instruct",

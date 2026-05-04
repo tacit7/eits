@@ -41,7 +41,17 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher.Registry do
     "block_force_push" => Builtin.BlockForcePush,
     "warn_git_stash_drop" => Builtin.WarnGitStashDrop,
     "warn_large_file_write" => Builtin.WarnLargeFileWrite,
-    "sanitize_connection_strings" => Builtin.SanitizeConnectionStrings
+    "sanitize_connection_strings" => Builtin.SanitizeConnectionStrings,
+    "block_kubectl" => Builtin.BlockKubectl,
+    "block_terraform" => Builtin.BlockTerraform,
+    "block_aws_cli" => Builtin.BlockAwsCli,
+    "block_gcloud" => Builtin.BlockGcloud,
+    "block_az_cli" => Builtin.BlockAzCli,
+    "block_helm" => Builtin.BlockHelm,
+    "warn_schema_alteration" => Builtin.WarnSchemaAlteration,
+    "warn_package_publish" => Builtin.WarnPackagePublish,
+    "warn_global_package_install" => Builtin.WarnGlobalPackageInstall,
+    "warn_background_process" => Builtin.WarnBackgroundProcess
   }
 
   @doc "Return all known registry keys."

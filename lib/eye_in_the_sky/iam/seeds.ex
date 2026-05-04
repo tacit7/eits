@@ -202,6 +202,106 @@ defmodule EyeInTheSky.IAM.Seeds do
       message: "Tool output contains a connection string with embedded credentials."
     },
     %{
+      system_key: "block_kubectl",
+      name: "Block destructive kubectl operations",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_kubectl",
+      priority: 90,
+      enabled: false,
+      message: "Destructive kubectl operation blocked. Use allowVerbs condition to permit specific verbs."
+    },
+    %{
+      system_key: "block_terraform",
+      name: "Block terraform destroy / apply",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_terraform",
+      priority: 90,
+      enabled: false,
+      message: "terraform destroy/apply is blocked. Enable with explicit approval or use allowCommands."
+    },
+    %{
+      system_key: "block_aws_cli",
+      name: "Block destructive AWS CLI operations",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_aws_cli",
+      priority: 90,
+      enabled: false,
+      message: "Destructive AWS CLI operation blocked (terminate, rm --recursive, delete)."
+    },
+    %{
+      system_key: "block_gcloud",
+      name: "Block destructive gcloud operations",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_gcloud",
+      priority: 90,
+      enabled: false,
+      message: "Destructive gcloud operation blocked."
+    },
+    %{
+      system_key: "block_az_cli",
+      name: "Block destructive az CLI operations",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_az_cli",
+      priority: 90,
+      enabled: false,
+      message: "Destructive Azure CLI operation blocked."
+    },
+    %{
+      system_key: "block_helm",
+      name: "Block destructive helm operations",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_helm",
+      priority: 90,
+      enabled: false,
+      message: "Destructive helm operation blocked (uninstall/delete/rollback)."
+    },
+    %{
+      system_key: "warn_schema_alteration",
+      name: "Warn on DDL schema alteration",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "warn_schema_alteration",
+      priority: 55,
+      enabled: true,
+      message: "DDL schema alteration detected (ALTER TABLE / DROP COLUMN). Ensure a migration is tracked and the change is reversible."
+    },
+    %{
+      system_key: "warn_package_publish",
+      name: "Warn on package publish",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "warn_package_publish",
+      priority: 70,
+      enabled: true,
+      message: "Package publish detected. Confirm version, changelog, and registry auth before proceeding."
+    },
+    %{
+      system_key: "warn_global_package_install",
+      name: "Warn on global package install",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "warn_global_package_install",
+      priority: 60,
+      enabled: true,
+      message: "Global package install detected. Prefer project-local installs to avoid polluting the system environment."
+    },
+    %{
+      system_key: "warn_background_process",
+      name: "Warn on background process",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "warn_background_process",
+      priority: 50,
+      enabled: true,
+      message: "Background process detected (&). Ensure cleanup on session end — orphan processes may bind ports or consume resources."
+    },
+    %{
       system_key: "builtin.workflow_stop_gate",
       name: "Session end gate (example)",
       effect: "instruct",

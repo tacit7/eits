@@ -50,10 +50,15 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
         <button
           phx-click="toggle_bulk_mode"
           class={"btn btn-sm sm:btn-xs gap-1 h-11 sm:h-7 min-h-0 " <> if(@bulk_mode, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
-          title="Bulk select mode"
+          title={if @bulk_mode, do: "Exit select mode", else: "Bulk select mode"}
         >
-          <.icon name="hero-check-mini" class="size-3.5" />
-          <span class="hidden sm:inline">Select</span>
+          <%= if @bulk_mode do %>
+            <.icon name="hero-x-mark-mini" class="size-3.5" />
+            <span class="hidden sm:inline">Cancel</span>
+          <% else %>
+            <.icon name="hero-check-mini" class="size-3.5" />
+            <span class="hidden sm:inline">Select</span>
+          <% end %>
         </button>
         <button
           phx-click="toggle_filter_drawer"

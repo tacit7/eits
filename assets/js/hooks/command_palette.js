@@ -71,6 +71,7 @@ export const CommandPalette = {
     })
 
     this._globalKeyHandler = (e) => {
+      if (this.el.open) return
       if (this._matchesModifier(e) && e.key.toLowerCase() === "k") {
         const inEditor = document.activeElement?.closest(".cm-editor, .monaco-editor, [data-palette-no-intercept]")
         if (inEditor) return
@@ -265,12 +266,12 @@ export const CommandPalette = {
     const items = this.visibleItems || []
     const len = Math.max(items.length, 1)
 
-    if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown" || (e.ctrlKey && e.key === "j")) {
       e.preventDefault()
       const prevIndex = this.activeIndex
       this.activeIndex = (this.activeIndex + 1) % len
       this.updateActiveClass(prevIndex, this.activeIndex)
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === "ArrowUp" || (e.ctrlKey && e.key === "k")) {
       e.preventDefault()
       const prevIndex = this.activeIndex
       this.activeIndex = (this.activeIndex - 1 + len) % len

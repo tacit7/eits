@@ -301,6 +301,7 @@ defmodule EyeInTheSkyWeb.Router do
     pipe_through [:accepts_json]
 
     post "/iam/decide", IAMController, :decide
+    post "/iam/hook", IAMController, :decide
   end
 
   # Unauthenticated settings reads (read-only, no sensitive data)

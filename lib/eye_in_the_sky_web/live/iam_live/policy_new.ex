@@ -16,9 +16,11 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   """
   use EyeInTheSkyWeb, :live_view
 
+  import EyeInTheSkyWeb.IAMLive.IAMComponents
   import EyeInTheSkyWeb.IAMLive.PolicyFormHelpers
 
   alias EyeInTheSky.IAM
+  alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.Projects
 
@@ -35,7 +37,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
      |> assign(:form, to_form(changeset))
      |> assign(:condition_text, "{}")
      |> assign(:scope, "global")
-     |> assign(:projects, projects)}
+     |> assign(:projects, projects)
+     |> assign(:iam_hooks_status, HooksChecker.status())}
   end
 
   @impl true
@@ -101,6 +104,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   def render(assigns) do
     ~H"""
     <div class="p-6 max-w-4xl mx-auto space-y-6">
+      <.iam_offline_banner hooks_status={@iam_hooks_status} />
       <div class="flex items-center gap-3">
         <.link navigate={~p"/iam/policies"} class="btn btn-ghost btn-sm">
           <.icon name="hero-arrow-left" class="size-4" />

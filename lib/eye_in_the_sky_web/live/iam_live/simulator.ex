@@ -14,8 +14,10 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.IAMLive.SimulatorComponents
+  import EyeInTheSkyWeb.IAMLive.IAMComponents
 
   alias EyeInTheSky.IAM.Context
+  alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.Simulator
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
@@ -68,7 +70,8 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
      |> assign(:form, @default_form)
      |> assign(:result, nil)
      |> assign(:sidebar_tab, :iam)
-     |> assign(:sidebar_project, nil)}
+     |> assign(:sidebar_project, nil)
+     |> assign(:iam_hooks_status, HooksChecker.status())}
   end
 
   @impl true
@@ -169,6 +172,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
   def render(assigns) do
     ~H"""
     <div class="p-6 max-w-7xl mx-auto space-y-6">
+      <.iam_offline_banner hooks_status={@iam_hooks_status} />
       <div class="flex items-center gap-3">
         <.icon name="hero-beaker" class="size-6 text-primary" />
         <h1 class="text-2xl font-bold">IAM Simulator</h1>

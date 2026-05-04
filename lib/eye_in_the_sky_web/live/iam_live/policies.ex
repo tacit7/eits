@@ -10,8 +10,10 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  import EyeInTheSkyWeb.IAMLive.IAMComponents
 
   alias EyeInTheSky.IAM
+  alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.Policy
 
   @default_filters %{
@@ -29,6 +31,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
       |> assign(:sidebar_tab, :iam)
       |> assign(:sidebar_project, nil)
       |> assign(:filters, @default_filters)
+      |> assign(:iam_hooks_status, HooksChecker.status())
 
     socket =
       if connected?(socket) do
@@ -129,6 +132,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
   def render(assigns) do
     ~H"""
     <div class="p-6 max-w-7xl mx-auto space-y-6">
+      <.iam_offline_banner hooks_status={@iam_hooks_status} />
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <.icon name="hero-shield-check" class="size-6 text-primary" />

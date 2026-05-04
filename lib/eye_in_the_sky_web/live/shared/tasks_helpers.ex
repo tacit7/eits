@@ -79,8 +79,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     task = socket.assigns.selected_task
     title = params["title"]
     description = params["description"]
-    state_id = parse_int(params["state_id"], 0)
-    priority = parse_int(params["priority"], 0)
+    state_id = parse_form_int(params["state_id"], 0)
+    priority = parse_form_int(params["priority"], 0)
     due_at = if params["due_at"] != "", do: params["due_at"], else: nil
     tags_string = params["tags"] || ""
 

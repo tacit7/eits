@@ -54,8 +54,11 @@ Each rate-limit evaluation emits a `[:eits, :rate_limit, :check]` telemetry even
 
 ```bash
 eits sessions list [--search <q>] [--name <partial>] [--status <s>] \
-  [--project <id>] [--agent <uuid>] [--parent <id|uuid>] [--mine] \
+  [--project <id>] [--agent <uuid>] [--agent-slug <slug>] \
+  [--parent <id|uuid>] [--mine] \
   [--limit <n>] [--include-archived] [--with-tasks]
+# --agent-slug: filter by agent definition slug (e.g. "eits-cli-expert")
+# --agent: filter by agent UUID (mutually exclusive with --search/--status/--project/--mine)
 
 eits sessions get <uuid>
 eits sessions get self                         # Use current $EITS_SESSION_UUID
@@ -432,6 +435,27 @@ eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--re
 Both `--from` and `--to` accept either an integer session ID or a session UUID. `--from` defaults to `$EITS_SESSION_UUID` or `$EITS_SESSION_ID`.
 
 `--since` filters messages by insertion timestamp (ISO8601 format, e.g., `2026-04-30T12:00:00Z`). Useful for orchestrators polling for new replies without diffing the full inbox.
+
+---
+
+## messages
+
+```bash
+eits messages search <query> [--session <uuid|id>] [--limit <n>] [--include-archived] [--json]
+# Full-text search across session message bodies (GIN index, no ILIKE fallback)
+# --session: scope to a specific session (UUID or integer ID)
+# --limit: max results (default 10, max 100)
+# --include-archived: include messages from archived sessions (excluded by default)
+# --json: raw JSON output
+```
+
+**Examples:**
+```bash
+eits messages search "deploy failed"
+eits messages search "error" --session abc123 --limit 50
+eits messages search "migration" --include-archived
+eits messages search "oauth" --json
+```
 
 ---
 

@@ -881,6 +881,7 @@ Search messages across all sessions with optional filtering.
 | `q` | string | yes | Search query (full-text search on message body) |
 | `session_id` | string or integer | no | Filter to messages from a specific session (UUID or integer ID) |
 | `limit` | integer | no | Max results (default 10, max 100) |
+| `include_archived` | boolean | no | Include messages from archived sessions (default false) |
 
 **Response:** `200 OK`
 
@@ -908,7 +909,9 @@ Search messages across all sessions with optional filtering.
 ```bash
 curl 'localhost:5001/api/v1/messages/search?q=authentication%20bug&limit=20'
 curl 'localhost:5001/api/v1/messages/search?q=oauth&session_id=42'
+curl 'localhost:5001/api/v1/messages/search?q=migration&include_archived=true'
 eits messages search "auth bug" --limit 20
+eits messages search "migration" --include-archived
 ```
 
 ---
@@ -1346,6 +1349,7 @@ List sessions with optional filtering. Supports full-text search, name filters, 
 | `parent_session_id` | string or integer | no | Filter to child sessions of a given parent session (UUID or integer ID). Independent of other filters |
 | `with_tasks` | boolean | no | When `true`, embeds task list per session (id, title, state_id, state) |
 | `include_archived` | boolean | no | Include archived sessions (default false) |
+| `agent_def_slug` | string | no | Filter by agent definition slug (e.g. `eits-cli-expert`). Combinable with other filters |
 | `limit` | integer | no | Max results (default 20) |
 
 **Response:** `200 OK`
@@ -1383,6 +1387,8 @@ eits sessions list --project 1 --include-archived
 eits sessions list --name "deploy"
 eits sessions list --parent 42
 eits sessions list --parent abc-123-uuid
+eits sessions list --agent-slug eits-cli-expert
+eits sessions list --agent-slug worker-agent --status working
 ```
 
 ---

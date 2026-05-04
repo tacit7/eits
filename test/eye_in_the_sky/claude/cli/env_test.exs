@@ -85,6 +85,28 @@ defmodule EyeInTheSky.Claude.CLI.EnvTest do
       env = Env.build_from_map(%{"CLAUDECODE" => "1", "HOME" => "/home/user"}, [])
       refute "CLAUDECODE" in env_keys(env)
     end
+
+    test "strips SECRET_KEY_BASE" do
+      env =
+        Env.build_from_map(
+          %{"SECRET_KEY_BASE" => "supersecretkey123", "HOME" => "/home/user"},
+          []
+        )
+
+      refute "SECRET_KEY_BASE" in env_keys(env)
+      assert "HOME" in env_keys(env)
+    end
+
+    test "strips DATABASE_URL" do
+      env =
+        Env.build_from_map(
+          %{"DATABASE_URL" => "postgres://user:pass@localhost/eits_prod", "HOME" => "/home/user"},
+          []
+        )
+
+      refute "DATABASE_URL" in env_keys(env)
+      assert "HOME" in env_keys(env)
+    end
   end
 
   describe "PATH sanitization" do

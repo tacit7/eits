@@ -18,6 +18,8 @@ defmodule EyeInTheSky.Claude.CLI.Env do
     BINDIR
     ROOTDIR
     EMU
+    SECRET_KEY_BASE
+    DATABASE_URL
   ]
 
   @blocked_prefixes ["RELEASE_"]

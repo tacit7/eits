@@ -121,9 +121,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
 
     socket =
       socket
-      |> assign(:selected_note_ids, MapSet.new())
-      |> assign(:notes_select_mode, false)
       |> load_notes()
+      |> clear_note_selection()
       |> put_flash(:info, "Deleted #{deleted} note#{if deleted != 1, do: "s"}")
 
     {:noreply, socket}
@@ -240,6 +239,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
 
     socket
     |> assign(:notes, notes)
+  end
+
+  defp clear_note_selection(socket) do
+    socket
     |> assign(:selected_note_ids, MapSet.new())
     |> assign(:notes_select_mode, false)
   end

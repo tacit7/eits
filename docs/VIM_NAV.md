@@ -110,9 +110,9 @@ Active on any page with `data-vim-list`.
 
 **Half-page scroll (`Ctrl-d`/`Ctrl-u`)**: Moves focus by approximately half the visible list height. The step size is calculated from the list container's `clientHeight` divided by the first item's `offsetHeight`. Falls back to 1 if items have zero height (e.g., in jsdom). These bindings work in normal mode only and are ignored in insert mode or when the cursor is in an editable field.
 
-**Group jump (`{`/`}`)**: Navigates between `data-vim-list-group` separator elements when present. Falls back to `gg`/`G` behavior when no separators exist in the DOM.
+**Group jump (`{`/`}`)**: Navigates between `data-vim-list-group` separator elements when present. Falls back to `gg`/`G` behavior when no separators exist in the DOM. Currently active on kanban column headers (via `data-vim-list-group` attribute on `.kanban-column`).
 
-**Generic delete/archive (`dd`/`aa`)**: Reads `data-vim-item-type` and `data-vim-item-id` from the focused item and fires `delete_<type>` / `archive_<type>` events via `pushToList`. Items without these attributes fall back to session behavior (`data-session-id`). Session items also include `session_id` in the payload for backwards compatibility. These attributes are set on `session_card`, `task_card/list_row`, and `notes_list` components.
+**Generic delete/archive (`dd`/`aa`)**: Reads `data-vim-item-type` and `data-vim-item-id` from the focused item and fires `delete_<type>` / `archive_<type>` events via `pushToList`. Items without these attributes fall back to session behavior (`data-session-id`). Session items also include `session_id` in the payload for backwards compatibility. These attributes are set on `session_card`, `task_card/list_row`, and `notes_list` components. Backend handlers are fully wired: `delete_task` and `archive_task` on the tasks page, `delete_note` on the notes page (archiving notes is not supported and returns an error message).
 
 ---
 

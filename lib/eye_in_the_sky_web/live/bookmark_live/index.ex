@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Bookmarks
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -18,6 +19,10 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
 
     {:ok, socket}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("filter_type", %{"type" => type}, socket) do

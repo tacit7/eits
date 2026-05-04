@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Tasks
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -87,6 +88,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     |> assign(:done_tasks, 0)
     |> assign(:claude_files, [])
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def render(assigns) do

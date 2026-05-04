@@ -22,6 +22,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Utils.ToolHelpers
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -78,6 +79,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
         end
     end
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("validate", %{"policy" => raw_params} = event_params, socket) do

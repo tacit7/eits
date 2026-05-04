@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Prompts
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
   @impl true
@@ -11,6 +12,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
 
     {:ok, assign(socket, :form, to_form(changeset))}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("validate", %{"prompt" => prompt_params}, socket) do

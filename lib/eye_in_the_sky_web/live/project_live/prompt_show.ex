@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Prompts
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Helpers.ViewHelpers
 
@@ -85,6 +86,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
         {:noreply, assign(socket, :form, to_form(changeset))}
     end
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("delete", _params, socket) do

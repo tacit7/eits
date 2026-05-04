@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.WorkspaceLive.Tasks do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.ScopeComponents
 
   on_mount {EyeInTheSkyWeb.WorkspaceLive.Hooks, :require_workspace}
@@ -13,6 +14,10 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Tasks do
 
     {:ok, socket}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def render(assigns) do

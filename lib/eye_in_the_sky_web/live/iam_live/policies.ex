@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.Policy
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @default_filters %{
     "agent_type" => "",
@@ -42,6 +43,10 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
 
     {:ok, socket}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("filter", %{"filters" => params}, socket) do

@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+
   @commands [
     %{group: "navigation", label: "Go to", bindings: [
       %{keys: ["g", "s"], desc: "Sessions"},
@@ -135,6 +137,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
      |> assign(:sidebar_project, nil)
      |> assign(:commands, @commands)}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def render(assigns) do

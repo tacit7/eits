@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Prompts
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
   @impl true
@@ -34,6 +35,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
 
     {:noreply, socket}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do

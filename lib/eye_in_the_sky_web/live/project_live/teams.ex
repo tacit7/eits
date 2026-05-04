@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Teams
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -114,6 +115,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
          )}
     end
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("toggle_archived", _params, socket) do

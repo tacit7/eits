@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
 
   alias EyeInTheSky.Metrics.TokenIngestion
   alias EyeInTheSky.Metrics.UsageReport
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @date_ranges %{"7d" => 7, "30d" => 30, "all" => nil}
 
@@ -23,6 +24,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
 
     {:ok, socket}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("set_range", %{"range" => range}, socket)

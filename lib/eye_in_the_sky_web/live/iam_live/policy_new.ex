@@ -23,6 +23,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.Projects
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -40,6 +41,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
      |> assign(:projects, projects)
      |> assign(:iam_hooks_status, HooksChecker.status())}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("validate", %{"policy" => raw_params} = event_params, socket) do

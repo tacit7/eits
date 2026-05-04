@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.ScopeComponents
   import EyeInTheSkyWeb.Components.SessionCard
 
@@ -31,6 +32,10 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
 
     {:ok, socket}
   end
+
+  @impl true
+  def handle_event("set_notify_on_stop", params, socket),
+    do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
   def handle_event("load_more", _params, socket) do

@@ -108,6 +108,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
              "save_session_name",
              "cancel_rename",
              "toggle_select",
+             "toggle_archived",
+             "search",
+             "set_notify_on_stop",
              "noop"
            ] do
     {:noreply, socket}

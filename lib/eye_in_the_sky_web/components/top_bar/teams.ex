@@ -15,6 +15,7 @@ defmodule EyeInTheSkyWeb.TopBar.Teams do
       placeholder="Search teams..."
       value={@search_query || ""}
       on_change="search"
+      debounce="300"
       class="w-44"
       vim_search={true}
     />

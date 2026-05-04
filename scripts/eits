@@ -273,25 +273,27 @@ cmd_sessions() {
   [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits sessions <list|get|create|update|set-intent|end|complete|waiting|reopen|archive|unarchive|context|tasks|notes>"; echo "  list -q/--search <q>   full-text search sessions by name/description"; echo "  set-intent <review|work>  declare read-only intent (review) or work mode"; return 0; }
   case "$sub" in
     list)
-      # eits sessions list [-q|--search <q>] [-n|--name <partial>] [--status <s>] [-p|--project <id>] [--agent <uuid>] [--parent <id|uuid>] [-l|--limit <n>] [--mine] [--include-archived] [--with-tasks] [-j|--json]
+      # eits sessions list [-q|--search <q>] [-n|--name <partial>] [--status <s>] [-p|--project <id>] [--agent <uuid>] [--agent-slug <slug>] [--parent <id|uuid>] [-l|--limit <n>] [--mine] [--include-archived] [--with-tasks] [-j|--json]
       # --agent is mutually exclusive with --search, --status, --project, and --mine
       # --mine is mutually exclusive with --agent, --search, --status, and --project
       # --name cannot combine with --agent or --mine
       # --parent: filter by parent session (integer ID or UUID); independent of other filters
+      # --agent-slug: filter by agent definition slug (e.g. "eits-cli-expert"); combinable with --status, --project
       local qs="" _agent_flag=0 _other_flag=0 _mine_flag=0 _json=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --search|-q)  [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--search cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --name|-n)    [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--name cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&name=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
-          --status)     [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--status cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&status=$2";     shift 2 ;;
-          --project|-p) [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--project cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
-          --agent)      [[ $_other_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, --project, and --mine"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
-          --parent)     qs="${qs}&parent_session_id=$2"; shift 2 ;;
-          --mine)       [[ $_agent_flag -eq 1 || $_other_flag -eq 1 ]] && die "--mine cannot combine with --agent, --search, --status, and --project"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
-          --limit|-l)   qs="${qs}&limit=$2";      shift 2 ;;
+          --search|-q)   [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--search cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --name|-n)     [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--name cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&name=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --status)      [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--status cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&status=$2";     shift 2 ;;
+          --project|-p)  [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--project cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
+          --agent)       [[ $_other_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, --project, and --mine"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
+          --agent-slug)  qs="${qs}&agent_def_slug=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
+          --parent)      qs="${qs}&parent_session_id=$2"; shift 2 ;;
+          --mine)        [[ $_agent_flag -eq 1 || $_other_flag -eq 1 ]] && die "--mine cannot combine with --agent, --search, --status, and --project"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
+          --limit|-l)    qs="${qs}&limit=$2";      shift 2 ;;
           --include-archived) qs="${qs}&include_archived=true"; shift ;;
-          --with-tasks) qs="${qs}&with_tasks=true"; shift ;;
-          --json|-j)    _json=1; shift ;;
+          --with-tasks)  qs="${qs}&with_tasks=true"; shift ;;
+          --json|-j)     _json=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done

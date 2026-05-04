@@ -28,6 +28,7 @@ defmodule EyeInTheSky.Sessions.Queries do
   - `:status_filter` - One of: "all", "active", "completed", "stale", "discovered"
   - `:project_id` - Filter by project ID
   - `:agent_id` - Filter by agent ID (integer)
+  - `:agent_def_slug` - Filter by agent definition slug (e.g. "eits-cli-expert")
   - `:limit` - Maximum number of results (default: 100)
   - `:offset` - Number of results to skip (default: 0)
   - `:include_archived` - Include archived sessions (default: false)
@@ -70,6 +71,15 @@ defmodule EyeInTheSky.Sessions.Queries do
     base_query =
       if agent_id do
         where(base_query, [s], s.agent_id == ^agent_id)
+      else
+        base_query
+      end
+
+    agent_def_slug = Keyword.get(opts, :agent_def_slug, nil)
+
+    base_query =
+      if agent_def_slug do
+        where(base_query, [_s, _a, ad], ad.slug == ^agent_def_slug)
       else
         base_query
       end

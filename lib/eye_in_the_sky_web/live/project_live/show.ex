@@ -28,18 +28,34 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           |> assign_empty_project_data()
 
         if connected?(socket) do
-          tasks = Tasks.list_tasks_for_project(project_id)
+          tasks_task = Task.async(fn -> Tasks.list_tasks_for_project(project_id) end)
 
-          active_sessions =
-            Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
+          active_sessions_task =
+            Task.async(fn ->
+              Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
+            end)
 
-          recent_notes = Notes.list_notes_for_project(project_id, limit: 5)
-          {agent_count, working_agent_count} = Agents.count_agents_for_project(project_id)
-          {session_count, session_ids} = Sessions.count_and_ids_for_project(project_id)
+          recent_notes_task =
+            Task.async(fn -> Notes.list_notes_for_project(project_id, limit: 5) end)
+
+          agent_count_task =
+            Task.async(fn -> Agents.count_agents_for_project(project_id) end)
+
+          session_ids_task =
+            Task.async(fn -> Sessions.count_and_ids_for_project(project_id) end)
+
+          claude_files_task = Task.async(fn -> scan_claude_files(project.path) end)
+
+          tasks = Task.await(tasks_task)
+          active_sessions = Task.await(active_sessions_task)
+          recent_notes = Task.await(recent_notes_task)
+          {agent_count, working_agent_count} = Task.await(agent_count_task)
+          {session_count, session_ids} = Task.await(session_ids_task)
+          claude_files = Task.await(claude_files_task)
+
           recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
           open_tasks = Enum.count(tasks, &is_nil(&1.completed_at))
           done_tasks = Enum.count(tasks, & &1.completed_at)
-          claude_files = scan_claude_files(project.path)
 
           recent_tasks =
             tasks

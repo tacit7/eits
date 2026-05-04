@@ -157,25 +157,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
 
   @impl true
   def handle_event("note_saved", %{"note_id" => note_id, "body" => body}, socket) do
-    case parse_id(note_id) do
-      nil ->
+    with {:id, id} when not is_nil(id) <- {:id, parse_id(note_id)},
+         note = Notes.get_note!(id),
+         {:ok, _note} <- Notes.update_note(note, %{body: body}) do
+      {:noreply,
+       socket
+       |> assign(:editing_note_id, nil)
+       |> load_notes()}
+    else
+      {:id, nil} ->
         {:noreply, socket}
 
-      id ->
-        note = Notes.get_note!(id)
-
-        case Notes.update_note(note, %{body: body}) do
-          {:ok, _note} ->
-            socket =
-              socket
-              |> assign(:editing_note_id, nil)
-              |> load_notes()
-
-            {:noreply, socket}
-
-          {:error, _changeset} ->
-            {:noreply, put_flash(socket, :error, "Failed to save note.")}
-        end
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to save note.")}
     end
   end
 

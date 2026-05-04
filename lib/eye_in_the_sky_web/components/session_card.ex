@@ -88,6 +88,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         data-vim-list-item
         data-vim-item-type="session"
         data-vim-item-id={@session.id}
+        data-vim-item-title={@session.name || "Unnamed session"}
         data-session-id={@session.id}
         data-session-uuid={@session.uuid}
         phx-click={if @select_mode, do: "toggle_select", else: @click_event}

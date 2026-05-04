@@ -97,6 +97,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                     data-vim-list-item
                     data-vim-item-type="note"
                     data-vim-item-id={note.id}
+                    data-vim-item-title={note.title || extract_title(note.body)}
                     navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
                     class="text-sm font-medium text-base-content/85 hover:text-base-content truncate [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
                   >

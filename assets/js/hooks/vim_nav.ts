@@ -226,7 +226,8 @@ export const VimNav = {
       return
     }
 
-    // Ctrl-D / Ctrl-U: half-page scroll on lists (handled before the modifier guard).
+    // Ctrl-D / Ctrl-U: half-page scroll; Ctrl-N / Ctrl-P: single-step j/k aliases.
+    // All handled before the modifier guard so they work regardless of other ctrl bindings.
     if (event.ctrlKey && !event.metaKey && !event.altKey && !isEditableTarget(event.target)) {
       const key = event.key.toLowerCase()
       if ((key === "d" || key === "u") && (document.querySelector("[data-vim-list]") || isFlyoutOpen())) {
@@ -242,6 +243,19 @@ export const VimNav = {
             this.focusListItem(Math.min(startIndex + halfPage, items.length - 1))
           } else {
             this.focusListItem(Math.max(startIndex - halfPage, 0))
+          }
+        }
+        return
+      }
+      if ((key === "n" || key === "p") && (document.querySelector("[data-vim-list]") || isFlyoutOpen())) {
+        event.preventDefault()
+        const items = this.currentListItems()
+        if (items.length > 0) {
+          const cur = this.listFocusIndex < 0 ? 0 : this.listFocusIndex
+          if (key === "n") {
+            this.focusListItem(Math.min(cur + 1, items.length - 1))
+          } else {
+            this.focusListItem(Math.max(cur - 1, 0))
           }
         }
         return
@@ -535,6 +549,14 @@ export const VimNav = {
         const item = this.currentListItems()[this.listFocusIndex]
         if (!item) return
         const value = action.name === "list_yank_uuid" ? item.dataset.sessionUuid : item.dataset.sessionId
+        if (!value) return
+        navigator.clipboard.writeText(value).catch(() => {})
+        return
+      }
+      if (action.name === "list_yank_title") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const value = item.dataset.vimItemTitle
         if (!value) return
         navigator.clipboard.writeText(value).catch(() => {})
         return

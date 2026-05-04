@@ -547,6 +547,13 @@ export const VimNav = {
         )
         return
       }
+      if (action.name === "session_nav_next" || action.name === "session_nav_prev") {
+        const direction = action.name === "session_nav_next" ? "next" : "prev"
+        this.pushEvent("vim:session-nav", { direction, current_path: window.location.pathname }, (reply: any) => {
+          if (reply?.url) window.location.href = reply.url
+        })
+        return
+      }
       if (action.name === "list_group_prev" || action.name === "list_group_next") {
         const items = this.currentListItems()
         if (items.length === 0) return

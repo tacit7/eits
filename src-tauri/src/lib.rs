@@ -162,6 +162,13 @@ pub fn run() {
                 }
             }
 
+            // --- IAM hook installer ---
+            // Write ~/.claude/settings.json hooks on every startup so agents
+            // automatically POST tool events to the local IAM endpoint.
+            // Idempotent: skips events that already have the hook present.
+            let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+            install_iam_hooks(&port);
+
             // --- ElixirKit PubSub: message dispatch ---
             let app_handle = app.handle().clone();
 
@@ -402,5 +409,137 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         }
 
         command
+    }
+}
+
+/// Install EITS IAM hooks into ~/.claude/settings.json.
+///
+/// Idempotent — checks each event type independently and only adds a hook
+/// group when none of the existing entries reference "iam/hook". Safe to
+/// call on every startup.
+///
+/// Fail-open design: any I/O or parse error is logged and silently skipped.
+/// The generated hook command uses `|| true` so Claude Code always sees
+/// exit 0 even when Phoenix is not yet reachable (connection refused / timeout).
+fn install_iam_hooks(port: &str) {
+    let home = match std::env::var("HOME") {
+        Ok(h) => std::path::PathBuf::from(h),
+        Err(_) => {
+            eprintln!("[eits-tauri] HOME not set; IAM hooks not installed");
+            return;
+        }
+    };
+
+    let claude_dir = home.join(".claude");
+    let settings_path = claude_dir.join("settings.json");
+
+    // Read existing file or start with an empty object.
+    let mut root: serde_json::Value = if settings_path.exists() {
+        match std::fs::read_to_string(&settings_path) {
+            Ok(raw) => match serde_json::from_str(&raw) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("[eits-tauri] settings.json parse error: {e}; IAM hooks not installed");
+                    return;
+                }
+            },
+            Err(e) => {
+                eprintln!("[eits-tauri] Could not read settings.json: {e}; IAM hooks not installed");
+                return;
+            }
+        }
+    } else {
+        serde_json::json!({})
+    };
+
+    // Ensure root is an object (guard against malformed files).
+    if !root.is_object() {
+        eprintln!("[eits-tauri] settings.json root is not an object; IAM hooks not installed");
+        return;
+    }
+
+    // Build the hook group to inject.
+    let cmd = format!(
+        "curl -sf --max-time 5 -X POST http://127.0.0.1:{port}/api/v1/iam/hook \
+         -H 'Content-Type: application/json' -d @- || true"
+    );
+    let group_entry = serde_json::json!({
+        "matcher": "",
+        "hooks": [{ "type": "command", "command": cmd }]
+    });
+
+    let hooks_obj = root
+        .as_object_mut()
+        .unwrap()
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}));
+
+    // Guard: if "hooks" is somehow not an object, bail.
+    if !hooks_obj.is_object() {
+        eprintln!("[eits-tauri] settings.json hooks field is not an object; IAM hooks not installed");
+        return;
+    }
+
+    let mut installed_any = false;
+
+    for event in &["PreToolUse", "PostToolUse", "Stop"] {
+        let event_hooks = hooks_obj
+            .as_object_mut()
+            .unwrap()
+            .entry(*event)
+            .or_insert_with(|| serde_json::json!([]));
+
+        // Ensure the event value is an array.
+        if !event_hooks.is_array() {
+            eprintln!("[eits-tauri] hooks.{event} is not an array; skipping");
+            continue;
+        }
+
+        // Check whether any existing entry already references our endpoint.
+        let already = event_hooks
+            .as_array()
+            .map(|groups| {
+                groups.iter().any(|g| {
+                    g.get("hooks")
+                        .and_then(|h| h.as_array())
+                        .map(|entries| {
+                            entries.iter().any(|e| {
+                                e.get("command")
+                                    .and_then(|c| c.as_str())
+                                    .map(|s| s.contains("iam/hook"))
+                                    .unwrap_or(false)
+                            })
+                        })
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false);
+
+        if !already {
+            event_hooks.as_array_mut().unwrap().push(group_entry.clone());
+            installed_any = true;
+        }
+    }
+
+    if !installed_any {
+        println!("[eits-tauri] IAM hooks already present in settings.json; nothing to do");
+        return;
+    }
+
+    // Ensure ~/.claude/ directory exists before writing.
+    if let Err(e) = std::fs::create_dir_all(&claude_dir) {
+        eprintln!("[eits-tauri] Could not create ~/.claude/: {e}");
+        return;
+    }
+
+    match serde_json::to_string_pretty(&root) {
+        Ok(json_str) => match std::fs::write(&settings_path, json_str) {
+            Ok(()) => println!(
+                "[eits-tauri] IAM hooks written to {}",
+                settings_path.display()
+            ),
+            Err(e) => eprintln!("[eits-tauri] Could not write settings.json: {e}"),
+        },
+        Err(e) => eprintln!("[eits-tauri] Could not serialize settings.json: {e}"),
     }
 }

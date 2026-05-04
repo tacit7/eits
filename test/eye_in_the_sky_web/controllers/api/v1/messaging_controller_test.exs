@@ -1,11 +1,26 @@
 defmodule EyeInTheSkyWeb.Api.V1.MockFailingAgentManager do
-  @moduledoc "Test double that always returns an error from send_message."
+  @moduledoc "Test double that returns a generic unknown error from send_message."
   def send_message(_session_id, _message, _opts \\ []), do: {:error, :worker_failed}
 end
 
 defmodule EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManager do
   @moduledoc "Test double that always succeeds send_message."
   def send_message(_session_id, _message, _opts \\ []), do: :ok
+end
+
+defmodule EyeInTheSkyWeb.Api.V1.MockQueueFullAgentManager do
+  @moduledoc "Test double that returns :queue_full."
+  def send_message(_session_id, _message, _opts \\ []), do: {:error, :queue_full}
+end
+
+defmodule EyeInTheSkyWeb.Api.V1.MockWorkerNotFoundAgentManager do
+  @moduledoc "Test double that returns :worker_not_found."
+  def send_message(_session_id, _message, _opts \\ []), do: {:error, :worker_not_found}
+end
+
+defmodule EyeInTheSkyWeb.Api.V1.MockWorkerExitAgentManager do
+  @moduledoc "Test double that returns a worker_exit tuple."
+  def send_message(_session_id, _message, _opts \\ []), do: {:error, {:worker_exit, :killed}}
 end
 
 defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
@@ -113,7 +128,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       assert json_response(conn, 404)["error"] == "Target session not found"
     end
 
-    test "returns 500 when agent manager fails to route the message", %{conn: conn} do
+    test "returns 503 with delivery_failed when agent manager returns unknown error", %{conn: conn} do
       original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
 
       Application.put_env(
@@ -136,12 +151,103 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
           "message" => "Hello agent!"
         })
 
-      resp = json_response(conn, 500)
-      assert resp["error"] == "Failed to deliver message"
+      resp = json_response(conn, 503)
+      assert resp["error"] == "delivery_failed"
+      assert resp["reachable"] == false
       refute Map.has_key?(resp, "reason")
 
       # Message must NOT be persisted when routing fails (no duplicates on retry)
       assert EyeInTheSky.Messages.list_messages_for_session(session.id) == []
+    end
+
+    test "returns 503 with queue_full when target session queue is saturated", %{conn: conn} do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockQueueFullAgentManager
+      )
+
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      sender_agent = create_agent()
+      sender_session = create_session(sender_agent)
+      target_agent = create_agent()
+      target_session = create_session(target_agent)
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "from_session_id" => sender_session.uuid,
+          "to_session_id" => target_session.uuid,
+          "message" => "Hello!"
+        })
+
+      resp = json_response(conn, 503)
+      assert resp["error"] == "queue_full"
+      assert resp["reachable"] == true
+    end
+
+    test "returns 503 with target_session_unreachable when worker is not found", %{conn: conn} do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockWorkerNotFoundAgentManager
+      )
+
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      sender_agent = create_agent()
+      sender_session = create_session(sender_agent)
+      target_agent = create_agent()
+      target_session = create_session(target_agent)
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "from_session_id" => sender_session.uuid,
+          "to_session_id" => target_session.uuid,
+          "message" => "Hello!"
+        })
+
+      resp = json_response(conn, 503)
+      assert resp["error"] == "target_session_unreachable"
+      assert resp["reachable"] == false
+    end
+
+    test "returns 503 with target_session_unreachable when worker crashes", %{conn: conn} do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockWorkerExitAgentManager
+      )
+
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      sender_agent = create_agent()
+      sender_session = create_session(sender_agent)
+      target_agent = create_agent()
+      target_session = create_session(target_agent)
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "from_session_id" => sender_session.uuid,
+          "to_session_id" => target_session.uuid,
+          "message" => "Hello!"
+        })
+
+      resp = json_response(conn, 503)
+      assert resp["error"] == "target_session_unreachable"
+      assert resp["reachable"] == false
     end
   end
 

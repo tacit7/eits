@@ -321,6 +321,60 @@ defmodule EyeInTheSky.IAM.Seeds do
       priority: 50,
       enabled: false,
       message: "Session ended."
+    },
+    %{
+      system_key: "sanitize_jwt",
+      name: "Sanitize JWT tokens in output",
+      effect: "instruct",
+      action: "*",
+      event: "PostToolUse",
+      builtin_matcher: "sanitize_jwt",
+      priority: 100,
+      enabled: true,
+      message: "Tool output contains a JWT token. Avoid logging or forwarding this output."
+    },
+    %{
+      system_key: "sanitize_private_key_content",
+      name: "Sanitize PEM private key content in output",
+      effect: "instruct",
+      action: "*",
+      event: "PostToolUse",
+      builtin_matcher: "sanitize_private_key_content",
+      priority: 100,
+      enabled: true,
+      message: "Tool output contains PEM private key material. Do not log or forward this content."
+    },
+    %{
+      system_key: "sanitize_bearer_tokens",
+      name: "Sanitize Bearer tokens in output",
+      effect: "instruct",
+      action: "*",
+      event: "PostToolUse",
+      builtin_matcher: "sanitize_bearer_tokens",
+      priority: 100,
+      enabled: true,
+      message: "Tool output contains an HTTP Bearer token. Avoid logging or forwarding this output."
+    },
+    %{
+      system_key: "block_gh_pipeline",
+      name: "Block gh CLI pipeline triggers",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_gh_pipeline",
+      priority: 90,
+      enabled: false,
+      message: "GitHub Actions pipeline trigger blocked (gh workflow run/enable/disable, gh run rerun/cancel). Add to allowWorkflows condition to permit specific workflows."
+    },
+    %{
+      system_key: "prefer_package_manager",
+      name: "Enforce preferred package manager",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "prefer_package_manager",
+      priority: 60,
+      enabled: false,
+      message: "Command uses a different package manager than the configured preference. Set the packageManager condition to enable this policy.",
+      condition: %{}
     }
   ]
 

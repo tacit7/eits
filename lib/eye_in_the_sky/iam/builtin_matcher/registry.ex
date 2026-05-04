@@ -52,7 +52,12 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher.Registry do
     "warn_package_publish" => Builtin.WarnPackagePublish,
     "warn_global_package_install" => Builtin.WarnGlobalPackageInstall,
     "warn_background_process" => Builtin.WarnBackgroundProcess,
-    "block_secrets_write" => Builtin.BlockSecretsWrite
+    "block_secrets_write" => Builtin.BlockSecretsWrite,
+    "sanitize_jwt" => Builtin.SanitizeJwt,
+    "sanitize_private_key_content" => Builtin.SanitizePrivateKeyContent,
+    "sanitize_bearer_tokens" => Builtin.SanitizeBearerTokens,
+    "block_gh_pipeline" => Builtin.BlockGhPipeline,
+    "prefer_package_manager" => Builtin.PreferPackageManager
   }
 
   @doc "Return all known registry keys."

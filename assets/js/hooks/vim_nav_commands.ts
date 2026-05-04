@@ -16,7 +16,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "list_yank_title" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab" | "session_nav_next" | "session_nav_prev" | "hint_mode_enter"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "list_yank_title" | "list_rename" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab" | "session_nav_next" | "session_nav_prev" | "hint_mode_enter"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -328,6 +328,10 @@ export const COMMANDS: Command[] = [
   // open in new tab (context: any list)
   { id: "list.open_tab", label: "Open in new tab", keys: ["o"], group: "context",
     action: { kind: "client", name: "list_open_tab" }, scope: "feature:vim-list" },
+
+  // rename inline (context: any list)
+  { id: "list.rename", label: "Rename item", keys: ["r"], group: "context",
+    action: { kind: "client", name: "list_rename" }, scope: "feature:vim-list" },
 ]
 
 // All valid first keys in multi-key sequences

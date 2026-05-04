@@ -561,6 +561,20 @@ export const VimNav = {
         navigator.clipboard.writeText(value).catch(() => {})
         return
       }
+      if (action.name === "list_rename") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const selector = item.dataset.vimRenameTarget
+        if (!selector) return
+        const input = item.querySelector<HTMLElement>(selector)
+        if (!input) return
+        input.focus()
+        if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) {
+          input.select()
+        }
+        this.setMode("insert")
+        return
+      }
       if (action.name === "focus_flyout") {
         const items = [...document.querySelectorAll<HTMLElement>("[data-vim-flyout-item]")]
         if (items.length === 0) return

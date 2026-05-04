@@ -303,6 +303,21 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Batch-archives sessions by integer IDs in a single query.
+  Only archives sessions belonging to the given project_id (ownership check).
+  Returns `{archived_count, nil}`.
+  """
+  def batch_archive_sessions_for_project(ids, project_id) when is_list(ids) and ids != [] do
+    Repo.update_all(
+      from(s in Session,
+        where: s.id in ^ids and s.project_id == ^project_id),
+      set: [archived_at: DateTime.utc_now()]
+    )
+  end
+
+  def batch_archive_sessions_for_project([], _project_id), do: {0, nil}
+
+  @doc """
   Atomically increments the cached token and cost totals on a session row.
 
   Called after each message insert that carries usage metadata. Uses a raw

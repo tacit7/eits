@@ -2522,3 +2522,97 @@ describe("y t yank focused item title", () => {
     expect(writeText).not.toHaveBeenCalled()
   })
 })
+
+describe("r rename inline", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  const renameCmd = { id: "list.rename", label: "Rename item", keys: ["r"], group: "context" as const, action: { kind: "client" as const, name: "list_rename" as const }, scope: "feature:vim-list" }
+
+  function makeListItemWithInput(selector: string): { item: HTMLElement; input: HTMLInputElement } {
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    li.dataset.vimRenameTarget = selector
+    const input = document.createElement("input")
+    input.type = "text"
+    input.name = "name"
+    li.appendChild(input)
+    ul.appendChild(li)
+    document.body.appendChild(ul)
+    return { item: li, input }
+  }
+
+  it("focuses input and switches to insert mode when data-vim-rename-target exists", () => {
+    const { input } = makeListItemWithInput('input[name="name"]')
+    const focusSpy = vi.spyOn(input, "focus")
+    const selectSpy = vi.spyOn(input, "select")
+
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+
+    h.executeCommand(renameCmd)
+
+    expect(focusSpy).toHaveBeenCalled()
+    expect(selectSpy).toHaveBeenCalled()
+    expect(h.mode).toBe("insert")
+  })
+
+  it("no-op when listFocusIndex is -1", () => {
+    const { input } = makeListItemWithInput('input[name="name"]')
+    const focusSpy = vi.spyOn(input, "focus")
+
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = -1
+
+    h.executeCommand(renameCmd)
+
+    expect(focusSpy).not.toHaveBeenCalled()
+    expect(h.mode).toBe("normal")
+  })
+
+  it("no-op when focused item has no data-vim-rename-target", () => {
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    // no data-vim-rename-target
+    const input = document.createElement("input")
+    input.name = "name"
+    li.appendChild(input)
+    ul.appendChild(li)
+    document.body.appendChild(ul)
+
+    const focusSpy = vi.spyOn(input, "focus")
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+
+    h.executeCommand(renameCmd)
+
+    expect(focusSpy).not.toHaveBeenCalled()
+    expect(h.mode).toBe("normal")
+  })
+
+  it("no-op when querySelector finds nothing", () => {
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    li.dataset.vimRenameTarget = 'input[name="title"]'
+    // no input with name="title" inside li
+    ul.appendChild(li)
+    document.body.appendChild(ul)
+
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+
+    h.executeCommand(renameCmd)
+
+    expect(h.mode).toBe("normal")
+  })
+})

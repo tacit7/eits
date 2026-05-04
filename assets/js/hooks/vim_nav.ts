@@ -147,6 +147,10 @@ export const VimNav = {
     document.addEventListener("keydown", this._onKeydown, { capture: true })
     document.addEventListener("focusin", this._onFocusin)
     document.addEventListener("focusout", this._onFocusout)
+
+    this.handleEvent("vim:session-nav-result", ({ url }: { url: string | null }) => {
+      if (url) window.location.href = url
+    })
   },
 
   destroyed() {
@@ -549,9 +553,7 @@ export const VimNav = {
       }
       if (action.name === "session_nav_next" || action.name === "session_nav_prev") {
         const direction = action.name === "session_nav_next" ? "next" : "prev"
-        this.pushEvent("vim:session-nav", { direction, current_path: window.location.pathname }, (reply: any) => {
-          if (reply?.url) window.location.href = reply.url
-        })
+        this.pushEvent("vim:session-nav", { direction, current_path: window.location.pathname })
         return
       }
       if (action.name === "list_group_prev" || action.name === "list_group_next") {

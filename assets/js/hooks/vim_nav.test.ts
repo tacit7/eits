@@ -10,6 +10,7 @@ function makeHook(opts: { enabled?: boolean; projectPath?: string } = {}) {
   const inst: any = Object.create(VimNav)
   inst.el = el
   inst.pushEvent = vi.fn()
+  inst.handleEvent = vi.fn()
   // Own-property init ensures test isolation — prototype mutable state (buffer, count)
   // can otherwise bleed between tests if a prior test mutates the prototype array.
   inst.buffer = []

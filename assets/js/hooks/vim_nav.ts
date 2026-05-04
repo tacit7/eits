@@ -95,6 +95,20 @@ function updateStatusbar(el: HTMLElement, mode: Mode, count = 0): void {
   }
 }
 
+function _generateHintLabels(count: number): string[] {
+  const alpha = "abcdefghijklmnopqrstuvwxyz"
+  const labels: string[] = []
+  for (let i = 0; labels.length < count && i < alpha.length; i++) {
+    labels.push(alpha[i])
+  }
+  for (let i = 0; labels.length < count && i < alpha.length; i++) {
+    for (let j = 0; labels.length < count && j < alpha.length; j++) {
+      labels.push(alpha[i] + alpha[j])
+    }
+  }
+  return labels
+}
+
 export const VimNav = {
   // Injected by LiveView at runtime — `null as unknown as` is intentional since
   // Phoenix provides no official TS types for hook lifecycle properties.
@@ -118,6 +132,10 @@ export const VimNav = {
   listFocusIndex: -1 as number,
   count: 0 as number,
   countTimer: null as ReturnType<typeof setTimeout> | null,
+  hintMode: false as boolean,
+  hintBuffer: "" as string,
+  hintLabels: [] as Array<{ label: string; index: number }>,
+  hintOverlayEl: null as HTMLElement | null,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -196,6 +214,18 @@ export const VimNav = {
     }
 
     // Phase 2: normal mode
+    // Hint mode: intercept all keystrokes while active.
+    if (this.hintMode) {
+      event.preventDefault()
+      if (event.key === "Escape") {
+        this.exitHintMode()
+      } else if (/^[a-z]$/i.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        this.hintBuffer += event.key.toLowerCase()
+        this._updateHintFilter()
+      }
+      return
+    }
+
     // Ctrl-D / Ctrl-U: half-page scroll on lists (handled before the modifier guard).
     if (event.ctrlKey && !event.metaKey && !event.altKey && !isEditableTarget(event.target)) {
       const key = event.key.toLowerCase()
@@ -356,6 +386,7 @@ export const VimNav = {
       .forEach(el => el.classList.remove("vim-nav-focused"))
     this.listFocusIndex = -1
     this.flyoutFocused = false
+    if (this.hintMode) this.exitHintMode()
   },
 
   _focusFlyoutAfterOpen(): void {
@@ -551,6 +582,10 @@ export const VimNav = {
         )
         return
       }
+      if (action.name === "hint_mode_enter") {
+        this.enterHintMode()
+        return
+      }
       if (action.name === "session_nav_next" || action.name === "session_nav_prev") {
         const direction = action.name === "session_nav_next" ? "next" : "prev"
         this.pushEvent("vim:session-nav", { direction, current_path: window.location.pathname })
@@ -646,6 +681,98 @@ export const VimNav = {
         this.pushToList?.(event, payload)
         return
       }
+    }
+  },
+
+  enterHintMode(): void {
+    const items = this.currentListItems()
+    if (items.length === 0) return
+    this.exitHintMode() // clear any stale overlay
+    const labels = _generateHintLabels(items.length)
+    this.hintLabels = labels.map((label, i) => ({ label, index: i }))
+    this.hintBuffer = ""
+    this.hintMode = true
+
+    const overlay = document.createElement("div")
+    overlay.id = "vim-nav-hints"
+    overlay.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999"
+    this.hintOverlayEl = overlay
+
+    items.forEach((item, i) => {
+      const rect = item.getBoundingClientRect()
+      const badge = document.createElement("span")
+      badge.dataset.hintLabel = labels[i]
+      badge.textContent = labels[i]
+      badge.style.cssText = [
+        "position:fixed",
+        `top:${rect.top + 4}px`,
+        `left:${rect.left + 4}px`,
+        "background:var(--color-warning,#f59e0b)",
+        "color:var(--color-warning-content,#000)",
+        "font-family:monospace",
+        "font-size:11px",
+        "font-weight:700",
+        "line-height:1",
+        "padding:1px 4px",
+        "border-radius:3px",
+        "pointer-events:none",
+        "z-index:9999",
+        "letter-spacing:0.05em",
+      ].join(";")
+      overlay.appendChild(badge)
+    })
+
+    document.body.appendChild(overlay)
+    if (this.statusbarEl) {
+      this.statusbarEl.textContent = "[ HINT ]"
+      this.statusbarEl.style.color = "var(--color-warning, #f59e0b)"
+      this.statusbarEl.style.opacity = "1"
+    }
+  },
+
+  exitHintMode(): void {
+    this.hintMode = false
+    this.hintBuffer = ""
+    this.hintLabels = []
+    if (this.hintOverlayEl) {
+      this.hintOverlayEl.remove()
+      this.hintOverlayEl = null
+    }
+    if (this.statusbarEl) updateStatusbar(this.statusbarEl, this.mode, this.count)
+  },
+
+  _updateHintFilter(): void {
+    if (!this.hintOverlayEl) return
+    const prefix = this.hintBuffer
+
+    // Find all matching labels
+    const matches = this.hintLabels.filter(h => h.label.startsWith(prefix))
+
+    if (matches.length === 0) {
+      this.exitHintMode()
+      return
+    }
+
+    // Update badge visibility
+    this.hintOverlayEl.querySelectorAll<HTMLElement>("[data-hint-label]").forEach(badge => {
+      const label = badge.dataset.hintLabel!
+      if (label.startsWith(prefix)) {
+        badge.style.opacity = "1"
+        // Bold the typed prefix, normal for remaining chars
+        const typed = label.slice(0, prefix.length)
+        const rest = label.slice(prefix.length)
+        badge.innerHTML = typed
+          ? `<span style="opacity:0.5">${typed}</span>${rest}`
+          : label
+      } else {
+        badge.style.opacity = "0.15"
+      }
+    })
+
+    // Exact match — focus and exit
+    if (matches.length === 1 && matches[0].label === prefix) {
+      this.focusListItem(matches[0].index)
+      this.exitHintMode()
     }
   },
 

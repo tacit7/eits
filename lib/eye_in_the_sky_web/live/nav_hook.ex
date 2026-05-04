@@ -38,6 +38,7 @@ defmodule EyeInTheSkyWeb.NavHook do
       |> attach_hook(:session_failed_toast, :handle_info, &maybe_push_session_failed/2)
       |> attach_hook(:palette_sessions, :handle_event, &PaletteHandlers.handle_palette_event/3)
       |> attach_hook(:session_nav, :handle_event, &PaletteHandlers.handle_session_nav_event/3)
+      |> attach_hook(:task_nav, :handle_event, &PaletteHandlers.handle_task_nav_event/3)
       |> attach_hook(
         :palette_create_task,
         :handle_event,

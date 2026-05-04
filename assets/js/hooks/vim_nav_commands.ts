@@ -16,7 +16,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab" | "session_nav_next" | "session_nav_prev"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab" | "session_nav_next" | "session_nav_prev" | "hint_mode_enter"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -159,6 +159,8 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "list_next" },   scope: "feature:vim-list" },
   { id: "list.prev",   label: "Previous item", keys: ["k"],     group: "context",
     action: { kind: "client", name: "list_prev" },   scope: "feature:vim-list" },
+  { id: "list.hint",   label: "Jump to item",  keys: ["f"],     group: "navigation",
+    action: { kind: "client", name: "hint_mode_enter" }, scope: "feature:vim-list" },
   { id: "list.open",   label: "Open item",     keys: ["Enter"], group: "context",
     action: { kind: "client", name: "list_open" },   scope: "feature:vim-list" },
   { id: "list.top",    label: "Jump to top",   keys: ["g", "g"], group: "context",

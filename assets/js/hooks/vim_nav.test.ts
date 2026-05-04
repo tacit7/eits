@@ -2234,3 +2234,141 @@ describe("o open in new tab", () => {
     windowOpenSpy.mockRestore()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Hint mode (f key)
+// ---------------------------------------------------------------------------
+
+function makeListWithItems(count: number): HTMLElement[] {
+  const list = document.createElement("ul")
+  list.setAttribute("data-vim-list", "")
+  const items: HTMLElement[] = []
+  for (let i = 0; i < count; i++) {
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    li.textContent = `Item ${i}`
+    list.appendChild(li)
+    items.push(li)
+  }
+  document.body.appendChild(list)
+  return items
+}
+
+describe("hint mode (f key)", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  it("f command is registered with scope feature:vim-list", () => {
+    const cmd = COMMANDS.find(c => c.id === "list.hint")!
+    expect(cmd).toBeDefined()
+    expect(cmd.keys).toEqual(["f"])
+    expect(cmd.scope).toBe("feature:vim-list")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("hint_mode_enter")
+  })
+
+  it("enterHintMode sets hintMode true and creates overlay", () => {
+    makeListWithItems(3)
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    expect(h.hintMode).toBe(true)
+    expect(h.hintOverlayEl).not.toBeNull()
+    expect(document.getElementById("vim-nav-hints")).not.toBeNull()
+  })
+
+  it("enterHintMode creates one badge per list item", () => {
+    makeListWithItems(5)
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    const badges = h.hintOverlayEl!.querySelectorAll("[data-hint-label]")
+    expect(badges.length).toBe(5)
+  })
+
+  it("badges have sequential alphabetical labels", () => {
+    makeListWithItems(3)
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    const labels = [...h.hintOverlayEl!.querySelectorAll<HTMLElement>("[data-hint-label]")]
+      .map(b => b.dataset.hintLabel)
+    expect(labels).toEqual(["a", "b", "c"])
+  })
+
+  it("exitHintMode removes overlay and resets state", () => {
+    makeListWithItems(3)
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    h.exitHintMode()
+    expect(h.hintMode).toBe(false)
+    expect(h.hintOverlayEl).toBeNull()
+    expect(document.getElementById("vim-nav-hints")).toBeNull()
+  })
+
+  it("Escape key exits hint mode", () => {
+    makeListWithItems(3)
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    h.handleKey(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+    expect(h.hintMode).toBe(false)
+  })
+
+  it("single matching letter auto-focuses item and exits", () => {
+    makeListWithItems(3)
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    // 'a' is the label for item 0
+    h.handleKey(new KeyboardEvent("keydown", { key: "a", bubbles: true }))
+    expect(h.hintMode).toBe(false)
+    expect(h.listFocusIndex).toBe(0)
+  })
+
+  it("two-char label: first char narrows to multiple matches, second resolves", () => {
+    // Create 27 items so labels go a..z then aa
+    makeListWithItems(27)
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    // After 26 single-char labels, 27th is "aa"
+    expect(h.hintLabels[26].label).toBe("aa")
+    // Pressing 'a' matches both "a" (item 0) and "aa" (item 26) — stays in hint mode
+    h.handleKey(new KeyboardEvent("keydown", { key: "a", bubbles: true }))
+    expect(h.hintMode).toBe(true)
+    expect(h.hintBuffer).toBe("a")
+    // Second 'a' makes buffer "aa" — exact match for item 26
+    h.handleKey(new KeyboardEvent("keydown", { key: "a", bubbles: true }))
+    expect(h.hintMode).toBe(false)
+    expect(h.listFocusIndex).toBe(26)
+  })
+
+  it("no matching label exits hint mode", () => {
+    makeListWithItems(3) // labels: a, b, c
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    h.handleKey(new KeyboardEvent("keydown", { key: "z", bubbles: true }))
+    expect(h.hintMode).toBe(false)
+  })
+
+  it("enterHintMode does nothing when no list items", () => {
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    expect(h.hintMode).toBe(false)
+    expect(h.hintOverlayEl).toBeNull()
+  })
+
+  it("clearListFocus exits hint mode if active", () => {
+    makeListWithItems(3)
+    const h = makeHook()
+    h.mounted()
+    h.enterHintMode()
+    expect(h.hintMode).toBe(true)
+    h.clearListFocus()
+    expect(h.hintMode).toBe(false)
+  })
+})

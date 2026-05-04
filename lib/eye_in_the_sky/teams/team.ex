@@ -21,7 +21,8 @@ defmodule EyeInTheSky.Teams.Team do
     |> cast(attrs, [:uuid, :name, :description, :status, :project_id, :created_at, :archived_at])
     |> maybe_generate_uuid()
     |> validate_required([:name])
-    |> validate_length(:name, min: 1)
+    |> validate_length(:name, min: 1, max: 255)
+    |> validate_length(:description, max: 2000)
     |> unique_constraint(:name)
     |> unique_constraint(:uuid)
   end

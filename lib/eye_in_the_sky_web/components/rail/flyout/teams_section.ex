@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
         <.icon name="hero-users" class="size-3 flex-shrink-0 text-base-content/30" />
         <span class="truncate text-xs font-medium">{team.name}</span>
         <span class="ml-auto text-micro text-base-content/30 flex-shrink-0">
-          {length(team.members)}
+          {if is_list(team.members), do: length(team.members), else: 0}
         </span>
       </.link>
     <% end %>

@@ -10,6 +10,7 @@ function makeHook(opts: { enabled?: boolean; projectPath?: string } = {}) {
   const inst: any = Object.create(VimNav)
   inst.el = el
   inst.pushEvent = vi.fn()
+  inst.handleEvent = vi.fn()
   // Own-property init ensures test isolation — prototype mutable state (buffer, count)
   // can otherwise bleed between tests if a prior test mutates the prototype array.
   inst.buffer = []
@@ -1016,6 +1017,28 @@ describe("Space leader", () => {
     expect(cmd.scope).toBe("page:sessions")
     expect(cmd.action.kind).toBe("client")
     if (cmd.action.kind === "client") expect(cmd.action.name).toBe("list_archive")
+  })
+
+  it("Space b n navigates to next session (route_suffix:/projects scope)", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.session.next")!
+    expect(cmd).toBeDefined()
+    expect(cmd.label).toBe("Next session")
+    expect(cmd.keys).toEqual(["Space", "b", "n"])
+    expect(cmd.group).toBe("navigation")
+    expect(cmd.scope).toBe("route_suffix:/projects")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("session_nav_next")
+  })
+
+  it("Space b p navigates to previous session (route_suffix:/projects scope)", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.session.prev")!
+    expect(cmd).toBeDefined()
+    expect(cmd.label).toBe("Prev session")
+    expect(cmd.keys).toEqual(["Space", "b", "p"])
+    expect(cmd.group).toBe("navigation")
+    expect(cmd.scope).toBe("route_suffix:/projects")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("session_nav_prev")
   })
 
   it("Space x x fires close_flyout", () => {

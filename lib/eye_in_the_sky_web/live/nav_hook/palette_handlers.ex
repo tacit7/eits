@@ -205,6 +205,96 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
   def handle_create_chat_event(_event, _params, socket), do: {:cont, socket}
 
+  # ---------------------------------------------------------------------------
+  # vim:session-nav
+  # ---------------------------------------------------------------------------
+
+  def handle_session_nav_event("vim:session-nav", params, socket) do
+    direction = params["direction"]
+    current_path = params["current_path"]
+
+    # Extract project_id from path: /projects/5/sessions/uuid/chat -> 5
+    project_id =
+      case Regex.run(~r{^/projects/(\d+)}, current_path) do
+        [_, id] -> String.to_integer(id)
+        _ -> nil
+      end
+
+    # Extract current session UUID from path: /projects/5/sessions/uuid/chat -> uuid
+    current_uuid =
+      case Regex.run(~r{/sessions/([a-f0-9\-]+)}, current_path) do
+        [_, uuid] -> uuid
+        _ -> nil
+      end
+
+    if project_id do
+      sessions = Sessions.list_sessions_filtered(project_id: project_id, sort_by: :last_activity, limit: 100, status_filter: "all")
+
+      next_uuid = find_adjacent_session(sessions, current_uuid, direction)
+
+      if next_uuid do
+        url = "/projects/#{project_id}/sessions/#{next_uuid}/chat"
+        {:halt, push_event(socket, "vim:session-nav-result", %{url: url})}
+      else
+        {:halt, push_event(socket, "vim:session-nav-result", %{url: nil})}
+      end
+    else
+      {:halt, push_event(socket, "vim:session-nav-result", %{url: nil})}
+    end
+  end
+
+  def handle_session_nav_event(_event, _params, socket), do: {:cont, socket}
+
+  defp find_adjacent_session(sessions, current_uuid, direction) do
+    # Find index of current session
+    current_idx = Enum.find_index(sessions, fn s -> s.uuid == current_uuid end)
+
+    case direction do
+      "next" ->
+        cond do
+          current_idx != nil && current_idx < length(sessions) - 1 ->
+            Enum.at(sessions, current_idx + 1).uuid
+
+          current_idx == nil ->
+            # Not on a session page, return first (most recent)
+            case sessions do
+              [first | _] -> first.uuid
+              [] -> nil
+            end
+
+          true ->
+            # At the end, wrap around to first
+            case sessions do
+              [first | _] -> first.uuid
+              [] -> nil
+            end
+        end
+
+      "prev" ->
+        cond do
+          current_idx != nil && current_idx > 0 ->
+            Enum.at(sessions, current_idx - 1).uuid
+
+          current_idx == nil ->
+            # Not on a session page, return last (oldest)
+            case Enum.reverse(sessions) do
+              [last | _] -> last.uuid
+              [] -> nil
+            end
+
+          true ->
+            # At the beginning, wrap around to last
+            case Enum.reverse(sessions) do
+              [last | _] -> last.uuid
+              [] -> nil
+            end
+        end
+
+      _ ->
+        nil
+    end
+  end
+
   defp do_create_chat(session_uuid, params, socket) do
     project_id = Projects.parse_project_id(params["project_id"])
 

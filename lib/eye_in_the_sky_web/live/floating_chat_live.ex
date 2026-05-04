@@ -6,9 +6,11 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
 
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
+  import Ecto.Query
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.{Messages, Sessions}
+  alias EyeInTheSky.{Messages, Sessions, Repo}
+  alias EyeInTheSky.Sessions.Session
 
   require Logger
 
@@ -285,13 +287,25 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     if ids == [] do
       %{}
     else
-      bookmark_set = MapSet.new(ids)
+      int_ids = ids |> Enum.flat_map(fn s -> case Integer.parse(s) do {n, ""} -> [n]; _ -> [] end end)
+      uuid_ids = ids |> Enum.filter(fn s -> case Ecto.UUID.cast(s) do {:ok, _} -> true; _ -> false end end)
 
-      Sessions.list_sessions_with_agent(include_archived: false)
-      |> Enum.filter(fn s ->
-        MapSet.member?(bookmark_set, to_string(s.id)) or
-          (not is_nil(s.uuid) and MapSet.member?(bookmark_set, s.uuid))
-      end)
+      sessions =
+        case {int_ids, uuid_ids} do
+          {[], []} ->
+            []
+
+          {[], uuids} ->
+            Repo.all(from s in Session, where: s.uuid in ^uuids)
+
+          {ints, []} ->
+            Repo.all(from s in Session, where: s.id in ^ints)
+
+          {ints, uuids} ->
+            Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids)
+        end
+
+      sessions
       |> Enum.reduce(%{}, fn s, acc ->
         status = s.status || "idle"
         acc = Map.put(acc, to_string(s.id), status)

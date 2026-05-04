@@ -399,7 +399,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
       {:ok, task} ->
         sessions =
-          Enum.map(task.sessions, fn s ->
+          Enum.map(task.sessions || [], fn s ->
             %{id: s.id, uuid: s.uuid, name: s.name, status: s.status, description: s.description}
           end)
 

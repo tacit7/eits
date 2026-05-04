@@ -18,7 +18,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   require Logger
 
-  alias EyeInTheSky.{Agents, Messages, Sessions}
+  alias EyeInTheSky.{Agents, Channels, Messages, Sessions}
 
   alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
   alias EyeInTheSky.Claude.{ChannelFanout, ChannelProtocol}
@@ -167,6 +167,8 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       maybe_fanout_mentions(channel_id, text, session_id)
     end
 
+    maybe_mark_channel_read(channel_id, session_id)
+
     :ok
   end
 
@@ -201,6 +203,25 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   @doc "Broadcast queue state change."
   def broadcast_queue_update(session_id, queue) do
     Events.queue_updated(session_id, queue)
+  end
+
+  # Mark the channel as read for this session after the agent has produced a reply.
+  # Skipped when there is no channel_id (DM or non-channel message).
+  # In test mode (async_tasks_sync: true), runs synchronously so assertions can
+  # observe the DB write. In production, fires in a supervised task so the worker
+  # is not blocked waiting for the DB round-trip.
+  defp maybe_mark_channel_read(nil, _session_id), do: :ok
+
+  defp maybe_mark_channel_read(channel_id, session_id) do
+    if Application.get_env(:eye_in_the_sky, :async_tasks_sync, false) do
+      Channels.mark_as_read(channel_id, session_id)
+    else
+      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+        Channels.mark_as_read(channel_id, session_id)
+      end)
+    end
+
+    :ok
   end
 
   defp save_result(session_id, provider, text, metadata, channel_id, source_uuid) do

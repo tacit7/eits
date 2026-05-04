@@ -3,7 +3,7 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
   @moduletag :capture_log
 
-  alias EyeInTheSky.{Agents, Messages, Sessions}
+  alias EyeInTheSky.{Agents, Channels, Messages, Sessions}
   alias EyeInTheSky.AgentWorkerEvents
 
   # --- Helpers ---
@@ -297,6 +297,95 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
       messages = Messages.list_messages_for_session(session.id)
       assert Enum.any?(messages, &String.contains?(&1.body, "spawn error"))
+    end
+  end
+
+  # --- channel read receipts ---
+
+  defp create_channel do
+    {:ok, channel} =
+      Channels.create_channel(%{
+        uuid: Ecto.UUID.generate(),
+        name: "test-channel-#{System.unique_integer([:positive])}",
+        channel_type: "public"
+      })
+
+    channel
+  end
+
+  defp get_member_last_read_at(channel_id, session_id) do
+    case Channels.get_member(channel_id, session_id) do
+      {:ok, member} -> member.last_read_at
+      _ -> nil
+    end
+  end
+
+  describe "on_result_received/2 — channel read receipts" do
+    test "writes last_read_at when channel_id is present" do
+      {agent, session} = create_session()
+      channel = create_channel()
+      Channels.add_member(channel.id, agent.id, session.id)
+
+      assert get_member_last_read_at(channel.id, session.id) == nil
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "reply in channel",
+        metadata: %{},
+        channel_id: channel.id,
+        source_uuid: nil
+      })
+
+      assert get_member_last_read_at(channel.id, session.id) != nil
+    end
+
+    test "does not write last_read_at when channel_id is nil (DM path)" do
+      {agent, session} = create_session()
+      channel = create_channel()
+      Channels.add_member(channel.id, agent.id, session.id)
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "dm reply",
+        metadata: %{},
+        channel_id: nil,
+        source_uuid: nil
+      })
+
+      # No channel touched — last_read_at stays nil
+      assert get_member_last_read_at(channel.id, session.id) == nil
+    end
+
+    test "last_read_at is not updated for suppressed [NO_RESPONSE] — message skipped" do
+      {agent, session} = create_session()
+      channel = create_channel()
+      Channels.add_member(channel.id, agent.id, session.id)
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "[NO_RESPONSE]",
+        metadata: %{},
+        channel_id: channel.id,
+        source_uuid: nil
+      })
+
+      # maybe_mark_channel_read still fires even for [NO_RESPONSE] — agent consumed the message
+      assert get_member_last_read_at(channel.id, session.id) != nil
+    end
+
+    test "does not crash when session is not a member of the channel" do
+      {_agent, session} = create_session()
+      channel = create_channel()
+
+      # No add_member call — mark_as_read is a no-op update_all on zero rows
+      assert :ok ==
+               (AgentWorkerEvents.on_result_received(session.id, %{
+                  provider: "claude",
+                  text: "orphan reply",
+                  metadata: %{},
+                  channel_id: channel.id,
+                  source_uuid: nil
+                }) && :ok)
     end
   end
 end

@@ -132,4 +132,28 @@ defmodule EyeInTheSky.IAM.Builtin.BlockReadOutsideCwdTest do
     ctx = %Context{tool: "Read", resource_path: "/projects-evil/secret", project_path: "/projects"}
     assert BlockReadOutsideCwd.matches?(policy(), ctx)
   end
+
+  # ── URL-path false positive guard ────────────────────────────────────────────
+
+  test "does not block Bash command with URL-path in --message arg (eits dm regression)" do
+    # /api/v1/editors/ is a URL route, not a filesystem path — /api does not
+    # exist on the local filesystem, so the matcher must not treat it as a
+    # real path to check against cwd.
+    cmd = ~s(eits dm --to some-uuid --message "no REST route for /api/v1/editors/ yet")
+    ctx = %Context{tool: "Bash", resource_content: cmd, project_path: "/Users/me/project"}
+    refute BlockReadOutsideCwd.matches?(policy(), ctx)
+  end
+
+  test "does not block eits dm command with complex message containing slashes" do
+    cmd = ~s(eits dm --to abc-123 --message "Events.editor_push/3 and /api/v1/editors/")
+    ctx = %Context{tool: "Bash", resource_content: cmd, project_path: "/Users/me/project"}
+    refute BlockReadOutsideCwd.matches?(policy(), ctx)
+  end
+
+  test "still blocks Bash command with real out-of-cwd path after URL-path guard" do
+    # /etc DOES exist on the filesystem, so this should still be caught
+    cmd = "cat /etc/passwd"
+    ctx = %Context{tool: "Bash", resource_content: cmd, project_path: "/Users/me/project"}
+    assert BlockReadOutsideCwd.matches?(policy(), ctx)
+  end
 end

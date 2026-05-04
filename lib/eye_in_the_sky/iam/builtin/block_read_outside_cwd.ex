@@ -37,16 +37,44 @@ defmodule EyeInTheSky.IAM.Builtin.BlockReadOutsideCwd do
        do: path
 
   defp extract_path(%Context{tool: "Bash", resource_content: cmd}) when is_binary(cmd) do
-    # naive extraction: first absolute path or ~-prefixed path argument.
+    # Naive extraction: first absolute path or ~-prefixed token.
     # Does not attempt to parse every shell form — built-in is advisory
     # alongside the stricter per-tool policies.
+    #
+    # Guard: reject candidates whose first path segment does not exist on the
+    # filesystem. This filters URL-like strings such as `/api/v1/foo` that
+    # appear inside --message / --body / --instructions argument values —
+    # those are not filesystem paths and would otherwise produce false-positive
+    # denies for CLI tools like `eits dm`.
     case Regex.run(~r/(?:^|\s)((?:~|\/)[^\s;&|`<>]+)/, cmd) do
-      [_, p] -> p
+      [_, p] -> if filesystem_path?(p), do: p, else: nil
       _ -> nil
     end
   end
 
   defp extract_path(_), do: nil
+
+  # Returns true when the first segment of `path` exists in the local
+  # filesystem, indicating the candidate is a real path rather than a
+  # URL route string.
+  defp filesystem_path?("~" <> _ = path) do
+    case System.user_home() do
+      nil -> false
+      home -> File.exists?(home) and filesystem_path?(Path.expand(path))
+    end
+  end
+
+  defp filesystem_path?("/" <> _ = path) do
+    first_segment =
+      path
+      |> String.trim_leading("/")
+      |> String.split("/")
+      |> List.first("")
+
+    File.exists?("/" <> first_segment)
+  end
+
+  defp filesystem_path?(_), do: false
 
   defp outside?(path, cwd) do
     abs = path |> expand_with_home(cwd) |> resolve_symlinks()

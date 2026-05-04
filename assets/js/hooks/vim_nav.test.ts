@@ -2616,3 +2616,137 @@ describe("r rename inline", () => {
     expect(h.mode).toBe("normal")
   })
 })
+
+describe("task nav commands (Space t n / Space t p)", () => {
+  beforeEach(() => {
+    document.body.innerHTML = ""
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/5/tasks", search: "", assign: vi.fn() },
+      writable: true,
+      configurable: true,
+    })
+  })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  it("leader.task.next command has correct definition", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.task.next")!
+    expect(cmd).toBeDefined()
+    expect(cmd.label).toBe("Next task")
+    expect(cmd.keys).toEqual(["Space", "t", "n"])
+    expect(cmd.group).toBe("navigation")
+    expect(cmd.scope).toBe("route_suffix:/tasks")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("task_nav_next")
+  })
+
+  it("leader.task.prev command has correct definition", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.task.prev")!
+    expect(cmd).toBeDefined()
+    expect(cmd.label).toBe("Prev task")
+    expect(cmd.keys).toEqual(["Space", "t", "p"])
+    expect(cmd.group).toBe("navigation")
+    expect(cmd.scope).toBe("route_suffix:/tasks")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("task_nav_prev")
+  })
+
+  it("task_nav_next pushes vim:task-nav with direction next", () => {
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.task.next")!
+    h.executeCommand(cmd)
+    expect(h.pushEvent).toHaveBeenCalledWith("vim:task-nav", expect.objectContaining({ direction: "next" }))
+  })
+
+  it("task_nav_prev pushes vim:task-nav with direction prev", () => {
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.task.prev")!
+    h.executeCommand(cmd)
+    expect(h.pushEvent).toHaveBeenCalledWith("vim:task-nav", expect.objectContaining({ direction: "prev" }))
+  })
+
+  it("task_nav_next sends current_path from location.pathname", () => {
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.task.next")!
+    h.executeCommand(cmd)
+    expect(h.pushEvent).toHaveBeenCalledWith("vim:task-nav", expect.objectContaining({
+      current_path: "/projects/5/tasks"
+    }))
+  })
+
+  it("task_nav_next sends task_uuid null when no ?task= in search", () => {
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.task.next")!
+    h.executeCommand(cmd)
+    expect(h.pushEvent).toHaveBeenCalledWith("vim:task-nav", expect.objectContaining({
+      task_uuid: null
+    }))
+  })
+
+  it("task_nav_next sends task_uuid from ?task= query param", () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/5/tasks", search: "?task=abc-def-123", assign: vi.fn() },
+      writable: true,
+      configurable: true,
+    })
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.task.next")!
+    h.executeCommand(cmd)
+    expect(h.pushEvent).toHaveBeenCalledWith("vim:task-nav", expect.objectContaining({
+      task_uuid: "abc-def-123"
+    }))
+  })
+
+  it("handleEvent vim:task-nav-result navigates when url provided", () => {
+    const assignMock = vi.fn()
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/5/tasks", search: "", assign: assignMock },
+      writable: true,
+      configurable: true,
+    })
+    const h = makeHook()
+    h.mounted()
+    const [_evt, callback] = (h.handleEvent as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([evt]: [string]) => evt === "vim:task-nav-result"
+    )!
+    callback({ url: "/projects/5/tasks?task=next-uuid" })
+    expect(assignMock).toHaveBeenCalledWith("/projects/5/tasks?task=next-uuid")
+    h.destroyed()
+  })
+
+  it("handleEvent vim:task-nav-result does nothing when url is null", () => {
+    const assignMock = vi.fn()
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/projects/5/tasks", search: "", assign: assignMock },
+      writable: true,
+      configurable: true,
+    })
+    const h = makeHook()
+    h.mounted()
+    const [_evt, callback] = (h.handleEvent as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([evt]: [string]) => evt === "vim:task-nav-result"
+    )!
+    callback({ url: null })
+    expect(assignMock).not.toHaveBeenCalled()
+    h.destroyed()
+  })
+
+  it("Space t n is scoped to route_suffix:/tasks (task_nav takes priority on tasks page)", () => {
+    const cmd = COMMANDS.find(c =>
+      isCommandActive(c) &&
+      c.keys.length === 3 &&
+      c.keys[0] === "Space" && c.keys[1] === "t" && c.keys[2] === "n"
+    )!
+    expect(cmd).toBeDefined()
+    expect(cmd.id).toBe("leader.task.next")
+  })
+
+  it("Space t p is scoped to route_suffix:/tasks (task_nav takes priority on tasks page)", () => {
+    const cmd = COMMANDS.find(c =>
+      isCommandActive(c) &&
+      c.keys.length === 3 &&
+      c.keys[0] === "Space" && c.keys[1] === "t" && c.keys[2] === "p"
+    )!
+    expect(cmd).toBeDefined()
+    expect(cmd.id).toBe("leader.task.prev")
+  })
+})

@@ -169,6 +169,9 @@ export const VimNav = {
     this.handleEvent("vim:session-nav-result", ({ url }: { url: string | null }) => {
       if (url) window.location.href = url
     })
+    this.handleEvent("vim:task-nav-result", ({ url }: { url: string | null }) => {
+      if (url) window.location.assign(url)
+    })
   },
 
   destroyed() {
@@ -327,6 +330,7 @@ export const VimNav = {
     this.resetSequenceTimer()
 
     const cmd = COMMANDS.find(c =>
+      isCommandActive(c) &&
       c.keys.length === this.buffer.length &&
       c.keys.every((k, i) => k === this.buffer[i])
     )
@@ -625,6 +629,13 @@ export const VimNav = {
       if (action.name === "session_nav_next" || action.name === "session_nav_prev") {
         const direction = action.name === "session_nav_next" ? "next" : "prev"
         this.pushEvent("vim:session-nav", { direction, current_path: window.location.pathname })
+        return
+      }
+      if (action.name === "task_nav_next" || action.name === "task_nav_prev") {
+        const direction = action.name === "task_nav_next" ? "next" : "prev"
+        const taskUuidMatch = window.location.search.match(/[?&]task=([a-f0-9-]+)/)
+        const task_uuid = taskUuidMatch ? taskUuidMatch[1] : null
+        this.pushEvent("vim:task-nav", { direction, task_uuid, current_path: window.location.pathname })
         return
       }
       if (action.name === "list_group_prev" || action.name === "list_group_next") {

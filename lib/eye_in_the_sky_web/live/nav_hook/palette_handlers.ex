@@ -245,6 +245,83 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
   def handle_session_nav_event(_event, _params, socket), do: {:cont, socket}
 
+  # ---------------------------------------------------------------------------
+  # vim:task-nav
+  # ---------------------------------------------------------------------------
+
+  def handle_task_nav_event("vim:task-nav", params, socket) do
+    direction = params["direction"]
+    current_path = params["current_path"]
+    current_task_uuid = params["task_uuid"]
+
+    project_id =
+      case Regex.run(~r{^/projects/(\d+)}, current_path) do
+        [_, id] -> String.to_integer(id)
+        _ -> nil
+      end
+
+    if project_id do
+      tasks = Tasks.list_tasks_for_project(project_id, sort_by: "created_asc", limit: 200)
+      next_uuid = find_adjacent_task(tasks, current_task_uuid, direction)
+
+      if next_uuid do
+        url = "/projects/#{project_id}/tasks?task=#{next_uuid}"
+        {:halt, push_event(socket, "vim:task-nav-result", %{url: url})}
+      else
+        {:halt, push_event(socket, "vim:task-nav-result", %{url: nil})}
+      end
+    else
+      {:halt, push_event(socket, "vim:task-nav-result", %{url: nil})}
+    end
+  end
+
+  def handle_task_nav_event(_event, _params, socket), do: {:cont, socket}
+
+  defp find_adjacent_task(tasks, current_uuid, direction) do
+    current_idx = Enum.find_index(tasks, fn t -> t.uuid == current_uuid end)
+
+    case direction do
+      "next" ->
+        cond do
+          current_idx != nil && current_idx < length(tasks) - 1 ->
+            Enum.at(tasks, current_idx + 1).uuid
+
+          current_idx == nil ->
+            case tasks do
+              [first | _] -> first.uuid
+              [] -> nil
+            end
+
+          true ->
+            case tasks do
+              [first | _] -> first.uuid
+              [] -> nil
+            end
+        end
+
+      "prev" ->
+        cond do
+          current_idx != nil && current_idx > 0 ->
+            Enum.at(tasks, current_idx - 1).uuid
+
+          current_idx == nil ->
+            case Enum.reverse(tasks) do
+              [last | _] -> last.uuid
+              [] -> nil
+            end
+
+          true ->
+            case Enum.reverse(tasks) do
+              [last | _] -> last.uuid
+              [] -> nil
+            end
+        end
+
+      _ ->
+        nil
+    end
+  end
+
   defp find_adjacent_session(sessions, current_uuid, direction) do
     # Find index of current session
     current_idx = Enum.find_index(sessions, fn s -> s.uuid == current_uuid end)

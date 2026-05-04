@@ -22,6 +22,7 @@ defmodule EyeInTheSky.Teams.Team do
     |> maybe_generate_uuid()
     |> validate_required([:name])
     |> validate_length(:name, min: 1)
+    |> validate_inclusion(:status, ~w(active archived))
     |> unique_constraint(:name)
     |> unique_constraint(:uuid)
   end

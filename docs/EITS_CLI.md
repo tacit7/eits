@@ -321,6 +321,15 @@ eits agents list [--project <id>] [--status <status>] [--limit <n>]
 
 eits agents get <id>
 
+eits agents defs [--query <q>] [--project <id>]
+# List agent definitions (markdown files in .claude/agents/)
+# --query: filter definitions by name
+# Descriptions are truncated to 500 characters (first sentence or char limit, whichever comes first)
+```
+
+**`agents defs` details**: Lists all agent definitions from the `.claude/agents/` directory. Each definition shows the agent name and a truncated description (max 500 chars, ending at the first period). Use `--query` to filter by agent name pattern. Useful for discovering available agents before spawning.
+
+```bash
 eits agents spawn --instructions <text> | --instructions-file <path> \
   [--interpolate-env] \
   [--model <m>] [--provider <p>] \
@@ -334,6 +343,8 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 **Instructions**: `--instructions <text>` or `--instructions-file <path>` (required, mutually exclusive). `--instructions-file` reads instructions from a file — useful for large payloads that break shell escaping.
 
 **Env interpolation**: `--interpolate-env` substitutes `$VAR` and `${VAR}` patterns in the instructions using the current process environment before sending to the API. Requires `envsubst` (gettext) or `perl`. Useful when instructions come from a file and need to embed runtime values like `$EITS_SESSION_UUID`.
+
+**Project context warning**: If neither `EITS_PROJECT_ID` is set in instructions nor `--project-id` flag is provided, spawn will emit a warning to stderr — spawned agents will have null project context and may fail. Either add `EITS_PROJECT_ID=<id>` to instructions or use `--project-id <n>` flag.
 
 **Project defaults**: `--project-id` defaults to `$EITS_PROJECT_ID`; `--project-path` defaults to `$PWD`.
 

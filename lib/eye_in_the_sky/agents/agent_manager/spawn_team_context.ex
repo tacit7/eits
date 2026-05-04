@@ -55,7 +55,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnTeamContext do
            agent_id: agent.id,
            session_id: session.id,
            name: member_name || agent.uuid,
-           role: member_name || "agent",
+           role: "member",
            status: "active"
          }) do
       {:ok, member} ->

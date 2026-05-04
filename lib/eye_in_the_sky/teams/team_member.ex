@@ -30,6 +30,7 @@ defmodule EyeInTheSky.Teams.TeamMember do
       :last_activity_at
     ])
     |> validate_required([:team_id, :name])
+    |> validate_inclusion(:status, ~w(active idle done failed blocked))
     |> unique_constraint([:team_id, :name], name: :team_members_team_id_name_index)
   end
 end

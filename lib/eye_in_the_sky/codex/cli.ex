@@ -254,9 +254,31 @@ defmodule EyeInTheSky.Codex.CLI do
   # Environment
   # ---------------------------------------------------------------------------
 
+  # Vars that must never be forwarded to spawned Codex processes.
+  # Keep in sync with EyeInTheSky.Claude.CLI.Env.
+  @codex_blocked_vars ~w[
+    SECRET_KEY_BASE
+    DATABASE_URL
+    ANTHROPIC_API_KEY
+    CLAUDECODE
+    CLAUDE_CODE_ENTRYPOINT
+    BINDIR
+    ROOTDIR
+    EMU
+  ]
+
+  @codex_blocked_prefixes ["RELEASE_"]
+
+  defp codex_blocked_key?(key) do
+    key in @codex_blocked_vars or
+      Enum.any?(@codex_blocked_prefixes, &String.starts_with?(key, &1))
+  end
+
   defp build_env(opts) do
     base_env =
-      for {key, value} <- System.get_env(), value != "" do
+      for {key, value} <- System.get_env(),
+          value != "",
+          not codex_blocked_key?(key) do
         {String.to_charlist(key), String.to_charlist(value)}
       end
 

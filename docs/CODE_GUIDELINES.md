@@ -680,6 +680,53 @@ Prepending (`[item | acc]`) is O(1). A single `Enum.reverse/1` at the end is O(n
 
 ---
 
+
+### For comprehensions instead of filter+map
+
+**Problem:** Chaining `Enum.filter/2` then `Enum.map/2` traverses the list twice and reads less like intent. When filtering and transforming, the double-pass is both less efficient and less readable.
+
+**❌ Antipattern — double-pass:**
+```elixir
+tasks
+|> Enum.filter(&(&1.state_id == done_id))
+|> Enum.map(fn t ->
+  %{id: t.id, title: t.title, completed_at: format_dt(t.completed_at)}
+end)
+
+# Also antipattern with reject+map
+members
+|> Enum.reject(fn m -> ChannelProtocol.skip?(m.session_id, sender_session_id) end)
+|> Enum.map(fn member -> process_member(member) end)
+```
+
+**✅ Correct — for comprehension:**
+```elixir
+for t <- tasks, t.state_id == done_id do
+  %{id: t.id, title: t.title, completed_at: format_dt(t.completed_at)}
+end
+
+# With rejection pattern
+for member <- members,
+    not ChannelProtocol.skip?(member.session_id, sender_session_id) do
+  process_member(member)
+end
+```
+
+**Benefits:**
+- Single traversal — faster on large lists
+- Clearer intent — filtering + transformation in one expression
+- Works with multiple guards and can be more complex (variable bindings, pattern matches)
+
+**Examples from codebase (commit f2adc619):**
+- `agents/activity.ex` — `for t <- tasks, t.state_id == done_id do`
+- `claude/chat_worker.ex` — `for member <- members, not ChannelProtocol.skip?(...)`
+- `projects/file_tree.ex` — `for name <- entries, not ignored?(name) do`
+- `commit_controller.ex` — `for {:ok, %{id: id} = commit} <- results, not is_nil(id) do`
+
+**Rule:** Replace `filter/map` chains with `for` comprehensions. Use guards (`for x <- list, guard do`) for conditions and pattern matching in the generator.
+
+---
+
 ## Context Boundary Rules
 
 ### All list queries must have a default limit
@@ -2335,6 +2382,204 @@ end
 
 ---
 
+
+### Batch ID Parsing with split_uuid_and_int_ids
+
+**Problem:** Context functions that process batch operations (bulk archive, bulk delete, bulk state update) repeat the same UUID/integer ID parsing logic. Multiple modules have identical `Integer.parse/1` + accumulator logic.
+
+**Solution:** Extract the ID-splitting logic into a shared helper function.
+
+**Pattern (commit 84c5ed5a):**
+
+```elixir
+# ✅ Shared helper in EyeInTheSky.Tasks
+defp split_uuid_and_int_ids(id_strings) do
+  Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
+    id_str = to_string(id_str)
+    case Integer.parse(id_str) do
+      {int_id, ""} -> {us, [int_id | is]}
+      _ -> {[id_str | us], is}
+    end
+  end)
+end
+
+# ✅ Used in batch_archive_tasks
+def batch_archive_tasks(id_strings) when is_list(id_strings) do
+  {uuids, int_ids} = split_uuid_and_int_ids(id_strings)
+  
+  Repo.update_all(
+    from(t in Task,
+      where: (t.uuid in ^uuids or t.id in ^int_ids) and is_nil(t.archived_at)
+    ),
+    set: [archived_at: DateTime.utc_now()]
+  )
+end
+
+# ✅ Reused in batch_delete_tasks_with_associations
+def batch_delete_tasks_with_associations(id_strings) when is_list(id_strings) do
+  {uuids, int_ids} = split_uuid_and_int_ids(id_strings)
+  # ... rest of deletion logic
+end
+
+# ✅ Reused in batch_update_task_state
+def batch_update_task_state(id_strings, state_id) when is_list(id_strings) do
+  {uuids, int_ids} = split_uuid_and_int_ids(id_strings)
+  # ... rest of update logic
+end
+```
+
+**Before (Antipattern):**
+```elixir
+# ❌ Duplicated in batch_archive_tasks
+def batch_archive_tasks(id_strings) when is_list(id_strings) do
+  {uuids, int_ids} =
+    Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
+      id_str = to_string(id_str)
+      case Integer.parse(id_str) do
+        {int_id, ""} -> {us, [int_id | is]}
+        _ -> {[id_str | us], is}
+      end
+    end)
+  # ... rest
+end
+
+# ❌ Same code duplicated in batch_delete_tasks_with_associations
+def batch_delete_tasks_with_associations(id_strings) when is_list(id_strings) do
+  {uuids, int_ids} =
+    Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
+      # ... identical logic repeated
+    end)
+  # ... rest
+end
+
+# ❌ And again in batch_update_task_state
+def batch_update_task_state(id_strings, state_id) when is_list(id_strings) do
+  {uuids, int_ids} =
+    Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
+      # ... identical logic repeated again
+    end)
+  # ... rest
+end
+```
+
+**Benefits:**
+- Single source of truth for ID parsing logic
+- Easier to debug or change parsing rules
+- Clearer intent in batch functions (delegates parsing to a named helper)
+
+**Rule:** When the same parse+accumulate pattern appears in 2+ batch functions, extract it to a private helper. Name it clearly (e.g., `split_uuid_and_int_ids/1`) and use it consistently across all callers.
+
+---
+
+### Collapsing Dual-Clause Duplication with Extract Helpers
+
+**Problem:** LiveView event handlers sometimes have near-identical clauses that differ only in which param key they check (e.g., `task_id` vs `item_id`). This creates maintenance burden — any logic change requires updates in 2+ places.
+
+**Solution:** Collapse the clauses into one and extract the param-key logic into a private helper.
+
+**Pattern (commit 232b56a3):**
+
+```elixir
+# ✅ Collapsed handler with extracted param helper
+def handle_delete_task(params, socket, reload_fn) do
+  task_id = extract_task_id(params)
+  task = Tasks.get_task_by_uuid_or_id!(task_id)
+
+  case Tasks.delete_task_with_associations(task) do
+    {:ok, _} ->
+      {:noreply,
+       socket
+       |> assign(:show_task_detail_drawer, false)
+       |> assign(:selected_task, nil)
+       |> reload_fn.()}
+
+    {:error, _} ->
+      {:noreply, put_flash(socket, :error, "Failed to delete task")}
+  end
+end
+
+def handle_archive_task(params, socket, reload_fn) do
+  task_id = extract_task_id(params)
+  task = Tasks.get_task_by_uuid_or_id!(task_id)
+
+  case Tasks.archive_task(task) do
+    {:ok, _} ->
+      {:noreply,
+       socket
+       |> assign(:show_task_detail_drawer, false)
+       |> assign(:selected_task, nil)
+       |> reload_fn.()}
+
+    {:error, _} ->
+      {:noreply, put_flash(socket, :error, "Failed to archive task")}
+  end
+end
+
+# ✅ Private helper handles both param key variants
+defp extract_task_id(%{"task_id" => id}), do: id
+defp extract_task_id(%{"item_id" => id}), do: id
+defp extract_task_id(_), do: nil
+```
+
+**Before (Antipattern):**
+```elixir
+# ❌ Duplicate clause for task_id
+def handle_delete_task(%{"task_id" => task_id}, socket, reload_fn) do
+  task = Tasks.get_task_by_uuid_or_id!(task_id)
+
+  case Tasks.delete_task_with_associations(task) do
+    {:ok, _} ->
+      {:noreply,
+       socket
+       |> assign(:show_task_detail_drawer, false)
+       |> assign(:selected_task, nil)
+       |> reload_fn.()}
+
+    {:error, _} ->
+      {:noreply, put_flash(socket, :error, "Failed to delete task")}
+  end
+end
+
+# ❌ Almost-identical clause for item_id
+def handle_delete_task(%{"item_id" => item_id}, socket, reload_fn) do
+  task = Tasks.get_task_by_uuid_or_id!(item_id)
+
+  case Tasks.delete_task_with_associations(task) do
+    {:ok, _} ->
+      {:noreply,
+       socket
+       |> assign(:show_task_detail_drawer, false)
+       |> assign(:selected_task, nil)
+       |> reload_fn.()}
+
+    {:error, _} ->
+      {:noreply, put_flash(socket, :error, "Failed to delete task")}
+  end
+end
+
+# ❌ And the same duplication for handle_archive_task...
+def handle_archive_task(%{"task_id" => task_id}, socket, reload_fn) do
+  # ... 16 lines of identical logic
+end
+
+def handle_archive_task(%{"item_id" => item_id}, socket, reload_fn) do
+  # ... 16 lines of identical logic repeated again
+end
+```
+
+**Benefits:**
+- Reduce function duplication from 4 clauses to 1 handler + 1 helper
+- Change logic in one place (the handler) instead of multiple clauses
+- Extract helper is minimal and focused (just param extraction)
+
+**When to apply:**
+- 2+ handler clauses differ only in pattern-matching or param extraction
+- The handler body is identical (or nearly so) across clauses
+- Extraction adds readability without sacrificing clarity
+
+**Rule:** Collapse multi-clause handlers that differ only in param keys into a single clause with a private `extract_*` helper. Keep the handler logic readable; the helper does only the minimal extraction needed.
+
+---
 ## State Derivation Helper Modules
 
 **Problem:** LiveView event handlers mix state mutation with complex state calculation (indeterminate checkboxes, off-screen counts, select-all toggles), making handlers large and hard to test.

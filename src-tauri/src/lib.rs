@@ -495,6 +495,11 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         command.env("BYPASS_AUTH", "true");
         command.env("DATABASE_SSL_VERIFY", "false");
         command.env("PHX_DISABLE_FORCE_SSL", "1");
+        // Disable Erlang distribution — the desktop app is standalone and does
+        // not need distributed Erlang. Without this, if a dev server (mix phx.server)
+        // is running on the same machine, both processes try to register the same
+        // node name and the release refuses to start.
+        command.env("RELEASE_DISTRIBUTION", "none");
 
         if std::env::var("DATABASE_URL").is_err() {
             command.env("DATABASE_URL", "postgres://postgres:postgres@localhost/eits_dev?sslmode=disable");

@@ -141,7 +141,13 @@ defmodule EyeInTheSky.Claude.ChatWorker do
           {mode, _mentioned_ids, _mention_all} =
             ChannelProtocol.parse_routing(message, member.session_id)
 
-          prompt = ChannelProtocol.build_prompt(mode, message, channel_ctx)
+          prompt =
+            ChannelProtocol.build_prompt(%{
+              mode: mode,
+              channel: channel_ctx,
+              sender: "@#{sender_session_id}",
+              body: message
+            })
 
           result = AgentManager.send_message(member.session_id, prompt, opts)
 

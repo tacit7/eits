@@ -19,12 +19,13 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
   - `:eits_workflow` — EITS workflow identifier string (default: "1")
   - `:bypass_sandbox` — skip all confirmations and sandboxing (Codex only; maps to --dangerously-bypass-approvals-and-sandbox)
   - `:message_id` — DB id of the outbound message record tracking this job's lifecycle
+  - `:context`    — string-keyed metadata map forwarded to AgentWorker (e.g. `%{"source" => "channel", "reply_mode" => "cli_required"}`)
   """
 
   alias EyeInTheSky.Claude.ModelCapabilities
   alias EyeInTheSky.Messages
 
-  @known_keys ~w(model effort_level channel_id thinking_budget max_budget_usd agent eits_workflow bypass_sandbox content_blocks message_id dm_metadata)a
+  @known_keys ~w(model effort_level channel_id thinking_budget max_budget_usd agent eits_workflow bypass_sandbox content_blocks message_id dm_metadata context)a
 
   @type t :: %{
           model: String.t() | nil,
@@ -39,6 +40,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
           content_blocks: [EyeInTheSky.Claude.ContentBlock.t()],
           message_id: integer() | nil,
           dm_metadata: map() | nil,
+          context: map() | nil,
           extra_cli_opts: keyword()
         }
 
@@ -68,6 +70,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
       content_blocks: ModelCapabilities.filter_blocks(opts[:content_blocks] || [], opts[:model]),
       message_id: opts[:message_id],
       dm_metadata: opts[:dm_metadata],
+      context: opts[:context],
       extra_cli_opts: extra
     }
   end

@@ -102,8 +102,14 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
               :ok
 
             channel ->
-              channel_ctx = %{id: channel.id, name: channel.name}
-              prompt = ChannelProtocol.build_prompt(:direct, body, channel_ctx)
+              prompt =
+                ChannelProtocol.build_prompt(%{
+                  mode: :direct,
+                  channel: %{id: channel.id, name: channel.name},
+                  sender: "@#{session_id}",
+                  body: body
+                })
+
               AgentManager.send_message(target_session_id, prompt, channel_id: channel_id)
           end
         end

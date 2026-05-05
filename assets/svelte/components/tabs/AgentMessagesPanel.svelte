@@ -130,6 +130,23 @@
   let selectedSlashIndex = 0
   let slashTriggerPos = -1
 
+  // Reactive: session_id (string) → display name, built from channelMembers + activeAgents
+  $: mentionNameMap = (() => {
+    const map = {}
+    for (const m of channelMembers) {
+      const agent = activeAgents.find(a => a.id === m.session_id)
+      const name = m.session_name || agent?.name || agent?.agent_description
+      if (name) map[String(m.session_id)] = name
+    }
+    for (const a of activeAgents) {
+      if (!map[String(a.id)]) {
+        const name = a.name || a.agent_description
+        if (name) map[String(a.id)] = name
+      }
+    }
+    return map
+  })()
+
   // Reactive: channel members currently working
   $: workingMembers = channelMembers
     .filter(m => workingAgents && workingAgents[m.session_id])
@@ -216,21 +233,23 @@
   }
 
   // Renders message body with @mention tokens highlighted.
-  // @all and @<integer> are wrapped in a styled span.
-  function renderBody(body) {
+  // @all and @<integer> are wrapped in a styled span. nameMap resolves IDs to names.
+  function renderBody(body, nameMap = {}) {
     if (!body) return ''
     const escaped = escapeHtml(body)
     return escaped.replace(/@(all|\d+)/g, (match, token) => {
       if (token === 'all') {
         return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-warning/10 text-warning/80">@all</span>`
       }
-      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">@${token}</span>`
+      const name = nameMap[token]
+      const display = name ? escapeHtml(name) : token
+      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary" data-session-id="${token}">@${display}</span>`
     })
   }
 
   // Renders agent message body as parsed markdown with @mention highlighting.
   // Sanitized via DOMPurify before injection. @mentions applied after sanitization
-  // since they are numeric IDs or "all" — no XSS surface.
+  // since they are numeric IDs or "all" — no XSS surface. nameMap resolves IDs to names.
   const DOMPURIFY_CONFIG = {
     ALLOWED_TAGS: ['p', 'strong', 'em', 'b', 'i', 'code', 'pre', 'ul', 'ol', 'li',
                    'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'a',
@@ -238,7 +257,7 @@
     ALLOWED_ATTR: ['class', 'href', 'target', 'rel']
   }
 
-  function renderMarkdownBody(body) {
+  function renderMarkdownBody(body, nameMap = {}) {
     if (!body) return ''
     const html = marked.parse(body)
     const clean = DOMPurify.sanitize(html, DOMPURIFY_CONFIG)
@@ -246,7 +265,9 @@
       if (token === 'all') {
         return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-warning/10 text-warning/80">@all</span>`
       }
-      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary">@${token}</span>`
+      const name = nameMap[token]
+      const display = name ? escapeHtml(name) : token
+      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary" data-session-id="${token}">@${display}</span>`
     })
   }
 
@@ -719,11 +740,11 @@
                   <div class="max-w-[580px]">
                     <div class="message-body mt-2 text-sm leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
-                        {@html renderMarkdownBody(message.body)}
+                        {@html renderMarkdownBody(message.body, mentionNameMap)}
                       {:else if searchQuery.trim()}
                         <span class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words whitespace-pre-wrap" contenteditable="false">{@html highlightMatch(message.body || '', searchQuery)}</span>
                       {:else}
-                        <p class="whitespace-pre-wrap">{@html renderBody(message.body)}</p>
+                        <p class="whitespace-pre-wrap">{@html renderBody(message.body, mentionNameMap)}</p>
                       {/if}
                     </div>
 

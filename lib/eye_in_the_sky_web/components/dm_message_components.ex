@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     ~H"""
     <%= if @metrics_text != "" do %>
       <div class="mt-1 px-1">
-        <span class="text-[10px] font-mono tabular-nums text-base-content/30">
+        <span class="text-[11px] font-mono tabular-nums text-base-content/40">
           {@metrics_text}
         </span>
       </div>

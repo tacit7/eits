@@ -174,7 +174,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <%!-- Inter-turn divider: user → agent turn boundary --%>
       <div
         :if={@is_new_turn && @role == :agent && !@is_tool_event}
-        class="my-4 mx-1 h-px bg-[var(--border-subtle)]"
+        class="my-5 mx-3 h-px bg-[var(--border-subtle)]"
       />
       <div
         id={"dm-message-#{@message.id}"}
@@ -194,9 +194,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         }
       >
         <%= if @is_tool_event do %>
-          <%!-- Tool events: no header, indented to align with agent body --%>
-          <div class="pl-[33px]">
-            <.message_body message={@message} compact={false} />
+          <%!-- Tool events: subordinate rendering — compact + muted --%>
+          <div class="pl-[33px] opacity-[0.65]">
+            <.message_body message={@message} compact={true} />
           </div>
         <% else %>
           <%= if @role == :user do %>
@@ -226,7 +226,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             </div>
           <% else %>
             <%!-- ── Agent message ── --%>
-            <div class="group rounded-md bg-[var(--agent-bg)] px-3 py-2.5">
+            <div class="group rounded-lg bg-[var(--agent-bg)] hover:bg-base-content/[0.03] px-3 py-2.5 transition-colors duration-100">
               <%!-- Header row --%>
               <div :if={@show_header} class="flex items-center gap-2 mb-3">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 </div>
               </div>
               <%!-- Body with guide line --%>
-              <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content/90 break-words">
+              <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content break-words">
                 <.message_body message={@message} compact={false} />
               </div>
               <.message_attachments attachments={@message.attachments || []} />
@@ -266,7 +266,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
                 <span
                   :if={!show_message_metrics?(@message)}
-                  class="text-[11px] font-mono tabular-nums text-base-content/30"
+                  class="text-[11px] font-mono tabular-nums text-base-content/40"
                 >
                   {[
                     message_model(@message),

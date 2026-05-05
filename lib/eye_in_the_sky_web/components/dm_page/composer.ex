@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           name="body"
           rows="1"
           placeholder={if @processing, do: "Queue a message...", else: "Reply..."}
-          class="w-full bg-transparent border-0 outline-none focus:ring-0 text-base resize-none min-h-[28px] max-h-40 overflow-y-auto placeholder:text-base-content/30 p-0"
+          class="w-full bg-transparent border-0 outline-none focus:ring-0 text-[13px] resize-none min-h-[28px] max-h-40 overflow-y-auto placeholder:text-base-content/30 p-0 leading-relaxed"
           autocomplete="off"
           phx-hook="CommandHistory"
           id="message-input"
@@ -174,12 +174,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               <button
                 type="button"
                 tabindex="0"
-                class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-base-content/50 hover:text-base-content/70 transition-colors min-h-[44px]"
+                class="flex items-center gap-1.5 px-2 h-6 rounded-md text-[11px] font-medium text-base-content/55 bg-base-content/[0.05] border border-[var(--border-subtle)] hover:text-base-content/75 hover:bg-base-content/[0.08] transition-colors"
                 id="effort-selector-button"
               >
-                <.icon name="hero-adjustments-horizontal" class="size-3.5" />
-                <span class="font-medium">{DmHelpers.effort_display_name(@selected_effort)}</span>
-                <.icon name="hero-chevron-down-mini" class="size-3.5" />
+                <.icon name="hero-adjustments-horizontal" class="size-3" />
+                <span>{DmHelpers.effort_display_name(@selected_effort)}</span>
+                <.icon name="hero-chevron-down-mini" class="size-3 flex-shrink-0" />
               </button>
               <%= if @active_overlay == :effort_menu do %>
                 <ul
@@ -251,11 +251,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
             <button
               type="button"
               tabindex="0"
-              class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-base-content/50 hover:text-base-content/70 transition-colors min-h-[44px]"
+              class="flex items-center gap-1.5 px-2 h-6 rounded-md text-[11px] font-medium text-base-content/55 bg-base-content/[0.05] border border-[var(--border-subtle)] hover:text-base-content/75 hover:bg-base-content/[0.08] transition-colors"
               id="model-selector-button"
             >
-              <span class="font-medium">{model_display_name(@selected_model)}</span>
-              <.icon name="hero-chevron-down-mini" class="size-3.5" />
+              <span class="w-[5px] h-[5px] rounded-full bg-primary/60 flex-shrink-0"></span>
+              <span>{model_display_name(@selected_model)}</span>
+              <.icon name="hero-chevron-down-mini" class="size-3 flex-shrink-0" />
             </button>
 
             <%= if @active_overlay == :model_menu do %>
@@ -329,27 +330,30 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
             <%= if @processing do %>
               <button
                 type="submit"
-                class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors"
+                class="flex items-center gap-1.5 px-3 h-7 rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors text-[12px] font-semibold"
                 id="dm-queue-button"
                 title="Add to queue"
               >
-                <.icon name="hero-arrow-up-mini" class="size-5" />
+                Queue
+                <kbd class="text-[10px] font-mono opacity-55 leading-none">↵</kbd>
               </button>
               <button
                 type="button"
                 phx-click="kill_session"
-                class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors"
+                class="flex items-center gap-1.5 px-3 h-7 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors text-[12px] font-semibold"
                 id="dm-stop-button"
               >
-                <.icon name="hero-stop-solid" class="size-4" />
+                <.icon name="hero-stop-solid" class="size-3.5" />
+                Stop
               </button>
             <% else %>
               <button
                 type="submit"
-                class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg bg-primary/70 text-primary-content hover:bg-primary transition-colors"
+                class="flex items-center gap-1.5 px-3 h-7 rounded-lg bg-primary/80 text-primary-content hover:bg-primary transition-colors text-[12px] font-semibold"
                 id="dm-send-button"
               >
-                <.icon name="hero-arrow-up-mini" class="size-5" />
+                Send
+                <kbd class="text-[10px] font-mono opacity-55 leading-none">↵</kbd>
               </button>
             <% end %>
           </div>

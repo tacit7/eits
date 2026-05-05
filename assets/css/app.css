@@ -414,6 +414,13 @@ form:focus-visible {
   opacity: 0.65;
 }
 
+/* Active session row — name at full contrast + tighter tracking */
+.flyout-session-row[aria-current="page"] .session-row-name {
+  color: var(--color-base-content);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 /* ===== Flyout panel scrollbar — hidden ===== */
 [data-flyout-panel] .overflow-y-auto {
   scrollbar-width: none;

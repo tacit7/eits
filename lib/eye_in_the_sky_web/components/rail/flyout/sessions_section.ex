@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
     >
       <.status_dot status={@session.status} size="xs" class="mt-[3px] flex-shrink-0" />
       <div class="min-w-0 flex-1">
-        <div class="truncate font-medium text-xs text-base-content/75">
+        <div class="session-row-name truncate font-medium text-xs text-base-content/75">
           {@session.name || "unnamed"}
         </div>
         <div class="text-nano text-base-content/35 mt-0.5 flex items-center gap-1">

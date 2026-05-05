@@ -360,13 +360,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
         <%!-- Pill tabs --%>
         <div class="px-5 pb-3 flex items-center gap-3" id="dm-tabs">
-          <div class="flex items-center gap-1 bg-base-content/[0.03] rounded-lg p-0.5 min-w-max">
+          <div class="flex items-center gap-0.5 min-w-max">
             <%= for {tab, icon, label} <- @tabs do %>
               <button
                 class={[
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150",
-                  @active_tab == tab && "bg-base-200 text-base-content shadow-sm",
-                  @active_tab != tab && "text-base-content/40 hover:text-base-content/60"
+                  "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] font-medium transition-all duration-150",
+                  @active_tab == tab && "bg-primary/10 text-primary",
+                  @active_tab != tab && "text-base-content/40 hover:text-base-content/65 hover:bg-base-content/5"
                 ]}
                 phx-click="change_tab"
                 phx-value-tab={tab}
@@ -391,7 +391,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   placeholder="Search messages..."
                   autocomplete="off"
                   phx-debounce="300"
-                  class="w-full pl-8 pr-7 py-1.5 text-base rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
+                  class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
                 />
                 <%= if @message_data.message_search_query != "" do %>
                   <button

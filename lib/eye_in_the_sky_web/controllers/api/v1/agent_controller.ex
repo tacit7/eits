@@ -121,18 +121,33 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
   end
 
   defp build_response(agent, session, team, member_name) do
+    worktree_path = session.git_worktree_path
+
     base = %{
       success: true,
       message: "Agent spawned",
       agent_id: agent.uuid,
       session_id: session.id,
-      session_uuid: session.uuid
+      session_uuid: session.uuid,
+      worktree_path: worktree_path,
+      branch_name: resolve_branch_name(worktree_path)
     }
 
     if team do
       Map.merge(base, %{team_id: team.id, team_name: team.name, member_name: member_name})
     else
       base
+    end
+  end
+
+  defp resolve_branch_name(nil), do: nil
+
+  defp resolve_branch_name(wt_path) do
+    case System.cmd("git", ["-C", wt_path, "symbolic-ref", "--short", "HEAD"],
+           stderr_to_stdout: true
+         ) do
+      {branch, 0} -> String.trim(branch)
+      _ -> nil
     end
   end
 end

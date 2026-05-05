@@ -4,7 +4,7 @@ defmodule EyeInTheSky.Channels do
   """
 
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Channels.{Channel, ChannelMember}
+  alias EyeInTheSky.Channels.{Channel, ChannelMember, ChannelOnboarding}
   alias EyeInTheSky.Repo
 
   @doc """
@@ -142,12 +142,31 @@ defmodule EyeInTheSky.Channels do
       updated_at: now
     }
 
-    %ChannelMember{}
-    |> ChannelMember.changeset(attrs)
-    |> Repo.insert(
-      on_conflict: :nothing,
-      conflict_target: [:channel_id, :session_id]
-    )
+    result =
+      %ChannelMember{}
+      |> ChannelMember.changeset(attrs)
+      |> Repo.insert(
+        on_conflict: :nothing,
+        conflict_target: [:channel_id, :session_id]
+      )
+
+    case result do
+      {:ok, _} ->
+        maybe_onboard(channel_id, session_id)
+
+      {:error, _} ->
+        :ignore
+    end
+
+    result
+  end
+
+  defp maybe_onboard(channel_id, session_id) do
+    with channel when not is_nil(channel) <- get_channel(channel_id),
+         member when not is_nil(member) <-
+           Repo.one(channel_member_query(channel_id, session_id)) do
+      ChannelOnboarding.deliver(member, channel)
+    end
   end
 
   @doc """

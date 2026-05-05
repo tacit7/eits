@@ -9,7 +9,7 @@
     "devUrl": "http://127.0.0.1:5050"
   },
   "app": {
-    "macOSPrivateApi": false,
+    "macOSPrivateApi": true,
     "security": {
       "csp": null
     }

@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
 
-  alias EyeInTheSky.{Notifications, Projects}
+  alias EyeInTheSky.{Notifications, Projects, Tasks, Prompts}
   alias EyeInTheSkyWeb.Components.Rail.{
     FileActions,
     FilterActions,
@@ -66,10 +66,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_tasks: [],
         task_search: "",
         task_state_filter: nil,
-        task_filter_open: false,
-        session_filter_open: false,
         session_sort: :last_activity,
         session_name_filter: "",
+        session_show: :twenty,
+        rail_modal: nil,
         flyout_agents: [],
         flyout_notes: [],
         flyout_jobs: [],
@@ -284,23 +284,82 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     end
   end
 
-  def handle_event("toggle_session_filter", _params, socket),
-    do: {:noreply, assign(socket, :session_filter_open, !socket.assigns.session_filter_open)}
-
   def handle_event("set_session_sort", params, socket),
     do: FilterActions.handle_set_session_sort(params, socket)
 
   def handle_event("update_session_name_filter", params, socket),
     do: FilterActions.handle_update_session_name_filter(params, socket)
 
-  def handle_event("toggle_task_filter", _params, socket),
-    do: {:noreply, assign(socket, :task_filter_open, !socket.assigns.task_filter_open)}
+  def handle_event("set_session_show", params, socket),
+    do: FilterActions.handle_set_session_show(params, socket)
 
   def handle_event("update_task_search", params, socket),
     do: FilterActions.handle_update_task_search(params, socket)
 
   def handle_event("set_task_state_filter", params, socket),
     do: FilterActions.handle_set_task_state_filter(params, socket)
+
+  def handle_event("open_rail_modal", %{"type" => type}, socket) do
+    modal =
+      case type do
+        "new_task" -> :new_task
+        "new_prompt" -> :new_prompt
+        _ -> nil
+      end
+
+    {:noreply, assign(socket, :rail_modal, modal)}
+  end
+
+  def handle_event("close_rail_modal", _params, socket),
+    do: {:noreply, assign(socket, :rail_modal, nil)}
+
+  def handle_event("submit_rail_modal", params, socket) do
+    title = String.trim(params["title"] || "")
+    body = String.trim(params["body"] || "")
+    modal_type = socket.assigns.rail_modal
+    project_id = socket.assigns.sidebar_project && socket.assigns.sidebar_project.id
+
+    if title == "" do
+      {:noreply, put_flash(socket, :error, "Title is required")}
+    else
+      result =
+        case modal_type do
+          :new_task ->
+            Tasks.create_task(%{title: title, body: body, state_id: 1, project_id: project_id})
+
+          :new_prompt ->
+            Prompts.create_prompt(%{title: title, body: body, project_id: project_id})
+
+          _ ->
+            {:error, :unknown}
+        end
+
+      case result do
+        {:ok, _} ->
+          socket = assign(socket, :rail_modal, nil)
+
+          socket =
+            case modal_type do
+              :new_task ->
+                assign(socket, :flyout_tasks,
+                  Loader.load_flyout_tasks(
+                    socket.assigns.sidebar_project,
+                    socket.assigns.task_search,
+                    socket.assigns.task_state_filter
+                  )
+                )
+
+              _ ->
+                socket
+            end
+
+          {:noreply, socket}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to create")}
+      end
+    end
+  end
 
   def handle_event("file_open", params, socket),
     do: FileActions.handle_file_open(params, socket)
@@ -420,10 +479,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_tasks={@flyout_tasks}
         task_search={@task_search}
         task_state_filter={@task_state_filter}
-        task_filter_open={@task_filter_open}
-        session_filter_open={@session_filter_open}
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
+        session_show={@session_show}
         notification_count={@notification_count}
         flyout_agents={@flyout_agents}
         flyout_notes={@flyout_notes}
@@ -432,6 +490,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_expanded={@flyout_file_expanded}
         flyout_file_children={@flyout_file_children}
         flyout_file_error={@flyout_file_error}
+        rail_modal={@rail_modal}
         myself={@myself}
       />
 

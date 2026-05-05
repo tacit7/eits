@@ -4,30 +4,50 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
 
   alias EyeInTheSkyWeb.Components.Rail.Flyout.Helpers
 
+  attr :task_search, :string, default: ""
+  attr :state_filter, :any, default: nil
+  attr :myself, :any, required: true
+
+  def tasks_filters(assigns) do
+    ~H"""
+    <div class="px-2.5 py-2 border-b border-base-content/8 flex flex-col gap-2">
+      <%!-- Search --%>
+      <div class="relative">
+        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
+          <.icon name="hero-magnifying-glass-mini" class="size-3" />
+        </span>
+        <input
+          type="text"
+          value={@task_search}
+          placeholder="Search tasks…"
+          phx-keyup="update_task_search"
+          phx-change="update_task_search"
+          phx-target={@myself}
+          phx-debounce="200"
+          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+        />
+      </div>
+
+      <%!-- State filter pills --%>
+      <div class="flex flex-wrap gap-0.5">
+        <.state_pill label="All" value="all" current={@state_filter} myself={@myself} />
+        <.state_pill label="To Do" value="1" current={@state_filter} myself={@myself} />
+        <.state_pill label="In Progress" value="2" current={@state_filter} myself={@myself} />
+        <.state_pill label="In Review" value="4" current={@state_filter} myself={@myself} />
+        <.state_pill label="Done" value="3" current={@state_filter} myself={@myself} />
+      </div>
+    </div>
+    """
+  end
+
   attr :tasks, :list, default: []
   attr :task_search, :string, default: ""
   attr :state_filter, :any, default: nil
-  attr :filter_open, :boolean, default: false
   attr :sidebar_project, :any, default: nil
   attr :myself, :any, required: true
 
   def tasks_content(assigns) do
     ~H"""
-    <%= if @filter_open do %>
-      <div class="px-3 py-2 border-b border-base-content/8 bg-base-200/40">
-        <div class="text-nano font-semibold uppercase tracking-widest text-base-content/35 mb-1.5">
-          State
-        </div>
-        <div class="flex flex-col gap-0.5">
-          <.task_state_option label="All" value="all" current={@state_filter} myself={@myself} />
-          <.task_state_option label="To Do" value="1" current={@state_filter} myself={@myself} />
-          <.task_state_option label="In Progress" value="2" current={@state_filter} myself={@myself} />
-          <.task_state_option label="In Review" value="4" current={@state_filter} myself={@myself} />
-          <.task_state_option label="Done" value="3" current={@state_filter} myself={@myself} />
-        </div>
-      </div>
-    <% end %>
-
     <.task_row :for={t <- @tasks} task={t} />
 
     <%= if @tasks == [] do %>
@@ -44,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
   attr :current, :any, default: nil
   attr :myself, :any, required: true
 
-  def task_state_option(assigns) do
+  defp state_pill(assigns) do
     ~H"""
     <% active = (@value == "all" and is_nil(@current)) or to_string(@current) == @value %>
     <button
@@ -52,17 +72,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
       phx-value-state={@value}
       phx-target={@myself}
       class={[
-        "flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded transition-colors",
+        "text-nano px-1.5 py-0.5 rounded transition-colors",
         if(active,
-          do: "text-primary bg-primary/10 font-medium",
-          else: "text-base-content/55 hover:text-base-content/80 hover:bg-base-content/8"
+          do: "bg-primary/15 text-primary font-medium",
+          else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"
         )
       ]}
     >
-      <span class={[
-        "w-1.5 h-1.5 rounded-full flex-shrink-0",
-        if(active, do: "bg-primary", else: "bg-transparent")
-      ]} />
       {@label}
     </button>
     """

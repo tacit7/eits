@@ -29,10 +29,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_tasks, :list, default: []
   attr :task_search, :string, default: ""
   attr :task_state_filter, :any, default: nil
-  attr :task_filter_open, :boolean, default: false
-  attr :session_filter_open, :boolean, default: false
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
+  attr :session_show, :atom, default: :twenty
   attr :notification_count, :integer, default: 0
   attr :flyout_agents, :list, default: []
   attr :flyout_notes, :list, default: []
@@ -41,6 +40,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_file_expanded, :any, default: nil
   attr :flyout_file_children, :map, default: %{}
   attr :flyout_file_error, :string, default: nil
+  attr :rail_modal, :any, default: nil
   attr :myself, :any, required: true
 
   def flyout(assigns) do
@@ -62,8 +62,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       }
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>
+        <%!-- ── Header row: [icon] [Page Name]  [+ button] ── --%>
         <div class="px-2.5 py-2.5 border-b border-base-content/8 flex-shrink-0 flex items-center gap-1">
-          <%!-- Icon + label: agents always links to /agents; dual-page sections link to project route when available --%>
+          <%!-- Icon + label --%>
           <%= cond do %>
             <% @active_section == :agents -> %>
               <Helpers.section_header_link
@@ -121,15 +122,26 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 </span>
               </div>
           <% end %>
+
+          <%!-- + / action button (right side of header) --%>
           <%= if @active_section == :notes do %>
-            <button
-              phx-click="new_note"
+            <.header_action_btn phx-click="new_note" phx-target={@myself} title="New note" />
+          <% end %>
+          <%= if @active_section == :tasks do %>
+            <.header_action_btn
+              phx-click="open_rail_modal"
+              phx-value-type="new_task"
               phx-target={@myself}
-              title="New note"
-              class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
-            >
-              <.icon name="hero-plus-mini" class="size-3.5" />
-            </button>
+              title="New task"
+            />
+          <% end %>
+          <%= if @active_section == :prompts do %>
+            <.header_action_btn
+              phx-click="open_rail_modal"
+              phx-value-type="new_prompt"
+              phx-target={@myself}
+              title="New prompt"
+            />
           <% end %>
           <%= if @active_section == :files do %>
             <button
@@ -143,41 +155,49 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           <% end %>
           <%= if @active_section == :sessions do %>
             <%= if @sidebar_project do %>
-              <button
+              <.header_action_btn
                 phx-click="new_session"
                 phx-value-project_id={@sidebar_project.id}
                 phx-target={@myself}
                 title={"New session in #{@sidebar_project.name}"}
-                class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
-              >
-                <.icon name="hero-plus-mini" class="size-3.5" />
-              </button>
+              />
             <% else %>
-              <button
+              <.header_action_btn
                 phx-click="toggle_new_session_form"
                 phx-target={@myself}
-                title="New agent"
-                class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
-              >
-                <.icon name="hero-plus-mini" class="size-3.5" />
-              </button>
+                title="New session"
+              />
             <% end %>
           <% end %>
         </div>
 
+        <%!-- ── Filter zone (section-specific, always visible) ── --%>
+        <%= if @active_section == :sessions do %>
+          <SessionsSection.sessions_filters
+            session_sort={@session_sort}
+            session_name_filter={@session_name_filter}
+            session_show={@session_show}
+            myself={@myself}
+          />
+        <% end %>
+        <%= if @active_section == :tasks do %>
+          <TasksSection.tasks_filters
+            task_search={@task_search}
+            state_filter={@task_state_filter}
+            myself={@myself}
+          />
+        <% end %>
+
+        <%!-- ── Content ── --%>
         <div class="flex-1 overflow-y-auto py-1">
           <%= case @active_section do %>
             <% :sessions -> %>
-              <SessionsSection.sessions_content
-                sessions={@flyout_sessions}
-                sidebar_project={@sidebar_project}
-              />
+              <SessionsSection.sessions_content sessions={@flyout_sessions} />
             <% :tasks -> %>
               <TasksSection.tasks_content
                 tasks={@flyout_tasks}
                 task_search={@task_search}
                 state_filter={@task_state_filter}
-                filter_open={@task_filter_open}
                 sidebar_project={@sidebar_project}
                 myself={@myself}
               />
@@ -219,6 +239,88 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <TasksSection.nav_links project={@sidebar_project} section={:sessions} />
           <% end %>
         </div>
+      </div>
+
+      <%!-- ── Rail modal (new task / new prompt) ── --%>
+      <.rail_modal
+        :if={@rail_modal in [:new_task, :new_prompt]}
+        modal={@rail_modal}
+        myself={@myself}
+      />
+    </div>
+    """
+  end
+
+  # Shared + button used in headers
+  attr :title, :string, required: true
+  attr :rest, :global
+
+  defp header_action_btn(assigns) do
+    ~H"""
+    <button
+      title={@title}
+      class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+      {@rest}
+    >
+      <.icon name="hero-plus-mini" class="size-3.5" />
+    </button>
+    """
+  end
+
+  attr :modal, :atom, required: true
+  attr :myself, :any, required: true
+
+  defp rail_modal(assigns) do
+    ~H"""
+    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+      <div class="bg-base-100 border border-base-content/10 rounded-lg shadow-xl w-72 p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-semibold text-base-content/80">
+            {if @modal == :new_task, do: "New Task", else: "New Prompt"}
+          </span>
+          <button
+            type="button"
+            phx-click="close_rail_modal"
+            phx-target={@myself}
+            class="size-5 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+          >
+            <.icon name="hero-x-mark-mini" class="size-3.5" />
+          </button>
+        </div>
+
+        <form phx-submit="submit_rail_modal" phx-target={@myself} class="flex flex-col gap-2">
+          <input
+            type="text"
+            name="title"
+            placeholder="Title"
+            autofocus
+            required
+            class="w-full px-2.5 py-1.5 text-sm bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+          />
+          <textarea
+            name="body"
+            placeholder="Body (optional)"
+            rows="3"
+            class="w-full px-2.5 py-1.5 text-sm bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30 resize-none"
+          ></textarea>
+
+          <div class="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              phx-click="close_rail_modal"
+              phx-target={@myself}
+              class="px-3 py-1 text-xs text-base-content/55 hover:text-base-content/80 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="px-3 py-1 text-xs bg-primary text-primary-content rounded hover:opacity-90 transition-opacity font-medium"
+            >
+              Create
+            </button>
+          </div>
+        </form>
       </div>
     </div>
     """

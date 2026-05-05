@@ -42,14 +42,22 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   def parse_session_sort("name"), do: :name
   def parse_session_sort(_), do: :last_activity
 
+  def parse_session_show("all_active"), do: :all_active
+  def parse_session_show(_), do: :twenty
+
   def parse_task_state("1"), do: 1
   def parse_task_state("2"), do: 2
   def parse_task_state("3"), do: 3
   def parse_task_state("4"), do: 4
   def parse_task_state(_), do: nil
 
-  def load_flyout_sessions(project, sort \\ :last_activity, name_filter \\ "") do
-    opts = [limit: 15, status_filter: "all", sort_by: sort]
+  def load_flyout_sessions(project, sort \\ :last_activity, name_filter \\ "", show \\ :twenty) do
+    opts =
+      case show do
+        :all_active -> [status_filter: "active", sort_by: sort]
+        _ -> [limit: 20, status_filter: "all", sort_by: sort]
+      end
+
     opts = if project, do: Keyword.put(opts, :project_id, project.id), else: opts
     opts = if name_filter != "", do: Keyword.put(opts, :name_filter, name_filter), else: opts
 

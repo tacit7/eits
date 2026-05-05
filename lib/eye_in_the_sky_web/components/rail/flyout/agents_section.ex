@@ -19,7 +19,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSection do
           value={@agent_search}
           placeholder="Search agents…"
           phx-keyup="update_agent_search"
-          phx-change="update_agent_search"
           phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"

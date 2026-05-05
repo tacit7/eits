@@ -32,7 +32,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          Loader.load_flyout_sessions(
            socket.assigns.sidebar_project,
            socket.assigns.session_sort,
-           socket.assigns.session_name_filter
+           socket.assigns.session_name_filter,
+           socket.assigns.session_show
          )
        )
        |> Loader.maybe_load_channels(section, socket.assigns.sidebar_project)

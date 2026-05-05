@@ -21,7 +21,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
           value={@team_search}
           placeholder="Search teams…"
           phx-keyup="update_team_search"
-          phx-change="update_team_search"
           phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"

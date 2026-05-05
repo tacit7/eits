@@ -50,7 +50,7 @@ The character(s) immediately after `@` determine the root directory used for lis
 | `@/…` | `"filesystem"` | `"/"` |
 | `@anything-else` | `"project"` | `session.working_directory` or app project root fallback |
 
-The server rejects any `root` value not in `["project", "home", "filesystem"]` and returns an empty result set. No error, no explanation — just empty.
+The server rejects any `root` value not in `["project", "home", "filesystem"]` and returns an empty result set — no error, just empty.
 
 ---
 
@@ -85,34 +85,47 @@ Location: delegated to new `EyeInTheSkyWeb.DmLive.FileAutocomplete` helper modul
    - `"src/components/"` → `{"src/components", ""}`
    - `"foo"` → `{"", "foo"}`
 4. Join base dir + `dir_part` and resolve with `Path.expand/1`.
-5. **Path traversal guard** — segment-aware comparison:
+5. **Path traversal guard** — segment-aware, with special case for filesystem root:
 
 ```elixir
 defp under_root?(path, root) do
   expanded_path = Path.expand(path)
   expanded_root = Path.expand(root)
-  expanded_path == expanded_root or
-    String.starts_with?(expanded_path, expanded_root <> "/")
+
+  cond do
+    expanded_root == "/" ->
+      String.starts_with?(expanded_path, "/")
+
+    expanded_path == expanded_root ->
+      true
+
+    true ->
+      String.starts_with?(expanded_path, expanded_root <> "/")
+  end
 end
 ```
+
+The `expanded_root <> "/"` form would produce `"//"` when root is `"/"`, making every valid absolute path fail the guard. The `cond` handles this correctly.
 
 Return empty if resolved dir does not satisfy `under_root?(resolved_dir, base_dir)`.
 
 Note on symlinks: `Path.expand/1` does not resolve symlinks. Symlink hardening via `File.realpath/1` is post-MVP.
 
 6. List the resolved directory with `File.ls/1`. On any error, return empty.
-7. Filter entries whose name starts with `file_prefix` (case-sensitive).
-8. **Exclude junk directories** when `dir_part` is empty (i.e., user is at root level):
+7. Filter entries whose name starts with `file_prefix` (case-sensitive, prefix-only — behaves like tab completion, not a mind-reading raccoon).
+8. **Exclude noisy directories** when `dir_part` is empty (user is at the root level of the selected base):
 
 ```elixir
-@excluded_dirs ~w(.git node_modules deps _build .elixir_ls .tmp priv/static/assets)
+@excluded_dirs ~w(.git node_modules deps _build .elixir_ls .tmp)
 ```
 
-Once a user explicitly navigates into an excluded dir (e.g. `@node_modules/`), they get what they asked for.
+Once a user explicitly navigates into an excluded dir (e.g. `@node_modules/`), they get what they asked for. `priv/static/assets` is NOT in this list — `File.ls/1` returns top-level entries like `priv`, not nested paths, so the compound form would never match; and `priv/` often contains useful files (`priv/repo`, `priv/gettext`, etc.).
 
-9. Sort: directories first, then files, alphabetically within each group.
-10. Limit to 50 entries. Set `truncated: true` if more existed.
-11. Build insertion-safe paths — relative to the selected root, never raw absolute server paths (exception: `filesystem` root, where absolute paths are correct by definition).
+9. **Dotfiles are shown by default.** The server lists names only and never reads file contents. Showing `.env` as a filename is acceptable; this is a developer tool.
+
+10. Sort: directories first, then files, alphabetically within each group.
+11. Limit to 50 entries. Set `truncated: true` if more existed.
+12. Build response entries with both `path` (root-relative, used for refetching) and `insert_text` (full composer text, used for insertion).
 
 ### Response shape
 
@@ -120,13 +133,25 @@ Once a user explicitly navigates into an excluded dir (e.g. `@node_modules/`), t
 {:reply,
  %{
    entries: [
-     %{name: "components", path: "src/components/", is_dir: true},
-     %{name: "router.ex",  path: "src/router.ex",   is_dir: false}
+     %{name: "components", path: "src/components/",    insert_text: "@src/components/",    is_dir: true},
+     %{name: "router.ex",  path: "src/router.ex",      insert_text: "@src/router.ex",      is_dir: false}
    ],
    truncated: false
  },
  socket}
 ```
+
+`insert_text` prefix matches the root:
+- `"project"` root → `@src/foo.ex`
+- `"home"` root → `@~/Documents/foo.ex`
+- `"filesystem"` root → `@/etc/hosts`
+
+The server produces insertion-safe text. The client does not reconstruct root semantics.
+
+| Field | Purpose |
+|-------|---------|
+| `path` | Root-relative path; used as `partial` for refetching children of a directory |
+| `insert_text` | Exact text inserted into the textarea |
 
 ---
 
@@ -159,18 +184,23 @@ startFileAutocomplete(partial, root) {
 
 ### `renderFilePopup(entries, truncated)`
 
-Renders into `this.popup` (same DOM node as slash popup). Dirs show a folder icon; files show a document icon. If `truncated`, append a non-selectable footer: _"Showing first 50 — keep typing to narrow"_.
+Renders into `this.popup` (same DOM node as slash popup). Dirs show a folder icon; files show a document icon.
+
+- If `entries` is empty: render a single non-selectable row — _"No matching files"_. Popup stays open while trigger is active.
+- If `truncated`: append a non-selectable footer row — _"Showing first 50 — keep typing to narrow"_.
 
 ### Directory selection
 
-1. Insert `@{entry.path}` (already ends with `/`) at trigger position.
+1. Insert `entry.insert_text` into textarea at trigger position.
 2. Update `this.slashTriggerPos`.
 3. **Immediately** call `startFileAutocomplete(entry.path, currentRoot)` — do not wait for next input event.
 4. Popup stays open; content refreshes with children.
 
 ### File selection
 
-Insert `@{entry.path}` and call `slashClose()`.
+Insert `entry.insert_text` and call `slashClose()`.
+
+`entry.path` is used only for refetch. `entry.insert_text` is used only for insertion. The two are never swapped.
 
 ### Debounce and stale-response guard
 
@@ -179,17 +209,17 @@ Insert `@{entry.path}` and call `slashClose()`.
 
 ### Spaces in paths (MVP limitation)
 
-Trigger parsing stops at whitespace. Paths with spaces may appear in results and be inserted, but will not be re-detected as an active trigger during subsequent edits. Post-MVP fix: quoted path syntax `@"docs/my file.md"`.
+Trigger parsing stops at whitespace. Paths with spaces may appear in results and be inserted correctly, but will not be re-detected as an active trigger during subsequent edits. Post-MVP fix: quoted path syntax `@"docs/my file.md"`.
 
 ---
 
 ## Security
 
 - Server lists entries only — never reads file contents.
-- Path traversal prevented via segment-aware `under_root?/2`.
+- Path traversal prevented via segment-aware `under_root?/2`, with correct handling of filesystem root `/`.
 - Unknown root values return empty silently.
 - Any `File.ls` error returns empty silently.
-- `path` in response is insertion-safe; absolute host paths are not leaked for `project` or `home` roots.
+- `insert_text` is constructed server-side and is insertion-safe; raw absolute host paths are not sent for `project` or `home` roots.
 - Result count capped at 50.
 
 ---
@@ -198,9 +228,10 @@ Trigger parsing stops at whitespace. Paths with spaces may appear in results and
 
 - Symlink traversal hardening (`File.realpath/1`)
 - Quoted path syntax for space-containing paths
-- Fuzzy/ranked matching (prefix filter only, like tab completion)
+- Fuzzy/ranked matching (prefix filter only)
 - `.gitignore`-aware filtering
 - Multi-`@` mentions in one message (each trigger detected at cursor position independently)
+- Rename `slashFilter` → `filterSlashItems` (naming is stale but not blocking)
 
 ---
 
@@ -208,6 +239,42 @@ Trigger parsing stops at whitespace. Paths with spaces may appear in results and
 
 | File | Change |
 |------|--------|
-| `assets/js/hooks/slash_command_popup.js` | Updated trigger detection; `startFileAutocomplete`, `renderFilePopup`; directory-select immediate refetch; debounce + seq guard |
-| `lib/eye_in_the_sky_web/live/dm_live.ex` | New `handle_event("list_files", ...)` clause |
-| `lib/eye_in_the_sky_web/live/dm_live/file_autocomplete.ex` | New helper: `list_entries/3`, `under_root?/2` |
+| `assets/js/hooks/slash_command_popup.js` | Updated trigger detection; `startFileAutocomplete`; `renderFilePopup` with empty-state; directory-select immediate refetch; debounce + seq guard; use `insert_text` for insertion, `path` for refetch |
+| `lib/eye_in_the_sky_web/live/dm_live.ex` | New `handle_event("list_files", ...)` clause delegated to helper |
+| `lib/eye_in_the_sky_web/live/dm_live/file_autocomplete.ex` | New helper: `list_entries/3`, root resolution, path splitting, `under_root?/2`, sorting, exclusions, truncation, `insert_text` generation |
+| `test/eye_in_the_sky_web/live/dm_live/file_autocomplete_test.exs` | Tests for root validation, traversal rejection, filesystem root `/`, sorting, truncation, excluded dirs, dotfile visibility, and `insert_text` correctness |
+
+### Test cases for `file_autocomplete_test.exs`
+
+**Root validation**
+- Unknown root returns empty entries
+- `project`, `home`, `filesystem` each resolve correctly
+
+**Traversal guard**
+- `../` does not escape project root
+- Absolute-looking partials do not escape selected root
+- Filesystem root `/` allows valid absolute traversal
+
+**`under_root?/2` edge cases**
+- `/Users/uriel/project-old` does not pass guard for root `/Users/uriel/project`
+- `/` root accepts `/etc`, `/usr`, etc.
+
+**Sorting**
+- Directories appear before files
+- Alphabetized within each group
+
+**Exclusions**
+- `.git`, `node_modules`, `deps`, `_build`, `.elixir_ls`, `.tmp` hidden at root level
+- Explicit navigation into an excluded dir returns its contents
+
+**Truncation**
+- >50 results returns exactly 50 entries with `truncated: true`
+
+**`insert_text` correctness**
+- Project root: `@src/foo.ex`
+- Home root: `@~/Documents/foo.ex`
+- Filesystem root: `@/etc/hosts`
+- Directories include trailing slash in both `path` and `insert_text`
+
+**Dotfiles**
+- `.env`, `.gitignore`, `.formatter.exs` appear in results

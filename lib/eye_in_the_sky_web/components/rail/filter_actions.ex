@@ -137,6 +137,28 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
     {:noreply, socket |> assign(:skill_scope, scope) |> assign(:flyout_skills, skills)}
   end
 
+  def handle_update_team_search(%{"value" => value}, socket) do
+    teams =
+      Loader.load_flyout_teams_filtered(
+        socket.assigns.sidebar_project,
+        value,
+        socket.assigns.team_status
+      )
+
+    {:noreply, socket |> assign(:team_search, value) |> assign(:flyout_teams, teams)}
+  end
+
+  def handle_set_team_status(%{"status" => status}, socket) do
+    teams =
+      Loader.load_flyout_teams_filtered(
+        socket.assigns.sidebar_project,
+        socket.assigns.team_search,
+        status
+      )
+
+    {:noreply, socket |> assign(:team_status, status) |> assign(:flyout_teams, teams)}
+  end
+
   def handle_update_prompt_search(%{"value" => value}, socket) do
     prompts =
       Loader.load_flyout_prompts(

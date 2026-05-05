@@ -124,11 +124,23 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   def maybe_load_canvases(socket, _section), do: socket
 
   def maybe_load_teams(socket, :teams, project) do
-    opts = if project, do: [project_id: project.id], else: []
-    assign(socket, :flyout_teams, Teams.list_teams(opts))
+    search = socket.assigns[:team_search] || ""
+    status = socket.assigns[:team_status] || "active"
+    assign(socket, :flyout_teams, load_flyout_teams_filtered(project, search, status))
   end
 
   def maybe_load_teams(socket, _section, _project), do: socket
+
+  def load_flyout_teams_filtered(project, search \\ "", status \\ "active") do
+    opts =
+      []
+      |> then(&if project, do: Keyword.put(&1, :project_id, project.id), else: &1)
+      |> then(&if search != "", do: Keyword.put(&1, :name, search), else: &1)
+      |> then(&if status != "all", do: Keyword.put(&1, :status, status), else: &1)
+      |> Keyword.put(:limit, 30)
+
+    Teams.list_teams(opts)
+  end
 
   def maybe_load_tasks(socket, :tasks, project) do
     tasks =

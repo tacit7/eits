@@ -63,6 +63,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         scope_type: :project,
         flyout_canvases: [],
         flyout_teams: [],
+        team_search: "",
+        team_status: "active",
         flyout_tasks: [],
         task_search: "",
         task_state_filter: nil,
@@ -329,6 +331,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("set_skill_scope", params, socket),
     do: FilterActions.handle_set_skill_scope(params, socket)
 
+  def handle_event("update_team_search", params, socket),
+    do: FilterActions.handle_update_team_search(params, socket)
+
+  def handle_event("set_team_status", params, socket),
+    do: FilterActions.handle_set_team_status(params, socket)
+
   def handle_event("update_prompt_search", params, socket),
     do: FilterActions.handle_update_prompt_search(params, socket)
 
@@ -512,6 +520,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         unread_counts={@unread_counts}
         flyout_canvases={@flyout_canvases}
         flyout_teams={@flyout_teams}
+        team_search={@team_search}
+        team_status={@team_status}
         flyout_tasks={@flyout_tasks}
         task_search={@task_search}
         task_state_filter={@task_state_filter}

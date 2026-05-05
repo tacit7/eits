@@ -28,6 +28,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :unread_counts, :map, default: %{}
   attr :flyout_canvases, :list, default: []
   attr :flyout_teams, :list, default: []
+  attr :team_search, :string, default: ""
+  attr :team_status, :string, default: "active"
   attr :flyout_tasks, :list, default: []
   attr :task_search, :string, default: ""
   attr :task_state_filter, :any, default: nil
@@ -227,6 +229,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             myself={@myself}
           />
         <% end %>
+        <%= if @active_section == :teams do %>
+          <TeamsSection.teams_filters
+            team_search={@team_search}
+            team_status={@team_status}
+            myself={@myself}
+          />
+        <% end %>
 
         <%!-- ── Content ── --%>
         <div class="flex-1 overflow-y-auto py-1">
@@ -264,7 +273,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :skills -> %>
               <SkillsSection.skills_content skills={@flyout_skills} />
             <% :teams -> %>
-              <TeamsSection.teams_content teams={@flyout_teams} sidebar_project={@sidebar_project} />
+              <TeamsSection.teams_content
+                teams={@flyout_teams}
+                team_search={@team_search}
+                team_status={@team_status}
+                sidebar_project={@sidebar_project}
+              />
             <% :canvas -> %>
               <CanvasSection.canvas_content canvases={@flyout_canvases} />
             <% :agents -> %>

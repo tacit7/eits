@@ -8,8 +8,10 @@ import Config
 config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json"
 
-# LiveSvelte SSR via Node.js in production
-config :live_svelte, ssr_module: LiveSvelte.SSR.NodeJS
+# All LiveSvelte components use ssr={false} — no Node.js runtime required.
+# Using ViteJS module skips NodeJS.Supervisor entirely, which would otherwise
+# fail to start when launched from Finder/Alfred (minimal PATH, no node binary).
+config :live_svelte, ssr_module: LiveSvelte.SSR.ViteJS
 
 # Configures Swoosh API Client
 config :swoosh, api_client: false

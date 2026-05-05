@@ -50,28 +50,36 @@ _curl() {
     fi
     _status="${_body##*$'\n'}"
     _body="${_body%$'\n'*}"
-    if [[ "$_status" == "429" ]]; then
+    if [[ "$_status" == "429" || "$_status" == "503" ]]; then
       _attempt=$((_attempt + 1))
       if [[ $_attempt -lt 4 ]]; then
         local _sleep_time=$(_backoff "$_delay")
-        echo "rate limited, retrying in ${_sleep_time}s..." >&2
+        echo "[eits] rate limited, retrying in ${_sleep_time}s..." >&2
         sleep "$_sleep_time"
         _delay=$((_delay * 2))
         [[ $_delay -gt 30 ]] && _delay=30
         continue
+      else
+        echo "[eits] rate limit not cleared after 4 attempts. Try again in 30s." >&2
+        return 1
       fi
+    fi
+    # Permanent 4xx: no retries
+    if [[ "$_status" -ge 400 && "$_status" -lt 500 ]]; then
+      local _display_body="$_body"
+      if echo "$_body" | grep -qi '<!DOCTYPE\|<html'; then
+        _display_body="{\"error\":\"server_error\",\"status\":$_status,\"hint\":\"server returned HTML — check server logs\"}"
+      fi
+      echo "[eits] permanent error ${_status}: ${_display_body}" >&2
+      return 1
+    fi
+    # 5xx other than 503: no retries
+    if [[ "$_status" -ge 500 ]]; then
+      echo "[eits] server error ${_status}" >&2
+      return 1
     fi
     break
   done
-  if [[ "$_status" -ge 400 ]]; then
-    # Normalize HTML error pages to a plain JSON error so agents don't get raw HTML
-    local _display_body="$_body"
-    if echo "$_body" | grep -qi '<!DOCTYPE\|<html'; then
-      _display_body="{\"error\":\"server_error\",\"status\":$_status,\"hint\":\"server returned HTML — check server logs\"}"
-    fi
-    printf 'HTTP %s: %s\n' "$_status" "$_display_body" >&2
-    return 1
-  fi
   printf '%s\n' "$_body"
 }
 

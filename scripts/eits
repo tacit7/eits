@@ -659,6 +659,7 @@ Subcommands:
   claim     <id>
   delete    <id>
   bulk-update --ids <id,...> --state <id|name>
+             --session <uuid|int> --state <id|name>
 
   When EITS_SESSION_UUID is set, 'list' scopes to the current session.
   Pass --all to list across all sessions.
@@ -1132,29 +1133,35 @@ HELP
       ;;
     bulk-update)
       # eits tasks bulk-update --ids <id,id,...> [--state <id|name>] [--priority <p>] [--title <t>]
+      # eits tasks bulk-update --session <uuid|int> [--state <id|name>] [--priority <p>] [--title <t>]
       # Applies the same update to all specified task IDs.
-      # Example: eits tasks bulk-update --ids 101,102,103 --state 3
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
         cat <<'HELP'
 usage: eits tasks bulk-update --ids <id,...> [--state <id>] [--priority <p>] [--title <t>]
+       eits tasks bulk-update --session <uuid|int> [--state <id>] [--priority <p>] [--title <t>]
 
 Apply the same field update to multiple tasks at once.
 
-  --ids <id,...>     Comma-separated task IDs (required)
-  --state <id>       Workflow state: 1=To Do, 2=In Progress, 3=Done, 4=In Review
-  --priority <p>     Priority value
-  --title <t>        New title (applied to all — use with care)
+  --ids <id,...>       Comma-separated task IDs (mutually exclusive with --session)
+  --session <uuid|int> Fetch all task IDs for the given session (mutually exclusive with --ids)
+  --state <id>         Workflow state: 1=To Do, 2=In Progress, 3=Done, 4=In Review
+  --priority <p>       Priority value
+  --title <t>          New title (applied to all — use with care)
 
 Examples:
   eits tasks bulk-update --ids 101,102,103 --state 3
   eits tasks bulk-update --ids 200,201 --state 1 --priority high
+  eits tasks bulk-update --session abc-123 --state done
+  eits tasks bulk-update --session 42 --state done
 HELP
         return 0; }
-      local ids_raw="" updates="{}"
+      local ids_raw="" session_id="" updates="{}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --ids)
             ids_raw="$2"; shift 2 ;;
+          --session)
+            session_id="$2"; shift 2 ;;
           --state)
             if [[ "$2" =~ ^[0-9]+$ ]]; then
               updates=$(echo "$updates" | jq --argjson v "$2" '. + {state_id: $v}')
@@ -1167,7 +1174,22 @@ HELP
           *) die "unknown flag: $1" ;;
         esac
       done
-      [[ -n "$ids_raw" ]] || die "--ids is required"
+      [[ -n "$ids_raw" && -n "$session_id" ]] && die "--ids and --session are mutually exclusive"
+      if [[ -n "$session_id" ]]; then
+        local _sess_resp
+        _sess_resp=$(_curl "$BASE_URL/tasks?session_id=${session_id}&limit=200") || return 1
+        ids_raw=$(printf '%s' "$_sess_resp" | jq -r '[.tasks[].id] | join(",")') \
+          || { echo "[eits] failed to parse session task list" >&2; return 1; }
+        local _task_count; _task_count=$(printf '%s' "$_sess_resp" | jq -r '.tasks | length' 2>/dev/null || echo 0)
+        if [[ "$_task_count" -ge 200 ]]; then
+          echo "[eits] warning: session has 200+ tasks; only the first 200 are included" >&2
+        fi
+        if [[ -z "$ids_raw" ]]; then
+          printf 'no tasks found for session\n'
+          return 0
+        fi
+      fi
+      [[ -n "$ids_raw" ]] || die "--ids or --session is required"
       [[ "$updates" != "{}" ]] || die "at least one field to update is required (--state, --priority, --title)"
       local ok=0 fail=0
       IFS=',' read -ra _ids <<< "$ids_raw"

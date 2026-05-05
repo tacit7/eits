@@ -1003,7 +1003,8 @@ TASKS_HELP
       fi
       # --notify: send a DM to the given session after successful complete
       if [[ -n "$notify" && $_comp_ok -eq 1 ]]; then
-        cmd_dm --to "$notify" --message "Task $id complete: $message" >/dev/null 2>&1 || true
+        cmd_dm --to "$notify" --message "Task $id completed" >/dev/null 2>&1 || \
+          echo "warning: task closed but DM to $notify failed" >&2
       fi
       ;;
     begin|quick)

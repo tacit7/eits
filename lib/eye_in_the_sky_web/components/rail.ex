@@ -126,6 +126,27 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     {:ok, assign(socket, :projects, Projects.list_projects_for_sidebar())}
   end
 
+  # Targeted update from NavHook when a session is created/updated/stopped.
+  # Replaces the session in-place if it's already in the list (status change).
+  # Falls back to a full reload if the session is new (not yet in the list).
+  def update(%{session_updated: session}, socket) do
+    sessions = socket.assigns[:flyout_sessions] || []
+
+    updated_sessions =
+      if Enum.any?(sessions, &(&1.id == session.id)) do
+        Enum.map(sessions, fn s -> if s.id == session.id, do: session, else: s end)
+      else
+        Loader.load_flyout_sessions(
+          socket.assigns[:sidebar_project],
+          socket.assigns[:session_sort] || :last_activity,
+          socket.assigns[:session_name_filter] || "",
+          socket.assigns[:session_show] || :twenty
+        )
+      end
+
+    {:ok, assign(socket, :flyout_sessions, updated_sessions)}
+  end
+
   def update(assigns, socket) do
     # Only adopt parent's sidebar_project if it's non-nil — prevents parent re-renders from
     # clearing a project that was locally selected via the rail's own project picker.

@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   Palette events are delegated to PaletteHandlers and PaletteAgentHandlers.
   """
 
-  import Phoenix.LiveView, only: [attach_hook: 4, push_event: 3, connected?: 1]
+  import Phoenix.LiveView, only: [attach_hook: 4, push_event: 3, connected?: 1, send_update: 3]
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Events
@@ -36,6 +36,7 @@ defmodule EyeInTheSkyWeb.NavHook do
       |> assign(:palette_shortcut, Settings.get("palette_shortcut") || "auto")
       |> attach_hook(:capture_nav_path, :handle_params, &capture_nav_path/3)
       |> attach_hook(:session_failed_toast, :handle_info, &maybe_push_session_failed/2)
+      |> attach_hook(:rail_session_update, :handle_info, &maybe_update_rail_sessions/2)
       |> attach_hook(:palette_sessions, :handle_event, &PaletteHandlers.handle_palette_event/3)
       |> attach_hook(:session_nav, :handle_event, &PaletteHandlers.handle_session_nav_event/3)
       |> attach_hook(:task_nav, :handle_event, &PaletteHandlers.handle_task_nav_event/3)
@@ -88,6 +89,16 @@ defmodule EyeInTheSkyWeb.NavHook do
   end
 
   defp maybe_push_session_failed(_msg, socket), do: {:cont, socket}
+
+  # Forward session create/update/stop events to the Rail so its flyout sessions list
+  # stays live without requiring a page refresh or navigation.
+  defp maybe_update_rail_sessions({event, session}, socket)
+       when event in [:agent_updated, :agent_stopped, :agent_created] do
+    send_update(EyeInTheSkyWeb.Components.Rail, "app-rail", %{session_updated: session})
+    {:cont, socket}
+  end
+
+  defp maybe_update_rail_sessions(_msg, socket), do: {:cont, socket}
 
   defp capture_nav_path(_params, url, socket) do
     path = URI.parse(url).path || "/"

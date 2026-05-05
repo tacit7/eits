@@ -2548,27 +2548,35 @@ cmd_channels() {
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
         cat <<'HELP'
 usage: eits channels join <channel_id> [--session <uuid|id>] [--role member|admin]
+       eits channels join <channel_id> --sessions <id,id,...> [--dry-run] [--role member|admin]
        eits channels join <channel_id> --all-sessions [--project <id>] [--status <s>] [--limit <n>] [--dry-run] [--role member|admin]
 
   Single join (default):
-    --session <id>   Session UUID or integer ID (default: $EITS_SESSION_UUID)
-    --role <r>       Role: member (default) or admin
+    --session <id>       Session UUID or integer ID (default: $EITS_SESSION_UUID)
+    --role <r>           Role: member (default) or admin
+
+  Explicit list (--sessions):
+    --sessions <id,...>  Comma-separated session UUIDs or integer IDs
+    --dry-run            Print sessions that would be joined without joining
+    --role <r>           Role to assign to all joined sessions
 
   Bulk join (--all-sessions):
     Fetches sessions matching the given filters and joins all of them.
-    --project <id>   Filter by project ID (default: $EITS_PROJECT_ID)
-    --status <s>     Filter by session status (e.g. working, idle)
-    --limit <n>      Max sessions to join (default: 100)
-    --dry-run        Print session IDs that would be joined without joining
-    --role <r>       Role to assign to all joined sessions
+    --project <id>       Filter by project ID (default: $EITS_PROJECT_ID)
+    --status <s>         Filter by session status (e.g. working, idle)
+    --limit <n>          Max sessions to join (default: 100)
+    --dry-run            Print session IDs that would be joined without joining
+    --role <r>           Role to assign to all joined sessions
 HELP
         return 0; }
       local channel_id="${1:-}"; need channel_id; shift
       local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" role="" all_sessions=0
       local bulk_project="${EITS_PROJECT_ID:-}" bulk_status="" bulk_limit=100 dry_run=0
+      local sessions_list=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --session)      session_id="$2";    shift 2 ;;
+          --sessions)     sessions_list="$2"; shift 2 ;;
           --role)         role="$2";          shift 2 ;;
           --all-sessions) all_sessions=1;     shift ;;
           --project|-p)   bulk_project="$2";  shift 2 ;;
@@ -2578,6 +2586,33 @@ HELP
           *) die "unknown flag: $1" ;;
         esac
       done
+
+      # --sessions: explicit comma-separated list
+      if [[ -n "$sessions_list" ]]; then
+        local _ids_arr
+        IFS=',' read -ra _ids_arr <<< "$sessions_list"
+        local _count=${#_ids_arr[@]}
+        if [[ $dry_run -eq 1 ]]; then
+          echo "[eits] dry-run: would join channel $channel_id for $_count session(s):"
+          printf '  %s\n' "${_ids_arr[@]}"
+          return 0
+        fi
+        local _ok=0 _fail=0
+        for _sid in "${_ids_arr[@]}"; do
+          _sid="${_sid// /}"  # trim spaces
+          [[ -z "$_sid" ]] && continue
+          local _payload; _payload="$(json session_id "$_sid")"
+          [[ -n "$role" ]] && _payload="$(echo "$_payload" | jq --arg v "$role" '. + {role: $v}')"
+          if _post "/channels/$channel_id/members" "$_payload" >/dev/null 2>&1; then
+            _ok=$((_ok + 1))
+          else
+            echo "[eits] warning: failed to join session $_sid" >&2
+            _fail=$((_fail + 1))
+          fi
+        done
+        echo "[eits] bulk join complete: $_ok joined, $_fail failed"
+        return 0
+      fi
 
       if [[ $all_sessions -eq 1 ]]; then
         # Bulk join: fetch sessions then join each

@@ -43,10 +43,20 @@ _curl() {
     _body=$(curl -sk --write-out '\n%{http_code}' ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"} ${ROLE_ARGS[@]+"${ROLE_ARGS[@]}"} ${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"} "$@")
     local _curl_exit=$?
     if [[ $_curl_exit -eq 7 ]]; then
-      echo "error: cannot connect to ${BASE_URL} — is the EITS server running?" >&2
-      echo "       Start it with: mix phx.server  (or PORT=5001 mix phx.server)" >&2
-      echo "       Override URL:  export EITS_URL=http://localhost:5001/api/v1" >&2
-      return 1
+      _attempt=$((_attempt + 1))
+      if [[ $_attempt -lt 4 ]]; then
+        local _sleep_time=$(_backoff "$_delay")
+        echo "[eits] connection refused, retrying in ${_sleep_time}s... (server restarting?)" >&2
+        sleep "$_sleep_time"
+        _delay=$((_delay * 2))
+        [[ $_delay -gt 30 ]] && _delay=30
+        continue
+      else
+        echo "error: cannot connect to ${BASE_URL} after 4 attempts — is the EITS server running?" >&2
+        echo "       Start it with: mix phx.server  (or PORT=5001 mix phx.server)" >&2
+        echo "       Override URL:  export EITS_URL=http://localhost:5001/api/v1" >&2
+        return 1
+      fi
     fi
     _status="${_body##*$'\n'}"
     _body="${_body%$'\n'*}"
@@ -2534,16 +2544,77 @@ cmd_channels() {
       ;;
     join)
       # eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
-      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { echo "usage: eits channels join <channel_id> [--session <uuid|id>] [--role member|admin]"; return 0; }
+      #                                  [--all-sessions [--project <id>] [--status <s>] [--limit <n>] [--dry-run]]
+      [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+        cat <<'HELP'
+usage: eits channels join <channel_id> [--session <uuid|id>] [--role member|admin]
+       eits channels join <channel_id> --all-sessions [--project <id>] [--status <s>] [--limit <n>] [--dry-run] [--role member|admin]
+
+  Single join (default):
+    --session <id>   Session UUID or integer ID (default: $EITS_SESSION_UUID)
+    --role <r>       Role: member (default) or admin
+
+  Bulk join (--all-sessions):
+    Fetches sessions matching the given filters and joins all of them.
+    --project <id>   Filter by project ID (default: $EITS_PROJECT_ID)
+    --status <s>     Filter by session status (e.g. working, idle)
+    --limit <n>      Max sessions to join (default: 100)
+    --dry-run        Print session IDs that would be joined without joining
+    --role <r>       Role to assign to all joined sessions
+HELP
+        return 0; }
       local channel_id="${1:-}"; need channel_id; shift
-      local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" role=""
+      local session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" role="" all_sessions=0
+      local bulk_project="${EITS_PROJECT_ID:-}" bulk_status="" bulk_limit=100 dry_run=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --session) session_id="$2"; shift 2 ;;
-          --role)    role="$2";       shift 2 ;;
+          --session)      session_id="$2";    shift 2 ;;
+          --role)         role="$2";          shift 2 ;;
+          --all-sessions) all_sessions=1;     shift ;;
+          --project|-p)   bulk_project="$2";  shift 2 ;;
+          --status)       bulk_status="$2";   shift 2 ;;
+          --limit|-l)     bulk_limit="$2";    shift 2 ;;
+          --dry-run)      dry_run=1;          shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
+
+      if [[ $all_sessions -eq 1 ]]; then
+        # Bulk join: fetch sessions then join each
+        local _qs="limit=${bulk_limit}"
+        [[ -n "$bulk_project" ]] && _qs="${_qs}&project_id=${bulk_project}"
+        [[ -n "$bulk_status" ]]  && _qs="${_qs}&status=${bulk_status}"
+        local _sessions_resp
+        _sessions_resp=$(_curl "$BASE_URL/sessions?${_qs}") || return 1
+        local _uuids
+        _uuids=$(echo "$_sessions_resp" | jq -r '.results[].uuid // empty')
+        local _count; _count=$(echo "$_uuids" | grep -c . 2>/dev/null || echo 0)
+        if [[ "${_count:-0}" -eq 0 ]]; then
+          echo "[eits] no sessions matched filters — nothing to join" >&2
+          return 0
+        fi
+        if [[ $dry_run -eq 1 ]]; then
+          echo "[eits] dry-run: would join $channel_id for $_count session(s):"
+          echo "$_uuids"
+          return 0
+        fi
+        local _ok=0 _fail=0
+        while IFS= read -r _uuid; do
+          [[ -z "$_uuid" ]] && continue
+          local _payload; _payload="$(json session_id "$_uuid")"
+          [[ -n "$role" ]] && _payload="$(echo "$_payload" | jq --arg v "$role" '. + {role: $v}')"
+          if _post "/channels/$channel_id/members" "$_payload" >/dev/null 2>&1; then
+            _ok=$((_ok + 1))
+          else
+            echo "[eits] warning: failed to join session $_uuid" >&2
+            _fail=$((_fail + 1))
+          fi
+        done <<< "$_uuids"
+        echo "[eits] bulk join complete: $_ok joined, $_fail failed"
+        return 0
+      fi
+
+      # Single join (default path)
       need session_id
       local payload
       payload="$(json session_id "$session_id")"

@@ -232,6 +232,26 @@ pub fn run() {
             let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
             install_iam_hooks(&port);
 
+            // --- Notification permission (macOS requires explicit grant) ---
+            // Without this, show() silently succeeds but no notification appears.
+            {
+                use tauri_plugin_notification::NotificationExt;
+                let state = app.notification().permission_state();
+                log!("[eits-tauri] notification permission state: {:?}", state);
+                match state {
+                    Ok(tauri_plugin_notification::PermissionState::Granted) => {
+                        log!("[eits-tauri] notifications: already granted");
+                    }
+                    Ok(_) => {
+                        match app.notification().request_permission() {
+                            Ok(s) => log!("[eits-tauri] notifications: requested, state={:?}", s),
+                            Err(e) => log!("[eits-tauri] notifications: request failed: {e}"),
+                        }
+                    }
+                    Err(e) => log!("[eits-tauri] notifications: permission_state() error: {e}"),
+                }
+            }
+
             // --- ElixirKit PubSub ---
             #[cfg(debug_assertions)]
             {

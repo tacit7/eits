@@ -7,10 +7,14 @@ defmodule EyeInTheSky.Channels.ChannelOnboarding do
 
   require Logger
 
+  alias EyeInTheSky.ChannelMessages
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Channels.ChannelMember
 
   import Ecto.Query, warn: false
+
+  @snapshot_limit 8
+  @body_max 120
 
   @doc """
   Delivers an onboarding DM to the session associated with `member`, then
@@ -32,7 +36,8 @@ defmodule EyeInTheSky.Channels.ChannelOnboarding do
         :ok
 
       true ->
-        message = build_message(channel)
+        recent = ChannelMessages.list_messages_for_channel(channel.id, limit: @snapshot_limit)
+        message = build_message(channel, recent)
         agent_manager = Application.get_env(:eye_in_the_sky, :agent_manager_module, EyeInTheSky.Agents.AgentManager)
 
         case agent_manager.send_message(member.session_id, message) do
@@ -61,13 +66,15 @@ defmodule EyeInTheSky.Channels.ChannelOnboarding do
     :ok
   end
 
-  defp build_message(channel) do
+  defp build_message(channel, recent_messages) do
+    snapshot = format_snapshot(recent_messages, channel.id)
+
     """
     You have been added to Channel ##{channel.name} (#{channel.id}).
 
     This is a shared channel with users and other agents.
-
-    To read recent messages:
+    #{snapshot}
+    To read more history:
       eits channels messages #{channel.id} --limit 20
 
     To send a message:
@@ -90,4 +97,37 @@ defmodule EyeInTheSky.Channels.ChannelOnboarding do
     A normal DM response will NOT be posted to the channel.\
     """
   end
+
+  defp format_snapshot([], _channel_id), do: "\n"
+
+  defp format_snapshot(messages, _channel_id) do
+    lines =
+      messages
+      |> Enum.map(fn msg ->
+        sender = sender_name(msg)
+        body = truncate(msg.body, @body_max)
+        "  [#{sender}] #{body}"
+      end)
+      |> Enum.join("\n")
+
+    "\nRecent activity:\n#{lines}\n\n"
+  end
+
+  defp sender_name(%{session: %{name: name}}) when is_binary(name) and name != "",
+    do: name
+
+  defp sender_name(%{session: %{id: id}}), do: "session:#{id}"
+  defp sender_name(_), do: "unknown"
+
+  defp truncate(body, max) when is_binary(body) do
+    body = String.replace(body, "\n", " ")
+
+    if String.length(body) > max do
+      String.slice(body, 0, max) <> "…"
+    else
+      body
+    end
+  end
+
+  defp truncate(_, _max), do: ""
 end

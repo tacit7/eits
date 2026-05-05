@@ -1006,7 +1006,7 @@ TASKS_HELP
       fi
       ;;
     begin|quick)
-      # eits tasks begin [--id <task_id>] [--title <t>] [--description <d>] [--project <id>] [--priority <p>] [--quiet|-q]
+      # eits tasks begin [--id <task_id>] [--title <t>] [--description <d>] [--project <id>] [--priority <p>] [--tag <id>] [--quiet|-q]
       # With --id: claims an existing task (links session + sets In Progress). No new task created.
       # Without --id: creates a new task then claims it.
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
@@ -1021,6 +1021,7 @@ usage: eits tasks begin [--id <task_id>] --title <title> [options]
   --description <t>  Task description
   --project <id>     Project ID (default: $EITS_PROJECT_ID)
   --priority <p>     Priority
+  --tag <id>         Tag ID to apply after creation (repeatable: --tag 1 --tag 2)
   --quiet|-q         Print only the task ID
 
 NOTES:
@@ -1030,6 +1031,7 @@ NOTES:
 HELP
         return 0; }
       local task_id_flag="" title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
+      local -a tag_ids=()
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --id)             task_id_flag="$2"; shift 2 ;;
@@ -1037,6 +1039,7 @@ HELP
           --description|-d) description="$2";  shift 2 ;;
           --project|-p)     project_id="$2";   shift 2 ;;
           --priority)       priority="$2";     shift 2 ;;
+          --tag)            tag_ids+=("$2");   shift 2 ;;
           --quiet|-q)       quiet=1;           shift ;;
           *) die "unknown flag: $1" ;;
         esac
@@ -1049,6 +1052,11 @@ HELP
         _claim_resp=$(_curl -X POST -H "Content-Type: application/json" \
           -d "$(json session_id "$_sess")" \
           "$BASE_URL/tasks/$task_id_flag/claim")
+        for _tag_id in "${tag_ids[@]:-}"; do
+          [[ -n "$_tag_id" ]] || continue
+          _post "/tasks/$task_id_flag/tags" "$(json tag_id "$_tag_id")" >/dev/null 2>&1 \
+            || echo "warning: failed to apply tag $_tag_id to task $task_id_flag" >&2
+        done
         if [[ $quiet -eq 0 ]]; then
           echo "$_claim_resp" | jq .
         else
@@ -1082,6 +1090,12 @@ HELP
           -d "$(json session_id "$_sess")" \
           "$BASE_URL/tasks/$task_id/sessions" >/dev/null 2>&1 || true
       fi
+      # apply tags (--tag is repeatable)
+      for _tag_id in "${tag_ids[@]:-}"; do
+        [[ -n "$_tag_id" ]] || continue
+        _post "/tasks/$task_id/tags" "$(json tag_id "$_tag_id")" >/dev/null 2>&1 \
+          || echo "warning: failed to apply tag $_tag_id to task $task_id" >&2
+      done
       if [[ $quiet -eq 0 ]]; then
         # Fetch full task so response includes state name, title, etc.
         _curl "$BASE_URL/tasks/$task_id" | jq '{task_id: .task.id, title: .task.title, state: .task.state, state_id: .task.state_id, message: "Task created"}'

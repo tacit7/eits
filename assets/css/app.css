@@ -731,31 +731,21 @@ html[data-env="tauri"] .app-titlebar {
   padding-bottom: 10px;
 }
 
-/* wry's drag handler matches `data-tauri-drag-region` via `closest()`, so
-   any descendant of an annotated element starts a drag on mousedown —
-   including links and buttons. We keep the attribute ONLY on the dedicated
-   spacer in the sidebar titlebar strip so clickable elements still receive
-   their clicks. The `no-drag` declarations below are a belt-and-suspenders
-   guard in case a future titlebar-child gains the attribute. */
-html[data-env="tauri"] .app-titlebar a,
-html[data-env="tauri"] .app-titlebar button,
-html[data-env="tauri"] .app-titlebar input {
-  -webkit-app-region: no-drag;
-}
-
-/* Tauri overlay titlebar: show and size the drag spacer in the icon rail.
-   Height matches the macOS titlebar area (~38px) so traffic lights never
-   overlap clickable icons. wry intercepts mousedown via JS closest() on
-   [data-tauri-drag-region] — no CSS -webkit-app-region needed in WKWebView. */
-html[data-tauri-overlay] [data-tauri-drag-region] {
-  display: block;
-  height: 38px;
-}
-
-/* Give the drag spacer a grab cursor so the zone is discoverable. */
-html[data-env="tauri"] [data-tauri-drag-region] {
+/* Tauri window drag: show a grab cursor over the top bar drag region.
+   The actual drag is triggered by the JS mousedown handler in app.js — no
+   CSS -webkit-app-region needed (WKWebView ignores it). */
+html[data-env="tauri"] #app-topbar {
   cursor: grab;
 }
-html[data-env="tauri"] [data-tauri-drag-region]:active {
+html[data-env="tauri"] #app-topbar:active {
   cursor: grabbing;
+}
+/* Interactive children revert to their normal cursor. */
+html[data-env="tauri"] #app-topbar a,
+html[data-env="tauri"] #app-topbar button,
+html[data-env="tauri"] #app-topbar input,
+html[data-env="tauri"] #app-topbar select,
+html[data-env="tauri"] #app-topbar [role="button"],
+html[data-env="tauri"] #app-topbar summary {
+  cursor: default;
 }

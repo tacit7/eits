@@ -73,10 +73,10 @@
 
     <%!-- Desktop top bar — hidden on mobile --%>
     <% sidebar_tab = assigns[:sidebar_tab] || :sessions %>
-    <div id="app-topbar" class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 px-3 relative">
-      <%!-- Tauri drag region: absolute, sits behind flex content so empty-space
-           clicks drag the window while buttons/links remain fully clickable. --%>
-      <div data-tauri-drag-region class="absolute inset-0" aria-hidden="true" />
+    <%!-- data-tauri-drag-region on the container itself — the JS handler in app.js
+         excludes interactive descendants (a/button/input/etc) so clicks on toolbar
+         controls still work; clicks on empty space start window drag. --%>
+    <div id="app-topbar" data-tauri-drag-region class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 px-3">
       <.top_bar_breadcrumb
         sidebar_tab={sidebar_tab}
         dm_session_name={assigns[:page_title]}

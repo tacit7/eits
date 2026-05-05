@@ -68,4 +68,116 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
 
     {:noreply, socket |> assign(:task_state_filter, state_id) |> assign(:flyout_tasks, tasks)}
   end
+
+  def handle_update_note_search(%{"value" => value}, socket) do
+    notes =
+      Loader.load_flyout_notes(
+        socket.assigns.sidebar_project,
+        value,
+        socket.assigns.note_parent_type
+      )
+
+    {:noreply, socket |> assign(:note_search, value) |> assign(:flyout_notes, notes)}
+  end
+
+  def handle_set_note_parent_type(%{"type" => type_str}, socket) do
+    parent_type = if type_str == "all", do: nil, else: type_str
+
+    notes =
+      Loader.load_flyout_notes(
+        socket.assigns.sidebar_project,
+        socket.assigns.note_search,
+        parent_type
+      )
+
+    {:noreply, socket |> assign(:note_parent_type, parent_type) |> assign(:flyout_notes, notes)}
+  end
+
+  def handle_update_agent_search(%{"value" => value}, socket) do
+    agents =
+      Loader.load_flyout_agents_filtered(
+        socket.assigns.sidebar_project,
+        value,
+        socket.assigns.agent_scope
+      )
+
+    {:noreply, socket |> assign(:agent_search, value) |> assign(:flyout_agents, agents)}
+  end
+
+  def handle_set_agent_scope(%{"scope" => scope}, socket) do
+    agents =
+      Loader.load_flyout_agents_filtered(
+        socket.assigns.sidebar_project,
+        socket.assigns.agent_search,
+        scope
+      )
+
+    {:noreply, socket |> assign(:agent_scope, scope) |> assign(:flyout_agents, agents)}
+  end
+
+  def handle_update_skill_search(%{"value" => value}, socket) do
+    skills =
+      Loader.load_flyout_skills_filtered(
+        socket.assigns.sidebar_project,
+        value,
+        socket.assigns.skill_scope
+      )
+
+    {:noreply, socket |> assign(:skill_search, value) |> assign(:flyout_skills, skills)}
+  end
+
+  def handle_set_skill_scope(%{"scope" => scope}, socket) do
+    skills =
+      Loader.load_flyout_skills_filtered(
+        socket.assigns.sidebar_project,
+        socket.assigns.skill_search,
+        scope
+      )
+
+    {:noreply, socket |> assign(:skill_scope, scope) |> assign(:flyout_skills, skills)}
+  end
+
+  def handle_update_team_search(%{"value" => value}, socket) do
+    teams =
+      Loader.load_flyout_teams_filtered(
+        socket.assigns.sidebar_project,
+        value,
+        socket.assigns.team_status
+      )
+
+    {:noreply, socket |> assign(:team_search, value) |> assign(:flyout_teams, teams)}
+  end
+
+  def handle_set_team_status(%{"status" => status}, socket) do
+    teams =
+      Loader.load_flyout_teams_filtered(
+        socket.assigns.sidebar_project,
+        socket.assigns.team_search,
+        status
+      )
+
+    {:noreply, socket |> assign(:team_status, status) |> assign(:flyout_teams, teams)}
+  end
+
+  def handle_update_prompt_search(%{"value" => value}, socket) do
+    prompts =
+      Loader.load_flyout_prompts(
+        socket.assigns.sidebar_project,
+        value,
+        socket.assigns.prompt_scope
+      )
+
+    {:noreply, socket |> assign(:prompt_search, value) |> assign(:flyout_prompts, prompts)}
+  end
+
+  def handle_set_prompt_scope(%{"scope" => scope}, socket) do
+    prompts =
+      Loader.load_flyout_prompts(
+        socket.assigns.sidebar_project,
+        socket.assigns.prompt_search,
+        scope
+      )
+
+    {:noreply, socket |> assign(:prompt_scope, scope) |> assign(:flyout_prompts, prompts)}
+  end
 end

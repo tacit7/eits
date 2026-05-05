@@ -13,6 +13,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   alias EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.JobsSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection
 
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
@@ -26,6 +28,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :unread_counts, :map, default: %{}
   attr :flyout_canvases, :list, default: []
   attr :flyout_teams, :list, default: []
+  attr :team_search, :string, default: ""
+  attr :team_status, :string, default: "active"
   attr :flyout_tasks, :list, default: []
   attr :task_search, :string, default: ""
   attr :task_state_filter, :any, default: nil
@@ -34,7 +38,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :session_show, :atom, default: :twenty
   attr :notification_count, :integer, default: 0
   attr :flyout_agents, :list, default: []
+  attr :agent_search, :string, default: ""
+  attr :agent_scope, :string, default: "all"
   attr :flyout_notes, :list, default: []
+  attr :note_search, :string, default: ""
+  attr :note_parent_type, :any, default: nil
+  attr :flyout_skills, :list, default: []
+  attr :skill_search, :string, default: ""
+  attr :skill_scope, :string, default: "all"
+  attr :flyout_prompts, :list, default: []
+  attr :prompt_search, :string, default: ""
+  attr :prompt_scope, :string, default: "all"
   attr :flyout_jobs, :list, default: []
   attr :flyout_file_nodes, :list, default: []
   attr :flyout_file_expanded, :any, default: nil
@@ -187,6 +201,41 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             myself={@myself}
           />
         <% end %>
+        <%= if @active_section == :notes do %>
+          <NotesSection.notes_filters
+            note_search={@note_search}
+            note_parent_type={@note_parent_type}
+            myself={@myself}
+          />
+        <% end %>
+        <%= if @active_section == :agents do %>
+          <AgentsSection.agents_filters
+            agent_search={@agent_search}
+            agent_scope={@agent_scope}
+            myself={@myself}
+          />
+        <% end %>
+        <%= if @active_section == :skills do %>
+          <SkillsSection.skills_filters
+            skill_search={@skill_search}
+            skill_scope={@skill_scope}
+            myself={@myself}
+          />
+        <% end %>
+        <%= if @active_section == :prompts do %>
+          <PromptsSection.prompts_filters
+            prompt_search={@prompt_search}
+            prompt_scope={@prompt_scope}
+            myself={@myself}
+          />
+        <% end %>
+        <%= if @active_section == :teams do %>
+          <TeamsSection.teams_filters
+            team_search={@team_search}
+            team_status={@team_status}
+            myself={@myself}
+          />
+        <% end %>
 
         <%!-- ── Content ── --%>
         <div class="flex-1 overflow-y-auto py-1">
@@ -202,7 +251,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 myself={@myself}
               />
             <% :prompts -> %>
-              <TasksSection.nav_links project={@sidebar_project} section={:prompts} />
+              <PromptsSection.prompts_content
+                prompts={@flyout_prompts}
+                prompt_search={@prompt_search}
+                prompt_scope={@prompt_scope}
+                sidebar_project={@sidebar_project}
+              />
             <% :chat -> %>
               <ChatSection.chat_content
                 channels={@flyout_channels}
@@ -211,11 +265,20 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 myself={@myself}
               />
             <% :notes -> %>
-              <NotesSection.notes_content notes={@flyout_notes} />
+              <NotesSection.notes_content
+                notes={@flyout_notes}
+                note_search={@note_search}
+                note_parent_type={@note_parent_type}
+              />
             <% :skills -> %>
-              <Helpers.simple_link href="/skills" label="All Skills" icon="hero-bolt" />
+              <SkillsSection.skills_content skills={@flyout_skills} />
             <% :teams -> %>
-              <TeamsSection.teams_content teams={@flyout_teams} sidebar_project={@sidebar_project} />
+              <TeamsSection.teams_content
+                teams={@flyout_teams}
+                team_search={@team_search}
+                team_status={@team_status}
+                sidebar_project={@sidebar_project}
+              />
             <% :canvas -> %>
               <CanvasSection.canvas_content canvases={@flyout_canvases} />
             <% :agents -> %>

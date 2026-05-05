@@ -270,6 +270,71 @@ All three operations:
 
 ---
 
+## Session Batch Archive Operations
+
+Archives multiple sessions in a single database call, eliminating N+1 query patterns in bulk archive workflows.
+
+### batch_archive_sessions_for_project/2
+
+Archives multiple sessions belonging to a project in a single `Repo.update_all` call.
+
+**Before (removed):**
+- Looped over selected session IDs
+- Called `fetch_project_session/2` per row to fetch and validate ownership
+- Called `archive_session/1` per row to archive individually
+- O(N) roundtrips for fetch + archive
+
+**After (current):**
+- Accepts list of session IDs and project_id for ownership verification
+- Single `Repo.update_all` with `WHERE id IN ^ AND project_id == ^project_id`
+- Sets `archived_at: DateTime.utc_now()`
+- Returns `{archived_count, nil}`
+- Returns `{0, nil}` on empty list
+
+**Ownership Check:** Built into the query via `project_id == ^project_id` constraint — sessions not belonging to the project are silently skipped, preventing privilege escalation.
+
+**Integration:**
+- `handle_archive_selected/2` in `ProjectLive.Sessions.Actions`
+- Fetches sessions separately to get UUIDs for the `evict-dm-history` PubSub event
+- Bulk archive in a single atomic call improves responsiveness for 10–100+ selected sessions
+
+**Code locations:**
+- `lib/eye_in_the_sky/sessions.ex` — `batch_archive_sessions_for_project/2`
+- `lib/eye_in_the_sky_web/live/project_live/sessions/actions.ex` — `handle_archive_selected/2` integration
+- `lib/eye_in_the_sky/selection.ex` — `normalize_id/1` helper for mixed ID types
+
+**Commits:** 2c402aaf (batch archive sessions to eliminate N+1), 03d0d42c (merge)
+
+---
+
+## Type-Safe Form Parameter Parsing
+
+LiveView form handlers parse HTTP parameters as strings and must convert them to typed values with safe fallback defaults.
+
+### parse_form_int/2
+
+Parses form parameters that should be integers (e.g., `state_id`, `priority`) with type safety and null-coalescing.
+
+**Pattern:**
+```elixir
+state_id = parse_form_int(params["state_id"], 0)
+priority = parse_form_int(params["priority"], 0)
+```
+
+**Behavior:**
+- Accepts `params["key"]` (string or nil)
+- Returns integer value if parseable, fallback default otherwise
+- Prevents type errors in downstream Ecto changesets
+- Used in `handle_update_task/2` (TasksHelpers) to safely coerce form input before validation
+
+**Code locations:**
+- `lib/eye_in_the_sky_web/live/shared/tasks_helpers.ex` — `handle_update_task/2`
+- Used for: `state_id`, `priority` integer parameters from task form
+
+**Commits:** 03a4ff3f (use parse_form_int for state_id/priority in handle_update_task)
+
+---
+
 ## DM Message Delivery with Metadata
 
 AgentWorker consumes structured JSON metadata sent alongside DM message bodies, enabling agents to receive machine-readable context without JSON appearing in the UI.

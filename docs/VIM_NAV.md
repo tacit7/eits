@@ -28,6 +28,19 @@ In-app overlay: press `?` anywhere, or visit `/keybindings`.
 
 ---
 
+## Command palette
+
+When the command palette is open (`:` or `Space :`):
+
+| Keys | Action |
+|---|---|
+| `Ctrl-j` | Move to next command |
+| `Ctrl-k` | Move to previous command |
+| `ArrowDown` | Move to next command |
+| `ArrowUp` | Move to previous command |
+
+---
+
 ## Go to page — `g` prefix
 
 | Keys | Destination |
@@ -95,6 +108,8 @@ Active on any page with `data-vim-list`.
 |---|---|
 | `j` | Next item |
 | `k` | Previous item |
+| `Ctrl-n` | Next item (alias for `j`) |
+| `Ctrl-p` | Previous item (alias for `k`) |
 | `Enter` | Open focused item |
 | `o` | Open focused item in new tab |
 | `g g` | Jump to first item |
@@ -103,8 +118,13 @@ Active on any page with `data-vim-list`.
 | `Ctrl-u` | Scroll up half a page |
 | `{` | Jump to previous group separator |
 | `}` | Jump to next group separator |
+| `f` | Hint mode — show jump labels (qutebrowser-style) |
+| `r` | Rename focused item inline *(requires `data-vim-rename-target` on item)* |
 | `d d` | Delete focused item (generic; reads `data-vim-item-type` + `data-vim-item-id`) |
 | `a a` | Archive focused item (generic; reads `data-vim-item-type` + `data-vim-item-id`) |
+| `y u` | Copy focused item UUID to clipboard *(sessions only)* |
+| `y i` | Copy focused item integer ID to clipboard *(sessions only)* |
+| `y t` | Copy focused item title to clipboard *(all list types)* |
 
 **Numeric count prefix**: Type a number before `j`, `k`, or `G` to repeat the motion (`3j` moves down 3, `5k` moves up 5, `10G` jumps to item 10). The accumulated count is shown in the status bar. Pressing `Escape` or waiting 2s clears the count.
 
@@ -112,7 +132,13 @@ Active on any page with `data-vim-list`.
 
 **Group jump (`{`/`}`)**: Navigates between `data-vim-list-group` separator elements when present. Falls back to `gg`/`G` behavior when no separators exist in the DOM. Currently active on kanban column headers (via `data-vim-list-group` attribute on `.kanban-column`).
 
+**Hint mode (`f`)**: Pressing `f` shows alphabetical labels on each list item (a, b, c... aa, ab...). Type the label to jump focus to that item and exit hint mode. Multi-character labels narrow the visible hints with each keystroke. Press `Escape` to exit without jumping. Silently exits if no list items exist.
+
+**Rename inline (`r`)**: Pressing `r` on a focused list item finds the element referenced by `data-vim-rename-target`, focuses it, selects its text, and switches to insert mode. No-op when the target attribute is missing or the element doesn't exist. Currently wired on `session_card` for renaming sessions; `task_card` and `notes_list` have no inline title input so are intentionally left without the attribute.
+
 **Generic delete/archive (`dd`/`aa`)**: Reads `data-vim-item-type` and `data-vim-item-id` from the focused item and fires `delete_<type>` / `archive_<type>` events via `pushToList`. Items without these attributes fall back to session behavior (`data-session-id`). Session items also include `session_id` in the payload for backwards compatibility. These attributes are set on `session_card`, `task_card/list_row`, and `notes_list` components. Backend handlers are fully wired: `delete_task` and `archive_task` on the tasks page, `delete_note` on the notes page (archiving notes is not supported and returns an error message).
+
+**Copy to clipboard (`y u`, `y i`, `y t`)**: `y u` and `y i` read `data-vim-item-uuid` and `data-vim-item-id` from the focused item (sessions). `y t` reads `data-vim-item-title` from any focused list item and works across all entity types (sessions, tasks, notes).
 
 ---
 
@@ -146,6 +172,13 @@ When a focused session is archived or deleted, vim-nav automatically refocuses t
 | `j` / `k` | Navigate task list |
 | `Enter` | Open focused task detail drawer |
 | `f f` | Toggle filter drawer |
+
+## Task navigation (projects page) — `route_suffix:/projects`
+
+| Keys | Action |
+|---|---|
+| `Space t n` | Next task |
+| `Space t p` | Previous task |
 
 ---
 
@@ -222,6 +255,8 @@ When a focused session is archived or deleted, vim-nav automatically refocuses t
 
 | Keys | Action |
 |---|---|
+| `Space b n` | Next session *(projects page)* |
+| `Space b p` | Previous session *(projects page)* |
 | `Space b a` | Archive session *(sessions page)* |
 | `Space b D` | Delete session *(sessions page)* |
 
@@ -294,7 +329,8 @@ Scoped commands only fire when their scope condition is met.
 | `feature:vim-search` | `[data-vim-search]` exists in DOM (wired on tasks, teams, skills, kanban, agents, and generic top-bar search inputs) |
 | `feature:vim-flyout` | `[data-vim-flyout-open]` attribute is present |
 | `page:sessions` | `[data-vim-page="sessions"]` exists in DOM |
-| `route_suffix:/tasks` | `window.location.pathname` ends with `/tasks` |
+| `route_suffix:/projects` | `window.location.pathname` ends with `/projects` (session/task navigation) |
+| `route_suffix:/tasks` | ends with `/tasks` |
 | `route_suffix:/chat` | ends with `/chat` |
 | `route_suffix:/dm` | ends with `/dm` |
 | `page:tasks` | `/tasks` page (j/k navigation, filter toggle) |

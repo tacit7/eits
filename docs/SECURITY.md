@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-05-01
-Last updated: 2026-05-02 (IAM sanitize modules prepend+reverse, archdo linter added)
+Last updated: 2026-05-04 (Path traversal fixes, Claude/Codex env var blocking, dependency updates)
 
 ## Authentication
 
@@ -252,6 +252,20 @@ Hammer v7 with ETS backend, applied to the `:webauthn` and `:api` pipelines.
 
 ## Input Validation
 
+### Path Traversal Prevention
+
+File access handlers use `FileHelpers.path_within?/2` (realpath-based comparison) instead of string prefix checks:
+
+**Project config viewer** (`project_live/config.ex`):
+- `view_file` and `open_file` handlers verify paths are within the `.claude` directory using `path_within?(path, claude_dir)`.
+- `String.starts_with?` was replaced because it does not resolve symlinks or `..` segments, allowing traversal attacks via crafted paths like `/home/user/.claude/../.ssh/id_rsa`.
+- `path_within?` uses `File.cwd!()` and `Path.expand()` to canonicalize paths before comparison, making the check traversal-safe.
+
+**Settings editor** (`overview_live/settings.ex`):
+- `open_in_editor` handler is scoped to an explicit allowlist (`@allowed_editor_roots`) containing only `~/.claude`.
+- Previously, `File.exists?` was the only check, allowing any path to be opened via a crafted WebSocket event.
+- Now uses `path_within?` against the allowlist, rejecting all paths outside `~/.claude`.
+
 ### Database
 
 - All database access uses Ecto with parameterized queries — no raw SQL.
@@ -465,13 +479,43 @@ Keys are stored as HMAC-SHA256 hashes in the `api_keys` table. To revoke a key, 
 
 ### Claude CLI Spawning
 
-The app spawns Claude CLI processes as Erlang Ports:
+The app spawns Claude CLI processes as Erlang Ports via `EyeInTheSky.Claude.CLI`:
 
 - Process arguments are built from a validated keyword list with known flags only.
 - Sensitive flags (`-p`, `--system-prompt`, `--append-system-prompt`) are redacted in logs via `safe_log_args/1`.
 - Port output buffer is capped at 4MB to prevent memory exhaustion.
 - Idle timeout (configurable, default 5 minutes) kills stalled processes.
 - Process cancellation sends `SIGTERM` to the process group, with `SIGKILL` fallback.
+
+**Environment variable filtering** (`EyeInTheSky.Claude.CLI.Env`):
+- Sensitive environment variables are stripped from spawned Claude processes to prevent credential leakage.
+- **Blocked variables**: `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `BINDIR`, `ROOTDIR`, `EMU`, `SECRET_KEY_BASE`, `DATABASE_URL`
+- **Blocked prefixes**: `RELEASE_*` (for release-bundled ERTS)
+- **Conditional blocking**: `ANTHROPIC_API_KEY` is blocked by default (preserves Max plan OAuth authentication). When the `use_anthropic_api_key` setting is enabled, the key is passed through for token-based authentication (configurable per deployment via Settings UI).
+- **PATH sanitization**: Entries containing `_build/prod/rel` or `/erts-` are stripped (release artifacts that can shadow production binaries).
+- **Injected vars**: `EITS_SESSION_ID`, `EITS_AGENT_ID`, `EITS_CHANNEL_ID`, `EITS_WORKFLOW`, `CLAUDE_CODE_EFFORT_LEVEL` (when provided in opts).
+
+**Rationale**: Without filtering, spawned Claude processes would inherit the entire server environment, including:
+- `SECRET_KEY_BASE` and `DATABASE_URL`: Production database credentials would leak to arbitrary subprocess commands.
+- `ANTHROPIC_API_KEY`: A stale or invalid API key in the server env would silently override Max plan OAuth, causing "Credit balance is too low" billing errors instead of prompting real auth.
+- Poisoned PATH entries: Release-bundled ERTS could shadow system binaries and execute during spawned process startup.
+
+### Codex CLI Spawning
+
+The app spawns Codex CLI processes (Rust binary) as Erlang Ports via `EyeInTheSky.Codex.CLI`:
+
+- Binary is located via standard search paths (`/usr/local/bin/codex`, `/opt/homebrew/bin/codex`, etc.).
+- Subcommand: `codex exec` with `--json` flag for JSONL output streaming.
+- Output is parsed into structured events (thread started, turn completed, etc.) and written to the `iam_decisions` table.
+
+**Environment variable filtering** (`EyeInTheSky.Codex.CLI.build_env/1`):
+- Mirrors the Claude CLI's denylist pattern to prevent credential leakage.
+- **Blocked variables**: `SECRET_KEY_BASE`, `DATABASE_URL`, `ANTHROPIC_API_KEY`, `BINDIR`, `ROOTDIR`, `EMU`, `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`
+- **Blocked prefixes**: `RELEASE_*`
+- **Exception**: `OPENAI_API_KEY` is intentionally NOT blocked — Codex requires it for operation.
+- All other environment variables are passed through to the spawned process.
+
+**Rationale**: Same as Claude CLI — prevents database credentials and internal binaries from leaking to spawned subprocesses.
 
 ### Webhook Agent Spawning
 
@@ -516,6 +560,8 @@ Security-relevant dependencies:
 | `bandit` | ~> 1.5 | HTTP server |
 | `web_push_encryption` | ~> 0.3 | VAPID-signed web push |
 | `dotenvy` | ~> 0.8 | Environment variable loading from `.env` |
+| `vite` | 6.4.2 | Asset bundler and dev server |
+| `postcss` | 8.5.13 | CSS processor |
 
 ## Identity and Access Management (IAM)
 
@@ -554,7 +600,7 @@ IAM provides fine-grained policy control over Claude Code and API operations, ev
 | `block_env_files` | `block_env_files` | * | PreToolUse | deny | Blocks direct access to `.env` files |
 | `block_read_outside_cwd` | `block_read_outside_cwd` | * | PreToolUse | deny | Blocks reads outside the project working directory |
 | `block_push_master` | `block_push_master` | Bash | PreToolUse | deny | Blocks `git push` to protected branches (main/master) |
-| `block_curl_pipe_sh` | `block_curl_pipe_sh` | Bash | PreToolUse | deny | Blocks `curl|sh`, `bash <(curl)`, `eval "$(curl)"` remote execution patterns |
+| `block_curl_pipe_sh` | `block_curl_pipe_sh` | Bash | PreToolUse | deny | Blocks `curl\|sh`, `bash <(curl)`, `eval "$(curl)"` remote execution patterns |
 | `block_work_on_main` | `block_work_on_main` | Bash | PreToolUse | deny | Blocks mutating git operations on protected branches |
 | `warn_destructive_sql` | `warn_destructive_sql` | Bash | PreToolUse | instruct | Warns on `DROP/TRUNCATE/DELETE` without `WHERE` clause |
 | `builtin.sanitize_api_keys` | `sanitize_api_keys` | * | PostToolUse | instruct | Redacts API keys from tool output (instructs to redaction) |

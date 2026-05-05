@@ -120,6 +120,35 @@ All 11 call sites across `dm_live.ex`, `agent_live/`, `project_live/`, and `chat
 
 `spawn_channel_agent` in CLI runs outside this supervision tree. Channel agents are spawned directly by LiveViews via `Task.Supervisor.start_child` with their own output handler (`handle_channel_output`). They have a different lifecycle and message routing (channel-based, not session-based). Integration into the DynamicSupervisor pattern is a future option.
 
+### Channel Session Read Receipts
+
+When an agent produces a result in a channel context, the system marks the agent's session as having consumed messages up to that point via `Channels.mark_as_read`. This is handled in `AgentWorkerEvents.on_result_received/3` via the `maybe_mark_channel_read/2` helper:
+
+**Behavior:**
+- Called after each agent reply (result_received event)
+- No-op when `channel_id` is nil (DM path)
+- No-op when session is not a channel member (update_all affects zero rows)
+- Synchronous in test mode (`async_tasks_sync: true`); runs in supervised `TaskSupervisor` in production
+- Writes `last_read_at` timestamp to the channel member record, marking the session as having consumed all messages up to that point
+
+**Implementation:**
+```elixir
+defp maybe_mark_channel_read(nil, _session_id), do: :ok
+
+defp maybe_mark_channel_read(channel_id, session_id) do
+  if Application.get_env(:eye_in_the_sky, :async_tasks_sync, false) do
+    Channels.mark_as_read(channel_id, session_id)
+  else
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      Channels.mark_as_read(channel_id, session_id)
+    end)
+  end
+  :ok
+end
+```
+
+This allows the UI to show which agent sessions in a channel have read which messages, supporting read-receipts and user-facing "seen" indicators.
+
 ## Agent State Lifecycle
 
 Agent state is independent from session state and transitions through three states during the agent spawning and execution lifecycle:
@@ -776,6 +805,33 @@ Agent workers use git worktrees to isolate CLI processes and prevent conflicts o
 
 ## LiveView Safety Fixes
 
+### set_notify_on_stop Event Handler Safety
+
+All routed LiveViews must implement a `set_notify_on_stop` event handler to prevent GenServer crashes. The PushNotifications JS hook fires this event on every page load, and any LiveView without a matching `handle_event` clause will crash (commit a406e06d).
+
+**Implementation via NotificationHelpers:**
+```elixir
+defmodule EyeInTheSkyWeb.NotificationHelpers do
+  def notify_on_stop_handler(socket) do
+    assign(socket, :notify_on_stop, true)
+  end
+end
+
+# In any routed LiveView:
+def handle_event("set_notify_on_stop", _params, socket) do
+  {:noreply, NotificationHelpers.notify_on_stop_handler(socket)}
+end
+```
+
+**Affected LiveViews (15 fixed):**
+- `BookmarkLive.Index`
+- `IAMLive.Policies`, `IAMLive.PolicyEdit`, `IAMLive.PolicyNew`
+- `OverviewLive.Keybindings`, `OverviewLive.Usage`
+- `ProjectLive.PromptNew`, `ProjectLive.PromptShow`, `ProjectLive.Prompts`, `ProjectLive.Show`, `ProjectLive.TeamShow`, `ProjectLive.Teams`
+- `WorkspaceLive.NotesLive`, `WorkspaceLive.SessionsLive`, `WorkspaceLive.TasksLive`
+
+Without this handler, PushNotifications hook initialization would silently crash the GenServer, leaving the user with a stale page and no error message visible.
+
 ### PubSub Unsubscribe Safety
 
 LiveViews must use `Events.unsubscribe_session/1` instead of raw `Phoenix.PubSub.unsubscribe` calls. The Events module wraps unsubscribe with proper topic formatting and deduplication:
@@ -805,6 +861,61 @@ end
 ```
 
 Without this guard, accessing project files after the project was deleted or project context was lost would crash with undefined behavior. The guard routes to home safely.
+
+### FloatingChatLive Bookmark Query Optimization
+
+`FloatingChatLive.fetch_bookmark_statuses/1` was refactored to use targeted Ecto queries instead of loading all sessions and filtering in memory (commit be14181d). The function now:
+
+1. Parses the incoming `ids` list into integer IDs and UUIDs
+2. Issues a targeted `from s in Session, where: s.id in ^ints or s.uuid in ^uuids` query
+3. Handles empty lists and mixed integer/UUID formats
+
+**Previous approach (N+1 pattern):**
+- Loaded all sessions with `Sessions.list_sessions_with_agent(include_archived: false)`
+- Filtered by MapSet membership in Elixir (memory overhead)
+
+**New approach:**
+```elixir
+int_ids = ids |> Enum.flat_map(fn s -> case Integer.parse(s) do {n, ""} -> [n]; _ -> [] end end)
+uuid_ids = ids |> Enum.filter(fn s -> case Ecto.UUID.cast(s) do {:ok, _} -> true; _ -> false end end)
+
+sessions =
+  case {int_ids, uuid_ids} do
+    {[], []} -> []
+    {[], uuids} -> Repo.all(from s in Session, where: s.uuid in ^uuids)
+    {ints, []} -> Repo.all(from s in Session, where: s.id in ^ints)
+    {ints, uuids} -> Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids)
+  end
+```
+
+This reduces DB load when rendering the floating chat sidebar, especially in workspaces with hundreds of bookmarked sessions.
+
+### Project Live Show Mount Query Parallelization
+
+`ProjectLive.Show.mount/3` parallelizes 6 independent DB queries using `Task.async/await` (commit 69392629). Previously, queries ran sequentially in the connected render path, blocking completion of mount until all 6 finished:
+
+**Parallelized Queries:**
+1. `Tasks.list_tasks_for_project(project_id)`
+2. `Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)`
+3. `Notes.list_notes_for_project(project_id, limit: 5)`
+4. `Agents.count_agents_for_project(project_id)`
+5. `Sessions.count_and_ids_for_project(project_id)`
+6. `scan_claude_files(project.path)` (filesystem scan)
+
+**Implementation:**
+```elixir
+if connected?(socket) do
+  tasks_task = Task.async(fn -> Tasks.list_tasks_for_project(project_id) end)
+  active_sessions_task = Task.async(fn -> ... end)
+  # ... spawn remaining 4 tasks
+  
+  tasks = Task.await(tasks_task)
+  active_sessions = Task.await(active_sessions_task)
+  # ... await remaining results
+end
+```
+
+This reduces perceived mount latency — the page renders as soon as the slowest query completes (usually filesystem scan), not the sum of all 6. Tasks run concurrently on the pool, so wall-clock time approaches the duration of the slowest single query rather than serialized cumulative time.
 
 ---
 

@@ -3423,3 +3423,418 @@ end
 
 **Rule:** Public functions have `@spec` annotations. Filters and limits are parameterized in the function signature, with sensible defaults. Extraction to sub-modules happens at 50+ lines of domain logic.
 
+---
+
+## Handler Flattening and Helper Extraction
+
+**Problem:** Event handlers and request handlers accumulate nested case/cond logic, parameter parsing is duplicated across handlers, and side-effect logic clutters single functions. This makes code harder to read, test, and maintain.
+
+**Solution:** Apply four refactoring patterns:
+
+### 1. Extract Duplicated Helper Functions
+
+When two or more functions contain identical or near-identical logic, extract the shared algorithm into a private helper that works on generic data.
+
+**Pattern (commit 10fd11a1):**
+
+```elixir
+# ❌ Before: Duplicated logic in find_adjacent_task and find_adjacent_session
+defp find_adjacent_task(tasks, current_uuid, direction) do
+  current_idx = Enum.find_index(tasks, fn t -> t.uuid == current_uuid end)
+  case direction do
+    "next" ->
+      cond do
+        current_idx != nil && current_idx < length(tasks) - 1 ->
+          Enum.at(tasks, current_idx + 1).uuid
+        current_idx == nil ->
+          case tasks do
+            [first | _] -> first.uuid
+            [] -> nil
+          end
+        true ->
+          case tasks do
+            [first | _] -> first.uuid
+            [] -> nil
+          end
+      end
+    # ... "prev" with similar duplication
+  end
+end
+
+defp find_adjacent_session(sessions, current_uuid, direction) do
+  # ❌ Identical logic, just different parameter names
+  current_idx = Enum.find_index(sessions, fn s -> s.uuid == current_uuid end)
+  # ... rest is the same
+end
+
+# ✅ After: Extract generic helper, specialize callers
+defp find_adjacent(list, current_uuid, direction) do
+  current_idx = Enum.find_index(list, fn item -> item.uuid == current_uuid end)
+  case direction do
+    "next" ->
+      if current_idx != nil && current_idx < length(list) - 1 do
+        Enum.at(list, current_idx + 1).uuid
+      else
+        case list do
+          [first | _] -> first.uuid
+          [] -> nil
+        end
+      end
+    "prev" ->
+      if current_idx != nil && current_idx > 0 do
+        Enum.at(list, current_idx - 1).uuid
+      else
+        case Enum.reverse(list) do
+          [last | _] -> last.uuid
+          [] -> nil
+        end
+      end
+    _ -> nil
+  end
+end
+
+defp find_adjacent_task(tasks, current_uuid, direction) do
+  find_adjacent(tasks, current_uuid, direction)
+end
+
+defp find_adjacent_session(sessions, current_uuid, direction) do
+  find_adjacent(sessions, current_uuid, direction)
+end
+```
+
+**Rules:**
+- Rename loop variables to be generic (`tasks` → `list`, `task` → `item`).
+- Extract nested `cond` to `if` when there are only two branches (less visual clutter).
+- Create thin wrapper functions for domain-specific callers if needed.
+
+---
+
+### 2. Flatten Handler Logic with `with` Statements
+
+Deeply nested case/cond logic in event handlers or controller actions hides the happy path. Use `with/1` to flatten sequential validations and bind intermediate values.
+
+**Pattern (commit 5c19c7f2):**
+
+```elixir
+# ❌ Before: Nested case statements obscure the happy path
+def handle_event("note_saved", %{"note_id" => note_id, "body" => body}, socket) do
+  case parse_id(note_id) do
+    nil ->
+      {:noreply, socket}
+
+    id ->
+      note = Notes.get_note!(id)
+
+      case Notes.update_note(note, %{body: body}) do
+        {:ok, _note} ->
+          socket =
+            socket
+            |> assign(:editing_note_id, nil)
+            |> load_notes()
+
+          {:noreply, socket}
+
+        {:error, _changeset} ->
+          {:noreply, put_flash(socket, :error, "Failed to save note.")}
+      end
+  end
+end
+
+# ✅ After: with/1 flattens the logic flow
+def handle_event("note_saved", %{"note_id" => note_id, "body" => body}, socket) do
+  with {:id, id} when not is_nil(id) <- {:id, parse_id(note_id)},
+       note = Notes.get_note!(id),
+       {:ok, _note} <- Notes.update_note(note, %{body: body}) do
+    {:noreply,
+     socket
+     |> assign(:editing_note_id, nil)
+     |> load_notes()}
+  else
+    {:id, nil} ->
+      {:noreply, socket}
+
+    {:error, _changeset} ->
+      {:noreply, put_flash(socket, :error, "Failed to save note.")}
+  end
+end
+```
+
+**Benefits:**
+- The happy path is on line 1–2 (happy-path-first reading).
+- Errors fall through to explicit `else` clauses.
+- Each validation is a guard or clause, not a nested case.
+
+**Rules:**
+- Use `with` when you have 2+ sequential validations or transformations.
+- Tag each binding with `{:tag, value}` for unambiguous error clauses in `else`.
+- Guard conditions (`when not is_nil(...)`) make intent explicit.
+
+---
+
+### 3. Extract Parameter Parsing Helpers
+
+When multiple handlers or contexts parse parameters the same way, extract the parsing logic into a shared private helper. This reduces duplication and ensures consistent behavior.
+
+**Pattern (commit ae258ef2):**
+
+```elixir
+# ❌ Before: Tag parsing is duplicated in update_task and create_task
+def handle_event("update_task", params, socket) do
+  tags_string = params["tags"] || ""
+
+  tag_names =
+    tags_string
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  Tasks.update_task(task, %{tags: tag_names, ...})
+end
+
+def handle_event("create_task", params, socket) do
+  tags_string = params["tags"] || ""
+
+  tag_names =
+    tags_string
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  Tasks.create_task(%{tags: tag_names, ...})
+end
+
+# ✅ After: Extract parse_tag_names, reuse in both
+defp parse_tag_names(tags_string) do
+  tags_string
+  |> String.split(",")
+  |> Enum.map(&String.trim/1)
+  |> Enum.reject(&(&1 == ""))
+end
+
+def handle_event("update_task", params, socket) do
+  tag_names = parse_tag_names(params["tags"] || "")
+  Tasks.update_task(task, %{tags: tag_names, ...})
+end
+
+def handle_event("create_task", params, socket) do
+  tag_names = parse_tag_names(params["tags"] || "")
+  Tasks.create_task(%{tags: tag_names, ...})
+end
+```
+
+**Rules:**
+- Extract parsing logic into thin private functions.
+- Name them descriptively: `parse_tag_names`, `parse_form_int`, etc.
+- Place them after public functions or at the end of the module.
+
+---
+
+### 4. Guard Against Nil Maps Before Iteration
+
+Maps that can be nil (e.g., optional preloaded associations) should be guarded with `||` before passing to `Enum.*`.
+
+**Pattern (commit 5c19c7f2):**
+
+```elixir
+# ❌ Before: Assumes task.sessions is always a list; crashes if nil
+def present_task(task) do
+  sessions = Enum.map(task.sessions, fn s ->
+    %{id: s.id, uuid: s.uuid}
+  end)
+  
+  %{task: task, sessions: sessions}
+end
+
+# ✅ After: Guard with || []
+def present_task(task) do
+  sessions = Enum.map(task.sessions || [], fn s ->
+    %{id: s.id, uuid: s.uuid}
+  end)
+  
+  %{task: task, sessions: sessions}
+end
+```
+
+**Rules:**
+- Always check optional associations with `|| []` before `Enum.*`.
+- This prevents runtime crashes when a preload was not applied.
+
+---
+
+### 5. Fix Inverted Boolean Conditions in `with` Statements
+
+When the happy path requires a boolean check, use `true` as the success case, not `false`. Inverted checks confuse the reader.
+
+**Pattern (commit c2ce8f92):**
+
+```elixir
+# ❌ Before: Inverted logic — false means success?
+def complete(conn, %{"id" => id} = params) do
+  message = trim_param(params["message"] || "")
+
+  with false <- message == "",
+       {:ok, task} <- Tasks.get_task(id),
+       {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
+    # ... success
+  else
+    true ->
+      {:error, "message is required"}
+
+    {:error, :not_found} ->
+      {:error, :not_found}
+  end
+end
+
+# ✅ After: Clear, positive condition
+def complete(conn, %{"id" => id} = params) do
+  message = trim_param(params["message"] || "")
+
+  with true <- message != "",
+       {:ok, task} <- Tasks.get_task(id),
+       {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
+    # ... success
+  else
+    false ->
+      {:error, "message is required"}
+
+    {:error, :not_found} ->
+      {:error, :not_found}
+  end
+end
+```
+
+**Rules:**
+- In `with`, always use positive conditions: `true <- message != ""` instead of `false <- message == ""`.
+- This makes the intent obvious: "proceed if message is not empty" vs. "proceed if false" (confusing).
+
+---
+
+### 6. Extract Side-Effect Logic into Dedicated Functions
+
+When a function has both business logic and side effects (assigning state, clearing selections), extract the side effects into small private functions that are called at the end.
+
+**Pattern (commit c2ce8f92):**
+
+```elixir
+# ❌ Before: Side effects mixed with load logic
+def load_notes(socket) do
+  socket
+  |> assign(:notes, fetch_notes())
+  |> assign(:selected_note_ids, MapSet.new())
+  |> assign(:notes_select_mode, false)
+end
+
+# Later, when deleting:
+def handle_event("delete_note", _, socket) do
+  socket =
+    socket
+    |> load_notes()
+    |> assign(:selected_note_ids, MapSet.new())    # Duplicate
+    |> assign(:notes_select_mode, false)             # Duplicate
+    |> put_flash(:info, "Note deleted")
+
+  {:noreply, socket}
+end
+
+# ✅ After: Extract clear_note_selection
+def load_notes(socket) do
+  socket
+  |> assign(:notes, fetch_notes())
+  |> clear_note_selection()
+end
+
+def handle_event("delete_note", _, socket) do
+  socket =
+    socket
+    |> load_notes()
+    |> put_flash(:info, "Note deleted")
+
+  {:noreply, socket}
+end
+
+# Small, reusable side-effect function
+defp clear_note_selection(socket) do
+  socket
+  |> assign(:selected_note_ids, MapSet.new())
+  |> assign(:notes_select_mode, false)
+end
+```
+
+**Rules:**
+- Extract repeated side-effect sequences into private functions.
+- Name them descriptively: `clear_note_selection`, `reset_form`, etc.
+- Call them at the end of the handler for readability.
+
+---
+
+### 7. Extract Message Formatting Helpers
+
+When generating user-facing messages with conditional logic, extract the formatting into a dedicated private function.
+
+**Pattern (commit 218db400):**
+
+```elixir
+# ❌ Before: Message formatting inline in handler
+def claim(conn, %{"id" => task_id} = params) do
+  with {:session, session} <- {:session, fetch_session(params)},
+       {:task, {:ok, task}} <- {:task, Tasks.get_task(task_id)},
+       {:claim, {:ok, _}} <- {:claim, Tasks.claim_task(task, session)} do
+    # ... success
+  else
+    {:claim, {:error, :already_claimed}} ->
+      owner_hint =
+        case Tasks.get_current_session_for_task(parse_int(task_id, 0)) do
+          {:ok, s} ->
+            " — currently held by session #{s.id} (#{s.uuid}#{if s.name, do: ", \"#{s.name}\"", else: ""})"
+          _ ->
+            ""
+        end
+      {:error, :conflict, "Task is already in progress#{owner_hint}"}
+  end
+end
+
+# ✅ After: Extract into dedicated helper
+def claim(conn, %{"id" => task_id} = params) do
+  with {:session, session} <- {:session, fetch_session(params)},
+       {:task, {:ok, task}} <- {:task, Tasks.get_task(task_id)},
+       {:claim, {:ok, _}} <- {:claim, Tasks.claim_task(task, session)} do
+    # ... success
+  else
+    {:claim, {:error, :already_claimed}} ->
+      hint = format_claim_owner_hint(task_id)
+      {:error, :conflict, "Task is already in progress#{hint}"}
+  end
+end
+
+defp format_claim_owner_hint(task_id_str) do
+  case Tasks.get_current_session_for_task(parse_int(task_id_str, 0)) do
+    {:ok, s} ->
+      name_part = if s.name, do: ", \"#{s.name}\"", else: ""
+      " — currently held by session #{s.id} (#{s.uuid}#{name_part})"
+    _ ->
+      ""
+  end
+end
+```
+
+**Rules:**
+- Extract message formatting into dedicated functions.
+- Use `if...do...else` instead of nested ternaries for readability.
+- Name functions after what they format: `format_claim_owner_hint`, `format_state_transition_message`, etc.
+
+---
+
+**Summary:** These six patterns work together to reduce nesting, duplication, and cognitive load:
+
+| Pattern | When to use | Benefit |
+|---------|-------------|---------|
+| Extract duplicated helpers | Same logic in 2+ functions | Single source of truth |
+| Flatten with `with` | 2+ sequential validations | Happy path is obvious |
+| Extract parameter parsing | Same parsing in 2+ handlers | Consistent behavior |
+| Guard nil maps | Optional associations | Prevents runtime crashes |
+| Fix inverted booleans | Confusing `false` success | Clear intent |
+| Extract side effects | Repeated state assignments | Reusable, testable snippets |
+| Extract message formatting | Complex string interpolation | Readable error messages |
+
+**Rule:** Before writing nested case/cond logic, ask: "Can I flatten this with `with`? Extract the parsing? Move side effects out?" Flattening makes code easier to test, modify, and review.
+

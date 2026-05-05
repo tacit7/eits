@@ -83,19 +83,24 @@ Three toggle buttons in the toolbar:
 
 - **Done** (check circle): Show/hide tasks with `completed_at` set
 - **Archived** (archive box): Show/hide archived tasks
-- **Select** (checkbox): Enter bulk selection mode
+- **Select** toggle: Enter/exit bulk selection mode
+  - **Inactive**: Shows checkmark icon and "Select" label
+  - **Active**: Shows X icon and "Cancel" label — click to exit bulk mode
 
 ## Bulk Operations
 
 ### Kanban Board
 
-1. Click the **Select** toggle to enter bulk mode
+1. Click the **Select** toggle to enter bulk mode. The button changes to **"✕ Cancel"** to make exit obvious.
 2. Checkboxes appear on each card. Click cards to select/deselect.
 3. **Select All** checkbox on column headers selects/deselects entire column
-4. Action bar appears showing count of selected tasks:
-   - **Move to**: Buttons for each column (moves all selected tasks)
-   - **Archive**: Archives all selected tasks
-   - **Delete**: Deletes all selected (with confirmation dialog)
+4. **Action bar** always renders while in bulk mode (even with no selection), showing:
+   - **{count} selected** label
+   - Action buttons (visible only when tasks are selected):
+     - **Move to**: Buttons for each column (moves all selected tasks)
+     - **Archive**: Archives all selected tasks
+     - **Delete**: Deletes all selected (with confirmation dialog)
+   - **Cancel button** (far right): Click to exit bulk mode. Always visible, even when no tasks are selected.
 
 ### Task List View
 
@@ -224,6 +229,21 @@ The task detail drawer and new agent drawer received mobile touch-target improve
 - `lib/eye_in_the_sky_web/components/new_agent_drawer.ex`
 
 **Commit**: `3b6a053`
+
+## Select Mode UX Improvements
+
+The toolbar Select button now provides clearer visual feedback for entering and exiting bulk selection mode:
+
+- **Button text changes**: Shows "Select" (with checkmark) when inactive, "Cancel" (with X) when active
+- **Action bar always visible**: The bulk operation bar renders whenever bulk mode is active, even if no tasks are selected
+- **Persistent Cancel button**: A Cancel button is always visible on the action bar (far right), making it obvious how to exit the mode. It's visible even when no tasks are selected.
+- **Conditional action buttons**: Move to, Archive, and Delete buttons appear only when tasks are selected, reducing visual clutter when no bulk operations are planned.
+
+**Files**:
+- `lib/eye_in_the_sky_web/components/kanban_toolbar.ex` — Select button label and icon swap
+- `lib/eye_in_the_sky_web/components/kanban_bulk_bar.ex` — Conditional action buttons, persistent Cancel button
+
+**Commits**: `1225e125`, `0a4c5b60`
 
 ## File Locations
 

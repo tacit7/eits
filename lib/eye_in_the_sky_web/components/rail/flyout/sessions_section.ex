@@ -20,7 +20,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
           value={@session_name_filter}
           placeholder="Search sessions…"
           phx-keyup="update_session_name_filter"
-          phx-change="update_session_name_filter"
           phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
@@ -29,19 +28,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
 
       <%!-- Sort dropdown + Show toggle --%>
       <div class="flex items-center justify-between gap-2">
-        <%!-- Sort: filter icon + native select --%>
+        <%!-- Sort: filter icon + native select (form wrapper required for phx-change on select) --%>
         <div class="flex items-center gap-1">
           <.icon name="hero-funnel-mini" class="size-3 text-base-content/30 flex-shrink-0" />
-          <select
-            phx-change="set_session_sort"
-            phx-target={@myself}
-            name="sort"
-            class="text-nano bg-transparent text-base-content/55 focus:outline-none cursor-pointer hover:text-base-content/80 transition-colors"
-          >
-            <option value="last_activity" selected={@session_sort == :last_activity}>Recent</option>
-            <option value="created" selected={@session_sort == :created}>Created</option>
-            <option value="name" selected={@session_sort == :name}>Name</option>
-          </select>
+          <form phx-change="set_session_sort" phx-target={@myself}>
+            <select
+              name="sort"
+              class="text-nano bg-transparent text-base-content/55 focus:outline-none cursor-pointer hover:text-base-content/80 transition-colors"
+            >
+              <option value="last_activity" selected={@session_sort == :last_activity}>Recent</option>
+              <option value="created" selected={@session_sort == :created}>Created</option>
+              <option value="name" selected={@session_sort == :name}>Name</option>
+            </select>
+          </form>
         </div>
 
         <%!-- Show toggle --%>

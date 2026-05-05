@@ -21,7 +21,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
           value={@task_search}
           placeholder="Search tasks…"
           phx-keyup="update_task_search"
-          phx-change="update_task_search"
           phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"

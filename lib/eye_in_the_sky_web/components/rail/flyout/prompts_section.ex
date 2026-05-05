@@ -19,7 +19,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection do
           value={@prompt_search}
           placeholder="Search prompts…"
           phx-keyup="update_prompt_search"
-          phx-change="update_prompt_search"
           phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"

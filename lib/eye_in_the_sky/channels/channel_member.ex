@@ -11,6 +11,7 @@ defmodule EyeInTheSky.Channels.ChannelMember do
     field :role, :string, default: "member"
     field :joined_at, :utc_datetime
     field :last_read_at, :utc_datetime
+    field :onboarded_at, :utc_datetime_usec
     field :notifications, :string, default: "all"
 
     belongs_to :channel, EyeInTheSky.Channels.Channel,

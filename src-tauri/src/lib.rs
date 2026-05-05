@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use tauri::Manager;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -78,7 +78,14 @@ pub fn run() {
 
             // --- App menu bar (macOS) ---
             let app_menu = Submenu::with_items(app, "Eye in the Sky", true, &[
-                &PredefinedMenuItem::about(app, Some("About Eye in the Sky"), None)?,
+                &PredefinedMenuItem::about(app, Some("About Eye in the Sky"), Some(AboutMetadata {
+                    version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                    website: Some("https://eits.dev".to_string()),
+                    website_label: Some("eits.dev".to_string()),
+                    authors: Some(vec!["EITS Team".to_string()]),
+                    license: Some("Proprietary".to_string()),
+                    ..Default::default()
+                }))?,
                 &PredefinedMenuItem::separator(app)?,
                 &MenuItem::with_id(app, "menu_settings", "Settings...", true, Some("CmdOrCtrl+,"))?,
                 &PredefinedMenuItem::separator(app)?,
@@ -192,6 +199,10 @@ pub fn run() {
                     let title = parts.first().unwrap_or(&"EITS").to_string();
                     let body = parts.get(1).unwrap_or(&"").to_string();
                     send_notification(&title, &body);
+                    // Bounce dock icon once to attract attention.
+                    if let Some(w) = app_handle.get_webview_window("main") {
+                        let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
+                    }
                 } else if msg.starts_with(b"badge:") {
                     // Format: badge:<count> (0 to clear)
                     let count_str = String::from_utf8_lossy(&msg[6..]);
@@ -250,6 +261,22 @@ pub fn run() {
                     }
                     // Secondary windows: allow normal close (do nothing, default behaviour).
                 }
+                tauri::WindowEvent::ThemeChanged(theme) => {
+                    // macOS switched dark/light mode — push the change into the webview
+                    // so Phoenix can update the theme if the user's setting is "system".
+                    let theme_name = match theme {
+                        tauri::Theme::Dark => "dark",
+                        _ => "light",
+                    };
+                    let js = format!(
+                        "window.dispatchEvent(new CustomEvent('tauri:theme-changed', \
+                         {{ detail: {{ theme: '{}' }} }}))",
+                        theme_name
+                    );
+                    if let Some(wv) = window.app_handle().get_webview_window(window.label()) {
+                        let _ = wv.eval(&js);
+                    }
+                }
                 tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
                     let paths_json: Vec<String> = paths.iter()
                         .filter_map(|p| p.to_str().map(|s| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))))
@@ -289,18 +316,25 @@ fn create_window(app_handle: &tauri::AppHandle) {
     let url = format!("http://127.0.0.1:{}", port);
     let parsed_url: tauri::Url = url.parse().unwrap();
 
-    // Start hidden, let window-state plugin restore position before showing
+    // Start hidden, let window-state plugin restore position before showing.
+    // title_bar_style::Overlay: native traffic lights float over the webview.
+    // JS marks the document so CSS can add the matching top padding.
     let window = tauri::WebviewWindowBuilder::new(
         app_handle,
         "main",
         tauri::WebviewUrl::External(parsed_url),
     )
     .title("Eye in the Sky")
+    .title_bar_style(tauri::TitleBarStyle::Overlay)
+    .hidden_title(true)
     .inner_size(1280.0, 800.0)
     .visible(false)
     .devtools(true)
     .build()
     .unwrap();
+
+    // Mark the root element so CSS can add padding-top for the traffic lights.
+    let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
 
     let _ = window.show();
 }

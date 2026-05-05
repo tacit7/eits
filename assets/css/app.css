@@ -743,6 +743,15 @@ html[data-env="tauri"] .app-titlebar input {
   -webkit-app-region: no-drag;
 }
 
+/* Tauri overlay titlebar: show and size the drag spacer in the icon rail.
+   Height matches the macOS titlebar area (~38px) so traffic lights never
+   overlap clickable icons. The spacer also acts as the window drag region. */
+html[data-tauri-overlay] [data-tauri-drag-region] {
+  display: block;
+  height: 38px;
+  -webkit-app-region: drag;
+}
+
 /* Give the drag spacer a grab cursor so the zone is discoverable. */
 html[data-env="tauri"] [data-tauri-drag-region] {
   cursor: grab;

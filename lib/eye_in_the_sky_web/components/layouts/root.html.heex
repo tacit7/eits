@@ -66,6 +66,7 @@
       // hide "Open in Desktop App" entry points (they're useless in-app).
       if (/Tauri/i.test(navigator.userAgent) || window.__TAURI_INTERNALS__) {
         document.documentElement.setAttribute("data-env", "tauri");
+        document.documentElement.setAttribute("data-tauri-overlay", "1");
       }
     </script>
   </head>

@@ -136,4 +136,26 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
 
     {:noreply, socket |> assign(:skill_scope, scope) |> assign(:flyout_skills, skills)}
   end
+
+  def handle_update_prompt_search(%{"value" => value}, socket) do
+    prompts =
+      Loader.load_flyout_prompts(
+        socket.assigns.sidebar_project,
+        value,
+        socket.assigns.prompt_scope
+      )
+
+    {:noreply, socket |> assign(:prompt_search, value) |> assign(:flyout_prompts, prompts)}
+  end
+
+  def handle_set_prompt_scope(%{"scope" => scope}, socket) do
+    prompts =
+      Loader.load_flyout_prompts(
+        socket.assigns.sidebar_project,
+        socket.assigns.prompt_search,
+        scope
+      )
+
+    {:noreply, socket |> assign(:prompt_scope, scope) |> assign(:flyout_prompts, prompts)}
+  end
 end

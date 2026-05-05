@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   alias EyeInTheSkyWeb.Components.Rail.Flyout.JobsSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection
 
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
@@ -43,6 +44,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_skills, :list, default: []
   attr :skill_search, :string, default: ""
   attr :skill_scope, :string, default: "all"
+  attr :flyout_prompts, :list, default: []
+  attr :prompt_search, :string, default: ""
+  attr :prompt_scope, :string, default: "all"
   attr :flyout_jobs, :list, default: []
   attr :flyout_file_nodes, :list, default: []
   attr :flyout_file_expanded, :any, default: nil
@@ -216,6 +220,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             myself={@myself}
           />
         <% end %>
+        <%= if @active_section == :prompts do %>
+          <PromptsSection.prompts_filters
+            prompt_search={@prompt_search}
+            prompt_scope={@prompt_scope}
+            myself={@myself}
+          />
+        <% end %>
 
         <%!-- ── Content ── --%>
         <div class="flex-1 overflow-y-auto py-1">
@@ -231,7 +242,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 myself={@myself}
               />
             <% :prompts -> %>
-              <TasksSection.nav_links project={@sidebar_project} section={:prompts} />
+              <PromptsSection.prompts_content
+                prompts={@flyout_prompts}
+                prompt_search={@prompt_search}
+                prompt_scope={@prompt_scope}
+                sidebar_project={@sidebar_project}
+              />
             <% :chat -> %>
               <ChatSection.chat_content
                 channels={@flyout_channels}

@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
     Canvases,
     Channels,
     Notes,
+    Prompts,
     ScheduledJobs,
     Sessions,
     Tasks,
@@ -222,6 +223,47 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   def load_flyout_skills_filtered(project, search \\ "", scope \\ "all") do
     SkillsHelpers.list_skills_for_flyout_filtered(project, search, scope)
   end
+
+  def maybe_load_prompts(socket, :prompts, project) do
+    search = socket.assigns[:prompt_search] || ""
+    scope = socket.assigns[:prompt_scope] || "all"
+    assign(socket, :flyout_prompts, load_flyout_prompts(project, search, scope))
+  end
+
+  def maybe_load_prompts(socket, _section, _project), do: socket
+
+  def load_flyout_prompts(project, search \\ "", scope \\ "all") do
+    project_id = project && project.id
+
+    cond do
+      search != "" ->
+        prompts = Prompts.search_prompts(search, project_id)
+        filter_prompts_by_scope(prompts, scope, project_id)
+        |> Enum.take(30)
+
+      scope == "global" ->
+        Prompts.list_global_prompts(limit: 30)
+
+      scope == "project" && project_id ->
+        Prompts.list_project_prompts(project_id, limit: 30)
+
+      scope == "project" ->
+        []
+
+      true ->
+        Prompts.list_prompts(project_id: project_id, limit: 30)
+    end
+  end
+
+  defp filter_prompts_by_scope(prompts, "global", _project_id),
+    do: Enum.filter(prompts, &is_nil(&1.project_id))
+
+  defp filter_prompts_by_scope(prompts, "project", project_id) when not is_nil(project_id),
+    do: Enum.filter(prompts, &(&1.project_id == project_id))
+
+  defp filter_prompts_by_scope(_prompts, "project", nil), do: []
+
+  defp filter_prompts_by_scope(prompts, _scope, _project_id), do: prompts
 
   # Load channels only when navigating to the :chat section — avoids a DB query on every page.
   def maybe_load_channels(socket, :chat, project) do

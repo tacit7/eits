@@ -79,6 +79,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_skills: [],
         skill_search: "",
         skill_scope: "all",
+        flyout_prompts: [],
+        prompt_search: "",
+        prompt_scope: "all",
         flyout_jobs: [],
         flyout_file_nodes: [],
         flyout_file_expanded: MapSet.new(),
@@ -187,6 +190,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> Loader.maybe_load_files(next_section)
         |> Loader.maybe_load_agents(next_section, sidebar_project)
         |> Loader.maybe_load_skills(next_section, sidebar_project)
+        |> Loader.maybe_load_prompts(next_section, sidebar_project)
       else
         socket
       end
@@ -324,6 +328,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("set_skill_scope", params, socket),
     do: FilterActions.handle_set_skill_scope(params, socket)
+
+  def handle_event("update_prompt_search", params, socket),
+    do: FilterActions.handle_update_prompt_search(params, socket)
+
+  def handle_event("set_prompt_scope", params, socket),
+    do: FilterActions.handle_set_prompt_scope(params, socket)
 
   def handle_event("open_rail_modal", %{"type" => type}, socket) do
     modal =
@@ -518,6 +528,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_skills={@flyout_skills}
         skill_search={@skill_search}
         skill_scope={@skill_scope}
+        flyout_prompts={@flyout_prompts}
+        prompt_search={@prompt_search}
+        prompt_scope={@prompt_scope}
         flyout_jobs={@flyout_jobs}
         flyout_file_nodes={@flyout_file_nodes}
         flyout_file_expanded={@flyout_file_expanded}

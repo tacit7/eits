@@ -76,46 +76,116 @@ defmodule EyeInTheSky.Claude.ChannelProtocolTest do
       {_mode, _mentioned_ids, mention_all} =
         ChannelProtocol.parse_routing("Hey @allison", 1)
 
-      # @all\b should NOT match @allison
       assert mention_all == false
     end
   end
 
-  describe "build_prompt/3" do
+  describe "build_prompt/1" do
     @channel_ctx %{id: 7, name: "general"}
 
-    test "direct mode includes channel context, direct instruction, and message" do
-      prompt = ChannelProtocol.build_prompt(:direct, "Hello agent", @channel_ctx)
-      assert prompt =~ "#general"
-      assert prompt =~ "ID: 7"
-      assert prompt =~ "directly mentioned"
+    test "direct mode includes MSG header with channel name, id, mode, sender, and body" do
+      prompt =
+        ChannelProtocol.build_prompt(%{
+          mode: :direct,
+          channel: @channel_ctx,
+          sender: "Uriel",
+          body: "Hello agent"
+        })
+
+      assert prompt =~ "MSG from Channel #general (7)"
+      assert prompt =~ "Mode: direct"
+      assert prompt =~ "From: Uriel"
       assert prompt =~ "Hello agent"
     end
 
-    test "broadcast mode includes channel context, broadcast instruction, and message" do
-      prompt = ChannelProtocol.build_prompt(:broadcast, "Everyone respond", @channel_ctx)
-      assert prompt =~ "#general"
-      assert prompt =~ "ID: 7"
-      assert prompt =~ "broadcast"
+    test "broadcast mode includes MSG header with broadcast mode" do
+      prompt =
+        ChannelProtocol.build_prompt(%{
+          mode: :broadcast,
+          channel: @channel_ctx,
+          sender: "Uriel",
+          body: "Everyone respond"
+        })
+
+      assert prompt =~ "MSG from Channel #general (7)"
+      assert prompt =~ "Mode: broadcast"
+      assert prompt =~ "From: Uriel"
       assert prompt =~ "Everyone respond"
     end
 
-    test "ambient mode includes channel context, ambient instruction, and message" do
-      prompt = ChannelProtocol.build_prompt(:ambient, "General chat", @channel_ctx)
-      assert prompt =~ "#general"
-      assert prompt =~ "ID: 7"
+    test "ambient mode includes MSG header and [NO_RESPONSE] instruction" do
+      prompt =
+        ChannelProtocol.build_prompt(%{
+          mode: :ambient,
+          channel: @channel_ctx,
+          sender: "Uriel",
+          body: "General chat"
+        })
+
+      assert prompt =~ "MSG from Channel #general (7)"
+      assert prompt =~ "Mode: ambient"
       assert prompt =~ "[NO_RESPONSE]"
       assert prompt =~ "General chat"
     end
 
-    test "message body is appended after instruction" do
-      prompt = ChannelProtocol.build_prompt(:direct, "test body", @channel_ctx)
-      assert prompt =~ "Message: test body"
+    test "includes eits channels send reply command with correct channel id" do
+      prompt =
+        ChannelProtocol.build_prompt(%{
+          mode: :direct,
+          channel: @channel_ctx,
+          sender: "Uriel",
+          body: "test"
+        })
+
+      assert prompt =~ "eits channels send 7 --body"
     end
 
-    test "instructs agent not to use DMs for channel discussions" do
-      prompt = ChannelProtocol.build_prompt(:direct, "hello", @channel_ctx)
-      assert prompt =~ "Do NOT use eits dm"
+    test "includes eits channels messages history command with correct channel id" do
+      prompt =
+        ChannelProtocol.build_prompt(%{
+          mode: :direct,
+          channel: @channel_ctx,
+          sender: "Uriel",
+          body: "test"
+        })
+
+      assert prompt =~ "eits channels messages 7 --limit 20"
+    end
+
+    test "includes important DM-will-not-post instruction" do
+      prompt =
+        ChannelProtocol.build_prompt(%{
+          mode: :direct,
+          channel: @channel_ctx,
+          sender: "Uriel",
+          body: "test"
+        })
+
+      assert prompt =~ "A normal DM response will NOT be posted to the channel"
+    end
+
+    test "sender name appears in From header" do
+      prompt =
+        ChannelProtocol.build_prompt(%{
+          mode: :direct,
+          channel: %{id: 1, name: "ops"},
+          sender: "Alice",
+          body: "ping"
+        })
+
+      assert prompt =~ "From: Alice"
+    end
+
+    test "session id fallback sender format works" do
+      prompt =
+        ChannelProtocol.build_prompt(%{
+          mode: :direct,
+          channel: %{id: 1, name: "ops"},
+          sender: "@99",
+          body: "ping"
+        })
+
+      assert prompt =~ "From: @99"
     end
   end
 

@@ -93,6 +93,7 @@ defmodule EyeInTheSky.Claude.Job do
       content_blocks: Map.get(context, :content_blocks, []),
       message_id: Map.get(context, :message_id),
       dm_metadata: Map.get(context, :dm_metadata),
+      context: Map.get(context, :context),
       extra_cli_opts: Map.get(context, :extra_cli_opts, []),
       kill_retry: Map.get(context, :kill_retry, false),
       allowed_tools: Map.get(context, :allowed_tools, [])

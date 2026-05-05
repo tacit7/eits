@@ -7,23 +7,8 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
   - :broadcast — @all was used; everyone must respond
   - :ambient   — no mention; agent should respond only if it has something useful to say
 
-  All modes fan out to every channel member. AgentWorker suppresses [NO_RESPONSE]
-  replies from DB storage.
-  """
-
-  @ambient_instruction """
-  You are in a multi-agent channel. A message was posted that was not directed at you.
-  Read it and reply ONLY if you have something genuinely useful or relevant to contribute.
-  If you have nothing to add, reply with exactly: [NO_RESPONSE]
-  Do not explain why you are not responding. Do not acknowledge the message. Just [NO_RESPONSE].
-  """
-
-  @direct_instruction """
-  You were directly mentioned in a channel message. You must respond.
-  """
-
-  @broadcast_instruction """
-  A broadcast message was sent to all agents in this channel. You must respond.
+  Ambient messages are never routed to agents per the chat channel protocol spec.
+  AgentWorker suppresses [NO_RESPONSE] replies from DB storage.
   """
 
   @type routing_mode :: :direct | :ambient | :broadcast
@@ -53,38 +38,78 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
   end
 
   @doc """
-  Builds the prompt to send to an agent based on routing mode, the original message,
-  and the channel context (id + name).
+  Builds the prompt to send to an agent for a channel-routed message.
+
+  Accepts a single map:
+    %{
+      mode:    :direct | :broadcast | :ambient,
+      channel: %{id: integer, name: string},
+      sender:  string,
+      body:    string
+    }
+
+  Output format:
+    MSG from Channel #<name> (<id>)
+    Mode: <mode>
+    From: <sender>
+
+    <body>
+
+    ---
+    Important:
+    Do not answer this prompt directly unless you are explaining that you cannot respond.
+    To respond to the channel, use:
+
+      eits channels send <id> --body "your response"
+
+    To read recent context:
+      eits channels messages <id> --limit 20
+
+    A normal DM response will NOT be posted to the channel.
   """
-  @spec build_prompt(routing_mode(), String.t(), %{id: integer(), name: String.t()}) :: String.t()
-  def build_prompt(:direct, body, %{id: channel_id, name: channel_name}) do
-    channel_ctx = """
-    You are in channel ##{channel_name} (ID: #{channel_id}).
-    Your response to this message will be automatically posted to this channel. This IS the group conversation.
-    Do NOT use eits dm to communicate with other channel members — reply here in the channel.
+  @spec build_prompt(%{
+          mode: routing_mode(),
+          channel: %{id: integer(), name: String.t()},
+          sender: String.t(),
+          body: String.t()
+        }) :: String.t()
+  def build_prompt(%{mode: mode, channel: %{id: channel_id, name: channel_name}, sender: sender, body: body}) do
+    mode_str = Atom.to_string(mode)
+
+    instruction =
+      case mode do
+        :ambient ->
+          """
+          Read this message and reply ONLY if you have something genuinely useful to contribute.
+          If you have nothing to add, reply with exactly: [NO_RESPONSE]
+          Do not explain why you are not responding. Just [NO_RESPONSE].
+          """
+
+        _ ->
+          ""
+      end
+
+    base = """
+    MSG from Channel ##{channel_name} (#{channel_id})
+    Mode: #{mode_str}
+    From: #{sender}
+
+    #{body}
+
+    ---
+    Important:
+    Do not answer this prompt directly unless you are explaining that you cannot respond.
+    To respond to the channel, use:
+
+      eits channels send #{channel_id} --body "your response"
+
+    To read recent context:
+      eits channels messages #{channel_id} --limit 20
+
+    A normal DM response will NOT be posted to the channel.
     """
 
-    channel_ctx <> @direct_instruction <> "\n\nMessage: #{body}"
-  end
-
-  def build_prompt(:broadcast, body, %{id: channel_id, name: channel_name}) do
-    channel_ctx = """
-    You are in channel ##{channel_name} (ID: #{channel_id}).
-    Your response to this message will be automatically posted to this channel. This IS the group conversation.
-    Do NOT use eits dm to communicate with other channel members — reply here in the channel.
-    """
-
-    channel_ctx <> @broadcast_instruction <> "\n\nMessage: #{body}"
-  end
-
-  def build_prompt(:ambient, body, %{id: channel_id, name: channel_name}) do
-    channel_ctx = """
-    You are in channel ##{channel_name} (ID: #{channel_id}).
-    Your response to this message will be automatically posted to this channel. This IS the group conversation.
-    Do NOT use eits dm to communicate with other channel members — reply here in the channel.
-    """
-
-    channel_ctx <> @ambient_instruction <> "\n\nMessage: #{body}"
+    (base <> instruction) |> String.trim_trailing()
   end
 
   @doc """

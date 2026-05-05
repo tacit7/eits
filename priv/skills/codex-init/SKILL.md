@@ -51,7 +51,15 @@ EITS env vars are pre-injected by AgentWorker before the session starts.
 
 ## Hooks
 
-If `.codex/hooks.json` is present at repo root, these run automatically:
+Codex lifecycle hooks require both `.codex/hooks.json` at repo root and this
+feature flag in `~/.codex/config.toml`:
+
+```toml
+[features]
+codex_hooks = true
+```
+
+When enabled, these run automatically:
 - `SessionStart` → `eits-codex-notify.sh` routes startup/resume bookkeeping without marking busy
 - `UserPromptSubmit` → `eits-codex-notify.sh` sets status=working
 - `PostToolUse/Bash` → `eits-codex-notify.sh` records tool activity and logs git commits

@@ -11,7 +11,7 @@ Use the `eits` CLI for all EITS operations.
 
 ## Session Status
 
-Codex hooks handle `working`/`idle`/`waiting`/`compacting` transitions automatically via `.codex/hooks.json`. If hooks are not active, set status manually:
+Codex hooks handle `working`/`idle`/`waiting`/`compacting` transitions automatically via `.codex/hooks.json` when `~/.codex/config.toml` has `features.codex_hooks = true`. If hooks are not active, set status manually:
 
 ```bash
 eits sessions update $EITS_SESSION_UUID --status working   # start of turn

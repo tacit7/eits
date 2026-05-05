@@ -177,9 +177,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
           <div class="card-body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Agent completion notifications</p>
+                <p class="text-sm font-medium text-base-content">Agent status notifications</p>
                 <p class="text-xs text-base-content/50 mt-0.5">
-                  Show an in-app notification when an agent finishes. Off by default.
+                  Show in-app notifications when an agent starts working and when it can be resumed.
+                  Off by default.
                 </p>
               </div>
               <input

@@ -106,8 +106,10 @@ if [ -n "$GIT_DIR" ]; then
   _log "wrote git files"
 fi
 
-# Mark session as working and patch project_id so workers can resolve the path
-_update_args=(--status "working")
+# Mark session status and patch project_id so workers can resolve the path.
+# Codex startup/resume should stay idle until UserPromptSubmit marks it busy.
+_session_start_status="${EITS_SESSION_START_STATUS:-working}"
+_update_args=(--status "$_session_start_status")
 [ -n "$PROJECT_ID" ] && _update_args+=(--project-id "$PROJECT_ID")
 eits sessions update "$SESSION_ID" "${_update_args[@]}" >/dev/null 2>&1 &
 

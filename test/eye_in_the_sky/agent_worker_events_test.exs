@@ -75,12 +75,12 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
       assert reload_session(session).status == "idle"
     end
 
-    test "sets status to idle for codex provider (no longer parks in waiting)" do
+    test "sets status to waiting for codex provider so it can be resumed" do
       {_agent, session} = create_session(%{status: "working", provider: "codex"})
 
       AgentWorkerEvents.on_sdk_completed(session.id, session.uuid, "codex")
 
-      assert reload_session(session).status == "idle"
+      assert reload_session(session).status == "waiting"
     end
 
     test "sets last_activity_at when transitioning to idle" do

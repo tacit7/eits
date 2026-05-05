@@ -1,11 +1,34 @@
 {
+  "SessionStart": [
+    {
+      "hooks": [
+        {
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+          "timeout": 15,
+          "statusMessage": "Updating EITS session status..."
+        }
+      ]
+    }
+  ],
   "UserPromptSubmit": [
     {
       "hooks": [
         {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-prompt-working.sh",
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
           "timeout": 10,
           "statusMessage": "Updating EITS session status..."
+        }
+      ]
+    }
+  ],
+  "PreToolUse": [
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+          "timeout": 15,
+          "statusMessage": "Checking EITS tool guard..."
         }
       ]
     }
@@ -15,9 +38,20 @@
       "matcher": "Bash",
       "hooks": [
         {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-post-commit.sh",
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
           "timeout": 15,
-          "statusMessage": "Logging commit to EITS..."
+          "statusMessage": "Updating EITS tool state..."
+        }
+      ]
+    }
+  ],
+  "PreCompact": [
+    {
+      "hooks": [
+        {
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+          "timeout": 10,
+          "statusMessage": "Marking EITS session compacting..."
         }
       ]
     }
@@ -26,7 +60,7 @@
     {
       "hooks": [
         {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-session-stop.sh",
+          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
           "timeout": 30,
           "statusMessage": "Updating EITS session status..."
         }

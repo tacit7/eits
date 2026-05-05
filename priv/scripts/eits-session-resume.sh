@@ -96,9 +96,11 @@ if [ -n "$GIT_DIR" ]; then
   fi
 fi
 
-# Patch entrypoint and mark session as working
+# Patch entrypoint and mark session status. Codex resume should stay idle until
+# UserPromptSubmit marks it busy.
+_session_start_status="${EITS_SESSION_START_STATUS:-working}"
 [ -n "$ENTRYPOINT" ] && eits sessions update "$SESSION_ID" --entrypoint "$ENTRYPOINT" >/dev/null 2>&1 || true
-eits sessions update "$SESSION_ID" --status "working" >/dev/null 2>&1 &
+eits sessions update "$SESSION_ID" --status "$_session_start_status" >/dev/null 2>&1 &
 
 # Inject context
 CONTEXT="# Eye in the Sky — Session Resumed

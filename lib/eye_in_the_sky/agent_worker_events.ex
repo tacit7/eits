@@ -18,7 +18,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   require Logger
 
-  alias EyeInTheSky.{Agents, Channels, Messages, Sessions}
+  alias EyeInTheSky.{Agents, Channels, Messages, Notifications, Sessions, Settings}
 
   alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
   alias EyeInTheSky.Claude.{ChannelFanout, ChannelProtocol}
@@ -32,6 +32,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       {:ok, session} ->
         promote_agent_if_pending(session_id)
         Events.agent_working(session)
+        notify_agent_status(session, :working)
 
       :error ->
         :ok
@@ -51,7 +52,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     case update_session_status(session_id, status, nil) do
       {:ok, session} ->
         Events.agent_stopped(session)
-        notify_agent_complete(session_id, provider_conversation_id)
+        notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
 
       :error ->
         :ok
@@ -314,15 +315,15 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     end
   end
 
-  defp notify_agent_complete(session_id, provider_conversation_id) do
+  defp notify_agent_status(session, status, opts \\ []) do
     # Skip in test mode. Running Notifications.notify in a synchronous Task
     # (via AsyncTask in test mode) inside AgentWorker.handle_info races with
     # sandbox teardown: the handle_info may still be executing when the test
     # process exits, crashing the GenServer and eventually the AgentSupervisor.
     # Notifications are tested directly in notifications_test.exs.
-    # Skip when the user has not opted in to agent completion notifications.
+    # Skip when the user has not opted in to agent status notifications.
     if Application.get_env(:eye_in_the_sky, :async_tasks_sync, false) or
-         not EyeInTheSky.Settings.get_boolean("agent_notifications") do
+         not Settings.get_boolean("agent_notifications") do
       :ok
     else
       meta = Logger.metadata()
@@ -330,22 +331,38 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
         Logger.metadata(meta)
 
-        title =
-          case Sessions.get_session(session_id) do
-            {:ok, session} when is_binary(session.name) and session.name != "" ->
-              String.slice("Agent finished: #{session.name}", 0, 255)
+        resource_id = Keyword.get(opts, :resource_id) || session.uuid || session.id
+        {title, body} = status_notification_copy(session, status)
 
-            _ ->
-              "Agent finished"
-          end
-
-        EyeInTheSky.Notifications.notify(title,
+        Notifications.notify(title,
           category: :agent,
-          resource: {"session", provider_conversation_id}
+          body: body,
+          resource: {"session", resource_id}
         )
       end)
 
       :ok
     end
   end
+
+  defp status_notification_copy(session, :working) do
+    name = session_name(session)
+    {"Agent working: #{name}" |> String.slice(0, 255), "Session is busy processing a task."}
+  end
+
+  defp status_notification_copy(session, :resumable) do
+    name = session_name(session)
+
+    title =
+      case session.status do
+        "waiting" -> "Agent waiting: #{name}"
+        _ -> "Agent idle: #{name}"
+      end
+      |> String.slice(0, 255)
+
+    {title, "Session stopped working and can be resumed."}
+  end
+
+  defp session_name(%{name: name}) when is_binary(name) and name != "", do: name
+  defp session_name(_session), do: "Session"
 end

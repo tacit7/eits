@@ -13,7 +13,7 @@ INPUT_JSON="$(timeout 2 cat 2>/dev/null || true)"
 hook_event_name="$(echo "$INPUT_JSON" | jq -r '.hook_event_name // .hook_event // empty' 2>/dev/null || true)"
 hook_source="$(echo "$INPUT_JSON" | jq -r '.source // empty' 2>/dev/null || true)"
 tool_name="$(echo "$INPUT_JSON" | jq -r '.tool_name // empty' 2>/dev/null || true)"
-has_stop_flag="$(echo "$INPUT_JSON" | jq -r 'has(\"stop_hook_active\")' 2>/dev/null || echo "false")"
+has_stop_flag="$(echo "$INPUT_JSON" | jq -r 'has("stop_hook_active")' 2>/dev/null || echo "false")"
 
 # Fallback inference when the event name is absent.
 if [ -z "$hook_event_name" ]; then
@@ -41,12 +41,10 @@ case "$hook_event_name" in
   SessionStart)
     case "$hook_source" in
       startup|clear)
-        run_hook "$SCRIPT_DIR/eits-session-startup.sh"
-        run_hook "$SCRIPT_DIR/eits-agent-working.sh"
+        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-startup.sh"
         ;;
       resume)
-        run_hook "$SCRIPT_DIR/eits-session-resume.sh"
-        run_hook "$SCRIPT_DIR/eits-agent-working.sh"
+        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-resume.sh"
         ;;
       compact)
         run_hook "$SCRIPT_DIR/eits-session-compact.sh"
@@ -54,9 +52,9 @@ case "$hook_event_name" in
         run_hook "$SCRIPT_DIR/eits-agent-working.sh"
         ;;
       *)
-        # Default to startup semantics when source is omitted/unknown.
-        run_hook "$SCRIPT_DIR/eits-session-startup.sh"
-        run_hook "$SCRIPT_DIR/eits-agent-working.sh"
+        # Default to startup semantics when source is omitted/unknown, but do
+        # not mark Codex busy until UserPromptSubmit arrives.
+        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-startup.sh"
         ;;
     esac
     ;;

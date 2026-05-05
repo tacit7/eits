@@ -238,7 +238,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         <%!-- Right: model selector + send/stop --%>
         <div class="flex items-center gap-2 ml-auto">
           <div
-            class="dropdown dropdown-top dropdown-end"
+            class="dropdown dropdown-top"
             phx-click="toggle_model_menu"
             id="model-selector-dropdown"
           >

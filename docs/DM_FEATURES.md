@@ -1078,29 +1078,64 @@ The `AutoScroll` hook preserves the auto-scroll behavior when the DM message lis
 
 ## DM Page Settings Tab
 
-**Commit:** `de1f085e`
+**Commits:** `de1f085e` (UI), `c0550615` (persistence)
 
-The DM page now has a sixth tab (Settings) with scope controls and provider-specific settings panels.
+The DM page has a Settings tab with scope controls and provider-specific settings panels. Settings are persisted to the database via JSONB columns on sessions and agents.
 
 **Tab structure:**
-- **General subtab:** Global DM settings
+- **General subtab:** Global DM settings (thinking enabled, show live stream, max budget, notifications)
 - **Claude subtab:** Claude-specific configurations
 - **Codex subtab:** Codex-specific configurations
 
 **Scope toggle:**
-- **Session scope:** Settings apply to the current session only
-- **Agent scope:** Settings apply to all agents (persistent across sessions)
+- **Session scope:** Settings apply to the current session only; stored in `sessions.settings` JSONB column
+- **Agent scope:** Settings apply to all agents (persistent across sessions); stored in `agents.settings` JSONB column
 
-**Current state (mockup):**
-- UI is fully rendered and styled
-- Event handlers (`dm_setting_scope`, `dm_setting_subtab`, `dm_setting_update`, `reset_dm_settings`) are stubbed
-- Changes write to socket assigns only; no persistence yet
-- JSONB persistence layer (schema + API) planned for future iteration
+**Settings persistence (commit c0550615):**
+
+Settings are stored as JSONB overrides in two places:
+- `sessions.settings` — session-level overrides
+- `agents.settings` — agent-level overrides (apply as defaults to all sessions from that agent)
+
+Effective settings are computed at read time via `JsonSettings.effective_settings/2`:
+```elixir
+effective = JsonSettings.effective_settings(agent_overrides, session_overrides)
+# Result: app_defaults ⊕ agent_overrides ⊕ session_overrides
+# Session overrides win; agent overrides are fallback; app defaults are base
+```
+
+**Settings schema:**
+
+`EyeInTheSky.Settings.Schema` is the single source of truth for all settings:
+- Dotted-key format: `"general.show_live_stream"`, `"anthropic.permission_mode"`, etc.
+- Each setting has: type (bool/string/number), default value, namespace, and allowed scopes
+- Schema.defaults provides the base map for all settings
+
+**Event handlers (commit c0550615):**
+
+`DmLive` handlers now persist settings to the scoped record:
+- `dm_setting_update/4` — coerce value via `JsonSettings.coerce_value/3`, persist via `Sessions.put_setting/3` or `Agents.put_setting/3`, update assigns with fresh effective settings
+- `reset_dm_settings/3` — clear overrides via `Sessions.reset_settings/1` or `Agents.reset_settings/1`, update assigns
+- Error handling: friendly flash messages on bad input (invalid type, enum mismatch, scope violation)
+
+**Mount initialization (commit c0550615):**
+
+`DmLive.MountState.assign_ui_flags/2` now:
+1. Loads agent + session overrides from their `.settings` JSONB columns
+2. Computes effective settings via `JsonSettings.effective_settings/2`
+3. Assigns all three levels to the socket (`:dm_settings_effective`, `:dm_settings_agent_overrides`, `:dm_settings_session_overrides`)
+4. Initializes runtime assigns (`:show_live_stream`, `:thinking_enabled`, `:max_budget_usd`, `:notify_on_stop`) from effective settings
+5. Critical: reads keys directly from effective map to preserve literal `false` values (avoids `get_in(...) || default` pattern)
 
 **Files:**
-- `lib/eye_in_the_sky_web/components/dm_page.ex` — tab registration
+- `lib/eye_in_the_sky/settings/schema.ex` — Settings.Schema (single source of truth)
+- `lib/eye_in_the_sky/settings/json_settings.ex` — JsonSettings module (pure logic: merge, put, get, delete, coerce)
+- `lib/eye_in_the_sky/sessions.ex` — Sessions context gains put_setting, delete_setting, reset_settings, reset_settings_namespace
+- `lib/eye_in_the_sky/agents.ex` — Agents context gains put_setting, delete_setting, reset_settings, reset_settings_namespace
 - `lib/eye_in_the_sky_web/components/dm_page/settings_tab.ex` — settings UI component
-- `lib/eye_in_the_sky_web/live/dm_live.ex` — event handlers
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — event handlers (dm_setting_update, reset_dm_settings)
+- `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — initialization with effective settings computation
+- `priv/repo/migrations/20260504112139_add_settings_to_sessions_and_agents.exs` — migration adding settings JSONB columns
 
 ---
 
@@ -1357,6 +1392,51 @@ POST /api/v1/dm
 - `lib/eye_in_the_sky/agents/runtime_context.ex` — RuntimeContext.build() type signature and dm_metadata field
 - `lib/eye_in_the_sky/claude/agent_worker.ex` — logging on metadata use
 - `docs/REST_API.md` — metadata field documentation and request examples
+
+---
+
+## DM Delivery Error Codes
+
+**Commit:** `d2672eb9`
+
+The `/api/v1/dm` endpoint now returns specific HTTP status codes and error codes for delivery failures instead of generic 500 errors. All error responses include a `reachable` boolean to distinguish "retry later" scenarios from permanent failures.
+
+**Error responses:**
+
+| Scenario | HTTP Status | Error Code | Reachable | Message | Action |
+|----------|-------------|-----------|-----------|---------|--------|
+| Target queue full | 503 | `queue_full` | `true` | "Target session queue is full; retry later" | Retry with backoff |
+| Worker not found / not running | 503 | `target_session_unreachable` | `false` | "Target session worker is not running" | Don't retry (session is dead) |
+| Worker crashed (exit) | 503 | `target_session_unreachable` | `false` | "Target session worker crashed" | Don't retry (session is dead) |
+| Invalid message payload | 422 | `unprocessable_entity` | — | "Invalid message payload" | Fix the request |
+| Unknown/other error | 503 | `delivery_failed` | `false` | "Failed to deliver message" | Don't retry (unknown condition) |
+
+**Response format:**
+
+All error responses (503 and 422) follow this structure:
+```json
+{
+  "error": "<error_code>",
+  "message": "<human-readable message>",
+  "reachable": <true|false>  // Present on 503 errors only
+}
+```
+
+**Caller behavior:**
+
+- **`reachable: true` (queue_full):** Safe to retry with exponential backoff. Session will process the message once queue drains.
+- **`reachable: false` (target_session_unreachable, delivery_failed):** Don't retry. Session worker is not running or unknown error occurred. Consider notifying the user or escalating.
+
+**Implementation:**
+
+In `MessagingController.do_dm/4`:
+- Catch specific error atoms from `DMDelivery.deliver_and_persist/4`
+- Return 503 with appropriate error code and reachable flag
+- Log warnings (queue_full) or errors (worker exit, unknown) for observability
+- Unknown errors default to `delivery_failed` with `reachable: false`
+
+**File:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex`
 
 ---
 

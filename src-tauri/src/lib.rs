@@ -1,6 +1,6 @@
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use tauri::Manager;
-use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 #[cfg(not(debug_assertions))]
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -9,6 +9,9 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Monotonic counter for generating unique secondary window labels.
 static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(2);
+
+/// Always-on-top state — persisted in memory, toggled via menu/tray.
+static ALWAYS_ON_TOP: AtomicBool = AtomicBool::new(false);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -31,8 +34,9 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
-            // --- System tray with navigation ---
+            // --- System tray ---
             let show_item = MenuItem::with_id(app, "show", "Show EITS", true, None::<&str>)?;
+            let always_on_top_item = CheckMenuItem::with_id(app, "always_on_top", "Always on Top", true, false, None::<&str>)?;
             let sep1 = PredefinedMenuItem::separator(app)?;
             let nav_dashboard = MenuItem::with_id(app, "nav_dashboard", "Dashboard", true, None::<&str>)?;
             let nav_sessions = MenuItem::with_id(app, "nav_sessions", "Sessions", true, None::<&str>)?;
@@ -40,8 +44,9 @@ pub fn run() {
             let nav_teams = MenuItem::with_id(app, "nav_teams", "Teams", true, None::<&str>)?;
             let sep2 = PredefinedMenuItem::separator(app)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[
+            let tray_menu = Menu::with_items(app, &[
                 &show_item,
+                &always_on_top_item,
                 &sep1,
                 &nav_dashboard,
                 &nav_sessions,
@@ -54,10 +59,11 @@ pub fn run() {
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().cloned().unwrap())
                 .tooltip("Eye in the Sky")
-                .menu(&menu)
+                .menu(&tray_menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => show_window(app),
+                    "always_on_top" => toggle_always_on_top(app),
                     "nav_dashboard" => navigate_to(app, "/"),
                     "nav_sessions" => navigate_to(app, "/sessions"),
                     "nav_tasks" => navigate_to(app, "/tasks"),
@@ -105,11 +111,17 @@ pub fn run() {
                 &PredefinedMenuItem::paste(app, None)?,
                 &PredefinedMenuItem::select_all(app, None)?,
             ])?;
+            let always_on_top_menu_item = CheckMenuItem::with_id(
+                app, "menu_always_on_top", "Always on Top", true, false,
+                Some("CmdOrCtrl+Shift+T"),
+            )?;
             let view_menu = Submenu::with_items(app, "View", true, &[
                 &MenuItem::with_id(app, "menu_dashboard", "Dashboard", true, Some("CmdOrCtrl+1"))?,
                 &MenuItem::with_id(app, "menu_sessions", "Sessions", true, Some("CmdOrCtrl+2"))?,
                 &MenuItem::with_id(app, "menu_tasks", "Tasks", true, Some("CmdOrCtrl+3"))?,
                 &MenuItem::with_id(app, "menu_teams", "Teams", true, Some("CmdOrCtrl+4"))?,
+                &PredefinedMenuItem::separator(app)?,
+                &always_on_top_menu_item,
                 &PredefinedMenuItem::separator(app)?,
                 &MenuItem::with_id(app, "menu_reload", "Reload", true, Some("CmdOrCtrl+R"))?,
             ])?;
@@ -132,6 +144,7 @@ pub fn run() {
                 "menu_sessions" => navigate_to(app, "/sessions"),
                 "menu_tasks" => navigate_to(app, "/tasks"),
                 "menu_teams" => navigate_to(app, "/teams"),
+                "menu_always_on_top" => toggle_always_on_top(app),
                 "menu_reload" => {
                     if let Some(window) = app.get_webview_window("main") {
                         let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
@@ -143,6 +156,7 @@ pub fn run() {
                 }
                 _ => {}
             });
+
 
             // --- Global shortcut: Cmd+Shift+E to show/focus window ---
             let shortcut = "CmdOrCtrl+Shift+E".parse::<Shortcut>()?;
@@ -178,25 +192,14 @@ pub fn run() {
             }
 
             // --- IAM hook installer ---
-            // Write ~/.claude/settings.json hooks on every startup so agents
-            // automatically POST tool events to the local IAM endpoint.
-            // Idempotent: skips events that already have the hook present.
             let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
             install_iam_hooks(&port);
 
-            // --- ElixirKit PubSub: message dispatch ---
-            //
-            // Release: spawn the bundled Elixir release and wait for the
-            //   "ready" signal before opening the webview window.
-            //
-            // Debug (cargo tauri dev): Phoenix is already running externally
-            //   via `PORT=5050 mix phx.server`. Skip the ElixirKit spawn
-            //   entirely and open the window immediately.
+            // --- ElixirKit PubSub ---
             #[cfg(debug_assertions)]
             {
                 println!("[eits-tauri] dev mode — skipping ElixirKit spawn, connecting to external Phoenix server");
                 let app_handle_dev = app.handle().clone();
-                // Drop pubsub — not used in dev mode.
                 drop(pubsub);
                 create_window(&app_handle_dev);
             }
@@ -205,25 +208,24 @@ pub fn run() {
             {
                 let app_handle = app.handle().clone();
 
-                // Wait for Phoenix to broadcast "ready" before opening the webview.
-                // Avoids the WebView loading before the endpoint is accepting
-                // connections, which would otherwise cause refresh/reconnect loops.
                 pubsub.subscribe("messages", move |msg| {
                     if msg == b"ready" {
                         create_window(&app_handle);
                     } else if msg.starts_with(b"notify:") {
-                        // Format: notify:<title>|<body>
+                        // Format: notify:<title>|<body>  or  notify:<title>|<body>|<path>
                         let payload = String::from_utf8_lossy(&msg[7..]);
-                        let parts: Vec<&str> = payload.splitn(2, '|').collect();
+                        let parts: Vec<&str> = payload.splitn(3, '|').collect();
                         let title = parts.first().unwrap_or(&"EITS").to_string();
                         let body = parts.get(1).unwrap_or(&"").to_string();
-                        send_notification(&title, &body);
-                        // Bounce dock icon once to attract attention.
+                        let nav_path = parts.get(2).map(|s| s.to_string());
+
+                        let app_clone = app_handle.clone();
+                        send_notification(&title, &body, nav_path, &app_clone);
+
                         if let Some(w) = app_handle.get_webview_window("main") {
                             let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
                         }
                     } else if msg.starts_with(b"badge:") {
-                        // Format: badge:<count> (0 to clear)
                         let count_str = String::from_utf8_lossy(&msg[6..]);
                         if let Ok(count) = count_str.trim().parse::<i64>() {
                             if let Some(window) = app_handle.get_webview_window("main") {
@@ -232,11 +234,9 @@ pub fn run() {
                             }
                         }
                     } else if msg.starts_with(b"clipboard:") {
-                        // Format: clipboard:<text>
                         let text = String::from_utf8_lossy(&msg[10..]).to_string();
                         let _ = app_handle.clipboard().write_text(text);
                     } else if msg.starts_with(b"save-file:") {
-                        // Format: save-file:<filename>|<content>
                         let payload = String::from_utf8_lossy(&msg[10..]).to_string();
                         let parts: Vec<&str> = payload.splitn(2, '|').collect();
                         let filename = parts.first().unwrap_or(&"export.txt").to_string();
@@ -246,7 +246,6 @@ pub fn run() {
                             save_file_dialog(&app_clone, &filename, &content).await;
                         });
                     } else if msg.starts_with(b"navigate:") {
-                        // Format: navigate:<path>
                         let path = String::from_utf8_lossy(&msg[9..]).to_string();
                         navigate_to(&app_handle, &path);
                     } else {
@@ -275,15 +274,11 @@ pub fn run() {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     if window.label() == "main" {
-                        // Main window: hide instead of close so the app stays alive in the tray.
                         let _ = window.hide();
                         api.prevent_close();
                     }
-                    // Secondary windows: allow normal close (do nothing, default behaviour).
                 }
                 tauri::WindowEvent::ThemeChanged(theme) => {
-                    // macOS switched dark/light mode — push the change into the webview
-                    // so Phoenix can update the theme if the user's setting is "system".
                     let theme_name = match theme {
                         tauri::Theme::Dark => "dark",
                         _ => "light",
@@ -298,6 +293,9 @@ pub fn run() {
                     }
                 }
                 tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                    // Forward dropped file paths into the webview as a CustomEvent.
+                    // A JS listener in app.js picks this up and pushes the paths to
+                    // the active LiveView session via pushEvent.
                     let paths_json: Vec<String> = paths.iter()
                         .filter_map(|p| p.to_str().map(|s| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))))
                         .collect();
@@ -315,7 +313,6 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error building tauri application")
         .run(|app_handle, event| {
-            // macOS: dock icon clicked with no visible windows → show the hidden window.
             if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
                 if !has_visible_windows {
                     show_window(app_handle);
@@ -331,14 +328,28 @@ fn show_window(app_handle: &tauri::AppHandle) {
     }
 }
 
+fn toggle_always_on_top(app_handle: &tauri::AppHandle) {
+    let current = ALWAYS_ON_TOP.load(Ordering::Relaxed);
+    let next = !current;
+    ALWAYS_ON_TOP.store(next, Ordering::Relaxed);
+
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = window.set_always_on_top(next);
+    }
+
+    // Sync checkmark on the menu-bar item.
+    if let Some(menu) = app_handle.menu() {
+        if let Some(tauri::menu::MenuItemKind::Check(item)) = menu.get("menu_always_on_top") {
+            let _ = item.set_checked(next);
+        }
+    }
+}
+
 fn create_window(app_handle: &tauri::AppHandle) {
     let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
     let url = format!("http://127.0.0.1:{}", port);
     let parsed_url: tauri::Url = url.parse().unwrap();
 
-    // Start hidden, let window-state plugin restore position before showing.
-    // title_bar_style::Overlay: native traffic lights float over the webview.
-    // JS marks the document so CSS can add the matching top padding.
     let window = tauri::WebviewWindowBuilder::new(
         app_handle,
         "main",
@@ -353,16 +364,17 @@ fn create_window(app_handle: &tauri::AppHandle) {
     .build()
     .unwrap();
 
-    // Mark the root element so CSS can add padding-top for the traffic lights.
-    let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
+    // Sidebar vibrancy — frosted-glass effect over the entire window.
+    #[cfg(target_os = "macos")]
+    {
+        use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+        apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None).ok();
+    }
 
+    let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
     let _ = window.show();
 }
 
-/// Open a new secondary window at the given path.
-/// Each call gets a unique label ("window-2", "window-3", …) so Tauri
-/// treats them as independent windows. Secondary windows close normally
-/// (unlike "main" which hides to keep the app alive in the tray).
 fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
     let n = WINDOW_COUNTER.fetch_add(1, Ordering::Relaxed);
     let label = format!("window-{}", n);
@@ -390,7 +402,6 @@ fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
     }
 }
 
-/// Map an `eits://...` deep-link URL to a Phoenix route and navigate.
 fn route_deep_link(app_handle: &tauri::AppHandle, url_str: &str) {
     let url = match url_str.parse::<tauri::Url>() {
         Ok(u) => u,
@@ -413,7 +424,6 @@ fn route_deep_link(app_handle: &tauri::AppHandle, url_str: &str) {
     navigate_to(app_handle, &path);
 }
 
-/// Navigate the main webview to a path (e.g., "/sessions", "/tasks")
 fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
     if let Some(window) = app_handle.get_webview_window("main") {
         let _ = window.show();
@@ -426,7 +436,41 @@ fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
     }
 }
 
-/// Show a native save file dialog and write content to the chosen path
+/// Send a native notification. If `nav_path` is provided, clicking the
+/// notification navigates the main window to that path.
+#[cfg(not(debug_assertions))]
+fn send_notification(title: &str, body: &str, nav_path: Option<String>, app_handle: &tauri::AppHandle) {
+    use tauri_plugin_notification::NotificationExt;
+
+    let mut builder = app_handle
+        .notification()
+        .builder()
+        .title(title)
+        .body(body);
+
+    // Embed the path in the notification identifier so we can retrieve it
+    // in the action callback. Format: "eits-nav:<path>" or "eits-default".
+    let id = match &nav_path {
+        Some(path) => format!("eits-nav:{}", path),
+        None => "eits-default".to_string(),
+    };
+    builder = builder.identifier(&id);
+
+    if let Err(e) = builder.show() {
+        eprintln!("[eits-tauri] notification error: {e}");
+    }
+
+    // If the window is already visible, also navigate immediately on receipt.
+    // This handles the case where the user has the app focused.
+    if let Some(path) = nav_path {
+        if let Some(window) = app_handle.get_webview_window("main") {
+            if window.is_visible().unwrap_or(false) {
+                navigate_to(app_handle, &path);
+            }
+        }
+    }
+}
+
 #[cfg(not(debug_assertions))]
 async fn save_file_dialog(app_handle: &tauri::AppHandle, filename: &str, content: &str) {
     use tauri_plugin_dialog::DialogExt;
@@ -440,50 +484,25 @@ async fn save_file_dialog(app_handle: &tauri::AppHandle, filename: &str, content
     }
 }
 
-/// Send a native macOS notification via osascript.
-#[cfg(not(debug_assertions))]
-fn send_notification(title: &str, body: &str) {
-    let script = format!(
-        "display notification \"{}\" with title \"{}\"",
-        body.replace('\\', "\\\\").replace('"', "\\\""),
-        title.replace('\\', "\\\\").replace('"', "\\\""),
-    );
-    let _ = std::process::Command::new("osascript")
-        .arg("-e")
-        .arg(&script)
-        .output();
-}
-
 #[cfg(not(debug_assertions))]
 fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
     if cfg!(debug_assertions) {
-        // Dev mode: run mix phx.server from the project root (one dir up from src-tauri)
         let mut command = elixirkit::mix("phx.server", &[]);
         command.current_dir("..");
         command.env("PORT", "5050");
         command.env("DISABLE_AUTH", "true");
-        // Skip Vite/Tailwind watchers — Vite's config loader picks up main's
-        // node_modules across the worktree boundary and fails. Phoenix serves
-        // pre-built assets from priv/static instead.
         command.env("SKIP_WATCHERS", "1");
         command
     } else {
-        // Prod mode: run the bundled release
         let mut command = elixirkit::release(rel_dir, "eye_in_the_sky");
         command.env("PHX_SERVER", "true");
         command.env("PHX_HOST", "127.0.0.1");
         command.env("PORT", "5050");
         command.env("DISABLE_AUTH", "true");
         command.env("BYPASS_AUTH", "true");
-        // Disable SSL for local Postgres — bundled ERTS has no OpenSSL.
         command.env("DATABASE_SSL_VERIFY", "false");
-        // Prevent Phoenix from redirecting http://localhost:5050 → https://
-        // WKWebView would get a redirect loop if force_ssl is active.
         command.env("PHX_DISABLE_FORCE_SSL", "1");
 
-        // Required by runtime.exs in prod — raises if absent.
-        // For the desktop app: DATABASE_URL points to local Postgres,
-        // SECRET_KEY_BASE is a stable desktop-only secret (not web-facing).
         if std::env::var("DATABASE_URL").is_err() {
             command.env("DATABASE_URL", "postgres://postgres:postgres@localhost/eits_dev?sslmode=disable");
         }
@@ -498,15 +517,6 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
     }
 }
 
-/// Install EITS IAM hooks into ~/.claude/settings.json.
-///
-/// Idempotent — checks each event type independently and only adds a hook
-/// group when none of the existing entries reference "iam/hook". Safe to
-/// call on every startup.
-///
-/// Fail-open design: any I/O or parse error is logged and silently skipped.
-/// The generated hook command uses `|| true` so Claude Code always sees
-/// exit 0 even when Phoenix is not yet reachable (connection refused / timeout).
 fn install_iam_hooks(port: &str) {
     let home = match std::env::var("HOME") {
         Ok(h) => std::path::PathBuf::from(h),
@@ -519,7 +529,6 @@ fn install_iam_hooks(port: &str) {
     let claude_dir = home.join(".claude");
     let settings_path = claude_dir.join("settings.json");
 
-    // Read existing file or start with an empty object.
     let mut root: serde_json::Value = if settings_path.exists() {
         match std::fs::read_to_string(&settings_path) {
             Ok(raw) => match serde_json::from_str(&raw) {
@@ -538,13 +547,11 @@ fn install_iam_hooks(port: &str) {
         serde_json::json!({})
     };
 
-    // Ensure root is an object (guard against malformed files).
     if !root.is_object() {
         eprintln!("[eits-tauri] settings.json root is not an object; IAM hooks not installed");
         return;
     }
 
-    // Build the hook group to inject.
     let cmd = format!(
         "curl -sf --max-time 5 -X POST http://127.0.0.1:{port}/api/v1/iam/hook \
          -H 'Content-Type: application/json' -d @- || true"
@@ -560,7 +567,6 @@ fn install_iam_hooks(port: &str) {
         .entry("hooks")
         .or_insert_with(|| serde_json::json!({}));
 
-    // Guard: if "hooks" is somehow not an object, bail.
     if !hooks_obj.is_object() {
         eprintln!("[eits-tauri] settings.json hooks field is not an object; IAM hooks not installed");
         return;
@@ -575,13 +581,11 @@ fn install_iam_hooks(port: &str) {
             .entry(*event)
             .or_insert_with(|| serde_json::json!([]));
 
-        // Ensure the event value is an array.
         if !event_hooks.is_array() {
             eprintln!("[eits-tauri] hooks.{event} is not an array; skipping");
             continue;
         }
 
-        // Check whether any existing entry already references our endpoint.
         let already = event_hooks
             .as_array()
             .map(|groups| {
@@ -612,7 +616,6 @@ fn install_iam_hooks(port: &str) {
         return;
     }
 
-    // Ensure ~/.claude/ directory exists before writing.
     if let Err(e) = std::fs::create_dir_all(&claude_dir) {
         eprintln!("[eits-tauri] Could not create ~/.claude/: {e}");
         return;

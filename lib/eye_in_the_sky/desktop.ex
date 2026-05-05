@@ -4,9 +4,20 @@ defmodule EyeInTheSky.Desktop do
   All functions are no-ops when not running in desktop mode (standard web).
   """
 
-  @doc "Send a native macOS notification."
-  def notify(title, body) do
-    broadcast("notify:#{title}|#{body}")
+  @doc """
+  Send a native macOS notification.
+
+  Pass an optional `path` to navigate the desktop window when the user
+  clicks the notification (e.g. `"/dm/abc-123"`). Without a path the
+  notification still shows but clicking only brings the window to focus.
+  """
+  def notify(title, body, path \\ nil) do
+    msg =
+      if path,
+        do: "notify:#{title}|#{body}|#{path}",
+        else: "notify:#{title}|#{body}"
+
+    broadcast(msg)
   end
 
   @doc "Set the dock badge count. Pass 0 to clear."

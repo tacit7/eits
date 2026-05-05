@@ -320,6 +320,25 @@ if (window.__TAURI_INTERNALS__) {
   })
 }
 
+// Tauri file drop: forward native file drops to the active LiveView session.
+// The Rust side fires tauri:file-drop with {paths: ["/abs/path", ...]}.
+// We push a "file_drop" event to whichever LiveView component has
+// data-file-drop-target on it; if none, push to the root liveSocket.
+window.addEventListener('tauri:file-drop', (e) => {
+  const paths = e.detail?.paths ?? []
+  if (!paths.length) return
+  const target = document.querySelector('[data-file-drop-target]')
+  if (target && window.liveSocket) {
+    const view = window.liveSocket.getViewByEl(target)
+    if (view) {
+      view.pushEvent('file_drop', { paths }, () => {})
+      return
+    }
+  }
+  // Fallback: push to root socket hooks
+  window.dispatchEvent(new CustomEvent('phx:file_drop', { detail: { paths } }))
+})
+
 // The lines below enable quality of life phoenix_live_reload
 // development features:
 //

@@ -127,6 +127,9 @@ defmodule EyeInTheSky.Notifications do
   defp maybe_push(%{category: "agent"} = notification) do
     url = build_url(notification.resource_type, notification.resource_id)
 
+    # Desktop: native macOS notification with click-to-navigate.
+    EyeInTheSky.Desktop.notify(notification.title, notification.body || "", url)
+
     AsyncTask.start(fn ->
       PushSubscriptions.broadcast(notification.title, notification.body, url)
     end)
@@ -135,6 +138,8 @@ defmodule EyeInTheSky.Notifications do
   defp maybe_push(_notification), do: :ok
 
   defp build_url("session", id) when is_binary(id), do: "/dm/#{id}"
+  defp build_url("note", id) when is_binary(id), do: "/notes/#{id}"
+  defp build_url("task", id) when is_binary(id), do: "/tasks/#{id}"
   defp build_url(_type, _id), do: nil
 
   defp normalize_category("agent"), do: "agent"

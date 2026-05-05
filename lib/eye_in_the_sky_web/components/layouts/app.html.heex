@@ -73,7 +73,7 @@
 
     <%!-- Desktop top bar — hidden on mobile --%>
     <% sidebar_tab = assigns[:sidebar_tab] || :sessions %>
-    <div class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 px-3">
+    <div id="app-topbar" class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 px-3">
       <.top_bar_breadcrumb
         sidebar_tab={sidebar_tab}
         dm_session_name={assigns[:page_title]}

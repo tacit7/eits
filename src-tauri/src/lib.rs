@@ -1,5 +1,29 @@
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
+
+/// File handle for /tmp/eits.log — written at startup, shared across threads.
+static LOG_FILE: OnceLock<Mutex<std::fs::File>> = OnceLock::new();
+
+/// Log to both stderr and /tmp/eits.log. Works from any launch method (Finder, Alfred, terminal).
+macro_rules! log {
+    ($($arg:tt)*) => {{
+        let msg = format!($($arg)*);
+        eprintln!("{}", msg);
+        if let Some(lock) = LOG_FILE.get() {
+            if let Ok(mut f) = lock.lock() {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let ts = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let _ = writeln!(f, "[{ts}] {msg}");
+                let _ = f.flush();
+            }
+        }
+    }};
+}
 use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 #[cfg(not(debug_assertions))]
@@ -15,7 +39,20 @@ static ALWAYS_ON_TOP: AtomicBool = AtomicBool::new(false);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize file logging first — before anything else so even early panics are captured.
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/eits.log")
+    {
+        Ok(file) => { let _ = LOG_FILE.set(Mutex::new(file)); }
+        Err(e) => eprintln!("[eits-tauri] WARNING: could not open /tmp/eits.log: {e}"),
+    }
+    log!("[eits-tauri] ===== startup pid={} =====", std::process::id());
+    log!("[eits-tauri] version={}", env!("CARGO_PKG_VERSION"));
+
     let pubsub = elixirkit::PubSub::listen("tcp://127.0.0.1:0").expect("failed to listen");
+    log!("[eits-tauri] pubsub listening on {}", pubsub.url());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
@@ -213,10 +250,16 @@ pub fn run() {
                         // Window creation requires the main thread on macOS (Cocoa).
                         // The ElixirKit PubSub callback runs on a background thread,
                         // so we must dispatch back to the main thread here.
+                        log!("[eits-tauri] received ready, dispatching window creation to main thread");
                         let app_clone = app_handle.clone();
-                        let _ = app_handle.run_on_main_thread(move || {
+                        match app_handle.run_on_main_thread(move || {
+                            log!("[eits-tauri] main thread: creating window");
                             create_window(&app_clone);
-                        });
+                            log!("[eits-tauri] main thread: window creation returned");
+                        }) {
+                            Ok(_) => log!("[eits-tauri] run_on_main_thread dispatched ok"),
+                            Err(e) => log!("[eits-tauri] run_on_main_thread failed: {e}"),
+                        };
                     } else if msg.starts_with(b"notify:") {
                         // Format: notify:<title>|<body>  or  notify:<title>|<body>|<path>
                         let payload = String::from_utf8_lossy(&msg[7..]);
@@ -356,6 +399,7 @@ fn create_window(app_handle: &tauri::AppHandle) {
     let url = format!("http://127.0.0.1:{}", port);
     let parsed_url: tauri::Url = url.parse().unwrap();
 
+    log!("[eits-tauri] create_window: building WebviewWindow url={url}");
     let window = match tauri::WebviewWindowBuilder::new(
         app_handle,
         "main",
@@ -369,9 +413,12 @@ fn create_window(app_handle: &tauri::AppHandle) {
     .devtools(true)
     .build()
     {
-        Ok(w) => w,
+        Ok(w) => {
+            log!("[eits-tauri] create_window: WebviewWindow built ok");
+            w
+        }
         Err(e) => {
-            eprintln!("[eits-tauri] failed to create window: {e}");
+            log!("[eits-tauri] create_window: FAILED to build window: {e}");
             return;
         }
     };
@@ -380,11 +427,17 @@ fn create_window(app_handle: &tauri::AppHandle) {
     #[cfg(target_os = "macos")]
     {
         use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
-        apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None).ok();
+        if let Err(e) = apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None) {
+            log!("[eits-tauri] create_window: vibrancy failed (non-fatal): {e}");
+        }
     }
 
     let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
-    let _ = window.show();
+    if let Err(e) = window.show() {
+        log!("[eits-tauri] create_window: window.show() FAILED: {e}");
+    } else {
+        log!("[eits-tauri] create_window: window.show() ok — window should be visible");
+    }
 }
 
 fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
@@ -395,7 +448,7 @@ fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
     let parsed_url: tauri::Url = match url.parse() {
         Ok(u) => u,
         Err(e) => {
-            eprintln!("[eits-tauri] open_new_window: bad url {url}: {e}");
+            log!("[eits-tauri] open_new_window: bad url {url}: {e}");
             return;
         }
     };
@@ -410,7 +463,7 @@ fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
     .build()
     {
         Ok(_) => {}
-        Err(e) => eprintln!("[eits-tauri] open_new_window: failed to create {label}: {e}"),
+        Err(e) => log!("[eits-tauri] open_new_window: failed to create {label}: {e}"),
     }
 }
 
@@ -462,7 +515,7 @@ fn send_notification(title: &str, body: &str, nav_path: Option<String>, app_hand
         .body(body);
 
     if let Err(e) = builder.show() {
-        eprintln!("[eits-tauri] notification error: {e}");
+        log!("[eits-tauri] notification error: {e}");
     }
 
     // If the window is already visible, navigate immediately on receipt.
@@ -531,7 +584,7 @@ fn install_iam_hooks(port: &str) {
     let home = match std::env::var("HOME") {
         Ok(h) => std::path::PathBuf::from(h),
         Err(_) => {
-            eprintln!("[eits-tauri] HOME not set; IAM hooks not installed");
+            log!("[eits-tauri] HOME not set; IAM hooks not installed");
             return;
         }
     };
@@ -544,12 +597,12 @@ fn install_iam_hooks(port: &str) {
             Ok(raw) => match serde_json::from_str(&raw) {
                 Ok(v) => v,
                 Err(e) => {
-                    eprintln!("[eits-tauri] settings.json parse error: {e}; IAM hooks not installed");
+                    log!("[eits-tauri] settings.json parse error: {e}; IAM hooks not installed");
                     return;
                 }
             },
             Err(e) => {
-                eprintln!("[eits-tauri] Could not read settings.json: {e}; IAM hooks not installed");
+                log!("[eits-tauri] Could not read settings.json: {e}; IAM hooks not installed");
                 return;
             }
         }
@@ -558,7 +611,7 @@ fn install_iam_hooks(port: &str) {
     };
 
     if !root.is_object() {
-        eprintln!("[eits-tauri] settings.json root is not an object; IAM hooks not installed");
+        log!("[eits-tauri] settings.json root is not an object; IAM hooks not installed");
         return;
     }
 
@@ -578,7 +631,7 @@ fn install_iam_hooks(port: &str) {
         .or_insert_with(|| serde_json::json!({}));
 
     if !hooks_obj.is_object() {
-        eprintln!("[eits-tauri] settings.json hooks field is not an object; IAM hooks not installed");
+        log!("[eits-tauri] settings.json hooks field is not an object; IAM hooks not installed");
         return;
     }
 
@@ -592,7 +645,7 @@ fn install_iam_hooks(port: &str) {
             .or_insert_with(|| serde_json::json!([]));
 
         if !event_hooks.is_array() {
-            eprintln!("[eits-tauri] hooks.{event} is not an array; skipping");
+            log!("[eits-tauri] hooks.{event} is not an array; skipping");
             continue;
         }
 
@@ -622,23 +675,23 @@ fn install_iam_hooks(port: &str) {
     }
 
     if !installed_any {
-        println!("[eits-tauri] IAM hooks already present in settings.json; nothing to do");
+        log!("[eits-tauri] IAM hooks already present in settings.json; nothing to do");
         return;
     }
 
     if let Err(e) = std::fs::create_dir_all(&claude_dir) {
-        eprintln!("[eits-tauri] Could not create ~/.claude/: {e}");
+        log!("[eits-tauri] Could not create ~/.claude/: {e}");
         return;
     }
 
     match serde_json::to_string_pretty(&root) {
         Ok(json_str) => match std::fs::write(&settings_path, json_str) {
-            Ok(()) => println!(
+            Ok(()) => log!(
                 "[eits-tauri] IAM hooks written to {}",
                 settings_path.display()
             ),
-            Err(e) => eprintln!("[eits-tauri] Could not write settings.json: {e}"),
+            Err(e) => log!("[eits-tauri] Could not write settings.json: {e}"),
         },
-        Err(e) => eprintln!("[eits-tauri] Could not serialize settings.json: {e}"),
+        Err(e) => log!("[eits-tauri] Could not serialize settings.json: {e}"),
     }
 }

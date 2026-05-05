@@ -22,6 +22,23 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
 
   def list_agents_for_flyout(_), do: list_agents_for_flyout(nil)
 
+  @doc """
+  Loads agents for the rail flyout with search and scope filtering.
+  scope: "all" | "global" | "project"
+  """
+  def list_agents_for_flyout_filtered(project, search \\ "", scope \\ "all") do
+    project_path =
+      case project do
+        %{path: p} when is_binary(p) and p != "" -> p
+        _ -> Path.expand("~")
+      end
+
+    do_load_agents(project_path)
+    |> filter_by_scope(scope)
+    |> filter_by_search(search)
+    |> Enum.take(30)
+  end
+
   def load_agents(socket) do
     project_path = project_path_for(socket)
     agents = do_load_agents(project_path)

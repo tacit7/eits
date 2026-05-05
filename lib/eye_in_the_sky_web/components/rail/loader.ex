@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   }
 
   alias EyeInTheSky.Projects.FileTree
-  alias EyeInTheSkyWeb.Live.Shared.AgentsHelpers
+  alias EyeInTheSkyWeb.Live.Shared.{AgentsHelpers, SkillsHelpers}
 
   @valid_sections ~w(sessions agents tasks prompts chat notes skills teams canvas notifications usage jobs files)
   @sticky_sections [:chat, :canvas]
@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   def load_flyout_sessions(project, sort \\ :last_activity, name_filter \\ "", show \\ :twenty) do
     opts =
       case show do
-        :all_active -> [status_filter: "active", sort_by: sort]
+        :all_active -> [status_filter: "all", sort_by: sort]
         _ -> [limit: 20, status_filter: "all", sort_by: sort]
       end
 
@@ -149,12 +149,31 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   def maybe_load_jobs(socket, _section), do: socket
 
   def maybe_load_notes(socket, :notes, project) do
-    opts = [limit: 20]
-    opts = if project, do: Keyword.put(opts, :project_id, project.id), else: opts
-    assign(socket, :flyout_notes, Notes.list_notes_filtered(opts))
+    search = socket.assigns[:note_search] || ""
+    parent_type = socket.assigns[:note_parent_type]
+    assign(socket, :flyout_notes, load_flyout_notes(project, search, parent_type))
   end
 
   def maybe_load_notes(socket, _section, _project), do: socket
+
+  def load_flyout_notes(project, search \\ "", parent_type \\ nil) do
+    opts = [limit: 50]
+    opts = if project, do: Keyword.put(opts, :project_id, project.id), else: opts
+    opts = if parent_type, do: Keyword.put(opts, :type_filter, to_string(parent_type)), else: opts
+
+    notes = Notes.list_notes_filtered(opts)
+
+    if search != "" do
+      q = String.downcase(search)
+
+      Enum.filter(notes, fn n ->
+        String.contains?(String.downcase(n.title || ""), q) ||
+          String.contains?(String.downcase(n.body || ""), q)
+      end)
+    else
+      notes
+    end
+  end
 
   def maybe_load_files(socket, :files) do
     project = socket.assigns.sidebar_project
@@ -181,10 +200,28 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   def maybe_load_files(socket, _section), do: socket
 
   def maybe_load_agents(socket, :agents, project) do
-    assign(socket, :flyout_agents, AgentsHelpers.list_agents_for_flyout(project))
+    search = socket.assigns[:agent_search] || ""
+    scope = socket.assigns[:agent_scope] || "all"
+    assign(socket, :flyout_agents, load_flyout_agents_filtered(project, search, scope))
   end
 
   def maybe_load_agents(socket, _section, _project), do: socket
+
+  def load_flyout_agents_filtered(project, search \\ "", scope \\ "all") do
+    AgentsHelpers.list_agents_for_flyout_filtered(project, search, scope)
+  end
+
+  def maybe_load_skills(socket, :skills, project) do
+    search = socket.assigns[:skill_search] || ""
+    scope = socket.assigns[:skill_scope] || "all"
+    assign(socket, :flyout_skills, load_flyout_skills_filtered(project, search, scope))
+  end
+
+  def maybe_load_skills(socket, _section, _project), do: socket
+
+  def load_flyout_skills_filtered(project, search \\ "", scope \\ "all") do
+    SkillsHelpers.list_skills_for_flyout_filtered(project, search, scope)
+  end
 
   # Load channels only when navigating to the :chat section — avoids a DB query on every page.
   def maybe_load_channels(socket, :chat, project) do

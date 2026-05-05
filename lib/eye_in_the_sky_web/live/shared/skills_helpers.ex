@@ -3,6 +3,23 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
 
   alias EyeInTheSkyWeb.OverviewLive.Skills.Skill
 
+  @doc """
+  Loads skills for the rail flyout with search and scope filtering.
+  scope: "all" | "global" | "project"
+  """
+  def list_skills_for_flyout_filtered(project, search \\ "", scope \\ "all") do
+    project_path =
+      case project do
+        %{path: p} when is_binary(p) and p != "" -> p
+        _ -> File.cwd!()
+      end
+
+    do_load_skills(project_path)
+    |> filter_by_scope(scope)
+    |> filter_by_search(search)
+    |> Enum.take(30)
+  end
+
   def load_skills(socket) do
     project_path = project_path_for(socket)
     skills = do_load_skills(project_path)

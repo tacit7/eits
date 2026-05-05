@@ -28,9 +28,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
         />
       </div>
 
-      <%!-- State filter pills --%>
+      <%!-- State filter pills — toggleable; click active pill to clear --%>
       <div class="flex flex-wrap gap-0.5">
-        <.state_pill label="All" value="all" current={@state_filter} myself={@myself} />
         <.state_pill label="To Do" value="1" current={@state_filter} myself={@myself} />
         <.state_pill label="In Progress" value="2" current={@state_filter} myself={@myself} />
         <.state_pill label="In Review" value="4" current={@state_filter} myself={@myself} />
@@ -66,10 +65,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
 
   defp state_pill(assigns) do
     ~H"""
-    <% active = (@value == "all" and is_nil(@current)) or to_string(@current) == @value %>
+    <% active = to_string(@current) == @value %>
     <button
       phx-click="set_task_state_filter"
-      phx-value-state={@value}
+      phx-value-state={if active, do: "all", else: @value}
       phx-target={@myself}
       class={[
         "text-nano px-1.5 py-0.5 rounded transition-colors",

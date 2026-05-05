@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   alias EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.JobsSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection
 
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
@@ -34,7 +35,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :session_show, :atom, default: :twenty
   attr :notification_count, :integer, default: 0
   attr :flyout_agents, :list, default: []
+  attr :agent_search, :string, default: ""
+  attr :agent_scope, :string, default: "all"
   attr :flyout_notes, :list, default: []
+  attr :note_search, :string, default: ""
+  attr :note_parent_type, :any, default: nil
+  attr :flyout_skills, :list, default: []
+  attr :skill_search, :string, default: ""
+  attr :skill_scope, :string, default: "all"
   attr :flyout_jobs, :list, default: []
   attr :flyout_file_nodes, :list, default: []
   attr :flyout_file_expanded, :any, default: nil
@@ -187,6 +195,27 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             myself={@myself}
           />
         <% end %>
+        <%= if @active_section == :notes do %>
+          <NotesSection.notes_filters
+            note_search={@note_search}
+            note_parent_type={@note_parent_type}
+            myself={@myself}
+          />
+        <% end %>
+        <%= if @active_section == :agents do %>
+          <AgentsSection.agents_filters
+            agent_search={@agent_search}
+            agent_scope={@agent_scope}
+            myself={@myself}
+          />
+        <% end %>
+        <%= if @active_section == :skills do %>
+          <SkillsSection.skills_filters
+            skill_search={@skill_search}
+            skill_scope={@skill_scope}
+            myself={@myself}
+          />
+        <% end %>
 
         <%!-- ── Content ── --%>
         <div class="flex-1 overflow-y-auto py-1">
@@ -211,9 +240,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 myself={@myself}
               />
             <% :notes -> %>
-              <NotesSection.notes_content notes={@flyout_notes} />
+              <NotesSection.notes_content
+                notes={@flyout_notes}
+                note_search={@note_search}
+                note_parent_type={@note_parent_type}
+              />
             <% :skills -> %>
-              <Helpers.simple_link href="/skills" label="All Skills" icon="hero-bolt" />
+              <SkillsSection.skills_content skills={@flyout_skills} />
             <% :teams -> %>
               <TeamsSection.teams_content teams={@flyout_teams} sidebar_project={@sidebar_project} />
             <% :canvas -> %>

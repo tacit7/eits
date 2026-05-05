@@ -27,19 +27,27 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
         />
       </div>
 
-      <%!-- Sort + Show row --%>
+      <%!-- Sort dropdown + Show toggle --%>
       <div class="flex items-center justify-between gap-2">
-        <%!-- Sort tabs --%>
-        <div class="flex items-center gap-0.5">
-          <.sort_tab label="Recent" value="last_activity" current={@session_sort} myself={@myself} />
-          <.sort_tab label="Created" value="created" current={@session_sort} myself={@myself} />
-          <.sort_tab label="Name" value="name" current={@session_sort} myself={@myself} />
+        <%!-- Sort: filter icon + native select --%>
+        <div class="flex items-center gap-1">
+          <.icon name="hero-funnel-mini" class="size-3 text-base-content/30 flex-shrink-0" />
+          <select
+            phx-change="set_session_sort"
+            phx-target={@myself}
+            name="sort"
+            class="text-nano bg-transparent text-base-content/55 focus:outline-none cursor-pointer hover:text-base-content/80 transition-colors"
+          >
+            <option value="last_activity" selected={@session_sort == :last_activity}>Recent</option>
+            <option value="created" selected={@session_sort == :created}>Created</option>
+            <option value="name" selected={@session_sort == :name}>Name</option>
+          </select>
         </div>
 
         <%!-- Show toggle --%>
         <div class="flex items-center gap-0.5">
           <.show_tab label="20" value="twenty" current={@session_show} myself={@myself} />
-          <.show_tab label="Active" value="all_active" current={@session_show} myself={@myself} />
+          <.show_tab label="All" value="all_active" current={@session_show} myself={@myself} />
         </div>
       </div>
     </div>
@@ -55,31 +63,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
     <%= if @sessions == [] do %>
       <div class="px-3 py-4 text-xs text-base-content/35 text-center">No sessions</div>
     <% end %>
-    """
-  end
-
-  attr :label, :string, required: true
-  attr :value, :string, required: true
-  attr :current, :atom, required: true
-  attr :myself, :any, required: true
-
-  defp sort_tab(assigns) do
-    ~H"""
-    <% active = to_string(@current) == @value %>
-    <button
-      phx-click="set_session_sort"
-      phx-value-sort={@value}
-      phx-target={@myself}
-      class={[
-        "text-nano px-1.5 py-0.5 rounded transition-colors",
-        if(active,
-          do: "bg-primary/15 text-primary font-medium",
-          else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"
-        )
-      ]}
-    >
-      {@label}
-    </button>
     """
   end
 

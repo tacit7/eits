@@ -71,7 +71,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_show: :twenty,
         rail_modal: nil,
         flyout_agents: [],
+        agent_search: "",
+        agent_scope: "all",
         flyout_notes: [],
+        note_search: "",
+        note_parent_type: nil,
+        flyout_skills: [],
+        skill_search: "",
+        skill_scope: "all",
         flyout_jobs: [],
         flyout_file_nodes: [],
         flyout_file_expanded: MapSet.new(),
@@ -179,6 +186,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         |> Loader.maybe_load_notes(next_section, sidebar_project)
         |> Loader.maybe_load_files(next_section)
         |> Loader.maybe_load_agents(next_section, sidebar_project)
+        |> Loader.maybe_load_skills(next_section, sidebar_project)
       else
         socket
       end
@@ -298,6 +306,24 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("set_task_state_filter", params, socket),
     do: FilterActions.handle_set_task_state_filter(params, socket)
+
+  def handle_event("update_note_search", params, socket),
+    do: FilterActions.handle_update_note_search(params, socket)
+
+  def handle_event("set_note_parent_type", params, socket),
+    do: FilterActions.handle_set_note_parent_type(params, socket)
+
+  def handle_event("update_agent_search", params, socket),
+    do: FilterActions.handle_update_agent_search(params, socket)
+
+  def handle_event("set_agent_scope", params, socket),
+    do: FilterActions.handle_set_agent_scope(params, socket)
+
+  def handle_event("update_skill_search", params, socket),
+    do: FilterActions.handle_update_skill_search(params, socket)
+
+  def handle_event("set_skill_scope", params, socket),
+    do: FilterActions.handle_set_skill_scope(params, socket)
 
   def handle_event("open_rail_modal", %{"type" => type}, socket) do
     modal =
@@ -484,7 +510,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_show={@session_show}
         notification_count={@notification_count}
         flyout_agents={@flyout_agents}
+        agent_search={@agent_search}
+        agent_scope={@agent_scope}
         flyout_notes={@flyout_notes}
+        note_search={@note_search}
+        note_parent_type={@note_parent_type}
+        flyout_skills={@flyout_skills}
+        skill_search={@skill_search}
+        skill_scope={@skill_scope}
         flyout_jobs={@flyout_jobs}
         flyout_file_nodes={@flyout_file_nodes}
         flyout_file_expanded={@flyout_file_expanded}

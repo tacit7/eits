@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Layouts do
             phx-blur="update_session_name"
             phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
             phx-key="Enter"
-            class="text-xs font-semibold text-base-content/75 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 min-w-[8rem] max-w-[24rem] w-auto placeholder:text-base-content/25 transition-colors"
+            class="text-[14px] font-semibold text-base-content/75 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 min-w-[8rem] max-w-[24rem] w-auto placeholder:text-base-content/25 transition-colors"
           />
         </div>
       <% @sidebar_tab == :chat -> %>

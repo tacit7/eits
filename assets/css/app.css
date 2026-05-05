@@ -334,6 +334,9 @@ form:focus-visible {
   --guide-line: color-mix(in oklch, var(--color-primary) 20%, transparent);
   --agent-bg:   color-mix(in oklch, var(--color-primary) 5%, transparent);
 
+  /* User prompt bubble */
+  --prompt-bg:  color-mix(in oklch, var(--color-base-content) 7%, transparent);
+
   /* Code — intentionally NOT accent */
   --code-bg:     var(--color-base-300);
   --code-text:   color-mix(in oklch, var(--color-base-content) 65%, transparent);
@@ -371,6 +374,7 @@ form:focus-visible {
   --status-error:    oklch(50% 0.22 25);
   --guide-line: color-mix(in oklch, var(--color-primary) 25%, transparent);
   --agent-bg:   color-mix(in oklch, var(--color-primary) 6%, transparent);
+  --prompt-bg:  oklch(95% 0.004 85);
 }
 
 /* ===== Sidebar styles ===== */
@@ -390,6 +394,24 @@ form:focus-visible {
 }
 #app-sidebar:hover::-webkit-scrollbar-thumb {
   background: oklch(50% 0 0 / 0.2);
+}
+
+/* ===== Flyout session row active state ===== */
+.flyout-session-row[aria-current="page"] {
+  position: relative;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-primary) 18%, transparent);
+}
+.flyout-session-row[aria-current="page"]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  background: var(--color-primary);
+  border-radius: 0 2px 2px 0;
+  opacity: 0.65;
 }
 
 /* ===== Flyout panel scrollbar — hidden ===== */

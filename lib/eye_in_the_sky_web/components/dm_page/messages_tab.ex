@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     <div class="flex h-full flex-col" id="dm-messages-tab">
       <div class="flex-1 min-h-0 flex flex-col">
         <div
-          class="px-4 py-4 overflow-y-auto flex-1 min-h-0"
+          class="overflow-y-auto flex-1 min-h-0"
           id="messages-container"
           phx-hook="AutoScroll"
           data-has-more={if @has_more_messages, do: "true", else: "false"}
@@ -53,58 +53,69 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               </:subtitle_slot>
             </.empty_state>
           <% else %>
-            <div class="py-2 flex items-center justify-center gap-3">
-              <%= if @has_more_messages do %>
-                <button
-                  phx-click="load_more_messages"
-                  class="text-xs text-base-content/35 hover:text-primary transition-colors"
-                  id="load-more-messages"
-                >
-                  Load older messages
-                </button>
-              <% end %>
-            </div>
+            <div class="max-w-[860px] w-full mx-auto px-5 py-5">
+              <div class="py-2 flex items-center justify-center gap-3">
+                <%= if @has_more_messages do %>
+                  <button
+                    phx-click="load_more_messages"
+                    class="text-xs text-base-content/35 hover:text-primary transition-colors"
+                    id="load-more-messages"
+                  >
+                    Load older messages
+                  </button>
+                <% end %>
+              </div>
 
-            <div>
-              <%= for {message, prev_role} <- @messages_with_context do %>
-                <.message_item message={message} prev_role={prev_role} />
-              <% end %>
-            </div>
+              <div>
+                <%= for {message, prev_role} <- @messages_with_context do %>
+                  <.message_item
+                    message={message}
+                    prev_role={prev_role}
+                    agent={@agent}
+                    session={@session}
+                  />
+                <% end %>
+              </div>
 
-            <%!-- Live streaming bubble --%>
-            <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
-              <div class="py-3 px-2" id="live-stream-bubble">
-                <div class="flex items-start gap-2.5">
-                  <.stream_provider_avatar session={@session} />
-                  <div class="min-w-0 flex-1">
-                    <span class="text-[13px] font-semibold text-primary/80">
+              <%!-- Live streaming bubble --%>
+              <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
+                <div class="mt-3 rounded-md bg-[var(--agent-bg)] px-3 py-2.5" id="live-stream-bubble">
+                  <div class="flex items-center gap-2 mb-2">
+                    <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      <.stream_provider_avatar session={@session} />
+                    </div>
+                    <span class="text-[11px] font-semibold text-primary/80 animate-pulse">
                       {stream_provider_label(@session)}
                     </span>
+                  </div>
+                  <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5">
                     <%= if @stream.thinking do %>
-                      <div class="text-xs text-base-content/30 italic font-mono mt-1 line-clamp-3">
+                      <div class="text-xs text-base-content/30 italic font-mono line-clamp-3">
                         {String.slice(@stream.thinking, -200, 200)}
                       </div>
                     <% end %>
                     <%= if @stream.tool do %>
-                      <div class="text-xs text-base-content/40 font-mono mt-1">
+                      <div class="text-xs text-base-content/40 font-mono">
                         Using {@stream.tool}...
                       </div>
                     <% end %>
                     <%= if @stream.content not in [nil, ""] do %>
-                      <div class="mt-1 text-sm text-base-content/60 whitespace-pre-wrap">
+                      <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">
                         {String.trim_leading(@stream.content)}
                       </div>
                     <% end %>
                   </div>
                 </div>
-              </div>
-            <% end %>
-            <%!-- Scroll anchor: keeps list pinned to bottom on resize (keyboard open/close) --%>
-            <div id="messages-scroll-anchor" style="height: 1px; overflow-anchor: auto;"></div>
+              <% end %>
+
+              <%!-- Scroll anchor --%>
+              <div id="messages-scroll-anchor" style="height: 1px; overflow-anchor: auto;"></div>
+            </div>
           <% end %>
         </div>
       </div>
-      <%!-- Codex raw JSONL stream panel — only visible for codex sessions with data --%>
+
+      <%!-- Codex raw JSONL stream panel --%>
       <%= if @codex_raw_lines != [] do %>
         <details class="border-t border-[var(--border-subtle)] shrink-0" id="codex-raw-panel">
           <summary class="px-4 py-1.5 text-micro font-mono text-base-content/30 cursor-pointer select-none hover:text-base-content/50 flex items-center gap-1.5">
@@ -112,7 +123,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             raw stream ({length(@codex_raw_lines)} lines)
           </summary>
           <div
-            class="h-40 overflow-y-auto bg-base-300/30 px-3 py-2"
+            class="h-40 overflow-y-auto bg-[var(--surface-code)] px-3 py-2"
             id="codex-raw-lines"
             phx-hook="AutoScroll"
           >
@@ -130,6 +141,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   attr :message, :map, required: true
   attr :prev_role, :any, default: nil
+  attr :agent, :map, default: nil
+  attr :session, :map, default: nil
 
   defp message_item(assigns) do
     role = if assigns.message.sender_role == "user", do: :user, else: :agent
@@ -144,6 +157,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     is_empty_tool_result =
       stream_type == "tool_result" and String.trim(assigns.message.body || "") == ""
 
+    show_header = !is_same_sender && !is_tool_event
+
     assigns =
       assigns
       |> assign(:role, role)
@@ -152,15 +167,21 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       |> assign(:is_same_sender, is_same_sender)
       |> assign(:is_new_turn, is_new_turn)
       |> assign(:is_empty_tool_result, is_empty_tool_result)
+      |> assign(:show_header, show_header)
 
     ~H"""
     <%= if !@is_empty_tool_result do %>
+      <%!-- Inter-turn divider: user → agent turn boundary --%>
+      <div
+        :if={@is_new_turn && @role == :agent && !@is_tool_event}
+        class="my-4 mx-1 h-px bg-[var(--border-subtle)]"
+      />
       <div
         id={"dm-message-#{@message.id}"}
         class={[
           cond do
             @is_tool_event -> "mt-1"
-            @is_new_turn -> "mt-5"
+            @is_new_turn -> "mt-2"
             @is_same_sender -> "mt-1"
             true -> "mt-3"
           end
@@ -172,29 +193,81 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           )
         }
       >
-          <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
-            <div class={[
-              "max-w-[78%] flex flex-col",
-              @role == :user && "items-end",
-              @role == :agent && "bg-[var(--agent-bg)] rounded-md px-2 py-1 -mx-2"
-            ]}>
+        <%= if @is_tool_event do %>
+          <%!-- Tool events: no header, indented to align with agent body --%>
+          <div class="pl-[33px]">
+            <.message_body message={@message} compact={false} />
+          </div>
+        <% else %>
+          <%= if @role == :user do %>
+            <%!-- ── User prompt ── --%>
+            <div class="group">
+              <%!-- Header row --%>
+              <div :if={@show_header} class="flex items-center gap-2 mb-1.5">
+                <div class="size-5 rounded-full bg-[var(--surface-card)] border border-[var(--border-subtle)] flex items-center justify-center text-[9px] font-bold text-base-content/40 flex-shrink-0 select-none">
+                  U
+                </div>
+                <span class="text-[11px] font-semibold text-base-content/40">you</span>
+                <time
+                  id={"msg-time-#{@message.id}"}
+                  class="text-[10px] text-base-content/25"
+                  data-utc={to_utc_string(@message.inserted_at)}
+                  phx-hook="LocalTime"
+                />
+              </div>
+              <%!-- Body --%>
               <div class={[
-                "leading-snug break-words",
-                @role == :user &&
-                  "px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] rounded-2xl rounded-br-sm text-sm",
-                @role == :user && @is_dm && "border border-primary/20",
-                @role == :agent && !@is_tool_event &&
-                  "py-1 pl-3 border-l-2 border-[var(--guide-line)] text-base-content/90",
-                @role == :agent && @is_tool_event && "py-0.5 text-base-content/90"
+                "px-3 py-2 bg-[var(--prompt-bg)] border border-[var(--border-subtle)] rounded-md text-[12.5px] leading-[1.5] break-words text-base-content/60",
+                @show_header && "ml-7"
               ]}>
                 <.message_body message={@message} compact={false} />
               </div>
-              <%!-- Agent inline model + cost — dot-separated plain text --%>
+              <.message_attachments attachments={@message.attachments || []} />
+            </div>
+          <% else %>
+            <%!-- ── Agent message ── --%>
+            <div class="group rounded-md bg-[var(--agent-bg)] px-3 py-2.5">
+              <%!-- Header row --%>
+              <div :if={@show_header} class="flex items-center gap-2 mb-3">
+                <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <.agent_provider_icon session={@session} />
+                </div>
+                <span class="text-[11px] font-semibold text-base-content/80">
+                  {if @agent, do: @agent.name, else: "agent"}
+                </span>
+                <time
+                  id={"msg-time-#{@message.id}"}
+                  class="text-[10px] text-base-content/25"
+                  data-utc={to_utc_string(@message.inserted_at)}
+                  phx-hook="LocalTime"
+                />
+                <div class="ml-auto opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 flex items-center gap-0.5">
+                  <button
+                    data-copy-btn
+                    data-copy-text={@message.body}
+                    class="p-1 rounded text-base-content/25 hover:text-base-content/55 hover:bg-base-content/8 transition-colors"
+                    title="Copy message"
+                    aria-label="Copy message"
+                  >
+                    <.icon name="hero-clipboard-document-mini" class="size-3.5" />
+                  </button>
+                </div>
+              </div>
+              <%!-- Body with guide line --%>
+              <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content/90 break-words">
+                <.message_body message={@message} compact={false} />
+              </div>
+              <.message_attachments attachments={@message.attachments || []} />
+              <%!-- Metadata footer --%>
               <div
-                :if={@role == :agent && (message_model(@message) || message_cost(@message))}
-                class="flex items-center mt-0.5 px-1"
+                :if={show_message_metrics?(@message) || message_model(@message) || message_cost(@message)}
+                class="flex items-center gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]"
               >
-                <span class="text-[10px] font-mono tabular-nums text-base-content/30">
+                <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
+                <span
+                  :if={!show_message_metrics?(@message)}
+                  class="text-[11px] font-mono tabular-nums text-base-content/30"
+                >
                   {[
                     message_model(@message),
                     message_cost(@message) &&
@@ -204,27 +277,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   |> Enum.join(" · ")}
                 </span>
               </div>
-              <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
-              <.message_attachments attachments={@message.attachments || []} />
-              <div class="flex items-center gap-1 mt-0.5 px-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150">
-                <time
-                  id={"msg-time-#{@message.id}"}
-                  class="text-nano text-base-content/30"
-                  data-utc={to_utc_string(@message.inserted_at)}
-                  phx-hook="LocalTime"
-                />
-                <button
-                  data-copy-btn
-                  data-copy-text={@message.body}
-                  class="ml-1 p-0.5 rounded text-base-content/25 hover:text-base-content/55 transition-colors"
-                  title="Copy message"
-                  aria-label="Copy message"
-                >
-                  <.icon name="hero-clipboard-document-mini" class="size-3" />
-                </button>
-              </div>
             </div>
-          </div>
+          <% end %>
+        <% end %>
       </div>
     <% end %>
     """
@@ -234,6 +289,26 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defp normalize_provider("gemini"), do: :gemini
   defp normalize_provider(_), do: :claude
 
+  # Static avatar icon for the agent message header
+  attr :session, :map, default: nil
+
+  defp agent_provider_icon(assigns) do
+    provider = if assigns.session, do: assigns.session.provider, else: "claude"
+    assigns = assign(assigns, :provider, normalize_provider(provider))
+
+    ~H"""
+    <%= cond do %>
+      <% @provider == :codex -> %>
+        <img src="/images/openai.svg" class="size-3" alt="Codex" width="12" height="12" loading="lazy" />
+      <% @provider == :gemini -> %>
+        <img src="/images/gemini.svg" class="size-3" alt="Gemini" width="12" height="12" loading="lazy" />
+      <% true -> %>
+        <img src="/images/claude.svg" class="size-3" alt="Claude" width="12" height="12" loading="lazy" />
+    <% end %>
+    """
+  end
+
+  # Animated avatar used by the stream bubble
   attr :session, :map, default: nil
 
   defp stream_provider_avatar(assigns) do
@@ -243,32 +318,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     ~H"""
     <%= cond do %>
       <% @provider == :codex -> %>
-        <img
-          src="/images/openai.svg"
-          class="size-4 mt-1 flex-shrink-0 animate-pulse"
-          alt="Codex"
-          width="16"
-          height="16"
-          loading="lazy"
-        />
+        <img src="/images/openai.svg" class="size-3 animate-pulse" alt="Codex" width="12" height="12" loading="lazy" />
       <% @provider == :gemini -> %>
-        <img
-          src="/images/gemini.svg"
-          class="size-4 mt-1 flex-shrink-0 animate-pulse"
-          alt="Gemini"
-          width="16"
-          height="16"
-          loading="lazy"
-        />
+        <img src="/images/gemini.svg" class="size-3 animate-pulse" alt="Gemini" width="12" height="12" loading="lazy" />
       <% true -> %>
-        <img
-          src="/images/claude.svg"
-          class="size-4 mt-1 flex-shrink-0 animate-pulse"
-          alt="Claude"
-          width="16"
-          height="16"
-          loading="lazy"
-        />
+        <img src="/images/claude.svg" class="size-3 animate-pulse" alt="Claude" width="12" height="12" loading="lazy" />
     <% end %>
     """
   end

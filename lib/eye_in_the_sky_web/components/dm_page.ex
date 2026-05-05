@@ -204,7 +204,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <.icon name="hero-bars-3" class="size-5" />
         </button>
         <div class="flex-1 flex items-center justify-center gap-1.5 min-w-0 px-1">
-          <.status_dot status={@agent.status} size="xs" animate={@agent.status in ~w(working waiting compacting)} />
+          <.status_dot
+            status={@agent.status}
+            size="xs"
+            animate={@agent.status in ~w(working waiting compacting)}
+          />
           <%= if @agent.entrypoint == "cli" do %>
             <.icon name="hero-command-line" class="size-3.5 text-base-content/40 flex-shrink-0" />
           <% end %>
@@ -249,7 +253,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="px-4 sm:px-5 py-3" id="dm-header">
           <div class="flex items-center gap-2 min-w-0">
             <div class="flex items-start gap-2 min-w-0 flex-1">
-              <.status_dot status={@agent.status} animate={@agent.status in ~w(working waiting compacting)} class="mt-[5px]" />
+              <.status_dot
+                status={@agent.status}
+                animate={@agent.status in ~w(working waiting compacting)}
+                class="mt-[5px]"
+              />
               <div class="flex flex-col min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <%= if @agent.entrypoint == "cli" do %>
@@ -448,7 +456,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <%= if @active_tab in ["messages", nil] do %>
         <div
           id="dm-page-composer"
-          class="flex-shrink-0 max-w-4xl mx-auto w-full pt-2 safe-inset-bottom"
+          class="flex-shrink-0 max-w-[860px] mx-auto w-full px-5 pb-7 pt-3 safe-inset-bottom"
         >
           <%= if @message_data.queued_prompts != [] do %>
             <Composer.prompt_queue prompts={@message_data.queued_prompts} />
@@ -478,5 +486,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
     </div>
     """
   end
-
 end

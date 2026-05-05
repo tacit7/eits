@@ -172,11 +172,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           )
         }
       >
-        <%= if @is_tool_event do %>
-          <div class="max-w-[70%] px-1">
-            <.message_body message={@message} compact={false} />
-          </div>
-        <% else %>
           <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
             <div class={[
               "max-w-[78%] flex flex-col",
@@ -188,7 +183,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 @role == :user &&
                   "px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] rounded-2xl rounded-br-sm text-sm",
                 @role == :user && @is_dm && "border border-primary/20",
-                @role == :agent && "py-1 pl-3 border-l-2 border-[var(--border-subtle)] text-base-content/90"
+                @role == :agent && !@is_tool_event &&
+                  "py-1 pl-3 border-l-2 border-[var(--border-subtle)] text-base-content/90",
+                @role == :agent && @is_tool_event && "py-0.5 text-base-content/90"
               ]}>
                 <.message_body message={@message} compact={false} />
               </div>
@@ -228,7 +225,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               </div>
             </div>
           </div>
-        <% end %>
       </div>
     <% end %>
     """

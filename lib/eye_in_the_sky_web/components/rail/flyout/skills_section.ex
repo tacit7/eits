@@ -56,6 +56,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
     ~H"""
     <details
       id={"skill-row-#{@skill.id}"}
+      phx-update="ignore"
       class="group"
       data-vim-flyout-item
     >

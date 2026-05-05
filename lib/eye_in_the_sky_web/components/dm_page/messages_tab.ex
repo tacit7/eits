@@ -172,11 +172,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           )
         }
       >
-          <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
+          <div class={["group flex gap-1.5", @role == :user && "flex-row-reverse items-end"]}>
             <div class={[
-              "max-w-[78%] flex flex-col",
-              @role == :user && "items-end",
-              @role == :agent && "bg-base-content/[0.025] rounded-md px-2 py-1 -mx-2"
+              "flex flex-col",
+              @role == :user && "max-w-[78%] items-end",
+              @role == :agent && "w-full bg-base-content/[0.025] rounded-md px-2 py-1 -mx-2"
             ]}>
               <div class={[
                 "leading-snug break-words",

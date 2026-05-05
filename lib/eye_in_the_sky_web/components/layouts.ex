@@ -16,21 +16,27 @@ defmodule EyeInTheSkyWeb.Layouts do
   @doc "Section label slot: section name or DM session name. No project breadcrumb — chrome spec shows label only."
   attr :sidebar_tab, :atom, required: true
   attr :dm_session_name, :string, default: nil
+  attr :dm_session_status, :string, default: nil
 
   def top_bar_breadcrumb(assigns) do
     ~H"""
     <%= cond do %>
       <% @sidebar_tab == :dm -> %>
-        <input
-          id="top-bar-session-name"
-          type="text"
-          value={@dm_session_name || ""}
-          placeholder="Session name"
-          phx-blur="update_session_name"
-          phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
-          phx-key="Enter"
-          class="text-xs font-semibold text-base-content/75 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 min-w-[8rem] max-w-[24rem] w-auto placeholder:text-base-content/25 transition-colors"
-        />
+        <div class="flex items-center gap-1.5 min-w-0">
+          <%= if @dm_session_status do %>
+            <.status_dot status={@dm_session_status} size="xs" class="flex-shrink-0" />
+          <% end %>
+          <input
+            id="top-bar-session-name"
+            type="text"
+            value={@dm_session_name || ""}
+            placeholder="Session name"
+            phx-blur="update_session_name"
+            phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
+            phx-key="Enter"
+            class="text-xs font-semibold text-base-content/75 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 min-w-[8rem] max-w-[24rem] w-auto placeholder:text-base-content/25 transition-colors"
+          />
+        </div>
       <% @sidebar_tab == :chat -> %>
         <%!-- chat toolbar renders #channel-name itself; no label here --%>
       <% true -> %>
@@ -69,7 +75,6 @@ defmodule EyeInTheSkyWeb.Layouts do
     <% end %>
     """
   end
-
 
   @doc false
   def top_bar_section_label(:dm), do: "Session"

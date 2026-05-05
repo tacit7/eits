@@ -8,7 +8,8 @@
     id="vim-nav-root"
     data-vim-nav-enabled={EyeInTheSky.Settings.get("vim_nav_enabled")}
     style="display:none"
-  ></div>
+  >
+  </div>
   <a
     href="#main-content"
     class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] rounded-md bg-base-100 px-3 py-2 text-xs font-medium shadow"
@@ -77,6 +78,7 @@
       <.top_bar_breadcrumb
         sidebar_tab={sidebar_tab}
         dm_session_name={assigns[:page_title]}
+        dm_session_status={assigns[:session_status]}
       />
       <%= case sidebar_tab do %>
         <% :sessions -> %>
@@ -316,5 +318,6 @@
     statuses={%{}}
   />
 
-  <div id="session-failure-toast" class="toast toast-bottom toast-end z-50" phx-update="ignore"></div>
+  <div id="session-failure-toast" class="toast toast-bottom toast-end z-50" phx-update="ignore">
+  </div>
 </div>

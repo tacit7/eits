@@ -78,9 +78,7 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
     notify? = Map.get(socket.assigns, :notify_on_stop, false)
     desktop? = Desktop.desktop_mode?()
 
-    Logger.info(
-      "agent_stopped notify check: notify_on_stop=#{notify?} desktop_mode?=#{desktop?}"
-    )
+    Logger.info("agent_stopped notify check: notify_on_stop=#{notify?} desktop_mode?=#{desktop?}")
 
     if notify? && desktop? do
       session = socket.assigns[:session]
@@ -97,6 +95,7 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
       socket =
         socket
         |> assign(:session, updated_session)
+        |> assign(:session_status, updated_session.status)
         |> sync_processing_from_status(updated_session.status)
 
       {:noreply, socket}

@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   alias EyeInTheSkyWeb.Components.DmHelpers
   import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1, parse_body_segments: 1]
+
   import EyeInTheSkyWeb.Components.DmMessageComponents,
     only: [message_body: 1, message_metrics: 1, message_attachments: 1]
 
@@ -47,8 +48,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               subtitle_class="mt-1.5 text-xs text-base-content/25 max-w-xs"
             >
               <:subtitle_slot :if={not is_nil(@agent) && not is_nil(@agent.git_worktree_path)}>
-                <span class="font-mono">{Path.basename(@agent.git_worktree_path)}</span>
-                &nbsp;&mdash;
+                <span class="font-mono">{Path.basename(@agent.git_worktree_path)}</span> &nbsp;&mdash;
                 Send a message to start the conversation
               </:subtitle_slot>
             </.empty_state>
@@ -106,7 +106,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       </div>
       <%!-- Codex raw JSONL stream panel — only visible for codex sessions with data --%>
       <%= if @codex_raw_lines != [] do %>
-        <details class="border-t border-base-300 shrink-0" id="codex-raw-panel">
+        <details class="border-t border-[var(--border-subtle)] shrink-0" id="codex-raw-panel">
           <summary class="px-4 py-1.5 text-micro font-mono text-base-content/30 cursor-pointer select-none hover:text-base-content/50 flex items-center gap-1.5">
             <.icon name="hero-code-bracket" class="size-3" />
             raw stream ({length(@codex_raw_lines)} lines)
@@ -140,6 +140,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
     is_same_sender = assigns.prev_role != nil && assigns.prev_role == assigns.message.sender_role
     is_new_turn = assigns.prev_role != nil && assigns.prev_role != assigns.message.sender_role
+
     is_empty_tool_result =
       stream_type == "tool_result" and String.trim(assigns.message.body || "") == ""
 
@@ -154,71 +155,77 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
     ~H"""
     <%= if !@is_empty_tool_result do %>
-    <div
-      id={"dm-message-#{@message.id}"}
-      class={[
-        cond do
-          @is_tool_event -> "mt-1"
-          @is_new_turn -> "mt-5"
-          @is_same_sender -> "mt-1"
-          true -> "mt-3"
-        end
-      ]}
-      phx-mounted={
-        JS.transition(
-          {"transition-all ease-out duration-200", "opacity-0 translate-y-1",
-           "opacity-100 translate-y-0"}
-        )
-      }
-    >
-      <%= if @is_tool_event do %>
-        <div class="max-w-[70%] px-1">
-          <.message_body message={@message} compact={false} />
-        </div>
-      <% else %>
-        <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
-          <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
-            <div class={[
-              "leading-snug break-words",
-              @role == :user &&
-                "px-3 py-2 bg-base-200 text-base-content rounded-2xl rounded-br-sm text-sm",
-              @role == :user && @is_dm && "border border-primary/20",
-              @role == :agent && "py-1 text-base-content/90"
-            ]}>
-              <.message_body message={@message} compact={false} />
-            </div>
-            <%!-- Agent inline model + cost — dot-separated plain text --%>
-            <div :if={@role == :agent && (message_model(@message) || message_cost(@message))} class="flex items-center mt-0.5 px-1">
-              <span class="text-[10px] font-mono tabular-nums text-base-content/30">
-                {[
-                  message_model(@message),
-                  message_cost(@message) && "$#{:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}"
-                ] |> Enum.reject(&is_nil/1) |> Enum.join(" · ")}
-              </span>
-            </div>
-            <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
-            <.message_attachments attachments={@message.attachments || []} />
-            <div class="flex items-center gap-1 mt-0.5 px-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150">
-              <time
-                id={"msg-time-#{@message.id}"}
-                class="text-nano text-base-content/30"
-                data-utc={to_utc_string(@message.inserted_at)}
-                phx-hook="LocalTime"
-              />
-              <button
-                data-copy-btn
-                data-copy-text={@message.body}
-                class="ml-1 p-0.5 rounded text-base-content/25 hover:text-base-content/55 transition-colors"
-                title="Copy message"
-                aria-label="Copy message"
+      <div
+        id={"dm-message-#{@message.id}"}
+        class={[
+          cond do
+            @is_tool_event -> "mt-1"
+            @is_new_turn -> "mt-5"
+            @is_same_sender -> "mt-1"
+            true -> "mt-3"
+          end
+        ]}
+        phx-mounted={
+          JS.transition(
+            {"transition-all ease-out duration-200", "opacity-0 translate-y-1",
+             "opacity-100 translate-y-0"}
+          )
+        }
+      >
+        <%= if @is_tool_event do %>
+          <div class="max-w-[70%] px-1">
+            <.message_body message={@message} compact={false} />
+          </div>
+        <% else %>
+          <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
+            <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
+              <div class={[
+                "leading-snug break-words",
+                @role == :user &&
+                  "px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] rounded-2xl rounded-br-sm text-sm",
+                @role == :user && @is_dm && "border border-primary/20",
+                @role == :agent && "py-1 text-base-content/90"
+              ]}>
+                <.message_body message={@message} compact={false} />
+              </div>
+              <%!-- Agent inline model + cost — dot-separated plain text --%>
+              <div
+                :if={@role == :agent && (message_model(@message) || message_cost(@message))}
+                class="flex items-center mt-0.5 px-1"
               >
-                <.icon name="hero-clipboard-document-mini" class="size-3" />
-              </button>
+                <span class="text-[10px] font-mono tabular-nums text-base-content/30">
+                  {[
+                    message_model(@message),
+                    message_cost(@message) &&
+                      "$#{:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}"
+                  ]
+                  |> Enum.reject(&is_nil/1)
+                  |> Enum.join(" · ")}
+                </span>
+              </div>
+              <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
+              <.message_attachments attachments={@message.attachments || []} />
+              <div class="flex items-center gap-1 mt-0.5 px-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150">
+                <time
+                  id={"msg-time-#{@message.id}"}
+                  class="text-nano text-base-content/30"
+                  data-utc={to_utc_string(@message.inserted_at)}
+                  phx-hook="LocalTime"
+                />
+                <button
+                  data-copy-btn
+                  data-copy-text={@message.body}
+                  class="ml-1 p-0.5 rounded text-base-content/25 hover:text-base-content/55 transition-colors"
+                  title="Copy message"
+                  aria-label="Copy message"
+                >
+                  <.icon name="hero-clipboard-document-mini" class="size-3" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      <% end %>
-    </div>
+        <% end %>
+      </div>
     <% end %>
     """
   end
@@ -280,5 +287,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     message.sender_role == "agent" and is_map(message.metadata) and
       not is_nil(message.metadata["total_cost_usd"])
   end
-
 end

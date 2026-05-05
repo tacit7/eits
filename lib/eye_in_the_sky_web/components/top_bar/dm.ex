@@ -21,26 +21,36 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- DM: search first, then tab pills --%>
-    <%= if @active_tab in ["messages", nil] && not is_nil(@search_query) do %>
+    <%!-- DM: search always visible on messages tab --%>
+    <%= if @active_tab in ["messages", nil] do %>
       <.search_bar
         id="top-bar-dm-search"
         size="xs"
         label="Search messages"
         placeholder="Search messages..."
-        value={@search_query}
+        value={@search_query || ""}
         on_change="search_messages"
         on_submit="search_messages"
         class="w-48"
       />
     <% end %>
     <.tab_pills value_key="tab">
-      <:item label="Messages" active={@active_tab in ["messages", nil]} on_click="change_tab" value="messages" />
+      <:item
+        label="Messages"
+        active={@active_tab in ["messages", nil]}
+        on_click="change_tab"
+        value="messages"
+      />
       <:item label="Tasks" active={@active_tab == "tasks"} on_click="change_tab" value="tasks" />
       <:item label="Commits" active={@active_tab == "commits"} on_click="change_tab" value="commits" />
       <:item label="Notes" active={@active_tab == "notes"} on_click="change_tab" value="notes" />
       <:item label="Context" active={@active_tab == "context"} on_click="change_tab" value="context" />
-      <:item label="Settings" active={@active_tab == "settings"} on_click="change_tab" value="settings" />
+      <:item
+        label="Settings"
+        active={@active_tab == "settings"}
+        on_click="change_tab"
+        value="settings"
+      />
     </.tab_pills>
     <div class="flex-1" />
     <%!-- ... menu --%>
@@ -80,7 +90,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
           </li>
         <% end %>
         <%= if @session_uuid || @show_iterm do %>
-          <li><div class="divider my-0"></div></li>
+          <li>
+            <div class="divider my-0"></div>
+          </li>
         <% end %>
         <li>
           <button
@@ -98,7 +110,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             <.icon name="hero-clipboard-document" class="size-3.5" /> Export as Markdown
           </button>
         </li>
-        <li><div class="divider my-0"></div></li>
+        <li>
+          <div class="divider my-0"></div>
+        </li>
         <li>
           <button
             id="topbar-push-setup-btn"
@@ -112,7 +126,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             <.icon name="hero-bell" class="size-3.5" /> Notify
           </button>
         </li>
-        <li><div class="divider my-0"></div></li>
+        <li>
+          <div class="divider my-0"></div>
+        </li>
         <li>
           <button
             phx-click="open_schedule_timer"

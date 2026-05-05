@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   @moduledoc false
   use EyeInTheSkyWeb, :html
+  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
@@ -97,10 +98,21 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
     <.link
       navigate={"/dm/#{@session.id}"}
       data-vim-flyout-item
-      class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+      class="flex items-start gap-2 px-3 py-1.5 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
     >
-      <.status_dot status={@session.status} size="xs" />
-      <span class="truncate font-medium text-xs">{@session.name || "unnamed"}</span>
+      <.status_dot status={@session.status} size="xs" class="mt-[3px] flex-shrink-0" />
+      <div class="min-w-0 flex-1">
+        <div class="truncate font-medium text-xs text-base-content/75">
+          {@session.name || "unnamed"}
+        </div>
+        <div class="text-nano text-base-content/35 mt-0.5 flex items-center gap-1">
+          <span class="capitalize">{@session.status}</span>
+          <%= if @session.last_activity_at do %>
+            <span>·</span>
+            <span>{relative_time(@session.last_activity_at)}</span>
+          <% end %>
+        </div>
+      </div>
     </.link>
     """
   end

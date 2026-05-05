@@ -68,6 +68,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   def assign_session_state(socket, session, agent) do
     socket
     |> assign(:page_title, session.name || "Session")
+    |> assign(:session_status, session.status)
     |> assign(:hide_mobile_header, true)
     |> assign(:session_id, session.id)
     |> assign(:session_uuid, session.uuid)

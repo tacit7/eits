@@ -93,6 +93,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
   def message_body(assigns) do
     raw_body = assigns.message.body || ""
+
     is_dm_body =
       dm_message?(assigns.message) or
         String.starts_with?(raw_body, "DM from:") or
@@ -138,7 +139,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
               "inline-flex items-center px-1.5 py-0.5 rounded text-micro font-mono font-semibold",
               @dm_info.status in ["done", "completed"] && "bg-success/15 text-success/80",
               @dm_info.status == "failed" && "bg-error/15 text-error/80",
-              @dm_info.status not in ["done", "completed", "failed"] && "bg-base-content/8 text-base-content/50"
+              @dm_info.status not in ["done", "completed", "failed"] &&
+                "bg-base-content/8 text-base-content/50"
             ]}>
               {@dm_info.status}
             </span>
@@ -159,7 +161,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       <% end %>
       <details
         :if={@thinking && @thinking != ""}
-        class="group rounded border-l-2 border-primary/50 bg-zinc-950/50 overflow-hidden"
+        class="group rounded border-l-2 border-primary/50 bg-[var(--surface-code)] overflow-hidden"
       >
         <summary class={
           "flex items-center cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors " <>
@@ -167,7 +169,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         }>
           <.icon
             name="hero-sparkles"
-            class={if @compact, do: "size-3 flex-shrink-0 text-primary/60", else: "size-3.5 flex-shrink-0 text-primary/60"}
+            class={
+              if @compact,
+                do: "size-3 flex-shrink-0 text-primary/60",
+                else: "size-3.5 flex-shrink-0 text-primary/60"
+            }
           />
           <span class={
             "font-mono font-semibold text-primary/60 uppercase tracking-wide " <>
@@ -177,11 +183,27 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           </span>
           <.icon
             name="hero-chevron-right"
-            class={if @compact, do: "w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90", else: "size-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"}
+            class={
+              if @compact,
+                do:
+                  "w-2.5 h-2.5 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90",
+                else:
+                  "size-3 text-base-content/20 ml-auto flex-shrink-0 transition-transform group-open:rotate-90"
+            }
           />
         </summary>
-        <div class={if @compact, do: "px-2 pb-1.5 pt-1 border-t border-primary/10", else: "px-2.5 pb-2 pt-1 border-t border-primary/10"}>
-          <pre class={if @compact, do: "font-mono text-micro text-base-content/40 whitespace-pre-wrap break-words leading-relaxed", else: "font-mono text-xs text-base-content/40 whitespace-pre-wrap break-words leading-relaxed"}>{@thinking}</pre>
+        <div class={
+          if @compact,
+            do: "px-2 pb-1.5 pt-1 border-t border-[var(--border-subtle)]",
+            else: "px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]"
+        }>
+          <pre class={
+            if @compact,
+              do:
+                "font-mono text-micro text-[var(--text-muted)] whitespace-pre-wrap break-words leading-relaxed",
+              else:
+                "font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap break-words leading-relaxed"
+          }>{@thinking}</pre>
         </div>
       </details>
       <%= if @stream_type == "tool_result" do %>
@@ -194,7 +216,10 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
             <% {:text, text} when text != "" -> %>
               <div
                 id={"msg-body-#{@id_prefix}#{@message.id}-#{idx}"}
-                class={["dm-markdown leading-relaxed text-base-content/85", if(@compact, do: "text-xs", else: "text-sm")]}
+                class={[
+                  "dm-markdown leading-relaxed text-base-content/85",
+                  if(@compact, do: "text-xs", else: "text-sm")
+                ]}
                 phx-hook="MarkdownMessage"
                 data-raw-body={text}
               >
@@ -219,38 +244,57 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
     ~H"""
     <%= if !@body_blank do %>
-    <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
-      <summary class={
-        "flex items-center cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors " <>
+      <details class="group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden">
+        <summary class={
+        "flex items-center cursor-pointer select-none list-none hover:bg-[var(--border-subtle)] transition-colors " <>
           if(@compact, do: "gap-1.5 px-2 py-1", else: "gap-2 px-2.5 py-1.5")
       }>
-        <.icon
-          name="hero-code-bracket"
-          class={if @compact, do: "size-3 flex-shrink-0 text-base-content/30", else: "size-3.5 flex-shrink-0 text-base-content/30"}
-        />
-        <span class={
+          <.icon
+            name="hero-code-bracket"
+            class={
+              if @compact,
+                do: "size-3 flex-shrink-0 text-base-content/30",
+                else: "size-3.5 flex-shrink-0 text-base-content/30"
+            }
+          />
+          <span class={
           "font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0 " <>
             if(@compact, do: "text-micro", else: "text-mini")
         }>
-          Output
-        </span>
-        <button
-          class="tool-copy-btn ml-auto mr-1 shrink-0"
-          data-copy-btn
-          data-copy-text={@body}
-          title="Copy output"
-        >
-          <.icon name="hero-clipboard-document" class={if @compact, do: "size-3", else: "size-3.5"} />
-        </button>
-        <.icon
-          name="hero-chevron-right"
-          class={if @compact, do: "w-2.5 h-2.5 text-base-content/20 shrink-0 transition-transform group-open:rotate-90", else: "size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"}
-        />
-      </summary>
-      <div class={if @compact, do: "px-2 pb-1.5 pt-1 border-t border-base-content/5", else: "px-2.5 pb-2 pt-1 border-t border-base-content/5"}>
-        <pre class={if @compact, do: "font-mono text-micro text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto", else: "font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto"}>{@body}</pre>
-      </div>
-    </details>
+            Output
+          </span>
+          <button
+            class="tool-copy-btn ml-auto mr-1 shrink-0"
+            data-copy-btn
+            data-copy-text={@body}
+            title="Copy output"
+          >
+            <.icon name="hero-clipboard-document" class={if @compact, do: "size-3", else: "size-3.5"} />
+          </button>
+          <.icon
+            name="hero-chevron-right"
+            class={
+              if @compact,
+                do:
+                  "w-2.5 h-2.5 text-base-content/20 shrink-0 transition-transform group-open:rotate-90",
+                else: "size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
+            }
+          />
+        </summary>
+        <div class={
+          if @compact,
+            do: "px-2 pb-1.5 pt-1 border-t border-[var(--border-subtle)]",
+            else: "px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]"
+        }>
+          <pre class={
+            if @compact,
+              do:
+                "font-mono text-micro text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto",
+              else:
+                "font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto"
+          }>{@body}</pre>
+        </div>
+      </details>
     <% end %>
     """
   end
@@ -282,8 +326,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       |> assign(:wrap_detail, wrap_detail)
 
     ~H"""
-    <details class="group rounded-md border border-base-content/8 bg-base-content/[0.025] overflow-hidden">
-      <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
+    <details class="group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden">
+      <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-[var(--border-subtle)] transition-colors">
         <.icon name={@icon} class="size-3.5 flex-shrink-0 text-base-content/35" />
         <span class="text-mini font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
           {@label}
@@ -327,31 +371,31 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     ~H"""
     <%= case @body_type do %>
       <% :bash -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-xs text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
+          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
         </div>
       <% :edit -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1.5">
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-1.5">
           <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
           <pre class="bg-red-950/30 text-red-400/70 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["old_string"] || "", 0..500)}</pre>
           <pre class="bg-green-950/30 text-green-400/70 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["new_string"] || "", 0..500)}</pre>
         </div>
       <% :write -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5 space-y-1">
-          <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-base-200 rounded px-2 py-1.5 font-mono text-xs text-base-content/55 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-1">
+          <div class="font-mono text-xs text-[var(--text-ghost)] pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
         </div>
       <% :speak -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="bg-base-200 rounded px-2 py-1.5 text-mini text-base-content/70 whitespace-pre-wrap break-all leading-relaxed">{@detail}</pre>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
+          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 text-mini text-[var(--text-secondary)] whitespace-pre-wrap break-all leading-relaxed">{@detail}</pre>
         </div>
       <% :json -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="font-mono text-xs text-base-content/40 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
+          <pre class="font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
         </div>
       <% :text -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-base-content/5">
-          <pre class="font-mono text-xs text-base-content/45 whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
+          <pre class="font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
         </div>
       <% :none -> %>
     <% end %>

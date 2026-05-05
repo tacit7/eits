@@ -1971,7 +1971,7 @@ BATCH_HELP
         esac
       done
       [[ -z "$_since" ]] && die "--since <duration> is required (e.g. --since 24h)"
-      local _resp; _resp=$(_curl "$BASE_URL/agents/activity?uuid=${_uuid}&since=${_since}")
+      local _resp; _resp=$(_curl "$BASE_URL/agents/activity?agent_uuid=${_uuid}&since=${_since}")
       if [[ "$_json" -eq 1 ]]; then
         printf '%s\n' "$_resp"
       else
@@ -3672,7 +3672,7 @@ USAGE
       while IFS= read -r uuid; do
         [[ -z "$uuid" ]] && continue
         local act
-        act=$(_curl "$BASE_URL/agents/activity?uuid=$(printf '%s' "$uuid" | jq -Rr @uri)&since=$(printf '%s' "$cutoff" | jq -Rr @uri)" 2>/dev/null) || continue
+        act=$(_curl "$BASE_URL/agents/activity?agent_uuid=$(printf '%s' "$uuid" | jq -Rr @uri)&since=$(printf '%s' "$cutoff" | jq -Rr @uri)" 2>/dev/null) || continue
         local task_count commit_count session_count
         task_count=$(echo "$act" | jq '[.tasks[]?] | length' 2>/dev/null || echo 0)
         commit_count=$(echo "$act" | jq '[.commits[]?] | length' 2>/dev/null || echo 0)

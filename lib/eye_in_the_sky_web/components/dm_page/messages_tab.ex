@@ -195,7 +195,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       >
         <%= if @is_tool_event do %>
           <%!-- Tool events: subordinate rendering — compact + muted --%>
-          <div class="pl-[33px] opacity-[0.65]">
+          <div class="pl-[33px]">
             <.message_body message={@message} compact={true} />
           </div>
         <% else %>

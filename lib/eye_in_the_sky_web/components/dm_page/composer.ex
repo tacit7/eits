@@ -34,13 +34,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
       data-session-flags={Jason.encode!(serialize_cli_opts(@session_cli_opts))}
       phx-hook="DmComposer"
     >
-      <%= if @display_name do %>
-        <div class="flex justify-end px-4 pt-2">
-          <span class="text-mini text-base-content/35 bg-base-content/5 px-2 py-0.5 rounded">
-            {@display_name}
-          </span>
-        </div>
-      <% end %>
       <%!-- Upload previews --%>
       <%= if @uploads.files.entries != [] do %>
         <div class="px-4 pt-3 flex flex-wrap gap-2" id="upload-preview-list">
@@ -68,7 +61,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         <textarea
           name="body"
           rows="1"
-          placeholder={if @processing, do: "Queue a message...", else: "Reply..."}
+          placeholder={
+            cond do
+              @processing -> "Queue a message…"
+              @display_name -> "Reply to #{@display_name}…"
+              true -> "Reply…"
+            end
+          }
           class="w-full bg-transparent border-0 outline-none focus:ring-0 text-[13px] resize-none min-h-[28px] max-h-40 overflow-y-auto placeholder:text-base-content/30 p-0 leading-relaxed"
           autocomplete="off"
           phx-hook="CommandHistory"

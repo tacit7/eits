@@ -1167,7 +1167,12 @@ HELP
       if [[ -n "$session_id" ]]; then
         local _sess_resp
         _sess_resp=$(_curl "$BASE_URL/tasks?session_id=${session_id}&limit=200") || return 1
-        ids_raw=$(printf '%s' "$_sess_resp" | jq -r '[.tasks[].id] | join(",")')
+        ids_raw=$(printf '%s' "$_sess_resp" | jq -r '[.tasks[].id] | join(",")') \
+          || { echo "[eits] failed to parse session task list" >&2; return 1; }
+        local _task_count; _task_count=$(printf '%s' "$_sess_resp" | jq -r '.tasks | length' 2>/dev/null || echo 0)
+        if [[ "$_task_count" -ge 200 ]]; then
+          echo "[eits] warning: session has 200+ tasks; only the first 200 are included" >&2
+        fi
         if [[ -z "$ids_raw" ]]; then
           printf 'no tasks found for session\n'
           return 0

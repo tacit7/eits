@@ -172,6 +172,11 @@ export const VimNav = {
     this.handleEvent("vim:task-nav-result", ({ url }: { url: string | null }) => {
       if (url) window.location.assign(url)
     })
+    this.handleEvent("vim:toggle-task-done-result", ({ task_id, done }: { task_id: string; done: boolean }) => {
+      const items = this.currentListItems()
+      const item = items.find(el => el.dataset.vimItemId === task_id)
+      if (item) item.dataset.vimItemDone = done ? "true" : "false"
+    })
   },
 
   destroyed() {
@@ -577,6 +582,23 @@ export const VimNav = {
           input.select()
         }
         this.setMode("insert")
+        return
+      }
+      if (action.name === "list_open_edit") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const url = item.dataset.vimItemUrl
+        if (!url) return
+        window.location.assign(url)
+        return
+      }
+      if (action.name === "list_toggle_done") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        if (item.dataset.vimItemType !== "task") return
+        const taskId = item.dataset.vimItemId
+        if (!taskId) return
+        this.pushToList?.("vim:toggle-task-done", { task_id: taskId })
         return
       }
       if (action.name === "focus_flyout") {

@@ -10,6 +10,7 @@ function makeHook(opts: { enabled?: boolean; projectPath?: string } = {}) {
   const inst: any = Object.create(VimNav)
   inst.el = el
   inst.pushEvent = vi.fn()
+  inst.pushToList = vi.fn()
   inst.handleEvent = vi.fn()
   // Own-property init ensures test isolation — prototype mutable state (buffer, count)
   // can otherwise bleed between tests if a prior test mutates the prototype array.
@@ -2748,5 +2749,139 @@ describe("task nav commands (Space t n / Space t p)", () => {
     )!
     expect(cmd).toBeDefined()
     expect(cmd.id).toBe("leader.task.prev")
+  })
+})
+
+describe("e open item (list_open_edit)", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  const openEditCmd = { id: "list.open_edit", label: "Open item", keys: ["e"], group: "context" as const, action: { kind: "client" as const, name: "list_open_edit" as const }, scope: "feature:vim-list" }
+
+  function makeListWithUrl(url: string): HTMLElement {
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    li.dataset.vimItemUrl = url
+    ul.appendChild(li)
+    document.body.appendChild(ul)
+    return li
+  }
+
+  it("navigates to data-vim-item-url of focused item", () => {
+    const assignMock = vi.fn()
+    Object.defineProperty(window, "location", { value: { assign: assignMock }, configurable: true })
+    makeListWithUrl("/dm/42")
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    h.executeCommand(openEditCmd)
+    expect(assignMock).toHaveBeenCalledWith("/dm/42")
+  })
+
+  it("no-op when listFocusIndex is -1", () => {
+    const assignMock = vi.fn()
+    Object.defineProperty(window, "location", { value: { assign: assignMock }, configurable: true })
+    makeListWithUrl("/dm/42")
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = -1
+    h.executeCommand(openEditCmd)
+    expect(assignMock).not.toHaveBeenCalled()
+  })
+
+  it("no-op when focused item has no data-vim-item-url", () => {
+    const assignMock = vi.fn()
+    Object.defineProperty(window, "location", { value: { assign: assignMock }, configurable: true })
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    ul.appendChild(li)
+    document.body.appendChild(ul)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    h.executeCommand(openEditCmd)
+    expect(assignMock).not.toHaveBeenCalled()
+  })
+})
+
+describe("x toggle task done (list_toggle_done)", () => {
+  beforeEach(() => { document.body.innerHTML = "" })
+  afterEach(() => { document.body.innerHTML = "" })
+
+  const toggleCmd = { id: "list.toggle_done", label: "Toggle done", keys: ["x"], group: "context" as const, action: { kind: "client" as const, name: "list_toggle_done" as const }, scope: "feature:vim-list" }
+
+  function makeTaskItem(taskId: string): HTMLElement {
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    li.dataset.vimItemType = "task"
+    li.dataset.vimItemId = taskId
+    ul.appendChild(li)
+    document.body.appendChild(ul)
+    return li
+  }
+
+  it("pushes vim:toggle-task-done with task_id", () => {
+    makeTaskItem("99")
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    h.executeCommand(toggleCmd)
+    expect(h.pushToList).toHaveBeenCalledWith("vim:toggle-task-done", { task_id: "99" })
+  })
+
+  it("no-op when item type is not task", () => {
+    const ul = document.createElement("ul")
+    ul.setAttribute("data-vim-list", "")
+    const li = document.createElement("li")
+    li.setAttribute("data-vim-list-item", "")
+    li.dataset.vimItemType = "session"
+    li.dataset.vimItemId = "5"
+    ul.appendChild(li)
+    document.body.appendChild(ul)
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = 0
+    h.executeCommand(toggleCmd)
+    expect(h.pushToList).not.toHaveBeenCalled()
+  })
+
+  it("no-op when listFocusIndex is -1", () => {
+    makeTaskItem("99")
+    const h = makeHook()
+    h.mode = "normal"
+    h.listFocusIndex = -1
+    h.executeCommand(toggleCmd)
+    expect(h.pushToList).not.toHaveBeenCalled()
+  })
+
+  it("handleEvent vim:toggle-task-done-result updates data-vim-item-done on matching item", () => {
+    const li = makeTaskItem("99")
+    const h = makeHook()
+    h.mounted()
+    h.listFocusIndex = 0
+    const [_evt, callback] = (h.handleEvent as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([evt]: [string]) => evt === "vim:toggle-task-done-result"
+    )!
+    callback({ task_id: "99", done: true })
+    expect(li.dataset.vimItemDone).toBe("true")
+    h.destroyed()
+  })
+
+  it("handleEvent vim:toggle-task-done-result does nothing when task_id does not match", () => {
+    const li = makeTaskItem("99")
+    const h = makeHook()
+    h.mounted()
+    const [_evt, callback] = (h.handleEvent as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([evt]: [string]) => evt === "vim:toggle-task-done-result"
+    )!
+    callback({ task_id: "999", done: true })
+    expect(li.dataset.vimItemDone).toBeUndefined()
+    h.destroyed()
   })
 })

@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       data-vim-flyout-open={to_string(@open)}
       class={
         [
-          "flex flex-col border-r border-base-content/8 bg-base-100 overflow-hidden flex-shrink-0 transition-[width] duration-150",
+          "flex flex-col border-r border-base-content/8 bg-[var(--surface-sidebar)] overflow-hidden flex-shrink-0 transition-[width] duration-150",
           # w-0 is always the mobile base; md:w-[236px] overrides on desktop when open.
           # w-[236px] overrides on mobile only when mobile_open is also true.
           if(@open, do: "w-0 md:w-[236px]", else: "w-0"),

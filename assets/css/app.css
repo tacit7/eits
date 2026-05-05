@@ -346,12 +346,14 @@ form:focus-visible {
   --status-error:   var(--color-error);
 }
 
-/* Dark theme tuning — surface-card needs a distinct step between canvas and sidebar */
+/* Dark theme tuning — base-200 is lighter than base-100 in dark mode, so
+   surface-sidebar must use base-300 (darkest) to sit visually behind the canvas */
 [data-theme="dark"] {
-  --surface-card:   hsl(60 2.4% 16%);
-  --surface-code:   hsl(30 3.3% 11.8%);
-  --code-bg:        hsl(30 3.3% 11.8%);
-  --code-text:      color-mix(in oklch, hsl(48 33.3% 97.1%) 58%, transparent);
+  --surface-card:    hsl(60 2.4% 16%);
+  --surface-code:    hsl(30 3.3% 11.8%);
+  --surface-sidebar: var(--color-base-300);
+  --code-bg:         hsl(30 3.3% 11.8%);
+  --code-text:       color-mix(in oklch, hsl(48 33.3% 97.1%) 58%, transparent);
 }
 
 /* Light theme tuning — code must be warm gray, NOT the orange accent family */

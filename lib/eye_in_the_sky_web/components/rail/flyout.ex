@@ -188,9 +188,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         <%!-- ── Filter zone (section-specific, always visible) ── --%>
         <%= if @active_section == :sessions do %>
           <SessionsSection.sessions_filters
-            session_sort={@session_sort}
             session_name_filter={@session_name_filter}
-            session_show={@session_show}
             myself={@myself}
           />
         <% end %>
@@ -238,10 +236,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         <% end %>
 
         <%!-- ── Content ── --%>
-        <div class="flex-1 overflow-y-auto py-1">
+        <%!-- Sessions manages its own scroll + footer; others use standard overflow wrapper --%>
+        <div class={[
+          "flex-1 min-h-0",
+          if(@active_section == :sessions, do: "flex flex-col", else: "overflow-y-auto py-1")
+        ]}>
           <%= case @active_section do %>
             <% :sessions -> %>
-              <SessionsSection.sessions_content sessions={@flyout_sessions} />
+              <SessionsSection.sessions_content
+                sessions={@flyout_sessions}
+                session_name_filter={@session_name_filter}
+                sidebar_project={@sidebar_project}
+              />
             <% :tasks -> %>
               <TasksSection.tasks_content
                 tasks={@flyout_tasks}

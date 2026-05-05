@@ -3,15 +3,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   use EyeInTheSkyWeb, :html
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
-  attr :session_sort, :atom, default: :last_activity
+  @active_statuses ~w(working waiting compacting)
+
+  # ---------------------------------------------------------------------------
+  # sessions_filters — search only (sort + show controls removed; those belong
+  # on the full Sessions page, not the compact DM switcher)
+  # ---------------------------------------------------------------------------
+
   attr :session_name_filter, :string, default: ""
-  attr :session_show, :atom, default: :twenty
   attr :myself, :any, required: true
 
   def sessions_filters(assigns) do
     ~H"""
-    <div class="px-2.5 py-2 border-b border-base-content/8 flex flex-col gap-2">
-      <%!-- Search --%>
+    <div class="px-2.5 py-2 border-b border-base-content/8">
       <div class="relative">
         <span class="absolute left-2 top-1/2 -translate-y-1/2 text-base-content/30 pointer-events-none">
           <.icon name="hero-magnifying-glass-mini" class="size-3" />
@@ -26,70 +30,109 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
         />
       </div>
+    </div>
+    """
+  end
 
-      <%!-- Sort dropdown + Show toggle --%>
-      <div class="flex items-center justify-between gap-2">
-        <%!-- Sort: filter icon + native select (form wrapper required for phx-change on select) --%>
-        <div class="flex items-center gap-1">
-          <.icon name="hero-funnel-mini" class="size-3 text-base-content/30 flex-shrink-0" />
-          <form phx-change="set_session_sort" phx-target={@myself}>
-            <select
-              name="sort"
-              class="text-nano bg-transparent text-base-content/55 focus:outline-none cursor-pointer hover:text-base-content/80 transition-colors"
-            >
-              <option value="last_activity" selected={@session_sort == :last_activity}>Recent</option>
-              <option value="created" selected={@session_sort == :created}>Created</option>
-              <option value="name" selected={@session_sort == :name}>Name</option>
-            </select>
-          </form>
-        </div>
+  # ---------------------------------------------------------------------------
+  # sessions_content — grouped switcher view
+  # ---------------------------------------------------------------------------
 
-        <%!-- Show toggle --%>
-        <div class="flex items-center gap-0.5">
-          <.show_tab label="20" value="twenty" current={@session_show} myself={@myself} />
-          <.show_tab label="All" value="all_active" current={@session_show} myself={@myself} />
-        </div>
+  attr :sessions, :list, required: true
+  attr :session_name_filter, :string, default: ""
+  attr :sidebar_project, :any, default: nil
+
+  def sessions_content(assigns) do
+    is_searching = assigns.session_name_filter != ""
+
+    {active, recent, results} =
+      if is_searching do
+        {[], [], Enum.take(assigns.sessions, 10)}
+      else
+        a = assigns.sessions |> Enum.filter(&(&1.status in @active_statuses)) |> Enum.take(5)
+        r = assigns.sessions |> Enum.reject(&(&1.status in @active_statuses)) |> Enum.take(8)
+        {a, r, []}
+      end
+
+    view_all_href =
+      if assigns.sidebar_project,
+        do: "/projects/#{assigns.sidebar_project.id}/sessions",
+        else: "/sessions"
+
+    assigns =
+      assigns
+      |> assign(:is_searching, is_searching)
+      |> assign(:active, active)
+      |> assign(:recent, recent)
+      |> assign(:results, results)
+      |> assign(:view_all_href, view_all_href)
+
+    ~H"""
+    <div class="flex flex-col flex-1 min-h-0">
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <%= if @is_searching do %>
+          <%!--Search results --%>
+          <%= if @results == [] do %>
+            <div class="px-3 py-5 text-xs text-base-content/35 text-center select-none">
+              No sessions found
+            </div>
+          <% else %>
+            <.session_row :for={s <- @results} session={s} />
+          <% end %>
+        <% else %>
+          <%!--ACTIVE group --%>
+          <%= if @active != [] do %>
+            <.group_label label="Active" />
+            <.session_row :for={s <- @active} session={s} />
+          <% end %>
+          <%!--RECENT group --%>
+          <%= if @recent != [] do %>
+            <.group_label label="Recent" />
+            <.session_row :for={s <- @recent} session={s} />
+          <% end %>
+          <%!--Both empty --%>
+          <%= if @active == [] && @recent == [] do %>
+            <div class="px-3 py-5 text-xs text-base-content/35 text-center select-none">
+              No sessions
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+
+      <%!--View all link — always visible at bottom --%>
+      <div class="flex-shrink-0 px-3 py-2 border-t border-base-content/[0.05]">
+        <.link
+          navigate={@view_all_href}
+          class="flex items-center gap-1 text-[11px] text-base-content/30 hover:text-base-content/55 transition-colors group select-none"
+        >
+          <.icon name="hero-arrow-right-mini" class="size-3 group-hover:translate-x-0.5 transition-transform duration-100" />
+          View all sessions
+        </.link>
       </div>
     </div>
     """
   end
 
-  attr :sessions, :list, required: true
-
-  def sessions_content(assigns) do
-    ~H"""
-    <.session_row :for={s <- @sessions} session={s} />
-
-    <%= if @sessions == [] do %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No sessions</div>
-    <% end %>
-    """
-  end
+  # ---------------------------------------------------------------------------
+  # group_label — ACTIVE / RECENT section header
+  # ---------------------------------------------------------------------------
 
   attr :label, :string, required: true
-  attr :value, :string, required: true
-  attr :current, :atom, required: true
-  attr :myself, :any, required: true
 
-  defp show_tab(assigns) do
+  defp group_label(assigns) do
     ~H"""
-    <% active = to_string(@current) == @value %>
-    <button
-      phx-click="set_session_show"
-      phx-value-show={@value}
-      phx-target={@myself}
-      class={[
-        "text-nano px-1.5 py-0.5 rounded transition-colors",
-        if(active,
-          do: "bg-primary/15 text-primary font-medium",
-          else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"
-        )
-      ]}
-    >
-      {@label}
-    </button>
+    <div class="px-3 pt-3 pb-1 flex items-center gap-1.5 select-none">
+      <span class="w-[2px] h-[10px] rounded-sm bg-primary/50 flex-shrink-0"></span>
+      <span class="text-nano font-extrabold uppercase tracking-[0.10em] text-primary/70">
+        {@label}
+      </span>
+    </div>
     """
   end
+
+  # ---------------------------------------------------------------------------
+  # session_row
+  # ---------------------------------------------------------------------------
 
   attr :session, :map, required: true
 

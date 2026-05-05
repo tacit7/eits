@@ -745,25 +745,11 @@ html[data-env="tauri"] .app-titlebar input {
 
 /* Tauri overlay titlebar: show and size the drag spacer in the icon rail.
    Height matches the macOS titlebar area (~38px) so traffic lights never
-   overlap clickable icons. The spacer also acts as a window drag region. */
+   overlap clickable icons. wry intercepts mousedown via JS closest() on
+   [data-tauri-drag-region] — no CSS -webkit-app-region needed in WKWebView. */
 html[data-tauri-overlay] [data-tauri-drag-region] {
   display: block;
   height: 38px;
-  -webkit-app-region: drag;
-}
-
-/* Desktop top bar is the primary drag region — users can grab any empty
-   space in it to move the window. Interactive children opt out via no-drag
-   so clicks still reach links, buttons, and inputs. */
-html[data-tauri-overlay] #app-topbar {
-  -webkit-app-region: drag;
-}
-html[data-tauri-overlay] #app-topbar a,
-html[data-tauri-overlay] #app-topbar button,
-html[data-tauri-overlay] #app-topbar input,
-html[data-tauri-overlay] #app-topbar [role="button"],
-html[data-tauri-overlay] #app-topbar select {
-  -webkit-app-region: no-drag;
 }
 
 /* Give the drag spacer a grab cursor so the zone is discoverable. */

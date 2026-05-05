@@ -178,13 +178,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           </div>
         <% else %>
           <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
-            <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
+            <div class={[
+              "max-w-[78%] flex flex-col",
+              @role == :user && "items-end",
+              @role == :agent && "bg-base-content/[0.025] rounded-md px-2 py-1 -mx-2"
+            ]}>
               <div class={[
                 "leading-snug break-words",
                 @role == :user &&
                   "px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] rounded-2xl rounded-br-sm text-sm",
                 @role == :user && @is_dm && "border border-primary/20",
-                @role == :agent && "py-1 text-base-content/90"
+                @role == :agent && "py-1 pl-3 border-l-2 border-[var(--border-subtle)] text-base-content/90"
               ]}>
                 <.message_body message={@message} compact={false} />
               </div>

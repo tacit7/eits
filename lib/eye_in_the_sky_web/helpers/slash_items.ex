@@ -3,7 +3,10 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
   Loads slash command, skill, agent, and prompt items for the DM composer popup.
   """
 
-  alias EyeInTheSky.{Agents, Prompts}
+  import Ecto.Query, only: [from: 2]
+
+  alias EyeInTheSky.{Agents, Prompts, Repo}
+  alias EyeInTheSky.Sessions.Session
   alias EyeInTheSkyWeb.DmLive.SlashCommands
 
   @doc """
@@ -231,14 +234,30 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
 
   @doc false
   def load_agents do
-    Agents.list_agents()
+    agents = Agents.list_agents()
+    agent_ids = Enum.map(agents, & &1.id)
+
+    # Single query: most recent session_id per agent (max id = most recently created).
+    # Used by the channel @mention autocomplete to insert @<session_id> so that
+    # ChannelProtocol.parse_routing/2 can route the mention correctly.
+    session_map =
+      from(s in Session,
+        where: s.agent_id in ^agent_ids,
+        group_by: s.agent_id,
+        select: {s.agent_id, max(s.id)}
+      )
+      |> Repo.all()
+      |> Map.new()
+
+    agents
     |> Enum.map(fn agent ->
       slug = agent.project_name || agent.description || "agent-#{agent.id}"
 
       %{
         slug: String.slice(slug, 0, 60),
         type: "agent",
-        description: agent.description || agent.project_name || ""
+        description: agent.description || agent.project_name || "",
+        session_id: Map.get(session_map, agent.id)
       }
     end)
     |> Enum.uniq_by(& &1.slug)

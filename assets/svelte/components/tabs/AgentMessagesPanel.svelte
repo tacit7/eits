@@ -468,7 +468,10 @@
     const cursorPos = inputElement.selectionStart
     const prefix = inputValue.slice(0, slashTriggerPos)
     const suffix = inputValue.slice(cursorPos)
-    const insertion = item.type === 'agent' ? `@${item.slug} ` : `/${item.slug} `
+    // For agent items, insert @<session_id> so ChannelProtocol.parse_routing/2 can
+    // match the numeric pattern (@\d+). Fall back to slug if session_id is absent.
+    const agentMention = item.session_id ? `@${item.session_id}` : `@${item.slug}`
+    const insertion = item.type === 'agent' ? `${agentMention} ` : `/${item.slug} `
 
     inputValue = prefix + insertion + suffix
     showSlashAutocomplete = false

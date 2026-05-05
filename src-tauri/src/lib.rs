@@ -1,9 +1,13 @@
+use std::sync::atomic::{AtomicU32, Ordering};
 use tauri::Manager;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+/// Monotonic counter for generating unique secondary window labels.
+static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(2);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -102,6 +106,8 @@ pub fn run() {
                 &MenuItem::with_id(app, "menu_reload", "Reload", true, Some("CmdOrCtrl+R"))?,
             ])?;
             let window_menu = Submenu::with_items(app, "Window", true, &[
+                &MenuItem::with_id(app, "menu_new_window", "New Window", true, Some("CmdOrCtrl+N"))?,
+                &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::minimize(app, None)?,
                 &PredefinedMenuItem::maximize(app, None)?,
                 &PredefinedMenuItem::separator(app)?,
@@ -112,6 +118,7 @@ pub fn run() {
             ])?;
             app.set_menu(menubar)?;
             app.on_menu_event(|app, event| match event.id.as_ref() {
+                "menu_new_window" => open_new_window(app, "/"),
                 "menu_settings" => navigate_to(app, "/settings"),
                 "menu_dashboard" => navigate_to(app, "/"),
                 "menu_sessions" => navigate_to(app, "/sessions"),
@@ -236,8 +243,12 @@ pub fn run() {
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    let _ = window.hide();
-                    api.prevent_close();
+                    if window.label() == "main" {
+                        // Main window: hide instead of close so the app stays alive in the tray.
+                        let _ = window.hide();
+                        api.prevent_close();
+                    }
+                    // Secondary windows: allow normal close (do nothing, default behaviour).
                 }
                 tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
                     let paths_json: Vec<String> = paths.iter()
@@ -292,6 +303,37 @@ fn create_window(app_handle: &tauri::AppHandle) {
     .unwrap();
 
     let _ = window.show();
+}
+
+/// Open a new secondary window at the given path.
+/// Each call gets a unique label ("window-2", "window-3", …) so Tauri
+/// treats them as independent windows. Secondary windows close normally
+/// (unlike "main" which hides to keep the app alive in the tray).
+fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
+    let n = WINDOW_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let label = format!("window-{}", n);
+    let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+    let url = format!("http://127.0.0.1:{}{}", port, path);
+    let parsed_url: tauri::Url = match url.parse() {
+        Ok(u) => u,
+        Err(e) => {
+            eprintln!("[eits-tauri] open_new_window: bad url {url}: {e}");
+            return;
+        }
+    };
+    match tauri::WebviewWindowBuilder::new(
+        app_handle,
+        &label,
+        tauri::WebviewUrl::External(parsed_url),
+    )
+    .title("Eye in the Sky")
+    .inner_size(1280.0, 800.0)
+    .devtools(true)
+    .build()
+    {
+        Ok(_) => {}
+        Err(e) => eprintln!("[eits-tauri] open_new_window: failed to create {label}: {e}"),
+    }
 }
 
 /// Map an `eits://...` deep-link URL to a Phoenix route and navigate.

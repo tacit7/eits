@@ -253,13 +253,15 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         %__MODULE__{sdk_ref: ref} = state
       ) do
     channel_id = if state.current_job, do: state.current_job.context[:channel_id], else: nil
+    job_context = if state.current_job, do: state.current_job.context, else: nil
 
     WorkerEvents.on_result_received(state.session_id, %{
       provider: state.provider,
       text: text,
       metadata: metadata,
       channel_id: channel_id,
-      source_uuid: metadata[:uuid]
+      source_uuid: metadata[:uuid],
+      job_context: job_context
     })
 
     result_len = if(is_binary(text), do: String.length(text), else: 0)

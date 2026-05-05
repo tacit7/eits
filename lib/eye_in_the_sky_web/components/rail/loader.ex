@@ -169,10 +169,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
 
   def maybe_load_notes(socket, _section, _project), do: socket
 
+  # Notes scoped by project use list_notes_filtered's project_id scope, which internally
+  # restricts results to parent_type="project" (and agent/session notes for that project's
+  # agents). Applying a type_filter of "session" or "task" on top of that creates an
+  # impossible conjunction: parent_type='project' AND parent_type='session' → 0 rows.
+  # Fix: only pass project_id when type_filter is nil or "project"; for other types,
+  # scope is unrestricted so all notes of that type are visible.
   def load_flyout_notes(project, search \\ "", parent_type \\ nil) do
+    type_str = parent_type && to_string(parent_type)
+    project_scoped = is_nil(type_str) or type_str == "project"
+
     opts = [limit: 50]
-    opts = if project, do: Keyword.put(opts, :project_id, project.id), else: opts
-    opts = if parent_type, do: Keyword.put(opts, :type_filter, to_string(parent_type)), else: opts
+    opts = if project && project_scoped, do: Keyword.put(opts, :project_id, project.id), else: opts
+    opts = if type_str, do: Keyword.put(opts, :type_filter, type_str), else: opts
 
     notes = Notes.list_notes_filtered(opts)
 
@@ -276,6 +285,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   defp filter_prompts_by_scope(_prompts, "project", nil), do: []
 
   defp filter_prompts_by_scope(prompts, _scope, _project_id), do: prompts
+
+  def maybe_load_sessions(socket, :sessions, project) do
+    assign(socket, :flyout_sessions,
+      load_flyout_sessions(
+        project,
+        socket.assigns[:session_sort] || :last_activity,
+        socket.assigns[:session_name_filter] || "",
+        socket.assigns[:session_show] || :twenty
+      )
+    )
+  end
+
+  def maybe_load_sessions(socket, _section, _project), do: socket
 
   # Load channels only when navigating to the :chat section — avoids a DB query on every page.
   def maybe_load_channels(socket, :chat, project) do

@@ -164,7 +164,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           Loader.load_flyout_sessions(
             sidebar_project,
             socket.assigns.session_sort,
-            socket.assigns.session_name_filter
+            socket.assigns.session_name_filter,
+            socket.assigns.session_show
           )
         )
         |> assign(:flyout_file_expanded, MapSet.new())
@@ -183,6 +184,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         socket
         |> assign(:active_section, next_section)
         |> assign(:mobile_open, false)
+        |> Loader.maybe_load_sessions(next_section, sidebar_project)
         |> Loader.maybe_load_channels(next_section, sidebar_project)
         |> Loader.maybe_load_canvases(next_section)
         |> Loader.maybe_load_teams(next_section, sidebar_project)

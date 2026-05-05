@@ -44,15 +44,17 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
              }) do
           {:ok, message} ->
             Enum.each(image_infos, fn {path, entry, size} ->
-              {:ok, _} =
-                FileAttachments.create_attachment(%{
-                  message_id: message.id,
-                  filename: Path.basename(path),
-                  original_filename: entry.client_name,
-                  content_type: entry.client_type || mime_from_ext(entry.client_name),
-                  size_bytes: size,
-                  storage_path: path
-                })
+              case FileAttachments.create_attachment(%{
+                     message_id: message.id,
+                     filename: Path.basename(path),
+                     original_filename: entry.client_name,
+                     content_type: entry.client_type || mime_from_ext(entry.client_name),
+                     size_bytes: size,
+                     storage_path: path
+                   }) do
+                {:ok, _} -> :ok
+                {:error, reason} -> Repo.rollback(reason)
+              end
             end)
 
             message

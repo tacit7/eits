@@ -89,6 +89,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         data-vim-item-type="session"
         data-vim-item-id={@session.id}
         data-vim-item-title={@session.name || "Unnamed session"}
+        data-vim-item-url={"/dm/#{@session.id}"}
         data-vim-rename-target={"input[name='name']"}
         data-session-id={@session.id}
         data-session-uuid={@session.uuid}

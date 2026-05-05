@@ -277,6 +277,33 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
   def handle_task_nav_event(_event, _params, socket), do: {:cont, socket}
 
+  # ---------------------------------------------------------------------------
+  # vim:toggle-task-done
+  # ---------------------------------------------------------------------------
+
+  def handle_toggle_task_done_event("vim:toggle-task-done", %{"task_id" => task_id_str}, socket) do
+    done_id = Tasks.WorkflowState.done_id()
+    todo_id = Tasks.WorkflowState.todo_id()
+
+    with {id, ""} <- Integer.parse(task_id_str),
+         {:ok, task} <- Tasks.get_task(id) do
+      new_state_id = if task.state_id == done_id, do: todo_id, else: done_id
+      case Tasks.update_task_state(task, new_state_id) do
+        {:ok, _updated} ->
+          {:halt, push_event(socket, "vim:toggle-task-done-result", %{
+            task_id: task_id_str,
+            done: new_state_id == done_id
+          })}
+        {:error, _} ->
+          {:halt, socket}
+      end
+    else
+      _ -> {:halt, socket}
+    end
+  end
+
+  def handle_toggle_task_done_event(_event, _params, socket), do: {:cont, socket}
+
   defp find_adjacent(list, current_uuid, direction) do
     current_idx = Enum.find_index(list, fn item -> item.uuid == current_uuid end)
 

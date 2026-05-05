@@ -287,6 +287,125 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
     end
   end
 
+  # --- on_result_received — cli_required guard ---
+
+  describe "on_result_received/2 — cli_required reply_mode" do
+    test "saves to session transcript only when reply_mode is cli_required" do
+      {agent, session} = create_session()
+      channel = create_channel()
+      Channels.add_member(channel.id, agent.id, session.id)
+
+      job_context = %{
+        "source" => "channel",
+        "channel_id" => channel.id,
+        "channel_message_id" => 99,
+        "reply_mode" => "cli_required"
+      }
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "I will respond via eits channels send",
+        metadata: %{},
+        channel_id: channel.id,
+        source_uuid: nil,
+        job_context: job_context
+      })
+
+      messages = Messages.list_messages_for_session(session.id)
+      assert length(messages) == 1
+
+      saved = hd(messages)
+      assert saved.body == "I will respond via eits channels send"
+      assert saved.channel_id == nil
+      assert get_in(saved.metadata, ["visibility"]) == "session_only"
+      assert get_in(saved.metadata, ["source"]) == "channel_prompt"
+      assert get_in(saved.metadata, ["channel_id"]) == channel.id
+      assert get_in(saved.metadata, ["channel_message_id"]) == 99
+    end
+
+    test "cli_required does not insert into channel_messages" do
+      {agent, session} = create_session()
+      channel = create_channel()
+      Channels.add_member(channel.id, agent.id, session.id)
+
+      job_context = %{
+        "source" => "channel",
+        "channel_id" => channel.id,
+        "channel_message_id" => 42,
+        "reply_mode" => "cli_required"
+      }
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "channel reply via CLI only",
+        metadata: %{},
+        channel_id: channel.id,
+        source_uuid: nil,
+        job_context: job_context
+      })
+
+      messages = Messages.list_messages_for_session(session.id)
+      assert length(messages) == 1
+
+      # No channel_id on the saved message — not in channel_messages
+      [saved] = messages
+      assert saved.channel_id == nil
+    end
+
+    test "missing job_context falls through to normal save_result path" do
+      {_agent, session} = create_session()
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "normal reply",
+        metadata: %{},
+        channel_id: nil,
+        source_uuid: nil,
+        job_context: nil
+      })
+
+      messages = Messages.list_messages_for_session(session.id)
+      assert Enum.any?(messages, &(&1.body == "normal reply"))
+      assert Enum.all?(messages, fn m ->
+        get_in(m.metadata, ["visibility"]) != "session_only"
+      end)
+    end
+
+    test "absent job_context key (backwards compat) falls through to normal save_result" do
+      {_agent, session} = create_session()
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "backwards compat reply",
+        metadata: %{},
+        channel_id: nil,
+        source_uuid: nil
+      })
+
+      messages = Messages.list_messages_for_session(session.id)
+      assert Enum.any?(messages, &(&1.body == "backwards compat reply"))
+    end
+
+    test "normal path (no reply_mode) unaffected by guard" do
+      {_agent, session} = create_session()
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "standard dm reply",
+        metadata: %{},
+        channel_id: nil,
+        source_uuid: nil,
+        job_context: %{"source" => "dm"}
+      })
+
+      messages = Messages.list_messages_for_session(session.id)
+      assert Enum.any?(messages, &(&1.body == "standard dm reply"))
+      refute Enum.any?(messages, fn m ->
+        get_in(m.metadata, ["visibility"]) == "session_only"
+      end)
+    end
+  end
+
   # --- on_spawn_error ---
 
   describe "on_spawn_error/2" do

@@ -658,6 +658,7 @@ Subcommands:
   create    -t <title> [-p <project>] [-d <desc>]
   claim     <id>
   delete    <id>
+  active    [--json]   In Progress + In Review tasks for current session
   bulk-update --ids <id,...> --state <id|name>
              --session <uuid|int> --state <id|name>
 
@@ -1222,12 +1223,12 @@ HELP
       [[ "$fail" -eq 0 ]]
       ;;
     active|mine)
-      # eits tasks active  — In Progress tasks linked to current session (context recovery on resume)
+      # eits tasks active  — In Progress + In Review tasks linked to current session (context recovery on resume)
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
         echo "usage: eits tasks active [--json]"
         echo "       eits tasks mine   [--json]"
         echo ""
-        echo "Show tasks currently In Progress for this session."
+        echo "Show tasks In Progress (state 2) and In Review (state 4) for this session."
         echo "Uses EITS_SESSION_UUID (or EITS_SESSION_ID as fallback)."
         return 0
       }
@@ -1235,14 +1236,18 @@ HELP
       [[ "${1:-}" == "--json" ]] && _json_mode=1
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
       [[ -n "$_sess" ]] || die "EITS_SESSION_UUID or EITS_SESSION_ID is required"
-      local _resp; _resp=$(_curl "$BASE_URL/tasks?session_id=${_sess}&state_id=2&limit=20") || return 1
-      local _count; _count=$(printf '%s' "$_resp" | jq '[.tasks[]?] | length')
+      local _resp2 _resp4 _merged
+      _resp2=$(_curl "$BASE_URL/tasks?session_id=${_sess}&state_id=2&limit=20") || return 1
+      _resp4=$(_curl "$BASE_URL/tasks?session_id=${_sess}&state_id=4&limit=20") || return 1
+      _merged=$(jq -n --argjson a "$_resp2" --argjson b "$_resp4" \
+        '{tasks: (($a.tasks // []) + ($b.tasks // []))}')
+      local _count; _count=$(printf '%s' "$_merged" | jq '[.tasks[]?] | length')
       if [[ $_json_mode -eq 1 ]]; then
-        printf '%s\n' "$_resp" | jq .
+        printf '%s\n' "$_merged" | jq .
       elif [[ "${_count:-0}" -eq 0 ]]; then
         printf 'No active tasks for this session.\n'
       else
-        _tbl_tasks "$_resp"
+        _tbl_tasks "$_merged"
       fi
       ;;
     *)
@@ -2077,7 +2082,7 @@ cmd_commits() {
         esac
       done
       if [[ -z "$agent_id" && -n "${EITS_SESSION_UUID:-}" ]]; then
-        agent_id=$(_curl "$BASE_URL/sessions/${EITS_SESSION_UUID}" 2>/dev/null | jq -r '.agent_id // empty' 2>/dev/null || true)
+        agent_id=$(_curl "$BASE_URL/sessions/${EITS_SESSION_UUID}" 2>/dev/null | jq -r '.agent_uuid // empty' 2>/dev/null || true)
       fi
       [[ -n "$agent_id" ]] || die "agent_id is required (or set EITS_AGENT_UUID)"
       if [[ ${#hashes[@]} -eq 0 ]]; then

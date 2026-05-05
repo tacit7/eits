@@ -12,7 +12,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
       Loader.load_flyout_sessions(
         socket.assigns.sidebar_project,
         sort,
-        socket.assigns.session_name_filter
+        socket.assigns.session_name_filter,
+        socket.assigns.session_show
       )
 
     {:noreply, socket |> assign(:session_sort, sort) |> assign(:flyout_sessions, sessions)}
@@ -23,10 +24,25 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
       Loader.load_flyout_sessions(
         socket.assigns.sidebar_project,
         socket.assigns.session_sort,
-        value
+        value,
+        socket.assigns.session_show
       )
 
     {:noreply, socket |> assign(:session_name_filter, value) |> assign(:flyout_sessions, sessions)}
+  end
+
+  def handle_set_session_show(%{"show" => show_str}, socket) do
+    show = Loader.parse_session_show(show_str)
+
+    sessions =
+      Loader.load_flyout_sessions(
+        socket.assigns.sidebar_project,
+        socket.assigns.session_sort,
+        socket.assigns.session_name_filter,
+        show
+      )
+
+    {:noreply, socket |> assign(:session_show, show) |> assign(:flyout_sessions, sessions)}
   end
 
   def handle_update_task_search(%{"value" => value}, socket) do

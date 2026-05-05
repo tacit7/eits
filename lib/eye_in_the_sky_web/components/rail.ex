@@ -495,9 +495,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         class="md:hidden fixed inset-0 z-40 bg-black/40"
       />
 
-      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-[var(--surface-rail)] z-20">
-        <%!-- Tauri overlay titlebar: spacer clears traffic lights + is the window drag region --%>
-        <div data-tauri-drag-region aria-hidden="true" class="w-full flex-shrink-0 hidden" />
+      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-base-100 z-20">
         <button
           phx-click="toggle_proj_picker"
           phx-target={@myself}

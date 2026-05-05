@@ -29,6 +29,6 @@ elixirkit = { path = "../deps/elixirkit/elixirkit_rs" }
 [profile.release]
 panic = "abort"
 codegen-units = 1
-lto = true
+lto = "thin"
 opt-level = "s"
 strip = false

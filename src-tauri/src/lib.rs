@@ -436,31 +436,24 @@ fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
     }
 }
 
-/// Send a native notification. If `nav_path` is provided, clicking the
-/// notification navigates the main window to that path.
+/// Send a native notification. If `nav_path` is provided and the window is
+/// already visible, navigates immediately. Click-to-navigate on macOS is not
+/// supported by tauri-plugin-notification (notify_rust fires-and-forgets).
 #[cfg(not(debug_assertions))]
 fn send_notification(title: &str, body: &str, nav_path: Option<String>, app_handle: &tauri::AppHandle) {
     use tauri_plugin_notification::NotificationExt;
 
-    let mut builder = app_handle
+    let builder = app_handle
         .notification()
         .builder()
         .title(title)
         .body(body);
 
-    // Embed the path in the notification identifier so we can retrieve it
-    // in the action callback. Format: "eits-nav:<path>" or "eits-default".
-    let id = match &nav_path {
-        Some(path) => format!("eits-nav:{}", path),
-        None => "eits-default".to_string(),
-    };
-    builder = builder.identifier(&id);
-
     if let Err(e) = builder.show() {
         eprintln!("[eits-tauri] notification error: {e}");
     }
 
-    // If the window is already visible, also navigate immediately on receipt.
+    // If the window is already visible, navigate immediately on receipt.
     // This handles the case where the user has the app focused.
     if let Some(path) = nav_path {
         if let Some(window) = app_handle.get_webview_window("main") {

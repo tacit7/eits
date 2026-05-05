@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "identifier": "com.eits.EyeInTheSky",
   "build": {
-    "beforeBuildCommand": "find src-tauri/target/release -type f -exec chmod u+w {} \\; 2>/dev/null; find src-tauri/target/release -type d -exec chmod u+wx {} \\; 2>/dev/null; touch lib/eye_in_the_sky_web/endpoint.ex; PHX_INSECURE_COOKIES=1 DISABLE_AUTH=1 DATABASE_URL=ecto://postgres:postgres@localhost/eits_dev DATABASE_SSL_VERIFY=false SECRET_KEY_BASE=bnsVqob9r8+zpVEcTxUEWHIamQVlRwx2xBgVP56XZAWIUJDTGAiG/WxzD7twxmPN7c2aaaaf50e1f72b3653c8f33bc1b3239e318214ceed08588536f5e62526b9dc405154507082f8caa48786531104ba0a8b66a9ffd7b3148e36649db0c28a1e3e MIX_ENV=prod mix do compile + assets.deploy + release --overwrite --path src-tauri/target/rel",
+    "beforeBuildCommand": "find src-tauri/target/release src-tauri/target/debug/rel src-tauri/target/rel -type f -exec chmod u+w {} \\; 2>/dev/null; find src-tauri/target/release src-tauri/target/debug/rel src-tauri/target/rel -type d -exec chmod u+wx {} \\; 2>/dev/null; touch lib/eye_in_the_sky_web/endpoint.ex; PHX_INSECURE_COOKIES=1 DISABLE_AUTH=1 DATABASE_URL=ecto://postgres:postgres@localhost/eits_dev DATABASE_SSL_VERIFY=false SECRET_KEY_BASE=bnsVqob9r8+zpVEcTxUEWHIamQVlRwx2xBgVP56XZAWIUJDTGAiG/WxzD7twxmPN7c2aaaaf50e1f72b3653c8f33bc1b3239e318214ceed08588536f5e62526b9dc405154507082f8caa48786531104ba0a8b66a9ffd7b3148e36649db0c28a1e3e MIX_ENV=prod mix do compile + assets.deploy + release --overwrite --path src-tauri/target/rel",
     "beforeDevCommand": "mkdir -p src-tauri/target/rel",
     "devUrl": "http://127.0.0.1:5050"
   },

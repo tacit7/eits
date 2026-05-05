@@ -266,6 +266,7 @@ pub fn run() {
                 let app_handle = app.handle().clone();
 
                 pubsub.subscribe("messages", move |msg| {
+                    log!("[eits-tauri] pubsub message: {} bytes, preview={:?}", msg.len(), String::from_utf8_lossy(&msg[..msg.len().min(80)]));
                     if msg == b"ready" {
                         // Window creation requires the main thread on macOS (Cocoa).
                         // The ElixirKit PubSub callback runs on a background thread,
@@ -288,8 +289,21 @@ pub fn run() {
                         let body = parts.get(1).unwrap_or(&"").to_string();
                         let nav_path = parts.get(2).map(|s| s.to_string());
 
+                        log!("[eits-tauri] notify: title={title:?} body={body:?} nav_path={nav_path:?}");
+
+                        // macOS UNUserNotificationCenter requires main-thread dispatch.
+                        // Calling show() from the elixirkit-pubsub background thread
+                        // silently fails on some macOS versions.
                         let app_clone = app_handle.clone();
-                        send_notification(&title, &body, nav_path, &app_clone);
+                        let title_c = title.clone();
+                        let body_c = body.clone();
+                        let nav_path_c = nav_path.clone();
+                        match app_handle.run_on_main_thread(move || {
+                            send_notification(&title_c, &body_c, nav_path_c, &app_clone);
+                        }) {
+                            Ok(_) => {}
+                            Err(e) => log!("[eits-tauri] notify run_on_main_thread failed: {e}"),
+                        };
 
                         if let Some(w) = app_handle.get_webview_window("main") {
                             let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
@@ -585,14 +599,17 @@ fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
 fn send_notification(title: &str, body: &str, nav_path: Option<String>, app_handle: &tauri::AppHandle) {
     use tauri_plugin_notification::NotificationExt;
 
+    log!("[eits-tauri] send_notification (main thread): title={title:?} body={body:?}");
+
     let builder = app_handle
         .notification()
         .builder()
         .title(title)
         .body(body);
 
-    if let Err(e) = builder.show() {
-        log!("[eits-tauri] notification error: {e}");
+    match builder.show() {
+        Ok(_) => log!("[eits-tauri] send_notification: show() ok"),
+        Err(e) => log!("[eits-tauri] notification error: {e}"),
     }
 
     // If the window is already visible, navigate immediately on receipt.

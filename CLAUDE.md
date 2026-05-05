@@ -14,7 +14,7 @@ This project uses Phoenix LiveView with Elixir. Primary languages: Elixir/HEEx, 
 
 Worktrees live in `.claude/worktrees/` relative to the project root.
 
-> **DO NOT DELETE `.claude/worktrees/tauri`** — this is the permanent long-running worktree for all Tauri/desktop work. It tracks the `tauri` branch (pushed to origin). Make all Tauri changes there and rebase against main as needed. This worktree has its **own isolated `deps/` and `_build/`** — do NOT symlink deps from main; Tauri work may require different dependency versions.
+> **DO NOT DELETE `.claude/worktrees/tauri`** — this is the permanent long-running worktree for all Tauri/desktop work. It tracks the `tauri` branch (pushed to origin). Make all Tauri changes there and rebase against main as needed. This worktree has its **own isolated `deps/`, `_build/`, and `assets/node_modules/`** — do NOT symlink anything from main; run `mix deps.get`, `mix compile`, and `npm install` directly inside the worktree.
 
 When using git worktrees, always verify you are editing files in the worktree directory, NOT the main project directory. Check `pwd` before making edits.
 

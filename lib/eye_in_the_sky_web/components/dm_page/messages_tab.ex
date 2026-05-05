@@ -176,7 +176,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             <div class={[
               "max-w-[78%] flex flex-col",
               @role == :user && "items-end",
-              @role == :agent && "bg-base-content/[0.025] rounded-md px-2 py-1 -mx-2"
+              @role == :agent && "bg-[var(--agent-bg)] rounded-md px-2 py-1 -mx-2"
             ]}>
               <div class={[
                 "leading-snug break-words",
@@ -184,7 +184,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   "px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] rounded-2xl rounded-br-sm text-sm",
                 @role == :user && @is_dm && "border border-primary/20",
                 @role == :agent && !@is_tool_event &&
-                  "py-1 pl-3 border-l-2 border-[var(--border-subtle)] text-base-content/90",
+                  "py-1 pl-3 border-l-2 border-[var(--guide-line)] text-base-content/90",
                 @role == :agent && @is_tool_event && "py-0.5 text-base-content/90"
               ]}>
                 <.message_body message={@message} compact={false} />

@@ -330,6 +330,10 @@ form:focus-visible {
   --accent-primary: var(--color-primary);
   --accent-soft:    color-mix(in oklch, var(--color-primary) 12%, transparent);
 
+  /* Agent message chrome — accent-derived so they adapt to theme */
+  --guide-line: color-mix(in oklch, var(--color-primary) 20%, transparent);
+  --agent-bg:   color-mix(in oklch, var(--color-primary) 5%, transparent);
+
   /* Code — intentionally NOT accent */
   --code-bg:     var(--color-base-300);
   --code-text:   color-mix(in oklch, var(--color-base-content) 65%, transparent);
@@ -363,6 +367,8 @@ form:focus-visible {
   --status-waiting:  oklch(55% 0.15 75);
   --status-idle:     oklch(72% 0.01 85);
   --status-error:    oklch(50% 0.22 25);
+  --guide-line: color-mix(in oklch, var(--color-primary) 25%, transparent);
+  --agent-bg:   color-mix(in oklch, var(--color-primary) 6%, transparent);
 }
 
 /* ===== Sidebar styles ===== */

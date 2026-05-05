@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
     <form
       phx-submit="send_message"
       phx-change="validate_upload"
-      class="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-composer)] shadow-sm outline-none"
+      class="rounded-2xl border border-[var(--border-subtle)] focus-within:border-primary/40 bg-[var(--surface-composer)] shadow-sm outline-none transition-colors"
       id="message-form"
       data-slash-items={Jason.encode!(@slash_items)}
       data-session-flags={Jason.encode!(serialize_cli_opts(@session_cli_opts))}

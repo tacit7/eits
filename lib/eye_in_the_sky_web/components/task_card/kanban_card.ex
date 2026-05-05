@@ -309,9 +309,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           <% is_waiting =
             not is_working && not is_nil(@waiting_session_ids) &&
               MapSet.member?(@waiting_session_ids, @dm_session.id) %>
-          <a
-            href={"/dm/#{@dm_session.uuid}"}
-            target="_blank"
+          <.link
+            navigate={"/dm/#{@dm_session.uuid}"}
             class="ml-auto flex-shrink-0 text-base-content/30 hover:text-primary transition-colors"
             onclick="event.stopPropagation();"
             title={
@@ -338,7 +337,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
                 <span class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-warning rounded-full animate-pulse" />
               <% end %>
             </span>
-          </a>
+          </.link>
         <% end %>
       </div>
     <% end %>

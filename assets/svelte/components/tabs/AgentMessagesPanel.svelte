@@ -727,6 +727,23 @@
                       {/if}
                     </div>
 
+                    <!-- Image attachments -->
+                    {#if message.attachments && message.attachments.length > 0}
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        {#each message.attachments as attachment}
+                          {#if attachment.content_type && attachment.content_type.startsWith('image/')}
+                            <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block flex-shrink-0">
+                              <img
+                                src={attachment.url}
+                                alt={attachment.original_filename || attachment.filename}
+                                class="max-w-[200px] max-h-[150px] rounded-lg border border-base-content/10 object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                              />
+                            </a>
+                          {/if}
+                        {/each}
+                      </div>
+                    {/if}
+
                     <!-- Usage metadata for agent messages -->
                     <!-- Default: duration + turns visible. Hover: cost + tokens expand in (opacity, no layout shift). -->
                     {#if message.sender_role === 'agent' && message.metadata && (message.metadata.total_cost_usd || message.metadata.duration_ms || message.metadata.num_turns)}

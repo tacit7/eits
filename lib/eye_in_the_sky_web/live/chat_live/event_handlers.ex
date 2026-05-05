@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [cancel_upload: 3, put_flash: 3, push_patch: 2]
 
-  alias EyeInTheSky.{ChannelMessages, Channels, MessageReactions, Messages}
+  alias EyeInTheSky.{ChannelMessages, Channels, FileAttachments, MessageReactions, Messages, Repo}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.ChannelProtocol
   alias EyeInTheSkyWeb.ChatLive.ChannelActions
@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
 
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
     session_id = get_session_id(socket)
-    content_blocks = consume_agent_images_as_content_blocks(socket)
+    {image_infos, content_blocks} = consume_and_persist_agent_images(socket)
 
     case ChannelMessages.send_channel_message(%{
            channel_id: channel_id,
@@ -36,10 +36,30 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
            provider: "claude",
            body: body
          }) do
-      {:ok, _message} ->
+      {:ok, message} ->
+        Enum.each(image_infos, fn {path, entry, size} ->
+          FileAttachments.create_attachment(%{
+            message_id: message.id,
+            filename: Path.basename(path),
+            original_filename: entry.client_name,
+            content_type: entry.client_type || mime_from_ext(entry.client_name),
+            size_bytes: size,
+            storage_path: path
+          })
+        end)
+
+        serialized =
+          message
+          |> Repo.preload([:session, :reactions, :attachments])
+          |> ChatPresenter.serialize_message()
+
         Channels.mark_as_read(channel_id, session_id)
         ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
-        {:noreply, refresh_members_and_picker(socket)}
+
+        {:noreply,
+         socket
+         |> assign(:messages, socket.assigns.messages ++ [serialized])
+         |> refresh_members_and_picker()}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to send message")}

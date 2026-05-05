@@ -38,6 +38,34 @@ defmodule EyeInTheSkyWeb.Helpers.UploadHelpers do
     "#{instructions}\n\nAttached images:\n#{paths}"
   end
 
+  # Returns {file_infos, content_blocks} where:
+  #   file_infos: [{storage_path, upload_entry, size_bytes}]
+  #   content_blocks: processed ImageContentBlock list for agent routing
+  # Saves images to disk and builds base64 content blocks in a single consume pass.
+  def consume_and_persist_agent_images(socket) do
+    results =
+      consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->
+        destination = agent_image_destination(entry.client_name)
+
+        with :ok <- File.mkdir_p(Path.dirname(destination)),
+             {:ok, data} <- File.read(temp_path),
+             :ok <- File.write(destination, data) do
+          mime_type = entry.client_type || mime_from_ext(entry.client_name)
+          content_block = ContentBlock.new_image(Base.encode64(data), mime_type)
+          {:ok, {destination, entry, content_block, byte_size(data)}}
+        else
+          {:error, reason} ->
+            require Logger
+            Logger.warning("consume_and_persist_agent_images: failed for #{entry.client_name}: #{inspect(reason)}")
+            {:postpone, entry}
+        end
+      end)
+
+    file_infos = Enum.map(results, fn {path, entry, _block, size} -> {path, entry, size} end)
+    blocks = results |> Enum.map(fn {_path, _entry, block, _size} -> block end) |> ImageProcessor.process_blocks()
+    {file_infos, blocks}
+  end
+
   def consume_agent_images_as_content_blocks(socket) do
     blocks =
       consume_uploaded_entries(socket, :agent_images, fn %{path: temp_path}, entry ->

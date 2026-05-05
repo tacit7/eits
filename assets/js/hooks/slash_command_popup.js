@@ -1,6 +1,6 @@
 import { createEnumAutocomplete } from './enum_autocomplete.js'
 import { filterAndScore } from './slash_scorer.js'
-import { renderItems, updateActiveItem } from './slash_renderer.js'
+import { renderItems, updateActiveItem, escapeHtml } from './slash_renderer.js'
 
 export const SlashCommandPopup = {
   mounted() {
@@ -11,7 +11,12 @@ export const SlashCommandPopup = {
     this.slashIndex = 0
     this.slashOpen = false
     this.slashTriggerPos = -1
-    this.slashTriggerChar = '/'  // '/' or '@'
+    this.slashTriggerChar = '/'  // '/', '@', or '@@'
+
+    this.fileMode = false
+    this._fileRoot = 'project'
+    this.fileRequestSeq = 0
+    this._fileDebounceTimer = null
 
     this.enumAC = createEnumAutocomplete(this)
 
@@ -20,7 +25,7 @@ export const SlashCommandPopup = {
 
     // Slash detection on input
     this._inputListener = () => {
-      this.loadSlashItems()
+      if (!this.fileMode) this.loadSlashItems()
       this.checkSlashTrigger()
       if (!this.slashOpen) this.enumAC.checkEnumContext()
     }
@@ -101,29 +106,45 @@ export const SlashCommandPopup = {
   checkSlashTrigger() {
     const val = this.el.value
     const cursor = this.el.selectionStart
+    const textToCursor = val.slice(0, cursor)
 
-    // Check for @ trigger (agents only)
-    let atTriggerPos = -1
-    for (let i = cursor - 1; i >= 0; i--) {
-      if (val[i] === '@') {
-        const before = i === 0 ? '' : val[i - 1]
-        if (i === 0 || before === ' ' || before === '\n') {
-          atTriggerPos = i
-        }
-        break
-      }
-      if (val[i] === ' ' || val[i] === '\n') break
-    }
-
-    if (atTriggerPos !== -1) {
-      const query = val.slice(atTriggerPos + 1, cursor)
-      this.slashTriggerPos = atTriggerPos
-      this.slashTriggerChar = '@'
+    // 1. @@ agent autocomplete — checked before @ to avoid fallthrough
+    const atAtMatch = textToCursor.match(/(^|[\s(])@@([^\s]*)$/)
+    if (atAtMatch) {
+      const query = atAtMatch[2]
+      this.slashTriggerPos = cursor - query.length - 2
+      this.slashTriggerChar = '@@'
+      this.fileMode = false
       this.slashFilter(query, 'agent')
       return
     }
 
-    // Check for / trigger (skills, commands, prompts)
+    // 2. @ file autocomplete — does not match @@ positions
+    const atMatch = textToCursor.match(/(^|[\s(])@([^\s@]*)$/)
+    if (atMatch) {
+      const rawPartial = atMatch[2]
+      this.slashTriggerPos = cursor - rawPartial.length - 1
+      this.slashTriggerChar = '@'
+      this.fileMode = true
+
+      let root, partial
+      if (rawPartial.startsWith('~/')) {
+        root = 'home'
+        partial = rawPartial.slice(2)
+      } else if (rawPartial.startsWith('/')) {
+        root = 'filesystem'
+        partial = rawPartial.slice(1)
+      } else {
+        root = 'project'
+        partial = rawPartial
+      }
+
+      this._fileRoot = root
+      this.startFileAutocomplete(partial, root)
+      return
+    }
+
+    // 3. / slash commands (unchanged logic)
     let triggerPos = -1
     for (let i = cursor - 1; i >= 0; i--) {
       if (val[i] === '/') {
@@ -144,7 +165,133 @@ export const SlashCommandPopup = {
     const query = val.slice(triggerPos + 1, cursor)
     this.slashTriggerPos = triggerPos
     this.slashTriggerChar = '/'
+    this.fileMode = false
     this.slashFilter(query, null)
+  },
+
+  startFileAutocomplete(partial, root) {
+    this.fileRequestSeq = (this.fileRequestSeq || 0) + 1
+    const seq = this.fileRequestSeq
+
+    clearTimeout(this._fileDebounceTimer)
+    this._fileDebounceTimer = setTimeout(() => {
+      this.pushEvent('list_files', { root, partial }, (reply) => {
+        if (seq !== this.fileRequestSeq) return
+        if (!reply?.entries) { this.slashClose(); return }
+        this.renderFilePopup(reply.entries, reply.truncated)
+      })
+    }, 150)
+  },
+
+  renderFilePopup(entries, truncated) {
+    if (!document.contains(this.popup)) {
+      const form = this.el.closest('form')
+      if (form) {
+        form.style.position = 'relative'
+        form.appendChild(this.popup)
+      }
+    }
+
+    this.popup.innerHTML = ''
+
+    if (entries.length === 0) {
+      const empty = document.createElement('div')
+      empty.className = 'px-4 py-3 text-xs text-base-content/40 select-none text-center'
+      empty.textContent = 'No matching files'
+      this.popup.appendChild(empty)
+      this.slashOrdered = []
+      this.slashIndex = 0
+      this.slashOpen = true
+      this.popup.classList.remove('hidden')
+      return
+    }
+
+    const header = document.createElement('div')
+    header.className = 'px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0'
+    header.textContent = 'Files'
+    this.popup.appendChild(header)
+
+    const ordered = []
+
+    for (const entry of entries) {
+      const idx = ordered.length
+      ordered.push(entry)
+
+      const row = document.createElement('button')
+      row.type = 'button'
+      row.dataset.slashIdx = idx
+      row.className = 'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors text-sm'
+
+      const iconHtml = entry.is_dir
+        ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 text-base-content/40 shrink-0"><path d="M2 6a2 2 0 0 1 2-2h5l2 2h5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z"/></svg>'
+        : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 text-base-content/30 shrink-0"><path d="M3 3.5A1.5 1.5 0 0 1 4.5 2h6.879a1.5 1.5 0 0 1 1.06.44l4.122 4.12A1.5 1.5 0 0 1 17 7.622V16.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 16.5v-13Z"/></svg>'
+
+      row.innerHTML = `${iconHtml}<span class="font-medium text-base-content truncate flex-1">${escapeHtml(entry.name)}${entry.is_dir ? '/' : ''}</span>`
+
+      row.addEventListener('mouseenter', () => {
+        this.slashIndex = idx
+        this._updateFileActive()
+      })
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        this.slashIndex = idx
+        this.slashSelect()
+      })
+
+      this.popup.appendChild(row)
+    }
+
+    if (truncated) {
+      const footer = document.createElement('div')
+      footer.className = 'px-3 py-1.5 text-xs text-base-content/30 border-t border-base-content/5 select-none'
+      footer.textContent = 'Showing first 50 — keep typing to narrow'
+      this.popup.appendChild(footer)
+    }
+
+    const hint = document.createElement('div')
+    hint.className = 'px-3 py-1.5 text-xs text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
+    hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
+    this.popup.appendChild(hint)
+
+    this.slashOrdered = ordered
+    this.slashIndex = 0
+    this.slashOpen = true
+    this.popup.classList.remove('hidden')
+
+    this._updateFileActive()
+  },
+
+  _updateFileActive() {
+    const rows = this.popup.querySelectorAll('button[data-slash-idx]')
+    rows.forEach(row => {
+      const active = parseInt(row.dataset.slashIdx) === this.slashIndex
+      row.classList.toggle('bg-base-content/[0.06]', active)
+      if (active) row.scrollIntoView?.({ block: 'nearest' })
+    })
+  },
+
+  _fileSelect() {
+    const item = this.slashOrdered[this.slashIndex]
+    if (!item) return
+
+    const val = this.el.value
+    const cursor = this.el.selectionStart
+    const before = val.slice(0, this.slashTriggerPos)
+    const after = val.slice(cursor)
+    const newVal = before + item.insert_text + after
+    this.el.value = newVal
+
+    const pos = before.length + item.insert_text.length
+    this.el.setSelectionRange(pos, pos)
+    this.el.focus()
+
+    if (item.is_dir) {
+      this.el.dispatchEvent(new Event('input', { bubbles: true }))
+    } else {
+      this.slashClose()
+      this.el.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    this.autoResize && this.autoResize()
   },
 
   slashFilter(query, typeFilter) {
@@ -193,11 +340,15 @@ export const SlashCommandPopup = {
     const total = (this.slashOrdered || this.slashFiltered).length
     if (total === 0) return
     this.slashIndex = (this.slashIndex + delta + total) % total
-    updateActiveItem(this.popup, this.slashIndex)
+    if (this.fileMode) {
+      this._updateFileActive()
+    } else {
+      updateActiveItem(this.popup, this.slashIndex)
+    }
   },
 
   slashBuildInsertion(item) {
-    if (item.type === 'agent') return { text: `@${item.slug} `, selectRange: null }
+    if (item.type === 'agent') return { text: `@@${item.slug} `, selectRange: null }
 
     const argType = item.arg_type
     if (!argType || argType === 'none') return { text: `/${item.slug} `, selectRange: null }
@@ -220,10 +371,15 @@ export const SlashCommandPopup = {
   },
 
   slashSelect() {
-    const item = (this.slashOrdered || this.slashFiltered)[this.slashIndex]
-    if (!item) return
+    if (this.fileMode) {
+      this._fileSelect()
+      return
+    }
 
     if (this.enumAC.handleSelect()) return
+
+    const item = (this.slashOrdered || this.slashFiltered)[this.slashIndex]
+    if (!item) return
 
     const val = this.el.value
     const cursor = this.el.selectionStart
@@ -248,6 +404,9 @@ export const SlashCommandPopup = {
   },
 
   slashClose() {
+    clearTimeout(this._fileDebounceTimer)
+    this.fileRequestSeq++
+    this.fileMode = false
     this.slashOpen = false
     this.slashTriggerPos = -1
     this.slashTriggerChar = '/'

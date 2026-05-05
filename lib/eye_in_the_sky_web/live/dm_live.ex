@@ -337,6 +337,17 @@ defmodule EyeInTheSkyWeb.DmLive do
   end
 
   # ---------------------------------------------------------------------------
+  # File autocomplete
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("list_files", %{"partial" => partial, "root" => root}, socket) do
+    session = socket.assigns.session
+    result = EyeInTheSkyWeb.DmLive.FileAutocomplete.list_entries(partial, root, session)
+    {:reply, result, socket}
+  end
+
+  # ---------------------------------------------------------------------------
   # Diffs & external tools
   # ---------------------------------------------------------------------------
 

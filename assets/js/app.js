@@ -302,6 +302,24 @@ document.addEventListener('click', (e) => {
   }
 }, true) // capture phase — runs before LiveView's own click handler
 
+// Tauri window drag: wry's built-in data-tauri-drag-region detection may not
+// fire for external-URL webviews. We implement it explicitly: mousedown on
+// any [data-tauri-drag-region] element (excluding interactive children) calls
+// start_dragging. Requires core:window:allow-start-dragging in capabilities.
+if (window.__TAURI_INTERNALS__) {
+  document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return
+    const dragEl = e.composedPath().find(el =>
+      el instanceof Element && el.hasAttribute('data-tauri-drag-region')
+    )
+    if (!dragEl) return
+    // Don't drag if the actual target is an interactive element
+    const interactive = e.target.closest('a, button, input, select, textarea, [contenteditable], [role="button"], summary')
+    if (interactive) return
+    window.__TAURI_INTERNALS__.invoke('plugin:window|start_dragging').catch(() => {})
+  })
+}
+
 // The lines below enable quality of life phoenix_live_reload
 // development features:
 //

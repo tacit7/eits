@@ -210,7 +210,13 @@ pub fn run() {
 
                 pubsub.subscribe("messages", move |msg| {
                     if msg == b"ready" {
-                        create_window(&app_handle);
+                        // Window creation requires the main thread on macOS (Cocoa).
+                        // The ElixirKit PubSub callback runs on a background thread,
+                        // so we must dispatch back to the main thread here.
+                        let app_clone = app_handle.clone();
+                        let _ = app_handle.run_on_main_thread(move || {
+                            create_window(&app_clone);
+                        });
                     } else if msg.starts_with(b"notify:") {
                         // Format: notify:<title>|<body>  or  notify:<title>|<body>|<path>
                         let payload = String::from_utf8_lossy(&msg[7..]);
@@ -350,7 +356,7 @@ fn create_window(app_handle: &tauri::AppHandle) {
     let url = format!("http://127.0.0.1:{}", port);
     let parsed_url: tauri::Url = url.parse().unwrap();
 
-    let window = tauri::WebviewWindowBuilder::new(
+    let window = match tauri::WebviewWindowBuilder::new(
         app_handle,
         "main",
         tauri::WebviewUrl::External(parsed_url),
@@ -362,7 +368,13 @@ fn create_window(app_handle: &tauri::AppHandle) {
     .visible(false)
     .devtools(true)
     .build()
-    .unwrap();
+    {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("[eits-tauri] failed to create window: {e}");
+            return;
+        }
+    };
 
     // Sidebar vibrancy — frosted-glass effect over the entire window.
     #[cfg(target_os = "macos")]

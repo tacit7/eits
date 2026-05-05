@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [cancel_upload: 3, put_flash: 3, push_patch: 2]
 
-  alias EyeInTheSky.{ChannelMessages, Channels, MessageReactions, Messages}
+  alias EyeInTheSky.{ChannelMessages, Channels, FileAttachments, MessageReactions, Messages, Repo}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.ChannelProtocol
   alias EyeInTheSkyWeb.ChatLive.ChannelActions
@@ -26,22 +26,61 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
 
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
     session_id = get_session_id(socket)
-    content_blocks = consume_agent_images_as_content_blocks(socket)
+    {image_infos, content_blocks} = consume_and_persist_agent_images(socket)
 
-    case ChannelMessages.send_channel_message(%{
-           channel_id: channel_id,
-           session_id: session_id,
-           sender_role: "user",
-           recipient_role: "agent",
-           provider: "claude",
-           body: body
-         }) do
-      {:ok, _message} ->
+    # Wrap message + attachments in a single transaction so the Postgres NOTIFY
+    # (which triggers the :new_message PubSub broadcast) fires only after both
+    # are committed — eliminating the race where subscribers see a message with
+    # no attachments.
+    result =
+      Repo.transaction(fn ->
+        case ChannelMessages.send_channel_message(%{
+               channel_id: channel_id,
+               session_id: session_id,
+               sender_role: "user",
+               recipient_role: "agent",
+               provider: "claude",
+               body: body
+             }) do
+          {:ok, message} ->
+            Enum.each(image_infos, fn {path, entry, size} ->
+              case FileAttachments.create_attachment(%{
+                     message_id: message.id,
+                     filename: Path.basename(path),
+                     original_filename: entry.client_name,
+                     content_type: entry.client_type || mime_from_ext(entry.client_name),
+                     size_bytes: size,
+                     storage_path: path
+                   }) do
+                {:ok, _} -> :ok
+                {:error, reason} -> Repo.rollback(reason)
+              end
+            end)
+
+            message
+
+          {:error, changeset} ->
+            Repo.rollback(changeset)
+        end
+      end)
+
+    case result do
+      {:ok, message} ->
+        serialized =
+          message
+          |> Repo.preload([:session, :reactions, :attachments])
+          |> ChatPresenter.serialize_message()
+
         Channels.mark_as_read(channel_id, session_id)
         ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
-        {:noreply, refresh_members_and_picker(socket)}
 
-      {:error, _changeset} ->
+        {:noreply,
+         socket
+         |> assign(:messages, socket.assigns.messages ++ [serialized])
+         |> refresh_members_and_picker()}
+
+      {:error, _} ->
+        Enum.each(image_infos, fn {path, _entry, _size} -> File.rm(path) end)
         {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end

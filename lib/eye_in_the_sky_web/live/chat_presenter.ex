@@ -47,8 +47,32 @@ defmodule EyeInTheSkyWeb.ChatPresenter do
       inserted_at: message.inserted_at,
       thread_reply_count: message.thread_reply_count || 0,
       reactions: serialize_reactions(message),
+      attachments: serialize_attachments(message),
       metadata: message.metadata || %{}
     }
+  end
+
+  defp serialize_attachments(message) do
+    if Ecto.assoc_loaded?(message.attachments) do
+      Enum.map(message.attachments, fn att ->
+        %{
+          id: att.id,
+          filename: att.filename,
+          original_filename: att.original_filename,
+          content_type: att.content_type,
+          url: storage_path_to_url(att.storage_path)
+        }
+      end)
+    else
+      []
+    end
+  end
+
+  defp storage_path_to_url(nil), do: nil
+
+  defp storage_path_to_url(storage_path) do
+    static_dir = :code.priv_dir(:eye_in_the_sky) |> to_string() |> Path.join("static")
+    "/" <> Path.relative_to(storage_path, static_dir)
   end
 
   defp serialize_reactions(message) do

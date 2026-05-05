@@ -305,14 +305,71 @@ pub fn run() {
                 let app_handle = app.handle().clone();
 
                 tauri::async_runtime::spawn_blocking(move || {
-                    let rel_dir = app_handle
-                        .path()
-                        .resource_dir()
-                        .unwrap()
-                        .join("rel");
+                    use std::io::BufRead;
+                    use std::process::Stdio;
+
+                    let rel_dir = match app_handle.path().resource_dir() {
+                        Ok(d) => d.join("rel"),
+                        Err(e) => {
+                            log!("[eits-tauri] elixir: resource_dir() failed: {e}");
+                            app_handle.exit(1);
+                            return;
+                        }
+                    };
+                    log!("[eits-tauri] elixir: rel_dir={}", rel_dir.display());
+                    log!("[eits-tauri] elixir: rel_dir exists={}", rel_dir.exists());
+
                     let mut command = elixir_command(&rel_dir);
                     command.env("ELIXIRKIT_PUBSUB", pubsub.url());
-                    let status = command.status().expect("failed to start Elixir");
+                    // Capture stderr so we can log Elixir startup errors.
+                    command.stderr(Stdio::piped());
+                    command.stdout(Stdio::piped());
+
+                    log!("[eits-tauri] elixir: spawning release");
+                    let mut child = match command.spawn() {
+                        Ok(c) => c,
+                        Err(e) => {
+                            log!("[eits-tauri] elixir: spawn() FAILED: {e}");
+                            app_handle.exit(1);
+                            return;
+                        }
+                    };
+                    log!("[eits-tauri] elixir: spawned pid={:?}", child.id());
+
+                    // Stream stderr to log in a separate thread.
+                    if let Some(stderr) = child.stderr.take() {
+                        std::thread::spawn(move || {
+                            let reader = std::io::BufReader::new(stderr);
+                            for line in reader.lines() {
+                                match line {
+                                    Ok(l) => log!("[elixir] {}", l),
+                                    Err(_) => break,
+                                }
+                            }
+                        });
+                    }
+                    // Stream stdout too.
+                    if let Some(stdout) = child.stdout.take() {
+                        std::thread::spawn(move || {
+                            let reader = std::io::BufReader::new(stdout);
+                            for line in reader.lines() {
+                                match line {
+                                    Ok(l) => log!("[elixir-out] {}", l),
+                                    Err(_) => break,
+                                }
+                            }
+                        });
+                    }
+
+                    let status = match child.wait() {
+                        Ok(s) => s,
+                        Err(e) => {
+                            log!("[eits-tauri] elixir: wait() failed: {e}");
+                            app_handle.exit(1);
+                            return;
+                        }
+                    };
+                    log!("[eits-tauri] elixir: exited with status={}", status);
                     app_handle.exit(status.code().unwrap_or(1));
                 });
             }

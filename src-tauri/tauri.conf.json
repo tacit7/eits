@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "identifier": "com.eits.EyeInTheSky",
   "build": {
-    "beforeBuildCommand": "find src-tauri/target/release -type f -exec chmod u+w {} \\; 2>/dev/null; find src-tauri/target/release -type d -exec chmod u+wx {} \\; 2>/dev/null; touch lib/eye_in_the_sky_web/endpoint.ex; PHX_INSECURE_COOKIES=1 MIX_ENV=prod mix do compile + assets.deploy + release --overwrite --path src-tauri/target/rel",
+    "beforeBuildCommand": "find src-tauri/target/release -type f -exec chmod u+w {} \\; 2>/dev/null; find src-tauri/target/release -type d -exec chmod u+wx {} \\; 2>/dev/null; touch lib/eye_in_the_sky_web/endpoint.ex; PHX_INSECURE_COOKIES=1 DISABLE_AUTH=1 MIX_ENV=prod mix do compile + assets.deploy + release --overwrite --path src-tauri/target/rel",
     "beforeDevCommand": "mkdir -p src-tauri/target/rel",
     "devUrl": "http://127.0.0.1:5050"
   },

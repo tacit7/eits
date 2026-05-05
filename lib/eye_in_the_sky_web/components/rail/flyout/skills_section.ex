@@ -56,7 +56,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
       data-vim-flyout-item
       class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
     >
-      <.icon name="hero-bolt" class="size-3 flex-shrink-0 text-base-content/30" />
+      <.icon name="hero-command-line" class="size-3 flex-shrink-0 text-base-content/30" />
       <span class="truncate">{@skill.slug}</span>
     </.link>
     """

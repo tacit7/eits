@@ -24,12 +24,15 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   def load_messages_only(socket, session_id) do
     {messages, has_more} = load_message_data(socket, "messages", session_id)
 
+    rows = MessageGrouper.grouped_rows(messages)
+
     socket
     |> assign(:messages, messages)
     |> assign(:has_more_messages, has_more)
     |> assign(:context_used, 0)
     |> assign(:context_window, 0)
-    |> stream(:grouped_messages, MessageGrouper.grouped_rows(messages), reset: true)
+    |> assign(:last_stream_tail, Enum.take(rows, -MessageGrouper.tail_window()))
+    |> stream(:grouped_messages, rows, reset: true)
   end
 
   def load_tab_data(socket, tab, session_id) do
@@ -77,7 +80,11 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       # reuse the current @messages assign (cache hit) and must not blow away
       # stream items the user is currently viewing.
       if tab == "messages" do
-        stream(s, :grouped_messages, MessageGrouper.grouped_rows(messages), reset: true)
+        rows = MessageGrouper.grouped_rows(messages)
+
+        s
+        |> assign(:last_stream_tail, Enum.take(rows, -MessageGrouper.tail_window()))
+        |> stream(:grouped_messages, rows, reset: true)
       else
         s
       end

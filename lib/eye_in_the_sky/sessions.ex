@@ -63,6 +63,22 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Returns a map of %{agent_id => most_recent_session_id} for a list of agent IDs.
+  Used for @mention autocomplete — resolves the latest session per agent in one query.
+  """
+  def latest_session_id_by_agents([]), do: %{}
+
+  def latest_session_id_by_agents(agent_ids) when is_list(agent_ids) do
+    from(s in Session,
+      where: s.agent_id in ^agent_ids,
+      group_by: s.agent_id,
+      select: {s.agent_id, max(s.id)}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  @doc """
   Returns idle or waiting sessions that have not been archived and whose
   last activity (or started_at as fallback) is older than the given cutoff.
   Used by the scheduler to auto-archive dead idle sessions.

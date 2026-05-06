@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
 
   defp assign_stream_defaults(socket) do
     socket
-    |> assign(:stream_content, nil)
+    |> assign(:stream_content, "")
     |> assign(:stream_tool, nil)
     |> assign(:stream_thinking, nil)
     |> assign(:total_tokens, 0)

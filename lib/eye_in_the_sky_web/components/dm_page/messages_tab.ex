@@ -173,7 +173,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   defp message_item(assigns) do
     role = if assigns.message.sender_role == "user", do: :user, else: :agent
-    is_dm = dm_message?(assigns.message)
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
     segments = parse_body_segments(assigns.message.body)
     body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
@@ -190,7 +189,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     assigns =
       assigns
       |> assign(:role, role)
-      |> assign(:is_dm, is_dm)
       |> assign(:is_tool_event, is_tool_event)
       |> assign(:is_same_sender, is_same_sender)
       |> assign(:is_new_turn, is_new_turn)
@@ -370,20 +368,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     """
   end
 
-  defp stream_provider_label(nil), do: "Agent"
-  defp stream_provider_label(%{provider: "codex"}), do: "Codex"
-  defp stream_provider_label(%{provider: "openai"}), do: "Codex"
-  defp stream_provider_label(%{provider: "gemini"}), do: "Gemini"
-  defp stream_provider_label(_session), do: "Claude"
-
-  defdelegate dm_message?(msg), to: DmHelpers
+  defdelegate stream_provider_label(session), to: DmHelpers
   defdelegate message_model(msg), to: DmHelpers
   defdelegate message_cost(msg), to: DmHelpers
-
-  defp show_message_metrics?(message) do
-    message.sender_role == "agent" and is_map(message.metadata) and
-      not is_nil(message.metadata["total_cost_usd"])
-  end
+  defdelegate show_message_metrics?(message), to: DmHelpers
 
   # ---------------------------------------------------------------------------
   # tool_cluster component

@@ -10,26 +10,38 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
     socket = mount_project(socket, params, sidebar_tab: :teams, page_title_prefix: "Team")
 
     team_id = parse_int(team_id_str)
+    project = socket.assigns.project
 
     socket =
       case team_id && Teams.get_team(team_id) do
         {:ok, team} ->
-          if connected?(socket) do
-            EyeInTheSky.Events.subscribe_teams()
-            team = load_team_detail(team)
-
+          # Security check: verify team belongs to the current project
+          # Reject if: project exists, but team doesn't belong to it, or team is global (nil project_id)
+          if project && (!team.project_id || team.project_id != project.id) do
+            # Team belongs to a different project or is global - treat as not found
             socket
-            |> assign(:team, team)
-            |> assign(:team_id, team_id)
-            |> assign(:team_loaded, true)
-            |> assign(:agent_session_id, nil)
-            |> assign(:page_title_prefix, team.name)
-          else
-            socket
-            |> assign(:team, team)
-            |> assign(:team_id, team_id)
+            |> assign(:team, nil)
+            |> assign(:team_id, nil)
             |> assign(:team_loaded, false)
             |> assign(:agent_session_id, nil)
+          else
+            if connected?(socket) do
+              EyeInTheSky.Events.subscribe_teams()
+              team = load_team_detail(team)
+
+              socket
+              |> assign(:team, team)
+              |> assign(:team_id, team_id)
+              |> assign(:team_loaded, true)
+              |> assign(:agent_session_id, nil)
+              |> assign(:page_title_prefix, team.name)
+            else
+              socket
+              |> assign(:team, team)
+              |> assign(:team_id, team_id)
+              |> assign(:team_loaded, false)
+              |> assign(:agent_session_id, nil)
+            end
           end
 
         _ ->

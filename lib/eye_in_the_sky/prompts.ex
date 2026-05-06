@@ -210,11 +210,6 @@ defmodule EyeInTheSky.Prompts do
       table: "subagent_prompts",
       schema: Prompt,
       search_columns: ["name", "description", "prompt_text"],
-      sql_filter: """
-      #{if project_id, do: "AND (s.project_id = $2 OR s.project_id IS NULL)", else: ""}
-      AND s.active = true
-      """,
-      sql_params: if(project_id, do: [project_id], else: []),
       extra_where: extra_where,
       order_by: [desc: :updated_at]
     )

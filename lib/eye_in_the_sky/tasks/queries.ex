@@ -254,8 +254,6 @@ defmodule EyeInTheSky.Tasks.Queries do
       table: "tasks",
       schema: Task,
       search_columns: ["title", "description"],
-      sql_filter: if(project_id, do: "AND t.project_id = $2", else: ""),
-      sql_params: if(project_id, do: [project_id], else: []),
       extra_where: extra_where,
       order_by: [desc: :priority, desc: :created_at],
       preload: @full_task_preloads,

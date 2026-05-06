@@ -42,7 +42,13 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
 
   def job_form_drawer(assigns) do
     ~H"""
-    <.side_drawer id="job-form-drawer" show={@show} on_close="cancel_form" target={@target} max_width="md">
+    <.side_drawer
+      id="job-form-drawer"
+      show={@show}
+      on_close="cancel_form"
+      target={@target}
+      max_width="md"
+    >
       <div class="overflow-y-auto flex-1">
         <div class="p-6">
           <div class="flex items-center justify-between mb-4">
@@ -58,7 +64,11 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 </p>
               <% end %>
             </div>
-            <button class="btn btn-ghost btn-square min-w-[44px] min-h-[44px]" phx-click="cancel_form" phx-target={@target}>
+            <button
+              class="btn btn-ghost btn-square min-w-[44px] min-h-[44px]"
+              phx-click="cancel_form"
+              phx-target={@target}
+            >
               <span class="sr-only">Close job form</span>
               <.icon name="hero-x-mark" class="size-4" />
             </button>

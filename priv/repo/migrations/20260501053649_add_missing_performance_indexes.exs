@@ -9,7 +9,8 @@ defmodule EyeInTheSky.Repo.Migrations.AddMissingPerformanceIndexes do
 
     create_if_not_exists index(:messages, [:parent_message_id],
                            where: "parent_message_id IS NOT NULL",
-                           concurrently: true)
+                           concurrently: true
+                         )
 
     create_if_not_exists index(:passkeys, [:user_id], concurrently: true)
     create_if_not_exists index(:sessions, [:last_activity_at], concurrently: true)
@@ -18,7 +19,8 @@ defmodule EyeInTheSky.Repo.Migrations.AddMissingPerformanceIndexes do
     create_if_not_exists index(:agents, [:status],
                            where: "status NOT IN ('completed', 'failed')",
                            name: :agents_pending_status_idx,
-                           concurrently: true)
+                           concurrently: true
+                         )
   end
 
   def down do

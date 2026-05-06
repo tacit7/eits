@@ -187,7 +187,9 @@ defmodule EyeInTheSky.Messages.Listings do
   Used by BulkImporter to replace per-message find_unlinked_import_candidate SELECTs.
   The most recent message wins when multiple rows share the same key.
   """
-  @spec unlinked_candidates_map_for_session(integer()) :: %{{String.t(), String.t()} => Message.t()}
+  @spec unlinked_candidates_map_for_session(integer()) :: %{
+          {String.t(), String.t()} => Message.t()
+        }
   def unlinked_candidates_map_for_session(session_id) do
     cutoff =
       DateTime.utc_now()
@@ -195,7 +197,10 @@ defmodule EyeInTheSky.Messages.Listings do
       |> DateTime.truncate(:second)
 
     Message
-    |> where([m], m.session_id == ^session_id and is_nil(m.source_uuid) and m.inserted_at >= ^cutoff)
+    |> where(
+      [m],
+      m.session_id == ^session_id and is_nil(m.source_uuid) and m.inserted_at >= ^cutoff
+    )
     |> order_by([m], desc: m.inserted_at)
     |> limit(5_000)
     |> Repo.all()

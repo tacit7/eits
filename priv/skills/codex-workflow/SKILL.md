@@ -16,7 +16,7 @@ Codex hooks handle `working`/`idle`/`waiting`/`compacting` transitions automatic
 ```bash
 eits sessions update $EITS_SESSION_UUID --status working   # start of turn
 eits sessions update $EITS_SESSION_UUID --status idle      # interactive turn stopped; resumable
-eits sessions update $EITS_SESSION_UUID --status waiting   # headless/spawned Codex run done; resumable
+eits sessions update $EITS_SESSION_UUID --status waiting   # explicitly blocked or waiting on external input
 eits sessions update $EITS_SESSION_UUID --status compacting # context compaction in progress
 eits sessions update $EITS_SESSION_UUID --status completed # interactive session done
 eits sessions update $EITS_SESSION_UUID --status failed    # unrecoverable error

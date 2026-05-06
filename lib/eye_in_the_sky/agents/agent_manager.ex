@@ -107,7 +107,10 @@ defmodule EyeInTheSky.Agents.AgentManager do
     with {:ok, project_id, project_name} <- Projects.resolve_project(params),
          {:ok, team} <- SpawnTeamContext.resolve_team(params["team_name"]) do
       params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
-      instructions = SpawnTeamContext.apply_context(params["instructions"], team, params["member_name"])
+
+      instructions =
+        SpawnTeamContext.apply_context(params["instructions"], team, params["member_name"])
+
       opts = SpawnParams.build(%{params | "instructions" => instructions}, team)
 
       case create_agent(opts) do
@@ -203,5 +206,4 @@ defmodule EyeInTheSky.Agents.AgentManager do
     Logger.warning("send_message: invalid message payload for session_id=#{session_id}")
     {:error, :invalid_message}
   end
-
 end

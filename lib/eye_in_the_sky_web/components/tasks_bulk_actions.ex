@@ -32,7 +32,8 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
             class="dropdown"
           >
             <summary class="btn btn-ghost btn-xs gap-1 min-h-[44px] text-base-content/70 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
-              <.icon name="hero-arrows-right-left-mini" class="size-3.5" /> Move to <.icon
+              <.icon name="hero-arrows-right-left-mini" class="size-3.5" /> Move to
+              <.icon
                 name="hero-chevron-down-mini"
                 class="size-3 opacity-50"
               />
@@ -97,8 +98,9 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
       <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Archive tasks</h3>
         <p class="py-4 text-sm text-base-content/70">
-          <% count = MapSet.size(@selected_task_ids) %>
-          Archive {count} selected task{if count == 1, do: "", else: "s"}?
+          <% count = MapSet.size(@selected_task_ids) %> Archive {count} selected task{if count == 1,
+            do: "",
+            else: "s"}?
           Archived tasks can be unarchived later.
         </p>
         <div class="modal-action">

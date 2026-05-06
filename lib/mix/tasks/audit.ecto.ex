@@ -48,7 +48,8 @@ defmodule Mix.Tasks.Audit.Ecto do
     %{
       id: :naive_datetime,
       severity: :medium,
-      description: "NaiveDateTime.utc_now used — schema is :utc_datetime_usec, use DateTime.utc_now()",
+      description:
+        "NaiveDateTime.utc_now used — schema is :utc_datetime_usec, use DateTime.utc_now()",
       pattern: ~r/NaiveDateTime\.utc_now/
     },
     %{
@@ -66,7 +67,8 @@ defmodule Mix.Tasks.Audit.Ecto do
     %{
       id: :load_then_find,
       severity: :medium,
-      description: "Enum.find on a Repo.all result — load all + filter in Elixir; use direct WHERE query",
+      description:
+        "Enum.find on a Repo.all result — load all + filter in Elixir; use direct WHERE query",
       pattern: ~r/Enum\.find\(/
     },
     %{
@@ -124,6 +126,7 @@ defmodule Mix.Tasks.Audit.Ecto do
         # Check window above for the absence pattern (e.g. limit piped above)
         start_idx = max(0, lineno - context_window - 1)
         window = Enum.slice(lines, start_idx, context_window + 1)
+
         not Enum.any?(window, &Regex.match?(absence, &1)) and
           not Regex.match?(absence, line)
       else

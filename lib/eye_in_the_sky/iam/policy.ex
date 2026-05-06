@@ -225,8 +225,11 @@ defmodule EyeInTheSky.IAM.Policy do
         changeset
 
       is_nil(system_key) ->
-        add_error(changeset, :builtin_matcher,
-          "is restricted to system policies (system_key must be set)")
+        add_error(
+          changeset,
+          :builtin_matcher,
+          "is restricted to system policies (system_key must be set)"
+        )
 
       not EyeInTheSky.IAM.BuiltinMatcher.Registry.known?(matcher) ->
         add_error(changeset, :builtin_matcher, "is not a registered builtin matcher key")

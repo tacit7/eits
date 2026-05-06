@@ -35,6 +35,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.RetryPolicy do
       state.provider_conversation_id,
       :retry_exhausted
     )
+
     WorkerEvents.broadcast_queue_update(state.session_id, [])
 
     %{state | status: :failed, queue: [], retry_attempt: 0}

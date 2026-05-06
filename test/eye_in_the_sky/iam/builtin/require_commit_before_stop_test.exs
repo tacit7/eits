@@ -53,8 +53,15 @@ defmodule EyeInTheSky.IAM.Builtin.RequireCommitBeforeStopTest do
   # ── non-git / wrong event ────────────────────────────────────────────────────
 
   test "does not match non-Stop events" do
-    refute RequireCommitBeforeStop.matches?(policy(), %Context{event: :pre_tool_use, project_path: "/tmp"})
-    refute RequireCommitBeforeStop.matches?(policy(), %Context{event: :post_tool_use, project_path: "/tmp"})
+    refute RequireCommitBeforeStop.matches?(policy(), %Context{
+             event: :pre_tool_use,
+             project_path: "/tmp"
+           })
+
+    refute RequireCommitBeforeStop.matches?(policy(), %Context{
+             event: :post_tool_use,
+             project_path: "/tmp"
+           })
   end
 
   test "does not match when project_path is nil" do

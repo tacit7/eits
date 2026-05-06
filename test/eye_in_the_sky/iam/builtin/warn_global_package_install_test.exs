@@ -48,6 +48,9 @@ defmodule EyeInTheSky.IAM.Builtin.WarnGlobalPackageInstallTest do
   end
 
   test "does not match non-Bash tool" do
-    refute WarnGlobalPackageInstall.matches?(%Policy{}, %Context{tool: "Write", resource_content: "npm install -g x"})
+    refute WarnGlobalPackageInstall.matches?(%Policy{}, %Context{
+             tool: "Write",
+             resource_content: "npm install -g x"
+           })
   end
 end

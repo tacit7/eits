@@ -12,7 +12,10 @@ defmodule EyeInTheSky.IAM.Builtin.WarnBackgroundProcessTest do
   end
 
   test "matches nohup command with &" do
-    assert WarnBackgroundProcess.matches?(%Policy{}, ctx("nohup mix phx.server > /tmp/log 2>&1 &"))
+    assert WarnBackgroundProcess.matches?(
+             %Policy{},
+             ctx("nohup mix phx.server > /tmp/log 2>&1 &")
+           )
   end
 
   test "matches & followed by disown" do
@@ -28,7 +31,10 @@ defmodule EyeInTheSky.IAM.Builtin.WarnBackgroundProcessTest do
   end
 
   test "does not match non-Bash tool" do
-    refute WarnBackgroundProcess.matches?(%Policy{}, %Context{tool: "Write", resource_content: "server &"})
+    refute WarnBackgroundProcess.matches?(%Policy{}, %Context{
+             tool: "Write",
+             resource_content: "server &"
+           })
   end
 
   test "does not match 2>&1 stderr redirect" do

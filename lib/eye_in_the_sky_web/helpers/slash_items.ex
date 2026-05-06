@@ -78,8 +78,11 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
         slug = String.replace_trailing(entry, ".md", "")
 
         case File.read(path) do
-          {:ok, content} -> [%{slug: slug, type: "command", description: extract_description(content)}]
-          {:error, _} -> []
+          {:ok, content} ->
+            [%{slug: slug, type: "command", description: extract_description(content)}]
+
+          {:error, _} ->
+            []
         end
 
       File.dir?(path) ->
@@ -95,8 +98,11 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
           subslug = "#{entry}:#{String.replace_trailing(filename, ".md", "")}"
 
           case File.read(Path.join(path, filename)) do
-            {:ok, content} -> [%{slug: subslug, type: "command", description: extract_description(content)}]
-            {:error, _} -> []
+            {:ok, content} ->
+              [%{slug: subslug, type: "command", description: extract_description(content)}]
+
+            {:error, _} ->
+              []
           end
         end)
 
@@ -115,8 +121,11 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
           end)
           |> Enum.flat_map(fn dir ->
             case File.read(Path.join([skills_dir, dir, "SKILL.md"])) do
-              {:ok, content} -> [%{slug: dir, type: "skill", description: extract_description(content)}]
-              {:error, _} -> []
+              {:ok, content} ->
+                [%{slug: dir, type: "skill", description: extract_description(content)}]
+
+              {:error, _} ->
+                []
             end
           end)
 

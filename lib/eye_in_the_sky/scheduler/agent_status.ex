@@ -73,7 +73,10 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     bulk_update_agent_status(idle, "idle")
 
     total = length(unknown) + length(stale) + length(idle)
-    Logger.debug("Agent status update completed: #{length(agents)} agents checked, #{total} updated")
+
+    Logger.debug(
+      "Agent status update completed: #{length(agents)} agents checked, #{total} updated"
+    )
   rescue
     DBConnection.ConnectionError -> Logger.warning("mark_stale_agents: DB unavailable, skipping")
   end
@@ -177,7 +180,8 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     # Join agents upfront — eliminates one get_agent/1 SELECT per zombie session.
     zombies =
       from(s in Session,
-        left_join: a in Agent, on: a.id == s.agent_id,
+        left_join: a in Agent,
+        on: a.id == s.agent_id,
         where: s.status == "working",
         where:
           (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
@@ -217,7 +221,8 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       Logger.info("Zombie sweep: marked #{length(zombies)} sessions as failed")
     end
   rescue
-    DBConnection.ConnectionError -> Logger.warning("sweep_zombie_sessions: DB unavailable, skipping")
+    DBConnection.ConnectionError ->
+      Logger.warning("sweep_zombie_sessions: DB unavailable, skipping")
   end
 
   defp archive_session_and_agent(session, now) do

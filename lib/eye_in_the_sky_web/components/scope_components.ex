@@ -103,7 +103,13 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
         </li>
         <li class="menu-title text-xs text-base-content/40 px-2 pt-2">PROJECTS</li>
         <li :for={project <- @projects}>
-          <.link navigate={~p"/projects/#{project.id}/sessions"} class={["gap-2 text-sm", Scope.project?(@scope) && @scope.project_id == project.id && "active"]}>
+          <.link
+            navigate={~p"/projects/#{project.id}/sessions"}
+            class={[
+              "gap-2 text-sm",
+              Scope.project?(@scope) && @scope.project_id == project.id && "active"
+            ]}
+          >
             <.icon name="hero-folder" class="size-4" />
             {project.name}
           </.link>
@@ -131,7 +137,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
       <%= if Scope.workspace?(@scope) do %>
         Across all projects
       <% else %>
-        <%= @scope.project && @scope.project.name %> only
+        {@scope.project && @scope.project.name} only
       <% end %>
     </p>
     """
@@ -154,7 +160,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
     ~H"""
     <nav class="flex items-center gap-1.5 text-xs text-base-content/50">
       <span class="font-medium text-base-content/70">
-        <%= if Scope.project?(@scope), do: @scope.project.name, else: @scope.workspace.name %>
+        {if Scope.project?(@scope), do: @scope.project.name, else: @scope.workspace.name}
       </span>
       <.icon name="hero-chevron-right" class="size-3" />
       <span>{@page_title}</span>

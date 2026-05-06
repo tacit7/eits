@@ -87,7 +87,10 @@ defmodule EyeInTheSky.IAM.Builtin.BlockSecretsWriteTest do
   end
 
   test "does not block Bash tool" do
-    refute BlockSecretsWrite.matches?(policy(), %Context{tool: "Bash", resource_path: "/certs/server.pem"})
+    refute BlockSecretsWrite.matches?(policy(), %Context{
+             tool: "Bash",
+             resource_path: "/certs/server.pem"
+           })
   end
 
   # ── allowPaths condition ────────────────────────────────────────────────────

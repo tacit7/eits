@@ -124,7 +124,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
       <%!-- List panel --%>
       <div class={[
         "overflow-y-auto px-4 sm:px-6 py-6",
-        if(@selected_skill, do: "w-[440px] flex-shrink-0 border-r border-base-content/8", else: "w-full max-w-3xl mx-auto")
+        if(@selected_skill,
+          do: "w-[440px] flex-shrink-0 border-r border-base-content/8",
+          else: "w-full max-w-3xl mx-auto"
+        )
       ]}>
         <div class="mb-3">
           <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
@@ -149,7 +152,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                   />
                   <div class={[
                     "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
-                    if(selected?, do: "bg-primary/5 border-l-2 border-primary", else: "hover:bg-base-content/4")
+                    if(selected?,
+                      do: "bg-primary/5 border-l-2 border-primary",
+                      else: "hover:bg-base-content/4"
+                    )
                   ]}>
                     <%!-- Name row --%>
                     <div class="flex items-center gap-2">
@@ -174,9 +180,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                         {source_label(skill.source)}
                       </span>
                       <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-[10px] text-base-content/40 tabular-nums">{FileHelpers.format_size(skill.size)}</span>
+                      <span class="text-[10px] text-base-content/40 tabular-nums">
+                        {FileHelpers.format_size(skill.size)}
+                      </span>
                       <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-[10px] text-base-content/35 font-mono truncate">{skill.path}</span>
+                      <span class="text-[10px] text-base-content/35 font-mono truncate">
+                        {skill.path}
+                      </span>
                     </div>
                   </div>
                   <%!-- Mobile inline viewer --%>
@@ -197,9 +207,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
           <.empty_state
             id="overview-skills-empty"
             icon="hero-code-bracket"
-            title={if @search_query != "" || @type_filter != "all" || @scope_filter != "all",
-              do: "No skills found",
-              else: "No skills yet"}
+            title={
+              if @search_query != "" || @type_filter != "all" || @scope_filter != "all",
+                do: "No skills found",
+                else: "No skills yet"
+            }
             subtitle={
               if @search_query != "" || @type_filter != "all" || @scope_filter != "all",
                 do: "Try adjusting your search or filters",
@@ -217,14 +229,18 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <code class="text-base font-semibold text-base-content">/{@selected_skill.slug}</code>
+                  <code class="text-base font-semibold text-base-content">
+                    /{@selected_skill.slug}
+                  </code>
                   <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
                     source_badge_class(@selected_skill.source)}>
                     {source_label(@selected_skill.source)}
                   </span>
                 </div>
                 <p class="text-xs text-base-content/45 font-mono truncate">{@selected_skill.path}</p>
-                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">{@selected_skill.description}</p>
+                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                  {@selected_skill.description}
+                </p>
               </div>
               <button
                 phx-click="close_viewer"

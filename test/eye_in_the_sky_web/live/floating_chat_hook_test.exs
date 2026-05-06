@@ -133,6 +133,7 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
 
       # subscribe_session subscribes to "session:#{id}" (not the :messages sub-topic)
       topic = "session:#{session1.id}"
+
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)
@@ -154,6 +155,7 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
       assert view_assigns(view).fab_active_session_id == nil
 
       topic = "session:#{session1.id}"
+
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)
@@ -187,6 +189,7 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
       assert view_assigns(view).config_guide_active_session_id == session1.id
 
       topic = "session:#{session1.id}"
+
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)
@@ -223,6 +226,7 @@ defmodule EyeInTheSkyWeb.FloatingChatHookTest do
       assert view_assigns(view).config_guide_active_session_id == nil
 
       topic = "session:#{session1.id}"
+
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)

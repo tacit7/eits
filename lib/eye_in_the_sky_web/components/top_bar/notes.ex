@@ -58,7 +58,12 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
     </button>
     <.tab_pills value_key="type">
       <:item label="All" active={@type_filter == "all"} on_click="filter_type" value="all" />
-      <:item label="Session" active={@type_filter == "session"} on_click="filter_type" value="session" />
+      <:item
+        label="Session"
+        active={@type_filter == "session"}
+        on_click="filter_type"
+        value="session"
+      />
       <:item label="Task" active={@type_filter == "task"} on_click="filter_type" value="task" />
     </.tab_pills>
     <details
@@ -69,7 +74,9 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
       class="dropdown"
     >
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-        Sort: <span class="js-sort-label">{if @sort_by == "oldest", do: "Oldest", else: "Newest"}</span> <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
+        Sort:
+        <span class="js-sort-label">{if @sort_by == "oldest", do: "Oldest", else: "Newest"}</span>
+        <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
         <%= for {value, label} <- [{"newest", "Newest"}, {"oldest", "Oldest"}] do %>

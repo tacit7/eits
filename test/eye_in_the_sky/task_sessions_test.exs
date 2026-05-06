@@ -70,6 +70,7 @@ defmodule EyeInTheSky.TaskSessionsTest do
 
     test "returns task_not_found for non-existent task id" do
       session = new_session()
+
       assert {:error, :task_not_found} =
                TaskSessions.transfer_session_ownership(999_999_999, session.id)
     end

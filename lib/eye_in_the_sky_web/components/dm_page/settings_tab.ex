@@ -76,7 +76,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <div class="join">
         <button
           type="button"
-          class={["join-item btn btn-sm", if(@scope == "session", do: "btn-primary", else: "btn-ghost")]}
+          class={[
+            "join-item btn btn-sm",
+            if(@scope == "session", do: "btn-primary", else: "btn-ghost")
+          ]}
           phx-click="dm_setting_scope"
           phx-value-scope="session"
         >
@@ -162,7 +165,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   defp general_section(assigns) do
     ~H"""
     <.section title="Model">
-      <.row label="Model" help="Used for new messages in this session" override={"model" in @overrides}>
+      <.row
+        label="Model"
+        help="Used for new messages in this session"
+        override={"model" in @overrides}
+      >
         <div class="font-mono text-sm text-base-content/80">
           {@session_state.model || "—"}
         </div>
@@ -194,7 +201,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="Show streaming tokens as the agent responds"
         override={"show_live_stream" in @overrides}
       >
-        <.toggle key="general.show_live_stream" scope={@scope} checked={@session_state[:show_live_stream] != false} />
+        <.toggle
+          key="general.show_live_stream"
+          scope={@scope}
+          checked={@session_state[:show_live_stream] != false}
+        />
       </.row>
       <.row
         label="Thinking"

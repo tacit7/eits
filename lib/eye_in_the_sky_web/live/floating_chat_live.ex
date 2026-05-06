@@ -287,8 +287,23 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     if ids == [] do
       %{}
     else
-      int_ids = ids |> Enum.flat_map(fn s -> case Integer.parse(s) do {n, ""} -> [n]; _ -> [] end end)
-      uuid_ids = ids |> Enum.filter(fn s -> case Ecto.UUID.cast(s) do {:ok, _} -> true; _ -> false end end)
+      int_ids =
+        ids
+        |> Enum.flat_map(fn s ->
+          case Integer.parse(s) do
+            {n, ""} -> [n]
+            _ -> []
+          end
+        end)
+
+      uuid_ids =
+        ids
+        |> Enum.filter(fn s ->
+          case Ecto.UUID.cast(s) do
+            {:ok, _} -> true
+            _ -> false
+          end
+        end)
 
       sessions =
         case {int_ids, uuid_ids} do

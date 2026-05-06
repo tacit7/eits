@@ -20,11 +20,12 @@ defmodule EyeInTheSky.Repo.Migrations.AddDedupIndexOnMessages do
     #
     # Built CONCURRENTLY so inserts are not blocked during index creation on
     # large production tables.
-    create index(:messages,
-      [:session_id, :sender_role, :inserted_at],
-      where: "source_uuid IS NULL",
-      name: "idx_messages_unlinked_dedup",
-      concurrently: true
-    )
+    create index(
+             :messages,
+             [:session_id, :sender_role, :inserted_at],
+             where: "source_uuid IS NULL",
+             name: "idx_messages_unlinked_dedup",
+             concurrently: true
+           )
   end
 end

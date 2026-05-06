@@ -29,7 +29,13 @@ defmodule EyeInTheSkyWeb.Components.TaskCard do
     ~H"""
     <%= case @variant do %>
       <% "list" -> %>
-        <.list_row task={@task} on_click={@on_click} on_delete={@on_delete} select_mode={@select_mode} selected={@selected} />
+        <.list_row
+          task={@task}
+          on_click={@on_click}
+          on_delete={@on_delete}
+          select_mode={@select_mode}
+          selected={@selected}
+        />
       <% "grid" -> %>
         <.grid_card task={@task} on_click={@on_click} {@rest} />
       <% _ -> %>

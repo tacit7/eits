@@ -16,7 +16,10 @@ defmodule EyeInTheSky.Messages.NotifyListener do
           {:ok, %{pid: pid, ref: ref}}
 
         {:error, reason} ->
-          Logger.error("NotifyListener: failed to start Postgrex.Notifications: #{inspect(reason)}")
+          Logger.error(
+            "NotifyListener: failed to start Postgrex.Notifications: #{inspect(reason)}"
+          )
+
           :ignore
       end
     else

@@ -12,6 +12,7 @@ defmodule EyeInTheSky.Messaging.DMDelivery do
   def deliver_and_persist(to_session_id, from_session_id, body, metadata \\ %{}) do
     # Pass metadata as context to the agent manager so the worker can use it
     opts = if metadata && metadata != %{}, do: [dm_metadata: metadata], else: []
+
     case agent_manager_mod().send_message(to_session_id, body, opts) do
       result when result == :ok or (is_tuple(result) and elem(result, 0) == :ok) ->
         attrs = %{

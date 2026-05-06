@@ -37,7 +37,11 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   def strip_dm_prefix(body) when is_binary(body) do
     cond do
       # New bracketed format — strip header and reply footer
-      match = Regex.run(~r/^\[DM from agent: [^\]]+\]\n(.*?)(?:\n\nReply: eits dm --to \d+ --message "")?$/s, body) ->
+      match =
+          Regex.run(
+            ~r/^\[DM from agent: [^\]]+\]\n(.*?)(?:\n\nReply: eits dm --to \d+ --message "")?$/s,
+            body
+          ) ->
         [_, content] = match
         String.trim(content)
 
@@ -56,17 +60,35 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   def parse_dm_info(body) when is_binary(body) do
     cond do
       # New format: [DM from agent: <name>]\n...\n\nReply: eits dm --to <id> --message ""
-      match = Regex.run(~r/^\[DM from agent: ([^\]]+)\]\n(.*?)(?:\n\nReply: eits dm --to (\d+) --message "")?$/s, body) ->
+      match =
+          Regex.run(
+            ~r/^\[DM from agent: ([^\]]+)\]\n(.*?)(?:\n\nReply: eits dm --to (\d+) --message "")?$/s,
+            body
+          ) ->
         case match do
           [_, sender, rest, session_id] ->
             rest = String.trim(rest)
             {status, url} = extract_dm_status_and_url(rest)
-            %{sender: String.trim(sender), status: status, url: url, session_id: session_id, format: :agent}
+
+            %{
+              sender: String.trim(sender),
+              status: status,
+              url: url,
+              session_id: session_id,
+              format: :agent
+            }
 
           [_, sender, rest] ->
             rest = String.trim(rest)
             {status, url} = extract_dm_status_and_url(rest)
-            %{sender: String.trim(sender), status: status, url: url, session_id: nil, format: :agent}
+
+            %{
+              sender: String.trim(sender),
+              status: status,
+              url: url,
+              session_id: nil,
+              format: :agent
+            }
         end
 
       # Legacy format: DM from:<name> (session:<uuid>) <body>

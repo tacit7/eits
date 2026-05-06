@@ -156,6 +156,7 @@ defmodule EyeInTheSky.SDK.MessageHandler do
     receive do
       {:claude_output, _cli_ref, line} ->
         maybe_log_raw_line(session_id, line, log_raw_key, log_raw_prefix)
+
         if forward_raw_lines do
           broadcast_id = Map.get(state, :eits_session_id) || session_id
           EyeInTheSky.Events.broadcast_codex_raw(broadcast_id, line)

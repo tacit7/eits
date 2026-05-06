@@ -103,10 +103,25 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
   defp sort_skills(skills, _), do: Enum.sort_by(skills, & &1.slug)
 
   defp do_load_skills(project_path) do
-    global_commands = load_from_dir(Path.expand("~/.claude/commands"), :commands, "~/.claude/commands")
-    global_skills = load_from_skills_dir(Path.expand("~/.claude/skills"), :skills, "~/.claude/skills")
-    project_commands = load_from_dir(Path.join(project_path, ".claude/commands"), :project_commands, ".claude/commands")
-    project_skills = load_from_skills_dir(Path.join(project_path, ".claude/skills"), :project_skills, ".claude/skills")
+    global_commands =
+      load_from_dir(Path.expand("~/.claude/commands"), :commands, "~/.claude/commands")
+
+    global_skills =
+      load_from_skills_dir(Path.expand("~/.claude/skills"), :skills, "~/.claude/skills")
+
+    project_commands =
+      load_from_dir(
+        Path.join(project_path, ".claude/commands"),
+        :project_commands,
+        ".claude/commands"
+      )
+
+    project_skills =
+      load_from_skills_dir(
+        Path.join(project_path, ".claude/skills"),
+        :project_skills,
+        ".claude/skills"
+      )
 
     (global_commands ++ global_skills ++ project_commands ++ project_skills)
     |> Enum.sort_by(& &1.slug)

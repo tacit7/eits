@@ -35,7 +35,7 @@ description: Clean session close for Codex agents. Completes in-progress tasks, 
    ```
 
 3. **Set session status**:
-   - Spawned agent: `eits sessions update $EITS_SESSION_UUID --status waiting`
+   - Spawned agent: `eits sessions update $EITS_SESSION_UUID --status idle`
    - Interactive: `eits sessions update $EITS_SESSION_UUID --status completed`
 
    The Stop hook sets `stopped` automatically. This step sets the final terminal status.

@@ -260,13 +260,18 @@ defmodule EyeInTheSky.Projects.FileTree do
       {:ok, %{type: :symlink} = _stat} ->
         case File.stat(entry_path) do
           {:ok, %{type: :directory}} -> make_node(name, rel_path, :directory, true, false)
-          {:ok, %{type: :regular}}   -> make_node(name, rel_path, :file, true, false)
-          _                          -> make_node(name, rel_path, :file, true, false)
+          {:ok, %{type: :regular}} -> make_node(name, rel_path, :file, true, false)
+          _ -> make_node(name, rel_path, :file, true, false)
         end
 
-      {:ok, %{type: :directory}} -> make_node(name, rel_path, :directory, false, false)
-      {:ok, %{type: :regular}}   -> make_node(name, rel_path, :file, false, true)
-      _                          -> make_node(name, rel_path, :file, false, false)
+      {:ok, %{type: :directory}} ->
+        make_node(name, rel_path, :directory, false, false)
+
+      {:ok, %{type: :regular}} ->
+        make_node(name, rel_path, :file, false, true)
+
+      _ ->
+        make_node(name, rel_path, :file, false, false)
     end
   end
 

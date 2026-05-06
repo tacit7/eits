@@ -23,7 +23,7 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
     * `handler_pid` is the pid of the spawned task
   """
   @spec start(prompt :: String.t(), opts :: map(), caller :: pid()) ::
-        {:ok, sdk_ref :: reference(), handler_pid :: pid()} | {:error, term()}
+          {:ok, sdk_ref :: reference(), handler_pid :: pid()} | {:error, term()}
   def start(prompt, opts, caller_pid, test_opts \\ []) do
     sdk_ref = make_ref()
 
@@ -45,16 +45,15 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
 
   Same as start/3 but resumes a conversation by session_id.
   """
-  @spec resume(session_id :: String.t(), prompt :: String.t(),
-               opts :: map(), caller :: pid()) ::
-        {:ok, sdk_ref :: reference(), handler_pid :: pid()} | {:error, term()}
+  @spec resume(session_id :: String.t(), prompt :: String.t(), opts :: map(), caller :: pid()) ::
+          {:ok, sdk_ref :: reference(), handler_pid :: pid()} | {:error, term()}
   def resume(session_id, prompt, opts, caller_pid, test_opts \\ []) do
     sdk_ref = make_ref()
 
     stream_fn =
-      Keyword.get(test_opts, :stream_fn,
-        fn -> GeminiCliSdk.resume_session(session_id, opts, prompt) end
-      )
+      Keyword.get(test_opts, :stream_fn, fn ->
+        GeminiCliSdk.resume_session(session_id, opts, prompt)
+      end)
 
     case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid) do
       {:ok, pid} ->
@@ -236,8 +235,10 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
 
   defp stats_to_map(nil), do: %{}
 
-  defp stats_to_map(%{total_tokens: total, input_tokens: input, output_tokens: output,
-                      duration_ms: duration} = stats) do
+  defp stats_to_map(
+         %{total_tokens: total, input_tokens: input, output_tokens: output, duration_ms: duration} =
+           stats
+       ) do
     %{
       total_tokens: total,
       input_tokens: input,

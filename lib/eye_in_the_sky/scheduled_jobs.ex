@@ -60,7 +60,11 @@ defmodule EyeInTheSky.ScheduledJobs do
   end
 
   def list_filesystem_agent_jobs do
-    base_jobs_query(job_type: "spawn_agent", prompt_id_nil: true, config_contains: "%agent_file_id%")
+    base_jobs_query(
+      job_type: "spawn_agent",
+      prompt_id_nil: true,
+      config_contains: "%agent_file_id%"
+    )
     |> limit(500)
     |> Repo.all()
   end

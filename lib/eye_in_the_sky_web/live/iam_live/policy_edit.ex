@@ -189,14 +189,20 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
             <div class="text-sm">
               Matcher fields are locked — you can only edit:
               <code class="font-mono">
-                <%= Enum.join(@policy.editable_fields || [], ", ") %>
+                {Enum.join(@policy.editable_fields || [], ", ")}
               </code>
             </div>
           </div>
         </div>
       <% end %>
 
-      <.form for={@form} id="iam-policy-form" phx-change="validate" phx-submit="save" class="space-y-4">
+      <.form
+        for={@form}
+        id="iam-policy-form"
+        phx-change="validate"
+        phx-submit="save"
+        class="space-y-4"
+      >
         <input type="hidden" name="condition_text" value={@condition_text} />
 
         <section class="card bg-base-200">

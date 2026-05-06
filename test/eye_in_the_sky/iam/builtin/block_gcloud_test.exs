@@ -8,7 +8,10 @@ defmodule EyeInTheSky.IAM.Builtin.BlockGcloudTest do
   defp ctx(cmd), do: %Context{tool: "Bash", resource_content: cmd}
 
   test "blocks gcloud compute instances delete" do
-    assert BlockGcloud.matches?(%Policy{}, ctx("gcloud compute instances delete my-vm --zone us-central1-a"))
+    assert BlockGcloud.matches?(
+             %Policy{},
+             ctx("gcloud compute instances delete my-vm --zone us-central1-a")
+           )
   end
 
   test "blocks gcloud projects delete" do
@@ -40,6 +43,9 @@ defmodule EyeInTheSky.IAM.Builtin.BlockGcloudTest do
   end
 
   test "does not match non-Bash tool" do
-    refute BlockGcloud.matches?(%Policy{}, %Context{tool: "Write", resource_content: "gcloud projects delete x"})
+    refute BlockGcloud.matches?(%Policy{}, %Context{
+             tool: "Write",
+             resource_content: "gcloud projects delete x"
+           })
   end
 end

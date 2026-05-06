@@ -124,5 +124,4 @@ defmodule EyeInTheSky.QueryHelpers do
     |> select([x], count(x.id))
     |> Repo.one() || 0
   end
-
 end

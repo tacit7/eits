@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Notes do
     ~H"""
     <div class="p-6">
       <div>
-        <h1 class="text-xl font-semibold"><%= @page_title %></h1>
+        <h1 class="text-xl font-semibold">{@page_title}</h1>
         <.scope_badge scope={@scope} />
       </div>
       <p class="mt-4 text-base-content/60">Workspace notes view — coming soon.</p>

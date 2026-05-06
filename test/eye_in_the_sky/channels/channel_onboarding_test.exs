@@ -21,13 +21,22 @@ defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
 
     agent = Factory.create_agent()
     session = Factory.create_session(agent)
-    {:ok, channel} = Channels.create_channel(%{name: "test-onboard-#{System.unique_integer([:positive])}", channel_type: "public"})
+
+    {:ok, channel} =
+      Channels.create_channel(%{
+        name: "test-onboard-#{System.unique_integer([:positive])}",
+        channel_type: "public"
+      })
 
     %{agent: agent, session: session, channel: channel}
   end
 
   describe "deliver/2 — first join" do
-    test "sends onboarding DM and stamps onboarded_at", %{agent: agent, session: session, channel: channel} do
+    test "sends onboarding DM and stamps onboarded_at", %{
+      agent: agent,
+      session: session,
+      channel: channel
+    } do
       Process.put(:mock_send_message_response, {:ok, :sent})
 
       {:ok, member} = Channels.add_member(channel.id, agent.id, session.id)
@@ -36,7 +45,11 @@ defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
       assert db_member.onboarded_at != nil
     end
 
-    test "onboarding DM includes channel name and id", %{agent: agent, session: session, channel: channel} do
+    test "onboarding DM includes channel name and id", %{
+      agent: agent,
+      session: session,
+      channel: channel
+    } do
       Process.put(:mock_send_message_response, {:ok, :sent})
 
       # Verify indirectly: after deliver, onboarded_at is set (DM sent).
@@ -45,21 +58,31 @@ defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
       {:ok, _member} = Channels.add_member(channel.id, agent.id, session.id)
 
       db_member =
-        Repo.one(from m in ChannelMember, where: m.channel_id == ^channel.id and m.session_id == ^session.id)
+        Repo.one(
+          from m in ChannelMember,
+            where: m.channel_id == ^channel.id and m.session_id == ^session.id
+        )
 
       assert db_member.onboarded_at != nil
     end
   end
 
   describe "deliver/2 — rejoin guard" do
-    test "does not send a second DM when onboarded_at is already set", %{agent: agent, session: session, channel: channel} do
+    test "does not send a second DM when onboarded_at is already set", %{
+      agent: agent,
+      session: session,
+      channel: channel
+    } do
       Process.put(:mock_send_message_response, {:ok, :sent})
 
       # First join — stamps onboarded_at
       {:ok, _member} = Channels.add_member(channel.id, agent.id, session.id)
 
       db_member =
-        Repo.one(from m in ChannelMember, where: m.channel_id == ^channel.id and m.session_id == ^session.id)
+        Repo.one(
+          from m in ChannelMember,
+            where: m.channel_id == ^channel.id and m.session_id == ^session.id
+        )
 
       assert db_member.onboarded_at != nil
 
@@ -71,7 +94,10 @@ defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
       # guard is for duplicate add_member calls on the same row, not re-inserts.
       # Verify deliver is called and stamps it on the new row.
       new_db_member =
-        Repo.one(from m in ChannelMember, where: m.channel_id == ^channel.id and m.session_id == ^session.id)
+        Repo.one(
+          from m in ChannelMember,
+            where: m.channel_id == ^channel.id and m.session_id == ^session.id
+        )
 
       assert new_db_member.onboarded_at != nil
     end
@@ -91,7 +117,11 @@ defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
   end
 
   describe "deliver/2 — no active worker" do
-    test "does not crash when session has no active AgentWorker", %{agent: agent, session: session, channel: channel} do
+    test "does not crash when session has no active AgentWorker", %{
+      agent: agent,
+      session: session,
+      channel: channel
+    } do
       # Mock returns error — simulates no active worker
       Process.put(:mock_send_message_response, {:error, :no_worker})
 
@@ -99,7 +129,10 @@ defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
 
       # Should not raise; onboarded_at NOT stamped because DM failed
       db_member =
-        Repo.one(from m in ChannelMember, where: m.channel_id == ^channel.id and m.session_id == ^session.id)
+        Repo.one(
+          from m in ChannelMember,
+            where: m.channel_id == ^channel.id and m.session_id == ^session.id
+        )
 
       assert db_member.onboarded_at == nil
     end

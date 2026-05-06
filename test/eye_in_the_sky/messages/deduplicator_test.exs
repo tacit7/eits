@@ -72,7 +72,9 @@ defmodule EyeInTheSky.Messages.DeduplicatorTest do
       assert {:error, :source_uuid_required} = Deduplicator.find_or_create(attrs, %{})
     end
 
-    test "returns {:error, :source_uuid_required} when source_uuid key is missing", %{session: session} do
+    test "returns {:error, :source_uuid_required} when source_uuid key is missing", %{
+      session: session
+    } do
       attrs =
         base_attrs(session.id, "ignored")
         |> Map.delete(:source_uuid)
@@ -88,7 +90,12 @@ defmodule EyeInTheSky.Messages.DeduplicatorTest do
       body = "Done."
 
       attrs1 = %{base_attrs(session.id, Ecto.UUID.generate()) | body: body}
-      attrs2 = %{base_attrs(session.id, Ecto.UUID.generate()) | body: body, uuid: Ecto.UUID.generate()}
+
+      attrs2 = %{
+        base_attrs(session.id, Ecto.UUID.generate())
+        | body: body,
+          uuid: Ecto.UUID.generate()
+      }
 
       {:ok, msg1} = Deduplicator.find_or_create(attrs1, %{})
       {:ok, msg2} = Deduplicator.find_or_create(attrs2, %{})

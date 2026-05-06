@@ -16,19 +16,31 @@ defmodule EyeInTheSky.IAM.Builtin.BlockAzCliTest do
   end
 
   test "blocks az sql db delete" do
-    assert BlockAzCli.matches?(%Policy{}, ctx("az sql db delete --name mydb --server srv --resource-group rg"))
+    assert BlockAzCli.matches?(
+             %Policy{},
+             ctx("az sql db delete --name mydb --server srv --resource-group rg")
+           )
   end
 
   test "blocks az aks delete" do
-    assert BlockAzCli.matches?(%Policy{}, ctx("az aks delete --name my-cluster --resource-group rg"))
+    assert BlockAzCli.matches?(
+             %Policy{},
+             ctx("az aks delete --name my-cluster --resource-group rg")
+           )
   end
 
   test "blocks az webapp delete" do
-    assert BlockAzCli.matches?(%Policy{}, ctx("az webapp delete --name my-app --resource-group rg"))
+    assert BlockAzCli.matches?(
+             %Policy{},
+             ctx("az webapp delete --name my-app --resource-group rg")
+           )
   end
 
   test "blocks az functionapp delete" do
-    assert BlockAzCli.matches?(%Policy{}, ctx("az functionapp delete --name my-fn --resource-group rg"))
+    assert BlockAzCli.matches?(
+             %Policy{},
+             ctx("az functionapp delete --name my-fn --resource-group rg")
+           )
   end
 
   test "does not block az vm list" do
@@ -40,6 +52,9 @@ defmodule EyeInTheSky.IAM.Builtin.BlockAzCliTest do
   end
 
   test "does not match non-Bash tool" do
-    refute BlockAzCli.matches?(%Policy{}, %Context{tool: "Write", resource_content: "az vm delete --name x"})
+    refute BlockAzCli.matches?(%Policy{}, %Context{
+             tool: "Write",
+             resource_content: "az vm delete --name x"
+           })
   end
 end

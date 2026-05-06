@@ -32,12 +32,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     assigns = assign(assigns, :dm_session, dm_session)
 
     ~H"""
-    <div
-      class={[
-        "group/row relative",
-        @task.completed_at && "opacity-60 hover:opacity-80"
-      ]}
-    >
+    <div class={[
+      "group/row relative",
+      @task.completed_at && "opacity-60 hover:opacity-80"
+    ]}>
       <%!-- Checkbox: absolute, outside row flow, hover-reveal --%>
       <div
         class={[
@@ -45,7 +43,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           "left-4 sm:left-[-0.875rem]",
           if(@select_mode,
             do: "opacity-100 scale-100",
-            else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
+            else:
+              "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
           )
         ]}
         aria-hidden={to_string(!@select_mode)}
@@ -102,14 +101,20 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           <div class="flex items-center gap-1.5 flex-wrap mt-1 text-mini">
             <%!-- State pill --%>
             <%= if @task.state do %>
-              <span class={["px-1.5 py-px rounded-full font-medium text-micro", state_pill_class(@task.state_id)]}>
+              <span class={[
+                "px-1.5 py-px rounded-full font-medium text-micro",
+                state_pill_class(@task.state_id)
+              ]}>
                 {@task.state.name}
               </span>
             <% end %>
 
             <%!-- Priority badge (only when set) --%>
             <%= if is_integer(@task.priority) && @task.priority > 0 do %>
-              <span class={["px-1.5 py-px rounded-full font-medium text-micro", priority_pill_class(@task.priority)]}>
+              <span class={[
+                "px-1.5 py-px rounded-full font-medium text-micro",
+                priority_pill_class(@task.priority)
+              ]}>
                 {priority_label(@task.priority)}
               </span>
             <% end %>
@@ -117,7 +122,9 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             <%!-- Agent name (replaces UUID — much more useful scan anchor) --%>
             <%= if @task.agent do %>
               <span class="text-base-content/15">&middot;</span>
-              <span class="text-base-content/40 truncate max-w-[160px]">{@task.agent.description}</span>
+              <span class="text-base-content/40 truncate max-w-[160px]">
+                {@task.agent.description}
+              </span>
             <% end %>
 
             <%!-- Notes count --%>

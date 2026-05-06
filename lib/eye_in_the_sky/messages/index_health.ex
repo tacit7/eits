@@ -20,7 +20,8 @@ defmodule EyeInTheSky.Messages.IndexHealth do
 
     case Repo.query(query) do
       {:ok, %{rows: rows}} ->
-        {:ok, Enum.map(rows, fn [name, valid, ready] -> %{name: name, valid: valid, ready: ready} end)}
+        {:ok,
+         Enum.map(rows, fn [name, valid, ready] -> %{name: name, valid: valid, ready: ready} end)}
 
       {:error, reason} ->
         {:error, reason}

@@ -104,7 +104,12 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentActivityControllerTest do
 
     test "in_progress task within window appears in in_progress bucket", %{conn: conn} do
       agent = create_agent()
-      task = create_task_for_agent(agent, %{state_id: WorkflowState.in_progress_id(), updated_at: DateTime.utc_now()})
+
+      task =
+        create_task_for_agent(agent, %{
+          state_id: WorkflowState.in_progress_id(),
+          updated_at: DateTime.utc_now()
+        })
 
       conn = get(conn, ~p"/api/v1/agents/activity?agent_uuid=#{agent.uuid}&since=24h")
       resp = json_response(conn, 200)

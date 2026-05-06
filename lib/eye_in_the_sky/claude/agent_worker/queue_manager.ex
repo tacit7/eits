@@ -10,7 +10,15 @@ defmodule EyeInTheSky.Claude.AgentWorker.QueueManager do
   require Logger
 
   alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
-  alias EyeInTheSky.Claude.AgentWorker.{IdleTimer, Reconciliation, RetryPolicy, SdkLifecycle, WatchdogTimer}
+
+  alias EyeInTheSky.Claude.AgentWorker.{
+    IdleTimer,
+    Reconciliation,
+    RetryPolicy,
+    SdkLifecycle,
+    WatchdogTimer
+  }
+
   alias EyeInTheSky.Claude.Job
   alias EyeInTheSky.Messages
 

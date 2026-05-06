@@ -127,7 +127,16 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
           target_ids
           |> Task.async_stream(
             fn session_id ->
-              route_to_member(session_id, body, :direct, channel_ctx, sender, channel_id, [], context)
+              route_to_member(
+                session_id,
+                body,
+                :direct,
+                channel_ctx,
+                sender,
+                channel_id,
+                [],
+                context
+              )
             end,
             max_concurrency: 10,
             timeout: 5_000,
@@ -144,7 +153,16 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
   # Private
   # ---------------------------------------------------------------------------
 
-  defp route_to_member(session_id, body, mode, channel_ctx, sender, channel_id, content_blocks, context) do
+  defp route_to_member(
+         session_id,
+         body,
+         mode,
+         channel_ctx,
+         sender,
+         channel_id,
+         content_blocks,
+         context
+       ) do
     case Messages.send_message(%{
            session_id: session_id,
            sender_role: "user",

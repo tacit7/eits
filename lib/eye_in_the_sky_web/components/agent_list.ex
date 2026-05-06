@@ -2,7 +2,6 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
-
   @filter_tabs [
     {"all", "All", "text-base-content"},
     {"active", "Active", "text-success"},
@@ -118,8 +117,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         <%= if @agent.id do %>
           <li>
             <a href={~p"/dm/#{@agent.id}"} target="_blank" class="flex items-center gap-2">
-              <.icon name="hero-arrow-top-right-on-square-mini" class="size-3.5" />
-              Open in new tab
+              <.icon name="hero-arrow-top-right-on-square-mini" class="size-3.5" /> Open in new tab
             </a>
           </li>
         <% end %>
@@ -295,8 +293,9 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
       <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Archive sessions</h3>
         <p class="py-4 text-sm text-base-content/70">
-          <% count = MapSet.size(@selected_ids) %>
-          Archive {count} selected session{if count == 1, do: "", else: "s"}?
+          <% count = MapSet.size(@selected_ids) %> Archive {count} selected session{if count == 1,
+            do: "",
+            else: "s"}?
           Archived sessions can be unarchived later.
         </p>
         <div class="modal-action">

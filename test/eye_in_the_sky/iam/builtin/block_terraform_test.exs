@@ -29,7 +29,10 @@ defmodule EyeInTheSky.IAM.Builtin.BlockTerraformTest do
   end
 
   test "does not match non-Bash tool" do
-    refute BlockTerraform.matches?(policy(), %Context{tool: "Write", resource_content: "terraform destroy"})
+    refute BlockTerraform.matches?(policy(), %Context{
+             tool: "Write",
+             resource_content: "terraform destroy"
+           })
   end
 
   test "allowCommands escapes the block" do

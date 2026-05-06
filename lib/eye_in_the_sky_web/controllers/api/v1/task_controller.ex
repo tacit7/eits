@@ -320,16 +320,30 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         task: ApiPresenter.present_task(updated)
       })
     else
-      {:session, {:error, :no_session}} -> {:error, :bad_request, "session_id is required"}
-      {:session, {:error, :invalid_session}} -> {:error, :bad_request, "session_id is invalid"}
-      {:session, _} -> {:error, :bad_request, "session_id is required"}
-      {:task, {:error, :not_found}} -> {:error, :not_found, "Task not found"}
+      {:session, {:error, :no_session}} ->
+        {:error, :bad_request, "session_id is required"}
+
+      {:session, {:error, :invalid_session}} ->
+        {:error, :bad_request, "session_id is invalid"}
+
+      {:session, _} ->
+        {:error, :bad_request, "session_id is required"}
+
+      {:task, {:error, :not_found}} ->
+        {:error, :not_found, "Task not found"}
+
       {:claim, {:error, :already_claimed}} ->
         hint = format_claim_owner_hint(task_id)
         {:error, :conflict, "Task is already in progress#{hint}"}
-      {:claim, {:error, :task_not_claimable}} -> {:error, :conflict, "Task cannot be claimed from its current state"}
-      {:claim, {:error, :task_not_found}} -> {:error, :not_found, "Task not found"}
-      {:claim, {:error, changeset}} -> {:error, changeset}
+
+      {:claim, {:error, :task_not_claimable}} ->
+        {:error, :conflict, "Task cannot be claimed from its current state"}
+
+      {:claim, {:error, :task_not_found}} ->
+        {:error, :not_found, "Task not found"}
+
+      {:claim, {:error, changeset}} ->
+        {:error, changeset}
     end
   end
 
@@ -500,9 +514,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       {:ok, s} ->
         name_part = if s.name, do: ", \"#{s.name}\"", else: ""
         " — currently held by session #{s.id} (#{s.uuid}#{name_part})"
+
       _ ->
         ""
     end
   end
-
 end

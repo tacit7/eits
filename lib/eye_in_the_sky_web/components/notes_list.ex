@@ -24,7 +24,9 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
         <div phx-click="toggle_select_all_notes" class="cursor-pointer">
           <.square_checkbox
             checked={MapSet.size(@selected_ids) == length(@notes)}
-            indeterminate={MapSet.size(@selected_ids) > 0 && MapSet.size(@selected_ids) < length(@notes)}
+            indeterminate={
+              MapSet.size(@selected_ids) > 0 && MapSet.size(@selected_ids) < length(@notes)
+            }
             aria-label="Select all notes"
           />
         </div>

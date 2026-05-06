@@ -100,7 +100,10 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
 
           {:noreply,
            socket
-           |> Phoenix.Component.assign(:channels, EyeInTheSkyWeb.ChatPresenter.serialize_channels(channels))
+           |> Phoenix.Component.assign(
+             :channels,
+             EyeInTheSkyWeb.ChatPresenter.serialize_channels(channels)
+           )
            |> Phoenix.Component.assign(:new_channel_name, nil)
            |> push_patch(to: "/chat?channel_id=#{channel_id}")}
 

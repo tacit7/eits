@@ -43,22 +43,53 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocompleteTest do
     end
 
     test "under_root? accepts children of the root" do
-      assert FileAutocomplete.under_root?(
-               "/Users/uriel/project/src/foo.ex",
-               "/Users/uriel/project"
-             )
+      root =
+        Path.join(System.tmp_dir!(), "fa_under_root_child_#{System.unique_integer([:positive])}")
+
+      child = Path.join(root, "src/foo.ex")
+      File.mkdir_p!(Path.dirname(child))
+      File.write!(child, "")
+      on_exit(fn -> File.rm_rf!(root) end)
+
+      assert FileAutocomplete.under_root?(child, root)
     end
 
     test "under_root? accepts path equal to root" do
-      assert FileAutocomplete.under_root?(
-               "/Users/uriel/project",
-               "/Users/uriel/project"
-             )
+      root =
+        Path.join(System.tmp_dir!(), "fa_under_root_equal_#{System.unique_integer([:positive])}")
+
+      File.mkdir_p!(root)
+      on_exit(fn -> File.rm_rf!(root) end)
+
+      assert FileAutocomplete.under_root?(root, root)
     end
 
     test "filesystem root / accepts all absolute paths" do
-      assert FileAutocomplete.under_root?("/etc/hosts", "/")
-      assert FileAutocomplete.under_root?("/usr/bin/env", "/")
+      assert FileAutocomplete.under_root?(System.tmp_dir!(), "/")
+      assert FileAutocomplete.under_root?("/", "/")
+    end
+
+    test "symlink under root that points outside is rejected" do
+      root = Path.join(System.tmp_dir!(), "fa_symlink_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(Path.join(root, ".claude"))
+      link_path = Path.join(root, ".claude/link")
+
+      case :os.type() do
+        {:unix, :darwin} ->
+          File.ln_s!("/etc", link_path)
+
+        {:unix, :linux} ->
+          File.ln_s!("/etc", link_path)
+
+        _ ->
+          :ok
+      end
+
+      on_exit(fn -> File.rm_rf!(root) end)
+
+      if File.exists?(link_path) do
+        refute FileAutocomplete.under_root?(Path.join(link_path, "hosts"), root)
+      end
     end
   end
 
@@ -107,9 +138,11 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocompleteTest do
     setup do
       root = Path.join(System.tmp_dir!(), "fa_excl_#{System.unique_integer([:positive])}")
       File.mkdir_p!(root)
+
       for dir <- ~w(.git node_modules deps _build .elixir_ls .tmp) do
         File.mkdir_p!(Path.join(root, dir))
       end
+
       File.mkdir_p!(Path.join(root, "lib"))
       on_exit(fn -> File.rm_rf!(root) end)
       {:ok, root: root}
@@ -119,6 +152,7 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocompleteTest do
       result = FileAutocomplete.list_entries("", "project", session(root))
       names = Enum.map(result.entries, & &1.name)
       assert "lib" in names
+
       for excluded <- ~w(.git node_modules deps _build .elixir_ls .tmp) do
         refute excluded in names, "Expected #{excluded} to be excluded"
       end
@@ -135,9 +169,11 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocompleteTest do
     setup do
       root = Path.join(System.tmp_dir!(), "fa_trunc_#{System.unique_integer([:positive])}")
       File.mkdir_p!(root)
+
       for i <- 1..55 do
         File.write!(Path.join(root, "file_#{String.pad_leading("#{i}", 3, "0")}.txt"), "")
       end
+
       on_exit(fn -> File.rm_rf!(root) end)
       {:ok, root: root}
     end

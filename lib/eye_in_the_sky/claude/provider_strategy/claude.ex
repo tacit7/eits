@@ -125,7 +125,11 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
 
     base_opts =
       if eits_workflow != "0" do
-        Keyword.put(base_opts, :append_system_prompt, eits_init_prompt(state, channel_id: context[:channel_id]))
+        Keyword.put(
+          base_opts,
+          :append_system_prompt,
+          eits_init_prompt(state, channel_id: context[:channel_id])
+        )
       else
         base_opts
       end
@@ -146,6 +150,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
   # are already in the message body via DMDelivery, so we only include additional custom fields
   # to give the agent machine-readable structured context.
   defp maybe_append_metadata(message, nil), do: message
+
   defp maybe_append_metadata(message, %{} = metadata) do
     # Filter out auto-populated fields; keep only custom fields
     auto_fields = ~w(sender_name from_session_uuid to_session_uuid response_required)a
@@ -159,5 +164,6 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       message
     end
   end
+
   defp maybe_append_metadata(message, _), do: message
 end

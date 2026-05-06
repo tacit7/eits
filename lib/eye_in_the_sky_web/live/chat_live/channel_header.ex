@@ -15,13 +15,16 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeader do
         <div class="flex flex-col gap-1">
           <h1 class="text-xl font-bold tracking-tight text-base-content leading-tight">
             <%= if @active_channel do %>
-              <span class="text-primary/50 mr-0.5 font-semibold">#</span>{@active_channel.name || "Channel"}
+              <span class="text-primary/50 mr-0.5 font-semibold">#</span>{@active_channel.name ||
+                "Channel"}
             <% else %>
               Chat
             <% end %>
           </h1>
           <%= if not is_nil(@active_channel) && not is_nil(@active_channel[:description]) do %>
-            <span class="text-xs text-base-content/50 leading-tight">{@active_channel.description}</span>
+            <span class="text-xs text-base-content/50 leading-tight">
+              {@active_channel.description}
+            </span>
           <% end %>
         </div>
       </div>

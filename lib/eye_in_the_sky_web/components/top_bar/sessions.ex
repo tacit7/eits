@@ -18,7 +18,10 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
     <%!-- Sessions: search + filter tabs + sort --%>
     <form id="top-bar-search" phx-change="search" class="relative flex items-center flex-1 max-w-xs">
       <label for="top-bar-search-input" class="sr-only">Search sessions</label>
-      <.icon name="hero-magnifying-glass-mini" class="absolute left-2.5 pointer-events-none size-3.5 text-base-content/30" />
+      <.icon
+        name="hero-magnifying-glass-mini"
+        class="absolute left-2.5 pointer-events-none size-3.5 text-base-content/30"
+      />
       <input
         type="text"
         id="top-bar-search-input"
@@ -33,30 +36,45 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
     </form>
     <.tab_pills value_key="filter">
       <:item label="All" active={@session_filter == "all"} on_click="filter_session" value="all" />
-      <:item label="Active" active={@session_filter == "working"} on_click="filter_session" value="working"
-             active_class="bg-base-100 text-success shadow-sm" />
-      <:item label="Archived" active={@session_filter == "archived"} on_click="filter_session" value="archived"
-             active_class="bg-base-100 text-warning shadow-sm" />
+      <:item
+        label="Active"
+        active={@session_filter == "working"}
+        on_click="filter_session"
+        value="working"
+        active_class="bg-base-100 text-success shadow-sm"
+      />
+      <:item
+        label="Archived"
+        active={@session_filter == "archived"}
+        on_click="filter_session"
+        value="archived"
+        active_class="bg-base-100 text-warning shadow-sm"
+      />
     </.tab_pills>
     <details
       id="sessions-sort-dropdown"
       phx-update="ignore"
       phx-hook="SortDropdown"
-      data-label={case @sort_by do
-        "name" -> "Name"
-        "agent" -> "Agent"
-        "model" -> "Model"
-        _ -> "Last msg"
-      end}
-      class="dropdown"
-    >
-      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-        Sort: <span class="js-sort-label">{case @sort_by do
+      data-label={
+        case @sort_by do
           "name" -> "Name"
           "agent" -> "Agent"
           "model" -> "Model"
           _ -> "Last msg"
-        end}</span> <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
+        end
+      }
+      class="dropdown"
+    >
+      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+        Sort:
+        <span class="js-sort-label">
+          {case @sort_by do
+            "name" -> "Name"
+            "agent" -> "Agent"
+            "model" -> "Model"
+            _ -> "Last msg"
+          end}
+        </span> <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
         <%= for {value, label} <- [{"last_message", "Last msg"}, {"name", "Name"}, {"agent", "Agent"}, {"model", "Model"}] do %>

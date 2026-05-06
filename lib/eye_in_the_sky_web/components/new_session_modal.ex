@@ -43,7 +43,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       end
     else
       project_path = if assigns[:current_project], do: assigns[:current_project].path
-      available_agents = Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
+
+      available_agents =
+        Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
 
       {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
     end
@@ -119,17 +121,36 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         phx-target={assigns[:target]}
       >
         <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
-          <.modal_header title={assigns[:title] || "New Agent"} toggle_event={@toggle_event} phx_target={assigns[:target]} />
+          <.modal_header
+            title={assigns[:title] || "New Agent"}
+            toggle_event={@toggle_event}
+            phx_target={assigns[:target]}
+          />
 
-          <form id="new-session-form" phx-submit={@submit_event} phx-target={assigns[:target]} class="flex flex-col gap-4">
-            <input type="hidden" name="submit_action" value="launch" id="new-session-submit-action" phx-update="ignore" />
+          <form
+            id="new-session-form"
+            phx-submit={@submit_event}
+            phx-target={assigns[:target]}
+            class="flex flex-col gap-4"
+          >
+            <input
+              type="hidden"
+              name="submit_action"
+              value="launch"
+              id="new-session-submit-action"
+              phx-update="ignore"
+            />
             <.provider_field selected_provider={@selected_provider} myself={@myself} />
             <.agent_combobox
               available_agents={@available_agents}
               prefill_agent_slug={assigns[:prefill_agent_slug]}
               prefill_agent_name={assigns[:prefill_agent_name]}
             />
-            <.prompt_selector prompts={assigns[:prompts]} selected_prompt_id={@selected_prompt_id} myself={@myself} />
+            <.prompt_selector
+              prompts={assigns[:prompts]}
+              selected_prompt_id={@selected_prompt_id}
+              myself={@myself}
+            />
             <.name_field focus_on_open={not is_nil(assigns[:prefill_agent_slug])} />
             <.description_field
               selected_prompt_id={@selected_prompt_id}
@@ -137,8 +158,16 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               focus_on_open={not is_nil(assigns[:prefill_agent_slug])}
             />
             <.image_attachments file_uploads={@file_uploads} />
-            <.project_selector current_project={assigns[:current_project]} projects={assigns[:projects]} myself={@myself} />
-            <.model_selector selected_provider={@selected_provider} selected_model={@selected_model} myself={@myself} />
+            <.project_selector
+              current_project={assigns[:current_project]}
+              projects={assigns[:projects]}
+              myself={@myself}
+            />
+            <.model_selector
+              selected_provider={@selected_provider}
+              selected_model={@selected_model}
+              myself={@myself}
+            />
             <.effort_selector selected_provider={@selected_provider} selected_model={@selected_model} />
             <.worktree_field />
             <.eits_workflow_field />
@@ -146,7 +175,12 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             <.modal_submit button_text={assigns[:button_text]} />
           </form>
         </div>
-        <div class="modal-backdrop bg-black/50 cursor-pointer" phx-click={@toggle_event} phx-target={assigns[:target]}></div>
+        <div
+          class="modal-backdrop bg-black/50 cursor-pointer"
+          phx-click={@toggle_event}
+          phx-target={assigns[:target]}
+        >
+        </div>
       </div>
     </div>
     """
@@ -183,7 +217,11 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       <div
         id="agent-combobox"
         phx-hook="AgentCombobox"
-        data-agents={Jason.encode!(Enum.map(@available_agents, fn {slug, name, scope} -> [slug, name, to_string(scope)] end))}
+        data-agents={
+          Jason.encode!(
+            Enum.map(@available_agents, fn {slug, name, scope} -> [slug, name, to_string(scope)] end)
+          )
+        }
         data-prefill-slug={@prefill_agent_slug}
         data-prefill-label={@prefill_agent_name}
         class="relative"
@@ -208,7 +246,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           data-combobox-list
           role="listbox"
           class="hidden absolute z-20 mt-1 w-full bg-base-200 border border-base-300 rounded-box shadow-lg max-h-60 overflow-y-auto"
-        ></ul>
+        >
+        </ul>
       </div>
     <% end %>
     """
@@ -420,8 +459,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     ~H"""
     <div>
       <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
-        Worktree Branch
-        <span class="text-xs font-normal text-base-content/40 ml-1">Optional</span>
+        Worktree Branch <span class="text-xs font-normal text-base-content/40 ml-1">Optional</span>
       </label>
       <input
         type="text"
@@ -507,8 +545,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         class="btn btn-secondary flex-1 gap-1.5"
         onclick="document.getElementById('new-session-submit-action').value='chat'; document.getElementById('new-session-form').requestSubmit();"
       >
-        <.icon name="hero-chat-bubble-left-right-mini" class="w-4 h-4" />
-        Chat
+        <.icon name="hero-chat-bubble-left-right-mini" class="w-4 h-4" /> Chat
       </button>
     </div>
     """

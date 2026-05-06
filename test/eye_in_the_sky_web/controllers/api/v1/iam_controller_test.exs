@@ -72,7 +72,11 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   # ── deny decision ────────────────────────────────────────────────────────────
 
   test "returns deny permissionDecision when a deny policy matches", %{conn: conn} do
-    project = project_fixture(%{name: "iam-test-project-#{System.unique_integer()}", path: "/tmp/iam-test-#{System.unique_integer()}"})
+    project =
+      project_fixture(%{
+        name: "iam-test-project-#{System.unique_integer()}",
+        path: "/tmp/iam-test-#{System.unique_integer()}"
+      })
 
     {:ok, _policy} =
       Repo.insert(%EyeInTheSky.IAM.Policy{
@@ -254,7 +258,11 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   end
 
   test "returns continue: false (stopReason) for Stop deny", %{conn: conn} do
-    project = project_fixture(%{name: "iam-test-stop-#{System.unique_integer()}", path: "/tmp/iam-test-stop-#{System.unique_integer()}"})
+    project =
+      project_fixture(%{
+        name: "iam-test-stop-#{System.unique_integer()}",
+        path: "/tmp/iam-test-stop-#{System.unique_integer()}"
+      })
 
     {:ok, _policy} =
       Repo.insert(%EyeInTheSky.IAM.Policy{
@@ -285,7 +293,11 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   end
 
   test "returns additionalContext for Stop instruct", %{conn: conn} do
-    project = project_fixture(%{name: "iam-test-instruct-#{System.unique_integer()}", path: "/tmp/iam-test-instruct-#{System.unique_integer()}"})
+    project =
+      project_fixture(%{
+        name: "iam-test-instruct-#{System.unique_integer()}",
+        path: "/tmp/iam-test-instruct-#{System.unique_integer()}"
+      })
 
     {:ok, _policy} =
       Repo.insert(%EyeInTheSky.IAM.Policy{
@@ -314,10 +326,11 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
     assert body["continue"] == true
     assert body["suppressOutput"] == true
     assert get_in(body, ["hookSpecificOutput", "hookEventName"]) == "Stop"
+
     assert String.contains?(
-      get_in(body, ["hookSpecificOutput", "additionalContext"]) || "",
-      "Session ended cleanly"
-    )
+             get_in(body, ["hookSpecificOutput", "additionalContext"]) || "",
+             "Session ended cleanly"
+           )
   end
 
   test "Stop event inserted in iam_decisions audit row", %{conn: conn} do

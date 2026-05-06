@@ -159,14 +159,16 @@ defmodule EyeInTheSkyWeb.Components.DmPageTest do
 
       # Send button should be at least w-10 h-10 on mobile (40x40px meets WCAG 2.5.5)
       # Current impl uses w-11 h-11 (44px), which exceeds the minimum
-      assert source =~ ~r/id="dm-send-button"[^>]*w-1[01] h-1[01]|w-1[01] h-1[01][^>]*id="dm-send-button"/s,
+      assert source =~
+               ~r/id="dm-send-button"[^>]*w-1[01] h-1[01]|w-1[01] h-1[01][^>]*id="dm-send-button"/s,
              "send button must have adequate touch target (w-10 h-10 or w-11 h-11) on mobile"
     end
 
     test "stop button has mobile-adequate touch target" do
       source = File.read!(@composer_source)
 
-      assert source =~ ~r/id="dm-stop-button"[^>]*w-1[01] h-1[01]|w-1[01] h-1[01][^>]*id="dm-stop-button"/s,
+      assert source =~
+               ~r/id="dm-stop-button"[^>]*w-1[01] h-1[01]|w-1[01] h-1[01][^>]*id="dm-stop-button"/s,
              "stop button must have adequate touch target (w-10 h-10 or w-11 h-11) on mobile"
     end
 

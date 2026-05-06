@@ -78,6 +78,9 @@ defmodule EyeInTheSky.IAM.Builtin.PreferPackageManagerTest do
   end
 
   test "does not match Read tool" do
-    refute PreferPackageManager.matches?(policy_for("pnpm"), %Context{tool: "Read", resource_content: "npm install lodash"})
+    refute PreferPackageManager.matches?(policy_for("pnpm"), %Context{
+             tool: "Read",
+             resource_content: "npm install lodash"
+           })
   end
 end

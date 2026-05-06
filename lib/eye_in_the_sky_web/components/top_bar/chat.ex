@@ -39,7 +39,10 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
         ]}>
           <.icon name="hero-funnel-mini" class="size-3.5" />
           <%= if @sender_filter do %>
-            <%= Enum.find(@channel_members, fn m -> to_string(m.session_id) == to_string(@sender_filter) end) |> then(fn m -> m && (m.session_name || "@#{m.session_id}") || "Filtered" end) %>
+            {Enum.find(@channel_members, fn m ->
+              to_string(m.session_id) == to_string(@sender_filter)
+            end)
+            |> then(fn m -> (m && (m.session_name || "@#{m.session_id}")) || "Filtered" end)}
           <% else %>
             Filter
           <% end %>
@@ -48,7 +51,13 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
           <button
             phx-click="set_sender_filter"
             phx-value-session_id=""
-            class={["w-full text-left px-3 py-1.5 text-xs transition-colors", if(is_nil(@sender_filter), do: "text-primary font-medium", else: "text-base-content/60 hover:text-base-content hover:bg-base-content/5")]}
+            class={[
+              "w-full text-left px-3 py-1.5 text-xs transition-colors",
+              if(is_nil(@sender_filter),
+                do: "text-primary font-medium",
+                else: "text-base-content/60 hover:text-base-content hover:bg-base-content/5"
+              )
+            ]}
           >
             All agents
           </button>
@@ -57,9 +66,15 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
             <button
               phx-click="set_sender_filter"
               phx-value-session_id={member.session_id}
-              class={["w-full text-left px-3 py-1.5 text-xs transition-colors", if(to_string(@sender_filter) == to_string(member.session_id), do: "text-primary font-medium bg-primary/5", else: "text-base-content/60 hover:text-base-content hover:bg-base-content/5")]}
+              class={[
+                "w-full text-left px-3 py-1.5 text-xs transition-colors",
+                if(to_string(@sender_filter) == to_string(member.session_id),
+                  do: "text-primary font-medium bg-primary/5",
+                  else: "text-base-content/60 hover:text-base-content hover:bg-base-content/5"
+                )
+              ]}
             >
-              <%= member.session_name || "@#{member.session_id}" %>
+              {member.session_name || "@#{member.session_id}"}
             </button>
           <% end %>
         </div>
@@ -88,7 +103,9 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
                       @{member.session_id}
                       <%= if member.session_name do %>
                         <span class="text-base-content/35">
-                          {String.slice(member.session_name, 0, 15)}{if String.length(member.session_name) > 15, do: "…"}
+                          {String.slice(member.session_name, 0, 15)}{if String.length(
+                                                                          member.session_name
+                                                                        ) > 15, do: "…"}
                         </span>
                       <% end %>
                     </a>
@@ -140,9 +157,17 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
                             class="inline-flex items-center gap-1 font-mono text-mini px-2 py-0.5 min-h-[44px] rounded bg-base-content/[0.03] text-base-content/40 hover:text-primary hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10"
                             title={"Add @#{session.id} to channel"}
                           >
-                            <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" /> @{session.id}
+                            <.icon name="hero-plus-mini" class="w-2.5 h-2.5 opacity-50" />
+                            @{session.id}
                             <span class="text-base-content/25">
-                              {String.slice(session.name || session.agent_description || "", 0, 20)}{if String.length(session.name || session.agent_description || "") > 20, do: "…"}
+                              {String.slice(session.name || session.agent_description || "", 0, 20)}{if String.length(
+                                                                                                          session.name ||
+                                                                                                            session.agent_description ||
+                                                                                                            ""
+                                                                                                        ) >
+                                                                                                          20,
+                                                                                                        do:
+                                                                                                          "…"}
                             </span>
                             <span class="text-xs text-base-content/15">{session.model}</span>
                             <%= if session.ended_at do %>

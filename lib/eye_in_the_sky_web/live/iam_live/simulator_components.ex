@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
     <div class="flex items-center gap-3">
       <span class={"badge #{@color} badge-lg gap-2"}>
         <.icon name={@icon_name} class="size-4" />
-        <%= @permission %>
+        {@permission}
       </span>
       <%= if @fallback? do %>
         <span class="badge badge-ghost">fallback (no policy matched)</span>
@@ -39,20 +39,18 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
           <div class="flex items-start justify-between gap-3">
             <div>
               <div class="text-xs text-base-content/60">Winning policy</div>
-              <div class="font-semibold"><%= @decision.winning_policy.name %></div>
+              <div class="font-semibold">{@decision.winning_policy.name}</div>
               <div class="text-xs text-base-content/70 mt-1">
-                id=<%= @decision.winning_policy.id %>
-                · effect=<code><%= @decision.winning_policy.effect %></code>
-                · priority=<%= @decision.winning_policy.priority %>
+                id={@decision.winning_policy.id} · effect=<code><%= @decision.winning_policy.effect %></code> · priority={@decision.winning_policy.priority}
               </div>
             </div>
             <span class={"badge " <> effect_badge(@decision.winning_policy.effect)}>
-              <%= @decision.winning_policy.effect %>
+              {@decision.winning_policy.effect}
             </span>
           </div>
           <%= if @decision.reason do %>
             <div class="text-sm mt-2 p-2 bg-base-200 rounded">
-              <%= @decision.reason %>
+              {@decision.reason}
             </div>
           <% end %>
         </div>
@@ -69,14 +67,13 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
       <div class="card bg-base-100 border border-base-300">
         <div class="card-body p-4">
           <div class="text-xs text-base-content/60 flex items-center gap-2 mb-2">
-            <.icon name="hero-megaphone" class="size-4" />
-            Instructions (<%= length(@instructions) %>)
+            <.icon name="hero-megaphone" class="size-4" /> Instructions ({length(@instructions)})
           </div>
           <ul class="space-y-2">
             <%= for %{policy: p, message: msg} <- @instructions do %>
               <li class="text-sm border-l-4 border-warning pl-3">
-                <div class="font-medium"><%= p.name %></div>
-                <div class="text-base-content/70"><%= msg %></div>
+                <div class="font-medium">{p.name}</div>
+                <div class="text-base-content/70">{msg}</div>
               </li>
             <% end %>
           </ul>
@@ -112,10 +109,14 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
                   <.icon name="hero-trophy" class="size-4 text-warning" />
                 <% end %>
               </td>
-              <td class="font-mono text-xs"><%= t.policy.id %></td>
-              <td><%= t.policy.name %></td>
-              <td><span class={"badge badge-sm " <> effect_badge(t.policy.effect)}><%= t.policy.effect %></span></td>
-              <td><%= t.policy.priority %></td>
+              <td class="font-mono text-xs">{t.policy.id}</td>
+              <td>{t.policy.name}</td>
+              <td>
+                <span class={"badge badge-sm " <> effect_badge(t.policy.effect)}>
+                  {t.policy.effect}
+                </span>
+              </td>
+              <td>{t.policy.priority}</td>
               <td>
                 <%= if t.matched? do %>
                   <span class="badge badge-sm badge-success">match</span>
@@ -123,7 +124,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
                   <span class="badge badge-sm badge-ghost">miss</span>
                 <% end %>
               </td>
-              <td class="font-mono text-xs text-base-content/70"><%= format_reason(t.reason) %></td>
+              <td class="font-mono text-xs text-base-content/70">{format_reason(t.reason)}</td>
             </tr>
           <% end %>
         </tbody>

@@ -135,7 +135,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
         post(conn, ~p"/api/v1/sessions", %{
           "session_id" => uuid,
           "name" => "Invalid project test",
-          "project_id" => 999999
+          "project_id" => 999_999
         })
 
       assert json_response(conn, 422)["error"] != nil

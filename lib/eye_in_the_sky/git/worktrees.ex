@@ -46,7 +46,9 @@ defmodule EyeInTheSky.Git.Worktrees do
           :ok
 
         {:error, :dirty_working_tree} ->
-          Logger.info("prepare_session_worktree: stashing dirty working tree before worktree create")
+          Logger.info(
+            "prepare_session_worktree: stashing dirty working tree before worktree create"
+          )
 
           case System.cmd("git", ["-C", project_path, "stash"], stderr_to_stdout: true) do
             {_, 0} -> :ok

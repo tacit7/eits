@@ -189,6 +189,7 @@ defmodule EyeInTheSky.Notes do
 
   @doc "Batch delete notes by integer IDs. Returns {deleted_count, nil}."
   def delete_notes_by_ids([]), do: {0, nil}
+
   def delete_notes_by_ids(ids) when is_list(ids) do
     Repo.delete_all(from n in Note, where: n.id in ^ids)
   end

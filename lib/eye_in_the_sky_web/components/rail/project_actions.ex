@@ -29,11 +29,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
   def handle_start_rename(%{"project_id" => id_str}, socket) do
     case parse_int(id_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       id ->
         case Projects.get_project(id) do
-          {:ok, project} -> {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
-          {:error, _} -> {:noreply, socket}
+          {:ok, project} ->
+            {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
+
+          {:error, _} ->
+            {:noreply, socket}
         end
     end
   end
@@ -84,12 +89,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
   def handle_delete_project(%{"project_id" => id_str}, socket) do
     case parse_int(id_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       id ->
         case Projects.get_project(id) do
           {:ok, project} -> Projects.delete_project(project)
           {:error, _} -> :ok
         end
+
         {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
     end
   end

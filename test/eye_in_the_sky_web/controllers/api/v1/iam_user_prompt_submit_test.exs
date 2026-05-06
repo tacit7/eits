@@ -43,15 +43,20 @@ defmodule EyeInTheSkyWeb.Controllers.Api.V1.IamUserPromptSubmitTest do
 
       # Should have instruction from sanitize_prompt_api_keys
       assert decision.instructions != []
+
       assert Enum.any?(decision.instructions, fn i ->
-        String.contains?(i.message, "Redacted:")
-      end)
+               String.contains?(i.message, "Redacted:")
+             end)
 
       # Check response structure — UserPromptSubmit must replace the prompt, not append context
       assert response["suppressUserPrompt"] == true
       assert response["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
       assert response["hookSpecificOutput"]["userPrompt"] != nil
-      assert String.contains?(response["hookSpecificOutput"]["userPrompt"], "[REDACTED:anthropic]")
+
+      assert String.contains?(
+               response["hookSpecificOutput"]["userPrompt"],
+               "[REDACTED:anthropic]"
+             )
     end
 
     test "passes through benign prompts without redaction instructions", %{policy: policy} do
@@ -66,9 +71,10 @@ defmodule EyeInTheSkyWeb.Controllers.Api.V1.IamUserPromptSubmitTest do
       assert decision.permission == :allow
 
       # Benign prompt should have no redaction instructions
-      redaction_instruction = Enum.find(decision.instructions, fn i ->
-        String.contains?(i.message, "Redacted:")
-      end)
+      redaction_instruction =
+        Enum.find(decision.instructions, fn i ->
+          String.contains?(i.message, "Redacted:")
+        end)
 
       assert redaction_instruction == nil
     end

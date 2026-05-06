@@ -210,7 +210,10 @@ defmodule EyeInTheSkyWeb.ChatLive do
         <div class="flex flex-wrap gap-2 mb-2">
           <%= for entry <- @uploads.agent_images.entries do %>
             <div class="relative group">
-              <.live_img_preview entry={entry} class="w-16 h-16 object-cover rounded-lg border border-base-content/10" />
+              <.live_img_preview
+                entry={entry}
+                class="w-16 h-16 object-cover rounded-lg border border-base-content/10"
+              />
               <%= if entry.progress < 100 do %>
                 <div class="absolute inset-0 flex items-center justify-center bg-base-100/70 rounded-lg">
                   <span class="text-xs font-mono text-base-content/60">{entry.progress}%</span>
@@ -242,7 +245,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
       >
         <.icon name="hero-paper-clip-mini" class="w-3.5 h-3.5" />
         <%= if @uploads.agent_images.entries != [] do %>
-          {length(@uploads.agent_images.entries)} image{if length(@uploads.agent_images.entries) > 1, do: "s"}
+          {length(@uploads.agent_images.entries)} image{if length(@uploads.agent_images.entries) > 1,
+            do: "s"}
         <% else %>
           Attach
         <% end %>
@@ -308,5 +312,4 @@ defmodule EyeInTheSkyWeb.ChatLive do
   defp get_session_id(socket) do
     socket.assigns[:session_id]
   end
-
 end

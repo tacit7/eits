@@ -48,6 +48,9 @@ defmodule EyeInTheSky.IAM.Builtin.WarnPackagePublishTest do
   end
 
   test "does not match non-Bash tool" do
-    refute WarnPackagePublish.matches?(%Policy{}, %Context{tool: "Write", resource_content: "npm publish"})
+    refute WarnPackagePublish.matches?(%Policy{}, %Context{
+             tool: "Write",
+             resource_content: "npm publish"
+           })
   end
 end

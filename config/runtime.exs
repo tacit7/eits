@@ -146,9 +146,20 @@ if config_env() == :prod do
 
   ssl_opts =
     case System.get_env("DATABASE_SSL_VERIFY") do
-      "none" -> [verify: :verify_none]
-      "false" -> false
-      _ -> [verify: :verify_peer, cacerts: :public_key.cacerts_get(), customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]]
+      "none" ->
+        [verify: :verify_none]
+
+      "false" ->
+        false
+
+      _ ->
+        [
+          verify: :verify_peer,
+          cacerts: :public_key.cacerts_get(),
+          customize_hostname_check: [
+            match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+          ]
+        ]
     end
 
   config :eye_in_the_sky, EyeInTheSky.Repo,

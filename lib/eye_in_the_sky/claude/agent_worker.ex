@@ -323,7 +323,11 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     Logger.info("[#{state.session_id}] SDK complete")
 
-    Reconciliation.emit([:eits, :agent, :sdk, :complete], %{system_time: System.system_time()}, state)
+    Reconciliation.emit(
+      [:eits, :agent, :sdk, :complete],
+      %{system_time: System.system_time()},
+      state
+    )
 
     WorkerEvents.on_sdk_completed(
       state.session_id,

@@ -18,7 +18,11 @@ defmodule EyeInTheSkyWeb.Helpers.UploadHelpers do
       else
         {:error, reason} ->
           require Logger
-          Logger.warning("consume_agent_images: failed to copy #{entry.client_name}: #{inspect(reason)}")
+
+          Logger.warning(
+            "consume_agent_images: failed to copy #{entry.client_name}: #{inspect(reason)}"
+          )
+
           {:postpone, entry}
       end
     end)
@@ -56,13 +60,22 @@ defmodule EyeInTheSkyWeb.Helpers.UploadHelpers do
         else
           {:error, reason} ->
             require Logger
-            Logger.warning("consume_and_persist_agent_images: failed for #{entry.client_name}: #{inspect(reason)}")
+
+            Logger.warning(
+              "consume_and_persist_agent_images: failed for #{entry.client_name}: #{inspect(reason)}"
+            )
+
             {:postpone, entry}
         end
       end)
 
     file_infos = Enum.map(results, fn {path, entry, _block, size} -> {path, entry, size} end)
-    blocks = results |> Enum.map(fn {_path, _entry, block, _size} -> block end) |> ImageProcessor.process_blocks()
+
+    blocks =
+      results
+      |> Enum.map(fn {_path, _entry, block, _size} -> block end)
+      |> ImageProcessor.process_blocks()
+
     {file_infos, blocks}
   end
 

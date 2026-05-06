@@ -12,13 +12,17 @@ defmodule EyeInTheSky.ScopeTest do
   defp setup_workspace_and_project(_ctx \\ %{}) do
     user = user_fixture()
     workspace = Workspaces.default_workspace_for_user!(user)
-    {:ok, project} = Projects.create_project(%{name: "scope-test-#{uniq()}", workspace_id: workspace.id})
+
+    {:ok, project} =
+      Projects.create_project(%{name: "scope-test-#{uniq()}", workspace_id: workspace.id})
+
     %{user: user, workspace: workspace, project: project}
   end
 
   defp setup_second_project(workspace) do
     {:ok, project} =
       Projects.create_project(%{name: "scope-test-other-#{uniq()}", workspace_id: workspace.id})
+
     project
   end
 
@@ -109,7 +113,9 @@ defmodule EyeInTheSky.ScopeTest do
       # Second workspace with its own project
       other_user = user_fixture()
       other_ws = Workspaces.default_workspace_for_user!(other_user)
-      {:ok, other_proj} = Projects.create_project(%{name: "other-ws-proj-#{uniq()}", workspace_id: other_ws.id})
+
+      {:ok, other_proj} =
+        Projects.create_project(%{name: "other-ws-proj-#{uniq()}", workspace_id: other_ws.id})
 
       agent = create_agent()
       other_session = create_session(agent, %{project_id: other_proj.id, status: "working"})
@@ -169,8 +175,19 @@ defmodule EyeInTheSky.ScopeTest do
       ctx = setup_workspace_and_project()
       other = setup_second_project(ctx.workspace)
 
-      {:ok, n1} = Notes.create_note(%{parent_type: "project", parent_id: to_string(ctx.project.id), body: "mine"})
-      {:ok, _n2} = Notes.create_note(%{parent_type: "project", parent_id: to_string(other.id), body: "theirs"})
+      {:ok, n1} =
+        Notes.create_note(%{
+          parent_type: "project",
+          parent_id: to_string(ctx.project.id),
+          body: "mine"
+        })
+
+      {:ok, _n2} =
+        Notes.create_note(%{
+          parent_type: "project",
+          parent_id: to_string(other.id),
+          body: "theirs"
+        })
 
       scope = Scope.for_project(ctx.user, ctx.workspace, ctx.project)
       results = Notes.list_notes_for_scope(scope)
@@ -184,8 +201,19 @@ defmodule EyeInTheSky.ScopeTest do
       ctx = setup_workspace_and_project()
       other = setup_second_project(ctx.workspace)
 
-      {:ok, n1} = Notes.create_note(%{parent_type: "project", parent_id: to_string(ctx.project.id), body: "p1 note"})
-      {:ok, n2} = Notes.create_note(%{parent_type: "project", parent_id: to_string(other.id), body: "p2 note"})
+      {:ok, n1} =
+        Notes.create_note(%{
+          parent_type: "project",
+          parent_id: to_string(ctx.project.id),
+          body: "p1 note"
+        })
+
+      {:ok, n2} =
+        Notes.create_note(%{
+          parent_type: "project",
+          parent_id: to_string(other.id),
+          body: "p2 note"
+        })
 
       scope = Scope.for_workspace(ctx.user, ctx.workspace)
       results = Notes.list_notes_for_scope(scope)
@@ -200,10 +228,23 @@ defmodule EyeInTheSky.ScopeTest do
 
       other_user = user_fixture()
       other_ws = Workspaces.default_workspace_for_user!(other_user)
-      {:ok, other_proj} = Projects.create_project(%{name: "other-ws-#{uniq()}", workspace_id: other_ws.id})
 
-      {:ok, mine} = Notes.create_note(%{parent_type: "project", parent_id: to_string(ctx.project.id), body: "mine"})
-      {:ok, theirs} = Notes.create_note(%{parent_type: "project", parent_id: to_string(other_proj.id), body: "theirs"})
+      {:ok, other_proj} =
+        Projects.create_project(%{name: "other-ws-#{uniq()}", workspace_id: other_ws.id})
+
+      {:ok, mine} =
+        Notes.create_note(%{
+          parent_type: "project",
+          parent_id: to_string(ctx.project.id),
+          body: "mine"
+        })
+
+      {:ok, theirs} =
+        Notes.create_note(%{
+          parent_type: "project",
+          parent_id: to_string(other_proj.id),
+          body: "theirs"
+        })
 
       scope = Scope.for_workspace(ctx.user, ctx.workspace)
       results = Notes.list_notes_for_scope(scope)

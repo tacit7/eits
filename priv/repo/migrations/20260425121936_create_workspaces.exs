@@ -14,8 +14,8 @@ defmodule EyeInTheSky.Repo.Migrations.CreateWorkspaces do
 
     # Only one default workspace per user
     create unique_index(:workspaces, [:owner_user_id],
-      where: "\"default\" = true",
-      name: :workspaces_owner_user_id_default_unique_index
-    )
+             where: "\"default\" = true",
+             name: :workspaces_owner_user_id_default_unique_index
+           )
   end
 end

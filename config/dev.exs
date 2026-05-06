@@ -5,17 +5,21 @@ hexdocs_data_path = Path.expand("~/.hexdocs_mcp")
 config :hexdocs_mcp,
   data_path: hexdocs_data_path,
   default_embedding_model: "nomic-embed-text",
-  project_paths: System.get_env("HEXDOCS_MCP_MIX_PROJECT_PATHS", "/Users/urielmaldonado/projects/eits/web/mix.exs"),
+  project_paths:
+    System.get_env(
+      "HEXDOCS_MCP_MIX_PROJECT_PATHS",
+      "/Users/urielmaldonado/projects/eits/web/mix.exs"
+    ),
   system_command: "mix hex.docs.mcp"
 
-config :hexdocs_mcp, HexdocsMcp.Repo,
-  database: Path.join(hexdocs_data_path, "hexdocs_mcp.db")
+config :hexdocs_mcp, HexdocsMcp.Repo, database: Path.join(hexdocs_data_path, "hexdocs_mcp.db")
 
 config :eye_in_the_sky, :env, :dev
 # Core-layer config keys — keeps core modules free of EyeInTheSkyWeb.Endpoint atom references
 config :eye_in_the_sky,
   secret_key_base: "N/iElaaIGg/5yCN4JOKd13aAXziMbsBDWfTjQFgjjLY32KpeZ7hBDnQEx1AcpSLO",
   server_base_url: "http://localhost:#{System.get_env("PORT", "5001")}"
+
 config :eye_in_the_sky, :bypass_auth, System.get_env("BYPASS_AUTH", "true") in ~w(true 1)
 config :eye_in_the_sky, digest_desktop_path: Path.expand("~/Desktop")
 

@@ -33,7 +33,10 @@ defmodule EyeInTheSky.IAM.Builtin.BlockHelmTest do
   end
 
   test "does not match non-Bash tool" do
-    refute BlockHelm.matches?(policy(), %Context{tool: "Write", resource_content: "helm uninstall x"})
+    refute BlockHelm.matches?(policy(), %Context{
+             tool: "Write",
+             resource_content: "helm uninstall x"
+           })
   end
 
   test "blockCommands condition adds extra blocked verbs" do

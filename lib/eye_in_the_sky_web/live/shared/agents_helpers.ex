@@ -109,7 +109,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
 
   defp do_load_agents(project_path) do
     global = load_from_dir(Path.expand("~/.claude/agents"), :agents, "~/.claude/agents")
-    project = load_from_dir(Path.join(project_path, ".claude/agents"), :project_agents, ".claude/agents")
+
+    project =
+      load_from_dir(Path.join(project_path, ".claude/agents"), :project_agents, ".claude/agents")
 
     (global ++ project)
     |> Enum.sort_by(& &1.slug)

@@ -167,7 +167,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "block_force_push",
       priority: 95,
       enabled: true,
-      message: "Force-pushing is blocked. Use --force-with-lease on shared branches, or add the branch to allowBranches."
+      message:
+        "Force-pushing is blocked. Use --force-with-lease on shared branches, or add the branch to allowBranches."
     },
     %{
       system_key: "warn_git_stash_drop",
@@ -209,7 +210,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "block_kubectl",
       priority: 90,
       enabled: false,
-      message: "Destructive kubectl operation blocked. Use allowVerbs condition to permit specific verbs."
+      message:
+        "Destructive kubectl operation blocked. Use allowVerbs condition to permit specific verbs."
     },
     %{
       system_key: "block_terraform",
@@ -219,7 +221,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "block_terraform",
       priority: 90,
       enabled: false,
-      message: "terraform destroy/apply is blocked. Enable with explicit approval or use allowCommands."
+      message:
+        "terraform destroy/apply is blocked. Enable with explicit approval or use allowCommands."
     },
     %{
       system_key: "block_aws_cli",
@@ -269,7 +272,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "warn_schema_alteration",
       priority: 55,
       enabled: true,
-      message: "DDL schema alteration detected (ALTER TABLE / DROP COLUMN). Ensure a migration is tracked and the change is reversible."
+      message:
+        "DDL schema alteration detected (ALTER TABLE / DROP COLUMN). Ensure a migration is tracked and the change is reversible."
     },
     %{
       system_key: "warn_package_publish",
@@ -279,7 +283,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "warn_package_publish",
       priority: 70,
       enabled: true,
-      message: "Package publish detected. Confirm version, changelog, and registry auth before proceeding."
+      message:
+        "Package publish detected. Confirm version, changelog, and registry auth before proceeding."
     },
     %{
       system_key: "warn_global_package_install",
@@ -289,7 +294,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "warn_global_package_install",
       priority: 60,
       enabled: true,
-      message: "Global package install detected. Prefer project-local installs to avoid polluting the system environment."
+      message:
+        "Global package install detected. Prefer project-local installs to avoid polluting the system environment."
     },
     %{
       system_key: "warn_background_process",
@@ -299,7 +305,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "warn_background_process",
       priority: 50,
       enabled: true,
-      message: "Background process detected (&). Ensure cleanup on session end — orphan processes may bind ports or consume resources."
+      message:
+        "Background process detected (&). Ensure cleanup on session end — orphan processes may bind ports or consume resources."
     },
     %{
       system_key: "block_secrets_write",
@@ -309,7 +316,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "block_secrets_write",
       priority: 95,
       enabled: true,
-      message: "Writing to private key or certificate files is blocked (.pem, .key, id_rsa, ~/.ssh/*, etc.)."
+      message:
+        "Writing to private key or certificate files is blocked (.pem, .key, id_rsa, ~/.ssh/*, etc.)."
     },
     %{
       system_key: "builtin.workflow_stop_gate",
@@ -342,7 +350,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "sanitize_private_key_content",
       priority: 100,
       enabled: true,
-      message: "Tool output contains PEM private key material. Do not log or forward this content."
+      message:
+        "Tool output contains PEM private key material. Do not log or forward this content."
     },
     %{
       system_key: "sanitize_bearer_tokens",
@@ -353,7 +362,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "sanitize_bearer_tokens",
       priority: 100,
       enabled: true,
-      message: "Tool output contains an HTTP Bearer token. Avoid logging or forwarding this output."
+      message:
+        "Tool output contains an HTTP Bearer token. Avoid logging or forwarding this output."
     },
     %{
       system_key: "block_gh_pipeline",
@@ -363,7 +373,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "block_gh_pipeline",
       priority: 90,
       enabled: false,
-      message: "GitHub Actions pipeline trigger blocked (gh workflow run/enable/disable, gh run rerun/cancel). Add to allowWorkflows condition to permit specific workflows."
+      message:
+        "GitHub Actions pipeline trigger blocked (gh workflow run/enable/disable, gh run rerun/cancel). Add to allowWorkflows condition to permit specific workflows."
     },
     %{
       system_key: "prefer_package_manager",
@@ -373,7 +384,8 @@ defmodule EyeInTheSky.IAM.Seeds do
       builtin_matcher: "prefer_package_manager",
       priority: 60,
       enabled: false,
-      message: "Command uses a different package manager than the configured preference. Set the packageManager condition to enable this policy.",
+      message:
+        "Command uses a different package manager than the configured preference. Set the packageManager condition to enable this policy.",
       condition: %{}
     },
     %{

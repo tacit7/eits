@@ -44,11 +44,17 @@ defmodule EyeInTheSky.IAM.Builtin.SanitizeBearerTokensTest do
   # ── event / nil guards ──────────────────────────────────────────────────────
 
   test "does not match on PreToolUse event" do
-    refute SanitizeBearerTokens.matches?(policy(), pre_ctx("curl -H 'Bearer longtoken12345678901234'"))
+    refute SanitizeBearerTokens.matches?(
+             policy(),
+             pre_ctx("curl -H 'Bearer longtoken12345678901234'")
+           )
   end
 
   test "does not match when tool_response is nil" do
-    refute SanitizeBearerTokens.matches?(policy(), %Context{event: :post_tool_use, tool_response: nil})
+    refute SanitizeBearerTokens.matches?(policy(), %Context{
+             event: :post_tool_use,
+             tool_response: nil
+           })
   end
 
   test "does not match empty tool_response" do

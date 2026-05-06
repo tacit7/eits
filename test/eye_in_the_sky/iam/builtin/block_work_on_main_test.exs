@@ -30,6 +30,10 @@ defmodule EyeInTheSky.IAM.Builtin.BlockWorkOnMainTest do
 
   defp init_repo!(dir, branch) do
     System.cmd("git", ["init"], cd: dir, stderr_to_stdout: true)
-    System.cmd("git", ["symbolic-ref", "HEAD", "refs/heads/" <> branch], cd: dir, stderr_to_stdout: true)
+
+    System.cmd("git", ["symbolic-ref", "HEAD", "refs/heads/" <> branch],
+      cd: dir,
+      stderr_to_stdout: true
+    )
   end
 end

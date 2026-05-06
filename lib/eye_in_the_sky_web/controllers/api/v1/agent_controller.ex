@@ -31,13 +31,17 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
   defp resolve_agents(%{"active_since" => since_str} = params, limit) do
     case DateTime.from_iso8601(since_str) do
-      {:ok, since_dt, _} -> {:ok, Agents.list_agents_active_since(since_dt, build_query_opts(params, limit))}
-      _ -> {:error, :invalid_since}
+      {:ok, since_dt, _} ->
+        {:ok, Agents.list_agents_active_since(since_dt, build_query_opts(params, limit))}
+
+      _ ->
+        {:error, :invalid_since}
     end
   end
 
   defp resolve_agents(%{"project_id" => project_id} = params, limit) do
-    {:ok, Agents.list_agents_by_project(parse_int(project_id, nil), build_query_opts(params, limit))}
+    {:ok,
+     Agents.list_agents_by_project(parse_int(project_id, nil), build_query_opts(params, limit))}
   end
 
   defp resolve_agents(params, limit) do

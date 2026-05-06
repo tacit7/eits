@@ -19,7 +19,8 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
     end
 
     test "rejects absolute path /etc/passwd before any trimming" do
-      assert {:error, :absolute_path_not_allowed} = FileTree.safe_path("/tmp/project", "/etc/passwd")
+      assert {:error, :absolute_path_not_allowed} =
+               FileTree.safe_path("/tmp/project", "/etc/passwd")
     end
 
     test "rejects ../ traversal" do
@@ -207,7 +208,11 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
       {:ok, read_result} = FileTree.read_file(root, "existing.ex")
       original_hash = read_result.hash
 
-      assert {:ok, result} = FileTree.write_file(root, "existing.ex", "new content", original_hash: original_hash)
+      assert {:ok, result} =
+               FileTree.write_file(root, "existing.ex", "new content",
+                 original_hash: original_hash
+               )
+
       assert is_binary(result.hash)
       assert result.hash != original_hash
 
@@ -215,23 +220,27 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
     end
 
     test "rejects missing original_hash", %{root: root} do
-      assert {:error, :missing_original_hash} = FileTree.write_file(root, "existing.ex", "new content")
+      assert {:error, :missing_original_hash} =
+               FileTree.write_file(root, "existing.ex", "new content")
     end
 
     test "rejects stale original hash (conflict)", %{root: root} do
       stale_hash = "0000000000000000000000000000000000000000000000000000000000000000"
 
-      assert {:error, :conflict} = FileTree.write_file(root, "existing.ex", "new content", original_hash: stale_hash)
+      assert {:error, :conflict} =
+               FileTree.write_file(root, "existing.ex", "new content", original_hash: stale_hash)
     end
 
     test "succeeds with force?: true", %{root: root} do
-      assert {:ok, _result} = FileTree.write_file(root, "existing.ex", "forced content", force?: true)
+      assert {:ok, _result} =
+               FileTree.write_file(root, "existing.ex", "forced content", force?: true)
 
       assert File.read!(Path.join(root, "existing.ex")) == "forced content"
     end
 
     test "rejects outside project path", %{root: root} do
-      assert {:error, :outside_project} = FileTree.write_file(root, "../outside.txt", "content", force?: true)
+      assert {:error, :outside_project} =
+               FileTree.write_file(root, "../outside.txt", "content", force?: true)
     end
 
     test "rejects empty file path", %{root: root} do
@@ -242,7 +251,9 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
       File.chmod!(Path.join(root, "existing.ex"), 0o755)
 
       {:ok, read_result} = FileTree.read_file(root, "existing.ex")
-      {:ok, _} = FileTree.write_file(root, "existing.ex", "updated", original_hash: read_result.hash)
+
+      {:ok, _} =
+        FileTree.write_file(root, "existing.ex", "updated", original_hash: read_result.hash)
 
       {:ok, stat} = File.stat(Path.join(root, "existing.ex"))
       assert stat.mode == 0o100755
@@ -254,7 +265,11 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
       File.chmod!(script_path, 0o755)
 
       {:ok, read_result} = FileTree.read_file(root, "script.sh")
-      {:ok, _} = FileTree.write_file(root, "script.sh", "#!/bin/bash\necho hello", original_hash: read_result.hash)
+
+      {:ok, _} =
+        FileTree.write_file(root, "script.sh", "#!/bin/bash\necho hello",
+          original_hash: read_result.hash
+        )
 
       {:ok, stat} = File.stat(script_path)
       assert (stat.mode &&& 0o111) != 0
@@ -263,13 +278,15 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
     test "validates UTF-8 content", %{root: root} do
       invalid_utf8 = <<0xFF, 0xFE>>
 
-      assert {:error, :invalid_utf8} = FileTree.write_file(root, "existing.ex", invalid_utf8, force?: true)
+      assert {:error, :invalid_utf8} =
+               FileTree.write_file(root, "existing.ex", invalid_utf8, force?: true)
     end
 
     test "returns file_deleted when file was deleted", %{root: root} do
       File.rm!(Path.join(root, "existing.ex"))
 
-      assert {:error, :file_deleted} = FileTree.write_file(root, "existing.ex", "new content", force?: true)
+      assert {:error, :file_deleted} =
+               FileTree.write_file(root, "existing.ex", "new content", force?: true)
     end
 
     test "cleans up temp file on failure", %{root: root} do
@@ -317,7 +334,8 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
       link_path = Path.join(root, "linked_file.ex")
       File.ln_s!("real_file.ex", link_path)
 
-      assert {:error, :symlink_not_saveable} = FileTree.write_file(root, "linked_file.ex", "new content", force?: true)
+      assert {:error, :symlink_not_saveable} =
+               FileTree.write_file(root, "linked_file.ex", "new content", force?: true)
     end
 
     test "symlinked directory shows in listing but not expandable", %{root: root} do
@@ -357,14 +375,18 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
 
     test "read_file rejects access through symlinked ancestor directory", %{root: root} do
       # Try to read /project/linked_dir/secret.txt which resolves to /outside/secret.txt
-      assert {:error, :symlink_escapes_project} = FileTree.read_file(root, "linked_dir/secret.txt")
+      assert {:error, :symlink_escapes_project} =
+               FileTree.read_file(root, "linked_dir/secret.txt")
     end
 
     test "read_file rejects passwd through symlinked directory", %{root: root} do
       assert {:error, :symlink_escapes_project} = FileTree.read_file(root, "linked_dir/passwd")
     end
 
-    test "write_file rejects write through symlinked ancestor directory", %{root: root, outside_dir: outside_dir} do
+    test "write_file rejects write through symlinked ancestor directory", %{
+      root: root,
+      outside_dir: outside_dir
+    } do
       # Try to write through the symlinked directory
       assert {:error, :symlink_escapes_project} =
                FileTree.write_file(root, "linked_dir/secret.txt", "pwned", force?: true)
@@ -373,7 +395,10 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
       assert File.read!(Path.join(outside_dir, "secret.txt")) == "secret data"
     end
 
-    test "write_file rejects new file creation through symlinked ancestor", %{root: root, outside_dir: outside_dir} do
+    test "write_file rejects new file creation through symlinked ancestor", %{
+      root: root,
+      outside_dir: outside_dir
+    } do
       # Try to create a new file through the symlinked directory
       assert {:error, :symlink_escapes_project} =
                FileTree.write_file(root, "linked_dir/newfile.txt", "malicious", force?: true)
@@ -393,7 +418,8 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
       File.mkdir_p!(subdir)
       File.ln_s!(outside_dir, Path.join(subdir, "deep_link"))
 
-      assert {:error, :symlink_escapes_project} = FileTree.read_file(root, "subdir/deep_link/secret.txt")
+      assert {:error, :symlink_escapes_project} =
+               FileTree.read_file(root, "subdir/deep_link/secret.txt")
     end
 
     test "symlink loop returns error instead of crashing", %{root: root} do

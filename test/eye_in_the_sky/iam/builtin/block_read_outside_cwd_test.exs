@@ -58,7 +58,12 @@ defmodule EyeInTheSky.IAM.Builtin.BlockReadOutsideCwdTest do
 
   test "blocks absolute path before pipe" do
     # cat /etc/passwd | grep root — should detect /etc/passwd
-    ctx = %Context{tool: "Bash", resource_content: "cat /etc/passwd | grep root", project_path: "/proj"}
+    ctx = %Context{
+      tool: "Bash",
+      resource_content: "cat /etc/passwd | grep root",
+      project_path: "/proj"
+    }
+
     assert BlockReadOutsideCwd.matches?(policy(), ctx)
   end
 
@@ -115,6 +120,7 @@ defmodule EyeInTheSky.IAM.Builtin.BlockReadOutsideCwdTest do
       resource_path: "/proj/lib/does_not_exist_yet.ex",
       project_path: "/proj"
     }
+
     refute BlockReadOutsideCwd.matches?(policy(), ctx)
   end
 
@@ -129,7 +135,12 @@ defmodule EyeInTheSky.IAM.Builtin.BlockReadOutsideCwdTest do
 
   test "does not allow path that merely starts with cwd string but escapes boundary" do
     # /projects-evil is not inside /projects — must check trailing slash boundary
-    ctx = %Context{tool: "Read", resource_path: "/projects-evil/secret", project_path: "/projects"}
+    ctx = %Context{
+      tool: "Read",
+      resource_path: "/projects-evil/secret",
+      project_path: "/projects"
+    }
+
     assert BlockReadOutsideCwd.matches?(policy(), ctx)
   end
 

@@ -4,7 +4,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
-    only: [detect_file_type: 1, language_class: 1, binary_file?: 1, build_file_tree: 2, build_file_listing: 2, build_file_listing: 3]
+    only: [
+      detect_file_type: 1,
+      language_class: 1,
+      binary_file?: 1,
+      build_file_tree: 2,
+      build_file_listing: 2,
+      build_file_listing: 3
+    ]
 
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers,
     only: [read_file_safe_detailed: 1, path_within?: 2]
@@ -93,15 +100,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   # don't carry mode=tree (e.g. stale DOM from phx-update="ignore").
   defp parse_mode(params, current_mode) do
     case Map.get(params, "mode") do
-      "tree" -> :tree
-      "list" -> :list
+      "tree" ->
+        :tree
+
+      "list" ->
+        :list
+
       nil ->
         if current_mode == :tree and is_binary(Map.get(params, "path")) do
           :tree
         else
           :list
         end
-      _ -> :list
+
+      _ ->
+        :list
     end
   end
 
@@ -217,7 +230,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   defp unsubscribe_editor(socket) do
     case socket.assigns[:subscribed_editor_id] do
-      nil -> socket
+      nil ->
+        socket
+
       id ->
         Events.unsubscribe_editor(id)
         assign(socket, :subscribed_editor_id, nil)
@@ -314,7 +329,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           </div>
         <% end %>
         <div class="flex-1 min-h-0 overflow-hidden">
-          <.file_content_viewer file_content={@file_content} file_type={@file_type} file_path={@file_path} />
+          <.file_content_viewer
+            file_content={@file_content}
+            file_type={@file_type}
+            file_path={@file_path}
+          />
         </div>
       </div>
     <% else %>
@@ -335,17 +354,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   defp file_content_viewer(assigns) do
     assigns = assign(assigns, :editor_id, "file-editor-#{:erlang.phash2(assigns.file_path)}")
+
     ~H"""
     <.svelte
       id={@editor_id}
       name="FileEditor"
       ssr={false}
-      props={%{
-        content: @file_content,
-        lang: language_class(@file_type),
-        path: @file_path || "",
-        readonly: false
-      }}
+      props={
+        %{
+          content: @file_content,
+          lang: language_class(@file_type),
+          path: @file_path || "",
+          readonly: false
+        }
+      }
       class="h-full"
     />
     """
@@ -375,7 +397,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         ~H"""
         <li>
           <%= if binary_file?(@item.name) do %>
-            <span class="opacity-40 cursor-not-allowed pointer-events-none" title="Binary file — cannot preview">
+            <span
+              class="opacity-40 cursor-not-allowed pointer-events-none"
+              title="Binary file — cannot preview"
+            >
               <.icon name="hero-no-symbol" class="size-4" />
               {@item.name}
               <span class="badge badge-ghost badge-xs ml-auto font-mono">bin</span>

@@ -53,7 +53,10 @@ defmodule EyeInTheSky.Repo.Migrations.AddRound7PerfIndexes do
 
   def down do
     drop_if_exists(index(:job_runs, [:job_id], name: :job_runs_running_partial_idx))
-    drop_if_exists(index(:job_runs, [:job_id, "started_at DESC"], name: :job_runs_job_id_started_at_idx))
+
+    drop_if_exists(
+      index(:job_runs, [:job_id, "started_at DESC"], name: :job_runs_job_id_started_at_idx)
+    )
 
     execute(
       "ALTER INDEX IF EXISTS idx_subagent_prompts_slug_global RENAME TO subagent_prompts_slug_index",
@@ -61,7 +64,9 @@ defmodule EyeInTheSky.Repo.Migrations.AddRound7PerfIndexes do
     )
 
     drop_if_exists(
-      unique_index(:subagent_prompts, [:slug, :project_id], name: :idx_subagent_prompts_slug_project)
+      unique_index(:subagent_prompts, [:slug, :project_id],
+        name: :idx_subagent_prompts_slug_project
+      )
     )
   end
 end

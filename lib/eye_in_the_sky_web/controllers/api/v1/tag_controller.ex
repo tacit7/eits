@@ -8,10 +8,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TagController do
   Optional query param: q (name search, case-insensitive substring)
   """
   def index(conn, params) do
-    opts = case params["q"] do
-      q when is_binary(q) and q != "" -> [search: q]
-      _ -> []
-    end
+    opts =
+      case params["q"] do
+        q when is_binary(q) and q != "" -> [search: q]
+        _ -> []
+      end
 
     tags = TaskTags.list_tags(opts)
 

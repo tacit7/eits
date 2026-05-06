@@ -47,6 +47,7 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
         StreamHandler.start("test prompt", opts, test_pid, stream_fn: fn -> stream end)
 
       assert_receive {:codex_session_id, ^sdk_ref, "session-123"}, 1000
+
       assert_receive {:claude_message, ^sdk_ref, %Message{type: :text, content: "Hello there"}},
                      1000
     end
@@ -66,6 +67,7 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
         StreamHandler.start("test prompt", opts, test_pid, stream_fn: fn -> stream end)
 
       assert_receive {:codex_session_id, ^sdk_ref, _}, 1000
+
       assert_receive {:claude_message, ^sdk_ref, %Message{type: :text, content: "response"}},
                      1000
 
@@ -93,11 +95,15 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
       assert_receive {:codex_session_id, ^sdk_ref, _}, 1000
 
       assert_receive {
-        :claude_message,
-        ^sdk_ref,
-        %Message{type: :tool_use, content: "bash", metadata: %{input: %{"command" => "ls"}}}
-      },
-      1000
+                       :claude_message,
+                       ^sdk_ref,
+                       %Message{
+                         type: :tool_use,
+                         content: "bash",
+                         metadata: %{input: %{"command" => "ls"}}
+                       }
+                     },
+                     1000
     end
 
     test "sends tool result events" do
@@ -116,11 +122,15 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
       assert_receive {:codex_session_id, ^sdk_ref, _}, 1000
 
       assert_receive {
-        :claude_message,
-        ^sdk_ref,
-        %Message{type: :tool_result, content: "result output", metadata: %{tool_id: "tool-1"}}
-      },
-      1000
+                       :claude_message,
+                       ^sdk_ref,
+                       %Message{
+                         type: :tool_result,
+                         content: "result output",
+                         metadata: %{tool_id: "tool-1"}
+                       }
+                     },
+                     1000
     end
 
     test "sends result ok event and completion" do
@@ -147,14 +157,14 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
       assert_receive {:codex_session_id, ^sdk_ref, _}, 1000
 
       assert_receive {
-        :claude_message,
-        ^sdk_ref,
-        %Message{
-          type: :result,
-          metadata: %{total_tokens: 100, input_tokens: 50, output_tokens: 50}
-        }
-      },
-      1000
+                       :claude_message,
+                       ^sdk_ref,
+                       %Message{
+                         type: :result,
+                         metadata: %{total_tokens: 100, input_tokens: 50, output_tokens: 50}
+                       }
+                     },
+                     1000
 
       assert_receive {:claude_complete, ^sdk_ref, "session-123"}, 1000
     end
@@ -290,8 +300,12 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
         Stream.resource(
           fn -> :init end,
           fn
-            :init -> {[%Types.InitEvent{session_id: "session-789"}], :blocking}
-            :blocking -> Process.sleep(:infinity); {[], :done}
+            :init ->
+              {[%Types.InitEvent{session_id: "session-789"}], :blocking}
+
+            :blocking ->
+              Process.sleep(:infinity)
+              {[], :done}
           end,
           fn _ -> :ok end
         )
@@ -336,12 +350,18 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
         StreamHandler.start("test prompt", opts, test_pid, stream_fn: fn -> stream end)
 
       assert_receive {:codex_session_id, ^sdk_ref, "session-full"}, 1000
-      assert_receive {:claude_message, ^sdk_ref, %Message{type: :text, content: "I will run a command"}},
+
+      assert_receive {:claude_message, ^sdk_ref,
+                      %Message{type: :text, content: "I will run a command"}},
                      1000
+
       assert_receive {:claude_message, ^sdk_ref, %Message{type: :tool_use, content: "bash"}},
                      1000
-      assert_receive {:claude_message, ^sdk_ref, %Message{type: :tool_result, content: "/home/user"}},
+
+      assert_receive {:claude_message, ^sdk_ref,
+                      %Message{type: :tool_result, content: "/home/user"}},
                      1000
+
       assert_receive {:claude_message, ^sdk_ref, %Message{type: :text, content: "Done"}}, 1000
       assert_receive {:claude_message, ^sdk_ref, %Message{type: :result}}, 1000
       assert_receive {:claude_complete, ^sdk_ref, "session-full"}, 1000

@@ -78,7 +78,10 @@ defmodule EyeInTheSky.Settings.JsonSettingsTest do
 
   describe "reset_namespace/2" do
     test "drops the whole namespace" do
-      m = %{"anthropic" => %{"permission_mode" => "plan"}, "general" => %{"thinking_enabled" => true}}
+      m = %{
+        "anthropic" => %{"permission_mode" => "plan"},
+        "general" => %{"thinking_enabled" => true}
+      }
 
       assert JsonSettings.reset_namespace(m, "anthropic") == %{
                "general" => %{"thinking_enabled" => true}
@@ -103,7 +106,12 @@ defmodule EyeInTheSky.Settings.JsonSettingsTest do
 
     test "deleting a session override falls back to agent value" do
       agent = %{"anthropic" => %{"permission_mode" => "plan"}}
-      session_after_delete = JsonSettings.delete_setting(%{"anthropic" => %{"permission_mode" => "default"}}, "anthropic.permission_mode")
+
+      session_after_delete =
+        JsonSettings.delete_setting(
+          %{"anthropic" => %{"permission_mode" => "default"}},
+          "anthropic.permission_mode"
+        )
 
       effective = JsonSettings.effective_settings(agent, session_after_delete)
       assert effective["anthropic"]["permission_mode"] == "plan"
@@ -118,7 +126,8 @@ defmodule EyeInTheSky.Settings.JsonSettingsTest do
 
   describe "coerce_value/3" do
     test "rejects unknown key" do
-      assert {:error, :unknown_setting_key} = JsonSettings.coerce_value("x", "totally.fake", :session)
+      assert {:error, :unknown_setting_key} =
+               JsonSettings.coerce_value("x", "totally.fake", :session)
     end
 
     test "rejects key in disallowed scope" do
@@ -129,14 +138,20 @@ defmodule EyeInTheSky.Settings.JsonSettingsTest do
 
     test "boolean coercion" do
       assert {:ok, true} = JsonSettings.coerce_value(true, "general.thinking_enabled", :session)
-      assert {:ok, false} = JsonSettings.coerce_value("false", "general.thinking_enabled", :session)
-      assert {:error, :type_mismatch} = JsonSettings.coerce_value("yep", "general.thinking_enabled", :session)
+
+      assert {:ok, false} =
+               JsonSettings.coerce_value("false", "general.thinking_enabled", :session)
+
+      assert {:error, :type_mismatch} =
+               JsonSettings.coerce_value("yep", "general.thinking_enabled", :session)
     end
 
     test "float strict parsing rejects partial parses" do
       assert {:ok, 50.0} = JsonSettings.coerce_value("50", "general.max_budget_usd", :session)
       assert {:ok, 12.5} = JsonSettings.coerce_value("12.5", "general.max_budget_usd", :session)
-      assert {:error, :invalid_float} = JsonSettings.coerce_value("50abc", "general.max_budget_usd", :session)
+
+      assert {:error, :invalid_float} =
+               JsonSettings.coerce_value("50abc", "general.max_budget_usd", :session)
     end
 
     test "empty string coerces to nil for *_or_nil types" do
@@ -145,19 +160,28 @@ defmodule EyeInTheSky.Settings.JsonSettingsTest do
     end
 
     test "enum validates membership" do
-      assert {:ok, "plan"} = JsonSettings.coerce_value("plan", "anthropic.permission_mode", :session)
-      assert {:error, :invalid_enum_value} = JsonSettings.coerce_value("yolo", "anthropic.permission_mode", :session)
+      assert {:ok, "plan"} =
+               JsonSettings.coerce_value("plan", "anthropic.permission_mode", :session)
+
+      assert {:error, :invalid_enum_value} =
+               JsonSettings.coerce_value("yolo", "anthropic.permission_mode", :session)
     end
 
     test "enum_or_nil collapses empty string to nil" do
       assert {:ok, nil} = JsonSettings.coerce_value("", "anthropic.fallback_model", :session)
-      assert {:ok, "haiku"} = JsonSettings.coerce_value("haiku", "anthropic.fallback_model", :session)
-      assert {:error, :invalid_enum_value} = JsonSettings.coerce_value("gpt-4", "anthropic.fallback_model", :session)
+
+      assert {:ok, "haiku"} =
+               JsonSettings.coerce_value("haiku", "anthropic.fallback_model", :session)
+
+      assert {:error, :invalid_enum_value} =
+               JsonSettings.coerce_value("gpt-4", "anthropic.fallback_model", :session)
     end
 
     test "integer strict parsing" do
       assert {:ok, 5} = JsonSettings.coerce_value("5", "anthropic.max_turns", :session)
-      assert {:error, :invalid_integer} = JsonSettings.coerce_value("5abc", "anthropic.max_turns", :session)
+
+      assert {:error, :invalid_integer} =
+               JsonSettings.coerce_value("5abc", "anthropic.max_turns", :session)
     end
   end
 end

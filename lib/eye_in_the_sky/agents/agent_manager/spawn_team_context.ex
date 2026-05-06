@@ -18,7 +18,8 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnTeamContext do
   def apply_context(instructions, nil, _member_name), do: instructions
 
   def apply_context(instructions, team, member_name) do
-    instructions <> "\n\n" <> EyeInTheSky.Agents.InstructionTemplates.team_context(team, member_name)
+    instructions <>
+      "\n\n" <> EyeInTheSky.Agents.InstructionTemplates.team_context(team, member_name)
   end
 
   def record_spawn_failure(nil, _member_name), do: :ok

@@ -421,8 +421,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
         post(conn, ~p"/api/v1/tasks/9999999/sessions", %{"session_id" => session.uuid})
         # If no exception, just pass; endpoint behavior is undefined for invalid task_id
       rescue
-        Postgrex.Error -> :ok  # Expected: foreign key validation error
-        FunctionClauseError -> :ok  # Could be pattern matching issue
+        # Expected: foreign key validation error
+        Postgrex.Error -> :ok
+        # Could be pattern matching issue
+        FunctionClauseError -> :ok
       end
     end
   end
@@ -573,7 +575,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
 
   describe "regression: invalid task project_id does not crash" do
     test "creating task with invalid project_id does not crash", %{conn: conn} do
-      conn = post(conn, ~p"/api/v1/tasks", %{"title" => "Test task", "project_id" => 999999})
+      conn = post(conn, ~p"/api/v1/tasks", %{"title" => "Test task", "project_id" => 999_999})
       resp = json_response(conn, 201)
       assert resp["success"] == true
       assert resp["task_id"] != nil
@@ -622,7 +624,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
 
     test "returns 404 for non-existent tag", %{conn: conn} do
       task = create_task()
-      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/tags", %{"tag_id" => 9999999})
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/tags", %{"tag_id" => 9_999_999})
       assert json_response(conn, 404)
     end
 

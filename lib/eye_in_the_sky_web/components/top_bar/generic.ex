@@ -38,8 +38,7 @@ defmodule EyeInTheSkyWeb.TopBar.Generic do
       title="Search"
       aria-label="Search"
     >
-      <.icon name="hero-magnifying-glass" class="size-3.5" />
-      Search
+      <.icon name="hero-magnifying-glass" class="size-3.5" /> Search
       <kbd class="ml-0.5 inline-flex items-center px-1 py-0.5 rounded text-nano bg-base-content/8 text-base-content/30 border border-base-content/10 font-sans leading-none">
         ⌘K
       </kbd>

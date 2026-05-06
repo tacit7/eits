@@ -11,7 +11,8 @@ defmodule EyeInTheSky.Repo.Migrations.AddRound9PerfIndexes do
     # secondary id sort key.
     create_if_not_exists index(:notifications, [:inserted_at, :id],
                            name: :notifications_inserted_at_id_index,
-                           concurrently: true)
+                           concurrently: true
+                         )
 
     # MEDIUM: messages — composite (session_id, inserted_at DESC) for session-scoped
     # time queries. Without this the planner incorrectly picks the
@@ -20,7 +21,8 @@ defmodule EyeInTheSky.Repo.Migrations.AddRound9PerfIndexes do
     # on session_id. 275k+ rows on this table.
     create_if_not_exists index(:messages, [:session_id, :inserted_at],
                            name: :messages_session_id_inserted_at_index,
-                           concurrently: true)
+                           concurrently: true
+                         )
 
     # MEDIUM: commit_tasks — missing standalone task_id index for ON DELETE CASCADE
     # reverse scan. The unique (commit_id, task_id) index covers commit-first lookups
@@ -28,17 +30,15 @@ defmodule EyeInTheSky.Repo.Migrations.AddRound9PerfIndexes do
     # deleting a task causes a full seqscan of commit_tasks.
     create_if_not_exists index(:commit_tasks, [:task_id],
                            name: :commit_tasks_task_id_index,
-                           concurrently: true)
+                           concurrently: true
+                         )
   end
 
   def down do
-    drop_if_exists index(:notifications, [],
-                     name: :notifications_inserted_at_id_index)
+    drop_if_exists index(:notifications, [], name: :notifications_inserted_at_id_index)
 
-    drop_if_exists index(:messages, [],
-                     name: :messages_session_id_inserted_at_index)
+    drop_if_exists index(:messages, [], name: :messages_session_id_inserted_at_index)
 
-    drop_if_exists index(:commit_tasks, [],
-                     name: :commit_tasks_task_id_index)
+    drop_if_exists index(:commit_tasks, [], name: :commit_tasks_task_id_index)
   end
 end

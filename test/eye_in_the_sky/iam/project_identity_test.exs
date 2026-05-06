@@ -48,7 +48,11 @@ defmodule EyeInTheSky.IAM.ProjectIdentityTest do
       link = Path.join(tmp, "iam_test_link_#{System.unique_integer([:positive])}")
 
       File.mkdir_p!(target)
-      on_exit(fn -> File.rm_rf(target); File.rm(link) end)
+
+      on_exit(fn ->
+        File.rm_rf(target)
+        File.rm(link)
+      end)
 
       :ok = File.ln_s(target, link)
 

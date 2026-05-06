@@ -18,7 +18,9 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   def handle_event("set_notify_on_stop", params, socket),
-    do: {:noreply, EyeInTheSkyWeb.Live.Shared.NotificationHelpers.set_notify_on_stop(socket, params)}
+    do:
+      {:noreply,
+       EyeInTheSkyWeb.Live.Shared.NotificationHelpers.set_notify_on_stop(socket, params)}
 
   def handle_event("change_channel", %{"channel_id" => channel_id}, socket) do
     {:noreply, push_patch(socket, to: ~p"/chat?channel_id=#{channel_id}")}
@@ -292,5 +294,4 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
     |> assign(:channel_members, channel_members)
     |> assign(:sessions_by_project, sessions_by_project)
   end
-
 end

@@ -55,7 +55,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
 
   # Seed an inbound DM from `from_session` to `to_session`.
   defp seed_dm(from_session, to_session, body) do
-
     {:ok, msg} =
       Messages.create_message(%{
         uuid: Ecto.UUID.generate(),

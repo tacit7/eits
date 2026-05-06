@@ -28,7 +28,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
         socket.assigns.session_show
       )
 
-    {:noreply, socket |> assign(:session_name_filter, value) |> assign(:flyout_sessions, sessions)}
+    {:noreply,
+     socket |> assign(:session_name_filter, value) |> assign(:flyout_sessions, sessions)}
   end
 
   def handle_set_session_show(%{"show" => show_str}, socket) do

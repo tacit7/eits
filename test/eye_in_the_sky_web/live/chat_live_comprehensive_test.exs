@@ -119,6 +119,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
       topic = "channel:#{channel.id}:messages"
+
       subscribers =
         Registry.lookup(EyeInTheSky.PubSub, topic)
         |> Enum.map(fn {pid, _} -> pid end)
@@ -136,12 +137,16 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
       topic1 = "channel:#{channel.id}:messages"
       topic2 = "channel:#{channel2.id}:messages"
 
-      assert view.pid in (Registry.lookup(EyeInTheSky.PubSub, topic1) |> Enum.map(fn {p, _} -> p end))
+      assert view.pid in (Registry.lookup(EyeInTheSky.PubSub, topic1)
+                          |> Enum.map(fn {p, _} -> p end))
 
       render_patch(view, ~p"/chat?channel_id=#{channel2.id}")
 
-      assert view.pid not in (Registry.lookup(EyeInTheSky.PubSub, topic1) |> Enum.map(fn {p, _} -> p end))
-      assert view.pid in (Registry.lookup(EyeInTheSky.PubSub, topic2) |> Enum.map(fn {p, _} -> p end))
+      assert view.pid not in (Registry.lookup(EyeInTheSky.PubSub, topic1)
+                              |> Enum.map(fn {p, _} -> p end))
+
+      assert view.pid in (Registry.lookup(EyeInTheSky.PubSub, topic2)
+                          |> Enum.map(fn {p, _} -> p end))
     end
 
     test "repeated patch to same channel doesn't create duplicate subscription", %{
@@ -353,8 +358,8 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
       # Verify new message is in list
       assert Enum.any?(view.assigns.messages, fn m ->
-        m.body == "New from broadcast"
-      end)
+               m.body == "New from broadcast"
+             end)
     end
   end
 

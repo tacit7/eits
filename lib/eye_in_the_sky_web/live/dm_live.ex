@@ -105,7 +105,8 @@ defmodule EyeInTheSkyWeb.DmLive do
         {:noreply, assign(socket, assigns)}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Setting update failed: #{format_setting_error(reason)}")}
+        {:noreply,
+         put_flash(socket, :error, "Setting update failed: #{format_setting_error(reason)}")}
     end
   end
 
@@ -124,7 +125,8 @@ defmodule EyeInTheSkyWeb.DmLive do
         {:noreply, assign(socket, assigns)}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Setting update failed: #{format_setting_error(reason)}")}
+        {:noreply,
+         put_flash(socket, :error, "Setting update failed: #{format_setting_error(reason)}")}
     end
   end
 
@@ -154,10 +156,12 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("toggle_new_session_drawer", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("toggle_new_task_drawer", _params, socket), do: toggle_active_overlay(socket, :task_drawer)
+  def handle_event("toggle_new_task_drawer", _params, socket),
+    do: toggle_active_overlay(socket, :task_drawer)
 
   @impl true
-  def handle_event("toggle_task_detail_drawer", _params, socket), do: toggle_active_overlay(socket, :task_detail)
+  def handle_event("toggle_task_detail_drawer", _params, socket),
+    do: toggle_active_overlay(socket, :task_detail)
 
   @impl true
   def handle_event("open_schedule_timer", _params, socket) do
@@ -510,7 +514,8 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
 
   defp toggle_active_overlay(socket, overlay) do
-    {:noreply, assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, overlay))}
+    {:noreply,
+     assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, overlay))}
   end
 
   # ---------------------------------------------------------------------------
@@ -603,7 +608,9 @@ defmodule EyeInTheSkyWeb.DmLive do
     with {:ok, fresh_session} <- Sessions.put_setting(assigns.session, key, value) do
       agent_settings = (assigns.agent && assigns.agent.settings) || %{}
       session_settings = fresh_session.settings || %{}
-      {:ok, build_settings_assigns(:session, fresh_session, agent_settings, session_settings, assigns)}
+
+      {:ok,
+       build_settings_assigns(:session, fresh_session, agent_settings, session_settings, assigns)}
     end
   end
 
@@ -614,7 +621,9 @@ defmodule EyeInTheSkyWeb.DmLive do
     with {:ok, fresh_agent} <- Agents.put_setting(assigns.agent, key, value) do
       agent_settings = fresh_agent.settings || %{}
       session_settings = (assigns.session && assigns.session.settings) || %{}
-      {:ok, build_settings_assigns(:agent, fresh_agent, agent_settings, session_settings, assigns)}
+
+      {:ok,
+       build_settings_assigns(:agent, fresh_agent, agent_settings, session_settings, assigns)}
     end
   end
 
@@ -639,7 +648,13 @@ defmodule EyeInTheSkyWeb.DmLive do
   # (:thinking_enabled, :max_budget_usd, :show_live_stream, :notify_on_stop)
   # that message handlers and stream code read. Without this, settings changes
   # only take effect on remount.
-  defp build_settings_assigns(written_scope, fresh_record, agent_settings, session_settings, assigns) do
+  defp build_settings_assigns(
+         written_scope,
+         fresh_record,
+         agent_settings,
+         session_settings,
+         assigns
+       ) do
     effective = JsonSettings.effective_settings(agent_settings, session_settings)
     general = Map.get(effective, "general", %{})
 
@@ -662,7 +677,10 @@ defmodule EyeInTheSkyWeb.DmLive do
   end
 
   defp format_setting_error(:unknown_setting_key), do: "unknown setting"
-  defp format_setting_error(:scope_not_allowed), do: "this setting cannot be changed at this scope"
+
+  defp format_setting_error(:scope_not_allowed),
+    do: "this setting cannot be changed at this scope"
+
   defp format_setting_error(:invalid_float), do: "must be a number"
   defp format_setting_error(:invalid_integer), do: "must be a whole number"
   defp format_setting_error(:invalid_enum_value), do: "value not allowed"

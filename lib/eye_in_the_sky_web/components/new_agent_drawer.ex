@@ -226,7 +226,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
 
   defp advanced_output(assigns) do
     ~H"""
-    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Output / Print Mode</p>
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">
+      Output / Print Mode
+    </p>
 
     <div class="form-control">
       <label class="label">
@@ -280,7 +282,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
       <input
         type="text"
         name="allowed_tools"
-        placeholder='Bash(git *) Read Edit'
+        placeholder="Bash(git *) Read Edit"
         class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
       />
     </div>
@@ -288,7 +290,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
     <div class="form-control">
       <label class="label">
         <span class="label-text text-xs">Permission Prompt Tool</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-prompt-tool</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">
+          --permission-prompt-tool
+        </span>
       </label>
       <input
         type="text"
@@ -321,7 +325,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
 
   defp advanced_system_prompt(assigns) do
     ~H"""
-    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">System Prompt</p>
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">
+      System Prompt
+    </p>
 
     <div class="form-control">
       <label class="label">
@@ -352,7 +358,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
     <div class="form-control">
       <label class="label">
         <span class="label-text text-xs">System Prompt File</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--system-prompt-file</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">
+          --system-prompt-file
+        </span>
       </label>
       <input
         type="text"
@@ -365,7 +373,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
     <div class="form-control">
       <label class="label">
         <span class="label-text text-xs">Append System Prompt</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--append-system-prompt</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">
+          --append-system-prompt
+        </span>
       </label>
       <textarea
         name="append_system_prompt"
@@ -378,7 +388,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
     <div class="form-control">
       <label class="label">
         <span class="label-text text-xs">Append System Prompt File</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--append-system-prompt-file</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">
+          --append-system-prompt-file
+        </span>
       </label>
       <input
         type="text"
@@ -392,7 +404,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
 
   defp advanced_debug_safety(assigns) do
     ~H"""
-    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">Debug & Safety</p>
+    <p class="text-xs font-semibold text-base-content/40 uppercase tracking-wide pt-1">
+      Debug & Safety
+    </p>
 
     <div class="form-control">
       <label class="label">
@@ -416,21 +430,35 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
         </span>
       </label>
       <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input type="checkbox" name="verbose" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <input
+          type="checkbox"
+          name="verbose"
+          value="true"
+          class="checkbox checkbox-sm checkbox-primary"
+        />
         <span class="label-text text-xs">
-          Verbose output
-          <span class="font-mono text-base-content/40 text-xs ml-1">--verbose</span>
+          Verbose output <span class="font-mono text-base-content/40 text-xs ml-1">--verbose</span>
         </span>
       </label>
       <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input type="checkbox" name="include_partial_messages" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <input
+          type="checkbox"
+          name="include_partial_messages"
+          value="true"
+          class="checkbox checkbox-sm checkbox-primary"
+        />
         <span class="label-text text-xs">
           Include partial messages
           <span class="font-mono text-base-content/40 text-xs ml-1">--include-partial-messages</span>
         </span>
       </label>
       <label class="label cursor-pointer justify-start gap-2 py-1">
-        <input type="checkbox" name="no_session_persistence" value="true" class="checkbox checkbox-sm checkbox-primary" />
+        <input
+          type="checkbox"
+          name="no_session_persistence"
+          value="true"
+          class="checkbox checkbox-sm checkbox-primary"
+        />
         <span class="label-text text-xs">
           No session persistence
           <span class="font-mono text-base-content/40 text-xs ml-1">--no-session-persistence</span>

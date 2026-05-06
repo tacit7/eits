@@ -340,5 +340,4 @@ defmodule EyeInTheSky.Channels do
     )
     |> Repo.all()
   end
-
 end

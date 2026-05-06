@@ -9,7 +9,9 @@ defmodule EyeInTheSky.IAM.SeedsTest do
       assert is_binary(attrs[:system_key]), "missing system_key in #{inspect(attrs)}"
       assert is_binary(attrs[:name]), "missing name in #{inspect(attrs)}"
       assert is_binary(attrs[:effect]), "missing effect in #{inspect(attrs)}"
-      assert attrs[:effect] in ["allow", "deny", "instruct"], "invalid effect in #{inspect(attrs)}"
+
+      assert attrs[:effect] in ["allow", "deny", "instruct"],
+             "invalid effect in #{inspect(attrs)}"
     end)
   end
 

@@ -69,7 +69,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpersTest do
       {:ok, tmp: tmp}
     end
 
-    test "global command and project command with same slug both load with distinct ids", %{tmp: tmp} do
+    test "global command and project command with same slug both load with distinct ids", %{
+      tmp: tmp
+    } do
       # Project-side command with the same slug as a likely-global one
       write_skill(Path.join(tmp, ".claude/commands"), "clarify.md", "project clarify")
 
@@ -90,11 +92,29 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpersTest do
       skills = [
         %Skill{id: "skills:a", slug: "a", source: :skills, description: "", size: 0},
         %Skill{id: "commands:b", slug: "b", source: :commands, description: "", size: 0},
-        %Skill{id: "project_skills:c", slug: "c", source: :project_skills, description: "", size: 0},
-        %Skill{id: "project_commands:d", slug: "d", source: :project_commands, description: "", size: 0}
+        %Skill{
+          id: "project_skills:c",
+          slug: "c",
+          source: :project_skills,
+          description: "",
+          size: 0
+        },
+        %Skill{
+          id: "project_commands:d",
+          slug: "d",
+          source: :project_commands,
+          description: "",
+          size: 0
+        }
       ]
 
-      assigns = %{type_filter: "skills", scope_filter: "all", search_query: "", sort_by: "name_asc"}
+      assigns = %{
+        type_filter: "skills",
+        scope_filter: "all",
+        search_query: "",
+        sort_by: "name_asc"
+      }
+
       result = SkillsHelpers.apply_filters_and_sort(skills, assigns)
 
       assert Enum.map(result, & &1.slug) == ["a", "c"]
@@ -103,11 +123,29 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpersTest do
     test "filter_by_scope=project includes both project sources" do
       skills = [
         %Skill{id: "skills:a", slug: "a", source: :skills, description: "", size: 0},
-        %Skill{id: "project_skills:c", slug: "c", source: :project_skills, description: "", size: 0},
-        %Skill{id: "project_commands:d", slug: "d", source: :project_commands, description: "", size: 0}
+        %Skill{
+          id: "project_skills:c",
+          slug: "c",
+          source: :project_skills,
+          description: "",
+          size: 0
+        },
+        %Skill{
+          id: "project_commands:d",
+          slug: "d",
+          source: :project_commands,
+          description: "",
+          size: 0
+        }
       ]
 
-      assigns = %{type_filter: "all", scope_filter: "project", search_query: "", sort_by: "name_asc"}
+      assigns = %{
+        type_filter: "all",
+        scope_filter: "project",
+        search_query: "",
+        sort_by: "name_asc"
+      }
+
       result = SkillsHelpers.apply_filters_and_sort(skills, assigns)
 
       assert Enum.map(result, & &1.slug) == ["c", "d"]
@@ -119,7 +157,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpersTest do
         %Skill{id: "skills:zzz", slug: "zzz", source: :skills, description: "nothing", size: 0}
       ]
 
-      assigns = %{type_filter: "all", scope_filter: "all", search_query: "BAZ", sort_by: "name_asc"}
+      assigns = %{
+        type_filter: "all",
+        scope_filter: "all",
+        search_query: "BAZ",
+        sort_by: "name_asc"
+      }
+
       result = SkillsHelpers.apply_filters_and_sort(skills, assigns)
 
       assert Enum.map(result, & &1.slug) == ["foo"]

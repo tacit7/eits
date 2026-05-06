@@ -310,7 +310,8 @@ defmodule EyeInTheSky.Sessions do
   def batch_archive_sessions_for_project(ids, project_id) when is_list(ids) and ids != [] do
     Repo.update_all(
       from(s in Session,
-        where: s.id in ^ids and s.project_id == ^project_id),
+        where: s.id in ^ids and s.project_id == ^project_id
+      ),
       set: [archived_at: DateTime.utc_now()]
     )
   end

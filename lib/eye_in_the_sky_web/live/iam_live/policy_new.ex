@@ -118,12 +118,24 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
         <h1 class="text-2xl font-bold">New IAM Policy</h1>
       </div>
 
-      <.form for={@form} id="iam-policy-form" phx-change="validate" phx-submit="save" class="space-y-4">
+      <.form
+        for={@form}
+        id="iam-policy-form"
+        phx-change="validate"
+        phx-submit="save"
+        class="space-y-4"
+      >
         <input type="hidden" name="condition_text" value={@condition_text} />
 
         <section class="card bg-base-200">
           <div class="card-body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <.input field={@form[:name]} type="text" label="Name" placeholder="Block writes to /etc" required />
+            <.input
+              field={@form[:name]}
+              type="text"
+              label="Name"
+              placeholder="Block writes to /etc"
+              required
+            />
 
             <.input
               field={@form[:effect]}
@@ -133,15 +145,35 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
               required
             />
 
-            <.input field={@form[:agent_type]} type="text" label="Agent type" placeholder="* or e.g. root" />
+            <.input
+              field={@form[:agent_type]}
+              type="text"
+              label="Agent type"
+              placeholder="* or e.g. root"
+            />
 
-            <.input field={@form[:action]} type="text" label="Action (tool)" placeholder="* or e.g. Bash" />
+            <.input
+              field={@form[:action]}
+              type="text"
+              label="Action (tool)"
+              placeholder="* or e.g. Bash"
+            />
 
-            <.input field={@form[:resource_glob]} type="text" label="Resource glob" placeholder="e.g. /etc/*" />
+            <.input
+              field={@form[:resource_glob]}
+              type="text"
+              label="Resource glob"
+              placeholder="e.g. /etc/*"
+            />
 
             <.input field={@form[:priority]} type="number" label="Priority" />
 
-            <.input field={@form[:message]} type="text" label="Message (optional)" placeholder="Shown when this policy wins" />
+            <.input
+              field={@form[:message]}
+              type="text"
+              label="Message (optional)"
+              placeholder="Shown when this policy wins"
+            />
 
             <.input field={@form[:enabled]} type="checkbox" label="Enabled" />
           </div>

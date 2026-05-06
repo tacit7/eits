@@ -165,10 +165,12 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       ]
 
       count2 = BulkImporter.import_messages(messages2, session.id, provider: "codex")
-      assert count2 == 1  # counted as processed, but not inserted (fast-path returns true)
+      # counted as processed, but not inserted (fast-path returns true)
+      assert count2 == 1
 
       db_messages2 = Messages.list_messages_for_session(session.id)
-      assert length(db_messages2) == 1  # no duplicate created
+      # no duplicate created
+      assert length(db_messages2) == 1
     end
 
     test "skips dm_already_recorded? path (user msg matches recent inbound DM body)", %{
@@ -196,10 +198,12 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "codex")
-      assert count == 1  # counted as processed, but skipped by dm_already_recorded?
+      # counted as processed, but skipped by dm_already_recorded?
+      assert count == 1
 
       db_messages = Messages.list_messages_for_session(session.id)
-      assert length(db_messages) == 1  # only the inbound DM exists
+      # only the inbound DM exists
+      assert length(db_messages) == 1
       assert hd(db_messages).sender_role == "agent"
     end
 
@@ -224,7 +228,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
         })
 
       messages = [
-        %{uuid: Ecto.UUID.generate(), role: "user", content: "old DM body", timestamp: nil, usage: nil}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "user",
+          content: "old DM body",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count =
@@ -297,7 +307,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
         })
 
       messages = [
-        %{uuid: Ecto.UUID.generate(), role: "user", content: "recent DM body", timestamp: nil, usage: nil}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "user",
+          content: "recent DM body",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "codex")
@@ -336,7 +352,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       jsonl_uuid = Ecto.UUID.generate()
 
       messages = [
-        %{uuid: jsonl_uuid, role: "assistant", content: "The final answer is 42.", timestamp: nil, usage: nil}
+        %{
+          uuid: jsonl_uuid,
+          role: "assistant",
+          content: "The final answer is 42.",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
@@ -372,7 +394,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       jsonl_uuid = Ecto.UUID.generate()
 
       messages = [
-        %{uuid: jsonl_uuid, role: "assistant", content: "Earlier reply.", timestamp: nil, usage: nil}
+        %{
+          uuid: jsonl_uuid,
+          role: "assistant",
+          content: "Earlier reply.",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
@@ -406,7 +434,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       jsonl_uuid = Ecto.UUID.generate()
 
       messages = [
-        %{uuid: jsonl_uuid, role: "assistant", content: "Some agent output.", timestamp: nil, usage: nil}
+        %{
+          uuid: jsonl_uuid,
+          role: "assistant",
+          content: "Some agent output.",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count =
@@ -431,9 +465,27 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       body = "Batch duplicate body"
 
       messages = [
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil},
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil},
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: body,
+          timestamp: nil,
+          usage: nil
+        },
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: body,
+          timestamp: nil,
+          usage: nil
+        },
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: body,
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
@@ -463,8 +515,20 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
         })
 
       messages = [
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil},
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: body, timestamp: nil, usage: nil}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: body,
+          timestamp: nil,
+          usage: nil
+        },
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: body,
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
@@ -515,7 +579,13 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       jsonl_uuid = Ecto.UUID.generate()
 
       messages = [
-        %{uuid: jsonl_uuid, role: "assistant", content: "Hello from agent.", timestamp: nil, usage: nil}
+        %{
+          uuid: jsonl_uuid,
+          role: "assistant",
+          content: "Hello from agent.",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count =

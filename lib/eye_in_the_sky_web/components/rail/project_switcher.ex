@@ -41,7 +41,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
         >
           <div class={[
             "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold",
-            if(ws_selected, do: "bg-primary text-white", else: "bg-base-content/10 text-base-content/60")
+            if(ws_selected,
+              do: "bg-primary text-white",
+              else: "bg-base-content/10 text-base-content/60"
+            )
           ]}>
             <.icon name="hero-squares-2x2-mini" class="size-3.5" />
           </div>
@@ -60,7 +63,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       </div>
       <div class="p-1.5 max-h-48 overflow-y-auto">
         <%= for project <- @projects do %>
-          <% selected = @scope_type == :project && not is_nil(@sidebar_project) && @sidebar_project.id == project.id %>
+          <% selected =
+            @scope_type == :project && not is_nil(@sidebar_project) &&
+              @sidebar_project.id == project.id %>
           <button
             phx-click="select_project"
             phx-value-project_id={project.id}
@@ -75,7 +80,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
           >
             <div class={[
               "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold",
-              if(selected, do: "bg-primary text-white", else: "bg-base-content/10 text-base-content/60")
+              if(selected,
+                do: "bg-primary text-white",
+                else: "bg-base-content/10 text-base-content/60"
+              )
             ]}>
               {project_initial(project)}
             </div>
@@ -94,11 +102,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
             phx-target={@myself}
             class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-base-content/50 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
           >
-            <.icon name="hero-plus-mini" class="size-3.5" />
-            New project
+            <.icon name="hero-plus-mini" class="size-3.5" /> New project
           </button>
         <% else %>
-          <form phx-submit="create_project" phx-target={@myself} class="flex items-center gap-1 px-2 py-1">
+          <form
+            phx-submit="create_project"
+            phx-target={@myself}
+            class="flex items-center gap-1 px-2 py-1"
+          >
             <input
               type="text"
               name="path"
@@ -131,5 +142,4 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
     </div>
     """
   end
-
 end

@@ -98,9 +98,7 @@ defmodule EyeInTheSky.Projects do
   defp inject_workspace_id_if_missing(%{workspace_id: id} = attrs) when not is_nil(id), do: attrs
 
   defp inject_workspace_id_if_missing(attrs) do
-    case Repo.one(
-           from w in EyeInTheSky.Workspaces.Workspace, order_by: [asc: :id], limit: 1
-         ) do
+    case Repo.one(from w in EyeInTheSky.Workspaces.Workspace, order_by: [asc: :id], limit: 1) do
       nil -> attrs
       workspace -> Map.put(attrs, :workspace_id, workspace.id)
     end

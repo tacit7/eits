@@ -101,8 +101,7 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
             )}
           title="Filter"
         >
-          <.icon name="hero-funnel-mini" class="size-3.5" />
-          Filters
+          <.icon name="hero-funnel-mini" class="size-3.5" /> Filters
           <%= if @active_filter_count && @active_filter_count > 0 do %>
             <span class="inline-flex items-center justify-center size-4 rounded-full bg-primary text-primary-content text-nano font-bold">
               {@active_filter_count}

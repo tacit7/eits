@@ -173,7 +173,6 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   attr :schedule_value, :string, required: true
 
   defp interval_fields(assigns) do
-
     ~H"""
     <div class="form-control">
       <label class="label">
@@ -479,8 +478,6 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     </div>
     """
   end
-
-
 
   defp decode_job_config(raw) when is_map(raw), do: raw
 

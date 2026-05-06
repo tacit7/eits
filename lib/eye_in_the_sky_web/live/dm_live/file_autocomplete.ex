@@ -10,6 +10,8 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocomplete do
   @root_excluded_dirs ~w(.git node_modules deps _build .elixir_ls .tmp)
   @max_entries 50
 
+  alias EyeInTheSkyWeb.Helpers.FileHelpers
+
   @doc """
   Lists filesystem entries for the given partial path and root type.
 
@@ -41,23 +43,20 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocomplete do
   end
 
   @doc """
-  Returns true when `path` is equal to `root` or a direct descendant.
-  Handles filesystem root `/` without producing the `//` double-slash bug.
+  Returns true when `path` is equal to `root` or safely contained in `root`,
+  resolving symlinks via realpath to prevent traversal escapes.
   """
   @spec under_root?(String.t(), String.t()) :: boolean()
   def under_root?(path, root) do
-    expanded_path = Path.expand(path)
-    expanded_root = Path.expand(root)
-
-    cond do
-      expanded_root == "/" ->
-        String.starts_with?(expanded_path, "/")
-
-      expanded_path == expanded_root ->
-        true
-
-      true ->
-        String.starts_with?(expanded_path, expanded_root <> "/")
+    with {:ok, real_path} <- FileHelpers.safe_realpath(path),
+         {:ok, real_root} <- FileHelpers.safe_realpath(root) do
+      cond do
+        real_root == "/" -> String.starts_with?(real_path, "/")
+        real_path == real_root -> true
+        true -> FileHelpers.path_within?(real_path, real_root)
+      end
+    else
+      {:error, _} -> false
     end
   end
 
@@ -114,7 +113,13 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocomplete do
         is_dir = File.dir?(Path.join(target, name))
         rel_path = if dir_part == "", do: name, else: "#{dir_part}/#{name}"
         rel_path = if is_dir, do: "#{rel_path}/", else: rel_path
-        %{name: name, path: rel_path, insert_text: build_insert_text(rel_path, root_type), is_dir: is_dir}
+
+        %{
+          name: name,
+          path: rel_path,
+          insert_text: build_insert_text(rel_path, root_type),
+          is_dir: is_dir
+        }
       end)
       |> Enum.sort_by(&{!&1.is_dir, &1.name})
 

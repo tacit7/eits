@@ -127,11 +127,13 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     end)
     |> then(fn a ->
       if status && status != "waiting" && !params["status_reason"],
-        do: Map.put(a, :status_reason, nil), else: a
+        do: Map.put(a, :status_reason, nil),
+        else: a
     end)
     |> then(fn a ->
       if status in Sessions.terminated_statuses(),
-        do: Map.put(a, :ended_at, params["ended_at"] || DateTime.utc_now()), else: a
+        do: Map.put(a, :ended_at, params["ended_at"] || DateTime.utc_now()),
+        else: a
     end)
   end
 
@@ -177,8 +179,12 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
             tasks_by_session
             |> Map.get(s.id, [])
             |> Enum.map(fn t ->
-              %{id: t.id, title: t.title, state_id: t.state_id,
-                state: if(t.state, do: t.state.name, else: nil)}
+              %{
+                id: t.id,
+                title: t.title,
+                state_id: t.state_id,
+                state: if(t.state, do: t.state.name, else: nil)
+              }
             end)
 
           Map.put(ApiPresenter.present_session(s), :tasks, task_list)
@@ -291,6 +297,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       Logger.warning(
         "sync_member_status failed for session #{session_id}: #{inspect(e)}\n#{Exception.format_stacktrace(__STACKTRACE__)}"
       )
+
       false
   end
 
@@ -417,16 +424,23 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
   defp normalize_metadata(nil), do: %{}
   defp normalize_metadata(m) when is_map(m), do: m
+
   defp normalize_metadata(s) when is_binary(s) do
     case Jason.decode(s) do
       {:ok, m} when is_map(m) -> m
       _ -> %{}
     end
   end
+
   defp normalize_metadata(_), do: %{}
 
   defp do_upsert_context(conn, session, context, metadata) do
-    attrs = %{agent_id: session.agent_id, session_id: session.id, context: context, metadata: metadata}
+    attrs = %{
+      agent_id: session.agent_id,
+      session_id: session.id,
+      context: context,
+      metadata: metadata
+    }
 
     case Contexts.upsert_session_context(attrs) do
       {:ok, sc} ->
@@ -463,8 +477,13 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
   defp maybe_put_read_only(attrs, nil), do: attrs
   defp maybe_put_read_only(attrs, ""), do: attrs
-  defp maybe_put_read_only(attrs, val) when val in [true, "true", "1", 1], do: Map.put(attrs, :read_only, true)
-  defp maybe_put_read_only(attrs, val) when val in [false, "false", "0", 0], do: Map.put(attrs, :read_only, false)
+
+  defp maybe_put_read_only(attrs, val) when val in [true, "true", "1", 1],
+    do: Map.put(attrs, :read_only, true)
+
+  defp maybe_put_read_only(attrs, val) when val in [false, "false", "0", 0],
+    do: Map.put(attrs, :read_only, false)
+
   defp maybe_put_read_only(attrs, _), do: attrs
 
   defp maybe_put_session_opt(opts, _key, nil), do: opts
@@ -485,10 +504,15 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
     include_archived = params["include_archived"] in ["true", "1", true]
     name = if params["name"] && params["name"] != "", do: params["name"]
-    agent_def_slug = if params["agent_def_slug"] && params["agent_def_slug"] != "", do: params["agent_def_slug"]
+
+    agent_def_slug =
+      if params["agent_def_slug"] && params["agent_def_slug"] != "", do: params["agent_def_slug"]
 
     [search_query: params["q"] || ""]
-    |> maybe_put_session_opt(:project_id, params["project_id"] && parse_int(params["project_id"], nil))
+    |> maybe_put_session_opt(
+      :project_id,
+      params["project_id"] && parse_int(params["project_id"], nil)
+    )
     |> maybe_put_session_opt(:status_filter, params["status"])
     |> maybe_put_session_opt(:agent_id, agent_int_id)
     |> maybe_put_session_opt(:parent_session_id, parent_session_int_id)
@@ -497,5 +521,4 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     |> maybe_put_session_opt(:agent_def_slug, agent_def_slug)
     |> Keyword.put(:limit, parse_int(params["limit"], 20))
   end
-
 end

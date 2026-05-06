@@ -103,8 +103,7 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
             {:ok, DateTime.add(DateTime.utc_now(), -seconds, :second)}
 
           nil ->
-            {:error,
-             "Invalid duration '#{str}'. Use Nh/Nd/Nm (e.g. 24h, 7d, 30m) or ISO8601."}
+            {:error, "Invalid duration '#{str}'. Use Nh/Nd/Nm (e.g. 24h, 7d, 30m) or ISO8601."}
         end
     end
   end

@@ -145,8 +145,11 @@ defmodule EyeInTheSky.Teams do
         # picks the most-recent in-progress task per session in one pass,
         # replacing the previous Elixir-side reduce that relied on PG sort order.
         from(t in EitsTask,
-          join: ts in "task_sessions", on: ts.task_id == t.id,
-          where: ts.session_id in ^session_ids and t.state_id == ^WorkflowState.in_progress_id() and t.archived == false,
+          join: ts in "task_sessions",
+          on: ts.task_id == t.id,
+          where:
+            ts.session_id in ^session_ids and t.state_id == ^WorkflowState.in_progress_id() and
+              t.archived == false,
           distinct: [asc: ts.session_id],
           order_by: [asc: ts.session_id, desc: t.updated_at],
           select: {ts.session_id, %{id: t.id, title: t.title, state_id: t.state_id}}

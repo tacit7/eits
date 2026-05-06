@@ -535,41 +535,65 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def custom_icon(%{name: "lucide-robot"} = assigns) do
     ~H"""
-    <svg class={@class} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M12 8V4H8"/>
-      <rect width="16" height="12" x="4" y="8" rx="2"/>
-      <path d="M2 14h2"/>
-      <path d="M20 14h2"/>
-      <path d="M15 13v2"/>
-      <path d="M9 13v2"/>
+    <svg
+      class={@class}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2" />
+      <path d="M20 14h2" />
+      <path d="M15 13v2" />
+      <path d="M9 13v2" />
     </svg>
     """
   end
 
   def custom_icon(%{name: "lucide-bot-message-square"} = assigns) do
     ~H"""
-    <svg class={@class} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M12 6V2H8"/>
-      <path d="m8 18-4 4V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2Z"/>
-      <path d="M2 12h2"/>
-      <path d="M9 11v2"/>
-      <path d="M15 11v2"/>
-      <path d="M20 12h2"/>
+    <svg
+      class={@class}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 6V2H8" />
+      <path d="m8 18-4 4V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2Z" />
+      <path d="M2 12h2" />
+      <path d="M9 11v2" />
+      <path d="M15 11v2" />
+      <path d="M20 12h2" />
     </svg>
     """
   end
 
   def custom_icon(%{name: "lucide-kanban"} = assigns) do
     ~H"""
-    <svg class={@class} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-         fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <rect width="18" height="18" x="3" y="3" rx="2"/>
-      <path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>
+    <svg
+      class={@class}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M8 7v7" /><path d="M12 7v4" /><path d="M16 7v9" />
     </svg>
     """
   end
@@ -758,7 +782,11 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     ~H"""
     <div class={["flex items-center justify-between mb-6", @class]}>
       <h2 class="text-xl font-semibold">{@title}</h2>
-      <button phx-click={@toggle_event} phx-target={@phx_target} class="btn btn-ghost btn-sm btn-circle">
+      <button
+        phx-click={@toggle_event}
+        phx-target={@phx_target}
+        class="btn btn-ghost btn-sm btn-circle"
+      >
         <.icon name="hero-x-mark" class="size-4" />
       </button>
     </div>
@@ -917,7 +945,11 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def spinner(assigns) do
     ~H"""
-    <span class={"loading loading-spinner loading-#{@size} #{@class}"} aria-label="Loading" role="status" />
+    <span
+      class={"loading loading-spinner loading-#{@size} #{@class}"}
+      aria-label="Loading"
+      role="status"
+    />
     """
   end
 
@@ -983,7 +1015,9 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def status_badge(assigns) do
     assigns =
-      assign(assigns, :label_text,
+      assign(
+        assigns,
+        :label_text,
         assigns[:label] || assigns.status |> Atom.to_string() |> String.replace("_", " ")
       )
 
@@ -1092,7 +1126,6 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     """
   end
 
-
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do
@@ -1162,6 +1195,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_dot_color(:failed), do: "bg-base-content/15"
   defp status_dot_color(:stopped), do: "bg-base-content/15"
   defp status_dot_color(:compacting), do: "bg-orange-500"
+
   defp status_dot_color(s) when is_binary(s) do
     case s do
       "working" -> "bg-success"
@@ -1176,6 +1210,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       _ -> "bg-base-content/25"
     end
   end
+
   defp status_dot_color(_), do: "bg-base-content/25"
 
   defp status_badge_color(:working), do: "badge-success"
@@ -1187,6 +1222,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_badge_color(:failed), do: "badge-error"
   defp status_badge_color(:stopped), do: "badge-ghost"
   defp status_badge_color(:archived), do: "badge-ghost"
+
   defp status_badge_color(s) when is_binary(s) do
     case s do
       "working" -> "badge-success"
@@ -1200,6 +1236,6 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       _ -> "badge-ghost"
     end
   end
-  defp status_badge_color(_), do: "badge-ghost"
 
+  defp status_badge_color(_), do: "badge-ghost"
 end

@@ -180,7 +180,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
     project_scoped = is_nil(type_str) or type_str == "project"
 
     opts = [limit: 50]
-    opts = if project && project_scoped, do: Keyword.put(opts, :project_id, project.id), else: opts
+
+    opts =
+      if project && project_scoped, do: Keyword.put(opts, :project_id, project.id), else: opts
+
     opts = if type_str, do: Keyword.put(opts, :type_filter, type_str), else: opts
 
     notes = Notes.list_notes_filtered(opts)
@@ -259,6 +262,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
     cond do
       search != "" ->
         prompts = Prompts.search_prompts(search, project_id)
+
         filter_prompts_by_scope(prompts, scope, project_id)
         |> Enum.take(30)
 
@@ -287,7 +291,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   defp filter_prompts_by_scope(prompts, _scope, _project_id), do: prompts
 
   def maybe_load_sessions(socket, :sessions, project) do
-    assign(socket, :flyout_sessions,
+    assign(
+      socket,
+      :flyout_sessions,
       load_flyout_sessions(
         project,
         socket.assigns[:session_sort] || :last_activity,

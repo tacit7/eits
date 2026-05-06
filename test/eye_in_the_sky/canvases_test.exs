@@ -49,6 +49,7 @@ defmodule EyeInTheSky.CanvasesTest do
         %CanvasSession{pos_x: 0, pos_y: 0, width: 320, height: 260},
         %CanvasSession{pos_x: 0, pos_y: 0, width: 320, height: 260}
       ]
+
       [first, second] = apply_sentinel_offset(sessions)
       assert first.pos_x == 24
       assert second.pos_x == 56
@@ -71,7 +72,12 @@ defmodule EyeInTheSky.CanvasesTest do
 
     test "persists integer layout attrs", %{cs: cs} do
       assert {:ok, updated} =
-               Canvases.update_window_layout(cs.id, %{pos_x: 10, pos_y: 20, width: 400, height: 300})
+               Canvases.update_window_layout(cs.id, %{
+                 pos_x: 10,
+                 pos_y: 20,
+                 width: 400,
+                 height: 300
+               })
 
       assert updated.pos_x == 10
       assert updated.pos_y == 20

@@ -10,9 +10,9 @@ defmodule EyeInTheSky.Repo.Migrations.AddCanvasSessionsSessionIdIndex do
 
   def up do
     create_if_not_exists index(:canvas_sessions, [:session_id],
-                            name: :canvas_sessions_session_id_idx,
-                            concurrently: true
-                          )
+                           name: :canvas_sessions_session_id_idx,
+                           concurrently: true
+                         )
   end
 
   def down do

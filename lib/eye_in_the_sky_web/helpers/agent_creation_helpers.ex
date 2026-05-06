@@ -61,11 +61,20 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
       |> maybe_opt(:debug, params["debug"])
       |> maybe_opt(:bare, if(params["bare"] == "true", do: true))
       |> maybe_opt(:verbose, if(params["verbose"] == "true", do: true))
-      |> maybe_opt(:include_partial_messages, if(params["include_partial_messages"] == "true", do: true))
-      |> maybe_opt(:no_session_persistence, if(params["no_session_persistence"] == "true", do: true))
+      |> maybe_opt(
+        :include_partial_messages,
+        if(params["include_partial_messages"] == "true", do: true)
+      )
+      |> maybe_opt(
+        :no_session_persistence,
+        if(params["no_session_persistence"] == "true", do: true)
+      )
       |> maybe_opt(:chrome, if(params["chrome"] == "true", do: true))
       |> maybe_opt(:sandbox, if(params["sandbox"] == "true", do: true))
-      |> maybe_opt(:skip_permissions, if(params["dangerously_skip_permissions"] == "true", do: true))
+      |> maybe_opt(
+        :skip_permissions,
+        if(params["dangerously_skip_permissions"] == "true", do: true)
+      )
 
     base = [
       agent_type: params["agent_type"] || "claude",

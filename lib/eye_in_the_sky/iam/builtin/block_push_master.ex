@@ -57,7 +57,10 @@ defmodule EyeInTheSky.IAM.Builtin.BlockPushMaster do
     end
   rescue
     e in ErlangError ->
-      Logger.warning("BlockPushMaster: failed to determine current branch in #{cwd}: #{inspect(e)}")
+      Logger.warning(
+        "BlockPushMaster: failed to determine current branch in #{cwd}: #{inspect(e)}"
+      )
+
       false
   end
 

@@ -189,7 +189,9 @@ defmodule EyeInTheSky.AccountsTest do
 
       # Back-date the expiry to the past via direct Repo update
       expired_at =
-        NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second) |> NaiveDateTime.add(-60, :second)
+        NaiveDateTime.utc_now()
+        |> NaiveDateTime.truncate(:second)
+        |> NaiveDateTime.add(-60, :second)
 
       Repo.update!(Ecto.Changeset.change(rt, expires_at: expired_at))
 
@@ -222,8 +224,11 @@ defmodule EyeInTheSky.AccountsTest do
     test "returns error for expired token and still deletes it" do
       username = "consume_expired_#{uniq()}"
       {:ok, raw_token, rt} = Accounts.create_registration_token(username)
+
       expired_at =
-        NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second) |> NaiveDateTime.add(-60, :second)
+        NaiveDateTime.utc_now()
+        |> NaiveDateTime.truncate(:second)
+        |> NaiveDateTime.add(-60, :second)
 
       Repo.update!(Ecto.Changeset.change(rt, expires_at: expired_at))
 
@@ -255,7 +260,10 @@ defmodule EyeInTheSky.AccountsTest do
       {:ok, user} = Accounts.get_or_create_user("sess_ttl_#{uniq()}")
       {:ok, token} = Accounts.create_user_session(user.id)
       session = Repo.get_by!(UserSession, session_token: token)
-      diff_days = NaiveDateTime.diff(session.expires_at, NaiveDateTime.utc_now(), :second) / 86_400
+
+      diff_days =
+        NaiveDateTime.diff(session.expires_at, NaiveDateTime.utc_now(), :second) / 86_400
+
       assert diff_days > 6.9 and diff_days <= 7.1
     end
   end
@@ -276,8 +284,11 @@ defmodule EyeInTheSky.AccountsTest do
       {:ok, user} = Accounts.get_or_create_user("sess_expired_#{uniq()}")
       {:ok, token} = Accounts.create_user_session(user.id)
       session = Repo.get_by!(UserSession, session_token: token)
+
       expired_at =
-        NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second) |> NaiveDateTime.add(-3600, :second)
+        NaiveDateTime.utc_now()
+        |> NaiveDateTime.truncate(:second)
+        |> NaiveDateTime.add(-3600, :second)
 
       Repo.update!(Ecto.Changeset.change(session, expires_at: expired_at))
       assert {:error, :expired} = Accounts.get_valid_user_session(token)

@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.CspHeaderTest do
       script_src = Regex.run(~r/script-src[^;]+/, csp) |> List.first()
       assert script_src, "script-src directive missing"
       assert String.contains?(script_src, "'nonce-"), "nonce not in script-src"
+
       refute String.contains?(script_src, "'unsafe-inline'"),
              "unsafe-inline still present in script-src"
     end
@@ -25,6 +26,7 @@ defmodule EyeInTheSkyWeb.CspHeaderTest do
       assert nonce, "no nonce attribute found on script tag in HTML"
 
       csp = get_resp_header(conn, "content-security-policy") |> List.first()
+
       assert String.contains?(csp, "'nonce-#{nonce}'"),
              "CSP header nonce does not match HTML script nonce"
     end

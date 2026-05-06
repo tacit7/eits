@@ -142,7 +142,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
         <div class="flex items-center gap-3">
           <.icon name="hero-shield-check" class="size-6 text-primary" />
           <h1 class="text-2xl font-bold">IAM Policies</h1>
-          <span class="badge badge-ghost"><%= length(@policies) %></span>
+          <span class="badge badge-ghost">{length(@policies)}</span>
         </div>
 
         <div class="flex items-center gap-2">
@@ -157,14 +157,31 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
 
       <section class="card bg-base-200">
         <div class="card-body p-4">
-          <form id="iam-policies-filter" phx-change="filter" phx-submit="filter" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+          <form
+            id="iam-policies-filter"
+            phx-change="filter"
+            phx-submit="filter"
+            class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"
+          >
             <label class="form-control">
               <span class="label-text text-xs">Agent type</span>
-              <input type="text" name="filters[agent_type]" value={@filters["agent_type"]} placeholder="any" class="input input-bordered input-sm" />
+              <input
+                type="text"
+                name="filters[agent_type]"
+                value={@filters["agent_type"]}
+                placeholder="any"
+                class="input input-bordered input-sm"
+              />
             </label>
             <label class="form-control">
               <span class="label-text text-xs">Action</span>
-              <input type="text" name="filters[action]" value={@filters["action"]} placeholder="any" class="input input-bordered input-sm" />
+              <input
+                type="text"
+                name="filters[action]"
+                value={@filters["action"]}
+                placeholder="any"
+                class="input input-bordered input-sm"
+              />
             </label>
             <label class="form-control">
               <span class="label-text text-xs">Effect</span>
@@ -183,7 +200,9 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                 <option value="false" selected={@filters["enabled"] == "false"}>disabled</option>
               </select>
             </label>
-            <button type="button" class="btn btn-ghost btn-sm" phx-click="reset_filters">Reset</button>
+            <button type="button" class="btn btn-ghost btn-sm" phx-click="reset_filters">
+              Reset
+            </button>
           </form>
         </div>
       </section>
@@ -215,19 +234,19 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                 <% end %>
                 <%= for p <- @policies do %>
                   <tr id={"policy-#{p.id}"}>
-                    <td class="font-mono text-xs"><%= p.priority %></td>
+                    <td class="font-mono text-xs">{p.priority}</td>
                     <td>
-                      <div class="font-medium"><%= p.name %></div>
+                      <div class="font-medium">{p.name}</div>
                       <%= if p.system_key do %>
-                        <div class="text-xs text-base-content/60 font-mono"><%= p.system_key %></div>
+                        <div class="text-xs text-base-content/60 font-mono">{p.system_key}</div>
                       <% end %>
                     </td>
                     <td>
-                      <span class={"badge badge-sm " <> effect_badge(p.effect)}><%= p.effect %></span>
+                      <span class={"badge badge-sm " <> effect_badge(p.effect)}>{p.effect}</span>
                     </td>
-                    <td class="font-mono text-xs"><%= p.agent_type %></td>
-                    <td class="font-mono text-xs"><%= p.action %></td>
-                    <td class="font-mono text-xs"><%= p.resource_glob || "—" %></td>
+                    <td class="font-mono text-xs">{p.agent_type}</td>
+                    <td class="font-mono text-xs">{p.action}</td>
+                    <td class="font-mono text-xs">{p.resource_glob || "—"}</td>
                     <td>
                       <button
                         type="button"
@@ -236,8 +255,11 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                         phx-value-enabled={to_string(not p.enabled)}
                         class={"btn btn-xs " <> (if p.enabled, do: "btn-success", else: "btn-ghost")}
                       >
-                        <.icon name={if p.enabled, do: "hero-check-circle", else: "hero-x-circle"} class="size-4" />
-                        <%= if p.enabled, do: "on", else: "off" %>
+                        <.icon
+                          name={if p.enabled, do: "hero-check-circle", else: "hero-x-circle"}
+                          class="size-4"
+                        />
+                        {if p.enabled, do: "on", else: "off"}
                       </button>
                     </td>
                     <td>
@@ -254,7 +276,12 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                         <.icon name="hero-pencil-square" class="size-4" /> Edit
                       </.link>
                       <%= if p.system_key do %>
-                        <button type="button" class="btn btn-ghost btn-xs btn-disabled" disabled title="System policies cannot be deleted">
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-xs btn-disabled"
+                          disabled
+                          title="System policies cannot be deleted"
+                        >
                           <.icon name="hero-trash" class="size-4" />
                         </button>
                       <% else %>

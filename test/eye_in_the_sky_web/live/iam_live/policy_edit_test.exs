@@ -105,7 +105,9 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEditTest do
       refute has_element?(view, "input[name='policy[message]'][disabled]")
     end
 
-    test "server-side changeset rejects locked-field edits even if the UI is bypassed", %{conn: _conn} do
+    test "server-side changeset rejects locked-field edits even if the UI is bypassed", %{
+      conn: _conn
+    } do
       p = system_policy!()
 
       # Simulate a client bypassing the disabled attributes (e.g. devtools).

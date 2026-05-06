@@ -12,7 +12,10 @@ defmodule EyeInTheSky.Canvases do
 
   def list_canvases_preloaded(opts \\ []) do
     limit = Keyword.get(opts, :limit, 500)
-    Repo.all(from c in Canvas, order_by: [asc: c.inserted_at], preload: :canvas_sessions, limit: ^limit)
+
+    Repo.all(
+      from c in Canvas, order_by: [asc: c.inserted_at], preload: :canvas_sessions, limit: ^limit
+    )
   end
 
   def get_canvas(id) do

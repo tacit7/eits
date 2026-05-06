@@ -130,5 +130,7 @@ defmodule EyeInTheSkyWeb.TopBar.Skills do
 
   defp type_label(v), do: Enum.find_value(type_options(), "All", fn {k, l} -> k == v && l end)
   defp scope_label(v), do: Enum.find_value(scope_options(), "All", fn {k, l} -> k == v && l end)
-  defp sort_label(v), do: Enum.find_value(sort_options(), "Name A–Z", fn {k, l} -> k == v && l end)
+
+  defp sort_label(v),
+    do: Enum.find_value(sort_options(), "Name A–Z", fn {k, l} -> k == v && l end)
 end

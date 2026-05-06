@@ -47,7 +47,10 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       id={"session-row-#{@session.id}"}
       class={[
         "relative group/row",
-        if(@selected, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg", else: "bg-base-100")
+        if(@selected,
+          do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg",
+          else: "bg-base-100"
+        )
       ]}
     >
       <%!--
@@ -62,7 +65,8 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
           "left-4 sm:left-[-0.875rem]",
           if(@select_mode,
             do: "opacity-100 scale-100",
-            else: "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
+            else:
+              "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
           )
         ]}
         aria-hidden={to_string(!@select_mode)}
@@ -90,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         data-vim-item-id={@session.id}
         data-vim-item-title={@session.name || "Unnamed session"}
         data-vim-item-url={"/dm/#{@session.id}"}
-        data-vim-rename-target={"input[name='name']"}
+        data-vim-rename-target="input[name='name']"
         data-session-id={@session.id}
         data-session-uuid={@session.uuid}
         phx-click={if @select_mode, do: "toggle_select", else: @click_event}
@@ -180,8 +184,12 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
   # unloaded associations and nil values.
   defp agent_display_name(session) do
     case Map.get(session, :agent) do
-      nil -> nil
-      %Ecto.Association.NotLoaded{} -> nil
+      nil ->
+        nil
+
+      %Ecto.Association.NotLoaded{} ->
+        nil
+
       agent ->
         case Map.get(agent, :agent_definition) do
           nil -> nil

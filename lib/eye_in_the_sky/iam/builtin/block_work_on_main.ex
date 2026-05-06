@@ -56,14 +56,20 @@ defmodule EyeInTheSky.IAM.Builtin.BlockWorkOnMain do
         String.trim(out)
 
       _ ->
-        case System.cmd("git", ["rev-parse", "--abbrev-ref", "HEAD"], cd: cwd, stderr_to_stdout: true) do
+        case System.cmd("git", ["rev-parse", "--abbrev-ref", "HEAD"],
+               cd: cwd,
+               stderr_to_stdout: true
+             ) do
           {out, 0} -> String.trim(out)
           _ -> nil
         end
     end
   rescue
     e in ErlangError ->
-      Logger.warning("BlockWorkOnMain: failed to determine current branch in #{cwd}: #{inspect(e)}")
+      Logger.warning(
+        "BlockWorkOnMain: failed to determine current branch in #{cwd}: #{inspect(e)}"
+      )
+
       nil
   end
 

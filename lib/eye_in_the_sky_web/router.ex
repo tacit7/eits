@@ -37,7 +37,8 @@ defmodule EyeInTheSkyWeb.Router do
     end
   else
     defp build_csp(nonce) do
-      script_src = if nonce, do: "script-src 'self' 'nonce-#{nonce}'; ", else: "script-src 'self'; "
+      script_src =
+        if nonce, do: "script-src 'self' 'nonce-#{nonce}'; ", else: "script-src 'self'; "
 
       "default-src 'self'; " <>
         script_src <>
@@ -60,6 +61,7 @@ defmodule EyeInTheSkyWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+
     # plug Plug.Logger, log: :error  # disabled — log: :error logs ALL requests at error level, not just errors
     plug EyeInTheSkyWeb.Plugs.RateLimit, default: {60, :timer.minutes(1)}
     plug EyeInTheSkyWeb.Plugs.RequireAuth
@@ -68,6 +70,7 @@ defmodule EyeInTheSkyWeb.Router do
   # Unauthenticated JSON pipeline for inbound webhooks (auth handled per-controller)
   pipeline :accepts_json do
     plug :accepts, ["json"]
+
     # plug Plug.Logger, log: :error  # disabled — log: :error logs ALL requests at error level, not just errors
   end
 
@@ -75,6 +78,7 @@ defmodule EyeInTheSkyWeb.Router do
   # (registration is token-gated; login uses WebAuthn challenge binding)
   pipeline :webauthn do
     plug :accepts, ["json"]
+
     # plug Plug.Logger, log: :error  # disabled — log: :error logs ALL requests at error level, not just errors
     plug :fetch_session
     plug EyeInTheSkyWeb.Plugs.RateLimit
@@ -85,6 +89,7 @@ defmodule EyeInTheSkyWeb.Router do
   # a valid authenticated session. Returns JSON 401 (not redirect) on auth failure.
   pipeline :browser_json do
     plug :accepts, ["json"]
+
     # plug Plug.Logger, log: :error  # disabled — log: :error logs ALL requests at error level, not just errors
     plug :fetch_session
     plug EyeInTheSkyWeb.Plugs.JsonSessionAuth
@@ -293,7 +298,6 @@ defmodule EyeInTheSkyWeb.Router do
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
     post "/teams/:team_id/broadcast", TeamController, :broadcast
-
   end
 
   # IAM hook endpoint — unauthenticated (hooks run in Claude CLI process with no user session)

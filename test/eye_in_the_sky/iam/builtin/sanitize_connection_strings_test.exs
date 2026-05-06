@@ -64,7 +64,10 @@ defmodule EyeInTheSky.IAM.Builtin.SanitizeConnectionStringsTest do
   end
 
   test "does not match plain text with no URI" do
-    refute SanitizeConnectionStrings.matches?(%Policy{}, ctx("connected to database successfully"))
+    refute SanitizeConnectionStrings.matches?(
+             %Policy{},
+             ctx("connected to database successfully")
+           )
   end
 
   test "does not match when tool_response is nil" do

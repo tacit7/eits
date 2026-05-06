@@ -73,7 +73,12 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
           sender: String.t(),
           body: String.t()
         }) :: String.t()
-  def build_prompt(%{mode: mode, channel: %{id: channel_id, name: channel_name}, sender: sender, body: body}) do
+  def build_prompt(%{
+        mode: mode,
+        channel: %{id: channel_id, name: channel_name},
+        sender: sender,
+        body: body
+      }) do
     mode_str = Atom.to_string(mode)
 
     instruction =

@@ -188,14 +188,32 @@ defmodule EyeInTheSky.AgentDefinitions do
     :erlang.phash2({:agent_def_sync, scope, project_id})
   end
 
-  defp sync_one(file_path, slug, %{scope: scope, project_id: project_id, now: now, existing_map: existing_map}) do
+  defp sync_one(file_path, slug, %{
+         scope: scope,
+         project_id: project_id,
+         now: now,
+         existing_map: existing_map
+       }) do
     case File.read(file_path) do
-      {:error, _} -> {:error, :missing}
-      {:ok, content} -> sync_one_content(file_path, content, slug, %{scope: scope, project_id: project_id, now: now, existing_map: existing_map})
+      {:error, _} ->
+        {:error, :missing}
+
+      {:ok, content} ->
+        sync_one_content(file_path, content, slug, %{
+          scope: scope,
+          project_id: project_id,
+          now: now,
+          existing_map: existing_map
+        })
     end
   end
 
-  defp sync_one_content(file_path, content, slug, %{scope: scope, project_id: project_id, now: now, existing_map: existing_map}) do
+  defp sync_one_content(file_path, content, slug, %{
+         scope: scope,
+         project_id: project_id,
+         now: now,
+         existing_map: existing_map
+       }) do
     checksum = :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
 
     existing = Map.get(existing_map, slug)

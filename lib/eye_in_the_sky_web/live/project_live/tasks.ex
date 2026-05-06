@@ -265,7 +265,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           >
             <.icon name="hero-funnel-mini" class="size-4" />
             <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
-              <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true">
+              <span
+                class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
+                aria-hidden="true"
+              >
               </span>
             <% end %>
           </button>

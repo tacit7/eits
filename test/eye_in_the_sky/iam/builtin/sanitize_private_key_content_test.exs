@@ -12,38 +12,61 @@ defmodule EyeInTheSky.IAM.Builtin.SanitizePrivateKeyContentTest do
   # ── positive matches ────────────────────────────────────────────────────────
 
   test "matches RSA private key header" do
-    assert SanitizePrivateKeyContent.matches?(policy(), post_ctx("-----BEGIN RSA PRIVATE KEY-----\nMIIE..."))
+    assert SanitizePrivateKeyContent.matches?(
+             policy(),
+             post_ctx("-----BEGIN RSA PRIVATE KEY-----\nMIIE...")
+           )
   end
 
   test "matches PKCS8 private key header" do
-    assert SanitizePrivateKeyContent.matches?(policy(), post_ctx("-----BEGIN PRIVATE KEY-----\nMIIE..."))
+    assert SanitizePrivateKeyContent.matches?(
+             policy(),
+             post_ctx("-----BEGIN PRIVATE KEY-----\nMIIE...")
+           )
   end
 
   test "matches EC private key header" do
-    assert SanitizePrivateKeyContent.matches?(policy(), post_ctx("-----BEGIN EC PRIVATE KEY-----\nMHQC..."))
+    assert SanitizePrivateKeyContent.matches?(
+             policy(),
+             post_ctx("-----BEGIN EC PRIVATE KEY-----\nMHQC...")
+           )
   end
 
   test "matches OpenSSH private key header" do
-    assert SanitizePrivateKeyContent.matches?(policy(), post_ctx("-----BEGIN OPENSSH PRIVATE KEY-----\nb3Bl..."))
+    assert SanitizePrivateKeyContent.matches?(
+             policy(),
+             post_ctx("-----BEGIN OPENSSH PRIVATE KEY-----\nb3Bl...")
+           )
   end
 
   test "matches key embedded in larger output" do
-    resp = "file contents:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+    resp =
+      "file contents:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+
     assert SanitizePrivateKeyContent.matches?(policy(), post_ctx(resp))
   end
 
   # ── negative ─────────────────────────────────────────────────────────────────
 
   test "does not match public key" do
-    refute SanitizePrivateKeyContent.matches?(policy(), post_ctx("-----BEGIN PUBLIC KEY-----\nMIIBIjAN..."))
+    refute SanitizePrivateKeyContent.matches?(
+             policy(),
+             post_ctx("-----BEGIN PUBLIC KEY-----\nMIIBIjAN...")
+           )
   end
 
   test "does not match certificate" do
-    refute SanitizePrivateKeyContent.matches?(policy(), post_ctx("-----BEGIN CERTIFICATE-----\nMIID..."))
+    refute SanitizePrivateKeyContent.matches?(
+             policy(),
+             post_ctx("-----BEGIN CERTIFICATE-----\nMIID...")
+           )
   end
 
   test "does not match arbitrary PEM-like text without PRIVATE KEY" do
-    refute SanitizePrivateKeyContent.matches?(policy(), post_ctx("-----BEGIN DH PARAMETERS-----\nMIIB..."))
+    refute SanitizePrivateKeyContent.matches?(
+             policy(),
+             post_ctx("-----BEGIN DH PARAMETERS-----\nMIIB...")
+           )
   end
 
   # ── event / nil guards ──────────────────────────────────────────────────────
@@ -53,6 +76,9 @@ defmodule EyeInTheSky.IAM.Builtin.SanitizePrivateKeyContentTest do
   end
 
   test "does not match when tool_response is nil" do
-    refute SanitizePrivateKeyContent.matches?(policy(), %Context{event: :post_tool_use, tool_response: nil})
+    refute SanitizePrivateKeyContent.matches?(policy(), %Context{
+             event: :post_tool_use,
+             tool_response: nil
+           })
   end
 end

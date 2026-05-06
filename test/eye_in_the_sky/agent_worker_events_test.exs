@@ -55,7 +55,17 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
       assert updated_agent.status == "running"
     end
 
-    test "does not change non-pending agent status" do
+    test "marks idle agent as running" do
+      {agent, session} = create_session()
+      {:ok, _} = Agents.update_agent(agent, %{status: "idle"})
+
+      AgentWorkerEvents.on_sdk_started(session.id, session.uuid)
+
+      {:ok, updated_agent} = Agents.get_agent(agent.id)
+      assert updated_agent.status == "running"
+    end
+
+    test "keeps running agent as running" do
       {agent, session} = create_session()
       {:ok, _} = Agents.update_agent(agent, %{status: "running"})
 
@@ -75,12 +85,22 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
       assert reload_session(session).status == "idle"
     end
 
-    test "sets status to waiting for codex provider so it can be resumed" do
+    test "sets status to idle for codex provider when the turn stops" do
       {_agent, session} = create_session(%{status: "working", provider: "codex"})
 
       AgentWorkerEvents.on_sdk_completed(session.id, session.uuid, "codex")
 
-      assert reload_session(session).status == "waiting"
+      assert reload_session(session).status == "idle"
+    end
+
+    test "marks agent idle when SDK completes" do
+      {agent, session} = create_session(%{status: "working"})
+      {:ok, _} = Agents.update_agent(agent, %{status: "running"})
+
+      AgentWorkerEvents.on_sdk_completed(session.id, session.uuid, "codex")
+
+      {:ok, updated_agent} = Agents.get_agent(agent.id)
+      assert updated_agent.status == "idle"
     end
 
     test "sets last_activity_at when transitioning to idle" do
@@ -107,21 +127,29 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
   describe "on_sdk_errored/2" do
     test "sets session status to idle" do
-      {_agent, session} = create_session(%{status: "working"})
+      {agent, session} = create_session(%{status: "working"})
+      {:ok, _} = Agents.update_agent(agent, %{status: "running"})
 
       AgentWorkerEvents.on_sdk_errored(session.id, session.uuid)
 
       assert reload_session(session).status == "idle"
+
+      {:ok, updated_agent} = Agents.get_agent(agent.id)
+      assert updated_agent.status == "idle"
     end
   end
 
   describe "on_max_retries_exceeded/2" do
     test "sets session status to failed" do
-      {_agent, session} = create_session(%{status: "working"})
+      {agent, session} = create_session(%{status: "working"})
+      {:ok, _} = Agents.update_agent(agent, %{status: "running"})
 
       AgentWorkerEvents.on_max_retries_exceeded(session.id, session.uuid)
 
       assert reload_session(session).status == "failed"
+
+      {:ok, updated_agent} = Agents.get_agent(agent.id)
+      assert updated_agent.status == "failed"
     end
   end
 
@@ -366,9 +394,10 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
       messages = Messages.list_messages_for_session(session.id)
       assert Enum.any?(messages, &(&1.body == "normal reply"))
+
       assert Enum.all?(messages, fn m ->
-        get_in(m.metadata, ["visibility"]) != "session_only"
-      end)
+               get_in(m.metadata, ["visibility"]) != "session_only"
+             end)
     end
 
     test "absent job_context key (backwards compat) falls through to normal save_result" do
@@ -400,9 +429,10 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
       messages = Messages.list_messages_for_session(session.id)
       assert Enum.any?(messages, &(&1.body == "standard dm reply"))
+
       refute Enum.any?(messages, fn m ->
-        get_in(m.metadata, ["visibility"]) == "session_only"
-      end)
+               get_in(m.metadata, ["visibility"]) == "session_only"
+             end)
     end
   end
 

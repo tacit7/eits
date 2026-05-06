@@ -101,7 +101,10 @@ defmodule EyeInTheSky.IAM.HookResponse do
     %{"continue" => true}
   end
 
-  def from_decision(%Decision{permission: :allow, instructions: instructions}, :user_prompt_submit)
+  def from_decision(
+        %Decision{permission: :allow, instructions: instructions},
+        :user_prompt_submit
+      )
       when instructions != [] do
     %{
       "suppressUserPrompt" => true,

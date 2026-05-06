@@ -26,11 +26,11 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   # --- Lifecycle Events ---
 
-  @doc "SDK started processing a job. Promotes agent to running if still pending."
+  @doc "SDK started processing a job. Marks the session and agent as running."
   def on_sdk_started(session_id, _provider_conversation_id) do
     case update_session_status(session_id, "working") do
       {:ok, session} ->
-        promote_agent_if_pending(session_id)
+        update_agent_status(session, "running")
         Events.agent_working(session)
         notify_agent_status(session, :working)
 
@@ -42,15 +42,15 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   @doc """
   SDK completed successfully.
 
-  Claude sessions transition to `idle` (ready for the next prompt). Codex
-  sessions transition to `waiting` — the headless run ended and the thread
-  is dormant until explicitly resumed. Both clear `status_reason`.
+  Provider sessions transition to `idle` (ready for the next prompt) and clear
+  `status_reason`. Explicit waiting/blocking states are handled by the API.
   """
   def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
     status = completion_status_for(provider)
 
     case update_session_status(session_id, status, nil) do
       {:ok, session} ->
+        update_agent_status(session, "idle")
         Events.agent_stopped(session)
         notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
 
@@ -59,8 +59,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     end
   end
 
-  defp completion_status_for("codex"), do: "waiting"
-  defp completion_status_for(_), do: "idle"
+  defp completion_status_for(_provider), do: "idle"
 
   @doc "Codex thread.started received — confirm session is working."
   def on_codex_thread_started(session_id) do
@@ -71,8 +70,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   @doc "SDK errored (transient or systemic)."
   def on_sdk_errored(session_id, _provider_conversation_id) do
     case update_session_status(session_id, "idle") do
-      {:ok, session} -> Events.agent_stopped(session)
-      :error -> :ok
+      {:ok, session} ->
+        update_agent_status(session, "idle")
+        Events.agent_stopped(session)
+
+      :error ->
+        :ok
     end
   end
 
@@ -81,8 +84,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     Events.stream_error(session_id, provider_conversation_id, "Max retries exceeded")
 
     case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
-      {:ok, session} -> Events.agent_stopped(session)
-      :error -> :ok
+      {:ok, session} ->
+        update_agent_status(session, "failed")
+        Events.agent_stopped(session)
+
+      :error ->
+        :ok
     end
   end
 
@@ -94,7 +101,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   """
   def on_session_failed(session_id, provider_conversation_id, reason) do
     Events.stream_error(session_id, provider_conversation_id, "Systemic error — session failed")
-    update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason))
+
+    case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
+      {:ok, session} -> update_agent_status(session, "failed")
+      :error -> :ok
+    end
+
     :ok
   end
 
@@ -339,20 +351,19 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     end
   end
 
-  # Synchronous — no Task.start. The promotion must complete before the next
-  # event fires, and Task.start spawns a process outside the SQL sandbox in tests.
-  defp promote_agent_if_pending(session_id) do
-    with {:ok, session} when not is_nil(session.agent_id) <- Sessions.get_session(session_id),
-         {:ok, %{status: "pending"} = agent} <- Agents.get_agent(session.agent_id),
-         {:ok, _} <- Agents.update_agent(agent, %{status: "running"}) do
-      Logger.info("[#{session_id}] Promoted agent #{agent.id} from pending to running")
+  # Synchronous for the same reason as session status updates: the UI should not
+  # show an agent as running after its only active session has stopped.
+  defp update_agent_status(%{agent_id: nil}, _status), do: :ok
+
+  defp update_agent_status(%{agent_id: agent_id, id: session_id}, status) do
+    with {:ok, agent} <- Agents.get_agent(agent_id),
+         {:ok, _} <- Agents.update_agent(agent, %{status: status}) do
+      :ok
     else
       {:error, reason} ->
-        Logger.warning("[#{session_id}] Failed to promote agent: #{inspect(reason)}")
-
-      {:ok, _} ->
-        # agent_id is nil or agent status is not "pending" — nothing to do
-        :ok
+        Logger.warning(
+          "[#{session_id}] Failed to update agent #{agent_id} status: #{inspect(reason)}"
+        )
     end
   end
 

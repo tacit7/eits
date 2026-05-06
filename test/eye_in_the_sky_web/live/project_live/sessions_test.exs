@@ -231,9 +231,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
   describe "Bulk selection — row highlight" do
     @tag :bulk_select
     @tag :bulk_select_row_highlight
-    test "selected session row has bg-primary/5 on the row element", %{conn: conn, project: project} do
+    test "selected session row has bg-primary/5 on the row element", %{
+      conn: conn,
+      project: project
+    } do
       agent = Factory.create_agent(%{project_id: project.id})
-      session = Factory.create_session(agent, %{name: "Highlight test", status: "idle", project_id: project.id})
+
+      session =
+        Factory.create_session(agent, %{
+          name: "Highlight test",
+          status: "idle",
+          project_id: project.id
+        })
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
@@ -273,7 +282,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     @tag :bulk_select_archive_offscreen
     test "archive_selected archives off-screen selected sessions", %{conn: conn, project: project} do
       agent = Factory.create_agent(%{project_id: project.id})
-      completed = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+
+      completed =
+        Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
@@ -287,9 +298,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
     @tag :bulk_select
     @tag :bulk_select_archive_button
-    test "archive button is visible in bulk action bar when sessions are selected", %{conn: conn, project: project} do
+    test "archive button is visible in bulk action bar when sessions are selected", %{
+      conn: conn,
+      project: project
+    } do
       agent = Factory.create_agent(%{project_id: project.id})
-      session = Factory.create_session(agent, %{name: "T", status: "idle", project_id: project.id})
+
+      session =
+        Factory.create_session(agent, %{name: "T", status: "idle", project_id: project.id})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
@@ -308,7 +324,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     test "selection survives a filter change", %{conn: conn, project: project} do
       agent = Factory.create_agent(%{project_id: project.id})
       # "completed" sessions are excluded by the "active" filter
-      s1 = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+      s1 =
+        Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
@@ -323,11 +340,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
     @tag :bulk_select
     @tag :bulk_select_select_all_visible
-    test "select_all_visible preserves off-screen selected sessions", %{conn: conn, project: project} do
+    test "select_all_visible preserves off-screen selected sessions", %{
+      conn: conn,
+      project: project
+    } do
       agent = Factory.create_agent(%{project_id: project.id})
       # "completed" is off-screen when filtered to "active"
-      completed = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
-      _active = Factory.create_session(agent, %{name: "Active", status: "working", project_id: project.id})
+      completed =
+        Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+
+      _active =
+        Factory.create_session(agent, %{name: "Active", status: "working", project_id: project.id})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
@@ -341,7 +364,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
     @tag :bulk_select
     @tag :bulk_select_toggle_all_deselect
-    test "select_all_visible toggles off visible sessions on second call", %{conn: conn, project: project} do
+    test "select_all_visible toggles off visible sessions on second call", %{
+      conn: conn,
+      project: project
+    } do
       agent = Factory.create_agent(%{project_id: project.id})
       _s1 = Factory.create_session(agent, %{name: "A", status: "idle", project_id: project.id})
 
@@ -355,11 +381,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
     @tag :bulk_select
     @tag :bulk_select_toggle_all_preserves_offscreen
-    test "select_all_visible toggled again removes only visible sessions, preserves off-screen", %{conn: conn, project: project} do
+    test "select_all_visible toggled again removes only visible sessions, preserves off-screen",
+         %{conn: conn, project: project} do
       agent = Factory.create_agent(%{project_id: project.id})
       # "completed" is off-screen when filtered to "active"
-      completed = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
-      _active = Factory.create_session(agent, %{name: "Active", status: "working", project_id: project.id})
+      completed =
+        Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+
+      _active =
+        Factory.create_session(agent, %{name: "Active", status: "working", project_id: project.id})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
@@ -379,9 +409,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
     @tag :bulk_select
     @tag :bulk_select_exit_clears
-    test "exit_select_mode clears all selected sessions including off-screen", %{conn: conn, project: project} do
+    test "exit_select_mode clears all selected sessions including off-screen", %{
+      conn: conn,
+      project: project
+    } do
       agent = Factory.create_agent(%{project_id: project.id})
-      session = Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
+
+      session =
+        Factory.create_session(agent, %{name: "Done", status: "completed", project_id: project.id})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
@@ -396,11 +431,30 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
   describe "Bulk selection — indeterminate state" do
     @tag :bulk_select
     @tag :bulk_select_parent_indeterminate
-    test "parent checkbox has data-indeterminate=true when some children selected", %{conn: conn, project: project} do
+    test "parent checkbox has data-indeterminate=true when some children selected", %{
+      conn: conn,
+      project: project
+    } do
       agent = Factory.create_agent(%{project_id: project.id})
-      parent = Factory.create_session(agent, %{name: "Parent", status: "idle", project_id: project.id})
-      child1 = Factory.create_session(agent, %{name: "Child 1", status: "idle", project_id: project.id, parent_session_id: parent.id})
-      _child2 = Factory.create_session(agent, %{name: "Child 2", status: "idle", project_id: project.id, parent_session_id: parent.id})
+
+      parent =
+        Factory.create_session(agent, %{name: "Parent", status: "idle", project_id: project.id})
+
+      child1 =
+        Factory.create_session(agent, %{
+          name: "Child 1",
+          status: "idle",
+          project_id: project.id,
+          parent_session_id: parent.id
+        })
+
+      _child2 =
+        Factory.create_session(agent, %{
+          name: "Child 2",
+          status: "idle",
+          project_id: project.id,
+          parent_session_id: parent.id
+        })
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 
@@ -412,7 +466,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
     @tag :bulk_select
     @tag :bulk_select_all_indeterminate
-    test "select-all checkbox is indeterminate when some visible sessions are selected", %{conn: conn, project: project} do
+    test "select-all checkbox is indeterminate when some visible sessions are selected", %{
+      conn: conn,
+      project: project
+    } do
       agent = Factory.create_agent(%{project_id: project.id})
       s1 = Factory.create_session(agent, %{name: "A", status: "idle", project_id: project.id})
       _s2 = Factory.create_session(agent, %{name: "B", status: "idle", project_id: project.id})
@@ -431,6 +488,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     @tag :bulk_select_range
     test "select_range selects all IDs between anchor and target", %{conn: conn, project: project} do
       agent = Factory.create_agent(%{project_id: project.id})
+
       sessions =
         for n <- 1..5 do
           Factory.create_session(agent, %{name: "S#{n}", status: "idle", project_id: project.id})
@@ -454,7 +512,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     @tag :bulk_select_range_dom_wiring
     test "shift-select DOM hooks and data attrs are present", %{conn: conn, project: project} do
       agent = Factory.create_agent(%{project_id: project.id})
-      session = Factory.create_session(agent, %{name: "X", status: "idle", project_id: project.id})
+
+      session =
+        Factory.create_session(agent, %{name: "X", status: "idle", project_id: project.id})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 

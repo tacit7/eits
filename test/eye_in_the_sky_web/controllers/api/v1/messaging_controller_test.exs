@@ -63,7 +63,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       )
 
       on_exit(fn ->
-        Application.put_env(:eye_in_the_sky, :agent_manager_module, EyeInTheSky.Agents.MockAgentManager)
+        Application.put_env(
+          :eye_in_the_sky,
+          :agent_manager_module,
+          EyeInTheSky.Agents.MockAgentManager
+        )
       end)
 
       agent = create_agent()
@@ -128,7 +132,9 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       assert json_response(conn, 404)["error"] == "Target session not found"
     end
 
-    test "returns 503 with delivery_failed when agent manager returns unknown error", %{conn: conn} do
+    test "returns 503 with delivery_failed when agent manager returns unknown error", %{
+      conn: conn
+    } do
       original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
 
       Application.put_env(

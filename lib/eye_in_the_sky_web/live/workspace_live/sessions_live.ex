@@ -74,15 +74,14 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
     <div class="p-6">
       <div class="flex items-start justify-between mb-6">
         <div>
-          <h1 class="text-xl font-semibold"><%= @page_title %></h1>
+          <h1 class="text-xl font-semibold">{@page_title}</h1>
           <.scope_badge scope={@scope} />
         </div>
         <button
           phx-click="toggle_new_session_drawer"
           class="btn btn-primary btn-sm gap-2"
         >
-          <.icon name="hero-plus-mini" class="size-4" />
-          New Agent
+          <.icon name="hero-plus-mini" class="size-4" /> New Agent
         </button>
       </div>
 

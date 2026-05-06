@@ -37,7 +37,8 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   # ---------------------------------------------------------------------------
 
   def handle_palette_event("palette:recent-sessions", _params, socket) do
-    sessions = Sessions.list_sessions_filtered(status_filter: "all", sort_by: :last_activity, limit: 15)
+    sessions =
+      Sessions.list_sessions_filtered(status_filter: "all", sort_by: :last_activity, limit: 15)
 
     results =
       Enum.map(sessions, fn s ->
@@ -63,7 +64,13 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
     results =
       Enum.map(tasks, fn t ->
-        %{id: t.id, title: t.title, state_id: t.state_id, state_name: t.state && t.state.name, project_id: t.project_id}
+        %{
+          id: t.id,
+          title: t.title,
+          state_id: t.state_id,
+          state_name: t.state && t.state.name,
+          project_id: t.project_id
+        }
       end)
 
     {:halt, push_event(socket, "palette:tasks-result", %{tasks: results})}
@@ -228,7 +235,13 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
       end
 
     if project_id do
-      sessions = Sessions.list_sessions_filtered(project_id: project_id, sort_by: :last_activity, limit: 100, status_filter: "all")
+      sessions =
+        Sessions.list_sessions_filtered(
+          project_id: project_id,
+          sort_by: :last_activity,
+          limit: 100,
+          status_filter: "all"
+        )
 
       next_uuid = find_adjacent_session(sessions, current_uuid, direction)
 
@@ -288,12 +301,15 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     with {id, ""} <- Integer.parse(task_id_str),
          {:ok, task} <- Tasks.get_task(id) do
       new_state_id = if task.state_id == done_id, do: todo_id, else: done_id
+
       case Tasks.update_task_state(task, new_state_id) do
         {:ok, _updated} ->
-          {:halt, push_event(socket, "vim:toggle-task-done-result", %{
-            task_id: task_id_str,
-            done: new_state_id == done_id
-          })}
+          {:halt,
+           push_event(socket, "vim:toggle-task-done-result", %{
+             task_id: task_id_str,
+             done: new_state_id == done_id
+           })}
+
         {:error, _} ->
           {:halt, socket}
       end

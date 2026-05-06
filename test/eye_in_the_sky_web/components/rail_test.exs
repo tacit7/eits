@@ -29,6 +29,7 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
       {:ok, view, _html} = live(conn, ~p"/sessions")
 
       view |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
+
       view
       |> element("[phx-click='select_project'][phx-value-project_id='#{project.id}']")
       |> render_click()
@@ -49,11 +50,13 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
       {:ok, view, _html} = live(conn, ~p"/sessions")
 
       view |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
+
       view
       |> element("[phx-click='select_project'][phx-value-project_id='#{p1.id}']")
       |> render_click()
 
       view |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
+
       view
       |> element("[phx-click='select_project'][phx-value-project_id='#{p2.id}']")
       |> render_click()

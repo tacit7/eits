@@ -159,8 +159,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           name: params["name"],
           role: params["role"] || "member",
           agent_id: resolve_id(params["agent_id"], &Agents.get_agent_by_uuid/1),
-          session_id:
-            resolve_id(params["session_id"], &Sessions.get_session_by_uuid/1)
+          session_id: resolve_id(params["session_id"], &Sessions.get_session_by_uuid/1)
         }
 
         case Teams.join_team(attrs) do
@@ -308,9 +307,14 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         failed: failed
       })
     else
-      {:error, :not_found} -> {:error, :not_found, "Sender session not found"}
-      {:from_active, true} -> {:error, :unprocessable_entity, "Sender session is terminated and cannot broadcast"}
-      {:member, false} -> {:error, :forbidden, "Sender is not a member of this team"}
+      {:error, :not_found} ->
+        {:error, :not_found, "Sender session not found"}
+
+      {:from_active, true} ->
+        {:error, :unprocessable_entity, "Sender session is terminated and cannot broadcast"}
+
+      {:member, false} ->
+        {:error, :forbidden, "Sender is not a member of this team"}
     end
   end
 
@@ -321,5 +325,4 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       Sessions.get_session_by_uuid(raw)
     end
   end
-
 end

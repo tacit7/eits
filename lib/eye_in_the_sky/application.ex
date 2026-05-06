@@ -69,7 +69,9 @@ defmodule EyeInTheSky.Application do
       if Application.get_env(:eye_in_the_sky, :run_iam_seeds, true) do
         [
           Supervisor.child_spec({Task, fn -> EyeInTheSky.IAM.Seeds.run() end},
-            id: :iam_seeds_task, restart: :transient)
+            id: :iam_seeds_task,
+            restart: :transient
+          )
         ]
       else
         []

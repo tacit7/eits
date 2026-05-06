@@ -42,7 +42,12 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
           <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
-            <button class="w-full text-left" phx-click="expand_job" phx-value-id={job.id} phx-target={@target}>
+            <button
+              class="w-full text-left"
+              phx-click="expand_job"
+              phx-value-id={job.id}
+              phx-target={@target}
+            >
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">

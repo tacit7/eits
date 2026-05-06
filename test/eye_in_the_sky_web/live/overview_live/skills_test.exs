@@ -18,7 +18,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.SkillsTest do
   describe "set_detail_tab event safety" do
     test "accepts 'preview' and sets :preview" do
       {:noreply, socket} =
-        SkillsLive.handle_event("set_detail_tab", %{"tab" => "preview"}, socket_with(%{detail_tab: :raw}))
+        SkillsLive.handle_event(
+          "set_detail_tab",
+          %{"tab" => "preview"},
+          socket_with(%{detail_tab: :raw})
+        )
 
       assert socket.assigns.detail_tab == :preview
     end
@@ -50,8 +54,22 @@ defmodule EyeInTheSkyWeb.OverviewLive.SkillsTest do
 
   describe "select_skill keyed by id (not slug)" do
     test "selects the right skill when two have the same slug but different sources" do
-      global = %Skill{id: "skills:dup", slug: "dup", source: :skills, description: "global", size: 1}
-      project = %Skill{id: "project_skills:dup", slug: "dup", source: :project_skills, description: "project", size: 1}
+      global = %Skill{
+        id: "skills:dup",
+        slug: "dup",
+        source: :skills,
+        description: "global",
+        size: 1
+      }
+
+      project = %Skill{
+        id: "project_skills:dup",
+        slug: "dup",
+        source: :project_skills,
+        description: "project",
+        size: 1
+      }
+
       socket = socket_with(%{skills: [global, project]})
 
       {:noreply, socket} =
@@ -65,7 +83,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.SkillsTest do
       skill = %Skill{id: "skills:foo", slug: "foo", source: :skills, description: "", size: 0}
       socket = socket_with(%{skills: [skill], selected_skill: skill})
 
-      {:noreply, socket} = SkillsLive.handle_event("select_skill", %{"id" => "skills:foo"}, socket)
+      {:noreply, socket} =
+        SkillsLive.handle_event("select_skill", %{"id" => "skills:foo"}, socket)
 
       assert is_nil(socket.assigns.selected_skill)
     end

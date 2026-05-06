@@ -166,13 +166,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                       {source_label(agent.source)}
                     </span>
                     <span class="text-base-content/20 text-xs">&middot;</span>
-                    <span class="text-[10px] text-base-content/40 tabular-nums">{FileHelpers.format_size(agent.size)}</span>
+                    <span class="text-[10px] text-base-content/40 tabular-nums">
+                      {FileHelpers.format_size(agent.size)}
+                    </span>
                     <%= if agent.model do %>
                       <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-[10px] text-base-content/35 font-mono truncate">{agent.model}</span>
+                      <span class="text-[10px] text-base-content/35 font-mono truncate">
+                        {agent.model}
+                      </span>
                     <% end %>
                     <span class="text-base-content/20 text-xs">&middot;</span>
-                    <span class="text-[10px] text-base-content/35 font-mono truncate">{agent.path}</span>
+                    <span class="text-[10px] text-base-content/35 font-mono truncate">
+                      {agent.path}
+                    </span>
                   </div>
                 </div>
                 <%!-- Mobile inline viewer --%>
@@ -194,9 +200,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
           <.empty_state
             id="overview-agents-empty"
             icon="hero-cpu-chip"
-            title={if @search_query != "" || @scope_filter != "all",
-              do: "No agents found",
-              else: "No agents yet"}
+            title={
+              if @search_query != "" || @scope_filter != "all",
+                do: "No agents found",
+                else: "No agents yet"
+            }
             subtitle={
               if @search_query != "" || @scope_filter != "all",
                 do: "Try adjusting your search or filters",
@@ -213,7 +221,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <code class="text-base font-semibold text-base-content">{@selected_agent.name}</code>
+                  <code class="text-base font-semibold text-base-content">
+                    {@selected_agent.name}
+                  </code>
                   <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
                     source_badge_class(@selected_agent.source)}>
                     {source_label(@selected_agent.source)}
@@ -225,7 +235,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                   <% end %>
                 </div>
                 <p class="text-xs text-base-content/45 font-mono truncate">{@selected_agent.path}</p>
-                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">{@selected_agent.description}</p>
+                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                  {@selected_agent.description}
+                </p>
                 <%= if @selected_agent.tools != [] do %>
                   <div class="flex flex-wrap gap-1 mt-2">
                     <%= for tool <- @selected_agent.tools do %>

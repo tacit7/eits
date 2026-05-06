@@ -76,9 +76,7 @@ defmodule EyeInTheSky.Repo.Migrations.AddRound10MissingUniqueIndexes do
     )
 
     drop_if_exists(
-      unique_index(:session_context, [:session_id],
-        name: :session_context_session_id_index
-      )
+      unique_index(:session_context, [:session_id], name: :session_context_session_id_index)
     )
 
     drop_if_exists(

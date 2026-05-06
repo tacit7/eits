@@ -413,7 +413,8 @@ defmodule EyeInTheSky.Tasks do
 
     Repo.update_all(
       from(t in Task,
-        where: t.uuid in ^uuids or t.id in ^int_ids),
+        where: t.uuid in ^uuids or t.id in ^int_ids
+      ),
       set: [archived: true, updated_at: DateTime.utc_now()]
     )
   end
@@ -431,15 +432,16 @@ defmodule EyeInTheSky.Tasks do
     task_ids_query =
       from(t in Task,
         where: t.uuid in ^uuids or t.id in ^int_ids,
-        select: t.id)
+        select: t.id
+      )
 
     result =
       Repo.transaction(fn ->
         task_ids = Repo.all(task_ids_query)
 
-        Repo.delete_all(from(tt in "task_tags",    where: tt.task_id in ^task_ids))
+        Repo.delete_all(from(tt in "task_tags", where: tt.task_id in ^task_ids))
         Repo.delete_all(from(ts in "task_sessions", where: ts.task_id in ^task_ids))
-        Repo.delete_all(from(ct in "commit_tasks",  where: ct.task_id in ^task_ids))
+        Repo.delete_all(from(ct in "commit_tasks", where: ct.task_id in ^task_ids))
 
         {deleted, _} =
           Repo.delete_all(from(t in Task, where: t.id in ^task_ids))
@@ -449,7 +451,7 @@ defmodule EyeInTheSky.Tasks do
 
     case result do
       {:ok, count} -> {count, nil}
-      {:error, _}  -> {0, nil}
+      {:error, _} -> {0, nil}
     end
   end
 
@@ -468,7 +470,8 @@ defmodule EyeInTheSky.Tasks do
 
     Repo.update_all(
       from(t in EyeInTheSky.Tasks.Task,
-        where: t.uuid in ^uuids or t.id in ^int_ids),
+        where: t.uuid in ^uuids or t.id in ^int_ids
+      ),
       set: [state_id: state_id, updated_at: now]
     )
   end
@@ -493,11 +496,11 @@ defmodule EyeInTheSky.Tasks do
   defp split_uuid_and_int_ids(id_strings) do
     Enum.reduce(id_strings, {[], []}, fn id_str, {us, is} ->
       id_str = to_string(id_str)
+
       case Integer.parse(id_str) do
         {int_id, ""} -> {us, [int_id | is]}
         _ -> {[id_str | us], is}
       end
     end)
   end
-
 end

@@ -8,7 +8,10 @@ defmodule EyeInTheSky.IAM.Builtin.BlockAwsCliTest do
   defp ctx(cmd), do: %Context{tool: "Bash", resource_content: cmd}
 
   test "blocks aws ec2 terminate-instances" do
-    assert BlockAwsCli.matches?(%Policy{}, ctx("aws ec2 terminate-instances --instance-ids i-123"))
+    assert BlockAwsCli.matches?(
+             %Policy{},
+             ctx("aws ec2 terminate-instances --instance-ids i-123")
+           )
   end
 
   test "blocks aws ec2 stop-instances" do
@@ -28,15 +31,24 @@ defmodule EyeInTheSky.IAM.Builtin.BlockAwsCliTest do
   end
 
   test "blocks aws rds delete-db-instance" do
-    assert BlockAwsCli.matches?(%Policy{}, ctx("aws rds delete-db-instance --db-instance-identifier mydb"))
+    assert BlockAwsCli.matches?(
+             %Policy{},
+             ctx("aws rds delete-db-instance --db-instance-identifier mydb")
+           )
   end
 
   test "blocks aws lambda delete-function" do
-    assert BlockAwsCli.matches?(%Policy{}, ctx("aws lambda delete-function --function-name my-fn"))
+    assert BlockAwsCli.matches?(
+             %Policy{},
+             ctx("aws lambda delete-function --function-name my-fn")
+           )
   end
 
   test "blocks aws cloudformation delete-stack" do
-    assert BlockAwsCli.matches?(%Policy{}, ctx("aws cloudformation delete-stack --stack-name my-stack"))
+    assert BlockAwsCli.matches?(
+             %Policy{},
+             ctx("aws cloudformation delete-stack --stack-name my-stack")
+           )
   end
 
   test "does not block aws s3 ls" do
@@ -48,6 +60,9 @@ defmodule EyeInTheSky.IAM.Builtin.BlockAwsCliTest do
   end
 
   test "does not match non-Bash tool" do
-    refute BlockAwsCli.matches?(%Policy{}, %Context{tool: "Write", resource_content: "aws ec2 terminate-instances"})
+    refute BlockAwsCli.matches?(%Policy{}, %Context{
+             tool: "Write",
+             resource_content: "aws ec2 terminate-instances"
+           })
   end
 end

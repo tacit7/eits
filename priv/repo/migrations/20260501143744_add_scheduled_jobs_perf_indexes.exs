@@ -12,10 +12,10 @@ defmodule EyeInTheSky.Repo.Migrations.AddScheduledJobsPerfIndexes do
   def up do
     # M-3: due_jobs poll: WHERE enabled = true AND next_run_at IS NOT NULL AND next_run_at <= NOW()
     create_if_not_exists index(:scheduled_jobs, [:next_run_at],
-                            where: "enabled = true AND next_run_at IS NOT NULL",
-                            name: :scheduled_jobs_due_idx,
-                            concurrently: true
-                          )
+                           where: "enabled = true AND next_run_at IS NOT NULL",
+                           name: :scheduled_jobs_due_idx,
+                           concurrently: true
+                         )
 
     # M-5: fs_agent_already_scheduled? query:
     #   WHERE job_type = 'spawn_agent' AND prompt_id IS NULL AND config::jsonb->>'agent_file_id' = ?
@@ -27,9 +27,9 @@ defmodule EyeInTheSky.Repo.Migrations.AddScheduledJobsPerfIndexes do
 
     # L-3: project_id FK — used in list_jobs/1 project filter
     create_if_not_exists index(:scheduled_jobs, [:project_id],
-                            name: :scheduled_jobs_project_id_idx,
-                            concurrently: true
-                          )
+                           name: :scheduled_jobs_project_id_idx,
+                           concurrently: true
+                         )
   end
 
   def down do

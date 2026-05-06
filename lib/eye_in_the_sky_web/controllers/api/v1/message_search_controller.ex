@@ -26,12 +26,19 @@ defmodule EyeInTheSkyWeb.Api.V1.MessageSearchController do
 
       opts_or_error =
         case params["session_id"] do
-          nil -> [limit: limit, include_archived: include_archived]
-          "" -> [limit: limit, include_archived: include_archived]
+          nil ->
+            [limit: limit, include_archived: include_archived]
+
+          "" ->
+            [limit: limit, include_archived: include_archived]
+
           raw ->
             case Sessions.resolve(raw) do
-              {:ok, session} -> [limit: limit, session_id: session.id, include_archived: include_archived]
-              {:error, :not_found} -> {:error, :not_found, "session not found: #{raw}"}
+              {:ok, session} ->
+                [limit: limit, session_id: session.id, include_archived: include_archived]
+
+              {:error, :not_found} ->
+                {:error, :not_found, "session not found: #{raw}"}
             end
         end
 

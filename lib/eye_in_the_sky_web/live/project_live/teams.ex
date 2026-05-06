@@ -59,7 +59,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     socket =
       if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, true, socket.assigns.search_query)),
+        do:
+          assign(
+            socket,
+            :teams,
+            load_teams(socket, socket.assigns.show_archived, true, socket.assigns.search_query)
+          ),
         else: socket
 
     {:noreply, socket}
@@ -70,7 +75,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     socket =
       if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, false, socket.assigns.search_query)),
+        do:
+          assign(
+            socket,
+            :teams,
+            load_teams(socket, socket.assigns.show_archived, false, socket.assigns.search_query)
+          ),
         else: socket
 
     {:noreply, socket}
@@ -83,7 +93,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
      assign(
        socket,
        :teams,
-       load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, socket.assigns.search_query)
+       load_teams(
+         socket,
+         socket.assigns.show_archived,
+         socket.assigns.show_all,
+         socket.assigns.search_query
+       )
      )}
   end
 
@@ -111,7 +126,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
          assign(
            socket,
            :teams,
-           load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, socket.assigns.search_query)
+           load_teams(
+             socket,
+             socket.assigns.show_archived,
+             socket.assigns.show_all,
+             socket.assigns.search_query
+           )
          )}
     end
   end
@@ -127,7 +147,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     {:noreply,
      socket
      |> assign(:show_archived, show_archived)
-     |> assign(:teams, load_teams(socket, show_archived, socket.assigns.show_all, socket.assigns.search_query))}
+     |> assign(
+       :teams,
+       load_teams(socket, show_archived, socket.assigns.show_all, socket.assigns.search_query)
+     )}
   end
 
   @impl true

@@ -37,15 +37,15 @@ defmodule EyeInTheSky.Repo.Migrations.AddWorkspaceIdToProjects do
 
     # Unique project path per workspace — scoped so multi-workspace future works cleanly
     create unique_index(:projects, [:workspace_id, :path],
-      where: "path IS NOT NULL",
-      name: :projects_workspace_id_path_unique_index
-    )
+             where: "path IS NOT NULL",
+             name: :projects_workspace_id_path_unique_index
+           )
   end
 
   def down do
     drop_if_exists index(:projects, [:workspace_id, :path],
-      name: :projects_workspace_id_path_unique_index
-    )
+                     name: :projects_workspace_id_path_unique_index
+                   )
 
     drop_if_exists index(:projects, [:workspace_id])
 

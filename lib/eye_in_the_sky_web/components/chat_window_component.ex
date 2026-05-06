@@ -22,8 +22,8 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
     prev_messages = socket.assigns[:messages] || []
     prev_count = length(prev_messages)
-    prev_last_id = prev_messages |> List.last() |> then(& &1 && &1.id)
-    new_last_id = List.last(messages) |> then(& &1 && &1.id)
+    prev_last_id = prev_messages |> List.last() |> then(&(&1 && &1.id))
+    new_last_id = List.last(messages) |> then(&(&1 && &1.id))
     messages_changed = length(messages) != prev_count || new_last_id != prev_last_id
 
     socket =
@@ -32,7 +32,10 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       |> assign(:session, session)
       |> assign(:messages, messages)
 
-    socket = if messages_changed, do: push_event(socket, "messages-updated-" <> to_string(cs.id), %{}), else: socket
+    socket =
+      if messages_changed,
+        do: push_event(socket, "messages-updated-" <> to_string(cs.id), %{}),
+        else: socket
 
     {:ok, socket}
   end
@@ -101,7 +104,11 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           <% else %>
             <div class="space-y-1">
               <%= for message <- @messages do %>
-                <.message_item message={message} cs_id={@canvas_session.id} agent_name={session_label(@session)} />
+                <.message_item
+                  message={message}
+                  cs_id={@canvas_session.id}
+                  agent_name={session_label(@session)}
+                />
               <% end %>
             </div>
           <% end %>
@@ -109,7 +116,11 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             <div class="flex items-center gap-1.5 px-1 pt-2 pb-1">
               <img
                 src={DmHelpers.provider_icon(@session.provider)}
-                class={["size-4 shrink-0", DmHelpers.provider_icon_class(@session.provider), "animate-pulse"]}
+                class={[
+                  "size-4 shrink-0",
+                  DmHelpers.provider_icon_class(@session.provider),
+                  "animate-pulse"
+                ]}
                 alt="working"
               />
             </div>

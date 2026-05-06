@@ -34,7 +34,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
                 phx-target={@myself}
                 class={[
                   "px-3 py-1.5 text-xs truncate max-w-[160px]",
-                  if(active, do: "text-base-content/90 font-medium", else: "text-base-content/45 hover:text-base-content/70")
+                  if(active,
+                    do: "text-base-content/90 font-medium",
+                    else: "text-base-content/45 hover:text-base-content/70"
+                  )
                 ]}
                 title={tab.path}
               >
@@ -83,12 +86,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
           <.svelte
             name="FileEditor"
             ssr={false}
-            props={%{
-              content: @active_tab.content,
-              lang: @active_tab.language,
-              path: @active_tab.path,
-              hash: @active_tab.hash
-            }}
+            props={
+              %{
+                content: @active_tab.content,
+                lang: @active_tab.language,
+                path: @active_tab.path,
+                hash: @active_tab.hash
+              }
+            }
             socket={@socket}
           />
         </div>

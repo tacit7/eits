@@ -98,7 +98,10 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
     channels =
       if params["project_id"] do
         project_id = parse_int(params["project_id"])
-        if project_id, do: Channels.list_channels_for_project(project_id), else: Channels.list_channels()
+
+        if project_id,
+          do: Channels.list_channels_for_project(project_id),
+          else: Channels.list_channels()
       else
         Channels.list_channels()
       end
@@ -115,8 +118,10 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
   Body: session_id (required), role (optional, default "member")
   """
   def join(conn, %{"channel_id" => channel_id} = params) do
-    with {:channel, channel} when not is_nil(channel) <- {:channel, Channels.get_channel(channel_id)},
-         {:session_raw, raw} when not is_nil(raw) and raw != "" <- {:session_raw, params["session_id"]},
+    with {:channel, channel} when not is_nil(channel) <-
+           {:channel, Channels.get_channel(channel_id)},
+         {:session_raw, raw} when not is_nil(raw) and raw != "" <-
+           {:session_raw, params["session_id"]},
          {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(raw)},
          {:session_record, {:ok, session}} <- {:session_record, Sessions.get_session(int_id)},
          {:agent_id, agent_id} when not is_nil(agent_id) <- {:agent_id, session.agent_id} do
@@ -154,8 +159,10 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
 
   @doc "DELETE /api/v1/channels/:channel_id/members/:session_id - Remove a session from a channel."
   def leave(conn, %{"channel_id" => channel_id, "session_id" => session_id_param}) do
-    with {:channel, channel} when not is_nil(channel) <- {:channel, Channels.get_channel(channel_id)},
-         {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(session_id_param)} do
+    with {:channel, channel} when not is_nil(channel) <-
+           {:channel, Channels.get_channel(channel_id)},
+         {:session, {:ok, int_id}} <-
+           {:session, ToolHelpers.resolve_session_int_id(session_id_param)} do
       Channels.remove_member(channel.id, int_id)
       json(conn, %{success: true, message: "Left channel #{channel.name}"})
     else

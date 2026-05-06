@@ -27,7 +27,12 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
 
         true ->
           query = params["q"] || ""
-          Notes.search_notes(query, [], limit: limit, project_id: params["project_id"], starred: starred_only)
+
+          Notes.search_notes(query, [],
+            limit: limit,
+            project_id: params["project_id"],
+            starred: starred_only
+          )
       end
 
     json(conn, %{

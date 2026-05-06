@@ -50,7 +50,8 @@ defmodule EyeInTheSky.Codex.SessionReader do
   If `after_uuid` is nil, reads all messages. If `after_uuid` is not found in the
   file (e.g., file rotated), reads all messages. Used for incremental sync.
   """
-  @spec read_messages_after_uuid(String.t(), String.t() | nil) :: {:ok, list(map())} | {:error, term()}
+  @spec read_messages_after_uuid(String.t(), String.t() | nil) ::
+          {:ok, list(map())} | {:error, term()}
   def read_messages_after_uuid(thread_id, after_uuid) do
     with {:ok, messages} <- read_messages(thread_id) do
       {:ok, drop_messages_before(messages, after_uuid)}

@@ -107,15 +107,18 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     if id = parse_int(id_str) do
       case Canvases.rename_canvas(id, name) do
         {:ok, updated} ->
-          canvases = Enum.map(socket.assigns.canvases, fn c ->
-            if c.id == id, do: updated, else: c
-          end)
+          canvases =
+            Enum.map(socket.assigns.canvases, fn c ->
+              if c.id == id, do: updated, else: c
+            end)
+
           socket =
             if socket.assigns.active_canvas_id == id do
               assign(socket, :page_title, updated.name <> " — Canvas")
             else
               socket
             end
+
           {:noreply, socket |> assign(:canvases, canvases) |> assign(:renaming_canvas_id, nil)}
 
         {:error, _} ->
@@ -388,7 +391,12 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   defp canvas_tabs(assigns) do
     ~H"""
-    <div id="canvas-tablist" role="tablist" phx-hook="CanvasStatusHook" class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0">
+    <div
+      id="canvas-tablist"
+      role="tablist"
+      phx-hook="CanvasStatusHook"
+      class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0"
+    >
       <button
         onclick="history.length > 1 ? history.back() : window.location.href = '/'"
         class="btn btn-ghost btn-xs px-1.5 self-center mr-1 text-base-content/50 hover:text-base-content"
@@ -463,7 +471,12 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       </span>
       <button
         :if={not is_nil(@active_canvas_id)}
-        phx-click={JS.dispatch("palette:open-command", to: "#command-palette", detail: %{commandId: "canvas-add-session"})}
+        phx-click={
+          JS.dispatch("palette:open-command",
+            to: "#command-palette",
+            detail: %{commandId: "canvas-add-session"}
+          )
+        }
         class="ml-auto btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
         title="Add session to canvas"
       >
@@ -495,7 +508,13 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   defp canvas_area(assigns) do
     ~H"""
-    <div data-canvas-area data-active-canvas-id={@active_canvas_id} id="canvas-area" phx-hook="CanvasPanHook" class="relative flex-1 overflow-hidden">
+    <div
+      data-canvas-area
+      data-active-canvas-id={@active_canvas_id}
+      id="canvas-area"
+      phx-hook="CanvasPanHook"
+      class="relative flex-1 overflow-hidden"
+    >
       <%= for cs <- @canvas_sessions do %>
         <.live_component
           module={ChatWindowComponent}
@@ -515,8 +534,12 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         <div class="flex flex-col items-center justify-center h-full gap-2 select-none">
           <.icon name="hero-squares-2x2" class="w-10 h-10 text-base-content/20" />
           <span class="text-base-content/40 text-sm font-medium">No sessions on this canvas</span>
-          <span class="text-base-content/30 text-xs">Go to Sessions and use Add to Canvas to attach one.</span>
-          <.link navigate={~p"/sessions"} class="btn btn-sm btn-ghost text-base-content/40 mt-1">Go to Sessions</.link>
+          <span class="text-base-content/30 text-xs">
+            Go to Sessions and use Add to Canvas to attach one.
+          </span>
+          <.link navigate={~p"/sessions"} class="btn btn-sm btn-ghost text-base-content/40 mt-1">
+            Go to Sessions
+          </.link>
         </div>
       <% end %>
       <%= if @canvases == [] do %>
@@ -544,7 +567,11 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         <div class="card-body p-4 flex flex-col gap-3 min-h-0">
           <div class="flex items-center justify-between shrink-0">
             <h3 class="font-semibold text-sm">Add Session to Canvas</h3>
-            <button type="button" phx-click="close_session_picker" class="btn btn-ghost btn-xs btn-circle">
+            <button
+              type="button"
+              phx-click="close_session_picker"
+              class="btn btn-ghost btn-xs btn-circle"
+            >
               <.icon name="hero-x-mark-mini" class="size-4" />
             </button>
           </div>
@@ -568,7 +595,9 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                 class="btn btn-ghost btn-sm justify-start gap-2 text-left w-full"
               >
                 <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
-                <span class={["badge badge-xs shrink-0", session_status_class(s.status)]}>{s.status}</span>
+                <span class={["badge badge-xs shrink-0", session_status_class(s.status)]}>
+                  {s.status}
+                </span>
               </button>
             <% end %>
             <%= if @filtered_sessions == [] do %>
@@ -585,6 +614,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   defp load_session_picker_results(socket, query) do
     canvas_session_ids = Enum.map(socket.assigns.canvas_sessions, & &1.session_id)
+
     Sessions.list_sessions_filtered(name_filter: query, limit: 50)
     |> Enum.reject(&(&1.id in canvas_session_ids))
   end
@@ -647,7 +677,10 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   defp remove_terminal(socket, terminal_id) do
     socket
-    |> assign(:canvas_terminals, Enum.reject(socket.assigns.canvas_terminals, &(&1.id == terminal_id)))
+    |> assign(
+      :canvas_terminals,
+      Enum.reject(socket.assigns.canvas_terminals, &(&1.id == terminal_id))
+    )
     |> assign(:terminal_pty_map, Map.delete(socket.assigns.terminal_pty_map, terminal_id))
   end
 

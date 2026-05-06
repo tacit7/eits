@@ -59,7 +59,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       metadata_fn: metadata_fn,
       existing_source_uuids: existing,
       import_opts: opts,
-      dedup_agent_bodies: Messages.recent_agent_bodies_for_session(session_id, seconds: dedup_seconds),
+      dedup_agent_bodies:
+        Messages.recent_agent_bodies_for_session(session_id, seconds: dedup_seconds),
       unlinked_candidates: Messages.unlinked_candidates_map_for_session(session_id)
     }
 
@@ -135,9 +136,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
         true
 
       {:error, reason} ->
-        Logger.debug(
-          "BulkImporter: failed to link message #{existing.id}: #{inspect(reason)}"
-        )
+        Logger.debug("BulkImporter: failed to link message #{existing.id}: #{inspect(reason)}")
 
         false
     end

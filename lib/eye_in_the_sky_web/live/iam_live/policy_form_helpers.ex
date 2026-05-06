@@ -39,8 +39,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
             {Map.put(params, "condition", %{}), "must be a JSON object"}
 
           {:error, %Jason.DecodeError{} = err} ->
-            {Map.put(params, "condition", %{}),
-             "invalid JSON: #{Exception.message(err)}"}
+            {Map.put(params, "condition", %{}), "invalid JSON: #{Exception.message(err)}"}
         end
     end
   end
@@ -96,7 +95,9 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
               class="radio radio-sm"
               disabled={@scope_disabled}
             />
-            <span class="label-text">Global <span class="text-xs opacity-60">— every project</span></span>
+            <span class="label-text">
+              Global <span class="text-xs opacity-60">— every project</span>
+            </span>
           </label>
           <label class="label cursor-pointer gap-2">
             <input
@@ -118,7 +119,9 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
               class="radio radio-sm"
               disabled={@scope_disabled}
             />
-            <span class="label-text">Path glob <span class="text-xs opacity-60">— match by filesystem path</span></span>
+            <span class="label-text">
+              Path glob <span class="text-xs opacity-60">— match by filesystem path</span>
+            </span>
           </label>
         </div>
 
@@ -166,7 +169,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
         ><%= @condition_text %></textarea>
 
         <%= if cond_error = @form[:condition].errors |> List.first() do %>
-          <p class="text-error text-xs"><%= elem(cond_error, 0) %></p>
+          <p class="text-error text-xs">{elem(cond_error, 0)}</p>
         <% end %>
       </div>
     </section>

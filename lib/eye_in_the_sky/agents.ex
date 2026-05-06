@@ -147,7 +147,10 @@ defmodule EyeInTheSky.Agents do
   """
   @spec create_agent(map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def create_agent(attrs \\ %{}) do
-    %Agent{} |> Agent.changeset(attrs) |> Repo.insert() |> broadcast_result(&EyeInTheSky.Events.agent_created/1)
+    %Agent{}
+    |> Agent.changeset(attrs)
+    |> Repo.insert()
+    |> broadcast_result(&EyeInTheSky.Events.agent_created/1)
   end
 
   @doc """
@@ -180,7 +183,10 @@ defmodule EyeInTheSky.Agents do
   """
   @spec update_agent(Agent.t(), map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def update_agent(%Agent{} = agent, attrs) do
-    agent |> Agent.changeset(attrs) |> Repo.update() |> broadcast_result(&EyeInTheSky.Events.agent_updated/1)
+    agent
+    |> Agent.changeset(attrs)
+    |> Repo.update()
+    |> broadcast_result(&EyeInTheSky.Events.agent_updated/1)
   end
 
   @doc """

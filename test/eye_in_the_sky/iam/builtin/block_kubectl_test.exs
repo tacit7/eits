@@ -41,7 +41,10 @@ defmodule EyeInTheSky.IAM.Builtin.BlockKubectlTest do
   end
 
   test "does not match non-Bash tool" do
-    refute BlockKubectl.matches?(policy(), %Context{tool: "Write", resource_content: "kubectl delete pod x"})
+    refute BlockKubectl.matches?(policy(), %Context{
+             tool: "Write",
+             resource_content: "kubectl delete pod x"
+           })
   end
 
   test "allowVerbs escapes the block" do

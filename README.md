@@ -103,7 +103,7 @@ mv /tmp/merged.json ~/.claude/settings.json
 | `SessionStart (startup/resume)` | `eits-agent-working.sh` | Sets agent status to `working` |
 | `SessionStart (compact)` | `eits-session-compact.sh` | Ends old session as `compacted`, lets init create a fresh one |
 | `SessionEnd` | `eits-session-end.sh` | Marks session `completed`, sets `ended_at` |
-| `Stop` | `eits-session-stop.sh` | Sets session status to `waiting` on Ctrl+C |
+| `Stop` | `eits-session-stop.sh` | Sets session status to `idle` on Ctrl+C |
 | `PreToolUse` | `eits-pre-tool-use.sh` | Logs tool call to `actions` table |
 | `PostToolUse` | `eits-post-tool-use.sh` | Logs tool result/error to `actions` table |
 

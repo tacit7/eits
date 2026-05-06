@@ -9,7 +9,8 @@ defmodule EyeInTheSky.IAM.Builtin.SanitizePromptApiKeysTest do
 
   describe "redact/1" do
     test "redacts Anthropic API keys" do
-      {redacted, count, summary} = SanitizePromptApiKeys.redact("key: sk-ant-aBcDeFgHiJkLmNoPqRsT0")
+      {redacted, count, summary} =
+        SanitizePromptApiKeys.redact("key: sk-ant-aBcDeFgHiJkLmNoPqRsT0")
 
       assert redacted == "key: [REDACTED:anthropic]"
       assert count == 1

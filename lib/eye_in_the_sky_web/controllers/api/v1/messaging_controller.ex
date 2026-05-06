@@ -153,7 +153,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   @receivable_statuses ~w(working idle waiting)
 
   defp do_dm(conn, params, from_raw, to_raw) do
-    with {:from, {:ok, from_session}} <- {:from, resolve_session_target(%{raw: from_raw, kind: :from})},
+    with {:from, {:ok, from_session}} <-
+           {:from, resolve_session_target(%{raw: from_raw, kind: :from})},
          {:from_active, false} <-
            {:from_active, from_session.status in Sessions.terminated_statuses()},
          {:to, {:ok, to_session}} <- {:to, resolve_session_target(%{raw: to_raw, kind: :to})},
@@ -188,22 +189,54 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
             {:error, :queue_full} ->
               Logger.warning("DM queue full for session #{to_session.id}")
-              conn |> put_status(503) |> json(%{error: "queue_full", reachable: true, message: "Target session queue is full; retry later"})
+
+              conn
+              |> put_status(503)
+              |> json(%{
+                error: "queue_full",
+                reachable: true,
+                message: "Target session queue is full; retry later"
+              })
 
             {:error, reason} when reason in [:worker_not_found, :not_running] ->
-              Logger.warning("DM worker unreachable for session #{to_session.id}: #{inspect(reason)}")
-              conn |> put_status(503) |> json(%{error: "target_session_unreachable", reachable: false, message: "Target session worker is not running"})
+              Logger.warning(
+                "DM worker unreachable for session #{to_session.id}: #{inspect(reason)}"
+              )
+
+              conn
+              |> put_status(503)
+              |> json(%{
+                error: "target_session_unreachable",
+                reachable: false,
+                message: "Target session worker is not running"
+              })
 
             {:error, {:worker_exit, exit_reason}} ->
-              Logger.error("DM worker exited for session #{to_session.id}: #{inspect(exit_reason)}")
-              conn |> put_status(503) |> json(%{error: "target_session_unreachable", reachable: false, message: "Target session worker crashed"})
+              Logger.error(
+                "DM worker exited for session #{to_session.id}: #{inspect(exit_reason)}"
+              )
+
+              conn
+              |> put_status(503)
+              |> json(%{
+                error: "target_session_unreachable",
+                reachable: false,
+                message: "Target session worker crashed"
+              })
 
             {:error, :invalid_message} ->
               {:error, :unprocessable_entity, "Invalid message payload"}
 
             {:error, reason} ->
               Logger.error("DM delivery failed for session #{to_session.id}: #{inspect(reason)}")
-              conn |> put_status(503) |> json(%{error: "delivery_failed", reachable: false, message: "Failed to deliver message"})
+
+              conn
+              |> put_status(503)
+              |> json(%{
+                error: "delivery_failed",
+                reachable: false,
+                message: "Failed to deliver message"
+              })
           end
 
         existing ->
@@ -220,7 +253,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
         {:error, :not_found, "Target session not found"}
 
       {:to_receivable, false} ->
-        {:error, :unprocessable_entity, "Target session is terminated (completed or failed) and cannot receive DMs"}
+        {:error, :unprocessable_entity,
+         "Target session is terminated (completed or failed) and cannot receive DMs"}
     end
   end
 

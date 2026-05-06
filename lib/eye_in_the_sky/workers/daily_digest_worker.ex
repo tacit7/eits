@@ -56,8 +56,11 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
         path = Path.join(dir, "daily-digest-#{date_label}.md")
 
         case File.write(path, body) do
-          :ok -> Logger.info("DailyDigestWorker: wrote #{path}")
-          {:error, reason} -> Logger.error("DailyDigestWorker: failed to write digest: #{inspect(reason)}")
+          :ok ->
+            Logger.info("DailyDigestWorker: wrote #{path}")
+
+          {:error, reason} ->
+            Logger.error("DailyDigestWorker: failed to write digest: #{inspect(reason)}")
         end
     end
 
@@ -165,5 +168,4 @@ defmodule EyeInTheSky.Workers.DailyDigestWorker do
       "- `#{hash}` #{msg} _(#{session})_"
     end)
   end
-
 end

@@ -10,9 +10,11 @@ defmodule EyeInTheSkyWeb.Components.CliFlags do
   attr :mcp_config, :string, default: nil
   attr :plugin_dir, :string, default: nil
   attr :settings_file, :string, default: nil
+
   attr :compact_paths, :boolean,
     default: false,
-    doc: "When true, wraps plugin_dir + settings_file in a 2-column grid (matches agent_schedule_form layout)."
+    doc:
+      "When true, wraps plugin_dir + settings_file in a 2-column grid (matches agent_schedule_form layout)."
 
   def path_fields(assigns) do
     ~H"""
@@ -108,8 +110,7 @@ defmodule EyeInTheSkyWeb.Components.CliFlags do
           class="checkbox checkbox-sm checkbox-primary"
         />
         <span class="label-text text-xs">
-          Chrome integration
-          <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
+          Chrome integration <span class="font-mono text-base-content/40 text-xs ml-1">--chrome</span>
         </span>
       </label>
       <label class="label cursor-pointer justify-start gap-2 py-1">

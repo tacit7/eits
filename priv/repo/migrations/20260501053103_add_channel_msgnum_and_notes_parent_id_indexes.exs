@@ -6,9 +6,10 @@ defmodule EyeInTheSky.Repo.Migrations.AddChannelMsgnumAndNotesParentIdIndexes do
 
   def up do
     create_if_not_exists index(:messages, [:channel_id, :channel_message_number],
-      name: :messages_channel_msgnum_idx,
-      concurrently: true,
-      where: "channel_message_number IS NOT NULL")
+                           name: :messages_channel_msgnum_idx,
+                           concurrently: true,
+                           where: "channel_message_number IS NOT NULL"
+                         )
 
     execute """
     CREATE INDEX CONCURRENTLY IF NOT EXISTS notes_parent_id_bigint_project_idx
@@ -19,7 +20,8 @@ defmodule EyeInTheSky.Repo.Migrations.AddChannelMsgnumAndNotesParentIdIndexes do
 
   def down do
     drop_if_exists index(:messages, [:channel_id, :channel_message_number],
-      name: :messages_channel_msgnum_idx)
+                     name: :messages_channel_msgnum_idx
+                   )
 
     execute "DROP INDEX CONCURRENTLY IF EXISTS notes_parent_id_bigint_project_idx"
   end

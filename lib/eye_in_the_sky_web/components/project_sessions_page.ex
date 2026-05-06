@@ -32,7 +32,11 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
 
   def page(assigns) do
     ~H"""
-    <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8" id="sessions-page-root" phx-hook="DmHistoryCleanup">
+    <div
+      class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8"
+      id="sessions-page-root"
+      phx-hook="DmHistoryCleanup"
+    >
       <div class="max-w-4xl mx-auto">
         <%!-- Toolbar --%>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
@@ -53,7 +57,10 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
             >
               <.icon name="hero-funnel-mini" class="size-4" />
               <%= if @session_filter != "all" || @sort_by != "last_message" do %>
-                <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full" aria-hidden="true">
+                <span
+                  class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
+                  aria-hidden="true"
+                >
                 </span>
               <% end %>
             </button>

@@ -70,6 +70,61 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
     >
+      <%!-- Create note modal --%>
+      <%= if @overlay_data.active_overlay == :create_note do %>
+        <div class="modal modal-open modal-bottom sm:modal-middle" id="create-note-modal">
+          <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+            <h3 class="font-semibold text-base mb-3">Create Note</h3>
+
+            <form id="create-note-form" phx-submit="create_note">
+              <div class="mb-4">
+                <label class="text-xs font-medium text-base-content/60 mb-1.5 block">
+                  Title
+                  <span class="text-base-content/30">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  class="input input-bordered w-full text-base"
+                  placeholder="Note title..."
+                  maxlength="255"
+                />
+              </div>
+
+              <div class="mb-4">
+                <label class="text-xs font-medium text-base-content/60 mb-1.5 block">
+                  Note
+                </label>
+                <textarea
+                  name="body"
+                  rows="6"
+                  class="textarea textarea-bordered w-full text-base resize-none"
+                  placeholder="Write your note..."
+                  required
+                ></textarea>
+              </div>
+
+              <div class="modal-action">
+                <button
+                  type="button"
+                  phx-click="close_create_note_modal"
+                  class="btn btn-ghost btn-sm min-h-[44px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-sm min-h-[44px]"
+                >
+                  Create Note
+                </button>
+              </div>
+            </form>
+          </div>
+          <div class="modal-backdrop" phx-click="close_create_note_modal"></div>
+        </div>
+      <% end %>
+
       <%!-- Reload confirm modal --%>
       <dialog
         id="dm-reload-confirm-modal"

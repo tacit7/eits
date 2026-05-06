@@ -12,8 +12,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
       EITS-CMD: dm --to <session_ref> --message <text>
       EITS-CMD: dm list [--limit <n>]
 
-      EITS-CMD: team broadcast --message <text>
-
       EITS-CMD: task create <title>
       EITS-CMD: task begin <title>
       EITS-CMD: task start <id>
@@ -35,11 +33,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
                       [--team-name <name>] [--member-name <alias>]
                       [--agent <name>] [--provider <claude|codex>] [--yolo]
 
-      EITS-CMD: teams join <team_id> --name <name> [--role <role>]
-      EITS-CMD: teams leave <team_id> <member_id>
-      EITS-CMD: teams done
-      EITS-CMD: teams update-member <team_id> <member_id> --status <status>
-
       EITS-CMD: channel send <channel_id> --body <text>
 
   ## Submodules
@@ -47,15 +40,19 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
     * `CmdDispatcher.Helpers`      — shared notify/extract/with_task helpers
     * `CmdDispatcher.TaskHandler`  — task subcommands
     * `CmdDispatcher.DmHandler`    — dm subcommands
-    * `CmdDispatcher.TeamsHandler` — teams + team subcommands
 
   Smaller command groups (note, commit, spawn, channel) are handled inline.
+
+  ## Removed
+
+  EITS-CMD team operations (join, leave, broadcast, update-member, done) were removed.
+  All team operations are available via the eits CLI. See `docs/REST_API.md`.
   """
 
   require Logger
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.Agents.CmdDispatcher.{DmHandler, Helpers, TaskHandler, TeamsHandler}
+  alias EyeInTheSky.Agents.CmdDispatcher.{DmHandler, Helpers, TaskHandler}
   alias EyeInTheSky.{AsyncTask, ChannelMessages, Commits, Notes, Tasks}
   alias EyeInTheSky.Utils.ToolHelpers
 
@@ -120,8 +117,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   defp route_cmd("note", args, sid), do: dispatch_note(args, sid)
   defp route_cmd("commit", hash, sid), do: dispatch_commit(String.trim(hash), sid)
   defp route_cmd("spawn", args, sid), do: dispatch_spawn(args, sid)
-  defp route_cmd("teams", args, sid), do: TeamsHandler.dispatch_teams(args, sid)
-  defp route_cmd("team", args, sid), do: TeamsHandler.dispatch_team(args, sid)
   defp route_cmd("channel", args, sid), do: dispatch_channel(args, sid)
   defp route_cmd(unknown, _args, sid), do: notify_error(sid, unknown, :unknown_command)
 

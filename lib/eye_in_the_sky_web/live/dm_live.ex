@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.DmLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Agents, Sessions}
+  alias EyeInTheSky.{Agents, Notes, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Settings.JsonSettings
   alias EyeInTheSkyWeb.Components.DmPage
@@ -180,6 +180,48 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("cancel_timer", _params, socket),
     do: TimerHandlers.handle_cancel_timer(socket)
+
+  # ---------------------------------------------------------------------------
+  # Note CRUD — create notes on DM page
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("open_create_note_modal", _params, socket) do
+    {:noreply, assign(socket, :active_overlay, :create_note)}
+  end
+
+  @impl true
+  def handle_event("close_create_note_modal", _params, socket) do
+    {:noreply, assign(socket, :active_overlay, nil)}
+  end
+
+  @impl true
+  def handle_event("create_note", %{"title" => title, "body" => body}, socket) do
+    session_id = socket.assigns.session_id
+
+    note_attrs = %{
+      parent_type: "session",
+      parent_id: to_string(session_id),
+      title: if(title != "", do: title, else: nil),
+      body: body
+    }
+
+    case Notes.create_note(note_attrs) do
+      {:ok, _note} ->
+        updated_notes = Notes.list_notes_for_session(session_id)
+
+        socket =
+          socket
+          |> assign(:notes, updated_notes)
+          |> assign(:active_overlay, nil)
+          |> put_flash(:info, "Note created")
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to create note: #{inspect(reason)}")}
+    end
+  end
 
   @impl true
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)

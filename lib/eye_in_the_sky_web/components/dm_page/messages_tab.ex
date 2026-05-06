@@ -352,7 +352,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     ~H"""
     <details
       id={"cluster-#{List.first(@events).id}"}
-      phx-update="ignore"
       class="group my-1 w-full pl-[33px]"
     >
       <summary class="flex items-center gap-2 px-1 py-0.5 cursor-pointer list-none text-[var(--text-muted)] hover:text-[var(--text-secondary)] select-none">

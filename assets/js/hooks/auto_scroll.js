@@ -15,10 +15,11 @@ export const AutoScroll = {
       this.shouldAutoScroll = scrollHeight - scrollTop - clientHeight <= 50
 
       // Auto-load older messages when scrolled near the top
-      if (this._mounted && !this._loadingMore && scrollTop < 100 && this.el.dataset.hasMore === "true") {
-        this._loadingMore = true
-        this.pushEvent("load_more_messages", {})
-      }
+      // DISABLED: behaviour is wonky — use the "Load older messages" button instead
+      // if (this._mounted && !this._loadingMore && scrollTop < 100 && this.el.dataset.hasMore === "true") {
+      //   this._loadingMore = true
+      //   this.pushEvent("load_more_messages", {})
+      // }
     }
 
     this.el.addEventListener("scroll", this._onScroll, { passive: true })

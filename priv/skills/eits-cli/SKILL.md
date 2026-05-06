@@ -8,13 +8,15 @@ allowed-tools: Bash
 
 # EITS CLI
 
-The `eits` bash script is the sole interface to the EITS REST API at `http://localhost:5001/api/v1`. All agents use it directly. EITS-CMD directives are **deprecated**.
+The `eits` bash script is the sole interface to the EITS REST API. By default it targets `http://localhost:5001/api/v1`, unless `EITS_URL` overrides it.
+
+All agents — including interactive `cli` agents and spawned `sdk-cli` agents — use the same `eits` script directly. Do not use deprecated EITS-CMD directives.
 
 ## Live Session Context
 
 !eits tasks active --json 2>/dev/null | jq -r 'if ((.tasks // []) | length) > 0 then "Active tasks: " + ((.tasks // []) | map("\(.id): \(.title)") | join("; ")) else "No active tasks" end' 2>/dev/null || echo "(active tasks unavailable)"
 
-!echo "Session: ${EITS_SESSION_UUID:-(not set)} | Project: ${EITS_PROJECT_ID:-(not set)} | URL: ${EITS_URL:-http://localhost:5001/api/v1}"
+!echo "Agent: ${EITS_AGENT_UUID:-(not set)} | Session: ${EITS_SESSION_UUID:-(not set)} | Project: ${EITS_PROJECT_ID:-(not set)} | URL: ${EITS_URL:-http://localhost:5001/api/v1}"
 
 ---
 
@@ -25,7 +27,7 @@ EITS agents run in one of two dispatch modes:
 - **`cli`** — interactive agent running in the current terminal/session
 - **`sdk-cli`** — spawned or delegated agent running through the SDK CLI wrapper
 
-Both modes use the **same `eits` command syntax**. Do not change task, note, commit, or session commands based on dispatch mode. Dispatch mode only matters when a command explicitly accepts a dispatch-related flag (e.g. agent spawn, job queue). For those flags, see `commands.md`.
+Both modes use the **same `eits` command syntax**. Do not change task, note, commit, or session commands based on dispatch mode. Dispatch mode only matters for commands such as `eits agents spawn` or `eits jobs create` that explicitly accept a dispatch-related flag. For those flags, see `commands.md`.
 
 ---
 
@@ -51,8 +53,8 @@ eits tasks complete <task_id> --message "What was done and why"
 
 # 5. Log commits — auto-links to current session via $EITS_AGENT_UUID/$EITS_SESSION_UUID
 eits commits create --hash <sha>
-# Can also be done inline with complete:
-eits tasks complete <task_id> --message "..." --commit <sha>
+# Can also be done inline with complete (--commit is repeatable for multiple hashes):
+eits tasks complete <task_id> --message "..." --commit <sha1> --commit <sha2>
 ```
 
 ---
@@ -80,7 +82,9 @@ eits tasks begin --id <task_id>
 
 `eits tasks list` scopes to the current session when `EITS_SESSION_UUID` is set. Pass `--all` to see across sessions.
 
-If `EITS_SESSION_UUID` is not set, task commands will not link work to a session. If `EITS_PROJECT_ID` is not set and a command requires it, pass `--project-id <id>` explicitly or see `commands.md` for project commands.
+If `EITS_SESSION_UUID` is not set, `tasks begin`, `tasks annotate`, `tasks complete`, and `commits create` may not attach work to the intended session. Do not assume session linkage unless `EITS_SESSION_UUID` is present.
+
+If `EITS_PROJECT_ID` is not set and a command requires a project, read `commands.md` for the command-specific project flag — the flag name varies by subcommand.
 
 ---
 

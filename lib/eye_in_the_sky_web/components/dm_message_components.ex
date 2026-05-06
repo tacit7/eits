@@ -9,7 +9,6 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     tool_widget_body/1    — renders the body inside a tool call widget
     message_metrics/1     — renders token/cost/duration metrics row
     message_attachments/1 — renders file attachment list
-    stream_provider_avatar/1 — renders the live-stream avatar
 
   Both message_body and tool_result_body accept a `compact` boolean (default false)
   that switches to smaller sizing for use in the canvas chat window.
@@ -490,26 +489,4 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   end
 
   defp text_body?(assigns), do: assigns.rest != "" and assigns.rest != assigns.detail
-
-  # ---------------------------------------------------------------------------
-  # stream_provider_avatar
-  # ---------------------------------------------------------------------------
-
-  attr :session, :map, default: nil
-
-  def stream_provider_avatar(assigns) do
-    provider = if assigns.session, do: assigns.session.provider, else: "claude"
-    assigns = assign(assigns, :provider, provider)
-
-    ~H"""
-    <img
-      src={provider_icon(@provider)}
-      class="size-4 mt-1 flex-shrink-0 animate-pulse"
-      alt={String.capitalize(@provider)}
-      width="16"
-      height="16"
-      loading="lazy"
-    />
-    """
-  end
 end

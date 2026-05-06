@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5" id="live-stream-bubble">
               <div class="flex items-center gap-2 mb-2">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <.stream_provider_avatar session={@session} />
+                  <.provider_avatar session={@session} class="size-3 animate-pulse" />
                 </div>
                 <span class="text-[11px] font-semibold text-primary/80 animate-pulse">
                   {stream_provider_label(@session)}
@@ -252,7 +252,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <%!-- Header row --%>
               <div :if={@show_header && @tier == :primary} class="flex items-center gap-2 mb-3">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <.agent_provider_icon session={@session} />
+                  <.provider_avatar session={@session} />
                 </div>
                 <span class="text-[11px] font-semibold text-base-content/80">
                   {if @agent, do: @agent.name, else: "agent"}
@@ -314,45 +314,29 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     """
   end
 
-  defp normalize_provider("codex"), do: :codex
-  defp normalize_provider("gemini"), do: :gemini
-  defp normalize_provider(_), do: :claude
-
-  # Static avatar icon for the agent message header
+  # Provider avatar — single canonical impl for both static and animated sites.
+  # Sources the SVG path and dark-mode class from DmHelpers; see lib/CLAUDE.md.
   attr :session, :map, default: nil
+  attr :class, :string, default: "size-3"
 
-  defp agent_provider_icon(assigns) do
+  defp provider_avatar(assigns) do
     provider = if assigns.session, do: assigns.session.provider, else: "claude"
-    assigns = assign(assigns, :provider, normalize_provider(provider))
+
+    assigns =
+      assigns
+      |> assign(:src, DmHelpers.provider_icon(provider))
+      |> assign(:icon_class, DmHelpers.provider_icon_class(provider))
+      |> assign(:alt, DmHelpers.stream_provider_label(assigns.session))
 
     ~H"""
-    <%= cond do %>
-      <% @provider == :codex -> %>
-        <img src="/images/openai.svg" class="size-3" alt="Codex" width="12" height="12" loading="lazy" />
-      <% @provider == :gemini -> %>
-        <img src="/images/gemini.svg" class="size-3" alt="Gemini" width="12" height="12" loading="lazy" />
-      <% true -> %>
-        <img src="/images/claude.svg" class="size-3" alt="Claude" width="12" height="12" loading="lazy" />
-    <% end %>
-    """
-  end
-
-  # Animated avatar used by the stream bubble
-  attr :session, :map, default: nil
-
-  defp stream_provider_avatar(assigns) do
-    provider = if assigns.session, do: assigns.session.provider, else: "claude"
-    assigns = assign(assigns, :provider, normalize_provider(provider))
-
-    ~H"""
-    <%= cond do %>
-      <% @provider == :codex -> %>
-        <img src="/images/openai.svg" class="size-3 animate-pulse" alt="Codex" width="12" height="12" loading="lazy" />
-      <% @provider == :gemini -> %>
-        <img src="/images/gemini.svg" class="size-3 animate-pulse" alt="Gemini" width="12" height="12" loading="lazy" />
-      <% true -> %>
-        <img src="/images/claude.svg" class="size-3 animate-pulse" alt="Claude" width="12" height="12" loading="lazy" />
-    <% end %>
+    <img
+      src={@src}
+      class={[@class, @icon_class]}
+      alt={@alt}
+      width="12"
+      height="12"
+      loading="lazy"
+    />
     """
   end
 

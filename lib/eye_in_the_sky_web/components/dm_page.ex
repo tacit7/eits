@@ -471,14 +471,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full" id="dm-tab-content">
         <%= case @active_tab do %>
           <% "messages" -> %>
-            <MessagesTab.messages_tab
+            <.messages_tab_content
               streams={@streams}
-              empty={@message_data.messages == []}
-              has_more_messages={@message_data.has_more_messages}
+              message_data={@message_data}
               stream={@stream}
-              session={@agent}
               agent={@agent}
-              message_search_query={@message_data.message_search_query}
               codex_raw_lines={@codex_raw_lines}
             />
           <% "tasks" -> %>
@@ -499,14 +496,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               notify_on_stop={@notify_on_stop}
             />
           <% _ -> %>
-            <MessagesTab.messages_tab
+            <.messages_tab_content
               streams={@streams}
-              empty={@message_data.messages == []}
-              has_more_messages={@message_data.has_more_messages}
+              message_data={@message_data}
               stream={@stream}
-              session={@agent}
               agent={@agent}
-              message_search_query={@message_data.message_search_query}
               codex_raw_lines={@codex_raw_lines}
             />
         <% end %>
@@ -545,6 +539,27 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         </div>
       <% end %>
     </div>
+    """
+  end
+
+  attr :streams, :map, required: true
+  attr :message_data, :map, required: true
+  attr :stream, :map, required: true
+  attr :agent, :map, required: true
+  attr :codex_raw_lines, :list, required: true
+
+  defp messages_tab_content(assigns) do
+    ~H"""
+    <MessagesTab.messages_tab
+      streams={@streams}
+      empty={@message_data.messages == []}
+      has_more_messages={@message_data.has_more_messages}
+      stream={@stream}
+      session={@agent}
+      agent={@agent}
+      message_search_query={@message_data.message_search_query}
+      codex_raw_lines={@codex_raw_lines}
+    />
     """
   end
 end

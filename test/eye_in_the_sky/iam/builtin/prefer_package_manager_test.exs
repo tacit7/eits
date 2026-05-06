@@ -9,6 +9,10 @@ defmodule EyeInTheSky.IAM.Builtin.PreferPackageManagerTest do
   defp policy(cond \\ nil), do: %Policy{condition: cond}
   defp policy_for(manager), do: policy(%{"packageManager" => manager})
 
+  # ---------------------------------------------------------------------------
+  # Positive — wrong manager used
+  # ---------------------------------------------------------------------------
+
   test "matches when npm is used but pnpm is preferred" do
     assert PreferPackageManager.matches?(policy_for("pnpm"), ctx("npm install lodash"))
   end
@@ -41,7 +45,11 @@ defmodule EyeInTheSky.IAM.Builtin.PreferPackageManagerTest do
     assert PreferPackageManager.matches?(policy_for("npm"), ctx("yarn remove lodash"))
   end
 
-  test "does not match when the correct manager is used (pnpm)" do
+  # ---------------------------------------------------------------------------
+  # Negative — correct manager used
+  # ---------------------------------------------------------------------------
+
+  test "does not match when the correct manager is used (pnpm preferred)" do
     refute PreferPackageManager.matches?(policy_for("pnpm"), ctx("pnpm install"))
   end
 
@@ -57,13 +65,22 @@ defmodule EyeInTheSky.IAM.Builtin.PreferPackageManagerTest do
     refute PreferPackageManager.matches?(policy_for("bun"), ctx("bun run test"))
   end
 
-  test "does not match when no packageManager condition is set" do
+  # ---------------------------------------------------------------------------
+  # Negative — no packageManager condition set
+  # ---------------------------------------------------------------------------
+
+  test "does not match when no packageManager condition is set (nil condition)" do
     refute PreferPackageManager.matches?(policy(), ctx("npm install lodash"))
   end
 
   test "does not match when condition map lacks packageManager key" do
-    refute PreferPackageManager.matches?(policy(%{"other" => "value"}), ctx("yarn add react"))
+    p = policy(%{"someOtherKey" => "value"})
+    refute PreferPackageManager.matches?(p, ctx("yarn add react"))
   end
+
+  # ---------------------------------------------------------------------------
+  # Negative — non-package-manager commands
+  # ---------------------------------------------------------------------------
 
   test "does not match non-package-manager bash commands (git)" do
     refute PreferPackageManager.matches?(policy_for("npm"), ctx("git commit -m 'fix'"))
@@ -77,10 +94,21 @@ defmodule EyeInTheSky.IAM.Builtin.PreferPackageManagerTest do
     refute PreferPackageManager.matches?(policy_for("pnpm"), ctx("npm --version"))
   end
 
+  test "does not match bare yarn --version" do
+    refute PreferPackageManager.matches?(policy_for("npm"), ctx("yarn --version"))
+  end
+
+  # ---------------------------------------------------------------------------
+  # Negative — non-Bash tool
+  # ---------------------------------------------------------------------------
+
   test "does not match Read tool" do
-    refute PreferPackageManager.matches?(policy_for("pnpm"), %Context{
-             tool: "Read",
-             resource_content: "npm install lodash"
-           })
+    ctx = %Context{tool: "Read", resource_content: "npm install lodash"}
+    refute PreferPackageManager.matches?(policy_for("pnpm"), ctx)
+  end
+
+  test "does not match Write tool" do
+    ctx = %Context{tool: "Write", resource_content: "npm install lodash"}
+    refute PreferPackageManager.matches?(policy_for("pnpm"), ctx)
   end
 end

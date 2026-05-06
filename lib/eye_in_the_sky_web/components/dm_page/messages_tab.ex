@@ -170,7 +170,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
     is_empty_tool_result =
       stream_type == "tool_result" and String.trim(assigns.message.body || "") == ""
-    tier = if role == :agent, do: DmMessageComponents.message_tier(assigns.message), else: :user
+    tier =
+      if role == :agent,
+        do: DmMessageComponents.message_tier(is_tool_event, assigns.message.body),
+        else: :user
 
     show_header = !is_same_sender && !is_tool_event
 

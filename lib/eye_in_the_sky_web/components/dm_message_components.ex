@@ -36,11 +36,21 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     segments = parse_body_segments(body)
     body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
 
-    cond do
-      is_tool_event or body_is_tool_calls -> :secondary
-      String.trim(body) == "" -> :secondary
-      true -> :primary
-    end
+    classify_tier(is_tool_event or body_is_tool_calls, body)
+  end
+
+  @doc """
+  Variant that accepts an already-computed `is_tool_event` flag and the raw
+  body. Used by `MessagesTab.message_item/1` to avoid re-parsing segments
+  and re-checking stream_type when those values are already on the assigns.
+  """
+  def message_tier(is_tool_event, body) when is_boolean(is_tool_event) do
+    classify_tier(is_tool_event, body || "")
+  end
+
+  defp classify_tier(true, _body), do: :secondary
+  defp classify_tier(false, body) do
+    if String.trim(body) == "", do: :secondary, else: :primary
   end
 
   # ---------------------------------------------------------------------------

@@ -87,6 +87,7 @@ import {ShiftSelect} from "./hooks/shift_select"
 import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
 import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
+import {PreserveDetails} from "./hooks/preserve_details"
 import {VimNav} from "./hooks/vim_nav"
 import {showToast, showSessionFailureToast} from "./hooks/utils"
 import SortDropdown from "./hooks/sort_dropdown"
@@ -161,6 +162,7 @@ Hooks.ShiftSelect = ShiftSelect
 Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
 Hooks.DmHistoryCleanup = DmHistoryCleanup
+Hooks.PreserveDetails = PreserveDetails
 Hooks.SortDropdown = SortDropdown
 Hooks.PtyHook = PtyHook
 Hooks.TerminalHook = TerminalHook

@@ -37,6 +37,23 @@ static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(2);
 /// Always-on-top state — persisted in memory, toggled via menu/tray.
 static ALWAYS_ON_TOP: AtomicBool = AtomicBool::new(false);
 
+/// Pending navigation path set when a notification fires while the app is in the
+/// background. Drained on the next window-focus event so that clicking a
+/// notification navigates to the right session.
+static PENDING_NAV: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+fn set_pending_nav(path: String) {
+    let lock = PENDING_NAV.get_or_init(|| Mutex::new(None));
+    if let Ok(mut guard) = lock.lock() {
+        *guard = Some(path);
+    }
+}
+
+fn take_pending_nav() -> Option<String> {
+    let lock = PENDING_NAV.get_or_init(|| Mutex::new(None));
+    lock.lock().ok().and_then(|mut g| g.take())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize file logging first — before anything else so even early panics are captured.
@@ -459,6 +476,19 @@ pub fn run() {
                         let _ = wv.eval(&js);
                     }
                 }
+                tauri::WindowEvent::Focused(true) => {
+                    // When the main window gains focus (e.g. user clicked a notification),
+                    // drain any pending navigation stored by send_notification.
+                    if window.label() == "main" {
+                        if let Some(path) = take_pending_nav() {
+                            let app = window.app_handle().clone();
+                            let app2 = app.clone();
+                            let _ = app.run_on_main_thread(move || {
+                                navigate_to(&app2, &path);
+                            });
+                        }
+                    }
+                }
                 _ => {}
             }
         })
@@ -607,14 +637,17 @@ fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
     }
 }
 
-/// Send a native notification. If `nav_path` is provided and the window is
-/// already visible, navigates immediately. Click-to-navigate on macOS is not
-/// supported by tauri-plugin-notification (notify_rust fires-and-forgets).
+/// Send a native notification with optional click-to-navigate support.
+///
+/// If `nav_path` is provided:
+/// - Window already visible → navigate immediately.
+/// - Window in background → store in PENDING_NAV; the Focused(true) window event
+///   drains it when the user clicks the notification and the app comes to front.
 #[cfg(not(debug_assertions))]
 fn send_notification(title: &str, body: &str, nav_path: Option<String>, app_handle: &tauri::AppHandle) {
     use tauri_plugin_notification::NotificationExt;
 
-    log!("[eits-tauri] send_notification (main thread): title={title:?} body={body:?}");
+    log!("[eits-tauri] send_notification (main thread): title={title:?} body={body:?} nav={nav_path:?}");
 
     let builder = app_handle
         .notification()
@@ -627,12 +660,17 @@ fn send_notification(title: &str, body: &str, nav_path: Option<String>, app_hand
         Err(e) => log!("[eits-tauri] notification error: {e}"),
     }
 
-    // If the window is already visible, navigate immediately on receipt.
-    // This handles the case where the user has the app focused.
     if let Some(path) = nav_path {
         if let Some(window) = app_handle.get_webview_window("main") {
             if window.is_visible().unwrap_or(false) {
+                // App is in the foreground — navigate right away.
                 navigate_to(app_handle, &path);
+            } else {
+                // App is in the background. Store the path; the Focused(true)
+                // window event fires when the user clicks the notification and
+                // macOS brings the app to the front.
+                log!("[eits-tauri] send_notification: storing pending_nav={path:?}");
+                set_pending_nav(path);
             }
         }
     }

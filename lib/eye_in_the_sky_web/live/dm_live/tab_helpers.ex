@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   require Logger
 
   @default_context_window 200_000
+  @extended_context_window 1_000_000
   @default_message_limit 50
 
   @doc """
@@ -203,17 +204,24 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
   defp extract_from_model_usage(model_usage) do
     model_usage
-    |> Map.values()
-    |> Enum.find_value(fn entry when is_map(entry) ->
+    |> Enum.find_value(fn {model_key, entry} when is_map(entry) ->
       input = entry["inputTokens"] || 0
       cache_read = entry["cacheReadInputTokens"] || 0
       cache_creation = entry["cacheCreationInputTokens"] || 0
-      ctx_window = entry["contextWindow"] || @default_context_window
+
+      # Claude Code reports contextWindow: 200k even for 1M models.
+      # Detect 1M from the model key suffix (e.g. "claude-opus-4-7[1m]").
+      ctx_window =
+        cond do
+          String.contains?(model_key, "[1m]") -> @extended_context_window
+          true -> entry["contextWindow"] || @default_context_window
+        end
+
       used = input + cache_read + cache_creation
 
       if used > ctx_window do
         Logger.warning(
-          "[ctx_overflow] model_usage: used=#{used} window=#{ctx_window} " <>
+          "[ctx_overflow] model_usage: used=#{used} window=#{ctx_window} model=#{model_key} " <>
             "input=#{input} cache_read=#{cache_read} cache_creation=#{cache_creation}"
         )
       end
@@ -228,14 +236,11 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     cache_creation = usage["cache_creation_input_tokens"] || 0
     used = input + cache_read + cache_creation
 
-    if used > @default_context_window do
-      Logger.warning(
-        "[ctx_overflow] usage: used=#{used} window=#{@default_context_window} " <>
-          "input=#{input} cache_read=#{cache_read} cache_creation=#{cache_creation}"
-      )
-    end
+    # If usage exceeds 200k, the session must be on a 1M model
+    ctx_window =
+      if used > @default_context_window, do: @extended_context_window, else: @default_context_window
 
-    if used > 0, do: {used, @default_context_window}
+    if used > 0, do: {used, ctx_window}
   end
 
   # Enriches commits that have no stored message by fetching subjects from git.

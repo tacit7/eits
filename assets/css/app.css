@@ -211,6 +211,66 @@ form:focus-visible {
   }
 }
 
+/* ===== Surface ladder tokens — dark theme only ===== */
+/* These tokens are referenced by var(--surface-*) in class attributes.
+   Gaps between levels are intentional; avoid collapsing them. */
+[data-theme="dark"] {
+  --surface-rail:     #10121a;
+  --surface-flyout:   #151827;
+  --surface-canvas:   #181b2a;
+  --surface-card:     #21253a;
+  --surface-tool:     #1b1f31;
+  --surface-composer: #1f2337;
+  /* text + border semantic tokens used by tier-based message rendering */
+  --text-primary:   oklch(92% 0 0);
+  --text-secondary: oklch(70% 0 0);
+  --border-subtle:  oklch(var(--bc) / 0.08);
+  --guide-line:     oklch(var(--p));
+}
+
+/* ===== Surface ladder tokens — Tokyo Night theme ===== */
+/* Values sourced directly from the approved DM page mockup (eits-dm-mockup.html).
+   Rail < Flyout < Canvas < Card/Composer — near-achromatic, no blue chroma. */
+[data-theme="tokyonight"] {
+  --surface-rail:            #131316;  /* nav icon rail — darkest */
+  --surface-flyout:          #161619;  /* session switcher panel */
+  --surface-canvas:          #1a1a22;  /* main content background */
+  --surface-card:            #1e1e27;  /* assistant message cards, composer */
+  --surface-tool:            #181820;  /* tool event rows — between canvas and card */
+  --surface-composer:        #1e1e27;  /* composer matches card */
+  --surface-selected:        #2c2f4a;  /* selected session row */
+  --surface-hover:           rgba(37,37,58,0.55);
+
+  /* Border tokens */
+  --border-subtle:           #25253a;
+  --border-select-ring:      rgba(122,162,247,0.14);
+
+  /* Text tokens — sourced from mockup fg values */
+  --text-primary:            #cdd6f4;  /* --fg */
+  --text-secondary:          #bac2de;  /* --fg-dim */
+  --text-muted:              #6c7086;  /* --fg-muted */
+  --text-ghost:              #484d6d;  /* --fg-ghost */
+  --text-meta:               #8292c8;  /* --fg-meta */
+
+  /* Accent tokens */
+  --accent-primary:          #7aa2f7;
+  --accent-soft:             rgba(122,162,247,0.12);
+  --accent-bar:              #7aa2f7;
+
+  /* Code tokens */
+  --code-bg:                 rgba(189,147,249,0.10);
+  --code-border:             rgba(189,147,249,0.20);
+  --code-text:               #bac2de;
+
+  /* Guide line for assistant message cards */
+  --guide-line:              #7aa2f7;
+
+  /* Warning tokens */
+  --warning-bg:              rgba(180,120,32,0.16);
+  --warning-border:          rgba(220,160,70,0.35);
+  --warning-text:            #e0af68;
+}
+
 /* ===== Dark theme - Claude.ai actual CSS vars ===== */
 /* --bg-100: hsl(60 2.7% 14.5%) page bg                */
 /* --bg-000: hsl(60 2.1% 18.4%) surfaces               */

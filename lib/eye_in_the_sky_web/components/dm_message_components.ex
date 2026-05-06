@@ -22,6 +22,29 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   import EyeInTheSkyWeb.Components.DmHelpers
 
   # ---------------------------------------------------------------------------
+  # message_tier/1
+  # Classifies an agent message into a display tier:
+  #   :primary   — substantial content (text body, DM) → full card treatment
+  #   :secondary — tool event / tool result → plain muted row
+  #   :user      — fallback / user-like agent message
+  # ---------------------------------------------------------------------------
+
+  def message_tier(message) do
+    stream_type = get_in(message.metadata || %{}, ["stream_type"])
+    is_tool_event = stream_type in ["tool_result", "tool_use"]
+
+    body = message.body || ""
+    segments = parse_body_segments(body)
+    body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+
+    cond do
+      is_tool_event or body_is_tool_calls -> :secondary
+      String.trim(body) == "" -> :secondary
+      true -> :primary
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # message_metrics
   # ---------------------------------------------------------------------------
 
@@ -467,22 +490,6 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   end
 
   defp text_body?(assigns), do: assigns.rest != "" and assigns.rest != assigns.detail
-
-  # ---------------------------------------------------------------------------
-  # message_tier
-  # ---------------------------------------------------------------------------
-
-  def message_tier(message) do
-    body = message.body || ""
-    stream_type = get_in(message.metadata || %{}, ["stream_type"])
-    has_code_block = String.contains?(body, "```")
-
-    cond do
-      stream_type in ~w(tool_use tool_result bash output) -> :tool
-      String.length(body) > 120 or has_code_block -> :primary
-      true -> :secondary
-    end
-  end
 
   # ---------------------------------------------------------------------------
   # stream_provider_avatar

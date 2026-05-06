@@ -68,8 +68,9 @@ Response shape is `{errors, commits, duplicates}` — no top-level `success`. Ch
 # Send
 eits dm --to <session_uuid_or_integer_id> --message "text"
 
-# Inbox
-eits dm inbox [--session <uuid|id>] [--limit <n>] [--from <id>] [--since <iso8601>] [--since-session] [--team-only] [--json]
+# Inbox — auto-resolves from $EITS_SESSION_UUID; omit --session
+eits dm inbox [--limit <n>] [--from <id>] [--since <iso8601>] [--since-session] [--team-only] [--json]
+# --session <uuid|id> is an override only — don't pass it when reading your own inbox
 # alias: eits dm list
 ```
 

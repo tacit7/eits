@@ -80,12 +80,16 @@ eits commits list [--session-id <uuid>] [--project-id <id>]
 # Send
 eits dm --to <session_uuid_or_integer_id> --message "text"
 
-# List inbound DMs (inbox polling — no browser required)
-eits dm list [--session <uuid|id>] [--limit <n>]
-# --session defaults to $EITS_SESSION_UUID; --limit defaults to 20, max 100
+# Inbox (inbound DMs, no browser required)
+eits dm inbox [--session <uuid|id>] [--limit <n>] [--from <id>] [--since <iso8601>] [--since-session] [--team-only] [--json]
+# Key flags:
+#   --since-session  only messages since this session started — suppresses stale resume DMs
+#   --from <id>      filter by sender UUID or integer ID
+#   --team-only      only DMs from sessions sharing a team with you
+# alias: eits dm list (identical)
 ```
 
-Accepts both UUID and integer session ID.
+`--to` / `--from` accept both UUID and integer session ID.
 
 ---
 
@@ -132,6 +136,11 @@ eits agents update <uuid> [--status <s>]
 
 `--team-name` and `--team-id` are mutually exclusive. `--interpolate-env` is the clean way to pass orchestrator context (UUID, session ID) into spawned agent instructions without string interpolation hacks — set the vars in your shell, reference them as `$VAR` in the instructions string, pass `--interpolate-env`.
 
+**Spawn output includes a compact summary as the final line** — `session_id`, `session_uuid`, `agent_id`, `worktree_path`, `branch_name`. Extract with:
+```bash
+session_uuid=$(eits agents spawn ... | tail -1 | jq -r '.session_uuid')
+```
+
 ---
 
 ## Teams
@@ -143,7 +152,10 @@ eits teams create --name "..." [--project-id <id>]
 eits teams join <id>
 eits teams leave <id>
 eits teams done
-eits teams status <id> [--wait] [--json]   # --wait blocks until all members done/spawn_failed; exits 0 all done, 1 any failed
+eits teams status <id> [--wait] [--watch [<n>]] [--json]
+# --wait   blocks until all members done/spawn_failed; exits 0/1; prints tick summary every 5s
+#          Bare invocation prints a reminder hint about --wait.
+# --watch  continuous auto-refresh every N seconds (default 5); Ctrl+C to stop
 eits teams update-member <team_id> [--status <s>]
 ```
 
@@ -222,7 +234,7 @@ eits notifications mark-all-read
 5. **Write hook blocks if no active task** — run `eits tasks begin` before editing files.
 6. **Agents commit to wrong branch** — always verify `git branch` before committing in a spawned agent.
 7. **`tasks begin` has no 429 auto-retry** — unlike `tasks annotate`, `begin` fails hard on rate limit. Retry manually with backoff if you hit 429.
-8. **DM to waiting/idle/completed session returns HTTP 500** — the DM controller doesn't gate on session status. Fall back to integer session ID if UUID fails; if both 500, the session is unreachable.
+8. **DM to inactive session returns HTTP 422** — sessions in `waiting`, `completed`, or `failed` states are not reachable. The controller now returns 422 (not 500). If the target is unreachable, wait for it to resume or use `eits teams status --wait` instead of DM-based completion polling.
 9. **`EITS_AGENT_UUID` unset on resume** — if the resume hook didn't export it, `commits create` auto-resolves the agent UUID from `EITS_SESSION_UUID` via the sessions API. Any other command that needs it can do the same: `EITS_AGENT_UUID=$(eits sessions get $EITS_SESSION_UUID | jq -r '.agent_id')`
 10. **`commits create` has no top-level `success` field** — response shape is `{errors, commits, duplicates}`. Check `duplicates | length > 0` for duplicate detection, not a `success` boolean. Example: `echo "$result" | jq '.duplicates | length > 0'`
 11. **`--interpolate-env` is the clean env passthrough** — to pass orchestrator UUID to spawned agents without string interpolation: set the var in your shell (`export ORCHESTRATOR_UUID=$EITS_SESSION_UUID`), reference it in the instructions string as `$ORCHESTRATOR_UUID`, pass `--interpolate-env`. No hardcoding, no bash substitution hacks.

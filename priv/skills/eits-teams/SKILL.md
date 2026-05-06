@@ -20,7 +20,10 @@ eits teams create --name <name> [--description <desc>] [--project <id>]
 eits teams delete <id>
 eits teams members <id>
 eits teams join <team_id> --name <alias> [--role lead|member] [--session <uuid>]
-eits teams status <id>
+eits teams status <id> [--wait] [--watch [<n>]] [--json]
+# --wait   blocks until all members have member_status=done/spawn_failed (polls every 5s)
+#          exits 0 when all done, 1 if any spawn_failed
+#          bare invocation (no flags) prints a hint reminding you about --wait
 eits teams update-member <team_id> <member_id> --status <active|idle|done|failed>
 eits teams leave <team_id> <member_id>
 ```
@@ -43,6 +46,17 @@ eits agents spawn \
 Only `--instructions` is required. `--project-id` is inherited from parent session automatically — do not pass it.
 
 `--team-name` and `--team-id` are mutually exclusive. Use `--team-id` when you have the integer ID and don't know the name — it resolves automatically via the teams API.
+
+**Spawn output: extract session_uuid from the final compact summary line:**
+```bash
+session_uuid=$(eits agents spawn ... | tail -1 | jq -r '.session_uuid')
+```
+
+**Before spawning with `--worktree`, prune stale entries** to avoid name conflicts from prior rounds:
+```bash
+git worktree prune
+```
+The spawn command warns you if registered worktrees exist, but won't auto-prune.
 
 ---
 
@@ -159,24 +173,33 @@ Spawn all agents in parallel. Each gets a unique `--member-name`.
 
 ### 6. Monitor
 
+**Preferred: block until all done** — eliminates shell gymnastics and stale-DM noise:
+
 ```bash
-eits teams status <team_id>
-# Shows members with live session_status (idle/working/completed/failed)
+eits teams status <team_id> --wait
+# Polls every 5s; prints [HH:MM:SS] waiting: N/M done, K pending
+# Exits 0 when all done, 1 if any spawn_failed
+# member_status is the authoritative signal — not session_status
 ```
 
-Send DMs to check progress — **sequentially, never in parallel Bash calls**:
-
+For spot checks or ad-hoc DMs:
 ```bash
-eits dm --to $UUID_1 --message "Status update: what is your progress?"
-eits dm --to $UUID_2 --message "Status update: what is your progress?"
+eits teams status <team_id>   # snapshot (also hints you about --wait)
+eits dm --to $UUID_1 --message "Status update?"   # sequential only
+eits dm --to $UUID_2 --message "Status update?"
 ```
 
 ### 7. Review and close out
 
-When an agent DMs that it's done, DM it to complete the task completion sequence:
+After `--wait` exits, collect results. If agents DM-back with structured payloads, read them:
 
 ```bash
-eits dm --to <agent_uuid_or_session_id> --message "Work complete. Run the task completion sequence and update your session status."
+eits dm inbox --since-session   # only DMs since this session started; suppresses stale resume noise
+```
+
+If a specific agent's DM is needed before the team is fully done:
+```bash
+eits dm --to <agent_uuid_or_session_id> --message "Work complete. Run the task completion sequence and DM back."
 ```
 
 ### 8. Shutdown
@@ -249,10 +272,11 @@ eits agents spawn \
   --model sonnet --team-name docs-team --member-name writer \
   --parent-session-id $EITS_SESSION_ID --parent-agent-id $ORC_AGENT_ID
 
-# 6. Monitor
-eits teams status <team_id>
-eits dm --to $RESEARCHER_UUID --message "Status update?"
-eits dm --to $WRITER_UUID --message "Status update?"
+# 6. Monitor — block until all done
+eits teams status <team_id> --wait
+
+# Collect results (suppress stale DMs from prior sessions)
+eits dm inbox --since-session
 ```
 
 ---

@@ -8,9 +8,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
-    if connected?(socket) do
-      EyeInTheSky.Events.subscribe_teams()
-    end
+    subscribe_if_connected(socket)
 
     socket =
       socket
@@ -20,18 +18,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:show_all, false)
       |> assign(:teams, [])
 
-    socket =
-      if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, false, false, "")),
-        else: socket
+    socket = load_teams_if_connected(socket, false)
 
     {:ok, socket}
   end
 
   def mount(_params, _session, socket) do
-    if connected?(socket) do
-      EyeInTheSky.Events.subscribe_teams()
-    end
+    subscribe_if_connected(socket)
 
     socket =
       socket
@@ -45,10 +38,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:show_all, true)
       |> assign(:teams, [])
 
-    socket =
-      if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, false, true, "")),
-        else: socket
+    socket = load_teams_if_connected(socket, true)
 
     {:ok, socket}
   end
@@ -250,6 +240,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       <% end %>
     </div>
     """
+  end
+
+  defp subscribe_if_connected(socket) do
+    if connected?(socket) do
+      EyeInTheSky.Events.subscribe_teams()
+    end
+  end
+
+  defp load_teams_if_connected(socket, show_all) do
+    if connected?(socket),
+      do: assign(socket, :teams, load_teams(socket, false, show_all, "")),
+      else: socket
   end
 
   defp load_teams(socket, show_archived, show_all, search_query) do

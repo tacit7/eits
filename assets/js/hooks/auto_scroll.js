@@ -72,7 +72,12 @@ export const AutoScroll = {
   },
 
   updated() {
-    if (this.shouldAutoScroll) {
+    if (this.el.dataset.loadingMore === "true") {
+      // "Load older messages" was clicked — user wants to see the newly loaded
+      // content at the top of the container, not stay anchored to their old position.
+      delete this.el.dataset.loadingMore
+      this.el.scrollTop = 0
+    } else if (this.shouldAutoScroll) {
       this.scrollToBottom()
     } else {
       // Preserve scroll position when older messages are prepended

@@ -469,6 +469,22 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   defp text_body?(assigns), do: assigns.rest != "" and assigns.rest != assigns.detail
 
   # ---------------------------------------------------------------------------
+  # message_tier
+  # ---------------------------------------------------------------------------
+
+  def message_tier(message) do
+    body = message.body || ""
+    stream_type = get_in(message.metadata || %{}, ["stream_type"])
+    has_code_block = String.contains?(body, "```")
+
+    cond do
+      stream_type in ~w(tool_use tool_result bash output) -> :tool
+      String.length(body) > 120 or has_code_block -> :primary
+      true -> :secondary
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # stream_provider_avatar
   # ---------------------------------------------------------------------------
 

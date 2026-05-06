@@ -219,6 +219,34 @@ form:focus-visible {
 /* --text-200: hsl(50 9% 73.7%) secondary text         */
 /* --brand-100: hsl(15 63.1% 59.6%) orange             */
 [data-theme="dark"] {
+  /* ===== Surface stack ===== */
+  --surface-canvas:           #161720;
+  --surface-sidebar:          #12131b;
+  --surface-card:             #202130;
+  --surface-card-hover:       #242538;
+  --surface-tool-event:       #191a26;
+  --surface-composer:         #1e1f30;
+  --surface-sidebar-selected: #1c1e32;
+
+  /* ===== Text contrast ===== */
+  --text-primary:   oklch(var(--bc) / 0.92);
+  --text-secondary: oklch(var(--bc) / 0.70);
+  --text-muted:     oklch(var(--bc) / 0.55);
+  --text-disabled:  oklch(var(--bc) / 0.35);
+
+  /* ===== Code tokens ===== */
+  --code-bg:     rgba(145, 105, 210, 0.18);
+  --code-border: rgba(165, 130, 230, 0.24);
+  --code-text:   #C8B3FF;
+
+  /* ===== Warning tokens (amber) ===== */
+  --warning-bg:     rgba(180, 120, 32, 0.16);
+  --warning-border: rgba(220, 160, 70, 0.35);
+  --warning-text:   #E6B86A;
+
+  /* ===== Accent soft (selected fill — low-opacity periwinkle) ===== */
+  --accent-primary: oklch(65% 0.18 260);
+  --accent-soft:    rgba(100, 120, 230, 0.14);
   /* daisyUI v5 variables */
   --color-base-100: hsl(60 2.7% 14.5%);      /* --bg-100 page bg */
   --color-base-200: hsl(60 2.1% 18.4%);      /* --bg-000 surfaces */
@@ -263,6 +291,12 @@ form:focus-visible {
 /* Text: #1D1D19 primary, #66655D secondary, #B1ADA1 muted */
 /* Accent: #D97757 primary orange, #C15F3C brand rust */
 [data-theme="light"] {
+  /* ===== Text contrast ===== */
+  --text-primary:   oklch(var(--bc) / 0.92);
+  --text-secondary: oklch(var(--bc) / 0.70);
+  --text-muted:     oklch(var(--bc) / 0.55);
+  --text-disabled:  oklch(var(--bc) / 0.35);
+
   /* daisyUI v5 variables (--color-*) */
   --color-base-100: oklch(97.5% 0.004 85);  /* page bg — #FAF9F6 */
   --color-base-200: oklch(94.5% 0.006 85);  /* sidebar/panels — #F0EFEA */

@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
       <% end %>
 
       <%!-- Textarea --%>
-      <div class="px-4 pt-3 pb-1">
+      <div class="px-3 pt-2 pb-1">
         <textarea
           name="body"
           rows="1"
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               true -> "Reply…"
             end
           }
-          class="w-full bg-transparent border-0 outline-none focus:ring-0 text-[13px] resize-none min-h-[28px] max-h-40 overflow-y-auto placeholder:text-base-content/30 p-0 leading-relaxed"
+          class="w-full bg-transparent border-0 outline-none focus:ring-0 text-[13px] resize-none min-h-[56px] max-h-40 overflow-y-auto placeholder:text-base-content/30 p-0 leading-relaxed"
           autocomplete="off"
           phx-hook="CommandHistory"
           id="message-input"
@@ -132,9 +132,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
       </div>
 
       <%!-- Bottom toolbar --%>
-      <div class="flex items-center justify-between px-3 pb-3 pt-1" id="dm-composer-toolbar">
+      <div class="flex items-center gap-2 px-3 pb-2 pt-1 mt-1" id="dm-composer-toolbar">
         <%!-- Left: upload + format toggle + budget + effort --%>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5">
           <label
             for={@uploads.files.ref}
             phx-drop-target={@uploads.files.ref}
@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
         </div>
 
         <%!-- Right: model selector + send/stop --%>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 ml-auto">
           <div
             class="dropdown dropdown-top dropdown-end"
             phx-click="toggle_model_menu"

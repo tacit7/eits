@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   import EyeInTheSkyWeb.Components.DmMessageComponents,
     only: [message_body: 1, message_metrics: 1, message_attachments: 1]
+  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
@@ -26,7 +27,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         {msg, prev_role}
       end)
 
-    assigns = assign(assigns, :messages_with_context, messages_with_context)
+    grouped_messages = group_events(assigns.messages)
+
+    assigns =
+      assigns
+      |> assign(:messages_with_context, messages_with_context)
+      |> assign(:grouped_messages, grouped_messages)
 
     ~H"""
     <div class="flex h-full flex-col" id="dm-messages-tab">
@@ -67,13 +73,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               </div>
 
               <div>
-                <%= for {message, prev_role} <- @messages_with_context do %>
-                  <.message_item
-                    message={message}
-                    prev_role={prev_role}
-                    agent={@agent}
-                    session={@session}
-                  />
+                <%= for item <- @grouped_messages do %>
+                  <%= case item do %>
+                    <% {:cluster, events, meta} -> %>
+                      <.tool_cluster events={events} meta={meta} />
+                    <% {:message, message} -> %>
+                      <% prev_role = get_prev_role(@messages_with_context, message) %>
+                      <.message_item
+                        message={message}
+                        prev_role={prev_role}
+                        agent={@agent}
+                        session={@session}
+                      />
+                  <% end %>
                 <% end %>
               </div>
 
@@ -341,4 +353,110 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     message.sender_role == "agent" and is_map(message.metadata) and
       not is_nil(message.metadata["total_cost_usd"])
   end
+
+  # ---------------------------------------------------------------------------
+  # tool_cluster component
+  # ---------------------------------------------------------------------------
+
+  attr :events, :list, required: true
+  attr :meta, :map, required: true
+
+  defp tool_cluster(assigns) do
+    ~H"""
+    <details
+      id={"cluster-#{List.first(@events).id}"}
+      phx-update="ignore"
+      class="group my-1 w-full pl-[33px]"
+    >
+      <summary class="flex items-center gap-2 px-1 py-0.5 cursor-pointer list-none text-[var(--text-muted)] hover:text-[var(--text-secondary)] select-none">
+        <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px]">&#9658;</span>
+        <span class="text-nano font-mono"><%= @meta.count %> tool events</span>
+        <%= for {type, count} <- @meta.type_counts do %>
+          <span class="rounded-sm px-1 py-px bg-base-content/[0.05] text-nano font-mono text-[var(--text-disabled)]">
+            <%= type %> &times;<%= count %>
+          </span>
+        <% end %>
+        <%= if @meta.duration_ms do %>
+          <span class="text-nano font-mono text-[var(--text-disabled)] ml-1">~<%= div(@meta.duration_ms, 1000) %>s</span>
+        <% end %>
+        <span class="ml-auto text-nano text-[var(--text-disabled)]"><%= relative_time(@meta.first_at) %></span>
+      </summary>
+      <div class="pl-5 mt-0.5 space-y-px">
+        <%= for event <- @events do %>
+          <div class="max-w-full px-1">
+            <.message_body message={event} compact={true} />
+          </div>
+        <% end %>
+      </div>
+    </details>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # group_events — clusters consecutive tool messages
+  # ---------------------------------------------------------------------------
+
+  defp group_events(messages) do
+    tool_types = ~w(tool_use tool_result bash output)
+
+    messages
+    |> Enum.chunk_while(
+      nil,
+      fn msg, acc ->
+        stream_type = get_in(msg.metadata || %{}, ["stream_type"]) || ""
+        is_tool = stream_type in tool_types
+
+        cond do
+          is_tool and is_nil(acc) ->
+            {:cont, {:cluster, [msg]}}
+
+          is_tool and match?({:cluster, _}, acc) ->
+            {:cont, {:cluster, [msg | elem(acc, 1)]}}
+
+          not is_tool and is_nil(acc) ->
+            {:cont, {:message, msg}, nil}
+
+          not is_tool and match?({:cluster, _}, acc) ->
+            {:cont, [flush_cluster(acc), {:message, msg}], nil}
+        end
+      end,
+      fn
+        nil -> {:cont, []}
+        acc -> {:cont, flush_cluster(acc), nil}
+      end
+    )
+    |> List.flatten()
+  end
+
+  defp flush_cluster({:cluster, events}) do
+    events = Enum.reverse(events)
+    first = List.first(events)
+    last = List.last(events)
+
+    duration_ms =
+      if first != last do
+        DateTime.diff(last.inserted_at, first.inserted_at, :millisecond)
+      end
+
+    type_counts =
+      Enum.frequencies_by(events, fn msg ->
+        get_in(msg.metadata || %{}, ["stream_type"]) || "event"
+      end)
+
+    {:cluster, events,
+     %{
+       count: length(events),
+       type_counts: type_counts,
+       first_at: first.inserted_at,
+       duration_ms: if(duration_ms && duration_ms > 1000, do: duration_ms)
+     }}
+  end
+
+  defp get_prev_role(messages_with_context, message) do
+    case Enum.find(messages_with_context, fn {msg, _prev} -> msg.id == message.id end) do
+      {_msg, prev_role} -> prev_role
+      nil -> nil
+    end
+  end
+
 end

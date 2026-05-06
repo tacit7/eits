@@ -10,7 +10,7 @@ allowed-tools: Bash
 
 The `eits` bash script is the sole interface to the EITS REST API. By default it targets `http://localhost:5001/api/v1`, unless `EITS_URL` overrides it.
 
-All agents — including interactive `cli` agents and spawned `sdk-cli` agents — use the same `eits` script directly. Do not use deprecated EITS-CMD directives.
+All EITS CLI-managed agents, including interactive `cli` agents and spawned `sdk-cli` agents, use the same `eits` script directly. Do not use deprecated EITS-CMD directives.
 
 ## Live Session Context
 
@@ -51,7 +51,7 @@ eits tasks annotate <task_id> --body "What changed, what was learned, what remai
 # 4. Finish (atomic: annotates + marks Done in one round-trip)
 eits tasks complete <task_id> --message "What was done and why"
 
-# 5. Log commits — auto-links to current session via $EITS_AGENT_UUID/$EITS_SESSION_UUID
+# 5. Log commits — auto-links using the current agent/session environment
 eits commits create --hash <sha>
 # Can also be done inline with complete (--commit is repeatable for multiple hashes):
 eits tasks complete <task_id> --message "..." --commit <sha1> --commit <sha2>
@@ -61,7 +61,7 @@ eits tasks complete <task_id> --message "..." --commit <sha1> --commit <sha2>
 
 ## Required Task Rule
 
-**You MUST have a task In Progress before editing files.** The write hook blocks edits if no task is active.
+**You MUST have a task In Progress before using write/edit tools that modify files.** The write hook blocks file modifications if no task is active.
 
 If blocked:
 
@@ -115,7 +115,7 @@ Run `eits tasks states` for the authoritative list.
 
 ## When More Detail Is Needed
 
-Read `commands.md` before answering questions about:
+Read `commands.md` before guessing command syntax for:
 - sessions, agents, teams, dm, notes, channels, jobs, timer, prompts, projects, notifications
 - any flag not shown in this file
 

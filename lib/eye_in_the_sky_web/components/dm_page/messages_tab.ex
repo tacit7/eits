@@ -14,7 +14,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   as stream diffs, not component diffs).
   """
 
-  use EyeInTheSkyWeb, :live_component
+  use Phoenix.Component
 
   alias EyeInTheSkyWeb.Components.DmHelpers
   import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1, parse_body_segments: 1]
@@ -22,20 +22,25 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   import EyeInTheSkyWeb.Components.DmMessageComponents,
     only: [message_body: 1, message_metrics: 1, message_attachments: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
+  import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, empty_state: 1]
 
+  alias Phoenix.LiveView.JS
   alias EyeInTheSkyWeb.Components.DmMessageComponents
 
   # ---------------------------------------------------------------------------
-  # LiveComponent lifecycle
+  # Function component
   # ---------------------------------------------------------------------------
 
-  @impl true
-  def update(assigns, socket) do
-    {:ok, assign(socket, assigns)}
-  end
+  attr :streams, :map, required: true
+  attr :empty, :boolean, required: true
+  attr :has_more_messages, :boolean, required: true
+  attr :stream, :map, required: true
+  attr :session, :any, default: nil
+  attr :agent, :any, default: nil
+  attr :message_search_query, :string, default: ""
+  attr :codex_raw_lines, :list, default: []
 
-  @impl true
-  def render(assigns) do
+  def messages_tab(assigns) do
     ~H"""
     <div class="flex h-full flex-col" id="dm-messages-tab">
       <div

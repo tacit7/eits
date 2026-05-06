@@ -15,13 +15,16 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
   @impl true
   def update(assigns, socket) do
     team = assigns.team
-    active_members = Enum.count(team.members, &(&1.status == "active"))
+    # Use members from stream if provided, otherwise fallback to team.members
+    members = Map.get(assigns, :members, team.members)
+    active_members = Enum.count(members, &(&1.status == "active"))
     done_tasks = Enum.count(team.tasks, &(&1.state_id == @state_done))
     total_tasks = length(team.tasks)
 
     {:ok,
      socket
      |> assign(assigns)
+     |> assign(:members, members)
      |> assign(:active_members, active_members)
      |> assign(:done_tasks, done_tasks)
      |> assign(:total_tasks, total_tasks)}
@@ -49,7 +52,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
       <%!-- Stats row --%>
       <div class="flex items-center gap-3 text-mini text-base-content/40">
         <span>
-          <span class="font-mono font-semibold text-base-content/70">{length(@team.members)}</span>
+          <span class="font-mono font-semibold text-base-content/70">{length(@members)}</span>
           members
         </span>
         <span class="text-base-content/20">·</span>
@@ -89,11 +92,11 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
             Members
           </h2>
           <div class="h-px flex-1 bg-base-300"></div>
-          <span class="font-mono text-mini text-base-content/30">{length(@team.members)}</span>
+          <span class="font-mono text-mini text-base-content/30">{length(@members)}</span>
         </div>
 
         <div class="space-y-2">
-          <%= for member <- @team.members do %>
+          <%= for member <- @members do %>
             <div class={[
               "rounded-lg overflow-hidden",
               member.session_id && @selected_agent_session_id == member.session_id &&
@@ -218,7 +221,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
                       name="session-id"
                     >
                       <option value="">Assign to...</option>
-                      <%= for member <- Enum.filter(@team.members, & &1.session_id) do %>
+                      <%= for member <- Enum.filter(@members, & &1.session_id) do %>
                         <option value={member.session_id}>{member.name}</option>
                       <% end %>
                     </select>

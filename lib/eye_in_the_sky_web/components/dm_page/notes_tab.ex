@@ -9,18 +9,39 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
 
   def notes_tab(assigns) do
     ~H"""
-    <%= if @notes == [] do %>
-      <.empty_state
-        id="dm-notes-empty"
-        icon="hero-document-text"
-        title="No notes yet"
-        subtitle="Notes from this session will appear here"
-      />
-    <% else %>
-      <div
-        class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
-        id="dm-note-list"
-      >
+    <div class="flex flex-col h-full">
+      <%= if @notes == [] do %>
+        <div class="flex-1 flex flex-col items-center justify-center">
+          <.empty_state
+            id="dm-notes-empty"
+            icon="hero-document-text"
+            title="No notes yet"
+            subtitle="Notes from this session will appear here"
+          />
+          <button
+            type="button"
+            phx-click="open_create_note_modal"
+            class="btn btn-primary btn-sm mt-4"
+          >
+            <.icon name="hero-plus" class="size-4" />
+            Create Note
+          </button>
+        </div>
+      <% else %>
+      <div class="flex flex-col gap-3">
+        <button
+          type="button"
+          phx-click="open_create_note_modal"
+          class="btn btn-primary btn-sm self-start"
+        >
+          <.icon name="hero-plus" class="size-4" />
+          Create Note
+        </button>
+
+        <div
+          class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
+          id="dm-note-list"
+        >
         <%= for note <- @notes do %>
           <div
             class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
@@ -90,8 +111,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
             </div>
           </div>
         <% end %>
+        </div>
       </div>
     <% end %>
+    </div>
     """
   end
 end

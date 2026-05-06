@@ -34,13 +34,22 @@ The script's internal `json()` helper coerces numeric values only for keys whose
 
 ### Rate limiting
 
-The script has built-in **3-retry logic for HTTP 429 (rate limited)** errors. You'll see:
+The script distinguishes between **retryable errors** (429/503) and **permanent errors** (4xx/5xx):
+
+**Retryable errors (429/503)**:
 ```
-rate limited, retrying in 1s...
-rate limited, retrying in 2s...
+[eits] rate limited, retrying in 1s...
+[eits] rate limited, retrying in 2s...
+```
+Retries up to 4 attempts with exponential backoff (1s, 2s, 4s, then cap at 30s). If all 4 attempts fail:
+```
+[eits] rate limit not cleared after 4 attempts. Try again in 30s.
 ```
 
-If all 3 attempts fail, the command exits with HTTP 429 error.
+**Permanent errors**:
+- **4xx (401/403/404/422, etc)**: `[eits] permanent error <status>: <body>` — exits immediately without retries
+- **5xx (500/502, etc)**: `[eits] server error <status>` — exits immediately without retries
+- **503 Service Unavailable**: Treated as retryable (same as 429)
 
 **Phase 1 — Orchestrator bump**: When `EITS_SESSION_UUID` is set, the script sends the `x-eits-role: orchestrator` header to get a 5× higher rate-limit burst ceiling (keyed separately as `api:orch:<ip>` so orchestrator traffic doesn't consume the regular IP bucket).
 
@@ -122,7 +131,7 @@ eits tasks list [--project <id>] [--session <uuid>] [--q <query>|--search <query
 
 eits tasks active [--json]
 eits tasks mine [--json]
-# Show In Progress tasks linked to current session (useful for context recovery on resume)
+# Show In Progress (state 2) and In Review (state 4) tasks linked to current session (useful for context recovery on resume)
 # Uses EITS_SESSION_UUID (or EITS_SESSION_ID as fallback)
 
 # Get
@@ -136,10 +145,11 @@ eits tasks create --title <t> [--description <d>] [--project <id>] \
 
 # Create + start in one shot
 eits tasks begin --title <t> [--description <d>] [--project <id>] \
-  [--priority <p>] [--quiet|-q]
+  [--priority <p>] [--tag <id>] [--quiet|-q]
 # Or claim a pre-created task instead of creating new
 # On conflict (already_claimed), shows the holding session ID, UUID, and name
 eits tasks begin --id <task_id>
+# --tag: apply one or more tags after creation/claim (repeatable: --tag 1 --tag 2)
 
 # Update
 eits tasks update <id> [--state <id|name>] \
@@ -149,6 +159,9 @@ eits tasks update <id> [--state <id|name>] \
 
 # Bulk update
 eits tasks bulk-update --ids <id,...> [--state <id>] [--priority <p>] [--title <t>]
+eits tasks bulk-update --session <uuid|id> [--state <id>] [--priority <p>] [--title <t>]
+# --ids and --session are mutually exclusive
+# --session: fetch all task IDs for the given session and apply the same update to all
 
 # State shorthands (canonical)
 eits tasks claim <id>          # → In Progress (state 2), transfers session ownership to claimer (preferred)
@@ -162,9 +175,9 @@ eits tasks done <id>           # DEPRECATED: use complete instead
 # Complete with message (canonical close: annotate + mark Done in one call)
 eits tasks complete <id> <message>
 eits tasks complete <id> --message <text>
-eits tasks complete <id> --message <text> --commit <sha>
-# --commit: track a commit atomically with task close (eliminates a separate eits commits create round-trip)
-# --notify <session_uuid_or_id>: DM a session after successful close
+eits tasks complete <id> --message <text> --commit <sha> [--commit <sha>] ...
+# --commit: track commits atomically with task close (repeatable; eliminates separate eits commits create round-trips)
+# --notify <session_uuid_or_id>: DM a session after successful close (logs "Task <id> completed")
 
 # Delete
 eits tasks delete <id>
@@ -210,6 +223,7 @@ eits tasks begin --title "Implement X"              # create + start in one shot
 eits tasks update 42 --state-name in-review        # move to review when ready
 eits tasks complete 42 "Implemented feature X"     # CANONICAL close: annotate + mark Done + DM lead
 eits tasks complete 42 --message "done" --commit $SHA  # close + track commit atomically
+eits tasks complete 42 --message "done" --commit $SHA1 --commit $SHA2  # track multiple commits
 ```
 
 **Option 2: Claim pre-created task (orchestrator-assigned)**
@@ -286,7 +300,7 @@ eits notes update <id> [--body <text>] [--title <t>] \
   [--parent-type <session|task|agent|project>] [--parent-id <id>]
 
 eits notes add --body <text> [--title <t>] [--starred]
-# Auto-attach to current session (requires EITS_SESSION_UUID)
+# Auto-attach to current session (requires EITS_SESSION_UUID or EITS_SESSION_ID as fallback)
 ```
 
 `--mine` is mutually exclusive with `--session`.
@@ -385,7 +399,7 @@ eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] \
 # --since <hash>: return only commits newer than the given hash (sprint reconciliation)
 
 eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] ...
-# --agent defaults to $EITS_AGENT_UUID; falls back to session lookup when unset
+# --agent: defaults to $EITS_AGENT_UUID; falls back to agent_uuid lookup from $EITS_SESSION_UUID when unset
 # If no --hash provided, uses current HEAD (git rev-parse HEAD)
 # If no --message provided, uses git log -1 --format=%s
 # Response includes top-level boolean: already_tracked=true when ALL submitted hashes were duplicates
@@ -491,6 +505,13 @@ eits channels send <channel_id> --body <text> [--session <uuid|id>] \
 eits channels messages <channel_id> [--limit|-n <N>] [--since <message_id>] [--before <message_id>]
 
 eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
+
+eits channels join <channel_id> --sessions <id,id,...> [--dry-run] [--role <member|admin>]
+# --sessions: comma-separated list of session UUIDs or integer IDs to join
+# --dry-run: print sessions that would be joined without joining
+
+eits channels join <channel_id> --all-sessions [--project <id>] [--status <s>] [--limit <n>] [--dry-run] [--role <member|admin>]
+# Bulk join all sessions matching filter criteria
 
 eits channels leave <channel_id> [--session <uuid|id>]
 

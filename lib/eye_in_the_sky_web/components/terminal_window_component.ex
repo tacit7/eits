@@ -55,7 +55,11 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponent do
     {:noreply, socket}
   end
 
-  def handle_event(_event, _params, socket), do: {:noreply, socket}
+  def handle_event(event, _params, socket) do
+    require Logger
+    Logger.debug("TerminalWindowComponent: Unexpected handle_event: #{event}")
+    {:noreply, socket}
+  end
 
   @impl true
   def render(assigns) do

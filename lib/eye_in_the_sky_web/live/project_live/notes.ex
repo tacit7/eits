@@ -352,9 +352,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       </div>
     </div>
 
-    <%!-- Quick Note Modal --%>
+    <.quick_note_modal :if={@show_quick_note_modal} project={@project} />
+    """
+  end
+
+  defp quick_note_modal(assigns) do
+    ~H"""
     <div
-      :if={@show_quick_note_modal}
       class="modal modal-open"
       phx-window-keydown="close_quick_note_modal"
       phx-key="Escape"

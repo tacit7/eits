@@ -38,9 +38,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
     ~H"""
     <div class="flex h-full flex-col" id="dm-messages-tab">
-      <div class="flex-1 min-h-0 flex flex-col">
+      <%!-- Use position:relative + absolute fill so the stream bubble can overlay
+           at the bottom without participating in flex layout. Previously the bubble
+           was flex-shrink-0 in this column, so every token that grew the bubble
+           shrank messages-container — the root cause of the visible flicker. --%>
+      <div class="flex-1 min-h-0 relative">
         <div
-          class="overflow-y-auto flex-1 min-h-0"
+          class={"overflow-y-auto absolute inset-0#{if @stream.show, do: " pb-32", else: ""}"}
           id="messages-container"
           phx-hook="AutoScroll"
           data-has-more={if @has_more_messages, do: "true", else: "false"}
@@ -99,11 +103,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           <% end %>
         </div>
 
-        <%!-- Live streaming bubble — outside messages-container so AutoScroll.updated()
-             does not fire on every stream_delta. Growing bubble text no longer changes
-             messages-container scrollHeight, eliminating the heightDiff scroll jump. --%>
+        <%!-- Live streaming bubble — absolutely positioned at the bottom of the relative
+             wrapper so it overlays messages without participating in flex layout.
+             flex-shrink-0 was the original approach but it shrank messages-container
+             on every token, which was the root cause of the visible scroll flicker. --%>
         <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
-          <div class="flex-shrink-0 max-w-[860px] mx-auto w-full px-5 pb-2">
+          <div class="absolute bottom-0 left-0 right-0 z-10 pointer-events-none">
+          <div class="max-w-[860px] mx-auto w-full px-5 pb-2 pointer-events-auto">
             <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5" id="live-stream-bubble">
               <div class="flex items-center gap-2 mb-2">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -131,6 +137,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 <% end %>
               </div>
             </div>
+          </div>
           </div>
         <% end %>
       </div>

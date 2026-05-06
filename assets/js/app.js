@@ -258,6 +258,9 @@ function _mountVimNav() {
 
   if (_vimNavInst) {
     if (_vimNavInst._wasEnabled === enabled) return
+    _vimNavInst._phxEventListeners?.forEach(({ event, handler }) =>
+      window.removeEventListener(event, handler)
+    )
     _vimNavInst.destroyed()
     _vimNavInst = null
   }
@@ -267,6 +270,7 @@ function _mountVimNav() {
   const inst = Object.create(VimNav)
   inst.el = el
   inst._wasEnabled = enabled
+  inst._phxEventListeners = []
   inst.pushEvent = (event, payload) => liveSocket.main?.pushHookEvent(el, el, event, payload)
   inst.pushEventToShell = (event, payload) => {
     const rail = document.getElementById("app-rail")
@@ -277,6 +281,11 @@ function _mountVimNav() {
     const listEl = document.querySelector("[data-vim-list]")
     if (!listEl) return
     liveSocket.main?.pushHookEvent(listEl, listEl, event, payload)
+  }
+  inst.handleEvent = (event, callback) => {
+    const handler = (e) => callback(e.detail)
+    window.addEventListener(`phx:${event}`, handler)
+    inst._phxEventListeners.push({ event: `phx:${event}`, handler })
   }
   inst.mounted()
   _vimNavInst = inst

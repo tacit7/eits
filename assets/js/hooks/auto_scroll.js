@@ -1,7 +1,6 @@
 export const AutoScroll = {
   mounted() {
     this.shouldAutoScroll = true
-    this._loadingMore = false
     this._intentLoadMore = false
     this._mounted = false
     this._updating = false
@@ -26,13 +25,6 @@ export const AutoScroll = {
 
       const { scrollHeight, scrollTop, clientHeight } = this.el
       this.shouldAutoScroll = scrollHeight - scrollTop - clientHeight <= 50
-
-      // Auto-load older messages when scrolled near the top
-      // DISABLED: behaviour is wonky — use the "Load older messages" button instead
-      // if (this._mounted && !this._loadingMore && scrollTop < 100 && this.el.dataset.hasMore === "true") {
-      //   this._loadingMore = true
-      //   this.pushEvent("load_more_messages", {})
-      // }
     }
 
     this.el.addEventListener("scroll", this._onScroll, { passive: true })
@@ -55,13 +47,24 @@ export const AutoScroll = {
         if (this.shouldAutoScroll) this.scrollToBottom()
       })
       this._resizeObserver.observe(this.el)
-      // Also observe each direct child — ResizeObserver on the container
-      // alone fires only when the container's own size changes, not when
-      // children grow inside an overflow:auto parent.
+      // Seed the WeakSet with children already in the DOM at mount time.
       for (const child of this.el.children) {
         this._observedChildren.add(child)
         this._resizeObserver.observe(child)
       }
+      // MutationObserver fires only when new children are added — O(added)
+      // instead of O(all children) on every patch.
+      this._mutationObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE && !this._observedChildren.has(node)) {
+              this._observedChildren.add(node)
+              this._resizeObserver.observe(node)
+            }
+          }
+        }
+      })
+      this._mutationObserver.observe(this.el, { childList: true })
     }
 
     // Mark ready on the next frame so the load-more guard doesn't fire
@@ -106,21 +109,9 @@ export const AutoScroll = {
         this.el.scrollTop = this._prevScrollTop + heightDiff
       }
     }
-    // Add newly added children to ResizeObserver — do NOT disconnect/reconnect.
-    // Disconnecting on every patch causes immediate size-check callbacks in
-    // many browsers, triggering spurious scrollToBottom() calls and visible
-    // scroll jitter at streaming speeds (10+ tokens/sec).
     if (this._resizeObserver) {
-      for (const child of this.el.children) {
-        if (!this._observedChildren.has(child)) {
-          this._observedChildren.add(child)
-          this._resizeObserver.observe(child)
-        }
-      }
       this._lastScrollHeight = this.el.scrollHeight
     }
-    // Reset load guard after DOM update so next scroll triggers work
-    this._loadingMore = false
     // Release the scroll listener after the browser has settled the swap
     requestAnimationFrame(() => { this._updating = false })
   },
@@ -128,6 +119,10 @@ export const AutoScroll = {
   destroyed() {
     this.el.removeEventListener("scroll", this._onScroll)
     this.el.removeEventListener("load-more-intent", this._onLoadMoreIntent)
+    if (this._mutationObserver) {
+      this._mutationObserver.disconnect()
+      this._mutationObserver = null
+    }
     if (this._resizeObserver) {
       this._resizeObserver.disconnect()
       this._resizeObserver = null

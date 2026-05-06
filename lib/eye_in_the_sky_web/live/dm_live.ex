@@ -456,13 +456,24 @@ defmodule EyeInTheSkyWeb.DmLive do
   end
 
   @impl true
-  def handle_info({:new_message, _message}, socket) do
-    {:noreply, MessageHandlers.schedule_message_reload(socket)}
+  def handle_info({:new_message, message}, socket) do
+    # Use the already-broadcast payload directly instead of scheduling a full
+    # DB reload. append_message_from_pubsub deduplicates by id (handles the
+    # race where force_reload_messages already loaded this message) and preloads
+    # :attachments. Also clear stream_content so the streaming bubble collapses
+    # when the agent reply is persisted.
+    socket =
+      socket
+      |> MessageHandlers.append_message_from_pubsub(message)
+      |> assign(:stream_content, "")
+
+    {:noreply, socket}
   end
 
   @impl true
-  def handle_info({:new_dm, _msg}, socket) do
-    {:noreply, MessageHandlers.schedule_message_reload(socket)}
+  def handle_info({:new_dm, msg}, socket) do
+    # Inbound DM from another session — append directly, no stream_content clear.
+    {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}
   end
 
   # ---------------------------------------------------------------------------

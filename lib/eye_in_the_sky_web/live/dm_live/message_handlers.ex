@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
   alias EyeInTheSky.Messages
+  alias EyeInTheSky.Repo
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.UploadHelpers
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
@@ -175,6 +176,42 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     end
   end
 
+  @doc """
+  Appends a single message from a PubSub broadcast to @messages in-place.
+
+  This replaces the previous schedule_message_reload approach for {:new_message} and
+  {:new_dm} events, which threw away the already-delivered payload and debounced a
+  full DB reload of all N messages.
+
+  Deduplication by id is required: handle_send_message calls force_reload_messages
+  immediately after persisting the user message, so @messages already contains it
+  when the PubSub {:new_message} event arrives. Without the check we'd duplicate it.
+
+  Attachments are preloaded here because broadcast_and_return only preloads
+  [:session, :reactions] at insert time — the :attachments association would be
+  %Ecto.Association.NotLoaded{}, which crashes the message_attachments template
+  component (the `attachments != []` guard does not rescue NotLoaded structs).
+  A targeted single-row JOIN is far cheaper than reloading the full message list.
+
+  Cancels any pending debounced reload timer so a stale :do_message_reload cannot
+  clobber the messages list after we have already appended the new entry.
+  """
+  def append_message_from_pubsub(socket, message) do
+    existing = socket.assigns[:messages] || []
+
+    if Enum.any?(existing, &(&1.id == message.id)) do
+      socket
+    else
+      message = Repo.preload(message, :attachments)
+      messages = existing ++ [message]
+
+      socket
+      |> cancel_reload_timer()
+      |> assign(:messages, messages)
+      |> push_event("new_message", %{})
+    end
+  end
+
   def schedule_message_reload(socket) do
     if socket.assigns.reload_timer do
       Process.cancel_timer(socket.assigns.reload_timer)
@@ -182,6 +219,17 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
     timer = Process.send_after(self(), :do_message_reload, @reload_debounce_ms)
     assign(socket, :reload_timer, timer)
+  end
+
+  defp cancel_reload_timer(socket) do
+    case socket.assigns[:reload_timer] do
+      nil ->
+        socket
+
+      timer ->
+        Process.cancel_timer(timer)
+        assign(socket, :reload_timer, nil)
+    end
   end
 
   defp sync_claude_session_file(socket) do

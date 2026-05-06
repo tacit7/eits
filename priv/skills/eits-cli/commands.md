@@ -20,6 +20,17 @@ eits tasks states              # list all state IDs and accepted aliases
 
 **`--tag` accepts a name or numeric ID.** Non-numeric values are resolved via `/tags?q=<name>` automatically.
 
+**`--state` takes positional numbers (1–4) or aliases — not raw DB IDs.**
+
+| Pos | Name        | Aliases                              |
+|-----|-------------|--------------------------------------|
+| 1   | To Do       | `todo`, `to-do`, `to do`             |
+| 2   | In Progress | `start`, `in-progress`, `progress`   |
+| 3   | In Review   | `review`, `in-review`                |
+| 4   | Done        | `done`, `complete`, `completed`      |
+
+Run `eits tasks states` for the full authoritative list.
+
 ---
 
 ## Sessions

@@ -44,12 +44,16 @@ eits commits create --hash <sha>
 
 ## State Reference
 
-| ID | Name        | Alias                  |
-|----|-------------|------------------------|
-| 1  | To Do       | `todo`                 |
-| 2  | In Progress | `start`, `in-progress` |
-| 4  | In Review   | `review`, `in-review`  |
-| 3  | Done        | `done`, `complete`     |
+`--state` accepts positional numbers (1–4) or name aliases. These are **not** the raw DB IDs.
+
+| Pos | Name        | Aliases                              |
+|-----|-------------|--------------------------------------|
+| 1   | To Do       | `todo`, `to-do`, `to do`             |
+| 2   | In Progress | `start`, `in-progress`, `progress`   |
+| 3   | In Review   | `review`, `in-review`                |
+| 4   | Done        | `done`, `complete`, `completed`      |
+
+Run `eits tasks states` for the authoritative list.
 
 ---
 

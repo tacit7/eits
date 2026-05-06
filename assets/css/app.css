@@ -211,6 +211,25 @@ form:focus-visible {
   }
 }
 
+/* ===== Fallback surface tokens — applies to all themes without explicit overrides ===== */
+/* MUST come before all [data-theme] blocks. Per-theme rules have equal specificity
+   to :root (both 0,1,0), so order matters — theme blocks must come AFTER this. */
+/* Dracula, Autumn, and any other themes without explicit overrides use these. */
+:root {
+  --surface-rail:     var(--color-base-300);
+  --surface-flyout:   var(--color-base-200);
+  --surface-canvas:   var(--color-base-100);
+  --surface-card:     var(--color-base-100);
+  --surface-tool:     var(--color-base-200);
+  --surface-composer: var(--color-base-100);
+  --surface-selected: color-mix(in srgb, var(--color-primary) 12%, var(--color-base-200));
+  --surface-hover:    color-mix(in srgb, var(--color-base-content) 6%, transparent);
+  --border-subtle:    color-mix(in srgb, var(--color-base-content) 8%, transparent);
+  --text-primary:     var(--color-base-content);
+  --text-secondary:   color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  --guide-line:       var(--color-primary);
+}
+
 /* ===== Surface ladder tokens — Tokyo Night theme ===== */
 /* Values sourced directly from the approved DM page mockup (eits-dm-mockup.html).
    Rail < Flyout < Canvas < Card/Composer — near-achromatic, no blue chroma. */
@@ -252,23 +271,6 @@ form:focus-visible {
   --warning-bg:              rgba(180,120,32,0.16);
   --warning-border:          rgba(220,160,70,0.35);
   --warning-text:            #e0af68;
-}
-
-/* ===== Fallback surface tokens — applies to all themes without explicit overrides ===== */
-/* Dracula, Autumn, and any other themes fall through to these DaisyUI-derived values. */
-:root {
-  --surface-rail:     var(--color-base-300);
-  --surface-flyout:   var(--color-base-200);
-  --surface-canvas:   var(--color-base-100);
-  --surface-card:     var(--color-base-100);
-  --surface-tool:     var(--color-base-200);
-  --surface-composer: var(--color-base-100);
-  --surface-selected: color-mix(in srgb, var(--color-primary) 12%, var(--color-base-200));
-  --surface-hover:    color-mix(in srgb, var(--color-base-content) 6%, transparent);
-  --border-subtle:    color-mix(in srgb, var(--color-base-content) 8%, transparent);
-  --text-primary:     var(--color-base-content);
-  --text-secondary:   color-mix(in srgb, var(--color-base-content) 70%, transparent);
-  --guide-line:       var(--color-primary);
 }
 
 /* ===== Dark theme - Claude.ai warm palette ===== */

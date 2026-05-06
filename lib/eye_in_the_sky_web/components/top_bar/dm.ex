@@ -66,11 +66,12 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         <.icon name="hero-ellipsis-horizontal" class="size-4" />
       </button>
       <ul
+        id="dm-topbar-dropdown-menu"
         tabindex="0"
         class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-xs"
       >
         <%= if @session_uuid do %>
-          <li>
+          <li id="dm-topbar-li-uuid">
             <button
               id="top-bar-copy-uuid"
               phx-hook="CopyToClipboard"
@@ -83,7 +84,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
           </li>
         <% end %>
         <%= if @show_iterm do %>
-          <li>
+          <li id="dm-topbar-li-iterm">
             <button
               phx-click="open_iterm"
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
@@ -93,11 +94,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
           </li>
         <% end %>
         <%= if @session_uuid || @show_iterm do %>
-          <li>
-            <div class="divider my-0"></div>
-          </li>
+          <li id="dm-topbar-li-div1"><div class="divider my-0"></div></li>
         <% end %>
-        <li>
+        <li id="dm-topbar-li-reload">
           <button
             phx-click="sync_messages"
             class={[
@@ -119,7 +118,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             <.icon name="hero-arrow-path" class="size-3.5" /> Reload from file
           </button>
         </li>
-        <li>
+        <li id="dm-topbar-li-export">
           <button
             phx-click="export_markdown"
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
@@ -127,10 +126,8 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             <.icon name="hero-clipboard-document" class="size-3.5" /> Export as Markdown
           </button>
         </li>
-        <li>
-          <div class="divider my-0"></div>
-        </li>
-        <li>
+        <li id="dm-topbar-li-div2"><div class="divider my-0"></div></li>
+        <li id="dm-topbar-li-notify">
           <button
             id="topbar-push-setup-btn"
             phx-hook="PushSetup"
@@ -143,10 +140,8 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             <.icon name="hero-bell" class="size-3.5" /> Notify
           </button>
         </li>
-        <li>
-          <div class="divider my-0"></div>
-        </li>
-        <li>
+        <li id="dm-topbar-li-div3"><div class="divider my-0"></div></li>
+        <li id="dm-topbar-li-schedule">
           <button
             phx-click="open_schedule_timer"
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
@@ -155,7 +150,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
           </button>
         </li>
         <%= if @active_timer do %>
-          <li>
+          <li id="dm-topbar-li-cancel">
             <button
               phx-click="cancel_timer"
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded"

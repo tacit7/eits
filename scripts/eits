@@ -1682,6 +1682,17 @@ USAGE
         fi
       fi
 
+      # Warn about stale worktrees before creating a new one — dangling entries cause name conflicts.
+      if [[ -n "$worktree" ]]; then
+        local _wt_count
+        _wt_count=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
+        # git worktree list always includes the main worktree; >1 means additional worktrees exist
+        if [[ "${_wt_count:-0}" -gt 1 ]]; then
+          printf 'warning: %d additional worktrees registered.\n' "$((_wt_count - 1))" >&2
+          printf '         Merged branches may conflict with --worktree "%s". Run: git worktree prune\n' "$worktree" >&2
+        fi
+      fi
+
       # Warn if EITS_PROJECT_ID is missing from instructions and not provided via --project-id
       if [[ -z "$project_id" ]]; then
         if ! echo "$instructions" | grep -qi "EITS_PROJECT_ID"; then
@@ -1774,6 +1785,8 @@ USAGE
         return 1
       fi
       printf '%s\n' "$_sp_resp_body" | jq .
+      # Final compact summary line — allows: eits agents spawn ... | tail -1 | jq .session_uuid
+      printf '%s\n' "$_sp_resp_body" | jq -c '{session_id, session_uuid, agent_id, worktree_path, branch_name} | with_entries(select(.value != null))'
       ;;
     spawn-batch)
       # eits agents spawn-batch --file <path.json> [--dry-run]
@@ -2261,8 +2274,8 @@ cmd_dm() {
     shift || true
     if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
       cat <<EOF
-usage: eits dm inbox [-s <session>] [-f <from>] [-l|-n <limit>] [--since <iso8601>] [-j|--json] [--team-only]
-       eits dm list  [-s <session>] [-f <from>] [-l|-n <limit>] [--since <iso8601>] [-j|--json] [--team-only]
+usage: eits dm inbox [-s <session>] [-f <from>] [-l|-n <limit>] [--since <iso8601>] [--since-session] [-j|--json] [--team-only]
+       eits dm list  [-s <session>] [-f <from>] [-l|-n <limit>] [--since <iso8601>] [--since-session] [-j|--json] [--team-only]
 
 Show inbound DMs for a session. Defaults to current session (EITS_SESSION_UUID / EITS_SESSION_ID).
 
@@ -2271,6 +2284,8 @@ Options:
   -f/--from <id>        Filter by sender session UUID or integer ID
   -l/-n/--limit <n>     Max messages to return (default: 20)
   --since <iso8601>     Return only messages inserted after this timestamp (e.g. 2026-04-30T12:00:00Z)
+  --since-session       Filter to DMs received since this session started (resolves created_at from API).
+                        Suppresses stale DMs from prior sessions replaying on resume.
   -j/--json             Raw JSON output
   --team-only           Only show DMs from sessions that share a team with the current session
 
@@ -2279,24 +2294,37 @@ Examples:
   eits dm inbox --limit 5
   eits dm inbox --from 3640
   eits dm inbox --since "2026-04-30T12:00:00Z"
+  eits dm inbox --since-session
   eits dm inbox --json
   eits dm inbox --team-only
 EOF
       return 0
     fi
-    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20 from="" since="" json_mode=0 team_only=0
+    local session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" limit=20 from="" since="" json_mode=0 team_only=0 since_session=0
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --session|-s)    session="$2";  shift 2 ;;
-        --from|-f)       from="$2";     shift 2 ;;
-        --limit|-l|-n)   limit="$2";    shift 2 ;;
-        --since)         since="$2";    shift 2 ;;
-        --json|-j)       json_mode=1;   shift ;;
-        --team-only)     team_only=1;   shift ;;
+        --session|-s)       session="$2";  shift 2 ;;
+        --from|-f)          from="$2";     shift 2 ;;
+        --limit|-l|-n)      limit="$2";    shift 2 ;;
+        --since)            since="$2";    shift 2 ;;
+        --since-session)    since_session=1; shift ;;
+        --json|-j)          json_mode=1;   shift ;;
+        --team-only)        team_only=1;   shift ;;
         *) die "unknown flag: $1" ;;
       esac
     done
     need session
+    # --since-session: resolve current session's created_at and use as --since filter.
+    # Suppresses stale DMs that arrived before this session started.
+    if [[ $since_session -eq 1 ]]; then
+      local _sess_ts
+      _sess_ts=$(_curl "${BASE_URL}/sessions/${session}" 2>/dev/null | jq -r '.created_at // empty' 2>/dev/null || true)
+      if [[ -n "$_sess_ts" ]]; then
+        since="$_sess_ts"
+      else
+        printf 'warning: --since-session: could not resolve session created_at; showing all DMs\n' >&2
+      fi
+    fi
     local qs="session=${session}&limit=${limit}"
     [[ -n "$from" ]] && qs="${qs}&from=${from}"
     [[ -n "$since" ]] && qs="${qs}&since=$(printf '%s' "$since" | jq -Rr @uri)"
@@ -3125,6 +3153,7 @@ HELP
         done
       else
         _teams_status_summary
+        printf '\nTip: use --wait to block until all members are done (polls every 5s, exits 0/1).\n' >&2
       fi
       ;;
     update-member)
@@ -3866,7 +3895,8 @@ Commands:
   standup       run [--since <duration>] [--channel <id|name>] [--dry-run] [--json]
                 Collect agent activity and post standup to a channel (default: channel 1)
   jobs          list|get|create|update|run|delete
-  dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--since <iso8601>] [--json] [--team-only]
+  dm            inbox|list [--session <uuid|id>] [--from <id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json] [--team-only]
+                --since-session  ← filter to DMs since this session started; suppresses stale resume DMs
   dm            [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
   channels      list|send|messages
   notifications create

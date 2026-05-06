@@ -1642,7 +1642,10 @@ USAGE
         local _team_info
         _team_info=$(_curl "$BASE_URL/teams/$team_id" 2>/dev/null || true)
         team_name=$(echo "$_team_info" | jq -r '.name // empty' 2>/dev/null || true)
-        [[ -n "$team_name" ]] || die "--team-id $team_id: team not found"
+        if [[ -z "$team_name" ]]; then
+          printf 'warning: --team-id %s: team not found, spawning without team assignment\n' "$team_id" >&2
+          team_id=""
+        fi
       fi
 
       # Dry-run validations

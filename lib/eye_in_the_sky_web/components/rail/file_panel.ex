@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
         "w-8 h-8 flex items-center justify-center transition-colors",
         if(@active_section == @section && @flyout_open,
           do: "bg-primary/[0.18] text-primary shadow-[inset_2px_0_0_oklch(var(--p)/0.8)]",
-          else: "text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"
+          else: "text-base-content/45 hover:text-base-content/80 hover:bg-base-content/8"
         )
       ]}
     >

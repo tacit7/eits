@@ -141,7 +141,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
     <.link
       navigate={"/dm/#{@session.id}"}
       data-vim-flyout-item
-      class="flyout-session-row flex items-start gap-2 px-3 py-1.5 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded [&.active]:font-semibold [&.active]:text-base-content/92 [&.active]:border-l-2 [&.active]:border-primary/80 [&.active]:pl-[10px]"
+      class="flyout-session-row flex items-start gap-2 px-3 py-1.5 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-[var(--surface-hover,theme(colors.base-content/6%))] transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded [&.active]:font-semibold [&.active]:text-base-content/92 [&.active]:bg-[var(--surface-selected,theme(colors.primary/12%))] [&.active]:border-l-2 [&.active]:border-primary/80 [&.active]:pl-[10px]"
     >
       <.status_dot status={@session.status} size="xs" class="mt-[3px] flex-shrink-0" />
       <div class="min-w-0 flex-1">

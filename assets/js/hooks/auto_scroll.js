@@ -94,7 +94,11 @@ export const AutoScroll = {
       // assignment from causing layout thrashing mid-patch.
       requestAnimationFrame(() => { this.el.scrollTop = 0 })
     } else if (this.shouldAutoScroll) {
-      this.scrollToBottom()
+      // Set scrollTop synchronously — the DOM is already patched by the time
+      // updated() runs, so reading scrollHeight here doesn't force an extra
+      // layout. Using RAF (scrollToBottom) would defer by one frame, causing a
+      // visible 1-frame slip on every stream token at 10+ tokens/sec.
+      this.el.scrollTop = this.el.scrollHeight
     } else {
       // Preserve scroll position when older messages are prepended
       const heightDiff = this.el.scrollHeight - this._prevScrollHeight

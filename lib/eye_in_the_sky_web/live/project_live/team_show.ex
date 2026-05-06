@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Notes, Tasks, Teams}
+  alias EyeInTheSky.{Notes, Repo, Tasks, Teams}
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -24,6 +24,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
             |> assign(:team_loaded, true)
             |> assign(:agent_session_id, nil)
             |> assign(:page_title_prefix, team.name)
+            |> stream(:members, team.members, reset: true, dom_id: fn m -> "member-#{m.id}" end)
           else
             socket
             |> assign(:team, team)
@@ -51,8 +52,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
       when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left],
       do: {:noreply, socket}
 
+  # Member events: targeted update using streams instead of full reload
+  def handle_info({:member_joined, member}, socket) do
+    member = Repo.preload(member, [session: [:agent]])
+    socket = stream_insert(socket, :members, member)
+    {:noreply, socket}
+  end
+
+  def handle_info({:member_updated, member}, socket) do
+    member = Repo.preload(member, [session: [:agent]])
+    socket = stream_insert(socket, :members, member)
+    {:noreply, socket}
+  end
+
+  def handle_info({:member_left, member}, socket) do
+    socket = stream_delete_by_dom_id(socket, :members, "member-#{member.id}")
+    {:noreply, socket}
+  end
+
+  # Team-level events: still need full reload
   def handle_info({event, _payload}, socket)
-      when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left] do
+      when event in [:team_created, :team_deleted] do
     socket =
       case Teams.get_team(socket.assigns.team_id) do
         {:ok, team} -> assign(socket, :team, load_team_detail(team))
@@ -137,6 +157,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
             module={EyeInTheSkyWeb.TeamDetailComponent}
             id="team-show-detail"
             team={@team}
+            members={Enum.to_list(@streams.members)}
             selected_agent_session_id={@agent_session_id}
           />
         <% end %>

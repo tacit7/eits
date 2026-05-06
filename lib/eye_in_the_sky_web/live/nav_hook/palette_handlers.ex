@@ -172,9 +172,14 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   # ---------------------------------------------------------------------------
 
   def handle_create_note_event("palette:create-note", params, socket) do
+    # Trim body and use fallback if empty. Empty string is truthy in Elixir,
+    # so we need to explicitly check String.trim/1 for blank strings.
+    body_param = (params["body"] || "") |> String.trim()
+    body = if body_param == "", do: "(empty)", else: body_param
+
     attrs = %{
-      title: params["title"] || "",
-      body: params["body"] || "(empty)",
+      title: (params["title"] || "") |> String.trim(),
+      body: body,
       parent_type: "system",
       parent_id: "0"
     }

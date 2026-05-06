@@ -109,6 +109,8 @@ eits notes update <id> [--body "..."] [--title "t"] [--starred]
 eits agents list [--project-id <id>]
 eits agents get <uuid>
 eits agents defs [--json]       # list agent definitions (descriptions truncated to 500 chars; use --json for full)
+eits agents update <uuid|id> [--status <s>] [--status-message "text"]
+# at least one flag required; agents updating themselves: eits agents update $EITS_AGENT_UUID --status-message "working on X"
 eits agents spawn --instructions "..." [options]
   --instructions-file <path>   read from file (avoids shell escaping issues with heredocs/sigils)
   --interpolate-env            expand $VAR in instructions from current env at spawn time

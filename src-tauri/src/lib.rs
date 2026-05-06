@@ -158,8 +158,6 @@ pub fn run() {
                 &MenuItem::with_id(app, "menu_tasks", "Tasks", true, Some("CmdOrCtrl+3"))?,
                 &MenuItem::with_id(app, "menu_teams", "Teams", true, Some("CmdOrCtrl+4"))?,
                 &PredefinedMenuItem::separator(app)?,
-                &always_on_top_menu_item,
-                &PredefinedMenuItem::separator(app)?,
                 &MenuItem::with_id(app, "menu_reload", "Reload", true, Some("CmdOrCtrl+R"))?,
             ])?;
             let window_menu = Submenu::with_items(app, "Window", true, &[
@@ -167,6 +165,8 @@ pub fn run() {
                 &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::minimize(app, None)?,
                 &PredefinedMenuItem::maximize(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &always_on_top_menu_item,
                 &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::close_window(app, None)?,
             ])?;
@@ -430,6 +430,18 @@ pub fn run() {
                     );
                     if let Some(wv) = window.app_handle().get_webview_window(window.label()) {
                         let _ = wv.eval(&js);
+                    }
+                }
+                tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Enter { .. }) => {
+                    let js = "window.dispatchEvent(new CustomEvent('tauri:file-drag-enter'))";
+                    if let Some(wv) = window.app_handle().get_webview_window("main") {
+                        let _ = wv.eval(js);
+                    }
+                }
+                tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Leave) => {
+                    let js = "window.dispatchEvent(new CustomEvent('tauri:file-drag-leave'))";
+                    if let Some(wv) = window.app_handle().get_webview_window("main") {
+                        let _ = wv.eval(js);
                     }
                 }
                 tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {

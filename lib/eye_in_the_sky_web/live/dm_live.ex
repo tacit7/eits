@@ -294,6 +294,14 @@ defmodule EyeInTheSkyWeb.DmLive do
     MessageHandlers.handle_send_message(cmd, socket)
   end
 
+  # Tauri native file drop — paths are absolute OS paths sent from Rust via
+  # window.dispatchEvent(tauri:file-drop). Stash them in the socket; they are
+  # merged with browser-uploaded files in handle_send_message.
+  @impl true
+  def handle_event("tauri_file_drop", %{"paths" => paths}, socket) when is_list(paths) do
+    {:noreply, assign(socket, :tauri_dropped_files, paths)}
+  end
+
   @impl true
   def handle_event("remove_queued_prompt", %{"id" => id_str}, socket) do
     if id = parse_int(id_str), do: AgentWorker.remove_queued_prompt(socket.assigns.session_id, id)

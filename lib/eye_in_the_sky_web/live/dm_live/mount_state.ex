@@ -150,7 +150,9 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   end
 
   defp assign_upload_config(socket) do
-    allow_upload(socket, :files,
+    socket
+    |> assign(:tauri_dropped_files, [])
+    |> allow_upload(:files,
       accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
       max_entries: 10,
       max_file_size: 50_000_000,

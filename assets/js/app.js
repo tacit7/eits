@@ -331,23 +331,22 @@ if (window.__TAURI_INTERNALS__) {
   })
 }
 
-// Tauri file drop: forward native file drops to the active LiveView session.
-// The Rust side fires tauri:file-drop with {paths: ["/abs/path", ...]}.
-// We push a "file_drop" event to whichever LiveView component has
-// data-file-drop-target on it; if none, push to the root liveSocket.
+// Tauri file drop: forward native OS file drops (from Finder) to DM LiveView.
+// WKWebView does NOT fire HTML5 drag events for native drags, so this is the
+// only path for files dragged from Finder into the app window.
+// The Rust side emits tauri:file-drop with { paths: ["/abs/path", ...] }.
 window.addEventListener('tauri:file-drop', (e) => {
   const paths = e.detail?.paths ?? []
   if (!paths.length) return
-  const target = document.querySelector('[data-file-drop-target]')
+  // Target the DM page — that's where file drops are handled.
+  const target = document.getElementById('dm-page')
   if (target && window.liveSocket) {
     const view = window.liveSocket.getViewByEl(target)
     if (view) {
-      view.pushEvent('file_drop', { paths }, () => {})
+      view.pushEvent('tauri_file_drop', { paths })
       return
     }
   }
-  // Fallback: push to root socket hooks
-  window.dispatchEvent(new CustomEvent('phx:file_drop', { detail: { paths } }))
 })
 
 // The lines below enable quality of life phoenix_live_reload

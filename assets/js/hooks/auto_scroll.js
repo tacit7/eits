@@ -84,7 +84,9 @@ export const AutoScroll = {
       // "Load older messages" was clicked — scroll to top so the user sees
       // the newly loaded older content immediately.
       this._intentLoadMore = false
-      this.el.scrollTop = 0
+      // RAF defers the scroll past the current paint, preventing sync scrollTop
+      // assignment from causing layout thrashing mid-patch.
+      requestAnimationFrame(() => { this.el.scrollTop = 0 })
     } else if (this.shouldAutoScroll) {
       this.scrollToBottom()
     } else {

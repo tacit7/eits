@@ -40,18 +40,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   def render(assigns) do
     ~H"""
     <div class="flex h-full flex-col" id="dm-messages-tab">
-      <%!-- Use position:relative + absolute fill so the stream bubble can overlay
-           at the bottom without participating in flex layout. Previously the bubble
-           was flex-shrink-0 in this column, so every token that grew the bubble
-           shrank messages-container — the root cause of the visible flicker. --%>
-      <div class="flex-1 min-h-0 relative">
-        <div
-          class={"overflow-y-auto absolute inset-0#{if @stream.show, do: " pb-32", else: ""}"}
-          id="messages-container"
-          phx-hook="AutoScroll"
-          data-has-more={if @has_more_messages, do: "true", else: "false"}
-          style="scrollbar-width: none; -ms-overflow-style: none; overflow-anchor: none;"
-        >
+      <div
+        class="overflow-y-auto flex-1 min-h-0"
+        id="messages-container"
+        phx-hook="AutoScroll"
+        data-has-more={if @has_more_messages, do: "true", else: "false"}
+        style="scrollbar-width: none; -ms-overflow-style: none; overflow-anchor: none;"
+      >
           <%= if @messages == [] do %>
             <.empty_state
               title={if @agent, do: @agent.name, else: "No messages yet"}
@@ -98,49 +93,46 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 <% end %>
               </div>
 
+              <%!-- Live streaming bubble — flows naturally in the scroll container.
+                   No absolute positioning, no pb-32 toggle: bubble growth is a
+                   single reflow event (the div itself growing), not two
+                   (bubble + padding toggle). --%>
+              <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
+                <div id="live-stream-bubble">
+                  <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5">
+                    <div class="flex items-center gap-2 mb-2">
+                      <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <.provider_avatar session={@session} class="size-3 animate-pulse" />
+                      </div>
+                      <span class="text-[11px] font-semibold text-primary/80 animate-pulse">
+                        {stream_provider_label(@session)}
+                      </span>
+                    </div>
+                    <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5">
+                      <%= if @stream.thinking do %>
+                        <div class="text-xs text-base-content/30 italic font-mono line-clamp-3">
+                          {String.slice(@stream.thinking, -200, 200)}
+                        </div>
+                      <% end %>
+                      <%= if @stream.tool do %>
+                        <div class="text-xs text-base-content/40 font-mono">
+                          Using {@stream.tool}...
+                        </div>
+                      <% end %>
+                      <%= if @stream.content not in [nil, ""] do %>
+                        <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">
+                          {String.trim_leading(@stream.content)}
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+
               <%!-- Scroll anchor --%>
               <div id="messages-scroll-anchor" style="height: 1px; overflow-anchor: auto;"></div>
             </div>
           <% end %>
-        </div>
-
-        <%!-- Live streaming bubble — absolutely positioned at the bottom of the relative
-             wrapper so it overlays messages without participating in flex layout.
-             flex-shrink-0 was the original approach but it shrank messages-container
-             on every token, which was the root cause of the visible scroll flicker. --%>
-        <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
-          <div class="absolute bottom-0 left-0 right-0 z-10 pointer-events-none">
-          <div class="max-w-[860px] mx-auto w-full px-5 pb-2 pointer-events-auto">
-            <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5" id="live-stream-bubble">
-              <div class="flex items-center gap-2 mb-2">
-                <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <.provider_avatar session={@session} class="size-3 animate-pulse" />
-                </div>
-                <span class="text-[11px] font-semibold text-primary/80 animate-pulse">
-                  {stream_provider_label(@session)}
-                </span>
-              </div>
-              <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5">
-                <%= if @stream.thinking do %>
-                  <div class="text-xs text-base-content/30 italic font-mono line-clamp-3">
-                    {String.slice(@stream.thinking, -200, 200)}
-                  </div>
-                <% end %>
-                <%= if @stream.tool do %>
-                  <div class="text-xs text-base-content/40 font-mono">
-                    Using {@stream.tool}...
-                  </div>
-                <% end %>
-                <%= if @stream.content not in [nil, ""] do %>
-                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">
-                    {String.trim_leading(@stream.content)}
-                  </div>
-                <% end %>
-              </div>
-            </div>
-          </div>
-          </div>
-        <% end %>
       </div>
 
       <%!-- Codex raw JSONL stream panel --%>

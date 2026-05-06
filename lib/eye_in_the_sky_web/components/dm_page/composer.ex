@@ -19,6 +19,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   attr :provider, :string, default: "claude"
   attr :context_used, :integer, default: 0
   attr :context_window, :integer, default: 0
+  attr :total_cost, :float, default: 0.0
   attr :display_name, :string, default: nil
   attr :session_cli_opts, :list, default: []
   attr :session_uuid, :string, default: nil
@@ -221,22 +222,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
           <% end %>
         </div>
 
-        <%!-- Center: context used --%>
+        <%!-- Center: context meter --%>
         <div class="inline-flex items-center gap-2">
           <%= if @context_window > 0 and @context_used > 0 do %>
-            <% pct = min(Float.round(@context_used / @context_window * 100, 1), 100.0) %>
-            <% color_class =
-              cond do
-                pct < 60 -> "text-base-content/30"
-                pct < 80 -> "text-warning/70"
-                true -> "text-error/70"
-              end %>
-            <span
-              class={"inline-flex items-center gap-1 text-mini font-mono tabular-nums " <> color_class}
-              title={"#{format_number(@context_used)} / #{format_number(@context_window)} tokens used"}
-            >
-              {pct}% ctx
-            </span>
+            <.context_meter
+              context_used={@context_used}
+              context_window={@context_window}
+              total_cost={@total_cost}
+              active_overlay={@active_overlay}
+            />
           <% end %>
         </div>
 
@@ -399,6 +393,191 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
     </details>
     """
   end
+
+  # ─── Context meter ──────────────────────────────────────────────────────────
+
+  attr :context_used, :integer, required: true
+  attr :context_window, :integer, required: true
+  attr :total_cost, :float, default: 0.0
+  attr :active_overlay, :any, default: nil
+
+  defp context_meter(assigns) do
+    ratio = min(assigns.context_used / assigns.context_window, 1.0)
+    pct = ratio * 100.0
+
+    # Segment shares (claudette visual fiction: 8% system, 7% files, rest convo)
+    scale = min(1.0, ratio / 0.15)
+    system_share = 0.08 * scale
+    files_share = 0.07 * scale
+    conv_share = max(0.0, ratio - system_share - files_share)
+
+    # Color band
+    {bar_color, label_color} =
+      cond do
+        pct < 60 -> {"bg-base-content/25", "text-base-content/30"}
+        pct < 85 -> {"bg-warning/70", "text-warning/70"}
+        true -> {"bg-error/70", "text-error/70"}
+      end
+
+    # 10-cell bar fill
+    filled_float = ratio * 10.0
+    filled_floor = trunc(filled_float)
+    partial_frac = filled_float - filled_floor
+
+    assigns =
+      assigns
+      |> Map.put(:ratio, ratio)
+      |> Map.put(:pct, pct)
+      |> Map.put(:system_share, system_share)
+      |> Map.put(:files_share, files_share)
+      |> Map.put(:conv_share, conv_share)
+      |> Map.put(:bar_color, bar_color)
+      |> Map.put(:label_color, label_color)
+      |> Map.put(:filled_floor, filled_floor)
+      |> Map.put(:partial_frac, partial_frac)
+
+    ~H"""
+    <div class="relative dropdown dropdown-top">
+      <%!-- Trigger: 10-cell segmented meter --%>
+      <button
+        type="button"
+        phx-click="toggle_context_meter"
+        class={"flex items-end gap-px h-3.5 cursor-pointer group " <> @label_color}
+        title={"#{format_number(@context_used)} / #{format_number(@context_window)} tokens — click for details"}
+        aria-label="Context window usage"
+      >
+        <%= for i <- 0..9 do %>
+          <span class={[
+            "w-[3px] rounded-sm transition-colors",
+            cond do
+              i < @filled_floor ->
+                "h-full " <> @bar_color
+              i == @filled_floor and @partial_frac > 0.02 ->
+                "relative h-full bg-base-content/10 overflow-hidden"
+              true ->
+                "h-full bg-base-content/10"
+            end
+          ]}>
+            <%= if i == @filled_floor and @partial_frac > 0.02 do %>
+              <span
+                class={"absolute bottom-0 left-0 right-0 " <> @bar_color}
+                style={"height: #{round(@partial_frac * 100)}%"}
+              />
+            <% end %>
+          </span>
+        <% end %>
+      </button>
+
+      <%!-- Popover --%>
+      <%= if @active_overlay == :context_meter do %>
+        <div
+          class="dropdown-content z-50 mb-2 w-64 rounded-xl border border-base-content/10 bg-base-100 shadow-xl p-4"
+          role="dialog"
+          aria-label="Context window details"
+        >
+          <%!-- Header --%>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold uppercase tracking-wider text-base-content/40">
+              Context
+            </span>
+            <span class={"text-xs font-mono font-semibold " <> @label_color}>
+              {round(@pct)}% used
+            </span>
+          </div>
+
+          <%!-- Segmented bar (3-segment continuous) --%>
+          <div class="flex h-1.5 rounded-full overflow-hidden mb-2 bg-base-content/[0.06]">
+            <%= if @system_share > 0 do %>
+              <span
+                class="bg-base-content/30 h-full"
+                style={"width: #{round(@system_share * 100)}%"}
+                title="System + tools"
+              />
+            <% end %>
+            <%= if @conv_share > 0 do %>
+              <span
+                class={"h-full " <> @bar_color}
+                style={"width: #{round(@conv_share * 100)}%"}
+                title="Conversation"
+              />
+            <% end %>
+            <%= if @files_share > 0 do %>
+              <span
+                class="bg-info/50 h-full"
+                style={"width: #{round(@files_share * 100)}%"}
+                title="Latest files"
+              />
+            <% end %>
+          </div>
+
+          <%!-- Legend --%>
+          <div class="space-y-1 mb-3">
+            <div class="flex items-center justify-between text-xs text-base-content/50">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-sm bg-base-content/30 flex-shrink-0" />
+                System + tools
+              </span>
+              <span class="font-mono">{format_number(round(@system_share * @context_window))}</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-base-content/50">
+              <span class="flex items-center gap-1.5">
+                <span class={"w-2 h-2 rounded-sm flex-shrink-0 " <> @bar_color} />
+                Conversation
+              </span>
+              <span class="font-mono">{format_number(round(@conv_share * @context_window))}</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-base-content/50">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-sm bg-info/50 flex-shrink-0" />
+                Latest files
+              </span>
+              <span class="font-mono">{format_number(round(@files_share * @context_window))}</span>
+            </div>
+          </div>
+
+          <%!-- Divider --%>
+          <div class="border-t border-base-content/[0.06] my-3" />
+
+          <%!-- Token count + cost --%>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs text-base-content/40 font-mono">
+              {format_number(@context_used)} / {format_number(@context_window)}
+            </span>
+            <%= if @total_cost > 0 do %>
+              <span class="text-xs font-mono text-base-content/40">
+                {format_cost(@total_cost)}
+              </span>
+            <% end %>
+          </div>
+
+          <%!-- Compact + Clear --%>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              phx-click="send_slash_command"
+              phx-value-command="/compact"
+              class="flex-1 rounded-lg bg-base-content/[0.05] hover:bg-base-content/[0.09] border border-base-content/[0.08] text-xs font-medium text-base-content/60 py-1.5 transition-colors"
+            >
+              Compact
+            </button>
+            <button
+              type="button"
+              phx-click="send_slash_command"
+              phx-value-command="/clear"
+              class="flex-1 rounded-lg bg-base-content/[0.05] hover:bg-base-content/[0.09] border border-base-content/[0.08] text-xs font-medium text-base-content/60 py-1.5 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp format_cost(cost) when cost < 0.01, do: "<$0.01"
+  defp format_cost(cost) when cost < 100, do: "$#{:erlang.float_to_binary(cost, decimals: 2)}"
+  defp format_cost(cost), do: "$#{round(cost)}"
 
   defp model_display_name(slug), do: EyeInTheSkyWeb.Helpers.ModelHelpers.model_display_name(slug)
 

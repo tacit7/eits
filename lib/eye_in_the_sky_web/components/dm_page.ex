@@ -473,6 +473,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             provider={@agent.provider}
             context_used={@session_state.context_used}
             context_window={@session_state.context_window}
+            total_cost={Map.get(@session_state, :total_cost, 0.0)}
             display_name={
               if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) &&
                    @agent_record.agent_definition,

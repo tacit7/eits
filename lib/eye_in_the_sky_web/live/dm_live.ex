@@ -147,6 +147,10 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("toggle_effort_menu", _params, socket), do: handle_toggle_effort_menu(socket)
 
   @impl true
+  def handle_event("toggle_context_meter", _params, socket),
+    do: toggle_active_overlay(socket, :context_meter)
+
+  @impl true
   def handle_event("toggle_new_session_drawer", _params, socket), do: {:noreply, socket}
 
   @impl true
@@ -269,6 +273,15 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("send_message", _params, socket) do
     {:noreply, socket}
+  end
+
+  # Compact/Clear buttons in the context meter popover dispatch a slash command
+  # directly without going through the textarea.
+  @impl true
+  def handle_event("send_slash_command", %{"command" => cmd}, socket)
+      when cmd in ["/compact", "/clear"] do
+    socket = assign(socket, :active_overlay, nil)
+    MessageHandlers.handle_send_message(cmd, socket)
   end
 
   @impl true
@@ -531,7 +544,8 @@ defmodule EyeInTheSkyWeb.DmLive do
             max_budget_usd: @max_budget_usd,
             compacting: @compacting,
             context_used: @context_used,
-            context_window: @context_window
+            context_window: @context_window,
+            total_cost: @total_cost
           }
         }
         message_data={

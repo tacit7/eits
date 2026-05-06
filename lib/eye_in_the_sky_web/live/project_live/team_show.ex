@@ -107,8 +107,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
 
       {task_id_int, session_id_int} ->
         Tasks.link_session_to_task(task_id_int, session_id_int)
-        team = Teams.get_team!(socket.assigns.team_id) |> load_team_detail()
-        {:noreply, assign(socket, :team, team)}
+
+        case Teams.get_team(socket.assigns.team_id) do
+          {:ok, team} ->
+            {:noreply, assign(socket, :team, load_team_detail(team))}
+
+          _ ->
+            {:noreply, put_flash(socket, :error, "Team not found")}
+        end
     end
   end
 

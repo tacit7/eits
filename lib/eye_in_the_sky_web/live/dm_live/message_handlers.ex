@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [connected?: 1, put_flash: 3, push_event: 3]
+  import Phoenix.LiveView, only: [connected?: 1, put_flash: 3, push_event: 3, stream_insert: 3]
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.SessionImporter
@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
   alias EyeInTheSky.Messages
   alias EyeInTheSky.Repo
+  alias EyeInTheSkyWeb.DmLive.MessageGrouper
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.UploadHelpers
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
@@ -177,7 +178,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   end
 
   @doc """
-  Appends a single message from a PubSub broadcast to @messages in-place.
+  Appends a single message from a PubSub broadcast to @messages and
+  stream_inserts only the changed grouped rows.
 
   This replaces the previous schedule_message_reload approach for {:new_message} and
   {:new_dm} events, which threw away the already-delivered payload and debounced a
@@ -191,10 +193,15 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   [:session, :reactions] at insert time — the :attachments association would be
   %Ecto.Association.NotLoaded{}, which crashes the message_attachments template
   component (the `attachments != []` guard does not rescue NotLoaded structs).
-  A targeted single-row JOIN is far cheaper than reloading the full message list.
+
+  Rather than re-rendering the entire grouped list, MessageGrouper.diff_tail/2
+  re-runs group_events on the last #{MessageGrouper.tail_window()} messages and
+  returns only rows that are new or changed. Typically 1 new row (standalone
+  assistant message). A tool event appended to an existing cluster produces 1
+  updated cluster row (same id → morphdom patches, no delete+reinsert).
 
   Cancels any pending debounced reload timer so a stale :do_message_reload cannot
-  clobber the messages list after we have already appended the new entry.
+  clobber the list after we have already appended the new entry.
   """
   def append_message_from_pubsub(socket, message) do
     existing = socket.assigns[:messages] || []
@@ -203,12 +210,18 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       socket
     else
       message = Repo.preload(message, :attachments)
-      messages = existing ++ [message]
+      new_messages = existing ++ [message]
+      changed_rows = MessageGrouper.diff_tail(existing, new_messages)
 
-      socket
-      |> cancel_reload_timer()
-      |> assign(:messages, messages)
-      |> push_event("new_message", %{})
+      socket =
+        socket
+        |> cancel_reload_timer()
+        |> assign(:messages, new_messages)
+        |> push_event("new_message", %{})
+
+      Enum.reduce(changed_rows, socket, fn row, acc ->
+        stream_insert(acc, :grouped_messages, row)
+      end)
     end
   end
 

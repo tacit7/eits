@@ -586,6 +586,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         session_uuid={@session_uuid}
         active_tab={@active_tab}
         uploads={@uploads}
+        streams={@streams}
         stream={
           %{
             show: @show_live_stream,

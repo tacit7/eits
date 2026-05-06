@@ -2,8 +2,10 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [stream: 4]
 
   alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}
+  alias EyeInTheSkyWeb.DmLive.MessageGrouper
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   require Logger
@@ -27,6 +29,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     |> assign(:has_more_messages, has_more)
     |> assign(:context_used, 0)
     |> assign(:context_window, 0)
+    |> stream(:grouped_messages, MessageGrouper.grouped_rows(messages), reset: true)
   end
 
   def load_tab_data(socket, tab, session_id) do
@@ -69,6 +72,16 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     |> assign(:context_used, context_used || 0)
     |> assign(:context_window, context_window || 0)
     |> assign(:current_task, current_task)
+    |> then(fn s ->
+      # Only reset the stream when loading the messages tab. Other tab loads
+      # reuse the current @messages assign (cache hit) and must not blow away
+      # stream items the user is currently viewing.
+      if tab == "messages" do
+        stream(s, :grouped_messages, MessageGrouper.grouped_rows(messages), reset: true)
+      else
+        s
+      end
+    end)
     |> assign(
       :tasks,
       maybe_load_tab_data(tab, "tasks", socket.assigns[:tasks], fn ->

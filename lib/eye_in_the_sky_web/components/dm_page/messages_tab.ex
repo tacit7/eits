@@ -2,11 +2,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   @moduledoc """
   LiveComponent for the DM messages tab.
 
-  Extracted from a plain function component so that unrelated assigns
-  on the parent LiveView (processing, current_task, session_status, etc.)
-  do not trigger a re-render of the message list. LiveView only calls
-  update/2 — and therefore only diffs the message list — when the assigns
-  passed to this component actually change.
+  Message rows are rendered via a LiveView stream (:grouped_messages) so only
+  new or changed rows are sent to the client on each PubSub event. The stream
+  is managed by the parent LiveView (DmLive) via MessageGrouper + TabHelpers;
+  this component receives @streams from the parent and renders the stream
+  container with phx-update="stream".
+
+  The old @messages assign and the prev_messages == new_messages cache in
+  update/2 are gone. The parent LV calls stream_insert only for changed rows;
+  stream updates bypass the component's update/2 entirely (LiveView sends them
+  as stream diffs, not component diffs).
   """
 
   use EyeInTheSkyWeb, :live_component
@@ -26,26 +31,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   @impl true
   def update(assigns, socket) do
-    # Only re-group messages when the messages list itself changed.
-    # stream_delta fires on every token and only changes @stream — re-running
-    # group_events on the full message list on every token is unnecessary O(n)
-    # work and causes a morphdom diff + AutoScroll.updated() call each time.
-    prev_messages = socket.assigns[:messages]
-    new_messages = assigns[:messages] || []
-
-    grouped_messages =
-      if prev_messages == new_messages do
-        socket.assigns[:grouped_messages] || group_events(new_messages)
-      else
-        group_events(new_messages)
-      end
-
-    socket =
-      socket
-      |> assign(assigns)
-      |> assign(:grouped_messages, grouped_messages)
-
-    {:ok, socket}
+    {:ok, assign(socket, assigns)}
   end
 
   @impl true
@@ -59,7 +45,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         data-has-more={if @has_more_messages, do: "true", else: "false"}
         style="scrollbar-width: none; -ms-overflow-style: none; overflow-anchor: none;"
       >
-          <%= if @messages == [] do %>
+          <%= if @empty do %>
             <.empty_state
               title={if @agent, do: @agent.name, else: "No messages yet"}
               class="flex flex-col items-center justify-center h-full py-20 text-center select-none"
@@ -89,20 +75,21 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 <% end %>
               </div>
 
-              <div>
-                <%= for item <- @grouped_messages do %>
-                  <%= case item do %>
-                    <% {:cluster, events, meta} -> %>
-                      <.tool_cluster events={events} meta={meta} />
-                    <% {:message, message, prev_role} -> %>
-                      <.message_item
-                        message={message}
-                        prev_role={prev_role}
-                        agent={@agent}
-                        session={@session}
-                      />
-                  <% end %>
-                <% end %>
+              <%!-- Stream container: each grouped row is a stream item. LiveView
+                   inserts/patches rows individually; morphdom only touches changed
+                   elements. The wrapper div carries the stream dom_id; the inner
+                   component renders its own element with a separate internal id. --%>
+              <div id="grouped-messages-stream" phx-update="stream">
+                <div :for={{dom_id, item} <- @streams.grouped_messages} id={dom_id}>
+                  <.tool_cluster :if={item.type == :cluster} events={item.data} meta={item.meta} />
+                  <.message_item
+                    :if={item.type == :message}
+                    message={item.data}
+                    prev_role={item.prev_role}
+                    agent={@agent}
+                    session={@session}
+                  />
+                </div>
               </div>
 
               <%!-- Live streaming bubble — flows naturally in the scroll container.
@@ -390,76 +377,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       </div>
     </details>
     """
-  end
-
-  # ---------------------------------------------------------------------------
-  # group_events — clusters consecutive tool messages
-  # ---------------------------------------------------------------------------
-
-  defp group_events(messages) do
-    tool_types = ~w(tool_use tool_result bash output)
-
-    # Pair each message with the sender_role of its predecessor (nil for the
-    # first message). This used to be a separate Enum.find pass per message
-    # (O(n^2)); now it's a single linear walk threaded through chunk_while.
-    pairs =
-      messages
-      |> Enum.zip([nil | messages])
-      |> Enum.map(fn {msg, prev} ->
-        {msg, if(prev, do: prev.sender_role, else: nil)}
-      end)
-
-    pairs
-    |> Enum.chunk_while(
-      nil,
-      fn {msg, prev_role}, acc ->
-        stream_type = get_in(msg.metadata || %{}, ["stream_type"]) || ""
-        is_tool = stream_type in tool_types
-
-        cond do
-          is_tool and is_nil(acc) ->
-            {:cont, {:cluster, [msg]}}
-
-          is_tool and match?({:cluster, _}, acc) ->
-            {:cont, {:cluster, [msg | elem(acc, 1)]}}
-
-          not is_tool and is_nil(acc) ->
-            {:cont, {:message, msg, prev_role}, nil}
-
-          not is_tool and match?({:cluster, _}, acc) ->
-            {:cont, [flush_cluster(acc), {:message, msg, prev_role}], nil}
-        end
-      end,
-      fn
-        nil -> {:cont, []}
-        acc -> {:cont, flush_cluster(acc), nil}
-      end
-    )
-    |> List.flatten()
-  end
-
-  defp flush_cluster({:cluster, events}) do
-    events = Enum.reverse(events)
-    first = List.first(events)
-    last = List.last(events)
-
-    duration_ms =
-      if first != last do
-        DateTime.diff(last.inserted_at, first.inserted_at, :millisecond)
-      end
-
-    type_counts =
-      Enum.frequencies_by(events, fn msg ->
-        get_in(msg.metadata || %{}, ["stream_type"]) || "event"
-      end)
-
-    {:cluster, events,
-     %{
-       count: length(events),
-       type_counts: type_counts,
-       first_at: first.inserted_at,
-       duration_ms: if(duration_ms && duration_ms > 1000, do: duration_ms)
-     }}
   end
 
 end

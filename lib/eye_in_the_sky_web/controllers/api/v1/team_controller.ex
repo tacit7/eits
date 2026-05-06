@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams
   def index(conn, params) do
-    with {:ok, requester_session} <- get_authenticated_session(params) do
+    with {:ok, requester_session} <- get_authenticated_session(conn, params) do
       limit =
         case parse_int(params["limit"]) do
           n when is_integer(n) and n > 0 -> n
@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams/:id
   def show(conn, %{"id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(params),
+    with {:ok, requester_session} <- get_authenticated_session(conn, params),
          {:ok, team} <- resolve_team(id),
          :ok <- validate_project_access(team, requester_session) do
       members = Teams.list_members(team.id)
@@ -71,7 +71,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # POST /api/v1/teams
   def create(conn, params) do
-    with {:ok, requester_session} <- get_authenticated_session(params),
+    with {:ok, requester_session} <- get_authenticated_session(conn, params),
          {:ok, project_id} <- resolve_create_project_id(params, requester_session) do
       attrs = %{
         name: params["name"],
@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     if map_size(attrs) == 0 do
       {:error, :bad_request, "at least one of name or description is required"}
     else
-      with {:ok, requester_session} <- get_authenticated_session(params),
+      with {:ok, requester_session} <- get_authenticated_session(conn, params),
            {:ok, team} <- resolve_team(id),
            :ok <- validate_project_access(team, requester_session) do
         case Teams.update_team(team, attrs) do
@@ -142,7 +142,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # DELETE /api/v1/teams/:id
   def delete(conn, %{"id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(params),
+    with {:ok, requester_session} <- get_authenticated_session(conn, params),
          {:ok, team} <- resolve_team(id),
          :ok <- validate_project_access(team, requester_session) do
       case Teams.delete_team(team) do
@@ -164,7 +164,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams/:team_id/members
   def list_members(conn, %{"team_id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(params),
+    with {:ok, requester_session} <- get_authenticated_session(conn, params),
          {:ok, team} <- resolve_team(id),
          :ok <- validate_project_access(team, requester_session) do
       members = Teams.list_members(team.id)
@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # POST /api/v1/teams/:team_id/members
   def join(conn, %{"team_id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(params),
+    with {:ok, requester_session} <- get_authenticated_session(conn, params),
          {:ok, team} <- resolve_team(id),
          :ok <- validate_project_access(team, requester_session) do
       attrs = %{
@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # PATCH /api/v1/teams/:team_id/members/:member_id
   def update_member(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(params),
+    with {:ok, requester_session} <- get_authenticated_session(conn, params),
          {:ok, team} <- resolve_team(team_id),
          :ok <- validate_project_access(team, requester_session),
          {:ok, member} <- Teams.get_member(member_id) do
@@ -242,7 +242,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # DELETE /api/v1/teams/:team_id/members/:member_id
   def leave(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(params),
+    with {:ok, requester_session} <- get_authenticated_session(conn, params),
          {:ok, team} <- resolve_team(team_id),
          :ok <- validate_project_access(team, requester_session),
          {:ok, member} <- Teams.get_member(member_id) do
@@ -270,7 +270,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         {:error, :bad_request, "from_session_id is required"}
 
       true ->
-        with {:ok, requester_session} <- get_authenticated_session(params),
+        with {:ok, requester_session} <- get_authenticated_session(conn, params),
              {:ok, team} <- resolve_team(id),
              :ok <- validate_project_access(team, requester_session) do
           do_broadcast(conn, team, from_raw, String.trim(body))
@@ -287,9 +287,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # ── helpers ──────────────────────────────────────────────────────────────────
 
-  defp get_authenticated_session(params) do
+  defp get_authenticated_session(conn, params) do
     session_id_raw = params["session_id"]
     agent_id_raw = params["agent_id"]
+    header_session = conn |> Plug.Conn.get_req_header("x-eits-session") |> List.first()
 
     cond do
       session_id_raw && session_id_raw != "" ->
@@ -297,6 +298,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       agent_id_raw && agent_id_raw != "" ->
         resolve_agent_session(agent_id_raw)
+
+      header_session && header_session != "" ->
+        resolve_session(header_session)
 
       true ->
         {:error, :unauthorized}

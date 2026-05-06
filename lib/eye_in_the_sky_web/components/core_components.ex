@@ -1062,8 +1062,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           class={[
             "px-2.5 py-1 rounded-md text-mini font-medium transition-all duration-150",
             if(item[:active],
-              do: item[:active_class] || "bg-base-100 text-base-content shadow-sm",
-              else: "text-base-content/45 hover:text-base-content/70"
+              do: item[:active_class] || "bg-base-100 text-base-content/90 shadow-sm",
+              else: "text-base-content/45 hover:text-base-content/65"
             )
           ]}
         >

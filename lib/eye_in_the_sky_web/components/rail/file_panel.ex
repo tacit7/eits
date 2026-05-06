@@ -119,10 +119,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
       title={@label}
       aria-label={@label}
       class={[
-        "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+        "w-8 h-8 flex items-center justify-center transition-colors",
         if(@active_section == @section && @flyout_open,
-          do: "bg-primary/15 text-primary",
-          else: "text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"
+          do: "bg-[var(--accent-soft,oklch(var(--p)/0.14))] rounded-lg text-primary border-l-2 border-primary/70 pl-[2px]",
+          else: "text-base-content/40 hover:bg-base-content/[0.06] hover:rounded-lg"
         )
       ]}
     >

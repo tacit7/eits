@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
           phx-keyup="update_session_name_filter"
           phx-target={@myself}
           phx-debounce="200"
-          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/[0.12] rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/35"
         />
       </div>
     </div>
@@ -159,4 +159,5 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
     </.link>
     """
   end
+
 end

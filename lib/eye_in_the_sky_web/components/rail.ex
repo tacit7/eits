@@ -490,6 +490,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           {project_initial(@sidebar_project)}
         </button>
 
+        <div class="mb-3" />
         <.rail_item section={:files} active_section={@active_section} flyout_open={@flyout_open} icon="hero-folder" label="Files" myself={@myself} />
         <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-bot-message-square" label="Sessions" myself={@myself} />
         <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-check-circle" label="Tasks" myself={@myself} />
@@ -504,19 +505,20 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
 
         <div class="flex-1" />
+        <div class="mb-3" />
 
-        <.link navigate="/notifications" class={["relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors", "text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"]} aria-label="Notifications">
+        <.link navigate="/notifications" class={["relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors", "text-base-content/40 hover:bg-base-content/[0.06] hover:rounded-lg"]} aria-label="Notifications">
           <.icon name="hero-bell-mini" class="size-4" />
           <span :if={@notification_count > 0} class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5">
             {@notification_count}
           </span>
         </.link>
 
-        <.link navigate="/settings" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors" aria-label="Settings">
+        <.link navigate="/settings" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Settings">
           <.icon name="hero-cog-6-tooth-mini" class="size-4" />
         </.link>
 
-        <.link href="/auth/logout" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors" aria-label="Sign out">
+        <.link href="/auth/logout" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Sign out">
           <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
         </.link>
       </nav>

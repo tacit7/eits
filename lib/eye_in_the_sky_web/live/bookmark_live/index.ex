@@ -245,6 +245,8 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
   defp format_timestamp(nil), do: "never"
 
   defp format_timestamp(timestamp) do
+    # Uses 12-hour time with AM/PM (e.g., "Jan 15, 2026 at 09:30 AM")
+    # DateHelpers.format_datetime_full uses 24-hour UTC format; format_datetime_short_time lacks the year
     Calendar.strftime(timestamp, "%b %d, %Y at %I:%M %p")
   end
 end

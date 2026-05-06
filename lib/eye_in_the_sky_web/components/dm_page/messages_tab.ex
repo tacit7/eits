@@ -417,7 +417,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             {:cont, {:message, msg}, nil}
 
           not is_tool and match?({:cluster, _}, acc) ->
-            {:cont, flush_cluster(acc), {:message, msg}}
+            {:cont, [flush_cluster(acc), {:message, msg}], nil}
         end
       end,
       fn

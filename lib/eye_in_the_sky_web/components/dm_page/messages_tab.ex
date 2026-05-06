@@ -26,7 +26,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   @impl true
   def update(assigns, socket) do
-    grouped_messages = group_events(assigns[:messages] || [])
+    # Only re-group messages when the messages list itself changed.
+    # stream_delta fires on every token and only changes @stream — re-running
+    # group_events on the full message list on every token is unnecessary O(n)
+    # work and causes a morphdom diff + AutoScroll.updated() call each time.
+    prev_messages = socket.assigns[:messages]
+    new_messages = assigns[:messages] || []
+
+    grouped_messages =
+      if prev_messages == new_messages do
+        socket.assigns[:grouped_messages] || group_events(new_messages)
+      else
+        group_events(new_messages)
+      end
 
     socket =
       socket

@@ -5,6 +5,11 @@ export const AutoScroll = {
     this._intentLoadMore = false
     this._mounted = false
     this._updating = false
+    // WeakSet of children already observed by ResizeObserver. Using WeakSet
+    // means removed DOM nodes are GC'd without manual cleanup. We only add
+    // children we haven't seen — no more disconnect/reconnect on every patch,
+    // which was causing layout thrashing + spurious callback fires.
+    this._observedChildren = new WeakSet()
 
     // Set by the "Load older messages" button via a custom DOM event so the
     // flag lives on the hook instance. We cannot use data-* attributes here —
@@ -54,6 +59,7 @@ export const AutoScroll = {
       // alone fires only when the container's own size changes, not when
       // children grow inside an overflow:auto parent.
       for (const child of this.el.children) {
+        this._observedChildren.add(child)
         this._resizeObserver.observe(child)
       }
     }
@@ -96,12 +102,16 @@ export const AutoScroll = {
         this.el.scrollTop = this._prevScrollTop + heightDiff
       }
     }
-    // Re-observe children — LiveView patches may have replaced them.
+    // Add newly added children to ResizeObserver — do NOT disconnect/reconnect.
+    // Disconnecting on every patch causes immediate size-check callbacks in
+    // many browsers, triggering spurious scrollToBottom() calls and visible
+    // scroll jitter at streaming speeds (10+ tokens/sec).
     if (this._resizeObserver) {
-      this._resizeObserver.disconnect()
-      this._resizeObserver.observe(this.el)
       for (const child of this.el.children) {
-        this._resizeObserver.observe(child)
+        if (!this._observedChildren.has(child)) {
+          this._observedChildren.add(child)
+          this._resizeObserver.observe(child)
+        }
       }
       this._lastScrollHeight = this.el.scrollHeight
     }
@@ -118,6 +128,7 @@ export const AutoScroll = {
       this._resizeObserver.disconnect()
       this._resizeObserver = null
     }
+    this._observedChildren = null
   },
 
   scrollToBottom() {

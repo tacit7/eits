@@ -473,7 +473,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         class="md:hidden fixed inset-0 z-40 bg-black/40"
       />
 
-      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-[var(--surface-sidebar)] z-20">
+      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-[var(--surface-rail)] z-20">
         <%!-- Tauri overlay titlebar: spacer clears traffic lights + is the window drag region --%>
         <div data-tauri-drag-region aria-hidden="true" class="w-full flex-shrink-0 hidden" />
         <button
@@ -507,18 +507,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="flex-1" />
         <div class="mb-3" />
 
-        <.link navigate="/notifications" class={["relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors", "text-base-content/40 hover:bg-base-content/[0.06] hover:rounded-lg"]} aria-label="Notifications">
+        <.link navigate="/notifications" class={["relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors", "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"]} aria-label="Notifications">
           <.icon name="hero-bell-mini" class="size-4" />
           <span :if={@notification_count > 0} class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5">
             {@notification_count}
           </span>
         </.link>
 
-        <.link navigate="/settings" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Settings">
+        <.link navigate="/settings" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Settings">
           <.icon name="hero-cog-6-tooth-mini" class="size-4" />
         </.link>
 
-        <.link href="/auth/logout" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/40 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Sign out">
+        <.link href="/auth/logout" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Sign out">
           <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
         </.link>
       </nav>

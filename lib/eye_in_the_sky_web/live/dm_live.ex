@@ -187,12 +187,12 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("open_create_note_modal", _params, socket) do
-    {:noreply, assign(socket, overlay_data: Map.put(socket.assigns.overlay_data, :active_overlay, :create_note))}
+    {:noreply, assign(socket, :active_overlay, :create_note)}
   end
 
   @impl true
   def handle_event("close_create_note_modal", _params, socket) do
-    {:noreply, assign(socket, overlay_data: Map.put(socket.assigns.overlay_data, :active_overlay, nil))}
+    {:noreply, assign(socket, :active_overlay, nil)}
   end
 
   @impl true
@@ -213,7 +213,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         socket =
           socket
           |> assign(:notes, updated_notes)
-          |> assign(overlay_data: Map.put(socket.assigns.overlay_data, :active_overlay, nil))
+          |> assign(:active_overlay, nil)
           |> put_flash(:info, "Note created")
 
         {:noreply, socket}

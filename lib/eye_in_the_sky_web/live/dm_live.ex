@@ -409,7 +409,8 @@ defmodule EyeInTheSkyWeb.DmLive do
      socket
      |> assign(:reload_timer, nil)
      |> assign(:stream_content, "")
-     |> MessageHandlers.maybe_reload_messages()}
+     |> MessageHandlers.maybe_reload_messages()
+     |> push_event("new_message", %{})}
   end
 
   @impl true

@@ -174,51 +174,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       |> assign(:workspace, workspace)
       |> assign(:scope_type, scope_type)
 
-    # Only reload flyout sessions when the project actually changes — not on every
-    # parent re-render. Every PubSub broadcast through the parent would otherwise
-    # fire a Sessions.list_sessions_filtered query on each page.
-    socket =
-      if sidebar_project != previous_project do
-        socket
-        |> assign(
-          :flyout_sessions,
-          Loader.load_flyout_sessions(
-            sidebar_project,
-            socket.assigns.session_sort,
-            socket.assigns.session_name_filter,
-            socket.assigns.session_show
-          )
-        )
-        |> assign(:flyout_file_expanded, MapSet.new())
-        |> assign(:flyout_file_children, %{})
-        |> Loader.maybe_load_files(socket.assigns.active_section)
-        |> Loader.maybe_load_agents(socket.assigns.active_section, sidebar_project)
-      else
-        socket
-      end
-
-    # On navigation (tab change): update active section and close mobile flyout.
-    # Keeping these together avoids a duplicate conditional and makes the
-    # "tab changed → reset nav state" intent explicit.
-    socket =
-      if sidebar_tab != previous_tab do
-        socket
-        |> assign(:active_section, next_section)
-        |> assign(:mobile_open, false)
-        |> Loader.maybe_load_sessions(next_section, sidebar_project)
-        |> Loader.maybe_load_channels(next_section, sidebar_project)
-        |> Loader.maybe_load_canvases(next_section)
-        |> Loader.maybe_load_teams(next_section, sidebar_project)
-        |> Loader.maybe_load_tasks(next_section, sidebar_project)
-        |> Loader.maybe_load_jobs(next_section)
-        |> Loader.maybe_load_notes(next_section, sidebar_project)
-        |> Loader.maybe_load_files(next_section)
-        |> Loader.maybe_load_agents(next_section, sidebar_project)
-        |> Loader.maybe_load_skills(next_section, sidebar_project)
-        |> Loader.maybe_load_prompts(next_section, sidebar_project)
-      else
-        socket
-      end
+    socket = maybe_reload_on_project_change(socket, previous_project, sidebar_project)
+    socket = maybe_reload_on_tab_change(socket, previous_tab, sidebar_tab, next_section)
 
     {:ok, socket}
   end
@@ -455,6 +412,44 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_async(:pick_folder, _result, socket),
     do: ProjectActions.handle_pick_folder(:cancelled, socket)
+
+  defp maybe_reload_on_project_change(socket, same_project, same_project), do: socket
+
+  defp maybe_reload_on_project_change(socket, _prev, new_project) do
+    socket
+    |> assign(
+      :flyout_sessions,
+      Loader.load_flyout_sessions(
+        new_project,
+        socket.assigns.session_sort,
+        socket.assigns.session_name_filter,
+        socket.assigns.session_show
+      )
+    )
+    |> assign(:flyout_file_expanded, MapSet.new())
+    |> assign(:flyout_file_children, %{})
+    |> Loader.maybe_load_files(socket.assigns.active_section)
+    |> Loader.maybe_load_agents(socket.assigns.active_section, new_project)
+  end
+
+  defp maybe_reload_on_tab_change(socket, same_tab, same_tab, _section), do: socket
+
+  defp maybe_reload_on_tab_change(socket, _prev_tab, _next_tab, next_section) do
+    socket
+    |> assign(:active_section, next_section)
+    |> assign(:mobile_open, false)
+    |> Loader.maybe_load_sessions(next_section, socket.assigns.sidebar_project)
+    |> Loader.maybe_load_channels(next_section, socket.assigns.sidebar_project)
+    |> Loader.maybe_load_canvases(next_section)
+    |> Loader.maybe_load_teams(next_section, socket.assigns.sidebar_project)
+    |> Loader.maybe_load_tasks(next_section, socket.assigns.sidebar_project)
+    |> Loader.maybe_load_jobs(next_section)
+    |> Loader.maybe_load_notes(next_section, socket.assigns.sidebar_project)
+    |> Loader.maybe_load_files(next_section)
+    |> Loader.maybe_load_agents(next_section, socket.assigns.sidebar_project)
+    |> Loader.maybe_load_skills(next_section, socket.assigns.sidebar_project)
+    |> Loader.maybe_load_prompts(next_section, socket.assigns.sidebar_project)
+  end
 
   @impl true
   def render(assigns) do

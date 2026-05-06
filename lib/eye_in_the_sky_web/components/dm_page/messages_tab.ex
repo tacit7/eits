@@ -353,6 +353,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :events, :list, required: true
   attr :meta, :map, required: true
 
+  defp tool_cluster(%{events: []} = assigns) do
+    ~H""
+  end
+
   defp tool_cluster(assigns) do
     ~H"""
     <details

@@ -227,18 +227,10 @@ defmodule EyeInTheSky.Tasks.Queries do
   def list_tasks_for_project(project_id, opts \\ []) when is_integer(project_id) do
     sort_by = Keyword.get(opts, :sort_by, "created_desc")
 
-    order =
-      case sort_by do
-        "created_desc" -> [desc: :created_at]
-        "created_asc" -> [asc: :created_at]
-        "priority" -> [desc: :priority, asc: :position]
-        _ -> [asc: :position, desc: :created_at]
-      end
-
     base_project_tasks_query(project_id, opts)
     |> maybe_since(opts)
     |> maybe_stale_since(opts)
-    |> order_by(^order)
+    |> order_by(^project_task_order(sort_by))
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
     |> preload(^@full_task_preloads)
@@ -277,6 +269,11 @@ defmodule EyeInTheSky.Tasks.Queries do
     do: order_by(query, [t], desc: t.priority, desc: t.created_at)
 
   defp task_order(query, _), do: order_by(query, [t], desc: t.created_at)
+
+  defp project_task_order("created_desc"), do: [desc: :created_at]
+  defp project_task_order("created_asc"), do: [asc: :created_at]
+  defp project_task_order("priority"), do: [desc: :priority, asc: :position]
+  defp project_task_order(_), do: [asc: :position, desc: :created_at]
 
   defp base_tasks_query(opts) do
     include_archived = Keyword.get(opts, :include_archived, false)
@@ -333,14 +330,6 @@ defmodule EyeInTheSky.Tasks.Queries do
     sort_by = Keyword.get(opts, :sort_by, "created_desc")
     include_archived = Keyword.get(opts, :include_archived, false)
 
-    order =
-      case sort_by do
-        "created_desc" -> [desc: :created_at]
-        "created_asc" -> [asc: :created_at]
-        "priority" -> [desc: :priority, asc: :position]
-        _ -> [asc: :position, desc: :created_at]
-      end
-
     query =
       from t in Task,
         join: p in EyeInTheSky.Projects.Project,
@@ -351,7 +340,7 @@ defmodule EyeInTheSky.Tasks.Queries do
     query = QueryBuilder.maybe_where(query, opts, :state_id)
 
     query
-    |> order_by(^order)
+    |> order_by(^project_task_order(sort_by))
     |> QueryBuilder.maybe_limit(opts)
     |> QueryBuilder.maybe_offset(opts)
     |> preload(^@full_task_preloads)

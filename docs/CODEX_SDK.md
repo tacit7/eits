@@ -443,6 +443,42 @@ The init prompt uses the `@eits_cli_reference` module attribute to inject the ca
 
 This centralizes the CLI reference, ensuring all Codex sessions receive identical and up-to-date instructions.
 
+## Codex Lifecycle Hooks
+
+Codex sessions can be wired to EITS via a unified hook system that tracks session status automatically. This requires two configuration steps:
+
+### Feature Flag (Required)
+
+Hooks require the feature flag in `~/.codex/config.toml`:
+
+```toml
+[features]
+codex_hooks = true
+```
+
+Without this flag, `.codex/hooks.json` is ignored and sessions run without EITS integration.
+
+### Hook Configuration (.codex/hooks.json)
+
+All lifecycle hooks are consolidated through a single script `eits-codex-notify.sh`, which routes events to session-specific helper scripts and status updates:
+
+| Hook | Trigger | Script | Purpose |
+|------|---------|--------|---------|
+| `SessionStart` | Session initialization (startup/resume/compact) | `eits-codex-notify.sh` | Route startup/resume bookkeeping; mark session idle unless resuming after a crashed agent |
+| `UserPromptSubmit` | User submits a prompt to Codex | `eits-codex-notify.sh` | Mark session as `"working"` |
+| `PreToolUse` | Before a tool is invoked | `eits-codex-notify.sh` | Check tool guards (e.g., block `rm` on unsafe paths) |
+| `PostToolUse` | After a Bash tool completes | `eits-codex-notify.sh` | Log git commits and record tool activity |
+| `PreCompact` | Before context compaction | `eits-codex-notify.sh` | Mark session as `"compacting"` |
+| `Stop` | Session ends (user stop, error, etc.) | `eits-codex-notify.sh` | Mark session `"idle"`, enforce final annotation |
+
+All hooks call the same `eits-codex-notify.sh` dispatcher script, which:
+1. Parses the JSON input from Codex to extract the hook event name
+2. Routes to the appropriate session-specific helper script (e.g., `eits-session-startup.sh` for SessionStart)
+3. Updates session status via `eits sessions update`
+4. Runs guards and validation checks (PreToolUse)
+
+This design allows all hook responsibilities to be managed and tested in one place while delegating session-specific logic to focused helper scripts.
+
 ## Key Modules
 
 ### Codex
@@ -480,14 +516,28 @@ Codex session status transitions are driven by JSONL events emitted by `codex ex
 | Codex Event | Handler | Status Set |
 |-------------|---------|------------|
 | `thread.started` | `on_codex_thread_started/1` | `"working"` |
-| `turn.completed` | `on_sdk_completed/2` | `"idle"` |
+| `turn.completed` | `on_sdk_completed/3` (provider="codex") | `"waiting"` |
 | SDK error | `on_sdk_errored/2` | `"idle"` |
 
-**`thread.started`**: Fires when Codex creates a new thread. The worker calls `on_codex_thread_started/1` immediately (not waiting for turn end) to promote the session to `"working"` and sync the real `thread_id` to `sessions.uuid`.
+**`thread.started`**: Fires when Codex creates a new thread. The worker calls `on_codex_thread_started/1` immediately (not waiting for turn end) to promote the session to `"working"` and sync the real `thread_id` to `sessions.uuid`. Also sends a `"working"` status notification.
 
-**`turn.completed`**: Codex sessions transition to `"idle"` on completion, matching Claude behavior. Sessions are cleaned up normally; they do not park in a waiting state.
+**`turn.completed`**: Codex sessions transition to `"waiting"` on completion, not `"idle"`. This allows the session to be resumed with `codex exec resume <thread_id>`. A resumable status notification is sent. Unlike Claude sessions which go to `"idle"`, Codex sessions remain resumable.
 
 **SDK error**: Failed turns transition to `"idle"` so the UI can display the failure and allow retry.
+
+### Status Notifications
+
+The notification system sends in-app alerts for agent status transitions:
+
+- **Working**: Sent on `thread.started` when the agent begins processing
+- **Resumable**: Sent on `turn.completed` when the agent finishes and can be resumed
+
+Notifications require the setting `agent_notifications` to be enabled in Settings. Notifications include:
+- Title with agent name (or "Session" as fallback)
+- Body describing the status change
+- Resource link back to the session
+
+The `notify_agent_status/3` function in `AgentWorkerEvents` handles both notification types, routing based on status (`:working` or `:resumable`).
 
 ## Streaming vs Claude
 
@@ -503,7 +553,7 @@ Codex session status transitions are driven by JSONL events emitted by `codex ex
 | Local persistence | `~/.claude/sessions/` | `$CODEX_HOME/sessions/` (30 days) | Via gemini_cli_sdk |
 | Binary | `claude` (Node.js) | `codex` (Rust) | `gemini` (Rust via SDK) |
 | Auth env var | `ANTHROPIC_API_KEY` | `OPENAI_API_KEY` | `GEMINI_API_KEY` |
-| Completion status | `"idle"` | `"idle"` | `"idle"` |
+| Completion status | `"idle"` | `"waiting"` | `"idle"` |
 
 ## Known Issues and Gotchas
 

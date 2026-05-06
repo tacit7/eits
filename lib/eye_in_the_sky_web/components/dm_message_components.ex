@@ -9,7 +9,6 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     tool_widget_body/1    — renders the body inside a tool call widget
     message_metrics/1     — renders token/cost/duration metrics row
     message_attachments/1 — renders file attachment list
-    stream_provider_avatar/1 — renders the live-stream avatar
 
   Both message_body and tool_result_body accept a `compact` boolean (default false)
   that switches to smaller sizing for use in the canvas chat window.
@@ -37,11 +36,21 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     segments = parse_body_segments(body)
     body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
 
-    cond do
-      is_tool_event or body_is_tool_calls -> :secondary
-      String.trim(body) == "" -> :secondary
-      true -> :primary
-    end
+    classify_tier(is_tool_event or body_is_tool_calls, body)
+  end
+
+  @doc """
+  Variant that accepts an already-computed `is_tool_event` flag and the raw
+  body. Used by `MessagesTab.message_item/1` to avoid re-parsing segments
+  and re-checking stream_type when those values are already on the assigns.
+  """
+  def message_tier(is_tool_event, body) when is_boolean(is_tool_event) do
+    classify_tier(is_tool_event, body || "")
+  end
+
+  defp classify_tier(true, _body), do: :secondary
+  defp classify_tier(false, body) do
+    if String.trim(body) == "", do: :secondary, else: :primary
   end
 
   # ---------------------------------------------------------------------------
@@ -51,7 +60,13 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :message, :map, required: true
 
   def message_metrics(assigns) do
-    assigns = assign(assigns, :metrics_text, format_metrics(assigns.message.metadata))
+    metrics_text =
+      case format_metrics(assigns.message.metadata) do
+        "" -> fallback_metrics(assigns.message)
+        text -> text
+      end
+
+    assigns = assign(assigns, :metrics_text, metrics_text)
 
     ~H"""
     <%= if @metrics_text != "" do %>
@@ -62,6 +77,21 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       </div>
     <% end %>
     """
+  end
+
+  # Renders model · $cost when metadata has no total_cost_usd to drive
+  # format_metrics/1. Mirrors the inline fallback that used to live in
+  # MessagesTab.message_item/1.
+  defp fallback_metrics(message) do
+    [
+      message_model(message),
+      case message_cost(message) do
+        nil -> nil
+        cost -> "$#{:erlang.float_to_binary(cost * 1.0, decimals: 4)}"
+      end
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" · ")
   end
 
   defp format_metrics(metadata) when is_map(metadata) do
@@ -256,6 +286,66 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # tool_card_shell — shared outer chrome for tool_widget + tool_result_body
+  #
+  # Owns the <details> wrapper, <summary> wrapper, optional copy button, and
+  # trailing chevron. Two modes:
+  #   compact = true  → strip-row styling, body slot is wrapped in an indent rule
+  #   compact = false → bordered card styling, body slot rendered raw
+  # ---------------------------------------------------------------------------
+
+  attr :compact, :boolean, default: false
+  attr :copy_text, :string, default: nil
+  attr :copy_title, :string, default: "Copy"
+  slot :summary, required: true
+  slot :inner_block, required: true
+
+  defp tool_card_shell(assigns) do
+    ~H"""
+    <details class={
+      if @compact,
+        do: "group my-px",
+        else: "group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
+    }>
+      <summary class={
+        if @compact,
+          do:
+            "flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors",
+          else:
+            "flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-[var(--border-subtle)] transition-colors"
+      }>
+        {render_slot(@summary)}
+        <button
+          :if={!@compact && @copy_text}
+          class="tool-copy-btn ml-auto mr-1 shrink-0"
+          data-copy-btn
+          data-copy-text={@copy_text}
+          title={@copy_title}
+        >
+          <.icon name="hero-clipboard-document" class="size-3.5" />
+        </button>
+        <.icon
+          name="hero-chevron-right"
+          class={
+            if @compact,
+              do:
+                "w-2.5 h-2.5 text-base-content/15 flex-shrink-0 ml-auto transition-transform group-open:rotate-90",
+              else: "size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
+          }
+        />
+      </summary>
+      <%= if @compact do %>
+        <div class="pl-3 mt-0.5 border-l border-[var(--border-subtle)]">
+          {render_slot(@inner_block)}
+        </div>
+      <% else %>
+        {render_slot(@inner_block)}
+      <% end %>
+    </details>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # tool_result_body
   # ---------------------------------------------------------------------------
 
@@ -272,54 +362,45 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       |> assign(:line_count, line_count)
 
     ~H"""
-    <%= if !@body_blank do %>
+    <.tool_card_shell
+      :if={!@body_blank}
+      compact={@compact}
+      copy_text={@body}
+      copy_title="Copy output"
+    >
+      <:summary>
+        <.icon
+          name="hero-code-bracket"
+          class={
+            if @compact,
+              do: "size-2.5 flex-shrink-0 text-base-content/20",
+              else: "size-3.5 flex-shrink-0 text-base-content/30"
+          }
+        />
+        <span class={
+          if @compact,
+            do:
+              "text-micro font-mono font-semibold text-base-content/30 flex-shrink-0 uppercase tracking-wide",
+            else:
+              "text-mini font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0"
+        }>
+          Output
+        </span>
+        <span
+          :if={@compact}
+          class="text-micro font-mono text-base-content/25 flex-shrink-0"
+        >
+          {@line_count} {if @line_count == 1, do: "line", else: "lines"}
+        </span>
+      </:summary>
       <%= if @compact do %>
-        <%!-- Strip mode: single-line output row, no card chrome --%>
-        <details class="group my-px">
-          <summary class="flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-            <.icon name="hero-code-bracket" class="size-2.5 flex-shrink-0 text-base-content/20" />
-            <span class="text-micro font-mono font-semibold text-base-content/30 flex-shrink-0 uppercase tracking-wide">
-              Output
-            </span>
-            <span class="text-micro font-mono text-base-content/25 flex-shrink-0">
-              {@line_count} {if @line_count == 1, do: "line", else: "lines"}
-            </span>
-            <.icon
-              name="hero-chevron-right"
-              class="w-2.5 h-2.5 text-base-content/15 flex-shrink-0 ml-auto transition-transform group-open:rotate-90"
-            />
-          </summary>
-          <div class="pl-3 mt-0.5 border-l border-[var(--border-subtle)]">
-            <pre class="font-mono text-micro text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{@body}</pre>
-          </div>
-        </details>
+        <pre class="font-mono text-micro text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{@body}</pre>
       <% else %>
-        <%!-- Full card mode --%>
-        <details class="group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden">
-          <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-[var(--border-subtle)] transition-colors">
-            <.icon name="hero-code-bracket" class="size-3.5 flex-shrink-0 text-base-content/30" />
-            <span class="text-mini font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0">
-              Output
-            </span>
-            <button
-              class="tool-copy-btn ml-auto mr-1 shrink-0"
-              data-copy-btn
-              data-copy-text={@body}
-              title="Copy output"
-            >
-              <.icon name="hero-clipboard-document" class="size-3.5" />
-            </button>
-            <.icon
-              name="hero-chevron-right"
-              class="size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
-            />
-          </summary>
-          <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
-            <pre class="font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
-          </div>
-        </details>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
+          <pre class="font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
+        </div>
       <% end %>
-    <% end %>
+    </.tool_card_shell>
     """
   end
 
@@ -351,59 +432,38 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       |> assign(:wrap_detail, wrap_detail)
 
     ~H"""
-    <%= if @compact do %>
-      <%!-- Strip mode: single-line event row, no card chrome --%>
-      <details class="group my-px">
-        <summary class="flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors">
-          <.icon name={@icon} class="size-2.5 flex-shrink-0 text-base-content/20" />
-          <span class="text-micro font-mono font-semibold text-base-content/30 flex-shrink-0 uppercase tracking-wide">
-            {@label}
-          </span>
-          <span
-            :if={@detail != "" && !@wrap_detail}
-            class="text-micro font-mono text-base-content/25 truncate flex-1 min-w-0"
-          >
-            {@detail}
-          </span>
-          <.icon
-            name="hero-chevron-right"
-            class="w-2.5 h-2.5 text-base-content/15 flex-shrink-0 ml-auto transition-transform group-open:rotate-90"
-          />
-        </summary>
-        <div class="pl-3 mt-0.5 border-l border-[var(--border-subtle)]">
-          <.tool_widget_body name={@name} rest={@rest} detail={@detail} input={@input} />
-        </div>
-      </details>
-    <% else %>
-      <%!-- Full card mode (canvas chat, non-compact contexts) --%>
-      <details class="group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden">
-        <summary class="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-[var(--border-subtle)] transition-colors">
-          <.icon name={@icon} class="size-3.5 flex-shrink-0 text-base-content/35" />
-          <span class="text-mini font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
-            {@label}
-          </span>
-          <span
-            :if={@detail != "" && !@wrap_detail}
-            class="text-mini font-mono text-base-content/35 truncate flex-1 min-w-0"
-          >
-            {@detail}
-          </span>
-          <button
-            class="tool-copy-btn ml-auto mr-1 shrink-0"
-            data-copy-btn
-            data-copy-text={@rest}
-            title="Copy input"
-          >
-            <.icon name="hero-clipboard-document" class="size-3.5" />
-          </button>
-          <.icon
-            name="hero-chevron-right"
-            class="size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
-          />
-        </summary>
-        <.tool_widget_body name={@name} rest={@rest} detail={@detail} input={@input} />
-      </details>
-    <% end %>
+    <.tool_card_shell compact={@compact} copy_text={@rest} copy_title="Copy input">
+      <:summary>
+        <.icon
+          name={@icon}
+          class={
+            if @compact,
+              do: "size-2.5 flex-shrink-0 text-base-content/20",
+              else: "size-3.5 flex-shrink-0 text-base-content/35"
+          }
+        />
+        <span class={
+          if @compact,
+            do:
+              "text-micro font-mono font-semibold text-base-content/30 flex-shrink-0 uppercase tracking-wide",
+            else:
+              "text-mini font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0"
+        }>
+          {@label}
+        </span>
+        <span
+          :if={@detail != "" && !@wrap_detail}
+          class={
+            if @compact,
+              do: "text-micro font-mono text-base-content/25 truncate flex-1 min-w-0",
+              else: "text-mini font-mono text-base-content/35 truncate flex-1 min-w-0"
+          }
+        >
+          {@detail}
+        </span>
+      </:summary>
+      <.tool_widget_body name={@name} rest={@rest} detail={@detail} input={@input} />
+    </.tool_card_shell>
     """
   end
 
@@ -490,26 +550,4 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   end
 
   defp text_body?(assigns), do: assigns.rest != "" and assigns.rest != assigns.detail
-
-  # ---------------------------------------------------------------------------
-  # stream_provider_avatar
-  # ---------------------------------------------------------------------------
-
-  attr :session, :map, default: nil
-
-  def stream_provider_avatar(assigns) do
-    provider = if assigns.session, do: assigns.session.provider, else: "claude"
-    assigns = assign(assigns, :provider, provider)
-
-    ~H"""
-    <img
-      src={provider_icon(@provider)}
-      class="size-4 mt-1 flex-shrink-0 animate-pulse"
-      alt={String.capitalize(@provider)}
-      width="16"
-      height="16"
-      loading="lazy"
-    />
-    """
-  end
 end

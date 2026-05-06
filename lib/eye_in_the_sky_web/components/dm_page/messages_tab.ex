@@ -21,20 +21,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :codex_raw_lines, :list, default: []
 
   def messages_tab(assigns) do
-    messages_with_context =
-      assigns.messages
-      |> Enum.zip([nil | assigns.messages])
-      |> Enum.map(fn {msg, prev} ->
-        prev_role = if prev, do: prev.sender_role, else: nil
-        {msg, prev_role}
-      end)
-
     grouped_messages = group_events(assigns.messages)
 
-    assigns =
-      assigns
-      |> assign(:messages_with_context, messages_with_context)
-      |> assign(:grouped_messages, grouped_messages)
+    assigns = assign(assigns, :grouped_messages, grouped_messages)
 
     ~H"""
     <div class="flex h-full flex-col" id="dm-messages-tab">
@@ -85,8 +74,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   <%= case item do %>
                     <% {:cluster, events, meta} -> %>
                       <.tool_cluster events={events} meta={meta} />
-                    <% {:message, message} -> %>
-                      <% prev_role = get_prev_role(@messages_with_context, message) %>
+                    <% {:message, message, prev_role} -> %>
                       <.message_item
                         message={message}
                         prev_role={prev_role}
@@ -113,7 +101,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5" id="live-stream-bubble">
               <div class="flex items-center gap-2 mb-2">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <.stream_provider_avatar session={@session} />
+                  <.provider_avatar session={@session} class="size-3 animate-pulse" />
                 </div>
                 <span class="text-[11px] font-semibold text-primary/80 animate-pulse">
                   {stream_provider_label(@session)}
@@ -173,7 +161,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   defp message_item(assigns) do
     role = if assigns.message.sender_role == "user", do: :user, else: :agent
-    is_dm = dm_message?(assigns.message)
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
     segments = parse_body_segments(assigns.message.body)
     body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
@@ -183,14 +170,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
     is_empty_tool_result =
       stream_type == "tool_result" and String.trim(assigns.message.body || "") == ""
-    tier = if role == :agent, do: DmMessageComponents.message_tier(assigns.message), else: :user
+    tier =
+      if role == :agent,
+        do: DmMessageComponents.message_tier(is_tool_event, assigns.message.body),
+        else: :user
 
     show_header = !is_same_sender && !is_tool_event
 
     assigns =
       assigns
       |> assign(:role, role)
-      |> assign(:is_dm, is_dm)
       |> assign(:is_tool_event, is_tool_event)
       |> assign(:is_same_sender, is_same_sender)
       |> assign(:is_new_turn, is_new_turn)
@@ -266,7 +255,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <%!-- Header row --%>
               <div :if={@show_header && @tier == :primary} class="flex items-center gap-2 mb-3">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <.agent_provider_icon session={@session} />
+                  <.provider_avatar session={@session} />
                 </div>
                 <span class="text-[11px] font-semibold text-base-content/80">
                   {if @agent, do: @agent.name, else: "agent"}
@@ -303,22 +292,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <.message_attachments attachments={@message.attachments || []} />
               <%!-- Metadata footer — only on primary tier --%>
               <div
-                :if={@tier == :primary && (show_message_metrics?(@message) || message_model(@message) || message_cost(@message))}
+                :if={@tier == :primary && DmHelpers.has_message_metrics?(@message)}
                 class="flex items-center gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]"
               >
-                <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
-                <span
-                  :if={!show_message_metrics?(@message)}
-                  class="text-[11px] font-mono tabular-nums text-base-content/40"
-                >
-                  {[
-                    message_model(@message),
-                    message_cost(@message) &&
-                      "$#{:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}"
-                  ]
-                  |> Enum.reject(&is_nil/1)
-                  |> Enum.join(" · ")}
-                </span>
+                <.message_metrics message={@message} />
               </div>
             </div>
           <% end %>
@@ -328,62 +305,33 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     """
   end
 
-  defp normalize_provider("codex"), do: :codex
-  defp normalize_provider("gemini"), do: :gemini
-  defp normalize_provider(_), do: :claude
-
-  # Static avatar icon for the agent message header
+  # Provider avatar — single canonical impl for both static and animated sites.
+  # Sources the SVG path and dark-mode class from DmHelpers; see lib/CLAUDE.md.
   attr :session, :map, default: nil
+  attr :class, :string, default: "size-3"
 
-  defp agent_provider_icon(assigns) do
+  defp provider_avatar(assigns) do
     provider = if assigns.session, do: assigns.session.provider, else: "claude"
-    assigns = assign(assigns, :provider, normalize_provider(provider))
+
+    assigns =
+      assigns
+      |> assign(:src, DmHelpers.provider_icon(provider))
+      |> assign(:icon_class, DmHelpers.provider_icon_class(provider))
+      |> assign(:alt, DmHelpers.stream_provider_label(assigns.session))
 
     ~H"""
-    <%= cond do %>
-      <% @provider == :codex -> %>
-        <img src="/images/openai.svg" class="size-3" alt="Codex" width="12" height="12" loading="lazy" />
-      <% @provider == :gemini -> %>
-        <img src="/images/gemini.svg" class="size-3" alt="Gemini" width="12" height="12" loading="lazy" />
-      <% true -> %>
-        <img src="/images/claude.svg" class="size-3" alt="Claude" width="12" height="12" loading="lazy" />
-    <% end %>
+    <img
+      src={@src}
+      class={[@class, @icon_class]}
+      alt={@alt}
+      width="12"
+      height="12"
+      loading="lazy"
+    />
     """
   end
 
-  # Animated avatar used by the stream bubble
-  attr :session, :map, default: nil
-
-  defp stream_provider_avatar(assigns) do
-    provider = if assigns.session, do: assigns.session.provider, else: "claude"
-    assigns = assign(assigns, :provider, normalize_provider(provider))
-
-    ~H"""
-    <%= cond do %>
-      <% @provider == :codex -> %>
-        <img src="/images/openai.svg" class="size-3 animate-pulse" alt="Codex" width="12" height="12" loading="lazy" />
-      <% @provider == :gemini -> %>
-        <img src="/images/gemini.svg" class="size-3 animate-pulse" alt="Gemini" width="12" height="12" loading="lazy" />
-      <% true -> %>
-        <img src="/images/claude.svg" class="size-3 animate-pulse" alt="Claude" width="12" height="12" loading="lazy" />
-    <% end %>
-    """
-  end
-
-  defp stream_provider_label(nil), do: "Agent"
-  defp stream_provider_label(%{provider: "codex"}), do: "Codex"
-  defp stream_provider_label(%{provider: "openai"}), do: "Codex"
-  defp stream_provider_label(%{provider: "gemini"}), do: "Gemini"
-  defp stream_provider_label(_session), do: "Claude"
-
-  defdelegate dm_message?(msg), to: DmHelpers
-  defdelegate message_model(msg), to: DmHelpers
-  defdelegate message_cost(msg), to: DmHelpers
-
-  defp show_message_metrics?(message) do
-    message.sender_role == "agent" and is_map(message.metadata) and
-      not is_nil(message.metadata["total_cost_usd"])
-  end
+  defdelegate stream_provider_label(session), to: DmHelpers
 
   # ---------------------------------------------------------------------------
   # tool_cluster component
@@ -430,10 +378,20 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   defp group_events(messages) do
     tool_types = ~w(tool_use tool_result bash output)
 
-    messages
+    # Pair each message with the sender_role of its predecessor (nil for the
+    # first message). This used to be a separate Enum.find pass per message
+    # (O(n^2)); now it's a single linear walk threaded through chunk_while.
+    pairs =
+      messages
+      |> Enum.zip([nil | messages])
+      |> Enum.map(fn {msg, prev} ->
+        {msg, if(prev, do: prev.sender_role, else: nil)}
+      end)
+
+    pairs
     |> Enum.chunk_while(
       nil,
-      fn msg, acc ->
+      fn {msg, prev_role}, acc ->
         stream_type = get_in(msg.metadata || %{}, ["stream_type"]) || ""
         is_tool = stream_type in tool_types
 
@@ -445,10 +403,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             {:cont, {:cluster, [msg | elem(acc, 1)]}}
 
           not is_tool and is_nil(acc) ->
-            {:cont, {:message, msg}, nil}
+            {:cont, {:message, msg, prev_role}, nil}
 
           not is_tool and match?({:cluster, _}, acc) ->
-            {:cont, [flush_cluster(acc), {:message, msg}], nil}
+            {:cont, [flush_cluster(acc), {:message, msg, prev_role}], nil}
         end
       end,
       fn
@@ -481,13 +439,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
        first_at: first.inserted_at,
        duration_ms: if(duration_ms && duration_ms > 1000, do: duration_ms)
      }}
-  end
-
-  defp get_prev_role(messages_with_context, message) do
-    case Enum.find(messages_with_context, fn {msg, _prev} -> msg.id == message.id end) do
-      {_msg, prev_role} -> prev_role
-      nil -> nil
-    end
   end
 
 end

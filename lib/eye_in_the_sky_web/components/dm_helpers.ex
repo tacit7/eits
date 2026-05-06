@@ -125,6 +125,28 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
       not is_nil(message.metadata["total_cost_usd"])
   end
 
+  @doc """
+  True when `message_metrics/1` will render something — either the full
+  metadata-driven metrics line or the model/cost fallback. Used to gate
+  the metrics footer divider in the message item.
+
+  Mirrors the full set of fields that `format_metrics/1` in
+  DmMessageComponents checks: total_cost_usd, usage.input_tokens,
+  usage.output_tokens, duration_ms, num_turns, and the fallback
+  message_model/message_cost paths.
+  """
+  def has_message_metrics?(message) do
+    m = message.metadata
+
+    is_map(m) and
+      (not is_nil(m["total_cost_usd"]) or
+         not is_nil(get_in(m, ["usage", "input_tokens"])) or
+         not is_nil(get_in(m, ["usage", "output_tokens"])) or
+         not is_nil(m["duration_ms"]) or
+         not is_nil(m["num_turns"]) or
+         not is_nil(message_model(message)))
+  end
+
   # ---------------------------------------------------------------------------
   # Provider / icon helpers
   # ---------------------------------------------------------------------------

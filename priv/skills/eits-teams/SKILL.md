@@ -126,8 +126,10 @@ Reviewers must cite `file:line` hunks in every finding. Ungrounded reviews produ
 ### 1. Create team
 
 ```bash
-eits teams create --name "my-team" --description "What this team is doing"
+eits teams create --name "my-team" --description "What this team is doing" --project-id $EITS_PROJECT_ID
 # Returns team_id
+# ALWAYS pass --project-id — teams without it have project_id=null and won't appear
+# in the /projects/:id/teams UI page.
 ```
 
 ### 2. Join as orchestrator
@@ -249,7 +251,7 @@ eits tasks update <task_id> --state done
 
 ```bash
 # 1. Create team
-eits teams create --name "docs-team" --description "Research flags and write README"
+eits teams create --name "docs-team" --description "Research flags and write README" --project-id $EITS_PROJECT_ID
 
 # 2. Join as orchestrator
 eits teams join <team_id> --name "orchestrator" --role lead --session $EITS_SESSION_UUID

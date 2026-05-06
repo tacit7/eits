@@ -34,7 +34,8 @@ eits agents spawn \
 
 ### 1. Create team + join as lead
 ```bash
-eits teams create --name "my-team" --description "..."
+eits teams create --name "my-team" --description "..." --project-id $EITS_PROJECT_ID
+# ALWAYS pass --project-id — omitting it sets project_id=null and hides the team from /projects/:id/teams
 eits teams join <team_id> --name "orchestrator" --role lead --session $EITS_SESSION_UUID
 ```
 

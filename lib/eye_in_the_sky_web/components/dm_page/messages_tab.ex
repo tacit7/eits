@@ -1,7 +1,15 @@
 defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
-  @moduledoc false
+  @moduledoc """
+  LiveComponent for the DM messages tab.
 
-  use EyeInTheSkyWeb, :html
+  Extracted from a plain function component so that unrelated assigns
+  on the parent LiveView (processing, current_task, session_status, etc.)
+  do not trigger a re-render of the message list. LiveView only calls
+  update/2 — and therefore only diffs the message list — when the assigns
+  passed to this component actually change.
+  """
+
+  use EyeInTheSkyWeb, :live_component
 
   alias EyeInTheSkyWeb.Components.DmHelpers
   import EyeInTheSkyWeb.Components.DmHelpers, only: [to_utc_string: 1, parse_body_segments: 1]
@@ -12,19 +20,24 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   alias EyeInTheSkyWeb.Components.DmMessageComponents
 
-  attr :messages, :list, default: []
-  attr :has_more_messages, :boolean, default: false
-  attr :stream, :map, default: %{show: false, content: "", tool: nil, thinking: nil}
-  attr :session, :map, default: nil
-  attr :agent, :map, default: nil
-  attr :message_search_query, :string, default: ""
-  attr :codex_raw_lines, :list, default: []
+  # ---------------------------------------------------------------------------
+  # LiveComponent lifecycle
+  # ---------------------------------------------------------------------------
 
-  def messages_tab(assigns) do
-    grouped_messages = group_events(assigns.messages)
+  @impl true
+  def update(assigns, socket) do
+    grouped_messages = group_events(assigns[:messages] || [])
 
-    assigns = assign(assigns, :grouped_messages, grouped_messages)
+    socket =
+      socket
+      |> assign(assigns)
+      |> assign(:grouped_messages, grouped_messages)
 
+    {:ok, socket}
+  end
+
+  @impl true
+  def render(assigns) do
     ~H"""
     <div class="flex h-full flex-col" id="dm-messages-tab">
       <%!-- Use position:relative + absolute fill so the stream bubble can overlay
@@ -153,6 +166,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     </div>
     """
   end
+
+  # ---------------------------------------------------------------------------
+  # Private components
+  # ---------------------------------------------------------------------------
 
   attr :message, :map, required: true
   attr :prev_role, :any, default: nil

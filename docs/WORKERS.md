@@ -149,6 +149,42 @@ When AgentWorker encounters a systemic error (billing/auth failure, API limits),
 
 ---
 
+## AgentWorkerEvents CLI-Required Guard
+
+When an agent is spawned to handle a channel-routed prompt, its result is saved to the session transcript only — not automatically mirrored into the channel. This preserves the agent output for audit purposes while requiring agents to explicitly post to channels via `eits channels send`.
+
+**Motivation:** Channel-routed prompts need transparent recording but don't automatically broadcast to all channel members. Agents are expected to decide what to share and use the explicit write path.
+
+**How it works:**
+1. `ChannelFanout` routes a channel prompt to AgentManager with `context[:reply_mode] = "cli_required"`
+2. AgentWorker threads `job_context` (the full context map) through to `WorkerEvents.on_result_received/2`
+3. `on_result_received` checks `get_in(job_context, ["reply_mode"]) == "cli_required"`
+4. If true: calls `save_to_session_transcript_only/5` instead of `save_result/6`
+5. If false or nil: normal flow — calls `save_result/6` and `maybe_fanout_mentions/3`
+
+**save_to_session_transcript_only/5:**
+- Saves to the `messages` table with visibility metadata
+- Does NOT insert into `channel_messages` (no auto-mirror)
+- Sets metadata fields:
+  - `visibility: "session_only"` — marks as audit-only
+  - `source: "channel_prompt"` — indicates it came from a channel
+  - `channel_id`, `channel_message_id` — source breadcrumb
+- Returns `{:ok, message}` or `{:error, reason}`
+
+**Backward Compatibility:**
+- If `job_context` key is absent (callers not yet updated), falls through to normal path via matching on `not is_map_key(params, :job_context)`
+- If `job_context` is nil or missing `reply_mode`, normal path is used
+- Existing agents unaffected
+
+**Code locations:**
+- `lib/eye_in_the_sky/agent_worker_events.ex` — `on_result_received/2` guard and `save_to_session_transcript_only/5`
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — threads `job_context` from `current_job`
+- Tests: `test/eye_in_the_sky/agent_worker_events_test.exs` — 5 new test cases covering cli_required guard, fallback to normal path, and backward compat
+
+**Commits:** 752f22c2 (add cli_required guard and save_to_session_transcript_only), 1baed13e (merge)
+
+---
+
 ## Team Member Bulk Updates
 
 Teams.mark_member_done_by_session now uses a single atomic bulk UPDATE instead of looping per-row.

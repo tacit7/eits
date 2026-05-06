@@ -163,8 +163,14 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
             end
 
           case result do
-            {:ok, _} -> send(lv_pid, :do_message_reload)
-            {:error, _} -> :ok
+            {:ok, _} ->
+              send(lv_pid, :do_message_reload)
+
+            {:error, reason} ->
+              Logger.warning("DM mount sync failed",
+                session_id: session_id,
+                reason: inspect(reason)
+              )
           end
         end)
       end

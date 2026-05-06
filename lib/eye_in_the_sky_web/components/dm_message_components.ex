@@ -22,6 +22,29 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   import EyeInTheSkyWeb.Components.DmHelpers
 
   # ---------------------------------------------------------------------------
+  # message_tier/1
+  # Classifies an agent message into a display tier:
+  #   :primary   — substantial content (text body, DM) → full card treatment
+  #   :secondary — tool event / tool result → plain muted row
+  #   :user      — fallback / user-like agent message
+  # ---------------------------------------------------------------------------
+
+  def message_tier(message) do
+    stream_type = get_in(message.metadata || %{}, ["stream_type"])
+    is_tool_event = stream_type in ["tool_result", "tool_use"]
+
+    body = message.body || ""
+    segments = parse_body_segments(body)
+    body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+
+    cond do
+      is_tool_event or body_is_tool_calls -> :secondary
+      String.trim(body) == "" -> :secondary
+      true -> :primary
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # message_metrics
   # ---------------------------------------------------------------------------
 

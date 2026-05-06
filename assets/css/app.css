@@ -211,6 +211,23 @@ form:focus-visible {
   }
 }
 
+/* ===== Surface ladder tokens — dark theme only ===== */
+/* These tokens are referenced by var(--surface-*) in class attributes.
+   Gaps between levels are intentional; avoid collapsing them. */
+[data-theme="dark"] {
+  --surface-rail:     #10121a;
+  --surface-flyout:   #151827;
+  --surface-canvas:   #181b2a;
+  --surface-card:     #21253a;
+  --surface-tool:     #1b1f31;
+  --surface-composer: #1f2337;
+  /* text + border semantic tokens used by tier-based message rendering */
+  --text-primary:   oklch(92% 0 0);
+  --text-secondary: oklch(70% 0 0);
+  --border-subtle:  oklch(var(--bc) / 0.08);
+  --guide-line:     oklch(var(--p));
+}
+
 /* ===== Dark theme - Claude.ai actual CSS vars ===== */
 /* --bg-100: hsl(60 2.7% 14.5%) page bg                */
 /* --bg-000: hsl(60 2.1% 18.4%) surfaces               */

@@ -391,7 +391,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   placeholder="Search messages..."
                   autocomplete="off"
                   phx-debounce="300"
-                  class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 placeholder:text-base-content/25 text-base-content/70 transition-colors"
+                  class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-base-content/20 focus:border-base-content/20 placeholder:text-base-content/25 text-base-content/70 transition-colors"
                 />
                 <%= if @message_data.message_search_query != "" do %>
                   <button

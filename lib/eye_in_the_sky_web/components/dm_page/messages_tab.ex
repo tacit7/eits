@@ -10,6 +10,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     only: [message_body: 1, message_metrics: 1, message_attachments: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
 
+  alias EyeInTheSkyWeb.Components.DmMessageComponents
+
   attr :messages, :list, default: []
   attr :has_more_messages, :boolean, default: false
   attr :stream, :map, default: %{show: false, content: "", tool: nil, thinking: nil}
@@ -168,6 +170,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
     is_empty_tool_result =
       stream_type == "tool_result" and String.trim(assigns.message.body || "") == ""
+    tier = if role == :agent, do: DmMessageComponents.message_tier(assigns.message), else: :user
 
     show_header = !is_same_sender && !is_tool_event
 
@@ -180,6 +183,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       |> assign(:is_new_turn, is_new_turn)
       |> assign(:is_empty_tool_result, is_empty_tool_result)
       |> assign(:show_header, show_header)
+      |> assign(:tier, tier)
 
     ~H"""
     <%= if !@is_empty_tool_result do %>
@@ -238,9 +242,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             </div>
           <% else %>
             <%!-- ── Agent message ── --%>
-            <div class="group rounded-lg bg-[var(--agent-bg)] hover:bg-base-content/[0.03] px-3 py-2.5 transition-colors duration-100">
+            <div class={[
+              "group",
+              @tier == :primary &&
+                "rounded-lg border bg-[var(--surface-card,theme(colors.base-200/40))] border-base-content/[0.08] px-3 py-2.5",
+              @tier == :secondary && "pl-[33px] py-1",
+              @tier not in [:primary, :secondary] &&
+                "rounded-lg bg-[var(--agent-bg)] hover:bg-base-content/[0.03] px-3 py-2.5 transition-colors duration-100"
+            ]}>
               <%!-- Header row --%>
-              <div :if={@show_header} class="flex items-center gap-2 mb-3">
+              <div :if={@show_header && @tier == :primary} class="flex items-center gap-2 mb-3">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
                   <.agent_provider_icon session={@session} />
                 </div>
@@ -265,14 +276,21 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   </button>
                 </div>
               </div>
-              <%!-- Body with guide line --%>
-              <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content break-words">
+              <%!-- Body --%>
+              <div class={[
+                "break-words",
+                @tier == :primary &&
+                  "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content",
+                @tier == :secondary && "text-[var(--text-secondary)] text-sm",
+                @tier not in [:primary, :secondary] &&
+                  "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content"
+              ]}>
                 <.message_body message={@message} compact={false} />
               </div>
               <.message_attachments attachments={@message.attachments || []} />
-              <%!-- Metadata footer --%>
+              <%!-- Metadata footer — only on primary tier --%>
               <div
-                :if={show_message_metrics?(@message) || message_model(@message) || message_cost(@message)}
+                :if={@tier == :primary && (show_message_metrics?(@message) || message_model(@message) || message_cost(@message))}
                 class="flex items-center gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]"
               >
                 <.message_metrics :if={show_message_metrics?(@message)} message={@message} />

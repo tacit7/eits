@@ -40,16 +40,18 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         active={@active_tab in ["messages", nil]}
         on_click="change_tab"
         value="messages"
+        active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium"
       />
-      <:item label="Tasks" active={@active_tab == "tasks"} on_click="change_tab" value="tasks" />
-      <:item label="Commits" active={@active_tab == "commits"} on_click="change_tab" value="commits" />
-      <:item label="Notes" active={@active_tab == "notes"} on_click="change_tab" value="notes" />
-      <:item label="Context" active={@active_tab == "context"} on_click="change_tab" value="context" />
+      <:item label="Tasks" active={@active_tab == "tasks"} on_click="change_tab" value="tasks" active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium" />
+      <:item label="Commits" active={@active_tab == "commits"} on_click="change_tab" value="commits" active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium" />
+      <:item label="Notes" active={@active_tab == "notes"} on_click="change_tab" value="notes" active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium" />
+      <:item label="Context" active={@active_tab == "context"} on_click="change_tab" value="context" active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium" />
       <:item
         label="Settings"
         active={@active_tab == "settings"}
         on_click="change_tab"
         value="settings"
+        active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium"
       />
     </.tab_pills>
     <div class="flex-1" />

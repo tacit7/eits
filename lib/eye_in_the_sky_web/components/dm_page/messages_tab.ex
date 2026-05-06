@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     phx-click-loading-class="opacity-50 pointer-events-none"
                     class="text-xs text-base-content/35 hover:text-primary transition-colors"
                     id="load-more-messages"
-                    onclick="document.getElementById('messages-container').dataset.loadingMore = 'true'"
+                    onclick="document.getElementById('messages-container').dispatchEvent(new CustomEvent('load-more-intent'))"
                   >
                     Load older messages
                   </button>

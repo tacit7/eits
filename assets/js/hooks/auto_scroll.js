@@ -2,8 +2,16 @@ export const AutoScroll = {
   mounted() {
     this.shouldAutoScroll = true
     this._loadingMore = false
+    this._intentLoadMore = false
     this._mounted = false
     this._updating = false
+
+    // Set by the "Load older messages" button via a custom DOM event so the
+    // flag lives on the hook instance. We cannot use data-* attributes here —
+    // morphdom reconciles element attributes against the server diff before
+    // updated() runs, stripping anything we set client-side.
+    this._onLoadMoreIntent = () => { this._intentLoadMore = true }
+    this.el.addEventListener("load-more-intent", this._onLoadMoreIntent)
 
     this._onScroll = () => {
       // Ignore scroll events fired by LiveView DOM swaps. The container's
@@ -72,10 +80,10 @@ export const AutoScroll = {
   },
 
   updated() {
-    if (this.el.dataset.loadingMore === "true") {
-      // "Load older messages" was clicked — user wants to see the newly loaded
-      // content at the top of the container, not stay anchored to their old position.
-      delete this.el.dataset.loadingMore
+    if (this._intentLoadMore) {
+      // "Load older messages" was clicked — scroll to top so the user sees
+      // the newly loaded older content immediately.
+      this._intentLoadMore = false
       this.el.scrollTop = 0
     } else if (this.shouldAutoScroll) {
       this.scrollToBottom()
@@ -103,6 +111,7 @@ export const AutoScroll = {
 
   destroyed() {
     this.el.removeEventListener("scroll", this._onScroll)
+    this.el.removeEventListener("load-more-intent", this._onLoadMoreIntent)
     if (this._resizeObserver) {
       this._resizeObserver.disconnect()
       this._resizeObserver = null

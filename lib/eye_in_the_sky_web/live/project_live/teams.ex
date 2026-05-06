@@ -2,6 +2,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Teams
+  alias EyeInTheSky.Teams.Team
+  alias EyeInTheSky.Teams.TeamMember
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -17,12 +19,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:show_archived, false)
       |> assign(:search_query, "")
       |> assign(:show_all, false)
-      |> assign(:teams, [])
+      |> assign(:all_teams, [])
 
     socket =
-      if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, false, false, "")),
-        else: socket
+      if connected?(socket) do
+        teams = load_teams(socket, false, false, "")
+        assign(socket, :all_teams, teams)
+        |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+      else
+        socket
+      end
 
     {:ok, socket}
   end
@@ -42,12 +48,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:show_archived, false)
       |> assign(:search_query, "")
       |> assign(:show_all, true)
-      |> assign(:teams, [])
+      |> assign(:all_teams, [])
 
     socket =
-      if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, false, true, "")),
-        else: socket
+      if connected?(socket) do
+        teams = load_teams(socket, false, true, "")
+        assign(socket, :all_teams, teams)
+        |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+      else
+        socket
+      end
 
     {:ok, socket}
   end
@@ -57,9 +67,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     socket = assign(socket, :show_all, true)
 
     socket =
-      if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, true, socket.assigns.search_query)),
-        else: socket
+      if connected?(socket) do
+        teams = load_teams(socket, socket.assigns.show_archived, true, socket.assigns.search_query)
+        assign(socket, :all_teams, teams)
+        |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
@@ -68,22 +82,62 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     socket = assign(socket, :show_all, false)
 
     socket =
-      if connected?(socket),
-        do: assign(socket, :teams, load_teams(socket, socket.assigns.show_archived, false, socket.assigns.search_query)),
-        else: socket
+      if connected?(socket) do
+        teams = load_teams(socket, socket.assigns.show_archived, false, socket.assigns.search_query)
+        assign(socket, :all_teams, teams)
+        |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
 
   @impl true
-  def handle_info({event, _payload}, socket)
-      when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left] do
-    {:noreply,
-     assign(
-       socket,
-       :teams,
-       load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, socket.assigns.search_query)
-     )}
+  def handle_info({:team_created, %Team{} = team}, socket) do
+    # Only add to stream if it matches current filters
+    case should_include_team?(team, socket) do
+      true ->
+        socket =
+          socket
+          |> update(:all_teams, &[team | &1])
+          |> stream_insert(:team_list, team)
+
+        {:noreply, socket}
+
+      false ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_info({:team_deleted, %Team{id: team_id}}, socket) do
+    socket =
+      socket
+      |> update(:all_teams, &Enum.reject(&1, fn t -> t.id == team_id end))
+      |> stream_delete_by_dom_id(:team_list, "team-#{team_id}")
+
+    {:noreply, socket}
+  end
+
+  def handle_info(
+        {:member_joined, %TeamMember{team_id: team_id}},
+        socket
+      ) do
+    update_team_in_stream(socket, team_id)
+  end
+
+  def handle_info(
+        {:member_updated, %TeamMember{team_id: team_id}},
+        socket
+      ) do
+    update_team_in_stream(socket, team_id)
+  end
+
+  def handle_info(
+        {:member_left, %TeamMember{team_id: team_id}},
+        socket
+      ) do
+    update_team_in_stream(socket, team_id)
   end
 
   def handle_info({:new_message, _message}, socket), do: {:noreply, socket}
@@ -93,7 +147,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
     teams = load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, query)
-    {:noreply, socket |> assign(:search_query, query) |> assign(:teams, teams)}
+
+    socket =
+      socket
+      |> assign(:search_query, query)
+      |> assign(:all_teams, teams)
+      |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -106,13 +167,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         case Teams.get_team(team_id) do
           {:ok, team} ->
             {:ok, _} = Teams.delete_team(team)
+            # The PubSub handler will update the stream when team_deleted event is received
 
-            {:noreply,
-             assign(
-               socket,
-               :teams,
-               load_teams(socket, socket.assigns.show_archived, socket.assigns.show_all, socket.assigns.search_query)
-             )}
+            {:noreply, socket}
 
           _ ->
             {:noreply, put_flash(socket, :error, "Team not found")}
@@ -123,22 +180,24 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   @impl true
   def handle_event("toggle_archived", _params, socket) do
     show_archived = !socket.assigns.show_archived
+    teams = load_teams(socket, show_archived, socket.assigns.show_all, socket.assigns.search_query)
 
-    {:noreply,
-     socket
-     |> assign(:show_archived, show_archived)
-     |> assign(:teams, load_teams(socket, show_archived, socket.assigns.show_all, socket.assigns.search_query))}
+    socket =
+      socket
+      |> assign(:show_archived, show_archived)
+      |> assign(:all_teams, teams)
+      |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+
+    {:noreply, socket}
   end
 
   @impl true
   def render(assigns) do
-    assigns = assign(assigns, :filtered_teams, assigns.teams)
-
     ~H"""
     <div class="overflow-y-auto px-4 sm:px-6 py-6" style="scrollbar-width: none;">
       <div class="mb-3 flex items-center justify-between">
         <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-          {length(@filtered_teams)} teams
+          {length(@all_teams)} teams
           <%= if @show_all do %>
             <span class="ml-1 text-primary">(all projects)</span>
           <% end %>
@@ -163,7 +222,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         <% end %>
       </div>
 
-      <%= if @filtered_teams == [] do %>
+      <%= if @all_teams == [] do %>
         <.empty_state
           id="teams-empty"
           icon="hero-user-group"
@@ -176,8 +235,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         />
       <% else %>
         <div class="divide-y divide-base-content/8" data-vim-list>
-          <%= for team <- @filtered_teams do %>
-            <div class="py-1 group flex items-center gap-1">
+          <%= for {dom_id, team} <- @team_list do %>
+            <div id={dom_id} class="py-1 group flex items-center gap-1">
               <.link
                 navigate={
                   if @project,
@@ -233,6 +292,67 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     opts = if project_id, do: Keyword.put(opts, :project_id, project_id), else: opts
     opts = if search_query != "", do: Keyword.put(opts, :name, search_query), else: opts
     Teams.list_teams(opts)
+  end
+
+  defp should_include_team?(%Team{} = team, socket) do
+    # Check status filter
+    status_matches =
+      if socket.assigns.show_archived do
+        team.status == "archived"
+      else
+        team.status != "archived"
+      end
+
+    # Check project filter
+    project_matches =
+      if socket.assigns.show_all do
+        true
+      else
+        team.project_id == socket.assigns[:project_id]
+      end
+
+    # Check search filter
+    search_matches =
+      if socket.assigns.search_query == "" do
+        true
+      else
+        String.contains?(
+          String.downcase(team.name),
+          String.downcase(socket.assigns.search_query)
+        )
+      end
+
+    status_matches and project_matches and search_matches
+  end
+
+  defp update_team_in_stream(socket, team_id) do
+    case Teams.get_team(team_id) do
+      {:ok, team} ->
+        if should_include_team?(team, socket) do
+          updated_all_teams =
+            Enum.map(socket.assigns.all_teams, fn t ->
+              if t.id == team_id, do: team, else: t
+            end)
+
+          socket =
+            socket
+            |> update(:all_teams, fn _ -> updated_all_teams end)
+            |> stream_insert(:team_list, team)
+
+          {:noreply, socket}
+        else
+          # Team no longer matches filters, remove it
+          socket =
+            socket
+            |> update(:all_teams, &Enum.reject(&1, fn t -> t.id == team_id end))
+            |> stream_delete_by_dom_id(:team_list, "team-#{team_id}")
+
+          {:noreply, socket}
+        end
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
   end
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))

@@ -111,24 +111,53 @@ mount/3 (single with chain)
 
 ## Chat Interface
 
-**Display:** Message stream with agent context, bubble-style rendering.
+**Display:** Message stream with document-style rendering, semantic color theming, and transcript hierarchy.
 
 **Features:**
 - Chronological message view (newest at bottom)
-- Bubble-style message rendering (right-aligned user, left-aligned agent)
+- Document-style message layout (left-aligned user cards, left-aligned agent responses with visual anchor)
 - Timestamps: hover-only at 9px via group-hover (desktop only, always visible on mobile)
 - Syntax highlighting for code blocks
 - Markdown rendering (via Marked.js)
 - Mention support (@agent mentions)
 
-**Message styling:**
-- **User messages**: right-aligned bubble with bg-base-200, rounded-2xl, 3px padding
-- **Agent messages**: left-aligned plain text, text-base-content/90
-- **Agent model/cost inline**: Rendered as dot-separated plain text (9px monospace, opacity-30) below agent message body (commit 8a8d576e)
-  - Format: `claude-opus-4-6 · $0.0045` (single line, no pills)
-  - Replaces prior per-metric badge pills with unified text rendering
-- **Tool events** (tool_result, tool_use): max-w-[70%] compact widget, no bubble, no timestamp
+**Message styling (commits 885514b3, f75e576d, 904915bc, 7b4f8e59, 652c90f3):**
+
+**Semantic color tokens** (`app.css`):
+- `--surface-card` — User bubble background
+- `--guide-line` — Agent message left border (derived from `--color-primary`)
+- `--agent-bg` — Agent message background wash (derived from `--color-primary`)
+- `--surface-code` — Code block backgrounds
+- `--border-subtle` / `--border-strong` — UI borders and dividers
+- Light/dark mode overrides for consistent contrast
+
+**User messages:**
+- Right-aligned bubble with `--surface-card` background (semantic card color)
+- `rounded-lg` corners, max-w-[78%] width constraint
+- `3px` padding, `items-end` alignment (right-side anchor)
 - **DM indicator**: primary/20 border on user DM bubbles
+
+**Agent messages:**
+- Left-aligned card with **2px left guide-line** (`--guide-line` color, theme-aware)
+- **2.5% opacity background wash** (`--agent-bg`) for visual subordination
+- Full-width layout so structured content (lists, code) fills the area
+- Text full contrast (not /90)
+
+**Agent model/cost inline:** Rendered as dot-separated plain text (9px monospace, opacity-30) below agent message body (commit 8a8d576e)
+- Format: `claude-opus-4-6 · $0.0045` (single line, no pills)
+- Replaces prior per-metric badge pills with unified text rendering
+
+**Tool events** (tool_result, tool_use) (commits 904915bc, 7b4f8e59):
+- Render **inside agent bubble** (not loose)
+- Skip the left guide-line
+- Use tighter padding for subordination
+- Compact mode: collapse by default, expand on click
+- Copy-on-hover icon
+
+**Inter-turn divider (commit f770e19b):**
+- `my-5 mx-3` spacing between turns
+- Metadata footer with provider avatar, model, cost
+- Provider-aware avatar (Claude or Codex icon)
 
 **Turn spacing and sender grouping (commit 8a8d576e):**
 - **mt-5**: Applied when sender role changes (user → agent, agent → user)
@@ -147,6 +176,7 @@ mount/3 (single with chain)
 - Messages streamed from agent worker via PubSub
 - Live update as agent sends chunks
 - Stream shows provider avatar (Claude or Codex) with thinking/tool indicators
+- Live-stream bubble with status indicator
 
 ---
 
@@ -390,6 +420,50 @@ The DM page supports three editor layout modes for flexible file editing alongsi
 
 ---
 
+## Composer Autocomplete: @ File and @@ Agent
+
+**Commit:** `0d5b7890`
+
+The DM composer supports inline autocomplete for file paths and agent names, enabling quick references in messages.
+
+### @ File Autocomplete
+
+**Trigger:** Type `@` followed by a path prefix to list files from the project root.
+
+**Behavior:**
+- Server-side file listing triggered via `list_files` pushEvent from JS
+- Results show files relative to project root, with sorting by name
+- Selecting a file inserts its path into the message
+
+**Root Resolution:**
+- `FileAutocomplete.list_files/1` resolves the project root from the current workspace scope
+- Traversal guard prevents access outside the project root
+- Returns sorted file list, filtered by prefix match
+
+**insert_text vs. path separation:**
+- Prevents home-root path corruption by separating the insert text (what appears in the message) from the file system path (traversal target)
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/live/dm_live/file_autocomplete.ex` — Server-side file listing and root resolution
+- `assets/js/hooks/slash_command_popup.js` — Debounce + stale-reply guard (`fileRequestSeq`)
+- Tests: 20 Elixir tests in `file_autocomplete_test.exs`, 18 JS tests in `slash_command_popup_file.test.js`
+
+### @@ Agent Autocomplete
+
+**Trigger:** Type `@@` to autocomplete agent names from the current workspace.
+
+**Behavior:**
+- Client-side autocomplete (no server call)
+- Filters agent list by typed prefix
+- Selects and inserts agent name into message
+- Remapped from original `@` trigger to avoid conflict with file autocomplete
+
+**Implementation:**
+- Client-side filtering in `assets/js/hooks/slash_command_popup.js`
+- Works without server-side queries; uses agents already loaded on the page
+
+---
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -400,6 +474,8 @@ The DM page supports three editor layout modes for flexible file editing alongsi
 | `Cmd/Ctrl + N` | New agent |
 | `Cmd/Ctrl + T` | New task |
 | `ArrowLeft / ArrowRight` (on splitter) | Resize editor panel by 20px |
+| `@` | Trigger file autocomplete in composer |
+| `@@` | Trigger agent autocomplete in composer |
 
 ---
 
@@ -711,7 +787,30 @@ DM from:<agent_name> (session:<uuid>) <message body>
 
 ---
 
-## Format Toolbar
+## DM Composer
+
+**Component:** `lib/eye_in_the_sky_web/components/dm_page/composer.ex`
+
+The DM composer is the message input area at the bottom of the DM page, with context display, format toolbar, and inline autocomplete.
+
+### Composer Layout and Context (commit 81ca01cf)
+
+**Context display:**
+- Agent name injected into textarea placeholder as "Reply to <agent>…"
+- Removed floating `display_name` chip (was redundant overhead)
+- Placeholder text provides lightweight context without extra UI clutter
+
+**Styling (commits f770e19b, 652c90f3):**
+- Textarea text size: `text-[13px]` for mockup density
+- Wrapper uses `--surface-composer` + `--border-subtle` semantic tokens
+- Focus-within accent border for visual feedback
+
+**Send/Queue buttons:**
+- **Send ↵** — Text label (was icon-only arrow) with `h-7` height consistency
+- **Queue button** — Text label + pill styling (`h-6` model/effort pills)
+- **Stop button** — Paired with queue button for in-progress sessions
+
+### Format Toolbar
 
 **Commit:** `fb46a50c`
 
@@ -741,6 +840,12 @@ A markdown format toolbar (Aa button) in the DM composer enables inline text for
 **Implementation:** 
 - `lib/eye_in_the_sky_web/components/dm_page/composer.ex` — HEEx format bar
 - `assets/js/hooks/dm_composer.js` — selection wrapping logic
+
+### Composer Autocomplete and History
+
+See **Composer Autocomplete: @ File and @@ Agent** (above) for file and agent name completion.
+
+See **DM Composer: localStorage History Persistence** and **Keyboard History Navigation** (below) for message history and recall.
 
 ---
 
@@ -1196,6 +1301,76 @@ An ellipsis button in the toolbar opens an inline dropdown with session-level ac
 - `lib/eye_in_the_sky_web/components/layouts.ex` — top_bar component with dm_toolbar private component
 - `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — top bar integration
 - `lib/eye_in_the_sky_web/components/dm_page.ex` — DM page height calculation
+
+---
+
+## Sessions Sidebar: Live Status Updates and Grouped Layout
+
+**Commits:** `045fdac4`, `3095d561`, `f75e576d`
+
+The DM sidebar sessions list displays agent status and relative time, grouped by activity level, with live updates via PubSub.
+
+### Grouped Sessions Layout (commit 045fdac4)
+
+**Session grouping:**
+- **ACTIVE:** Up to 5 sessions with recent activity or "working" status
+- **RECENT:** Up to 8 sessions sorted by last activity
+- **Search mode:** Flat results list capped at 10 items
+
+**Visual design:**
+- Section labels with 2px accent-color left border and uppercase tracking-widest text
+- "View all sessions →" footer link pinned to bottom of sessions section
+
+**Features:**
+- Search input remains visible; sort dropdown and "All" toggle removed
+- Sessions section uses `flex-col` layout for internal scrolling while keeping footer sticky
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/components/rail/flyout/sessions_section.ex` — grouping, filtering, and layout
+- `lib/eye_in_the_sky_web/components/rail/flyout.ex` — integration with main flyout
+
+### Session Status Display (commit f75e576d)
+
+**Status and time metadata:**
+- Session row shows **status badge** (working, idle, waiting, completed, failed) next to session name
+- **Relative time** displays below session name (e.g., "3m ago", "just now")
+- Status dot in top breadcrumb when `:dm_session_status` is set
+
+**Implementation:**
+- `mount_state.ex` — assigns `:session_status` on mount from `session.status`
+- `agent_lifecycle.ex` — syncs `:session_status` on PubSub `session_updated` broadcasts
+- `sessions_section.ex` — renders status badge and time secondary line
+
+### Live PubSub Updates (commit 3095d561)
+
+**Architecture:**
+- `NavHook` already subscribes to `agents` topic (`agent_updated`, `agent_stopped`, `agent_created` broadcasts)
+- `NavHook` forwards these events to `Rail` via `send_update/2`
+- `Rail.handle_info/2` receives the update and replaces changed session in-place
+
+**Targeted update path:**
+```elixir
+# In Rail component
+def handle_info({:agent_updated, agent}, socket) do
+  socket =
+    update_flyout_sessions(socket, fn sessions ->
+      Enum.map(sessions, &replace_if_matches(&1, agent))
+    end)
+  {:noreply, socket}
+end
+```
+
+**Fallback for new sessions:**
+- If a new session is not yet in the list, `Rail` triggers a full reload of the sessions list
+
+**Bug Fix (commit f6dcd122):**
+- Fixed `send_update/3` call in NavHook: was passing `"app-rail"` as pid; now uses `send_update/2` with `id` in assigns
+- This prevented crashes when `agent_updated` broadcasts fired during DM page sessions
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/rail.ex` — `handle_info` for targeted session updates
+- `lib/eye_in_the_sky_web/live/nav_hook.ex` — PubSub subscription and `send_update/2` dispatch
+- `lib/eye_in_the_sky_web/components/rail/flyout/sessions_section.ex` — status display
 
 ---
 

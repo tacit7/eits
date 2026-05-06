@@ -1480,7 +1480,7 @@ cmd_projects() {
 
 cmd_agents() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits agents <list|get|spawn>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits agents <list|get|update|spawn|spawn-batch|defs|activity>"; return 0; }
   case "$sub" in
     list)
       # eits agents list [-p|--project <id>] [--status <status>] [-l|--limit <n>] [--active-since <duration>] [-j|--json]
@@ -2004,8 +2004,23 @@ BATCH_HELP
         printf '%s\n' "$_resp" | jq .
       fi
       ;;
+    update)
+      # eits agents update <uuid|id> [--status <s>] [--status-message <text>]
+      local id="${1:-}"; need id; shift
+      local status="" status_message=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --status)          status="$2";         shift 2 ;;
+          --status-message)  status_message="$2"; shift 2 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$status" || -n "$status_message" ]] \
+        || die "at least one of --status or --status-message is required"
+      _patch "/agents/$id" "$(json status "$status" status_message "$status_message")"
+      ;;
     *)
-      echo "usage: eits agents <list|get|spawn|spawn-batch|defs|activity>"
+      echo "usage: eits agents <list|get|update|spawn|spawn-batch|defs|activity>"
       ;;
   esac
 }

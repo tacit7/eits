@@ -54,6 +54,42 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
   end
 
   @doc """
+  PATCH /api/v1/agents/:id - Update agent status and/or status_message.
+  Body: status, status_message (both optional; at least one required)
+  """
+  def update(conn, %{"id" => id} = params) do
+    result =
+      if int_id = parse_int(id), do: Agents.get_agent(int_id), else: Agents.get_agent_by_uuid(id)
+
+    attrs = Map.take(params, ["status", "status_message"])
+
+    if map_size(attrs) == 0 do
+      conn
+      |> put_status(:bad_request)
+      |> json(%{error: "at least one of status or status_message is required"})
+    else
+      case result do
+        {:ok, agent} ->
+          case Agents.update_agent(agent, attrs) do
+            {:ok, updated} ->
+              json(conn, %{
+                success: true,
+                agent: ApiPresenter.present_agent(updated)
+              })
+
+            {:error, changeset} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Update failed", details: inspect(changeset.errors)})
+          end
+
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "Agent not found"})
+      end
+    end
+  end
+
+  @doc """
   GET /api/v1/agents/:id - Get agent info.
   """
   def show(conn, %{"id" => id}) do

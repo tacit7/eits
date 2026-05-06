@@ -17,23 +17,25 @@ Multi-agent channel chat where agents and the user interact. Agents receive mess
 ### User Message Flow
 
 ```
-User types in AgentMessagesPanel (Svelte)
+User types + uploads files in AgentMessagesPanel (Svelte)
     |
     v
 ChatLive.handle_event("send_channel_message")
     |
-    |-- 1. Save message to DB (Messages.send_channel_message)
-    |-- 2. Broadcast to PubSub ("channel:<id>:messages")
-    |-- 3. ChannelFanout.fanout_all(channel_id, body, sender_session_id)
+    |-- 1. Persist images: UploadHelpers.consume_and_persist_agent_images(images)
+    |-- 2. Save message to DB + create FileAttachment rows (wrapped in Repo.transaction)
+    |-- 3. Broadcast to PubSub ("channel:<id>:messages") only after both commits
+    |-- 4. ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks)
+    |       (content_blocks: base64-encoded images for agent context)
     |
     v
 ChannelFanout.fanout_all (parallelized via Task.async_stream, max_concurrency: 10)
     |-- For each channel member (except sender):
     |       |-- Parse routing mode: :direct if @mentioned, :broadcast if @all, :ambient if no mention
     |       |-- Auto-add mentioned sessions to channel (if not members)
-    |       |-- Build member-specific prompt via ChannelProtocol.build_prompt
+    |       |-- Build member-specific prompt via ChannelProtocol.build_prompt(%{mode, channel, sender, body})
     |       |-- Mirror message to member's DM session (no channel_id)
-    |       |-- AgentManager.send_message(session_id, prompt) [concurrent]
+    |       |-- AgentManager.send_message(session_id, prompt, context_metadata) [concurrent]
     |
     v
 AgentWorker processes prompt, generates response
@@ -51,7 +53,7 @@ Response saved via Messages.record_incoming_reply
     v
 ChatLive receives {:new_message, _} via PubSub
     |-- Deduplication guard: skip if message.id already in socket.assigns.messages
-    |-- Preload associations via ChannelMessages.preload_for_serialization
+    |-- Preload associations via ChannelMessages.preload_for_serialization([:session, :reactions, :attachments])
     |-- Append message and update UI
 ```
 
@@ -83,10 +85,19 @@ Three modes determine how agents handle incoming channel messages:
 
 `ChannelProtocol.parse_routing(body, session_id)` returns `{mode, mentioned_ids, mention_all}`.
 
-`ChannelProtocol.build_prompt(mode, body)` prepends mode-specific instructions:
+`ChannelProtocol.build_prompt(%{mode, channel, sender, body})` accepts a map and prepends mode-specific instructions:
 - **Direct**: "You were directly mentioned. You must respond."
 - **Broadcast**: "A broadcast message was sent to all agents. You must respond."
 - **Ambient**: Messages without @mentions are **not** sent to agents; no automatic routing occurs.
+
+Output format includes channel context:
+```
+MSG from Channel #<name> (<id>)
+Mode: <mode>
+From: <sender>
+
+<body>
+```
 
 Only **@direct** mentions (`@session_id`) and **@all** broadcasts trigger agent responses. Ambient messages (no mention) are stored in the channel but do not fan out to agents.
 
@@ -122,6 +133,7 @@ Default channel auto-created as `#general` with ID format `proj-{project_id}-gen
 | `joined_at` | utc_datetime | |
 | `last_read_at` | utc_datetime | For unread tracking |
 | `notifications` | string | `"all"`, `"mentions"`, `"none"` |
+| `onboarded_at` | utc_datetime | Nullable; set after one-time onboarding DM delivered |
 
 Unique constraint: `(channel_id, session_id)`. No project constraint on membership, so sessions from any project can join any channel.
 
@@ -170,6 +182,8 @@ Unique constraint: `(message_id, session_id, emoji)`.
 
 Allowed types: JPEG, PNG, GIF, PDF, text, ZIP, TAR, GZIP.
 
+**Transaction Safety**: Message + attachment inserts are wrapped in `Repo.transaction` so PubSub broadcasts fire only after both commits. On failure, orphaned image files are cleaned up to prevent storage leaks.
+
 ## Key Modules
 
 ### ChatLive (`lib/eye_in_the_sky_web_web/live/chat_live.ex`)
@@ -214,6 +228,7 @@ Channels.archive_channel(channel)
 
 # Membership
 Channels.add_member(channel_id, agent_id, session_id, role \\ "member")
+  # Calls ChannelOnboarding.deliver/2 after successful insert
 Channels.remove_member(channel_id, session_id)
 Channels.list_members(channel_id)
 Channels.is_member?(channel_id, session_id)
@@ -221,6 +236,27 @@ Channels.mark_as_read(channel_id, session_id)
 Channels.count_unread_messages(channel_id, session_id)
 Channels.list_channels_for_session(session_id)
 ```
+
+### ChannelOnboarding (`lib/eye_in_the_sky/channels/channel_onboarding.ex`)
+
+Sends one-time onboarding DMs to agents when they join a channel. Idempotent via `onboarded_at` field.
+
+```elixir
+ChannelOnboarding.deliver(member, channel)
+  # Sends a DM to member.session_id with channel context and recent message snapshot
+  # Stamps onboarded_at after delivery
+  # Skips if: onboarded_at already set (rejoin guard), session_id is nil, or AgentManager unavailable
+  # Returns :ok in all cases — failures are logged but don't crash
+```
+
+**Onboarding Message Format:**
+- Channel welcome and purpose
+- Last 8 messages (if any):
+  - Each line: `[sender name] message body (truncated to 120 chars, newlines collapsed)`
+  - Omitted cleanly if channel is new or empty
+- Instructions for responding via `eits channels send <id>`
+
+**Schema**: `channel_members` table includes `onboarded_at` field (nullable, `:utc_datetime_usec`).
 
 ### ChannelMessages (`lib/eye_in_the_sky/channel_messages.ex`)
 
@@ -262,27 +298,49 @@ Routing logic for multi-agent channels.
 
 ```elixir
 ChannelProtocol.parse_routing(body, session_id)  # -> {mode, mentioned_ids, mention_all}
-ChannelProtocol.build_prompt(mode, body)          # -> instruction + message string
+ChannelProtocol.build_prompt(%{mode, channel, sender, body})  # -> instruction + message string with channel context
 ChannelProtocol.skip?(member_session_id, sender_session_id)  # -> boolean (skip self)
 ```
+
+**Mention Routing**: Only numeric session IDs (`@\d+`) are recognized for routing. Slash autocomplete now inserts `session_id` (numeric) instead of agent slug to ensure proper routing.
+
+### SlashItems (`lib/eye_in_the_sky_web/helpers/slash_items.ex`)
+
+Builds autocomplete suggestions for slash commands, @mentions, and agents.
+
+```elixir
+SlashItems.load_agents(channel_id)  # Returns agent items with most recent session_id per agent
+```
+
+**Agent Item Format**:
+- Includes `session_id` field (most recent active session for each agent)
+- Slash autocomplete: `selectSlashItem` inserts `@<session_id>` when available, falls back to slug-based mention
 
 ### ChannelFanout (`lib/eye_in_the_sky/claude/channel_fanout.ex`)
 
 Core fanout engine for routing messages to channel members. Uses `Task.async_stream` with `max_concurrency: 10` to parallelize DB inserts and agent message delivery.
 
 ```elixir
-ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks \\ [])
+ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks \\ [], message_id \\ nil)
   # Route to all members (excluding sender)
   # Routing mode (:direct/:broadcast/:ambient) determined per-member via ChannelProtocol
   # Auto-adds mentioned sessions as members if not present
+  # message_id: optional, passed to build_prompt context; used for dedup/threading
+  # Context metadata: %{"source" => "channel", "channel_id" => id, "channel_message_id" => message_id, "reply_mode" => "cli_required"}
   # Parallelized: all N sends fire concurrently, latency ≈ 1 insert time
 
-ChannelFanout.fanout_mentions_only(channel_id, body, sender_session_id)
+ChannelFanout.fanout_mentions_only(channel_id, body, sender_session_id, message_id \\ nil)
   # Route ONLY to explicitly @mentioned sessions as :direct
   # Does NOT fan out to non-mentioned members
   # Used by agent replies to prevent ambient chain reactions
   # Sender is skipped even if self-mentioned
+  # message_id: optional, passed to build_prompt context
 ```
+
+**Per-Message Changes (v2):**
+- Loads channel struct once per fanout call (optimization)
+- Resolves sender name from Sessions (name or fallback to uuid)
+- Passes string-keyed context metadata to AgentManager for logging/tracing
 
 **Integration points**:
 - Called from `ChatLive.handle_event("send_channel_message")` via `ChannelHelpers.route_to_members`
@@ -301,6 +359,27 @@ ChatWorker.is_processing?(channel_id)
 ```
 
 Workers are lazy-started on first message and registered in `EyeInTheSkyWeb.Claude.ChatRegistry`.
+
+### UploadHelpers (`lib/eye_in_the_sky_web/helpers/upload_helpers.ex`)
+
+Handles image upload persistence for channel messages.
+
+```elixir
+UploadHelpers.consume_and_persist_agent_images(images)
+  # Single-pass consume + persist
+  # Saves images to priv/static/uploads/agent/<hash>
+  # Returns base64 content blocks for agent inclusion
+```
+
+**Usage**: Called in `send_channel_message` event handler to persist uploaded images before sending to agents.
+
+### ChatPresenter (`lib/eye_in_the_sky_web/live/chat_presenter.ex`)
+
+Serializes messages for frontend display, including computed attachment URLs.
+
+**Attachments**: 
+- Preloaded via `ChannelMessages.preload_for_serialization(:attachments)`
+- URL computed from storage_path for rendering in AgentMessagesPanel thumbnail grid
 
 ### Broadcaster (`lib/eye_in_the_sky_web/messages/broadcaster.ex`)
 
@@ -523,9 +602,14 @@ Svelte component handling message display and input for `/chat`.
 - Typing indicator (bouncing dots above composer for working channel members)
 - Usage metadata display (cost, tokens, duration, turns) without border-t separator
 - Metrics footer opacity/contrast improved for legibility
+- File attachment grid: thumbnail preview below message body
 - @ mention autocomplete -- scoped to current channel members only
+  - Inserts `@<session_id>` (numeric ID)
+  - Renders as `@<agent_name>` in display with data-session-id attribute for accessibility
+  - Fallback to numeric ID when session not in member list
 - @all option broadcasts to all channel members
 - / slash command autocomplete -- grouped by type (skill, command, agent, prompt)
+  - Agent items now include most recent session_id for proper mention routing
 - Cmd/Ctrl+1-9 keyboard shortcuts to switch channels (1=first, 9=last channel)
 - Message history navigation (up/down arrows, 50 message buffer)
 - Auto-scroll on new messages

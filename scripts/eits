@@ -657,7 +657,7 @@ cmd_tasks() {
 usage: eits tasks <subcommand> [options]
 
 Subcommands:
-  list      [-s <session>] [-p <project>] [-l <limit>] [-q <query>] [--tag <id>] [--mine] [--all] [-j|--json]
+  list      [-s <session>] [-p <project>] [-l <limit>] [-q <query>] [--tag <id|name>] [--mine] [--all] [-j|--json]
   get       <id>
   begin     -t <title> [-p <project>] [-d <desc>] [-q]   create + claim in one shot
   complete  <id> -m <message> [--notify <session>]         atomic annotate + done
@@ -686,7 +686,7 @@ TASKS_HELP
   return 0; }
   case "$sub" in
     list)
-      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--tag <id>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by] [--all]
+      # eits tasks list [--project <id>] [--session <uuid>] [--agent <uuid>] [--tag <id|name>] [--q <query>] [--search <query>] [--state <id>] [--state-name <name>] [--limit <n>] [--mine|--assigned] [--created-by] [--all]
       # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only the
       # current session's tasks. Pass --all to list across all sessions.
       # --mine/--assigned: tasks where current session is the active executor (linked via task_sessions)

@@ -24,7 +24,9 @@ This is what you'll use 90% of the time:
 
 ```bash
 # 1. Start work (creates + links to session + sets In Progress atomically)
-eits tasks begin --title "What you're doing"
+eits tasks begin --title "What you're doing" [--description "..."] [--priority <p>] [--tag <id|name>]
+# --tag is repeatable: --tag bug --tag liveview-vite-expert
+# Annotate after the fact: eits tasks annotate <id> --body "..."
 
 # 2. Do your work...
 

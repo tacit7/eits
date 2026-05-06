@@ -413,7 +413,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full" id="dm-tab-content">
         <%= case @active_tab do %>
           <% "messages" -> %>
-            <MessagesTab.messages_tab
+            <.live_component
+              module={MessagesTab}
+              id="messages-tab"
               messages={@message_data.messages}
               has_more_messages={@message_data.has_more_messages}
               stream={@stream}
@@ -440,7 +442,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               notify_on_stop={@notify_on_stop}
             />
           <% _ -> %>
-            <MessagesTab.messages_tab
+            <.live_component
+              module={MessagesTab}
+              id="messages-tab"
               messages={@message_data.messages}
               has_more_messages={@message_data.has_more_messages}
               stream={@stream}

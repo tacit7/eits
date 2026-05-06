@@ -38,16 +38,20 @@ Run `eits tasks states` for the full authoritative list.
 ```bash
 eits sessions list [--project-id <id>] [--status <s>] [--include-archived] [--limit <n>]
 eits sessions get <uuid>
-eits sessions update <uuid|self> [--status <s>] [--name "..."] [--description "..."] [--project-id <id>] [--ended-at <iso8601>]
-eits sessions set-intent <review|work> [<uuid>]
+
+# Agents updating their own session — use 'self', no UUID needed
+eits sessions update self [--status <s>] [--name "..."] [--description "..."] [--project-id <id>] [--ended-at <iso8601>]
+eits sessions set-intent <review|work>      # defaults to $EITS_SESSION_UUID when uuid omitted
+
 eits sessions end <uuid> [--final-status <completed|failed|waiting>]
-eits sessions complete [<uuid>]
-eits sessions waiting [<uuid>]
+eits sessions complete [<uuid>]             # defaults to $EITS_SESSION_UUID
+eits sessions waiting [<uuid>]              # defaults to $EITS_SESSION_UUID
 eits sessions tasks <uuid>
 eits sessions notes <uuid>
 ```
 
-`self` resolves to `$EITS_SESSION_UUID` where supported.
+`self` and omitted-UUID commands resolve to `$EITS_SESSION_UUID` automatically — agents never need to pass their own UUID explicitly.
+**Note:** `sessions get self` has a server-side bug (CastError) — use `eits sessions get $EITS_SESSION_UUID` explicitly.
 
 ---
 
@@ -105,7 +109,6 @@ eits notes update <id> [--body "..."] [--title "t"] [--starred]
 eits agents list [--project-id <id>]
 eits agents get <uuid>
 eits agents defs [--json]       # list agent definitions (descriptions truncated to 500 chars; use --json for full)
-eits agents update <uuid> [--status <s>]
 eits agents spawn --instructions "..." [options]
   --instructions-file <path>   read from file (avoids shell escaping issues with heredocs/sigils)
   --interpolate-env            expand $VAR in instructions from current env at spawn time

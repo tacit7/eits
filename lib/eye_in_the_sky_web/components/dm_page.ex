@@ -37,6 +37,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :notify_on_stop, :boolean, default: false
   attr :dm_settings_scope, :string, default: "session"
   attr :dm_settings_subtab, :string, default: "general"
+  # LiveView streams — passed through to MessagesTab so it can render the
+  # phx-update="stream" container without holding @messages itself.
+  attr :streams, :map, required: true
   # Grouped maps replacing 10 individual attrs
   attr :message_data, :map,
     default: %{
@@ -471,7 +474,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <.live_component
               module={MessagesTab}
               id="messages-tab"
-              messages={@message_data.messages}
+              streams={@streams}
+              empty={@message_data.messages == []}
               has_more_messages={@message_data.has_more_messages}
               stream={@stream}
               session={@agent}
@@ -500,7 +504,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <.live_component
               module={MessagesTab}
               id="messages-tab"
-              messages={@message_data.messages}
+              streams={@streams}
+              empty={@message_data.messages == []}
               has_more_messages={@message_data.has_more_messages}
               stream={@stream}
               session={@agent}

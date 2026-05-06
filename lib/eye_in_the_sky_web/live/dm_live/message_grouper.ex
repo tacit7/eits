@@ -41,13 +41,40 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
   end
 
   @doc """
+  Returns `{changed_rows, new_tail_rows}` after appending a new message,
+  using a pre-computed cached tail to skip re-grouping the old messages.
+
+  `cached_old_tail` is the `new_tail_rows` returned by the previous call
+  (stored in `socket.assigns.last_stream_tail`). On the first call after
+  mount or a reset path, pass `[]` and the full tail will be treated as new.
+
+  Returns:
+  - `changed_rows` — rows to pass to `stream_insert/3` (new or patched).
+  - `new_tail_rows` — the updated tail to store back in `@last_stream_tail`.
+
+  The common case (standalone assistant message) produces exactly one new row.
+  A tool event appended to an existing cluster produces one updated row
+  (same id → morphdom patches in place, not delete+reinsert).
+  """
+  def diff_from_cached_tail(cached_old_tail, new_messages) do
+    new_tail_rows =
+      new_messages
+      |> Enum.take(-@tail_window)
+      |> group_events()
+      |> Enum.map(&to_stream_row/1)
+
+    old_by_id = Map.new(cached_old_tail, &{&1.id, &1})
+    changed = Enum.filter(new_tail_rows, fn row -> Map.get(old_by_id, row.id) != row end)
+
+    {changed, new_tail_rows}
+  end
+
+  @doc """
   Returns only the stream rows that changed after appending a new message.
 
-  Re-runs group_events on the last #{@tail_window} messages from both old and
-  new lists, then returns rows that are new or have changed content. The common
-  case (standalone assistant message) produces exactly one new row. A tool event
-  appended to an existing cluster produces one updated cluster row (same id →
-  morphdom patches in place, no delete+reinsert).
+  Re-groups the last #{@tail_window} messages from both old and new lists.
+  Prefer `diff_from_cached_tail/2` when the socket has `@last_stream_tail`
+  available — it skips the re-group of the old tail entirely.
   """
   def diff_tail(existing_messages, new_messages) do
     tail_old =
@@ -56,15 +83,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       |> group_events()
       |> Enum.map(&to_stream_row/1)
 
-    tail_new =
-      new_messages
-      |> Enum.take(-@tail_window)
-      |> group_events()
-      |> Enum.map(&to_stream_row/1)
-
-    old_by_id = Map.new(tail_old, &{&1.id, &1})
-
-    Enum.filter(tail_new, fn row -> Map.get(old_by_id, row.id) != row end)
+    {changed, _new_tail} = diff_from_cached_tail(tail_old, new_messages)
+    changed
   end
 
   # ---------------------------------------------------------------------------

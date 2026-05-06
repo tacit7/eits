@@ -211,12 +211,14 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     else
       message = Repo.preload(message, :attachments)
       new_messages = existing ++ [message]
-      changed_rows = MessageGrouper.diff_tail(existing, new_messages)
+      cached_tail = socket.assigns[:last_stream_tail] || []
+      {changed_rows, new_tail} = MessageGrouper.diff_from_cached_tail(cached_tail, new_messages)
 
       socket =
         socket
         |> cancel_reload_timer()
         |> assign(:messages, new_messages)
+        |> assign(:last_stream_tail, new_tail)
         |> push_event("new_message", %{})
 
       Enum.reduce(changed_rows, socket, fn row, acc ->

@@ -292,22 +292,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <.message_attachments attachments={@message.attachments || []} />
               <%!-- Metadata footer — only on primary tier --%>
               <div
-                :if={@tier == :primary && (show_message_metrics?(@message) || message_model(@message) || message_cost(@message))}
+                :if={@tier == :primary && DmHelpers.has_message_metrics?(@message)}
                 class="flex items-center gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]"
               >
-                <.message_metrics :if={show_message_metrics?(@message)} message={@message} />
-                <span
-                  :if={!show_message_metrics?(@message)}
-                  class="text-[11px] font-mono tabular-nums text-base-content/40"
-                >
-                  {[
-                    message_model(@message),
-                    message_cost(@message) &&
-                      "$#{:erlang.float_to_binary(message_cost(@message) * 1.0, decimals: 4)}"
-                  ]
-                  |> Enum.reject(&is_nil/1)
-                  |> Enum.join(" · ")}
-                </span>
+                <.message_metrics message={@message} />
               </div>
             </div>
           <% end %>
@@ -344,9 +332,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   end
 
   defdelegate stream_provider_label(session), to: DmHelpers
-  defdelegate message_model(msg), to: DmHelpers
-  defdelegate message_cost(msg), to: DmHelpers
-  defdelegate show_message_metrics?(message), to: DmHelpers
 
   # ---------------------------------------------------------------------------
   # tool_cluster component

@@ -60,7 +60,13 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :message, :map, required: true
 
   def message_metrics(assigns) do
-    assigns = assign(assigns, :metrics_text, format_metrics(assigns.message.metadata))
+    metrics_text =
+      case format_metrics(assigns.message.metadata) do
+        "" -> fallback_metrics(assigns.message)
+        text -> text
+      end
+
+    assigns = assign(assigns, :metrics_text, metrics_text)
 
     ~H"""
     <%= if @metrics_text != "" do %>
@@ -71,6 +77,21 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       </div>
     <% end %>
     """
+  end
+
+  # Renders model · $cost when metadata has no total_cost_usd to drive
+  # format_metrics/1. Mirrors the inline fallback that used to live in
+  # MessagesTab.message_item/1.
+  defp fallback_metrics(message) do
+    [
+      message_model(message),
+      case message_cost(message) do
+        nil -> nil
+        cost -> "$#{:erlang.float_to_binary(cost * 1.0, decimals: 4)}"
+      end
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" · ")
   end
 
   defp format_metrics(metadata) when is_map(metadata) do

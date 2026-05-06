@@ -375,7 +375,9 @@ Spawn a new Claude Code agent. Creates an Agent + Session, starts an AgentWorker
   "message": "Agent spawned",
   "agent_id": "agent-uuid",
   "session_id": 42,
-  "session_uuid": "session-uuid"
+  "session_uuid": "session-uuid",
+  "worktree_path": "/path/to/project/.claude/worktrees/feature-branch",
+  "branch_name": "feature-branch"
 }
 ```
 
@@ -388,11 +390,17 @@ With `team_name`:
   "agent_id": "agent-uuid",
   "session_id": 42,
   "session_uuid": "session-uuid",
+  "worktree_path": "/path/to/project/.claude/worktrees/feature-branch",
+  "branch_name": "feature-branch",
   "team_id": 1,
   "team_name": "my-team",
   "member_name": "worker-1"
 }
 ```
+
+**Fields:**
+- `worktree_path` — absolute path to the git worktree (if available); `null` if the session has no worktree
+- `branch_name` — git branch name extracted from the worktree (resolved via `git symbolic-ref --short HEAD`); `null` if worktree is not present or inaccessible
 
 **Example:**
 

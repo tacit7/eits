@@ -23,6 +23,27 @@ defmodule EyeInTheSky.Messages.Aggregations do
   alias EyeInTheSky.Repo
 
   @doc """
+  Returns `{total_tokens, total_cost_usd}` for a session in a single DB round-trip.
+
+  Reads both cache columns from the `sessions` row. Falls back to a single combined
+  aggregate scan over `messages` when either cache column is `nil` (pre-cache sessions).
+  """
+  @spec total_usage_for_session(integer()) :: {non_neg_integer(), float()}
+  def total_usage_for_session(session_id) do
+    case Repo.one(
+           from s in Session,
+             where: s.id == ^session_id,
+             select: {s.total_tokens, s.total_cost_usd}
+         ) do
+      {tokens, cost} when not is_nil(tokens) and not is_nil(cost) ->
+        {tokens, cost}
+
+      _ ->
+        aggregate_usage_for_session(session_id)
+    end
+  end
+
+  @doc """
   Returns the total cost in USD for all messages in a session.
 
   Reads from the `sessions.total_cost_usd` cache column. Falls back to a
@@ -55,6 +76,18 @@ defmodule EyeInTheSky.Messages.Aggregations do
   # ---------------------------------------------------------------------------
   # Fallback aggregate scans (used only for pre-cache sessions)
   # ---------------------------------------------------------------------------
+
+  defp aggregate_usage_for_session(session_id) do
+    Message
+    |> where([m], m.session_id == ^session_id)
+    |> select([m], {
+      fragment(
+        "COALESCE(SUM(CAST(COALESCE(metadata->'usage'->>'input_tokens', '0') AS INTEGER) + CAST(COALESCE(metadata->'usage'->>'output_tokens', '0') AS INTEGER)), 0)"
+      ),
+      fragment("COALESCE(SUM(CAST(COALESCE(metadata->>'total_cost_usd', '0') AS FLOAT)), 0.0)")
+    })
+    |> Repo.one() || {0, 0.0}
+  end
 
   defp aggregate_cost_for_session(session_id) do
     Message

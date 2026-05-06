@@ -319,13 +319,11 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
             {tokens, cost}
 
           _ ->
-            {Messages.total_tokens_for_session(session_id),
-             Messages.total_cost_for_session(session_id)}
+            Messages.total_usage_for_session(session_id)
         end
 
       _ ->
-        {Messages.total_tokens_for_session(session_id),
-         Messages.total_cost_for_session(session_id)}
+        Messages.total_usage_for_session(session_id)
     end
   end
 end

@@ -223,6 +223,7 @@ defmodule EyeInTheSky.Messages do
   # Aggregation / status delegates
   # ---------------------------------------------------------------------------
 
+  defdelegate total_usage_for_session(session_id), to: Aggregations
   defdelegate total_cost_for_session(session_id), to: Aggregations
   defdelegate total_tokens_for_session(session_id), to: Aggregations
   defdelegate mark_processing(message_id), to: StatusManager

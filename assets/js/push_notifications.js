@@ -83,11 +83,16 @@ export const PushSetup = {
     // Web Push path and toggle the server-side notify_on_stop flag directly —
     // the Rust side turns it into a native macOS notification.
     if (document.documentElement.dataset.env === "tauri") {
-      this._setTauriState(false)
+      // Restore persisted state from localStorage (survives LiveView reconnects).
+      const stored = localStorage.getItem("eits:notify_on_stop")
+      const initial = stored === "true"
+      this._setTauriState(initial)
+      this._notifyServer(initial)
       this.el.addEventListener("click", () => {
         const enabled = this.el.dataset.pushState !== "enabled"
         this._setTauriState(enabled)
         this._notifyServer(enabled)
+        localStorage.setItem("eits:notify_on_stop", String(enabled))
       })
       return
     }

@@ -479,13 +479,12 @@ pub fn run() {
                 tauri::WindowEvent::Focused(true) => {
                     // When the main window gains focus (e.g. user clicked a notification),
                     // drain any pending navigation stored by send_notification.
+                    // on_window_event already runs on the main thread — call navigate_to
+                    // directly; run_on_main_thread from main thread deadlocks.
                     if window.label() == "main" {
                         if let Some(path) = take_pending_nav() {
                             let app = window.app_handle().clone();
-                            let app2 = app.clone();
-                            let _ = app.run_on_main_thread(move || {
-                                navigate_to(&app2, &path);
-                            });
+                            navigate_to(&app, &path);
                         }
                     }
                 }

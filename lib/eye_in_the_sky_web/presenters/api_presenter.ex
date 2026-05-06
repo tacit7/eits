@@ -81,6 +81,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       uuid: agent.uuid,
       description: agent.description,
       status: agent.status,
+      status_message: agent.status_message,
       project_id: agent.project_id,
       project_name: agent.project_name
     }

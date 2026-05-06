@@ -17,6 +17,7 @@ defmodule EyeInTheSky.Agents.Agent do
     field :description, :string
     field :feature_description, :string
     field :status, :string
+    field :status_message, :string
     field :bookmarked, :boolean, default: false
     field :git_worktree_path, :string
 
@@ -58,6 +59,7 @@ defmodule EyeInTheSky.Agents.Agent do
       :source,
       :description,
       :status,
+      :status_message,
       :bookmarked,
       :git_worktree_path,
       :parent_agent_id,

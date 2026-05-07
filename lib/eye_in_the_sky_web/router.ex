@@ -199,6 +199,7 @@ defmodule EyeInTheSkyWeb.Router do
     get "/sessions", SessionController, :index
     post "/sessions", SessionController, :create
     get "/sessions/:uuid", SessionController, :show
+    get "/sessions/:id/worker", SessionController, :worker_status
     patch "/sessions/:uuid", SessionController, :update
     post "/sessions/:uuid/end", SessionController, :end_session
     post "/sessions/:uuid/complete", SessionController, :complete

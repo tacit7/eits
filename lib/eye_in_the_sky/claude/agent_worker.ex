@@ -142,6 +142,14 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     )
   end
 
+  @doc "Returns true if an AgentWorker process is registered and alive for the given session_id."
+  def alive?(session_id) do
+    case Registry.lookup(@registry, {:session, session_id}) do
+      [{_pid, _}] -> true
+      [] -> false
+    end
+  end
+
   defp with_worker(session_id, fun, default) do
     case Registry.lookup(@registry, {:session, session_id}) do
       [{pid, _}] -> fun.(pid)

@@ -7,7 +7,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
 
   require Logger
 
-  alias EyeInTheSky.{Agents, Projects}
+  alias EyeInTheSky.{Agents, Projects, Sessions}
   alias EyeInTheSky.Agents.AgentManager.RecordBuilder
   alias EyeInTheSky.Agents.AgentManager.SessionBridge
   alias EyeInTheSky.Agents.AgentManager.SpawnParams
@@ -107,6 +107,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
     with {:ok, project_id, project_name} <- Projects.resolve_project(params),
          {:ok, team} <- SpawnTeamContext.resolve_team(params["team_name"]) do
       params = Map.merge(params, %{"project_id" => project_id, "project_name" => project_name})
+      params = maybe_derive_parent_agent_id(params)
 
       instructions =
         SpawnTeamContext.apply_context(params["instructions"], team, params["member_name"])
@@ -134,6 +135,23 @@ defmodule EyeInTheSky.Agents.AgentManager do
       end
     end
   end
+
+  defp maybe_derive_parent_agent_id(%{"parent_agent_id" => id} = params)
+       when not is_nil(id) and id != "",
+       do: params
+
+  defp maybe_derive_parent_agent_id(%{"parent_session_id" => parent_id} = params)
+       when not is_nil(parent_id) and parent_id != "" do
+    case Sessions.resolve(parent_id) do
+      {:ok, %{agent_id: agent_id}} when not is_nil(agent_id) ->
+        Map.put(params, "parent_agent_id", agent_id)
+
+      _ ->
+        params
+    end
+  end
+
+  defp maybe_derive_parent_agent_id(params), do: params
 
   @doc """
   Continues an existing session with a new prompt.

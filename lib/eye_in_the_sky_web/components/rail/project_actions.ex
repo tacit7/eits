@@ -167,19 +167,44 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
   # Called by handle_event("folder_picked") in rail.ex — payload comes from the
   # Tauri pick_folder JS bridge after the user selects a folder.
+  # If the path already exists as a project, switch to it rather than failing silently.
   def handle_folder_picked(%{"path" => path}, socket) do
     path = String.trim(path)
     name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
 
     case Projects.create_project(%{name: name, path: path}) do
-      {:ok, _} -> {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
-      {:error, _} -> {:noreply, socket}
+      {:ok, _} ->
+        {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+
+      {:error, changeset} ->
+        if path_taken?(changeset) do
+          # Path already exists — select the existing project.
+          case Projects.get_project_by_path(path) do
+            {:ok, project} ->
+              {:noreply,
+               socket
+               |> assign(:projects, Projects.list_projects_for_sidebar())
+               |> assign(:sidebar_project, project)}
+
+            {:error, _} ->
+              {:noreply, socket}
+          end
+        else
+          {:noreply, socket}
+        end
     end
   end
 
   # Empty payload = cancelled or no Tauri; show the inline text-input fallback.
   def handle_folder_picked(_params, socket),
     do: {:noreply, assign(socket, :new_project_path, "")}
+
+  defp path_taken?(%Ecto.Changeset{errors: errors}) do
+    Enum.any?(errors, fn
+      {:path, {_, opts}} -> opts[:constraint] == :unique
+      _ -> false
+    end)
+  end
 
   # Opens the given project in a new Tauri window. No-op in browser context
   # (the JS bridge guard prevents the invoke call from running).

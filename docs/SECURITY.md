@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-05-01
-Last updated: 2026-05-04 (Path traversal fixes, Claude/Codex env var blocking, dependency updates)
+Last updated: 2026-05-06 (Team authentication and project_id ownership checks)
 
 ## Authentication
 
@@ -38,6 +38,18 @@ All `/api/v1/*` routes (except webhooks and public settings) require a Bearer to
 - **Development validation**: Dev/test environments allow passthrough for convenience when no keys are configured.
 
 **Test coverage**: The `RequireAuth` plug has 18 tests covering missing headers, malformed headers (Basic/empty/no-token), unknown tokens, valid/expired DB API keys, env-var key matching, and 401 response shape. Located in `test/eye_in_the_sky_web/plugs/require_auth_test.exs`.
+
+#### Session Authentication via x-eits-session Header
+
+The `/api/v1/teams` and related endpoints support session authentication via the `x-eits-session` header as a fallback when Bearer token auth is unavailable:
+
+- **Header**: `x-eits-session: <session_id|uuid|agent_id>`
+- **Fallback chain** (checked in order):
+  1. Query parameters: `?session_id=<id>` or `?agent_id=<id>`
+  2. `x-eits-session` request header
+  3. Return `401 Unauthorized` if none present
+- **Use case**: eits CLI agents (spawned via `eits agents spawn`) attach this header to all requests; this allows agents to authenticate without passing parameters
+- **Resolution**: Session ID (integer) or UUID can be provided; agent IDs resolve to the agent's first active session
 
 #### Key Storage and Rotation
 
@@ -249,6 +261,38 @@ Hammer v7 with ETS backend, applied to the `:webauthn` and `:api` pipelines.
 ### Static File Serving
 
 `Plug.Static` is configured with an `only` allowlist: `~w(assets fonts images favicon.ico robots.txt sw.js manifest.json)`. The `uploads/` directory is deliberately excluded — uploaded files are stored in `priv/static/uploads/` but are not served via HTTP.
+
+### Team Access Control
+
+Teams are scoped to projects. Unauthorized access to teams from different projects is prevented at two layers:
+
+#### API Layer (`TeamController`)
+
+All team endpoints require authentication and validate project scope:
+
+- **Authentication**: Requires `session_id`, `agent_id`, or `x-eits-session` header (see "Session Authentication via x-eits-session Header" above)
+- **Project scope enforcement**: All endpoints validate that `team.project_id == requester_session.project_id`
+- **Responses**:
+  - `401 Unauthorized` — no authenticated session provided
+  - `403 Forbidden` — team belongs to a different project or global team (nil `project_id`) accessed via project-scoped route
+- **Endpoints protected**: `/api/v1/teams` (index, show, create), `/api/v1/teams/:id` (update, delete), `/api/v1/teams/:team_id/members` (list, join, leave, update)
+
+**Example**: An agent in project A cannot list teams from project B. Attempting `GET /api/v1/teams?project_id=2` when the agent belongs to project 1 returns `403 Forbidden: "Access denied: team does not belong to your project"`.
+
+#### LiveView Layer (`TeamShow`)
+
+The `ProjectLive.TeamShow` component (UI for viewing team details) enforces project ownership on mount:
+
+- **Check**: `if project && (!team.project_id || team.project_id != project.id)`
+- **Rejection**: Cross-project team access returns `team: nil` and displays "Team not found"
+- **Protection**: Prevents URL manipulation attacks (e.g., `/projects/A/teams/B` where team B belongs to project C)
+
+**Test coverage**: 5 tests in `test/eye_in_the_sky_web/live/project_live/team_show_test.exs` verify:
+- Successful access to team within correct project
+- Rejection of cross-project team access (main vulnerability)
+- Rejection of global teams (nil `project_id`) via project route
+- Correct back link navigation
+- 404 for non-existent teams
 
 ## Input Validation
 

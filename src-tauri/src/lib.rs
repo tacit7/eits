@@ -579,19 +579,36 @@ fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
             return;
         }
     };
-    match tauri::WebviewWindowBuilder::new(
+    let window = match tauri::WebviewWindowBuilder::new(
         app_handle,
         &label,
         tauri::WebviewUrl::External(parsed_url),
     )
     .title("Eye in the Sky")
+    .title_bar_style(tauri::TitleBarStyle::Overlay)
+    .hidden_title(true)
     .inner_size(1280.0, 800.0)
     .devtools(true)
     .build()
     {
-        Ok(_) => {}
-        Err(e) => log!("[eits-tauri] open_new_window: failed to create {label}: {e}"),
+        Ok(w) => w,
+        Err(e) => {
+            log!("[eits-tauri] open_new_window: failed to create {label}: {e}");
+            return;
+        }
+    };
+
+    // Match main window vibrancy — frosted-glass sidebar effect.
+    #[cfg(target_os = "macos")]
+    {
+        use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+        if let Err(e) = apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None) {
+            log!("[eits-tauri] open_new_window: vibrancy failed (non-fatal): {e}");
+        }
     }
+
+    // Mark the document so CSS rules gated on data-tauri-overlay apply.
+    let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
 }
 
 fn route_deep_link(app_handle: &tauri::AppHandle, url_str: &str) {
@@ -842,15 +859,19 @@ fn install_iam_hooks(port: &str) {
 // ---------------------------------------------------------------------------
 
 /// Opens a native folder picker dialog and returns the selected path, or null
-/// if the user cancelled.  The dialog runs on the main thread internally via
-/// the plugin; we make the command async so Tauri spawns it off the WebKit
-/// thread and avoids blocking the webview.
+/// if the user cancelled.  Uses a oneshot channel so the tokio thread never
+/// blocks — the dialog callback fires on the main thread, sends the result,
+/// and the async command awaits it.
 #[tauri::command]
 async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
     use tauri_plugin_dialog::DialogExt;
-    app.dialog()
-        .file()
-        .blocking_pick_folder()
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |result| {
+        let _ = tx.send(result);
+    });
+    rx.await
+        .ok()
+        .flatten()
         .and_then(|p| p.into_path().ok())
         .and_then(|p| p.to_str().map(|s| s.to_string()))
 }

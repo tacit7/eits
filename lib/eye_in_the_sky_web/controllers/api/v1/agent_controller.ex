@@ -131,7 +131,12 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
           conn |> put_status(:bad_request) |> json(%{error_code: code, message: message})
 
         {:error, {:worktree_setup_failed, reason}} ->
-          msg = if is_binary(reason), do: String.trim(reason), else: inspect(reason)
+          msg =
+            case reason do
+              bin when is_binary(bin) -> String.trim(bin)
+              {_code, bin} when is_binary(bin) -> String.trim(bin)
+              other -> inspect(other)
+            end
 
           conn
           |> put_status(:unprocessable_entity)

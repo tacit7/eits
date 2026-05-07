@@ -29,11 +29,33 @@ defmodule EyeInTheSky.Git.Worktrees do
       Logger.info("prepare_session_worktree: reusing existing worktree at #{wt_path}")
       {:ok, wt_path}
     else
-      with :ok <- maybe_stash(project_path, opts),
+      with :ok <- check_stale_worktree(project_path, worktree_name),
+           :ok <- maybe_stash(project_path, opts),
            :ok <- check_clean_working_tree(project_path),
            :ok <- ensure_git_worktree(project_path, wt_path, branch) do
         {:ok, wt_path}
       end
+    end
+  end
+
+  defp check_stale_worktree(project_path, worktree_name) do
+    branch = "worktree-#{worktree_name}"
+
+    case System.cmd("git", ["-C", project_path, "worktree", "list", "--porcelain"],
+           stderr_to_stdout: true
+         ) do
+      {output, 0} ->
+        if String.contains?(output, "branch refs/heads/#{branch}") do
+          {:error,
+           {:worktree_conflict,
+            "worktree \"#{worktree_name}\" has a stale git entry (branch #{branch} still registered). " <>
+              "Run `git worktree prune` in #{project_path} to clean up, then retry."}}
+        else
+          :ok
+        end
+
+      _ ->
+        :ok
     end
   end
 

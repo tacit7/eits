@@ -328,25 +328,49 @@ Import failures are surfaced via telemetry metrics and the `IndexHealth` health 
 
 ---
 
-## Real-Time Updates
+## Real-Time Updates & Message Streaming
 
 **PubSub subscriptions:**
 - `agents` — monitor all agent state changes
 - `session:<current_session_id>:status` — monitor current session
 - `messages:<session_id>` — incoming messages from agent
 
-**Message broadcasting:**
-- On every message: `{:message_added, message}` to `session:<id>:status` topic
-- Includes full message object with tokens, type, content
-- Broadcast triggered by `NotifyListener` (Postgres LISTEN/NOTIFY) instead of polling
+**Message broadcasting and append flow (commit 54b88121):**
 
-**Handler:**
+Instead of debouncing and reloading all N messages on every PubSub event, the DM page now appends individual messages:
+- `{:new_message, msg}` and `{:new_dm, msg}` PubSub handlers call `MessageHandlers.append_message_from_pubsub/2`
+- `append_message_from_pubsub/2` deduplicates by message id (handles same message arriving via both `force_reload_messages` and PubSub)
+- Preloads `:attachments` before appending (prevents crash in `message_attachments` template when `attachments != []` guard fails)
+- Cancels any pending debounced reload timer to prevent a stale `:do_message_reload` from clobbering the append
+- `{:new_message}` also clears `:stream_content` so the live-stream bubble collapses when the agent reply is persisted
+- `{:new_dm}` does not clear it (inbound DM from another session should not dismiss an in-progress stream)
+
+**Grouped message streaming (commit 2e49205f):**
+
+The DM page streams the *output* of `MessageGrouper.group_events/1` (clusters + message rows) rather than raw Message structs:
+- `MessageGrouper` module groups consecutive tool messages into clusters and renders standalone messages separately
+- Stream item shape: `{:message, msg, prev_role}` or `{:cluster, [events], meta}`
+- Stream ids use `"msg-row-<id>"` and `"cluster-row-<id>"` to avoid collision with component-internal ids (`dm-message-<id>`, `cluster-<id>`)
+- `TabHelpers.init_stream(:grouped_messages, ...)` in `load_messages_only` and `load_tab_data("messages")`
+- `MessageHandlers.append_message_from_pubsub/2` calls `MessageGrouper.diff_tail/2` and `stream_insert` only the changed rows (typically 1)
+- `MessagesTab` LC drops `@messages` attr; template uses `phx-update="stream"` container with `@streams.grouped_messages`
+- Empty state keyed on boolean `@empty` attr computed inline
+
+**Last stream tail cache (commit 010cc8df):**
+
+To avoid re-grouping the full tail on every PubSub append:
+- `append_message_from_pubsub/2` reads `@last_stream_tail` from socket assigns instead of re-grouping the old tail from scratch
+- `diff_from_cached_tail/2` computes the new tail and returns only changed rows in one pass
+- `load_messages_only` and `load_tab_data` reset `@last_stream_tail` after each stream reset so the cache stays coherent with stream state
+- `diff_tail/2` delegates to `diff_from_cached_tail/2` internally
+
+**Message handler:**
 ```elixir
-def handle_info({:message_added, message}, socket) do
-  # Update messages stream
+def handle_info({:new_message, message}, socket) do
+  # Append via MessageGrouper.diff_tail → stream_insert (O(1) changed rows)
   # Update token count display
-  # Scroll to newest message
-  {:noreply, update_view(socket, message)}
+  # Auto-scroll to newest message (ResizeObserver in AutoScroll hook)
+  {:noreply, append_and_update(socket, message)}
 end
 ```
 
@@ -791,7 +815,7 @@ DM from:<agent_name> (session:<uuid>) <message body>
 
 **Component:** `lib/eye_in_the_sky_web/components/dm_page/composer.ex`
 
-The DM composer is the message input area at the bottom of the DM page, with context display, format toolbar, and inline autocomplete.
+The DM composer is the message input area at the bottom of the DM page, with context display, context meter, format toolbar, and inline autocomplete.
 
 ### Composer Layout and Context (commit 81ca01cf)
 
@@ -809,6 +833,36 @@ The DM composer is the message input area at the bottom of the DM page, with con
 - **Send ↵** — Text label (was icon-only arrow) with `h-7` height consistency
 - **Queue button** — Text label + pill styling (`h-6` model/effort pills)
 - **Stop button** — Paired with queue button for in-progress sessions
+
+### Context Meter Widget (commit 761b7c85)
+
+**Display:** 10-cell segmented bar showing context window usage percentage.
+
+**Features:**
+- **Segmented bar:** 10 cells, each representing ~10% of the session context window
+- **Visual feedback:** Cells fill proportionally based on current context usage (system prompt + conversation + files)
+- **Clickable:** Click to open a popover with detailed breakdown
+
+**Popover contents:**
+- **3-segment breakdown:** System prompt size, conversation size, files size (each with bytes and percentage)
+- **Token count:** Total tokens used in the session
+- **Session cost:** Estimated cost in USD based on model pricing
+- **Action buttons:**
+  - `/compact` — Launch the compact flow to consolidate conversation
+  - `/clear` — Clear conversation history (system prompt retained)
+
+**Context window detection (commit cde249cb):**
+- Models with `-1m` suffix (e.g., `claude-opus-4-6-1m`) are detected and use 1,000,000 token context window
+- Otherwise defaults to 200,000 tokens
+- Detection checks for `[1m]` in the model key and applies to both warning logs and context meter calculation
+
+**Overlay pattern:**
+- Uses existing `active_overlay` pattern with `:context_meter` as the overlay ID
+- Styled with DaisyUI popover for consistent UI
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/components/dm_page/composer.ex` — context meter bar and popover
+- `lib/eye_in_the_sky_web/live/dm_live/tab_helpers.ex` — context calculation and 1M window detection
 
 ### Format Toolbar
 
@@ -1154,9 +1208,31 @@ DM messages and tool call/output blocks expose a clipboard icon on hover for one
 
 ---
 
+## DM Stream: PreserveDetails Hook
+
+**Commit:** `43bef912`
+
+The `PreserveDetails` JS hook preserves the open state of tool cluster `<details>` elements across LiveView patches.
+
+**Problem:** When new tool events arrive, morphdom updates the cluster content (count, event list) correctly, but morphdom also reconciles the `open` attribute against server HTML (never rendered with `open`), collapsing any expanded cluster.
+
+**Solution:** PreserveDetails hooks snapshots `this.el.open` in `beforeUpdate()` and restores it in `updated()` — two lines, no state outside the hook instance.
+
+**Wire it on the `<details>` element:**
+```heex
+<details id={"cluster-#{first_id}"} phx-hook="PreserveDetails">
+```
+
+**Files:**
+- `assets/js/app.js` — hook registration
+- `assets/js/hooks/preserve_details.js` — implementation
+- `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex` — wiring on tool_cluster
+
+---
+
 ## Auto-Scroll Across LiveView Patches
 
-**Commits:** `08fdbac0`, `fd56f6fd`
+**Commits:** `08fdbac0`, `fd56f6fd`, `4462d2b8`
 
 The `AutoScroll` hook preserves the auto-scroll behavior when the DM message list DOM is rebuilt during LiveView patches and handles content growth after mount.
 
@@ -1176,8 +1252,13 @@ The `AutoScroll` hook preserves the auto-scroll behavior when the DM message lis
 - Solution: Added a `ResizeObserver` on the container and its children. While `shouldAutoScroll` is true, the observer snaps to bottom whenever scrollHeight changes
 - User scroll-up still wins — observer only acts when `shouldAutoScroll` is already true
 
+**Performance optimization (4462d2b8):**
+- Removed dead `_loadingMore` flag tracking
+- Replaced O(n) child iteration with `MutationObserver` to detect content changes
+- Eliminates expensive DOM queries on every message append; observer fires only when DOM changes
+
 **Files:**
-- `assets/js/hooks/auto_scroll.js` — `beforeUpdate`, `updated`, scroll listener, and `ResizeObserver` logic
+- `assets/js/hooks/auto_scroll.js` — `beforeUpdate`, `updated`, scroll listener, MutationObserver logic
 
 ---
 
@@ -1216,12 +1297,14 @@ effective = JsonSettings.effective_settings(agent_overrides, session_overrides)
 - Each setting has: type (bool/string/number), default value, namespace, and allowed scopes
 - Schema.defaults provides the base map for all settings
 
-**Event handlers (commit c0550615):**
+**Event handlers (commits c0550615, e1ca21ea):**
 
-`DmLive` handlers now persist settings to the scoped record:
-- `dm_setting_update/4` — coerce value via `JsonSettings.coerce_value/3`, persist via `Sessions.put_setting/3` or `Agents.put_setting/3`, update assigns with fresh effective settings
-- `reset_dm_settings/3` — clear overrides via `Sessions.reset_settings/1` or `Agents.reset_settings/1`, update assigns
-- Error handling: friendly flash messages on bad input (invalid type, enum mismatch, scope violation)
+Settings handlers were extracted into a dedicated `SettingsHandlers` module (commit e1ca21ea) to reduce DmLive size:
+- `SettingsHandlers.persist_setting_update/4` — coerce value via `JsonSettings.coerce_value/3`, persist via `Sessions.put_setting/3` or `Agents.put_setting/3`, update assigns with fresh effective settings
+- `SettingsHandlers.reset_scoped_settings/3` — clear overrides via `Sessions.reset_settings/1` or `Agents.reset_settings/1`, update assigns
+- `SettingsHandlers.build_settings_assigns/2` — compute effective settings and build all three levels of assigns
+- `SettingsHandlers.format_setting_error/2` — render friendly flash messages on bad input (invalid type, enum mismatch, scope violation)
+- `DmLive` thin one-line handlers delegate to SettingsHandlers; `dm_live.ex` reduced from 746 to 631 lines
 
 **Mount initialization (commit c0550615):**
 
@@ -1238,9 +1321,44 @@ effective = JsonSettings.effective_settings(agent_overrides, session_overrides)
 - `lib/eye_in_the_sky/sessions.ex` — Sessions context gains put_setting, delete_setting, reset_settings, reset_settings_namespace
 - `lib/eye_in_the_sky/agents.ex` — Agents context gains put_setting, delete_setting, reset_settings, reset_settings_namespace
 - `lib/eye_in_the_sky_web/components/dm_page/settings_tab.ex` — settings UI component
-- `lib/eye_in_the_sky_web/live/dm_live.ex` — event handlers (dm_setting_update, reset_dm_settings)
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — thin event handlers delegating to SettingsHandlers
+- `lib/eye_in_the_sky_web/live/dm_live/settings_handlers.ex` — settings persistence and helpers
 - `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — initialization with effective settings computation
 - `priv/repo/migrations/20260504112139_add_settings_to_sessions_and_agents.exs` — migration adding settings JSONB columns
+
+---
+
+## DM Component Refactoring
+
+**Commits:** `6826708f`, `e1ca21ea`
+
+### Module Extraction and Organization
+
+**M2a: Tool widget extraction (6826708f)**
+- Moved `tool_widget`, `tool_result_body`, `tool_widget_body` functions from `dm_message_components.ex` to new sub-module `dm_message_components/tool_widget.ex`
+- Parent imports the new sub-module for cleaner organization
+- Reduces main component file size without losing functionality
+
+**M2b: Prompt queue extraction (6826708f)**
+- Moved `prompt_queue/1` from `composer.ex` to new sub-module `composer/prompt_queue.ex`
+- Composer delegates via `defdelegate` for transparent integration
+
+**M3: Duplicate extract in dm_page (6826708f)**
+- Extracted private `messages_tab_content/1` function in `dm_page.ex`
+- Both "messages" and catch-all branches now call the single component instead of duplicating the attribute list
+- Improves maintainability by centralizing attribute list
+
+**L3: Crash guard on empty events (6826708f, e1ca21ea)**
+- Added empty-list guard clause on `tool_cluster/1` in `messages_tab.ex`
+- Prevents `List.first(@events).id` crash when events is `[]`
+- Handles edge case where cluster is created with no events
+
+**M5: Stream content guard (e1ca21ea)**
+- Guard `stream_content` clear in `:do_message_reload` — only clear when `show_live_stream` is false or stream_content is already empty
+- Prevents in-flight stream bubbles from being dismissed by a reload trigger
+- Preserves ongoing live-stream display across message reloads
+
+**Result:** DmLive reduced from 746 to 631 lines; improved code organization and reusability.
 
 ---
 
@@ -1728,9 +1846,58 @@ Two performance improvements reduce unnecessary DB queries and computations on p
 
 **LiveView:** `lib/eye_in_the_sky_web_web/live/note_live/new.ex`
 **Full Editor Hook:** `assets/js/hooks/note_full_editor.js`
-**Notes Contexts:** `lib/eye_in_the_sky_web_web/live/overview_live/notes.ex`, `lib/eye_in_the_sky_web_web/live/project_live/notes.ex`
+**Notes Contexts:** `lib/eye_in_the_sky_web_web/live/overview_live/notes.ex`, `lib/eye_in_the_sky_web_web/live/project_live/notes.ex`, `lib/eye_in_the_sky_web_web/live/dm_live.ex`
 
-### Quick Note Modal
+### Create Note on DM Page (commit 33931330)
+
+**Trigger:** "Create Note" button on the DM page Notes tab (visible when notes empty or exist).
+
+**Features:**
+- **Modal dialog** for creating notes with optional title and required body
+- **Title input**: Auto-focused placeholder, optional
+- **Body textarea**: Rich text area for note content
+- **Modal controls**: Escape key or cancel button closes modal
+
+**Flow:**
+1. User clicks "Create Note" button on DM Notes tab
+2. Modal opens with focus on title input
+3. User enters optional title and required body
+4. Submit button creates note via `create_dm_note` event handler
+5. Modal closes and notes list refreshes automatically
+6. Note appears in DM Notes tab with session context
+
+**Parent Type Resolution:**
+- **DM page notes**: Creates with `parent_type: "session"`, `parent_id: <session.id>`
+- Notes are scoped to the current DM session
+
+**Success/Error Feedback:**
+- Success: "Note created" flash message; notes tab reloads automatically
+- Error: "Failed to create note" flash message displays error details
+
+**Implementation:**
+```elixir
+# DmLive event handler
+def handle_event("create_dm_note", %{"title" => title, "body" => body}, socket) do
+  case Notes.create_note(%{
+    parent_type: "session",
+    parent_id: socket.assigns.session.id,
+    title: title,
+    body: body,
+    starred: false
+  }) do
+    {:ok, _note} ->
+      socket
+      |> put_flash(:info, "Note created")
+      |> assign(:show_create_note_modal, false)
+      |> load_tab_data("notes", socket.assigns.session.id)
+      |> {:noreply, _}
+    {:error, _changeset} ->
+      put_flash(socket, :error, "Failed to create note")
+  end
+end
+```
+
+### Quick Note Modal (Overview & Project Pages)
 
 **Trigger:** "Quick Note" button in notes list (available on overview and project notes pages).
 

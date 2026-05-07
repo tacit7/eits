@@ -161,15 +161,11 @@ eits tasks create --title "Research X" --description "Details" --team <team_id>
 
 ### 4. Get orchestrator IDs
 
-`$EITS_SESSION_ID` (integer) is set reliably by the startup hook — use it directly. `--parent-session-id` accepts both integer and UUID. `ORC_AGENT_ID` still requires a psql lookup (no env var):
-
-```bash
-ORC_AGENT_ID=$(psql -d eits_dev -t -c "SELECT a.id FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$EITS_SESSION_UUID'" | tr -d ' ')
-```
+`$EITS_SESSION_ID` (integer) and `$EITS_AGENT_ID` (integer) are both set by the startup hook — use them directly. No psql lookup needed.
 
 ### 5. Spawn agents
 
-Always include `parent_session_id` and `parent_agent_id` for proper session hierarchy. Use `--interpolate-env` whenever instructions reference `$EITS_SESSION_ID` or other env vars — without it the agent receives the literal string `"$EITS_SESSION_ID"`, not the integer:
+Pass `--parent-session-id` only — the server derives `parent_agent_id` from the parent session automatically. Use `--interpolate-env` whenever instructions reference `$EITS_SESSION_ID` or other env vars — without it the agent receives the literal string `"$EITS_SESSION_ID"`, not the integer:
 
 ```bash
 eits agents spawn \
@@ -178,8 +174,7 @@ eits agents spawn \
   --model sonnet \
   --team-name my-team \
   --member-name researcher \
-  --parent-session-id $EITS_SESSION_ID \
-  --parent-agent-id $ORC_AGENT_ID
+  --parent-session-id $EITS_SESSION_ID
 ```
 
 **Each agent must have a unique `--worktree` name.** Duplicate names cause the second spawn to fail at the git layer with a confusing error.
@@ -303,15 +298,14 @@ eits teams join <team_id> --name "orchestrator" --role admin --session $EITS_SES
 eits tasks create --title "Research Claude CLI flags" --team <team_id>
 eits tasks create --title "Write README from research" --team <team_id>
 
-# 4. Get IDs — $EITS_SESSION_ID is integer, set by startup hook
-ORC_AGENT_ID=$(psql -d eits_dev -t -c "SELECT a.id FROM agents a JOIN sessions s ON s.agent_id = a.id WHERE s.uuid = '$EITS_SESSION_UUID'" | tr -d ' ')
+# 4. No lookup needed — $EITS_SESSION_ID and $EITS_AGENT_ID are set by the startup hook
 
 # 5a. Spawn researcher first
 eits agents spawn \
   --interpolate-env \
   --instructions "Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. Run mix compile. DM back to $EITS_SESSION_ID when done." \
   --model sonnet --team-name docs-team --member-name researcher \
-  --parent-session-id $EITS_SESSION_ID --parent-agent-id $ORC_AGENT_ID
+  --parent-session-id $EITS_SESSION_ID
 
 # 6a. Wait for researcher
 eits teams status <team_id> --wait
@@ -321,7 +315,7 @@ eits agents spawn \
   --interpolate-env \
   --instructions "Read /tmp/research.md and write docs/README.md. team_id: <team_id>. Run mix compile. DM back to $EITS_SESSION_ID when done." \
   --model sonnet --team-name docs-team --member-name writer \
-  --parent-session-id $EITS_SESSION_ID --parent-agent-id $ORC_AGENT_ID
+  --parent-session-id $EITS_SESSION_ID
 
 # 6b. Wait for writer
 eits teams status <team_id> --wait

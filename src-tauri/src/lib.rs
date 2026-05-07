@@ -212,18 +212,6 @@ pub fn run() {
             });
 
 
-            // --- Global shortcut: Cmd+Shift+E to show/focus window ---
-            // Intentionally global — this is a "summon" shortcut designed to
-            // bring the app to the front from any context. Gating on focus
-            // would make it a no-op when the window is hidden.
-            let shortcut = "CmdOrCtrl+Shift+E".parse::<Shortcut>()?;
-            let app_handle_shortcut = app.handle().clone();
-            app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    show_window(&app_handle_shortcut);
-                }
-            })?;
-
             // --- Global shortcut: Cmd+Option+I to open Web Inspector ---
             // Focus-gated: only fires when the main window is the active window.
             let devtools_shortcut = "CmdOrCtrl+Alt+I".parse::<Shortcut>()?;

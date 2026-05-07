@@ -3705,6 +3705,7 @@ cmd_me() {
   printf '  Session UUID : %s\n' "${EITS_SESSION_UUID:-(not set)}"
   printf '  Session ID   : %s\n' "${EITS_SESSION_ID:-(not set)}"
   printf '  Agent UUID   : %s\n' "${EITS_AGENT_UUID:-(not set)}"
+  printf '  Agent ID     : %s\n' "${EITS_AGENT_ID:-(not set)}"
   printf '  Project ID   : %s\n' "${EITS_PROJECT_ID:-(not set)}"
   printf '  API URL      : %s\n' "${BASE_URL}"
 
@@ -3712,6 +3713,7 @@ cmd_me() {
   printf '\n── Tracking Status ──────────────────────────────────────────\n'
   [[ -n "${EITS_SESSION_UUID:-}" ]]  && printf '  %s Session UUID set\n' "$ok" || printf '  %s Session UUID NOT set — work may be untracked\n' "$fail"
   [[ -n "${EITS_AGENT_UUID:-}" ]]    && printf '  %s Agent UUID set\n'   "$ok" || printf '  %s Agent UUID NOT set — commits/sessions may not link\n' "$fail"
+  [[ -n "${EITS_AGENT_ID:-}" ]]      && printf '  %s Agent ID set\n'     "$ok" || printf '  %s Agent ID NOT set — --parent-agent-id spawns require psql lookup\n' "$fail"
   [[ -n "${EITS_PROJECT_ID:-}" ]]    && printf '  %s Project ID set\n'   "$ok" || printf '  %s Project ID NOT set — tasks will be unscoped\n' "$fail"
 
   # ── session intent ────────────────────────────────────────────────────────

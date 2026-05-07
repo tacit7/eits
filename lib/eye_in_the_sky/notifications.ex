@@ -84,6 +84,7 @@ defmodule EyeInTheSky.Notifications do
 
         with {:ok, updated} <- result do
           broadcast(:notification_read, updated.id)
+          sync_dock_badge()
         end
 
         result
@@ -97,6 +98,7 @@ defmodule EyeInTheSky.Notifications do
       |> Repo.update_all(set: [read: true])
 
     broadcast(:notifications_updated)
+    sync_dock_badge()
     {:ok, count}
   end
 

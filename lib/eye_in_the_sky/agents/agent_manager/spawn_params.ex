@@ -1,11 +1,14 @@
 defmodule EyeInTheSky.Agents.AgentManager.SpawnParams do
   @moduledoc "Builds keyword opts for create_agent from raw HTTP spawn params."
 
+  @months ~w(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
+
   # Name resolution priority:
   # 1. Explicit "name" param (trimmed, non-empty)
   # 2. "member_name @ team_name" when both present
   # 3. "member_name" alone
-  # 4. First 250 chars of instructions (or "Agent session" fallback)
+  # 4. Agent definition slug (e.g. "setup-guardian")
+  # 5. Datetime stamp "May 7 14:23:45" fallback
   def resolve_session_name(%{"name" => name} = params, team)
       when is_binary(name) and name != "" do
     case String.trim(name) do
@@ -20,14 +23,22 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnParams do
 
     if member,
       do: "#{member} @ #{team_name}",
-      else: String.slice(params["instructions"] || "Agent session", 0, 250)
+      else: params["agent"] || timestamp_name()
   end
 
   def resolve_session_name(%{"member_name" => member}, _team) when is_binary(member),
     do: member
 
   def resolve_session_name(params, _team),
-    do: String.slice(params["instructions"] || "Agent session", 0, 250)
+    do: params["agent"] || timestamp_name()
+
+  defp timestamp_name do
+    %{month: m, day: d, hour: h, minute: min, second: s} = DateTime.utc_now()
+    month = Enum.at(@months, m - 1)
+    "#{month} #{d} #{zero_pad(h)}:#{zero_pad(min)}:#{zero_pad(s)}"
+  end
+
+  defp zero_pad(n), do: String.pad_leading(Integer.to_string(n), 2, "0")
 
   def build(params, team) do
     name = resolve_session_name(params, team)

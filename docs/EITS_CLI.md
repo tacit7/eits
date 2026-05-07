@@ -338,6 +338,9 @@ eits agents list [--project <id>] [--status <status>] [--limit <n>]
 
 eits agents get <id>
 
+eits agents update <uuid|id> [--status <s>] [--status-message <text>]
+# Update agent status and/or status message. At least one flag is required.
+
 eits agents defs [--query <q>] [--project <id>]
 # List agent definitions (markdown files in .claude/agents/)
 # --query: filter definitions by name
@@ -345,6 +348,8 @@ eits agents defs [--query <q>] [--project <id>]
 ```
 
 **`agents defs` details**: Lists all agent definitions from the `.claude/agents/` directory. Each definition shows the agent name and a truncated description (max 500 chars, ending at the first period). Use `--query` to filter by agent name pattern. Useful for discovering available agents before spawning.
+
+**`agents update` details**: Updates an agent's status and/or status_message. Both flags are optional, but at least one must be provided. Accepts either UUID or numeric agent ID.
 
 ```bash
 eits agents spawn --instructions <text> | --instructions-file <path> \
@@ -367,7 +372,11 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Worktree cleanup**: `--stash-if-dirty` auto-stashes uncommitted changes before worktree creation (instead of failing with dirty_working_tree error).
 
-**Team joining**: `--team-name` (by name) or `--team-id` (by integer ID, mutually exclusive). `--team-id` is resolved to team name via GET /teams/:id.
+**Team joining**: `--team-name` (by name) or `--team-id` (by integer ID, mutually exclusive). `--team-id` is resolved to team name via GET /teams/:id. If `--team-id` is not found, spawn prints a warning to stderr and continues without team assignment.
+
+**Worktree conflict detection**: When `--worktree` is specified, spawn checks if dangling worktrees are registered (via `git worktree list`). If found, warns to stderr suggesting `git worktree prune` to avoid name conflicts with merged branches.
+
+**Summary output**: Spawn emits a final compact JSON summary as the last line of output. This enables reliable extraction of spawn results via `| tail -1 | jq .session_uuid` even when other verbose output precedes it. The summary includes `session_id`, `session_uuid`, `agent_id`, `worktree_path`, and `branch_name` (null fields omitted).
 
 **Sandbox**: `--yolo` bypasses sandbox restrictions. `--provider codex` defaults `bypass_sandbox` to true (can be overridden with explicit flags if needed).
 
@@ -435,12 +444,13 @@ eits jobs delete <id>
 ## dm
 
 ```bash
-eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--json]
-eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--json]
+eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json]
+eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json]
 # List inbound DMs for a session (CLI-side inbox polling)
 # inbox is an alias for list
 # --from: filter by sender (optional)
 # --since: return only messages inserted after ISO8601 timestamp (optional)
+# --since-session: filter to DMs received since this session started (suppresses stale DMs from prior resume sessions)
 
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
 # Send a direct message to an agent session
@@ -449,6 +459,8 @@ eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--re
 Both `--from` and `--to` accept either an integer session ID or a session UUID. `--from` defaults to `$EITS_SESSION_UUID` or `$EITS_SESSION_ID`.
 
 `--since` filters messages by insertion timestamp (ISO8601 format, e.g., `2026-04-30T12:00:00Z`). Useful for orchestrators polling for new replies without diffing the full inbox.
+
+`--since-session` automatically filters to DMs received since the current session started (resolves the session's `created_at` timestamp from the API). This suppresses stale DMs from prior sessions that may replay when resuming. If the session's creation timestamp cannot be resolved, a warning is printed to stderr and all DMs are returned.
 
 ---
 
@@ -568,9 +580,11 @@ eits teams members <id>
 eits teams join <team_id> --name <alias> [--role <member|admin>] \
   [--session <uuid|id>] [--agent <uuid>]
 
-eits teams status <id> [--wait] [--json]
+eits teams status <id> [--wait] [--json] [--summary]
 # Default: formatted summary with member status, session state, and current task
+# On bare invocation (no flags), prints a hint to stderr suggesting --wait for blocking until members are done
 # --wait: block until all members reach done or spawn_failed (polls every 5s)
+# --summary: print concise member counts by state (working, idle, done, failed, spawn_failed)
 # --json / --raw: output raw JSON instead of formatted text (useful for scripting)
 
 eits teams update-member <team_id> <member_id> --status <s>

@@ -331,17 +331,53 @@ Oban in production uses `Oban.Notifiers.PG` for real-time job notification via `
 
 ## 11. CLI Tools
 
-The `scripts/eits` script provides shell access to the REST API.
+The `scripts/eits` script provides shell access to the REST API. It requires two env vars and a PATH update:
+- `EITS_URL` — REST API endpoint
+- `EITS_API_KEY` — authentication token (optional in dev with no key set)
+- `PATH` — must include `scripts/` directory
 
-**Add to PATH** (add to `~/.zshrc`):
+### Option A: Via .claude/settings.local.json (Recommended in Claude Code)
+
+Claude Code can inject env vars automatically via `settings.local.json`. Create the file in the project root:
 
 ```bash
-export PATH="$HOME/projects/eits/web/scripts:$PATH"
+cat > .claude/settings.local.json <<'EOF'
+{
+  "env": {
+    "PATH": "/Users/urielmaldonado/projects/eits/web/scripts:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "EITS_URL": "http://localhost:5001/api/v1"
+  }
+}
+EOF
+```
+
+**Important:**
+- `settings.local.json` is **gitignored** — each developer creates it locally with their own machine paths
+- `settings.json` (committed to git) should NOT contain machine-specific vars like `PATH` or `EITS_URL`
+- Claude Code reads this file at session start and injects these vars into every Bash call automatically
+- Replace the PATH value with your actual machine PATH if needed; the above is typical for macOS
+
+This avoids polluting your shell configuration and keeps EITS env vars scoped to Claude Code sessions only.
+
+### Option B: Via ~/.zshrc (Traditional Shell Setup)
+
+If you want the env vars available in all shell sessions (not just Claude Code), add to `~/.zshrc`:
+
+```bash
+export PATH="/Users/urielmaldonado/projects/eits/web/scripts:$PATH"
 export EITS_API_KEY="<generated-key>"
 export EITS_URL="http://localhost:5001/api/v1"
 ```
 
-**Usage:**
+Then reload:
+
+```bash
+source ~/.zshrc
+```
+
+### Usage
+
+Once configured, use the `eits` CLI:
 
 ```bash
 eits projects list
@@ -352,7 +388,7 @@ eits notes create --parent-type session --parent-id <uuid> --body "finding"
 eits dm --from agent-1 --to <session_uuid> --message "hello"
 ```
 
-Requires `curl` and `jq`.
+Requires `curl` and `jq` to be installed system-wide.
 
 ---
 

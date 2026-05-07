@@ -19,7 +19,7 @@ eits teams get <id|name>
 eits teams create --name <name> [--description <desc>] [--project <id>]
 eits teams delete <id>
 eits teams members <id>
-eits teams join <team_id> --name <alias> [--role lead|member] [--session <uuid>]
+eits teams join <team_id> --name <alias> [--role member|admin] [--session <uuid>]
 eits teams status <id> [--wait] [--watch [<n>]] [--json]
 # --wait   blocks until all members have member_status=done/spawn_failed (polls every 5s)
 #          exits 0 when all done, 1 if any spawn_failed
@@ -43,7 +43,7 @@ eits agents spawn \
   --member-name researcher
 ```
 
-Only `--instructions` is required. `--project-id` is inherited from parent session automatically — do not pass it.
+Only `--instructions` is required. Always pass `EITS_PROJECT_ID` explicitly in instructions or via `--interpolate-env` — it is NOT inherited from the parent session in Claude agent environments.
 
 `--team-name` and `--team-id` are mutually exclusive. Use `--team-id` when you have the integer ID and don't know the name — it resolves automatically via the teams API.
 
@@ -147,7 +147,7 @@ eits teams create --name "my-team" --description "What this team is doing" --pro
 Always pass `--session` explicitly — auto-resolve can silently produce NULL and break the DM link in the Teams UI:
 
 ```bash
-eits teams join <team_id> --name "orchestrator" --role lead --session $EITS_SESSION_UUID
+eits teams join <team_id> --name "orchestrator" --role admin --session $EITS_SESSION_UUID
 ```
 
 ### 3. Create shared tasks
@@ -280,7 +280,7 @@ eits tasks update <task_id> --state done
 - **Never redirect stderr on `eits agents spawn`** — `2>/dev/null` swallows errors silently; the orchestrator thinks the agent started when it never did.
 - **`--to` in `eits dm` accepts UUID or integer session ID** — both work.
 - **DM sequentially** — parallel Bash DM calls cancel siblings on error, silently dropping messages.
-- **Don't pass `--project-id` when `--parent-session-id` is set** — it's inherited.
+- **Always pass `EITS_PROJECT_ID` in instructions or via `--interpolate-env`** — it is NOT inherited in Claude agent environments even when `--parent-session-id` is set.
 - **`--worktree` names must be unique per spawn** — duplicates fail at the git layer with a confusing error.
 - **`EITS_PROJECT_ID` is not in spawned agent environments** — pass it explicitly in instructions or via `--interpolate-env`.
 - `--worktree` requires a clean working tree — commit or stash first.
@@ -297,7 +297,7 @@ This example shows a **producer/consumer** pattern. Per the guidance above, sequ
 eits teams create --name "docs-team" --description "Research flags and write README" --project $EITS_PROJECT_ID
 
 # 2. Join as orchestrator
-eits teams join <team_id> --name "orchestrator" --role lead --session $EITS_SESSION_UUID
+eits teams join <team_id> --name "orchestrator" --role admin --session $EITS_SESSION_UUID
 
 # 3. Create tasks
 eits tasks create --title "Research Claude CLI flags" --team <team_id>
@@ -338,4 +338,4 @@ eits dm inbox --since-session
 - **Use descriptive `--member-name` values** — DMs identify agents by this alias.
 - **Teams LiveView at `/teams`** — real-time member status and per-member task lists.
 - **One team per logical unit of work** — don't reuse teams across unrelated tasks.
-- **Task must be linked to session** for Stop hook to gate. `eits tasks claim` handles this. Verify: `psql -d eits_dev -c "SELECT task_id FROM task_sessions WHERE session_id = (SELECT id FROM sessions WHERE uuid = '$EITS_SESSION_UUID')"`
+- **Task must be linked to session** for Stop hook to gate. `eits tasks begin --id <task_id>` claims and links atomically. Verify: `psql -d eits_dev -c "SELECT task_id FROM task_sessions WHERE session_id = (SELECT id FROM sessions WHERE uuid = '$EITS_SESSION_UUID')"`

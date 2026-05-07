@@ -98,10 +98,19 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         <% end %>
         <li>
           <button
-            phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
+            phx-click="sync_messages"
             class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+            title="Re-read transcript and import missed messages"
           >
-            <.icon name="hero-arrow-path" class="size-3.5" /> Reload
+            <.icon name="hero-arrow-path" class="size-3.5" /> Sync messages
+          </button>
+        </li>
+        <li>
+          <button
+            phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded text-warning"
+          >
+            <.icon name="hero-arrow-path" class="size-3.5" /> Reload from file
           </button>
         </li>
         <li>

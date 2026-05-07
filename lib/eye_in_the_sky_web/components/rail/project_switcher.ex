@@ -63,35 +63,42 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       </div>
       <div class="p-1.5 max-h-48 overflow-y-auto">
         <%= for project <- @projects do %>
-          <% selected =
-            @scope_type == :project && not is_nil(@sidebar_project) &&
-              @sidebar_project.id == project.id %>
-          <button
-            phx-click="select_project"
-            phx-value-project_id={project.id}
-            phx-target={@myself}
-            class={[
-              "w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-left transition-colors",
-              if(selected,
-                do: "bg-primary/10 text-primary",
-                else: "text-base-content/70 hover:bg-base-content/5 hover:text-base-content/90"
-              )
-            ]}
-          >
-            <div class={[
-              "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold",
-              if(selected,
-                do: "bg-primary text-white",
-                else: "bg-base-content/10 text-base-content/60"
-              )
-            ]}>
-              {project_initial(project)}
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="font-medium truncate">{project.name}</div>
-            </div>
-            <.icon :if={selected} name="hero-check-mini" class="size-3.5 flex-shrink-0" />
-          </button>
+          <% selected = @scope_type == :project && not is_nil(@sidebar_project) && @sidebar_project.id == project.id %>
+          <div class="group/proj relative flex items-center">
+            <button
+              phx-click="select_project"
+              phx-value-project_id={project.id}
+              phx-target={@myself}
+              class={[
+                "flex-1 flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-left transition-colors",
+                if(selected,
+                  do: "bg-primary/10 text-primary",
+                  else: "text-base-content/70 hover:bg-base-content/5 hover:text-base-content/90"
+                )
+              ]}
+            >
+              <div class={[
+                "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold",
+                if(selected, do: "bg-primary text-white", else: "bg-base-content/10 text-base-content/60")
+              ]}>
+                {project_initial(project)}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium truncate">{project.name}</div>
+              </div>
+              <.icon :if={selected} name="hero-check-mini" class="size-3.5 flex-shrink-0" />
+            </button>
+            <%!-- "Open in New Window" — only meaningful in Tauri; shown on hover. --%>
+            <button
+              phx-click="open_in_window"
+              phx-value-project_id={project.id}
+              phx-target={@myself}
+              title="Open in New Window"
+              class="absolute right-1 opacity-0 group-hover/proj:opacity-100 transition-opacity p-1 rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"
+            >
+              <.icon name="hero-arrow-top-right-on-square-mini" class="size-3.5" />
+            </button>
+          </div>
         <% end %>
       </div>
 

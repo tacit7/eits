@@ -485,6 +485,7 @@ pub fn run() {
                 _ => {}
             }
         })
+        .invoke_handler(tauri::generate_handler![pick_folder, open_window])
         .build(tauri::generate_context!())
         .expect("error building tauri application")
         .run(|app_handle, event| {
@@ -834,4 +835,29 @@ fn install_iam_hooks(port: &str) {
         },
         Err(e) => log!("[eits-tauri] Could not serialize settings.json: {e}"),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Tauri commands (invoked from the frontend via invoke('command_name', ...))
+// ---------------------------------------------------------------------------
+
+/// Opens a native folder picker dialog and returns the selected path, or null
+/// if the user cancelled.  The dialog runs on the main thread internally via
+/// the plugin; we make the command async so Tauri spawns it off the WebKit
+/// thread and avoids blocking the webview.
+#[tauri::command]
+async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    app.dialog()
+        .file()
+        .blocking_pick_folder()
+        .and_then(|p| p.into_path().ok())
+        .and_then(|p| p.to_str().map(|s| s.to_string()))
+}
+
+/// Opens a new app window navigated to the given path (e.g. "/projects/3").
+/// Wraps the internal open_new_window helper so JS can trigger it.
+#[tauri::command]
+fn open_window(app: tauri::AppHandle, path: String) {
+    open_new_window(&app, &path);
 }

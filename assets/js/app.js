@@ -349,6 +349,47 @@ window.addEventListener('tauri:file-drop', (e) => {
   }
 })
 
+// --- Tauri command bridges ---------------------------------------------------
+// LiveView pushes these events via push_event/3 when it needs a native dialog
+// or a new window — the server can't open a dialog or window directly.
+if (window.__TAURI_INTERNALS__) {
+  const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args ?? {})
+
+  // phx:pick_folder — opens a native folder picker, pushes result back to the
+  // originating LiveView component via pushEventTo('folder_picked', {path}).
+  // On cancel, pushes an empty payload so the server shows the text-input fallback.
+  window.addEventListener('phx:pick_folder', () => {
+    invoke('pick_folder').then((path) => {
+      const rail = document.getElementById('app-rail')
+      if (!rail || !window.liveSocket) return
+      const view = window.liveSocket.getViewByEl(rail)
+      if (!view) return
+      if (path) {
+        view.pushEventTo(rail, 'folder_picked', { path })
+      } else {
+        // Cancelled — show the inline text-input fallback.
+        view.pushEventTo(rail, 'folder_picked', {})
+      }
+    })
+  })
+
+  // phx:open_in_window — opens path in a new app window.
+  // Payload: { path: "/projects/3" }
+  window.addEventListener('phx:open_in_window', (e) => {
+    const path = e.detail?.path ?? '/'
+    invoke('open_window', { path })
+  })
+} else {
+  // Not in Tauri — fall back to showing the inline text input when the
+  // server fires phx:pick_folder (no native dialog available).
+  window.addEventListener('phx:pick_folder', () => {
+    const rail = document.getElementById('app-rail')
+    if (!rail || !window.liveSocket) return
+    const view = window.liveSocket.getViewByEl(rail)
+    if (view) view.pushEventTo(rail, 'folder_picked', {})
+  })
+}
+
 // The lines below enable quality of life phoenix_live_reload
 // development features:
 //

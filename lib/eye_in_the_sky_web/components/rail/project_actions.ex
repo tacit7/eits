@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 2, assign: 3]
-  import Phoenix.LiveView, only: [start_async: 3, push_navigate: 2, push_event: 3, put_flash: 3]
+  import Phoenix.LiveView, only: [push_navigate: 2, push_event: 3, put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Agents.AgentManager
@@ -107,20 +107,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  # macOS-specific: uses osascript for folder picker. Intentionally not generalized.
-  # Clicking "New project" triggers this. If the picker is cancelled or fails,
-  # handle_pick_folder/2 falls through to the inline path input fallback.
-  # NOTE: Creating a project does NOT auto-select it. Check the old Sidebar behavior —
-  # if it auto-selected, add |> assign(:sidebar_project, project) to handle_pick_folder/2.
+  # Clicking "New project" triggers this. In Tauri context the JS bridge opens
+  # a native dialog (pick_folder command) and pushes folder_picked back.
+  # In a plain browser session the JS bridge is absent and we fall back to the
+  # inline text-input form (new_project_path assign set to "").
+  # NOTE: Creating a project does NOT auto-select it.
   def handle_show_new_project(socket) do
-    {:noreply,
-     start_async(socket, :pick_folder, fn ->
-       System.cmd(
-         "osascript",
-         ["-e", ~s[POSIX path of (choose folder with prompt "Select project folder:")]],
-         stderr_to_stdout: true
-       )
-     end)}
+    {:noreply, push_event(socket, "pick_folder", %{})}
   end
 
   def handle_cancel_new_project(socket),
@@ -172,7 +165,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  def handle_pick_folder({path, 0}, socket) do
+  # Called by handle_event("folder_picked") in rail.ex — payload comes from the
+  # Tauri pick_folder JS bridge after the user selects a folder.
+  def handle_folder_picked(%{"path" => path}, socket) do
     path = String.trim(path)
     name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
 
@@ -182,9 +177,27 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  # Cancelled or failed: show inline path input fallback
-  def handle_pick_folder(_result, socket),
+  # Empty payload = cancelled or no Tauri; show the inline text-input fallback.
+  def handle_folder_picked(_params, socket),
     do: {:noreply, assign(socket, :new_project_path, "")}
+
+  # Opens the given project in a new Tauri window. No-op in browser context
+  # (the JS bridge guard prevents the invoke call from running).
+  def handle_open_in_window(%{"project_id" => id_str}, socket) do
+    case EyeInTheSkyWeb.ControllerHelpers.parse_int(id_str) do
+      nil ->
+        {:noreply, socket}
+
+      id ->
+        case Projects.get_project(id) do
+          {:ok, _project} ->
+            {:noreply, push_event(socket, "open_in_window", %{path: "/projects/#{id}"})}
+
+          {:error, _} ->
+            {:noreply, socket}
+        end
+    end
+  end
 
   # Only called when sidebar_project is nil (guarded in rail.ex handle_event clause).
   # Restores the project from a localStorage-persisted project_id after cross-LiveView nav.

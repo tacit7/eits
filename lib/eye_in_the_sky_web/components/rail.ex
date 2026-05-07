@@ -229,6 +229,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("show_new_project", _params, socket),
     do: ProjectActions.handle_show_new_project(socket)
 
+  # Tauri JS bridge pushes this after the user picks a folder in the native dialog.
+  def handle_event("folder_picked", params, socket),
+    do: ProjectActions.handle_folder_picked(params, socket)
+
+  # Tauri JS bridge: open a project in its own window.
+  def handle_event("open_in_window", params, socket),
+    do: ProjectActions.handle_open_in_window(params, socket)
+
   def handle_event("cancel_new_project", _params, socket),
     do: ProjectActions.handle_cancel_new_project(socket)
 
@@ -426,11 +434,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     {:noreply, assign(socket, :flyout_usage, {:error, reason})}
   end
 
-  def handle_async(:pick_folder, {:ok, result}, socket),
-    do: ProjectActions.handle_pick_folder(result, socket)
-
-  def handle_async(:pick_folder, _result, socket),
-    do: ProjectActions.handle_pick_folder(:cancelled, socket)
 
   defp maybe_reload_on_project_change(socket, same_project, same_project), do: socket
 

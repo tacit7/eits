@@ -178,11 +178,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
       {:error, changeset} ->
         if path_taken?(changeset) do
-          # Path already exists — select the existing project.
+          # Path already exists — select the existing project and tell the user.
           case Projects.get_project_by_path(path) do
             {:ok, project} ->
               {:noreply,
                socket
+               |> put_flash(:info, "\"#{project.name}\" is already in your projects")
                |> assign(:projects, Projects.list_projects_for_sidebar())
                |> assign(:sidebar_project, project)}
 

@@ -255,13 +255,14 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
   defp stale?(nil, _minutes), do: false
 
-  defp stale?(iso_string, minutes) do
-    case DateTime.from_iso8601(iso_string) do
-      {:ok, dt, _} ->
-        DateTime.diff(DateTime.utc_now(), dt, :second) > minutes * 60
+  defp stale?(%DateTime{} = dt, minutes) do
+    DateTime.diff(DateTime.utc_now(), dt, :second) > minutes * 60
+  end
 
-      _ ->
-        false
+  defp stale?(iso_string, minutes) when is_binary(iso_string) do
+    case DateTime.from_iso8601(iso_string) do
+      {:ok, dt, _} -> stale?(dt, minutes)
+      _ -> false
     end
   end
 

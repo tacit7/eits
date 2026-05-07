@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   require Logger
 
   alias EyeInTheSky.{Agents, Commits, Contexts, Notes, Projects, Sessions, Tasks}
+  alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -233,6 +234,34 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       )
     else
       {:error, :not_found} -> {:error, :not_found, "Session not found"}
+    end
+  end
+
+  @doc """
+  GET /api/v1/sessions/:id/worker - Check AgentWorker liveness for a session.
+  """
+  def worker_status(conn, %{"id" => id}) do
+    case Sessions.resolve(id) do
+      {:error, :not_found} ->
+        conn |> put_status(404) |> json(%{error: "not found"})
+
+      {:ok, session} ->
+        alive = AgentWorker.alive?(session.id)
+        last_activity_at = session.last_activity_at
+        hung = alive && stale?(last_activity_at, 10)
+        json(conn, %{alive: alive, last_activity_at: last_activity_at, hung: hung})
+    end
+  end
+
+  defp stale?(nil, _minutes), do: false
+
+  defp stale?(iso_string, minutes) do
+    case DateTime.from_iso8601(iso_string) do
+      {:ok, dt, _} ->
+        DateTime.diff(DateTime.utc_now(), dt, :second) > minutes * 60
+
+      _ ->
+        false
     end
   end
 

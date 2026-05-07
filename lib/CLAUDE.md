@@ -113,9 +113,10 @@ All agent identity operations go through `EyeInTheSky.Agents`. In LiveViews, `@s
 
 ### Agent `last_activity_at`
 
-ISO8601 text field, not a DateTime.
-- Always pass ISO8601 strings when updating it
-- Use `DateTime.from_iso8601/1` when comparing with Elixir datetimes
-- Scheduling in `lib/eye_in_the_sky/scheduler/agent_status.ex` uses ISO8601 strings
+`:utc_datetime_usec` field — a `DateTime` struct, not ISO8601 text. Schema type matches on both `Agent` (`lib/eye_in_the_sky/agents/agent.ex`) and `Session` (`lib/eye_in_the_sky/sessions/session.ex`).
+- Pass `DateTime` structs (e.g. `DateTime.utc_now/0`) when updating it
+- Compare directly with `DateTime.diff/2` or `DateTime.compare/2` — no parsing needed
+- Scheduling in `lib/eye_in_the_sky/scheduler/agent_status.ex` (`stale?/2`, `too_old?/2`) pattern-matches on `%DateTime{}`
+- The REST API serializes it as ISO8601 in JSON responses, but in Elixir code it's always a struct
 
 Sessions can be sorted by `last_activity_at`, `created_at`, or `last_message_at` via `Sessions.list_sessions/2`.

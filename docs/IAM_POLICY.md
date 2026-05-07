@@ -214,6 +214,8 @@ Example:
 
 **`require_commit_before_stop`**: Runs on Stop event (not PreToolUse). Runs `git status --porcelain` against the session's `project_path` and injects a warning into the transcript if uncommitted changes are found. Supports `"checkUntracked"` (default true) and `"ignorePaths"` conditions.
 
+**`prefer_package_manager`** (advisory): Warns when a Bash command uses a package manager that differs from the project's configured preference. Requires a `"packageManager"` condition key set to one of: `"npm"`, `"yarn"`, `"pnpm"`, or `"bun"`. Detects the manager from the first command token or runner prefixes (`npx`, `yarn`, `pnpm`, `bunx`). Only matches package manager operations (install/add/remove/uninstall/run/exec/ci sub-commands); bare invocations like `npm --version` do not trigger. Without the `"packageManager"` condition, the matcher is a no-op — the policy is opt-in.
+
 ---
 
 ## Policy Evaluation Flow
@@ -394,7 +396,9 @@ Port is resolved from the `PORT` environment variable (default 5050).
 
 ---
 
-## Migration: `20260417230411_add_builtin_matcher_to_iam_policies`
+## Migrations
+
+### `20260417230411_add_builtin_matcher_to_iam_policies`
 
 Adds the `builtin_matcher` column:
 
@@ -407,6 +411,17 @@ CREATE INDEX ix_iam_policies_builtin_matcher ON iam_policies(builtin_matcher)
 - Nullable: system policies set it; user policies ignore it
 - Indexed: only rows with `system_key` (system policies)
 - Validated: schema rejects invalid builtin matcher keys
+
+### `20260506143615_widen_iam_decisions_resource_path`
+
+Widened `iam_decisions.resource_path` from `varchar(255)` to `text`:
+
+```sql
+ALTER TABLE iam_decisions
+  MODIFY resource_path text;
+```
+
+**Reason**: The Bash tool resource_path is the full command string and overflows on moderately long commands (e.g., `git worktree add`, multi-flag compiles, agent spawn instructions). Widening to `text` eliminates truncation and removes the need for app-layer truncation logic. No data loss; existing varchar data migrates as-is.
 
 ---
 

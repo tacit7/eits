@@ -300,6 +300,48 @@ curl localhost:5001/api/v1/sessions/42 \
 
 ---
 
+### GET /api/v1/sessions/:id/worker
+
+Check AgentWorker liveness for a session. Returns the alive status, last activity timestamp, and whether the worker is hung (stale).
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | string or integer | Session ID (UUID or integer) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "alive": true,
+  "last_activity_at": "2026-05-06T19:30:45Z",
+  "hung": false
+}
+```
+
+**Fields:**
+- `alive` — Boolean indicating whether the AgentWorker process is registered and running
+- `last_activity_at` — ISO 8601 timestamp of the last recorded session activity; `null` if no activity recorded
+- `hung` — Boolean indicating whether the worker is stale (alive but with no activity in the last 10 minutes)
+
+**Response:** `404 Not Found`
+
+```json
+{
+  "error": "not found"
+}
+```
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/sessions/42/worker
+curl localhost:5001/api/v1/sessions/abc-123/worker
+```
+
+---
+
 ### GET /api/v1/sessions/:uuid/tasks
 
 List tasks linked to a session (path-based alias for `GET /api/v1/tasks?session_id=`).
@@ -528,6 +570,80 @@ List agents with optional filtering by project, status, or activity recency. Sta
 curl 'localhost:5001/api/v1/agents?project_id=1&limit=10'
 curl 'localhost:5001/api/v1/agents?active_since=2026-04-15T10:00:00Z'
 eits agents list --active-since 24h
+```
+
+---
+
+### PATCH /api/v1/agents/:id
+
+Update agent status and/or status message.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | string or integer | Agent ID (UUID or integer) |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `status` | string | no | New status value (e.g. `"working"`, `"idle"`) |
+| `status_message` | string | no | Optional status message or note |
+
+At least one of `status` or `status_message` must be provided.
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "agent": {
+    "id": 1,
+    "uuid": "agent-uuid",
+    "name": "code-review-agent",
+    "description": "Reviews pull requests",
+    "status": "working",
+    "status_message": "Currently processing PR #149",
+    "type": "general-purpose",
+    "project_id": 1,
+    "project_name": "web",
+    "created_at": "2026-04-10T10:00:00Z"
+  }
+}
+```
+
+**Error responses:**
+
+- `400 Bad Request` — Neither `status` nor `status_message` provided:
+```json
+{"error": "at least one of status or status_message is required"}
+```
+
+- `404 Not Found` — Agent not found:
+```json
+{"error": "Agent not found"}
+```
+
+- `422 Unprocessable Entity` — Validation failure:
+```json
+{"error": "Update failed", "details": "..."}
+```
+
+**Example:**
+
+```bash
+curl -X PATCH localhost:5001/api/v1/agents/abc-123 \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"idle","status_message":"Waiting for feedback"}'
+
+curl -X PATCH localhost:5001/api/v1/agents/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"status_message":"Completed task: PR review"}'
+
+# CLI
+eits agents update abc-123 --status idle --status-message "Waiting for feedback"
+eits agents update 1 --status working
 ```
 
 ---

@@ -940,6 +940,63 @@ Worker modules call `EyeInTheSky.Events.jobs_updated()` directly at each exit po
 
 ---
 
+## AgentWorker Liveness Detection
+
+Agents can be checked for liveness via the `/api/v1/sessions/:id/worker` endpoint.
+
+**AgentWorker.alive?/1:**
+- Registry lookup that returns true if a worker process is currently registered and alive for a given session_id
+- Used by the worker status controller to determine if a session has an active worker
+
+**GET /api/v1/sessions/:id/worker endpoint:**
+- Response: `{alive: boolean, last_activity_at: ISO8601|null, hung: boolean}`
+- `alive`: true if `AgentWorker.alive?/1` found a registered process
+- `last_activity_at`: session's last known activity timestamp
+- `hung`: true when `alive && stale?(last_activity_at, 10)` — worker is alive but inactive for >10 minutes
+- Returns 404 if session not found
+
+**stale?/2 helper:**
+- Compares an ISO8601 timestamp string against a duration in minutes
+- Returns false if timestamp is nil (no activity recorded yet)
+- Returns true if timestamp is older than the specified duration
+- Used to detect hung workers that are registered but producing no output
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — `alive?/1` function
+- `lib/eye_in_the_sky_web/controllers/api/v1/session_controller.ex` — `worker_status/2` action and `stale?/2` helper
+- `lib/eye_in_the_sky_web/router.ex` — route registration
+
+**Commits:** d2719936 (worker liveness endpoint)
+
+---
+
+## SDK Stream Optimization: Partial Messages Setting
+
+The SDK no longer forces `include_partial_messages: true`, allowing the session's configured streaming behavior to take effect.
+
+**Before (removed):**
+- `include_partial_messages: true` was hardcoded in `lib/eye_in_the_sky/claude/sdk.ex`
+- Claude emitted one `stream_delta` event per token regardless of session settings
+- Caused excessive re-renders on every token arrival
+
+**After (current):**
+- The hardcoded flag is removed from the spawn opts
+- Claude respects the session's `anthropic.include_partial_messages` setting
+- Without partial messages enabled, Claude emits one event per completed text block instead of per-token
+- Dramatically reduces rendering overhead and improves UI responsiveness
+
+**Effect on streaming:**
+- Default behavior (partial messages off): fewer, larger stream events, significantly fewer DOM updates
+- With partial messages enabled (explicit session setting): maintains old behavior if desired
+- Session setting `anthropic.include_partial_messages` now has actual effect for SDK-spawned agents
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/sdk.ex` — removed `:include_partial_messages` from spawn opts
+
+**Commits:** 802c45b6 (fix: stop forcing --include-partial-messages in SDK path)
+
+---
+
 ## Common Patterns
 
 ### Error Handling

@@ -51,14 +51,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   def format_cron_time(min, hour) do
     case {parse_cron_num(min), parse_cron_num(hour)} do
       {{:ok, m}, {:ok, h}} ->
-        period = if h >= 12, do: "PM", else: "AM"
-
-        display_h =
-          cond do
-            h == 0 -> 12
-            h > 12 -> h - 12
-            true -> h
-          end
+        {display_h, period} = to_12h(h)
 
         if m == 0,
           do: "#{display_h} #{period}",
@@ -74,6 +67,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
         nil
     end
   end
+
+  defp to_12h(0), do: {12, "AM"}
+  defp to_12h(12), do: {12, "PM"}
+  defp to_12h(h) when h < 12, do: {h, "AM"}
+  defp to_12h(h), do: {h - 12, "PM"}
 
   def format_cron_day(dow, dom, mon) do
     cond do

@@ -29,18 +29,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   end
 
   def handle_start_rename(%{"project_id" => id_str}, socket) do
-    case parse_int(id_str) do
-      nil ->
-        {:noreply, socket}
-
-      id ->
-        case Projects.get_project(id) do
-          {:ok, project} ->
-            {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
-
-          {:error, _} ->
-            {:noreply, socket}
-        end
+    with id when not is_nil(id) <- parse_int(id_str),
+         {:ok, project} <- Projects.get_project(id) do
+      {:noreply, assign(socket, renaming_project_id: id, rename_value: project.name)}
+    else
+      _ -> {:noreply, socket}
     end
   end
 
@@ -57,30 +50,27 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     if name == "" or is_nil(project_id) do
       {:noreply, assign(socket, renaming_project_id: nil, rename_value: "")}
     else
-      case Projects.get_project(project_id) do
-        {:ok, project} ->
-          case Projects.update_project(project, %{name: name}) do
-            {:ok, _} ->
-              {:noreply,
-               socket
-               |> assign(:projects, Projects.list_projects_for_sidebar())
-               |> assign(:renaming_project_id, nil)
-               |> assign(:rename_value, "")}
-
-            {:error, _} ->
-              {:noreply,
-               socket
-               |> put_flash(:error, "Failed to rename project")
-               |> assign(:projects, Projects.list_projects_for_sidebar())
-               |> assign(:renaming_project_id, nil)
-               |> assign(:rename_value, "")}
-          end
-
-        {:error, _} ->
+      with {:get, {:ok, project}} <- {:get, Projects.get_project(project_id)},
+           {:update, {:ok, _}} <- {:update, Projects.update_project(project, %{name: name})} do
+        {:noreply,
+         socket
+         |> assign(:projects, Projects.list_projects_for_sidebar())
+         |> assign(:renaming_project_id, nil)
+         |> assign(:rename_value, "")}
+      else
+        {:get, {:error, _}} ->
           # Project deleted while rename UI was open — reload to clear stale entry.
           {:noreply,
            socket
            |> put_flash(:error, "Project not found")
+           |> assign(:projects, Projects.list_projects_for_sidebar())
+           |> assign(:renaming_project_id, nil)
+           |> assign(:rename_value, "")}
+
+        {:update, {:error, _}} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, "Failed to rename project")
            |> assign(:projects, Projects.list_projects_for_sidebar())
            |> assign(:renaming_project_id, nil)
            |> assign(:rename_value, "")}

@@ -85,29 +85,32 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
 
   def build_config(params) do
     case params["job_type"] do
-      "spawn_agent" ->
-        %{
-          "instructions" => params["config_instructions"] || "",
-          "model" => params["config_model"] || "sonnet",
-          "project_path" => params["config_project_path"] || "",
-          "description" => params["config_description"] || ""
-        }
-
-      "mix_task" ->
-        args =
-          (params["config_args"] || "")
-          |> String.split(",", trim: true)
-          |> Enum.map(&String.trim/1)
-
-        %{
-          "task" => params["config_task"] || "",
-          "args" => args,
-          "project_path" => params["config_project_path"] || ""
-        }
-
-      _ ->
-        %{}
+      "spawn_agent" -> build_spawn_agent_config(params)
+      "mix_task" -> build_mix_task_config(params)
+      _ -> %{}
     end
+  end
+
+  defp build_spawn_agent_config(params) do
+    %{
+      "instructions" => params["config_instructions"] || "",
+      "model" => params["config_model"] || "sonnet",
+      "project_path" => params["config_project_path"] || "",
+      "description" => params["config_description"] || ""
+    }
+  end
+
+  defp build_mix_task_config(params) do
+    args =
+      (params["config_args"] || "")
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+
+    %{
+      "task" => params["config_task"] || "",
+      "args" => args,
+      "project_path" => params["config_project_path"] || ""
+    }
   end
 
   # ---------------------------------------------------------------------------

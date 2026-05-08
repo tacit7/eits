@@ -245,9 +245,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           }
         />
       <% else %>
-        <div class="divide-y divide-base-content/8" data-vim-list>
-          <%= for {dom_id, team} <- @team_list do %>
-            <div id={dom_id} class="py-1 group flex items-center gap-1">
+        <div id="team-list" phx-update="stream" class="divide-y divide-base-content/8" data-vim-list>
+          <div :for={{dom_id, team} <- @streams.team_list} id={dom_id} class="py-1 group flex items-center gap-1">
               <.link
                 navigate={
                   cond do
@@ -292,7 +291,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                 <.icon name="hero-trash" class="size-3.5" />
               </button>
             </div>
-          <% end %>
+          </div>
         </div>
       <% end %>
     </div>

@@ -2,31 +2,24 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.Helpers
-
   # ── Public entry-point ────────────────────────────────────────────────────
 
   attr :usage, :any, default: nil
 
   def usage_content(assigns) do
     ~H"""
-    <div class="flex flex-col gap-0">
-      <%= case @usage do %>
-        <% nil -> %>
-          <.usage_loading />
-        <% {:error, :token_expired} -> %>
-          <.usage_error message="OAuth token expired. Re-authenticate via Claude CLI." />
-        <% {:error, :no_credentials} -> %>
-          <.usage_error message="No Claude credentials found." />
-        <% {:error, _} -> %>
-          <.usage_error message="Could not load rate limits." />
-        <% {:ok, data} -> %>
-          <.rate_limit_bars data={data} />
-      <% end %>
-      <div class="px-3 pt-2 pb-1">
-        <Helpers.simple_link href="/usage" label="Usage Dashboard" icon="hero-chart-bar" />
-      </div>
-    </div>
+    <%= case @usage do %>
+      <% nil -> %>
+        <.usage_loading />
+      <% {:error, :token_expired} -> %>
+        <.usage_error message="OAuth token expired. Re-authenticate via Claude CLI." />
+      <% {:error, :no_credentials} -> %>
+        <.usage_error message="No Claude credentials found." />
+      <% {:error, _} -> %>
+        <.usage_error message="Could not load rate limits." />
+      <% {:ok, data} -> %>
+        <.rate_limit_bars data={data} />
+    <% end %>
     """
   end
 

@@ -420,15 +420,16 @@ cmd_sessions() {
 usage: eits sessions update <uuid|self> [options]
 
 Options:
-  --status <s>       Session status (see below)
-  --reason <text>    Human-readable reason for status change
-  --intent <text>    Intent annotation for this session
-  --name <text>      Rename the session
-  --description <d>  Set session description
-  --project-id <n>   Reassign to project
-  --entrypoint <e>   Set entrypoint string
-  --clear-entrypoint Remove entrypoint value
-  --ended-at <ISO>   Set ended_at timestamp (ISO8601)
+  --status <s>           Session status (see below)
+  --reason <text>        Human-readable reason for status change
+  --intent <text>        Intent annotation for this session
+  --name <text>          Rename the session
+  --description <d>      Set session description
+  --project-id <n>       Reassign to project
+  --entrypoint <e>       Set entrypoint string
+  --clear-entrypoint     Remove entrypoint value
+  --ended-at <ISO>       Set ended_at timestamp (ISO8601)
+  --worktree-path <path> Set the git worktree path for this session
 
 Valid --status values:
   working    Claude is actively processing (set by UserPromptSubmit hook)
@@ -443,22 +444,23 @@ SESSIONS_UPDATE_HELP
       fi
       local uuid="${1:-}"; need uuid; shift
       [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
-      local status="" reason="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at="" project_id=""
+      local status="" reason="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at="" project_id="" worktree_path=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --status)      status="$2";      shift 2 ;;
-          --reason)      reason="$2";      shift 2 ;;
-          --intent)      intent="$2";      shift 2 ;;
-          --entrypoint)  entrypoint="$2";  shift 2 ;;
-          --name)        name="$2";        shift 2 ;;
-          --description) description="$2"; shift 2 ;;
-          --project-id)  project_id="$2";  shift 2 ;;
+          --status)         status="$2";        shift 2 ;;
+          --reason)         reason="$2";        shift 2 ;;
+          --intent)         intent="$2";        shift 2 ;;
+          --entrypoint)     entrypoint="$2";    shift 2 ;;
+          --name)           name="$2";          shift 2 ;;
+          --description)    description="$2";   shift 2 ;;
+          --project-id)     project_id="$2";    shift 2 ;;
           --clear-entrypoint) clear_entrypoint="true"; shift ;;
-          --ended-at)    ended_at="$2";    shift 2 ;;
+          --ended-at)       ended_at="$2";      shift 2 ;;
+          --worktree-path)  worktree_path="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/sessions/$uuid" "$(json status "$status" status_reason "$reason" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at" project_id "$project_id")"
+      _patch "/sessions/$uuid" "$(json status "$status" status_reason "$reason" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at" project_id "$project_id" worktree_path "$worktree_path")"
       ;;
     set-intent)
       # eits sessions set-intent <review|work> [<uuid>]

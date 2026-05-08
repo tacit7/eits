@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Agents.AgentDef do
+  @moduledoc false
   defstruct [
     :id,
     :slug,

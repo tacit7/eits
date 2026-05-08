@@ -10,6 +10,7 @@ defmodule EyeInTheSky.Metrics.TokenIngestion do
   alias EyeInTheSky.Settings
 
   defmodule Acc do
+    @moduledoc false
     defstruct ingested: 0, skipped: 0, errors: 0
   end
 

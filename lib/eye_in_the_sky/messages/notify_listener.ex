@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.Messages.NotifyListener do
+  @moduledoc false
   use GenServer
   require Logger
   alias EyeInTheSky.{Events, Repo}

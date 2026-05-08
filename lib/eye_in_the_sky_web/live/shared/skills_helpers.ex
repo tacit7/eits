@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
+  @moduledoc false
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSkyWeb.OverviewLive.Skills.Skill

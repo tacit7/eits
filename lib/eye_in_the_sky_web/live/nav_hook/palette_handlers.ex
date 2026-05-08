@@ -379,28 +379,31 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     }
 
     result =
-      with {:agent, {:ok, agent}} <- {:agent, Agents.find_or_create_agent(agent_attrs)},
-           session_attrs = %{
-             uuid: session_uuid,
-             agent_id: agent.id,
-             name: params["name"],
-             project_id: project_id,
-             model_provider: "manual",
-             model_name: "chat",
-             status: "idle",
-             started_at: DateTime.utc_now()
-           },
-           {:session, {:ok, session}} <-
-             {:session, Sessions.create_session_with_model(session_attrs)} do
-        %{ok: true, session_uuid: session.uuid}
-      else
-        {:agent, {:error, reason}} ->
+      case Agents.find_or_create_agent(agent_attrs) do
+        {:ok, agent} ->
+          session_attrs = %{
+            uuid: session_uuid,
+            agent_id: agent.id,
+            name: params["name"],
+            project_id: project_id,
+            model_provider: "manual",
+            model_name: "chat",
+            status: "idle",
+            started_at: DateTime.utc_now()
+          }
+
+          case Sessions.create_session_with_model(session_attrs) do
+            {:ok, session} ->
+              %{ok: true, session_uuid: session.uuid}
+
+            {:error, reason} ->
+              Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
+              %{ok: false, error: "Failed to create session"}
+          end
+
+        {:error, reason} ->
           Logger.warning("palette create-chat: agent creation failed: #{inspect(reason)}")
           %{ok: false, error: "Failed to create agent"}
-
-        {:session, {:error, reason}} ->
-          Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
-          %{ok: false, error: "Failed to create session"}
       end
 
     {:halt, push_event(socket, "palette:create-chat-result", result)}

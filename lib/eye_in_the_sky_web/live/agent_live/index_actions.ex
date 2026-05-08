@@ -47,21 +47,22 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
         %{"session_id" => target_session_id, "body" => body},
         socket
       ) do
-    with {:channel, {:ok, global_channel}} <-
-           {:channel, find_global_channel_for_session(target_session_id)},
-         {:send, {:ok, _message}} <-
-           {:send, create_dm_channel_message(global_channel.id, body, "web-user")} do
-      maybe_continue_session(target_session_id, body)
-      {:noreply, socket}
-    else
-      {:channel, {:error, :session_not_found}} ->
+    case find_global_channel_for_session(target_session_id) do
+      {:ok, global_channel} ->
+        case create_dm_channel_message(global_channel.id, body, "web-user") do
+          {:ok, _message} ->
+            maybe_continue_session(target_session_id, body)
+            {:noreply, socket}
+
+          _ ->
+            {:noreply, put_flash(socket, :error, "Failed to send message")}
+        end
+
+      {:error, :session_not_found} ->
         {:noreply, put_flash(socket, :error, "Session not found")}
 
-      {:channel, _} ->
+      _ ->
         {:noreply, put_flash(socket, :error, "Global channel not found")}
-
-      {:send, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end
 
@@ -220,27 +221,30 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
   # -- Private helpers -------------------------------------------------------
 
   defp maybe_continue_session(target_session_id, body) do
-    with {:session, {:ok, session}} <- {:session, Sessions.get_session(target_session_id)},
-         {:agent, {:ok, chat_agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
-      project_path =
-        chat_agent.git_worktree_path ||
-          if(chat_agent.project, do: chat_agent.project.path)
+    case Sessions.get_session(target_session_id) do
+      {:ok, session} ->
+        case Agents.get_agent(session.agent_id) do
+          {:ok, chat_agent} ->
+            project_path =
+              chat_agent.git_worktree_path ||
+                if(chat_agent.project, do: chat_agent.project.path)
 
-      AgentManager.continue_session(
-        session.id,
-        direct_message_prompt(body),
-        model: "sonnet",
-        project_path: project_path
-      )
-    else
-      {:session, _} ->
+            AgentManager.continue_session(
+              session.id,
+              direct_message_prompt(body),
+              model: "sonnet",
+              project_path: project_path
+            )
+
+          _ ->
+            Logger.warning(
+              "maybe_continue_session: agent not found for session #{target_session_id}, message already sent"
+            )
+        end
+
+      _ ->
         Logger.warning(
           "maybe_continue_session: session #{target_session_id} not found, message already sent"
-        )
-
-      {:agent, _} ->
-        Logger.warning(
-          "maybe_continue_session: agent not found for session #{target_session_id}, message already sent"
         )
     end
   end

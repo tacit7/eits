@@ -316,12 +316,12 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   end
 
   defp resolve_agent_session(raw) do
-    with {:ok, agent} <- resolve_agent(raw),
-         sessions = Sessions.list_sessions_for_agent(agent.id),
-         session = Enum.at(sessions, 0) do
-      case session do
+    with {:ok, agent} <- resolve_agent(raw) do
+      sessions = Sessions.list_sessions_for_agent(agent.id)
+
+      case Enum.at(sessions, 0) do
         nil -> {:error, :unauthorized}
-        _ -> {:ok, session}
+        session -> {:ok, session}
       end
     else
       _ -> {:error, :unauthorized}

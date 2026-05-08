@@ -27,31 +27,30 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     path |> Path.extname() |> String.downcase() |> file_type_info() |> Map.get(:atom)
   end
 
+  @language_classes %{
+    markdown: "markdown",
+    elixir: "elixir",
+    javascript: "javascript",
+    typescript: "typescript",
+    json: "json",
+    yaml: "yaml",
+    html: "html",
+    css: "css",
+    python: "python",
+    ruby: "ruby",
+    go: "go",
+    rust: "rust",
+    java: "java",
+    c: "c",
+    cpp: "cpp",
+    bash: "bash",
+    sql: "sql",
+    xml: "xml",
+    toml: "toml"
+  }
+
   @spec language_class(atom) :: String.t()
-  def language_class(file_type) do
-    case file_type do
-      :markdown -> "markdown"
-      :elixir -> "elixir"
-      :javascript -> "javascript"
-      :typescript -> "typescript"
-      :json -> "json"
-      :yaml -> "yaml"
-      :html -> "html"
-      :css -> "css"
-      :python -> "python"
-      :ruby -> "ruby"
-      :go -> "go"
-      :rust -> "rust"
-      :java -> "java"
-      :c -> "c"
-      :cpp -> "cpp"
-      :bash -> "bash"
-      :sql -> "sql"
-      :xml -> "xml"
-      :toml -> "toml"
-      _ -> "plaintext"
-    end
-  end
+  def language_class(file_type), do: Map.get(@language_classes, file_type, "plaintext")
 
   @doc """
   Resolves a path to its canonical form, following symlinks.
@@ -86,37 +85,36 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
 
   def cm_language(_), do: "text"
 
-  defp file_type_info(ext) do
-    case ext do
-      ".md" -> %{atom: :markdown, class: "markdown", cm: "markdown"}
-      ".markdown" -> %{atom: :markdown, class: "markdown", cm: "markdown"}
-      ".ex" -> %{atom: :elixir, class: "elixir", cm: "elixir"}
-      ".exs" -> %{atom: :elixir, class: "elixir", cm: "elixir"}
-      ".js" -> %{atom: :javascript, class: "javascript", cm: "javascript"}
-      ".jsx" -> %{atom: :javascript, class: "javascript", cm: "javascript"}
-      ".ts" -> %{atom: :typescript, class: "typescript", cm: "javascript"}
-      ".tsx" -> %{atom: :typescript, class: "typescript", cm: "javascript"}
-      ".json" -> %{atom: :json, class: "json", cm: "json"}
-      ".yml" -> %{atom: :yaml, class: "yaml", cm: "yaml"}
-      ".yaml" -> %{atom: :yaml, class: "yaml", cm: "yaml"}
-      ".html" -> %{atom: :html, class: "html", cm: "html"}
-      ".heex" -> %{atom: :html, class: "html", cm: "html"}
-      ".css" -> %{atom: :css, class: "css", cm: "css"}
-      ".py" -> %{atom: :python, class: "python", cm: "text"}
-      ".rb" -> %{atom: :ruby, class: "ruby", cm: "text"}
-      ".go" -> %{atom: :go, class: "go", cm: "text"}
-      ".rs" -> %{atom: :rust, class: "rust", cm: "text"}
-      ".java" -> %{atom: :java, class: "java", cm: "text"}
-      ".c" -> %{atom: :c, class: "c", cm: "text"}
-      ".cpp" -> %{atom: :cpp, class: "cpp", cm: "text"}
-      ".sh" -> %{atom: :bash, class: "bash", cm: "shell"}
-      ".bash" -> %{atom: :bash, class: "bash", cm: "shell"}
-      ".sql" -> %{atom: :sql, class: "sql", cm: "text"}
-      ".xml" -> %{atom: :xml, class: "xml", cm: "text"}
-      ".toml" -> %{atom: :toml, class: "toml", cm: "text"}
-      _ -> %{atom: :text, class: "plaintext", cm: "text"}
-    end
-  end
+  @file_types %{
+    ".md" => %{atom: :markdown, class: "markdown", cm: "markdown"},
+    ".markdown" => %{atom: :markdown, class: "markdown", cm: "markdown"},
+    ".ex" => %{atom: :elixir, class: "elixir", cm: "elixir"},
+    ".exs" => %{atom: :elixir, class: "elixir", cm: "elixir"},
+    ".js" => %{atom: :javascript, class: "javascript", cm: "javascript"},
+    ".jsx" => %{atom: :javascript, class: "javascript", cm: "javascript"},
+    ".ts" => %{atom: :typescript, class: "typescript", cm: "javascript"},
+    ".tsx" => %{atom: :typescript, class: "typescript", cm: "javascript"},
+    ".json" => %{atom: :json, class: "json", cm: "json"},
+    ".yml" => %{atom: :yaml, class: "yaml", cm: "yaml"},
+    ".yaml" => %{atom: :yaml, class: "yaml", cm: "yaml"},
+    ".html" => %{atom: :html, class: "html", cm: "html"},
+    ".heex" => %{atom: :html, class: "html", cm: "html"},
+    ".css" => %{atom: :css, class: "css", cm: "css"},
+    ".py" => %{atom: :python, class: "python", cm: "text"},
+    ".rb" => %{atom: :ruby, class: "ruby", cm: "text"},
+    ".go" => %{atom: :go, class: "go", cm: "text"},
+    ".rs" => %{atom: :rust, class: "rust", cm: "text"},
+    ".java" => %{atom: :java, class: "java", cm: "text"},
+    ".c" => %{atom: :c, class: "c", cm: "text"},
+    ".cpp" => %{atom: :cpp, class: "cpp", cm: "text"},
+    ".sh" => %{atom: :bash, class: "bash", cm: "shell"},
+    ".bash" => %{atom: :bash, class: "bash", cm: "shell"},
+    ".sql" => %{atom: :sql, class: "sql", cm: "text"},
+    ".xml" => %{atom: :xml, class: "xml", cm: "text"},
+    ".toml" => %{atom: :toml, class: "toml", cm: "text"}
+  }
+
+  defp file_type_info(ext), do: Map.get(@file_types, ext, %{atom: :text, class: "plaintext", cm: "text"})
 
   @doc """
   Recursively builds a file tree up to `max_depth`.

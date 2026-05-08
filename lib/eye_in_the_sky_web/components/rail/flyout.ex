@@ -113,6 +113,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               </.link>
             <% @active_section == :usage -> %>
               <Helpers.section_header_link route="/usage" icon="hero-chart-bar" label="Usage" />
+              <button
+                phx-click="refresh_usage"
+                phx-target={@myself}
+                title="Refresh usage"
+                class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+              >
+                <.icon name="hero-arrow-path-mini" class="size-3.5" />
+              </button>
             <% @active_section == :chat -> %>
               <Helpers.section_header_link
                 route="/chat"

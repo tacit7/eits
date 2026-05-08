@@ -52,6 +52,13 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
     end
   end
 
+  @doc "Bypass the cache and immediately re-fetch from the Anthropic API."
+  @spec force_refresh() :: {:ok, map()} | {:error, atom()}
+  def force_refresh do
+    Agent.update(__MODULE__, fn _ -> %{} end)
+    refresh_cache(System.monotonic_time(:millisecond))
+  end
+
   # ── Internal ──────────────────────────────────────────────────────────────
 
   defp refresh_cache(now) do

@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
 
   alias EyeInTheSky.{Notifications, Projects, Prompts, Tasks}
+  alias EyeInTheSky.Claude.RateLimitClient
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Components.NewSessionModal
   alias EyeInTheSkyWeb.Components.Rail.{
@@ -187,6 +188,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("close_flyout", _params, socket),
     do: SectionActions.handle_close_flyout(socket)
+
+  def handle_event("refresh_usage", _params, socket) do
+    {:noreply, assign(socket, :flyout_usage, RateLimitClient.force_refresh())}
+  end
 
   def handle_event("restore_section", %{"section" => section_str}, socket),
     do: {:noreply, assign(socket, :active_section, Loader.parse_section(section_str))}

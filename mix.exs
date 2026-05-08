@@ -94,6 +94,7 @@ defmodule EyeInTheSky.MixProject do
        ref: "1e651d57096122d8125490e78e963db4aa956266",
        only: [:dev, :test],
        runtime: false},
+      {:req, "~> 0.5"},
       {:elixirkit, github: "livebook-dev/elixirkit"},
       {:erlexec, "~> 2.0"}
     ]

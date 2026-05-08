@@ -21,11 +21,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:search_query, "")
       |> assign(:show_all, false)
       |> assign(:all_teams, [])
+      |> stream(:team_list, [], dom_id: fn t -> "team-#{t.id}" end)
 
     socket =
       if connected?(socket) do
         teams = load_teams(socket, false, false, "")
-        assign(socket, :all_teams, teams)
+
+        socket
+        |> assign(:all_teams, teams)
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
       else
         socket
@@ -50,11 +53,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:search_query, "")
       |> assign(:show_all, true)
       |> assign(:all_teams, [])
+      |> stream(:team_list, [], dom_id: fn t -> "team-#{t.id}" end)
 
     socket =
       if connected?(socket) do
         teams = load_teams(socket, false, true, "")
-        assign(socket, :all_teams, teams)
+
+        socket
+        |> assign(:all_teams, teams)
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
       else
         socket

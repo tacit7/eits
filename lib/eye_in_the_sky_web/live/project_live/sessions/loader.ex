@@ -200,15 +200,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
       true ->
         refreshed = maybe_attach_project_name(refreshed, socket)
-
-        updated =
-          if Enum.any?(socket.assigns.all_agents, &(&1.id == session_id)) do
-            Enum.map(socket.assigns.all_agents, fn s ->
-              if s.id == session_id, do: refreshed, else: s
-            end)
-          else
-            [refreshed | socket.assigns.all_agents]
-          end
+        updated = upsert_in_list(socket.assigns.all_agents, session_id, refreshed)
 
         socket = assign(socket, :all_agents, updated)
 
@@ -232,6 +224,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
           nil -> socket
           changed -> stream_insert(socket, :session_list, changed)
         end
+    end
+  end
+
+  defp upsert_in_list(list, id, item) do
+    if Enum.any?(list, &(&1.id == id)) do
+      Enum.map(list, fn s -> if s.id == id, do: item, else: s end)
+    else
+      [item | list]
     end
   end
 

@@ -59,22 +59,13 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
       |> maybe_opt(:append_system_prompt, params["append_system_prompt"])
       |> maybe_opt(:append_system_prompt_file, params["append_system_prompt_file"])
       |> maybe_opt(:debug, params["debug"])
-      |> maybe_opt(:bare, if(params["bare"] == "true", do: true))
-      |> maybe_opt(:verbose, if(params["verbose"] == "true", do: true))
-      |> maybe_opt(
-        :include_partial_messages,
-        if(params["include_partial_messages"] == "true", do: true)
-      )
-      |> maybe_opt(
-        :no_session_persistence,
-        if(params["no_session_persistence"] == "true", do: true)
-      )
-      |> maybe_opt(:chrome, if(params["chrome"] == "true", do: true))
-      |> maybe_opt(:sandbox, if(params["sandbox"] == "true", do: true))
-      |> maybe_opt(
-        :skip_permissions,
-        if(params["dangerously_skip_permissions"] == "true", do: true)
-      )
+      |> maybe_opt(:bare, bool_param(params, "bare"))
+      |> maybe_opt(:verbose, bool_param(params, "verbose"))
+      |> maybe_opt(:include_partial_messages, bool_param(params, "include_partial_messages"))
+      |> maybe_opt(:no_session_persistence, bool_param(params, "no_session_persistence"))
+      |> maybe_opt(:chrome, bool_param(params, "chrome"))
+      |> maybe_opt(:sandbox, bool_param(params, "sandbox"))
+      |> maybe_opt(:skip_permissions, bool_param(params, "dangerously_skip_permissions"))
 
     base = [
       agent_type: params["agent_type"] || "claude",
@@ -91,6 +82,10 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
     ]
 
     base ++ advanced_opts
+  end
+
+  defp bool_param(params, key) do
+    if params[key] == "true", do: true
   end
 
   # Accepts the submitted agent slug only if it matches a known agent definition

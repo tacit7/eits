@@ -59,72 +59,55 @@ defmodule EyeInTheSky.Sessions.Queries do
         limit: ^limit,
         offset: ^offset
 
-    base_query = Archivable.include_archived(base_query, opts)
-
-    base_query =
-      if project_id do
-        where(base_query, [s, a], s.project_id == ^project_id or a.project_id == ^project_id)
-      else
-        base_query
-      end
-
-    base_query =
-      if agent_id do
-        where(base_query, [s], s.agent_id == ^agent_id)
-      else
-        base_query
-      end
-
-    agent_def_slug = Keyword.get(opts, :agent_def_slug, nil)
-
-    base_query =
-      if agent_def_slug do
-        where(base_query, [_s, _a, ad], ad.slug == ^agent_def_slug)
-      else
-        base_query
-      end
-
-    parent_session_id = Keyword.get(opts, :parent_session_id, nil)
-
-    base_query =
-      if parent_session_id do
-        where(base_query, [s], s.parent_session_id == ^parent_session_id)
-      else
-        base_query
-      end
-
-    name_filter = Keyword.get(opts, :name_filter, nil)
-
-    base_query =
-      if name_filter && name_filter != "" do
-        pattern = "%#{name_filter}%"
-        where(base_query, [s], ilike(s.name, ^pattern))
-      else
-        base_query
-      end
-
-    base_query = apply_search_filter(base_query, search_query)
-
-    base_query =
-      case status_filter do
-        "active" ->
-          where(base_query, [s, a], is_nil(s.ended_at) and a.status != "discovered")
-
-        "completed" ->
-          where(base_query, [s], not is_nil(s.ended_at))
-
-        "stale" ->
-          where(base_query, [s, a], is_nil(s.ended_at) and a.status == "stale")
-
-        "discovered" ->
-          where(base_query, [s, a], a.status == "discovered")
-
-        _ ->
-          base_query
-      end
-
-    Repo.all(base_query)
+    base_query
+    |> Archivable.include_archived(opts)
+    |> apply_project_filter(project_id)
+    |> apply_agent_filter(agent_id)
+    |> apply_agent_def_filter(Keyword.get(opts, :agent_def_slug))
+    |> apply_parent_session_filter(Keyword.get(opts, :parent_session_id))
+    |> apply_name_filter(Keyword.get(opts, :name_filter))
+    |> apply_search_filter(search_query)
+    |> apply_status_filter(status_filter)
+    |> Repo.all()
   end
+
+  defp apply_project_filter(query, nil), do: query
+  defp apply_project_filter(query, project_id) do
+    where(query, [s, a], s.project_id == ^project_id or a.project_id == ^project_id)
+  end
+
+  defp apply_agent_filter(query, nil), do: query
+  defp apply_agent_filter(query, agent_id), do: where(query, [s], s.agent_id == ^agent_id)
+
+  defp apply_agent_def_filter(query, nil), do: query
+  defp apply_agent_def_filter(query, slug), do: where(query, [_s, _a, ad], ad.slug == ^slug)
+
+  defp apply_parent_session_filter(query, nil), do: query
+  defp apply_parent_session_filter(query, id), do: where(query, [s], s.parent_session_id == ^id)
+
+  defp apply_name_filter(query, nil), do: query
+  defp apply_name_filter(query, ""), do: query
+  defp apply_name_filter(query, name) do
+    where(query, [s], ilike(s.name, ^"%#{name}%"))
+  end
+
+  defp apply_status_filter(query, "active") do
+    where(query, [s, a], is_nil(s.ended_at) and a.status != "discovered")
+  end
+
+  defp apply_status_filter(query, "completed") do
+    where(query, [s], not is_nil(s.ended_at))
+  end
+
+  defp apply_status_filter(query, "stale") do
+    where(query, [s, a], is_nil(s.ended_at) and a.status == "stale")
+  end
+
+  defp apply_status_filter(query, "discovered") do
+    where(query, [s, a], a.status == "discovered")
+  end
+
+  defp apply_status_filter(query, _), do: query
 
   @doc """
   Returns session overview rows for the sessions table.

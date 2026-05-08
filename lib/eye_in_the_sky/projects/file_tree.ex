@@ -175,13 +175,7 @@ defmodule EyeInTheSky.Projects.FileTree do
 
           case File.read_link(full_path) do
             {:ok, target} ->
-              resolved =
-                if Path.type(target) == :absolute do
-                  target
-                else
-                  Path.expand(target, real_parent)
-                end
-
+              resolved = resolve_link_target(target, real_parent)
               resolve_path_via_parent(resolved, MapSet.put(seen, full_path))
 
             {:error, :einval} ->
@@ -195,6 +189,14 @@ defmodule EyeInTheSky.Projects.FileTree do
           end
         end
       end
+    end
+  end
+
+  defp resolve_link_target(target, real_parent) do
+    if Path.type(target) == :absolute do
+      target
+    else
+      Path.expand(target, real_parent)
     end
   end
 

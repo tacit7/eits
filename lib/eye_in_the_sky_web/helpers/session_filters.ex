@@ -127,21 +127,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
         Enum.sort_by(sessions, fn s -> (s.name || "") |> String.downcase() end)
 
       "agent" ->
-        Enum.sort_by(sessions, fn s ->
-          case s.agent do
-            nil ->
-              ""
-
-            %{agent_definition: %{display_name: dn}} when is_binary(dn) ->
-              String.downcase(dn)
-
-            %{agent_definition: %{slug: slug}} when is_binary(slug) ->
-              String.downcase(slug)
-
-            agent ->
-              (agent.description || agent.project_name || "") |> String.downcase()
-          end
-        end)
+        Enum.sort_by(sessions, &agent_sort_key/1)
 
       "model" ->
         Enum.sort_by(sessions, fn s -> (s.model_name || s.model || "") |> String.downcase() end)
@@ -163,6 +149,11 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
         sort_by_last_message(sessions)
     end
   end
+
+  defp agent_sort_key(%{agent: nil}), do: ""
+  defp agent_sort_key(%{agent: %{agent_definition: %{display_name: dn}}}) when is_binary(dn), do: String.downcase(dn)
+  defp agent_sort_key(%{agent: %{agent_definition: %{slug: slug}}}) when is_binary(slug), do: String.downcase(slug)
+  defp agent_sort_key(%{agent: agent}), do: (agent.description || agent.project_name || "") |> String.downcase()
 
   defp sort_by_last_message(sessions) do
     Enum.sort_by(

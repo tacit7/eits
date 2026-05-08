@@ -147,29 +147,25 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
         |> Enum.map(fn item ->
           full = Path.join(current_dir, item)
           relative = Path.relative_to(full, base_dir)
-          is_dir = File.dir?(full)
-
-          if is_dir do
-            children =
-              if depth < @max_tree_depth,
-                do: scan_directory(base_dir, full, depth + 1),
-                else: []
-
-            %{name: item, path: full, relative: relative, is_dir: true, children: children}
-          else
-            size =
-              case File.stat(full) do
-                {:ok, %{size: s}} -> s
-                _ -> 0
-              end
-
-            %{name: item, path: full, relative: relative, is_dir: false, size: size}
-          end
+          build_scan_entry(item, base_dir, full, relative, depth)
         end)
         |> Enum.sort_by(&{!&1.is_dir, &1.name})
 
       _ ->
         []
+    end
+  end
+
+  defp build_scan_entry(item, base_dir, full, relative, depth) do
+    if File.dir?(full) do
+      children = if depth < @max_tree_depth, do: scan_directory(base_dir, full, depth + 1), else: []
+      %{name: item, path: full, relative: relative, is_dir: true, children: children}
+    else
+      size = case File.stat(full) do
+        {:ok, %{size: s}} -> s
+        _ -> 0
+      end
+      %{name: item, path: full, relative: relative, is_dir: false, size: size}
     end
   end
 

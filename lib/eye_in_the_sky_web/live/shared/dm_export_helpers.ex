@@ -63,9 +63,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
          {:ok, raw_messages} <-
            SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
       Messages.delete_session_messages(session_id)
-      imported = SessionImporter.import_messages(raw_messages, session_id)
+      %{inserted: inserted} = SessionImporter.import_messages(raw_messages, session_id)
       socket = load_messages_fn.(socket)
-      {:noreply, put_flash(socket, :info, "Reloaded #{imported} messages from session file")}
+      {:noreply, put_flash(socket, :info, "Reloaded #{inserted} messages from session file")}
     else
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "No session file found for this session")}
@@ -85,11 +85,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
     case CodexReader.read_messages(thread_id) do
       {:ok, messages} ->
         Messages.delete_session_messages(session_id)
-        imported = CodexImporter.import_messages(messages, session_id)
+        %{inserted: inserted} = CodexImporter.import_messages(messages, session_id)
         socket = load_messages_fn.(socket)
 
         {:noreply,
-         put_flash(socket, :info, "Reloaded #{imported} messages from Codex session file")}
+         put_flash(socket, :info, "Reloaded #{inserted} messages from Codex session file")}
 
       {:error, :not_found} ->
         {:noreply,

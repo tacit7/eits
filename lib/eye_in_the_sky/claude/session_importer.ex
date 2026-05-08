@@ -14,9 +14,12 @@ defmodule EyeInTheSky.Claude.SessionImporter do
   @doc """
   Reads new messages from the session file and imports them into the DB.
 
-  Returns `{:ok, count}` on success, `{:error, reason}` if the file can't be read.
+  Returns `{:ok, %{inserted: n, updated: n, skipped: n}}` on success,
+  `{:error, reason}` if the file can't be read.
   """
-  @spec sync(String.t(), String.t(), integer()) :: {:ok, integer()} | {:error, term()}
+  @spec sync(String.t(), String.t(), integer()) ::
+          {:ok, %{inserted: integer(), updated: integer(), skipped: integer()}}
+          | {:error, term()}
   def sync(session_uuid, project_path, session_id) do
     last_uuid = Messages.get_last_source_uuid(session_id)
 
@@ -29,9 +32,10 @@ defmodule EyeInTheSky.Claude.SessionImporter do
   @doc """
   Formats and imports a list of raw session messages into the DB for the given session.
 
-  Returns the count of successfully imported messages.
+  Returns `%{inserted: n, updated: n, skipped: n}`.
   """
-  @spec import_messages(list(), integer()) :: integer()
+  @spec import_messages(list(), integer()) ::
+          %{inserted: integer(), updated: integer(), skipped: integer()}
   def import_messages(raw_messages, session_id) do
     raw_messages
     |> SessionReader.format_messages()

@@ -16,7 +16,9 @@ defmodule EyeInTheSky.Codex.SessionImporter do
 
   Returns {:ok, count} on success, {:error, reason} on file read failure.
   """
-  @spec sync(String.t(), integer()) :: {:ok, integer()} | {:error, term()}
+  @spec sync(String.t(), integer()) ::
+          {:ok, %{inserted: integer(), updated: integer(), skipped: integer()}}
+          | {:error, term()}
   def sync(thread_id, session_id) do
     last_uuid = Messages.get_last_source_uuid(session_id)
 
@@ -31,7 +33,8 @@ defmodule EyeInTheSky.Codex.SessionImporter do
 
   Returns the count of successfully imported messages.
   """
-  @spec import_messages(list(map()), integer()) :: integer()
+  @spec import_messages(list(map()), integer()) ::
+          %{inserted: integer(), updated: integer(), skipped: integer()}
   def import_messages(messages, session_id) do
     BulkImporter.import_messages(messages, session_id,
       provider: "codex",

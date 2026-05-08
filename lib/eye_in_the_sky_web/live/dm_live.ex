@@ -340,14 +340,19 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("sync_messages", _params, socket) do
     case MessageHandlers.sync_messages_from_session_file(socket) do
-      {:ok, socket, 0} ->
+      {:ok, socket, %{inserted: 0, updated: 0}} ->
         {:noreply, put_flash(socket, :info, "Messages are already up to date.")}
 
-      {:ok, socket, 1} ->
-        {:noreply, put_flash(socket, :info, "Synced 1 missing message.")}
+      {:ok, socket, %{inserted: inserted, updated: updated}} ->
+        new_count = inserted + updated
 
-      {:ok, socket, count} ->
-        {:noreply, put_flash(socket, :info, "Synced #{count} missing messages.")}
+        msg =
+          case new_count do
+            1 -> "Synced 1 missing message."
+            n -> "Synced #{n} missing messages."
+          end
+
+        {:noreply, put_flash(socket, :info, msg)}
 
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "No session file found for this session.")}

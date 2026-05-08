@@ -31,7 +31,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   update, fast-path skip, or DM dedup skip). Rows that conflict on source_uuid
   are counted as processed because they are already present in the DB.
   """
-  @spec import_messages(list(map()), integer(), keyword()) :: integer()
+  @spec import_messages(list(map()), integer(), keyword()) ::
+          %{inserted: integer(), updated: integer(), skipped: integer()}
   def import_messages(messages, session_id, opts) do
     provider = Keyword.fetch!(opts, :provider)
     metadata_fn = Keyword.get(opts, :metadata_fn, fn _msg -> nil end)
@@ -78,11 +79,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     insert_count = run_inserts(inserts)
     update_count = run_updates(updates)
 
-    # Return rows newly written + linked + skipped by pre-fetched dedup.
-    # Race-conflict rows inside insert_all (rare: another session wrote the
-    # same source_uuid concurrently) are NOT counted — they would be counted
-    # as skips on the next import.
-    insert_count + update_count + skip_count
+    %{inserted: insert_count, updated: update_count, skipped: skip_count}
   end
 
   defp run_inserts([]), do: 0

@@ -98,11 +98,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
     <div class="px-3 py-3 flex flex-col gap-1.5">
       <div class="flex items-baseline justify-between gap-2">
         <span class="text-xs font-medium text-base-content/80 truncate">{@label}</span>
-        <span class="text-xs font-medium text-warning flex-shrink-0">{@pct}% used</span>
+        <span class="text-xs font-medium text-primary flex-shrink-0">{@pct}% used</span>
       </div>
       <div class="w-full h-1.5 rounded-full bg-base-content/15 overflow-hidden">
         <div
-          class="h-full rounded-full bg-warning transition-[width] duration-300"
+          class="h-full rounded-full bg-primary transition-[width] duration-300"
           style={"width: #{@pct}%"}
         >
         </div>
@@ -129,11 +129,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
     <div class="px-3 py-3 flex flex-col gap-1.5">
       <div class="flex items-baseline justify-between gap-2">
         <span class="text-xs font-medium text-base-content/80">Monthly spend</span>
-        <span class="text-xs font-medium text-warning flex-shrink-0">{@spend_label}</span>
+        <span class="text-xs font-medium text-primary flex-shrink-0">{@spend_label}</span>
       </div>
       <div class="w-full h-1.5 rounded-full bg-base-content/15 overflow-hidden">
         <div
-          class="h-full rounded-full bg-warning transition-[width] duration-300"
+          class="h-full rounded-full bg-primary transition-[width] duration-300"
           style={"width: #{@monthly_pct}%"}
         >
         </div>

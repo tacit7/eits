@@ -75,7 +75,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     socket =
       if connected?(socket) do
-        teams = load_teams(socket, socket.assigns.show_archived, true, socket.assigns.search_query)
+        teams =
+          load_teams(socket, socket.assigns.show_archived, true, socket.assigns.search_query)
+
         assign(socket, :all_teams, teams)
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
       else
@@ -90,7 +92,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     socket =
       if connected?(socket) do
-        teams = load_teams(socket, socket.assigns.show_archived, false, socket.assigns.search_query)
+        teams =
+          load_teams(socket, socket.assigns.show_archived, false, socket.assigns.search_query)
+
         assign(socket, :all_teams, teams)
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
       else
@@ -191,7 +195,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   @impl true
   def handle_event("toggle_archived", _params, socket) do
     show_archived = !socket.assigns.show_archived
-    teams = load_teams(socket, show_archived, socket.assigns.show_all, socket.assigns.search_query)
+
+    teams =
+      load_teams(socket, show_archived, socket.assigns.show_all, socket.assigns.search_query)
 
     socket =
       socket
@@ -292,7 +298,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
               </button>
             </div>
           </div>
-        </div>
       <% end %>
     </div>
     """

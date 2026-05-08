@@ -137,8 +137,6 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   in the DB and the message renders twice. Skipping the Task sync for active
   sessions eliminates this window entirely.
   """
-  @active_session_statuses ~w(working compacting)
-
   def load_messages_on_mount(socket) do
     if connected?(socket) do
       session = socket.assigns.session
@@ -147,33 +145,28 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       session_uuid = socket.assigns.session_uuid
       lv_pid = self()
 
-      # Skip the file sync when the session is actively running — the
-      # claude_complete / agent_stopped event handlers call sync_and_reload and
-      # will import any new JSONL entries when Claude finishes. Doing the sync
-      # here concurrently causes duplicate DB rows (different source_uuids,
-      # same body) because both paths check agent_reply_already_recorded?
-      # before either commits.
-      unless session.status in @active_session_statuses do
-        Task.start(fn ->
-          result =
-            case session.provider do
-              "codex" -> sync_codex_async(session_id, session_uuid)
-              "gemini" -> {:error, :no_file_sync}
-              _ -> sync_claude_async(session_id, session_uuid, session, agent)
-            end
-
-          case result do
-            {:ok, _} ->
-              send(lv_pid, :do_message_reload)
-
-            {:error, reason} ->
-              Logger.warning("DM mount sync failed",
-                session_id: session_id,
-                reason: inspect(reason)
-              )
+      # Sync from the session transcript file on every mount. BulkImporter's
+      # source_uuid unique index + on_conflict: :nothing prevents duplicates
+      # even if the live pipeline and mount sync race.
+      Task.start(fn ->
+        result =
+          case session.provider do
+            "codex" -> sync_codex_async(session_id, session_uuid)
+            "gemini" -> {:error, :no_file_sync}
+            _ -> sync_claude_async(session_id, session_uuid, session, agent)
           end
-        end)
-      end
+
+        case result do
+          {:ok, _} ->
+            send(lv_pid, :do_message_reload)
+
+          {:error, reason} ->
+            Logger.warning("DM mount sync failed",
+              session_id: session_id,
+              reason: inspect(reason)
+            )
+        end
+      end)
 
       TabHelpers.load_tab_data(socket, "messages", session_id)
     else

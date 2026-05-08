@@ -85,16 +85,15 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   defp run_inserts([]), do: 0
 
   defp run_inserts(inserts) do
-    try do
-      {count, _} =
-        Repo.insert_all(Message, inserts,
-          on_conflict: :nothing,
-          conflict_target: :source_uuid
-        )
+    {count, _} =
+      Repo.insert_all(Message, inserts,
+        on_conflict: :nothing,
+        conflict_target: :source_uuid
+      )
 
-      count
-    rescue
-      e in Postgrex.Error ->
+    count
+  rescue
+    e in Postgrex.Error ->
         if is_map(e.postgres) and e.postgres.code in @constraint_codes do
           :telemetry.execute(
             [:eits, :messages, :bulk_import, :constraint_violation],
@@ -120,7 +119,6 @@ defmodule EyeInTheSky.Messages.BulkImporter do
 
           reraise e, __STACKTRACE__
         end
-    end
   end
 
   defp run_updates(updates) do

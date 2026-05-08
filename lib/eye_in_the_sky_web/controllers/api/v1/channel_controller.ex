@@ -68,8 +68,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
   def mine(conn, params) do
     raw = params["session_id"] || ""
 
-    with {:session_raw, raw} when raw != "" <- {:session_raw, raw},
-         {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(raw)} do
+    with true <- raw != "",
+         {:ok, int_id} <- ToolHelpers.resolve_session_int_id(raw) do
       channels = Channels.list_channels_for_session(int_id)
 
       json(conn, %{
@@ -90,8 +90,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
           end)
       })
     else
-      {:session_raw, ""} -> {:error, :bad_request, "session_id is required"}
-      {:session, _} -> {:error, :not_found, "Session not found"}
+      false -> {:error, :bad_request, "session_id is required"}
+      _ -> {:error, :not_found, "Session not found"}
     end
   end
 
@@ -120,13 +120,11 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
   Body: session_id (required), role (optional, default "member")
   """
   def join(conn, %{"channel_id" => channel_id} = params) do
-    with {:channel, channel} when not is_nil(channel) <-
-           {:channel, Channels.get_channel(channel_id)},
-         {:session_raw, raw} when not is_nil(raw) and raw != "" <-
-           {:session_raw, params["session_id"]},
-         {:session, {:ok, int_id}} <- {:session, ToolHelpers.resolve_session_int_id(raw)},
-         {:session_record, {:ok, session}} <- {:session_record, Sessions.get_session(int_id)},
-         {:agent_id, agent_id} when not is_nil(agent_id) <- {:agent_id, session.agent_id} do
+    with {:ok, channel} <- get_channel_by_id(channel_id),
+         {:ok, raw} <- validate_session_id_param(params["session_id"]),
+         {:ok, int_id} <- ToolHelpers.resolve_session_int_id(raw),
+         {:ok, session} <- Sessions.get_session(int_id),
+         {:ok, agent_id} <- get_session_agent_id(session) do
       role = params["role"] || "member"
 
       case Channels.add_member(channel.id, agent_id, session.id, role) do
@@ -151,25 +149,22 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
           {:error, cs}
       end
     else
-      {:channel, nil} -> {:error, :not_found, "Channel not found"}
-      {:session_raw, _} -> {:error, :bad_request, "session_id is required"}
-      {:session, _} -> {:error, :not_found, "Session not found"}
-      {:session_record, _} -> {:error, :not_found, "Session not found"}
-      {:agent_id, nil} -> {:error, :unprocessable_entity, "Session has no registered agent"}
+      {:error, :channel_not_found} -> {:error, :not_found, "Channel not found"}
+      {:error, :session_id_required} -> {:error, :bad_request, "session_id is required"}
+      {:error, :no_agent} -> {:error, :unprocessable_entity, "Session has no registered agent"}
+      {:error, _} -> {:error, :not_found, "Session not found"}
     end
   end
 
   @doc "DELETE /api/v1/channels/:channel_id/members/:session_id - Remove a session from a channel."
   def leave(conn, %{"channel_id" => channel_id, "session_id" => session_id_param}) do
-    with {:channel, channel} when not is_nil(channel) <-
-           {:channel, Channels.get_channel(channel_id)},
-         {:session, {:ok, int_id}} <-
-           {:session, ToolHelpers.resolve_session_int_id(session_id_param)} do
+    with {:ok, channel} <- get_channel_by_id(channel_id),
+         {:ok, int_id} <- ToolHelpers.resolve_session_int_id(session_id_param) do
       Channels.remove_member(channel.id, int_id)
       json(conn, %{success: true, message: "Left channel #{channel.name}"})
     else
-      {:channel, nil} -> {:error, :not_found, "Channel not found"}
-      {:session, _} -> {:error, :not_found, "Session not found"}
+      {:error, :channel_not_found} -> {:error, :not_found, "Channel not found"}
+      _ -> {:error, :not_found, "Session not found"}
     end
   end
 
@@ -218,6 +213,24 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
 
     [NO_RESPONSE]
     """
+  end
+
+  defp get_channel_by_id(id) do
+    case Channels.get_channel(id) do
+      nil -> {:error, :channel_not_found}
+      channel -> {:ok, channel}
+    end
+  end
+
+  defp validate_session_id_param(nil), do: {:error, :session_id_required}
+  defp validate_session_id_param(""), do: {:error, :session_id_required}
+  defp validate_session_id_param(raw), do: {:ok, raw}
+
+  defp get_session_agent_id(session) do
+    case session.agent_id do
+      nil -> {:error, :no_agent}
+      agent_id -> {:ok, agent_id}
+    end
   end
 
   defp validate_name(""), do: {:error, :bad_request, "name is required"}

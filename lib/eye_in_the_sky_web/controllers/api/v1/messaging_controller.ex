@@ -153,13 +153,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   @receivable_statuses ~w(working idle waiting)
 
   defp do_dm(conn, params, from_raw, to_raw) do
-    with {:from, {:ok, from_session}} <-
-           {:from, resolve_session_target(%{raw: from_raw, kind: :from})},
-         {:from_active, false} <-
-           {:from_active, from_session.status in Sessions.terminated_statuses()},
-         {:to, {:ok, to_session}} <- {:to, resolve_session_target(%{raw: to_raw, kind: :to})},
-         {:to_receivable, true} <-
-           {:to_receivable, to_session.status in @receivable_statuses} do
+    with {:ok, from_session} <- resolve_dm_sender(from_raw),
+         :ok <- check_sender_not_terminated(from_session),
+         {:ok, to_session} <- resolve_dm_receiver(to_raw),
+         :ok <- check_receiver_reachable(to_session) do
       response_required = params["response_required"] in [true, "true", "1", 1]
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
@@ -243,19 +240,45 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
           dm_success(conn, to_session, existing)
       end
     else
-      {:from, {:error, :not_found}} ->
+      {:error, :sender_not_found} ->
         {:error, :not_found, "Sender session not found"}
 
-      {:from_active, true} ->
+      {:error, :sender_terminated} ->
         {:error, :unprocessable_entity, "Sender session is terminated and cannot send DMs"}
 
-      {:to, {:error, :not_found}} ->
+      {:error, :receiver_not_found} ->
         {:error, :not_found, "Target session not found"}
 
-      {:to_receivable, false} ->
+      {:error, :receiver_not_receivable} ->
         {:error, :unprocessable_entity,
          "Target session is terminated (completed or failed) and cannot receive DMs"}
     end
+  end
+
+  defp resolve_dm_sender(raw) do
+    case resolve_session_target(%{raw: raw, kind: :from}) do
+      {:ok, session} -> {:ok, session}
+      {:error, :not_found} -> {:error, :sender_not_found}
+    end
+  end
+
+  defp check_sender_not_terminated(session) do
+    if session.status in Sessions.terminated_statuses(),
+      do: {:error, :sender_terminated},
+      else: :ok
+  end
+
+  defp resolve_dm_receiver(raw) do
+    case resolve_session_target(%{raw: raw, kind: :to}) do
+      {:ok, session} -> {:ok, session}
+      {:error, :not_found} -> {:error, :receiver_not_found}
+    end
+  end
+
+  defp check_receiver_reachable(session) do
+    if session.status in @receivable_statuses,
+      do: :ok,
+      else: {:error, :receiver_not_receivable}
   end
 
   defp dm_success(conn, to_session, msg) do

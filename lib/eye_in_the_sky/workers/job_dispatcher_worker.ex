@@ -29,21 +29,35 @@ defmodule EyeInTheSky.Workers.JobDispatcherWorker do
   # - enqueue failure: release the claim so the next tick can retry
   # - mark_executed failure: job already enqueued, do NOT release (would cause re-enqueue)
   defp dispatch_job(jobs_mod, job, sentinel) do
-    with {:enqueue, {:ok, _}} <- {:enqueue, jobs_mod.enqueue_job(job)},
-         {:mark, {:ok, _}} <- {:mark, jobs_mod.mark_job_executed(job)} do
+    with {:ok, _} <- enqueue_job_or_error(jobs_mod, job),
+         {:ok, _} <- mark_job_executed_or_error(jobs_mod, job) do
       :ok
     else
-      {:enqueue, {:error, reason}} ->
+      {:error, {:enqueue_failed, reason}} ->
         Logger.error("JobDispatcherWorker: failed to enqueue job #{job.id}: #{inspect(reason)}")
         jobs_mod.release_claim(job, sentinel, job.next_run_at)
         :error
 
-      {:mark, {:error, reason}} ->
+      {:error, {:mark_failed, reason}} ->
         Logger.error(
           "JobDispatcherWorker: mark_job_executed failed for job #{job.id}: #{inspect(reason)}"
         )
 
         :error
+    end
+  end
+
+  defp enqueue_job_or_error(jobs_mod, job) do
+    case jobs_mod.enqueue_job(job) do
+      {:ok, _} = ok -> ok
+      {:error, reason} -> {:error, {:enqueue_failed, reason}}
+    end
+  end
+
+  defp mark_job_executed_or_error(jobs_mod, job) do
+    case jobs_mod.mark_job_executed(job) do
+      {:ok, _} = ok -> ok
+      {:error, reason} -> {:error, {:mark_failed, reason}}
     end
   end
 end

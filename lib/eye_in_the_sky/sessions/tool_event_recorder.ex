@@ -7,8 +7,8 @@ defmodule EyeInTheSky.Sessions.ToolEventRecorder do
 
   require Logger
 
-  alias EyeInTheSky.Messages
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Messages
 
   @doc """
   Records a tool pre/post event, creates a Message record, and fires PubSub events.

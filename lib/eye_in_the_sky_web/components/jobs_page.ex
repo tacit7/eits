@@ -21,8 +21,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
 
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.ScheduledJobs.ScheduledJob
-  alias EyeInTheSkyWeb.Components.AIJobCreator
   alias EyeInTheSkyWeb.Components.AgentScheduleSection
+  alias EyeInTheSkyWeb.Components.AIJobCreator
   import EyeInTheSkyWeb.Live.Shared.JobsHelpers
   import EyeInTheSkyWeb.Components.JobFormDrawer
   import EyeInTheSkyWeb.Components.JobsTable

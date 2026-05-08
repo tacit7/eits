@@ -4,8 +4,8 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   """
 
   alias EyeInTheSky.{Agents, Sessions}
-  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Agents.ModelConfig
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Validates and normalizes spawn parameters.

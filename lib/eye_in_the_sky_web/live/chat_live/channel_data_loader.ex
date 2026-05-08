@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelDataLoader do
   Isolated from socket state to keep queries side-effect-free.
   """
 
-  alias EyeInTheSky.{Agents, ChannelMessages, Prompts, Projects, Sessions}
+  alias EyeInTheSky.{Agents, ChannelMessages, Projects, Prompts, Sessions}
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ChatPresenter
 

@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.{Agents, Channels, ChannelMessages, Messages, Projects, Sessions}
+  alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Projects, Sessions}
 
   setup %{conn: conn} do
     # Create test project

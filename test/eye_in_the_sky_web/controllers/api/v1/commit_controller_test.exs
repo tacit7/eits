@@ -1,8 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.Commits
   alias EyeInTheSky.Accounts.ApiKey
+  alias EyeInTheSky.Commits
 
   import EyeInTheSky.Factory
 

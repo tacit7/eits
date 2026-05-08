@@ -7,11 +7,11 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
 
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Events
-  alias EyeInTheSky.Settings.JsonSettings
+  alias EyeInTheSky.OrchestratorTimers
   alias EyeInTheSky.{Projects, Tasks}
+  alias EyeInTheSky.Settings.JsonSettings
   alias EyeInTheSkyWeb.Helpers.PubSubHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
-  alias EyeInTheSky.OrchestratorTimers
 
   @default_message_limit 50
 

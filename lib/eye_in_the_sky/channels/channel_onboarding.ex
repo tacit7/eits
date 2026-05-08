@@ -8,8 +8,8 @@ defmodule EyeInTheSky.Channels.ChannelOnboarding do
   require Logger
 
   alias EyeInTheSky.ChannelMessages
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Channels.ChannelMember
+  alias EyeInTheSky.Repo
 
   import Ecto.Query, warn: false
 

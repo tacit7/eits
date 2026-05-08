@@ -3,9 +3,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
 
   import Ecto.Query, only: [from: 2]
 
+  alias EyeInTheSky.Accounts.ApiKey
   alias EyeInTheSky.{Repo, Tasks}
   alias EyeInTheSky.Tasks.WorkflowState
-  alias EyeInTheSky.Accounts.ApiKey
 
   import EyeInTheSky.Factory
 

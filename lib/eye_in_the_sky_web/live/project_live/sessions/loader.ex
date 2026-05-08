@@ -10,9 +10,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
+  alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
   alias EyeInTheSkyWeb.ProjectLive.Sessions.State
-  alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
 
   @telemetry_prefix [:eye_in_the_sky, :project_sessions]
 

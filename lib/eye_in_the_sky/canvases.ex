@@ -2,8 +2,8 @@ defmodule EyeInTheSky.Canvases do
   @moduledoc false
   import Ecto.Query
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Canvases.{Canvas, CanvasSession, CanvasTerminal}
+  alias EyeInTheSky.Repo
 
   def list_canvases(opts \\ []) do
     limit = Keyword.get(opts, :limit, 500)

@@ -3,8 +3,8 @@ defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
 
   alias EyeInTheSky.Channels
   alias EyeInTheSky.Channels.{ChannelMember, ChannelOnboarding}
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Factory
+  alias EyeInTheSky.Repo
 
   import Ecto.Query
 

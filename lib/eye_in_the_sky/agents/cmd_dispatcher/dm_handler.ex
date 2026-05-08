@@ -9,9 +9,9 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
 
   require Logger
 
+  alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
-  alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2]

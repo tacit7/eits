@@ -7,8 +7,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   alias EyeInTheSky.Canvases
   alias EyeInTheSky.Events
   alias EyeInTheSky.Sessions
-  alias EyeInTheSky.Terminal.PtySupervisor
   alias EyeInTheSky.Terminal.PtyServer
+  alias EyeInTheSky.Terminal.PtySupervisor
   alias EyeInTheSkyWeb.Components.ChatWindowComponent
   alias EyeInTheSkyWeb.Components.TerminalWindowComponent
 

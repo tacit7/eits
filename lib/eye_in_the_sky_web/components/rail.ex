@@ -7,7 +7,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
 
-  alias EyeInTheSky.{Notifications, Projects, Tasks, Prompts}
+  alias EyeInTheSky.{Notifications, Projects, Prompts, Tasks}
+  alias EyeInTheSkyWeb.AgentLive.IndexActions
+  alias EyeInTheSkyWeb.Components.NewSessionModal
   alias EyeInTheSkyWeb.Components.Rail.{
     FileActions,
     FilterActions,
@@ -15,8 +17,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     ProjectActions,
     SectionActions
   }
-  alias EyeInTheSkyWeb.Components.NewSessionModal
-  alias EyeInTheSkyWeb.AgentLive.IndexActions
 
   @section_map %{
     sessions: :sessions,

@@ -3,8 +3,8 @@ defmodule EyeInTheSky.Messages.NotifyListener do
   use GenServer
   require Logger
   alias EyeInTheSky.{Events, Repo}
-  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSky.Messages.Message
+  alias EyeInTheSky.Utils.ToolHelpers
 
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 

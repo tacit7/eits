@@ -3,10 +3,10 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
 
   import Phoenix.Component, only: [assign: 3]
 
+  alias EyeInTheSky.ChannelMessages
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
-  alias EyeInTheSky.ChannelMessages
 
   require Logger
 

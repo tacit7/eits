@@ -9,8 +9,8 @@ defmodule EyeInTheSky.Claude.AgentWorker.Reconciliation do
 
   require Logger
 
-  alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Agents.CmdDispatcher
+  alias EyeInTheSky.AgentWorkerEvents, as: WorkerEvents
   alias EyeInTheSky.Claude.Message
   alias EyeInTheSky.Messages.Trace
 

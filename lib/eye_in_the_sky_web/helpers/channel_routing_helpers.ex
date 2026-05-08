@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Helpers.ChannelRoutingHelpers do
   Shared helpers for routing direct messages to agent sessions via channels.
   """
 
-  alias EyeInTheSky.{Channels, ChannelMessages, Sessions}
+  alias EyeInTheSky.{ChannelMessages, Channels, Sessions}
 
   @doc """
   Creates a channel message for a direct message to a target session.

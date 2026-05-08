@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   import Ecto.Query
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.{Messages, Sessions, Repo}
+  alias EyeInTheSky.{Messages, Repo, Sessions}
   alias EyeInTheSky.Sessions.Session
 
   require Logger

@@ -19,8 +19,8 @@ defmodule EyeInTheSky.Messages.Aggregations do
   import Ecto.Query, warn: false
 
   alias EyeInTheSky.Messages.Message
-  alias EyeInTheSky.Sessions.Session
   alias EyeInTheSky.Repo
+  alias EyeInTheSky.Sessions.Session
 
   @doc """
   Returns `{total_tokens, total_cost_usd}` for a session in a single DB round-trip.

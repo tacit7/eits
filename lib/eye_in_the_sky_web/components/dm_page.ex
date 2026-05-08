@@ -5,11 +5,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
   alias EyeInTheSkyWeb.Components.DmPage.ActionMenu
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
-  alias EyeInTheSkyWeb.Components.DmPage.SettingsTab
   alias EyeInTheSkyWeb.Components.DmPage.Composer
   alias EyeInTheSkyWeb.Components.DmPage.ContextTab
   alias EyeInTheSkyWeb.Components.DmPage.MessagesTab
   alias EyeInTheSkyWeb.Components.DmPage.NotesTab
+  alias EyeInTheSkyWeb.Components.DmPage.SettingsTab
   alias EyeInTheSkyWeb.Components.DmPage.TasksTab
 
   @tabs [

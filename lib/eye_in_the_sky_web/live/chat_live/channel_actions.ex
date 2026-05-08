@@ -7,8 +7,8 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
 
   require Logger
 
-  alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSky.Channels.Channel
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ControllerHelpers

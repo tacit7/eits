@@ -1,4 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.UsageComponents do
+  @moduledoc false
   use EyeInTheSkyWeb, :html
 
   alias EyeInTheSkyWeb.Helpers.ViewHelpers

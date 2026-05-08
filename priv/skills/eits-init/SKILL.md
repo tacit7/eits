@@ -1,50 +1,39 @@
 ---
 name: eits-init
-description: MUST be called at the start of every session to register with Eye in the Sky tracking system. Creates agent and session records for monitoring all work, tasks, commits, and notes throughout the session.
+description: Fallback session registration for EITS. Only needed when auto-registration in the startup hook failed (EITS server was down at session start). Check $EITS_AGENT_UUID first — if set, exit immediately.
 ---
 
 Initialize Eye in the Sky session tracking.
 
+The startup hook now auto-registers all sessions. This skill is only needed when that failed.
+
 The startup/resume hooks inject these env vars automatically:
 - `$EITS_SESSION_UUID` — session UUID
 - `$EITS_PROJECT_ID` — project integer ID
-- `$EITS_AGENT_UUID` — agent UUID (resume only; not set on new sessions)
+- `$EITS_AGENT_UUID` — agent UUID (set by startup hook for all sessions)
 - `$EITS_URL` — `http://localhost:5001/api/v1`
 
 ## Steps
 
-1. **Check if already initialized** — resume hook sets `$EITS_AGENT_UUID` for existing sessions:
+1. **Check if already registered** — startup hook sets `$EITS_AGENT_UUID` for all sessions:
    ```bash
    echo "$EITS_AGENT_UUID"
    ```
-   - Non-empty → already initialized. Report active and exit.
-   - Empty → new session, proceed.
+   - Non-empty → already registered. Report active and exit immediately.
+   - Empty → auto-registration failed, proceed.
 
-2. **Get session name and description**:
-   - If `--name` and `--description` args were provided, use them.
-   - If `$CLAUDE_CODE_REMOTE` is `"true"`, infer from the user's opening message.
-   - Otherwise, ask the user. Both are required.
-   - **Name**: short title for the session (e.g. "Fix login bug")
-   - **Description**: one-line summary of the goal (e.g. "Session auth returns 401 on valid tokens")
-
-3. **Get project name**: derive from git remote or directory name.
-
-4. **Register the session**:
+2. **Register the session**:
    ```bash
    eits sessions create \
      --session-id $EITS_SESSION_UUID \
-     --name "<name>" \
-     --description "<description>" \
-     --project "<project_name>" \
+     --project "$(basename $(pwd))" \
      --model "claude-opus-4-6" \
      --entrypoint "${EITS_ENTRYPOINT:-}"
 
-   EITS_AGENT_UUID=$(eits sessions get $EITS_SESSION_UUID | jq -r '.agent_id')
+   export EITS_AGENT_UUID=$(eits sessions get $EITS_SESSION_UUID | jq -r '.agent_uuid')
    ```
 
-   Both `--name` and `--description` are stored as separate fields on the session. Name is the display title; description provides context.
-
-5. **Report success**: `"EITS active. Agent: $EITS_AGENT_UUID  Project: $EITS_PROJECT_ID"`
+3. **Report success**: `"EITS active. Agent: $EITS_AGENT_UUID  Project: $EITS_PROJECT_ID"`
 
 ## Messaging Protocol
 

@@ -52,7 +52,7 @@ if [[ "$PROJECT_DIR" == *"/.claude/worktrees/"* ]]; then
   echo "[EITS] startup: worktree detected, resolving project from $LOOKUP_DIR" >&2
 fi
 
-# Check if session was pre-registered (spawned by workable task worker)
+# Check if session was pre-registered (spawned by workable task worker or spawn endpoint)
 EXISTING_AGENT_UUID=""
 EXISTING_AGENT_INT_ID=""
 SESSION_INT_ID=""
@@ -63,6 +63,26 @@ if [ -n "$SESSION_INFO" ]; then
   SESSION_INT_ID=$(echo "$SESSION_INFO" | jq -r '.id // empty')
   _log "session found: session_int=$SESSION_INT_ID agent_uuid=${EXISTING_AGENT_UUID:-none} agent_int_id=${EXISTING_AGENT_INT_ID:-none}"
   echo "[EITS] startup: pre-registered session_int=$SESSION_INT_ID agent_uuid=${EXISTING_AGENT_UUID:-none} agent_int_id=${EXISTING_AGENT_INT_ID:-none}" >&2
+else
+  # New session (interactive cli or sdk-cli) — register it now so eits-init is not needed
+  _log "session not found, auto-registering: $SESSION_ID"
+  echo "[EITS] startup: auto-registering new session $SESSION_ID" >&2
+  CREATE_RESULT=$(eits sessions create \
+    --session-id "$SESSION_ID" \
+    --project "$(basename "$LOOKUP_DIR")" \
+    --project-path "$LOOKUP_DIR" \
+    --model "${MODEL:-}" \
+    --entrypoint "${ENTRYPOINT:-}" 2>/dev/null || true)
+  if [ -n "$CREATE_RESULT" ]; then
+    EXISTING_AGENT_UUID=$(echo "$CREATE_RESULT" | jq -r '.agent_uuid // empty')
+    EXISTING_AGENT_INT_ID=$(echo "$CREATE_RESULT" | jq -r '.agent_id // empty')
+    SESSION_INT_ID=$(echo "$CREATE_RESULT" | jq -r '.id // empty')
+    _log "auto-registered: session_int=$SESSION_INT_ID agent_uuid=${EXISTING_AGENT_UUID:-none} agent_int_id=${EXISTING_AGENT_INT_ID:-none}"
+    echo "[EITS] startup: auto-registered session_int=$SESSION_INT_ID agent_uuid=${EXISTING_AGENT_UUID:-none}" >&2
+  else
+    _log "auto-register failed for $SESSION_ID"
+    echo "[EITS] startup: auto-register failed — EITS server may be down" >&2
+  fi
 fi
 
 # Resolve or create project using the canonical (non-worktree) path
@@ -177,11 +197,12 @@ else
 fi
 
 if [ -n "$EXISTING_AGENT_UUID" ]; then
-  INIT_NOTE="Session pre-registered (spawned agent). EITS_AGENT_UUID is already set — skip /eits-init."
-  AGENT_UUID_LINE="**EITS_AGENT_UUID**: $EXISTING_AGENT_UUID (pre-registered)"
+  INIT_NOTE="Session registered. EITS_AGENT_UUID is set — /eits-init is not needed."
+  AGENT_UUID_LINE="**EITS_AGENT_UUID**: $EXISTING_AGENT_UUID"
 else
-  INIT_NOTE="**IMPORTANT**: Immediately invoke the Skill tool with \`skill: \"eits-init\"\` before responding to the user or taking any other action."
-  AGENT_UUID_LINE="**EITS_AGENT_UUID**: not yet set — available after /eits-init"
+  # Server down or registration failed — fall back to manual init
+  INIT_NOTE="**IMPORTANT**: Auto-registration failed (EITS server may be down). Invoke \`skill: \"eits-init\"\` before responding to the user."
+  AGENT_UUID_LINE="**EITS_AGENT_UUID**: not set — auto-registration failed"
 fi
 
 CONTEXT="# Eye in the Sky Integration Active

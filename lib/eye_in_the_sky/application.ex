@@ -65,7 +65,9 @@ defmodule EyeInTheSky.Application do
           # IAM policy cache (ETS-backed, single-node)
           EyeInTheSky.IAM.PolicyCache,
           # DynamicSupervisor for per-session PTY processes
-          EyeInTheSky.Terminal.PtySupervisor
+          EyeInTheSky.Terminal.PtySupervisor,
+          # In-process cache for Anthropic rate-limit API responses (5-min TTL)
+          EyeInTheSky.Claude.RateLimitClient
         ]
 
     iam_seeds =

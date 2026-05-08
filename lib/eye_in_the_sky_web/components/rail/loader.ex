@@ -20,6 +20,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
     Teams
   }
 
+  alias EyeInTheSky.Claude.RateLimitClient
   alias EyeInTheSky.Projects.FileTree
   alias EyeInTheSkyWeb.Live.Shared.{AgentsHelpers, SkillsHelpers}
 
@@ -289,6 +290,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   defp filter_prompts_by_scope(_prompts, "project", nil), do: []
 
   defp filter_prompts_by_scope(prompts, _scope, _project_id), do: prompts
+
+  def maybe_load_usage(socket, :usage) do
+    assign(socket, :flyout_usage, RateLimitClient.fetch())
+  end
+
+  def maybe_load_usage(socket, _section), do: socket
 
   def maybe_load_sessions(socket, :sessions, project) do
     assign(

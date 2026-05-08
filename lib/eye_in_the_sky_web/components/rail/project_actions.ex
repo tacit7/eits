@@ -227,7 +227,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   end
 
   # Full select_project flow: delegates to handle_select_project/2 for the project
-  # change, then reloads sessions + files and persists the selection to localStorage.
+  # change, then reloads sessions + files, persists the selection to localStorage,
+  # and navigates to the equivalent route on the new project.
   def handle_select_project_with_reload(params, socket) do
     previous_project = socket.assigns.sidebar_project
     {:noreply, socket2} = handle_select_project(params, socket)
@@ -253,7 +254,42 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
     project_id = new_project && new_project.id
     socket4 = push_event(socket3, "save_project", %{project_id: project_id})
-    {:noreply, socket4 |> assign(:proj_picker_open, false) |> assign(:scope_type, :project)}
+
+    socket5 =
+      socket4
+      |> assign(:proj_picker_open, false)
+      |> assign(:scope_type, :project)
+
+    # Navigate to the equivalent route on the newly selected project, preserving
+    # the current tab context (sessions, tasks, notes, etc.).
+    socket6 =
+      if not is_nil(new_project) and new_project != previous_project do
+        sidebar_tab = socket.assigns[:sidebar_tab] || :sessions
+        push_navigate(socket5, to: project_path(new_project.id, sidebar_tab))
+      else
+        socket5
+      end
+
+    {:noreply, socket6}
+  end
+
+  # Maps the current sidebar_tab to the equivalent project-scoped route.
+  # Falls back to /sessions for tabs without a direct project route
+  # (e.g. :dm, :chat, :canvas, :notifications, :usage).
+  defp project_path(id, tab) do
+    case tab do
+      :tasks -> "/projects/#{id}/tasks"
+      :kanban -> "/projects/#{id}/kanban"
+      :notes -> "/projects/#{id}/notes"
+      :prompts -> "/projects/#{id}/prompts"
+      :skills -> "/projects/#{id}/skills"
+      :teams -> "/projects/#{id}/teams"
+      :agents -> "/projects/#{id}/agents"
+      :files -> "/projects/#{id}/files"
+      :jobs -> "/projects/#{id}/jobs"
+      :config -> "/projects/#{id}/config"
+      _ -> "/projects/#{id}/sessions"
+    end
   end
 
   def handle_select_workspace(socket) do

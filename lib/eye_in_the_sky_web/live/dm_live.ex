@@ -36,29 +36,32 @@ defmodule EyeInTheSkyWeb.DmLive do
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
     session_result = Sessions.resolve(session_id_param)
 
-    with {:session, {:ok, session}} <- {:session, session_result},
-         {:agent, {:ok, agent}} <- {:agent, Agents.get_agent(session.agent_id)} do
-      MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
+    case session_result do
+      {:ok, session} ->
+        case Agents.get_agent(session.agent_id) do
+          {:ok, agent} ->
+            MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
 
-      socket =
-        socket
-        |> assign(:allow_split, true)
-        |> MountState.assign_sidebar_context(params)
-        |> MountState.assign_session_state(session, agent)
-        |> MountState.assign_essential_defaults(session)
-        |> then(fn s ->
-          if connected?(socket), do: MountState.assign_connected_defaults(s, session), else: s
-        end)
-        |> MessageHandlers.load_messages_on_mount()
+            socket =
+              socket
+              |> assign(:allow_split, true)
+              |> MountState.assign_sidebar_context(params)
+              |> MountState.assign_session_state(session, agent)
+              |> MountState.assign_essential_defaults(session)
+              |> then(fn s ->
+                if connected?(socket), do: MountState.assign_connected_defaults(s, session), else: s
+              end)
+              |> MessageHandlers.load_messages_on_mount()
 
-      {:ok, socket}
-    else
-      {:session, {:error, :not_found}} ->
+            {:ok, socket}
+
+          {:error, :not_found} ->
+            {:ok,
+             socket |> put_flash(:error, "Agent not found for this session") |> redirect(to: "/")}
+        end
+
+      {:error, :not_found} ->
         {:ok, socket |> put_flash(:error, "Session not found") |> redirect(to: "/")}
-
-      {:agent, {:error, :not_found}} ->
-        {:ok,
-         socket |> put_flash(:error, "Agent not found for this session") |> redirect(to: "/")}
     end
   end
 

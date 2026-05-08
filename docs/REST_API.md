@@ -403,8 +403,8 @@ Spawn a new Claude Code agent. Creates an Agent + Session, starts an AgentWorker
 | `project_path` | string | no | Working directory for the Claude process |
 | `worktree` | string | no | Git worktree branch name. Appends push+PR instructions to prompt |
 | `effort_level` | string | no | Passed to Claude CLI as effort level |
-| `parent_agent_id` | integer | no | Integer ID of the parent agent (integer only; UUID strings rejected) |
-| `parent_session_id` | integer\|string | no | Parent session ID — accepts integer ID or UUID string |
+| `parent_agent_id` | integer | no | Integer ID of the parent agent (integer only; UUID strings rejected). Automatically derived from `parent_session_id` if omitted |
+| `parent_session_id` | integer\|string | no | Parent session ID — accepts integer ID or UUID string. When provided without `parent_agent_id`, the server looks up the parent session and fills in `parent_agent_id` automatically |
 | `agent` | string | no | Named agent persona passed to Claude CLI via `--agent` |
 | `team_name` | string | no | Join this team on spawn. Team must exist |
 | `member_name` | string | no | Alias within the team. Defaults to agent UUID |
@@ -443,6 +443,16 @@ With `team_name`:
 **Fields:**
 - `worktree_path` — absolute path to the git worktree (if available); `null` if the session has no worktree
 - `branch_name` — git branch name extracted from the worktree (resolved via `git symbolic-ref --short HEAD`); `null` if worktree is not present or inaccessible
+
+**Error responses:**
+
+- `422 Unprocessable Entity` — Stale worktree entry detected (a registered git worktree branch exists from a prior pruned session):
+```json
+{
+  "error_code": "worktree_conflict",
+  "message": "worktree \"<name>\" has a stale git entry (branch worktree-<name> still registered). Run `git worktree prune` in <project_path> to clean up, then retry."
+}
+```
 
 **Example:**
 

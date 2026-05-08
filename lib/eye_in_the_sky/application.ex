@@ -5,6 +5,9 @@ defmodule EyeInTheSky.Application do
 
   use Application
 
+  alias EyeInTheSky.IAM.Seeds
+  alias LiveSvelte.SSR.NodeJS
+
   @impl true
   def start(_type, _args) do
     Oban.Telemetry.attach_default_logger(:info)
@@ -19,7 +22,7 @@ defmodule EyeInTheSky.Application do
 
     children =
       if Application.get_env(:live_svelte, :ssr_module) != LiveSvelte.SSR.ViteJS do
-        [{NodeJS.Supervisor, [path: LiveSvelte.SSR.NodeJS.server_path(), pool_size: 4]}]
+        [{NodeJS.Supervisor, [path: NodeJS.server_path(), pool_size: 4]}]
       else
         []
       end
@@ -68,7 +71,7 @@ defmodule EyeInTheSky.Application do
     iam_seeds =
       if Application.get_env(:eye_in_the_sky, :run_iam_seeds, true) do
         [
-          Supervisor.child_spec({Task, fn -> EyeInTheSky.IAM.Seeds.run() end},
+          Supervisor.child_spec({Task, fn -> Seeds.run() end},
             id: :iam_seeds_task,
             restart: :transient
           )

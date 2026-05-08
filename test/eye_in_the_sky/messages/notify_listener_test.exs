@@ -3,6 +3,7 @@ defmodule EyeInTheSky.Messages.NotifyListenerTest do
 
   alias EyeInTheSky.{Agents, Channels, Events, Messages, Sessions}
   alias EyeInTheSky.Messages.{Message, NotifyListener}
+  alias Ecto.Adapters.SQL.Sandbox
 
   defp uniq, do: System.unique_integer([:positive])
 
@@ -31,7 +32,7 @@ defmodule EyeInTheSky.Messages.NotifyListenerTest do
     Application.put_env(:eye_in_the_sky, NotifyListener, enabled: true)
 
     {:ok, pid} = NotifyListener.start_link([])
-    Ecto.Adapters.SQL.Sandbox.allow(EyeInTheSky.Repo, self(), pid)
+    Sandbox.allow(EyeInTheSky.Repo, self(), pid)
 
     on_exit(fn ->
       Application.put_env(:eye_in_the_sky, NotifyListener, enabled: false)

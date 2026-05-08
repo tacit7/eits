@@ -714,6 +714,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp phx_values(values) when map_size(values) == 0, do: []
 
   defp phx_values(values) do
+    # credo:disable-for-next-line Credo.Check.Warning.UnsafeToAtom
     Enum.map(values, fn {k, v} -> {:"phx-value-#{k}", v} end)
   end
 

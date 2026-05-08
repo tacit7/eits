@@ -1,3 +1,4 @@
+# credo:disable-for-this-file Credo.Check.Warning.UnsafeToAtom
 defmodule EyeInTheSky.Claude.AgentWorkerBroadcastIsolationTest do
   use EyeInTheSky.DataCase, async: false
 

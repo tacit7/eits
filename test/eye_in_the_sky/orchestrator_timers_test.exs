@@ -1,3 +1,4 @@
+# credo:disable-for-this-file Credo.Check.Warning.UnsafeToAtom
 defmodule EyeInTheSky.OrchestratorTimersTest do
   use ExUnit.Case, async: false
 

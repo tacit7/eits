@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
   use EyeInTheSkyWeb, :html
 
   alias EyeInTheSkyWeb.Components.Rail.Flyout.Helpers
+  alias EyeInTheSkyWeb.Helpers.FileHelpers
 
   attr :file_nodes, :list, default: []
   attr :file_expanded, :any, default: nil
@@ -50,9 +51,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
                 name={if expanded, do: "hero-chevron-down-mini", else: "hero-chevron-right-mini"}
                 class="size-3 text-base-content/30 flex-shrink-0"
               />
-              <.icon
-                name={if expanded, do: "hero-folder-open-mini", else: "hero-folder-mini"}
-                class="size-3.5 text-base-content/40 flex-shrink-0"
+              <img
+                src={FileHelpers.folder_icon_src(node.path, expanded: expanded)}
+                class="size-3.5 flex-shrink-0"
+                aria-hidden="true"
               />
               <span class="truncate">{node.name}</span>
             </button>
@@ -67,7 +69,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
               <%= if node.sensitive? do %>
                 <.icon name="hero-lock-closed-mini" class="size-3.5 text-warning/50 flex-shrink-0" />
               <% else %>
-                <.icon name="hero-document-mini" class="size-3.5 text-base-content/20 flex-shrink-0" />
+                <img
+                  src={FileHelpers.file_icon_src(node.path)}
+                  class="size-3.5 flex-shrink-0 opacity-80"
+                  aria-hidden="true"
+                />
               <% end %>
               <span class="truncate">{node.name}</span>
             </button>

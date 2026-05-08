@@ -89,6 +89,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_expanded: MapSet.new(),
         flyout_file_children: %{},
         flyout_file_error: nil,
+        flyout_usage: nil,
         file_tabs: [],
         active_tab_path: nil,
         show_new_session_form: false,
@@ -449,6 +450,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     |> Loader.maybe_load_agents(next_section, socket.assigns.sidebar_project)
     |> Loader.maybe_load_skills(next_section, socket.assigns.sidebar_project)
     |> Loader.maybe_load_prompts(next_section, socket.assigns.sidebar_project)
+    |> Loader.maybe_load_usage(next_section)
   end
 
   @impl true
@@ -566,6 +568,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_expanded={@flyout_file_expanded}
         flyout_file_children={@flyout_file_children}
         flyout_file_error={@flyout_file_error}
+        flyout_usage={@flyout_usage}
         rail_modal={@rail_modal}
         myself={@myself}
       />

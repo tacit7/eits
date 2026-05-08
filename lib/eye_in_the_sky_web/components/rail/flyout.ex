@@ -54,6 +54,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_file_expanded, :any, default: nil
   attr :flyout_file_children, :map, default: %{}
   attr :flyout_file_error, :string, default: nil
+  attr :flyout_usage, :any, default: nil
   attr :rail_modal, :any, default: nil
   attr :myself, :any, required: true
 
@@ -292,7 +293,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :notifications -> %>
               <Helpers.simple_link href="/notifications" label="Notifications" icon="hero-bell" />
             <% :usage -> %>
-              <UsageSection.usage_content />
+              <UsageSection.usage_content usage={@flyout_usage} />
             <% :jobs -> %>
               <JobsSection.jobs_content jobs={@flyout_jobs} sidebar_project={@sidebar_project} />
             <% :files -> %>

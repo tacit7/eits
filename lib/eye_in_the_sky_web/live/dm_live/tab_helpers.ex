@@ -295,19 +295,19 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
                 %{}
             end
 
-          Enum.map(commits, fn commit ->
-            if is_nil(commit.commit_message) do
-              %{commit | commit_message: Map.get(messages, commit.commit_hash)}
-            else
-              commit
-            end
-          end)
+          Enum.map(commits, &enrich_commit_message(&1, messages))
 
         _ ->
           commits
       end
     end
   end
+
+  defp enrich_commit_message(%{commit_message: nil} = commit, messages) do
+    %{commit | commit_message: Map.get(messages, commit.commit_hash)}
+  end
+
+  defp enrich_commit_message(commit, _messages), do: commit
 
   defp read_session_usage_stats(socket, session_id) do
     alias EyeInTheSky.Claude.SessionReader

@@ -41,19 +41,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         case Agents.get_agent(session.agent_id) do
           {:ok, agent} ->
             MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
-
-            socket =
-              socket
-              |> assign(:allow_split, true)
-              |> MountState.assign_sidebar_context(params)
-              |> MountState.assign_session_state(session, agent)
-              |> MountState.assign_essential_defaults(session)
-              |> then(fn s ->
-                if connected?(socket), do: MountState.assign_connected_defaults(s, session), else: s
-              end)
-              |> MessageHandlers.load_messages_on_mount()
-
-            {:ok, socket}
+            {:ok, mount_session_assigns(socket, params, session, agent, connected?(socket))}
 
           {:error, :not_found} ->
             {:ok,
@@ -63,6 +51,16 @@ defmodule EyeInTheSkyWeb.DmLive do
       {:error, :not_found} ->
         {:ok, socket |> put_flash(:error, "Session not found") |> redirect(to: "/")}
     end
+  end
+
+  defp mount_session_assigns(socket, params, session, agent, connected) do
+    socket
+    |> assign(:allow_split, true)
+    |> MountState.assign_sidebar_context(params)
+    |> MountState.assign_session_state(session, agent)
+    |> MountState.assign_essential_defaults(session)
+    |> then(fn s -> if connected, do: MountState.assign_connected_defaults(s, session), else: s end)
+    |> MessageHandlers.load_messages_on_mount()
   end
 
   # ---------------------------------------------------------------------------

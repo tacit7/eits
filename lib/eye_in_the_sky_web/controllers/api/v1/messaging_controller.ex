@@ -124,21 +124,13 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     if int_id = ToolHelpers.parse_int(raw) do
       Sessions.get_session(int_id)
     else
-      case Sessions.get_session_by_uuid(raw) do
-        {:ok, session} ->
-          {:ok, session}
-
-        {:error, :not_found} ->
-          case Agents.get_agent_by_uuid(raw) do
-            {:ok, agent} ->
-              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-                [session | _] -> {:ok, session}
-                _ -> {:error, :not_found}
-              end
-
-            _ ->
-              {:error, :not_found}
-          end
+      with {:error, :not_found} <- Sessions.get_session_by_uuid(raw),
+           {:ok, agent} <- Agents.get_agent_by_uuid(raw),
+           [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+        {:ok, session}
+      else
+        {:ok, session} -> {:ok, session}
+        _ -> {:error, :not_found}
       end
     end
   end

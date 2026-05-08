@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.ControllerHelpers do
   @moduledoc "Shared helpers for API controllers and LiveViews."
 
-  alias ToolHelpers
+  alias EyeInTheSky.Utils.ToolHelpers
 
   @doc """
   Canonical string-to-integer parser. **Do not use `Integer.parse/1` directly.**

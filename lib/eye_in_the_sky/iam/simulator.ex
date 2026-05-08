@@ -97,13 +97,11 @@ defmodule EyeInTheSky.IAM.Simulator do
 
     traces =
       Enum.map(policies, fn p ->
-        cond do
-          not p.enabled ->
-            %{policy: p, matched?: false, reason: {:miss, :disabled}}
-
-          true ->
-            reason = Evaluator.trace_policy(p, ctx, skip_builtins: skip_builtins)
-            %{policy: p, matched?: reason == :ok, reason: reason}
+        if not p.enabled do
+          %{policy: p, matched?: false, reason: {:miss, :disabled}}
+        else
+          reason = Evaluator.trace_policy(p, ctx, skip_builtins: skip_builtins)
+          %{policy: p, matched?: reason == :ok, reason: reason}
         end
       end)
 

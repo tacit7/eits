@@ -123,8 +123,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
   defp initials(name) do
     name
     |> String.split(" ")
-    |> Enum.map(&String.first/1)
-    |> Enum.join()
+    |> Enum.map_join(&String.first/1)
     |> String.slice(0, 2)
     |> String.upcase()
   end

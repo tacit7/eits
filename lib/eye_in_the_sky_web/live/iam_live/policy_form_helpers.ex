@@ -26,21 +26,19 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
   def merge_condition(params, condition_text) do
     trimmed = String.trim(condition_text || "")
 
-    cond do
-      trimmed == "" ->
-        {Map.put(params, "condition", %{}), nil}
+    if trimmed == "" do
+      {Map.put(params, "condition", %{}), nil}
+    else
+      case Jason.decode(trimmed) do
+        {:ok, %{} = decoded} ->
+          {Map.put(params, "condition", decoded), nil}
 
-      true ->
-        case Jason.decode(trimmed) do
-          {:ok, %{} = decoded} ->
-            {Map.put(params, "condition", decoded), nil}
+        {:ok, _other} ->
+          {Map.put(params, "condition", %{}), "must be a JSON object"}
 
-          {:ok, _other} ->
-            {Map.put(params, "condition", %{}), "must be a JSON object"}
-
-          {:error, %Jason.DecodeError{} = err} ->
-            {Map.put(params, "condition", %{}), "invalid JSON: #{Exception.message(err)}"}
-        end
+        {:error, %Jason.DecodeError{} = err} ->
+          {Map.put(params, "condition", %{}), "invalid JSON: #{Exception.message(err)}"}
+      end
     end
   end
 

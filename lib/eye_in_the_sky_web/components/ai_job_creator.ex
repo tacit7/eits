@@ -40,18 +40,18 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
       |> assign(:project, assigns.project)
 
     socket =
-      if not initialized do
-        socket
-        |> assign(:show_claude_drawer, false)
-        |> assign(:claude_model, "sonnet")
-        |> maybe_assign_web_project(assigns.project_id)
-      else
+      if initialized do
         # Refresh web_project if project context changed
         if assigns.project_id != prev_project_id do
           maybe_assign_web_project(socket, assigns.project_id)
         else
           socket
         end
+      else
+        socket
+        |> assign(:show_claude_drawer, false)
+        |> assign(:claude_model, "sonnet")
+        |> maybe_assign_web_project(assigns.project_id)
       end
 
     {:ok, socket}

@@ -68,9 +68,7 @@ defmodule EyeInTheSky.IAM.Normalizer do
     edits = input["edits"] || input[:edits] || []
 
     content =
-      edits
-      |> Enum.map(fn e -> e["new_string"] || e[:new_string] || "" end)
-      |> Enum.join("\n")
+      Enum.map_join(edits, "\n", fn e -> e["new_string"] || e[:new_string] || "" end)
 
     {:file, path, content}
   end

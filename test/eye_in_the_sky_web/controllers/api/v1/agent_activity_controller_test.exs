@@ -160,7 +160,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentActivityControllerTest do
       conn = get(conn, ~p"/api/v1/agents/activity?agent_uuid=#{agent.uuid}&since=24h")
       resp = json_response(conn, 200)
 
-      assert length(resp["commits"]) >= 1
+      assert resp["commits"] != []
       commit = hd(resp["commits"])
       assert Map.has_key?(commit, "hash")
       assert Map.has_key?(commit, "message")
@@ -176,7 +176,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentActivityControllerTest do
       resp = json_response(conn, 200)
 
       # Session was just created so it's within the 24h window
-      assert length(resp["sessions"]) >= 1
+      assert resp["sessions"] != []
       session = hd(resp["sessions"])
       assert Map.has_key?(session, "id")
       assert Map.has_key?(session, "uuid")

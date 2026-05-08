@@ -130,11 +130,9 @@ defmodule EyeInTheSky.IAM.HookResponse do
   # ── helpers ─────────────────────────────────────────────────────────────────
 
   defp render_instructions(instructions) do
-    instructions
-    |> Enum.map(fn %{policy: policy, message: msg} ->
+    Enum.map_join(instructions, "\n\n", fn %{policy: policy, message: msg} ->
       "**#{policy.name}**: #{msg}"
     end)
-    |> Enum.join("\n\n")
   end
 
   defp event_name(:pre_tool_use), do: "PreToolUse"

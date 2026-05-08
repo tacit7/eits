@@ -6,7 +6,7 @@ defmodule EyeInTheSky.Messages.IndexHealthTest do
   describe "list_message_indexes/0" do
     test "returns a non-empty list of indexes with valid and ready booleans" do
       assert {:ok, indexes} = IndexHealth.list_message_indexes()
-      assert length(indexes) > 0
+      assert indexes != []
 
       for index <- indexes do
         assert is_binary(index.name)

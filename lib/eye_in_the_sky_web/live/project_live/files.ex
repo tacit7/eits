@@ -121,23 +121,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   defp load_root_listing(socket, :list) do
     project = socket.assigns.project
 
-    if not is_nil(project.path) do
+    if is_nil(project.path) do
+      {:noreply, socket}
+    else
       case build_file_listing(project.path, "", ignore_hidden: true, ignored_dirs: @ignored_dirs) do
         {:ok, file_list} -> {:noreply, assign(socket, :files, file_list)}
         {:error, _reason} -> {:noreply, socket}
       end
-    else
-      {:noreply, socket}
     end
   end
 
   defp load_root_listing(socket, _mode), do: {:noreply, socket}
 
   defp handle_full_path(socket, full_path, path, project_path) do
-    if not path_within?(full_path, project_path) do
-      {:noreply, file_error(socket, "Access denied: path outside project directory")}
-    else
+    if path_within?(full_path, project_path) do
       dispatch_path(socket, full_path, path)
+    else
+      {:noreply, file_error(socket, "Access denied: path outside project directory")}
     end
   end
 

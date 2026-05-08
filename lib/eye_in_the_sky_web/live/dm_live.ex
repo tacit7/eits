@@ -338,6 +338,29 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("export_markdown", _params, socket), do: handle_export_markdown(socket)
 
   @impl true
+  def handle_event("sync_messages", _params, socket) do
+    case MessageHandlers.sync_messages_from_session_file(socket) do
+      {:ok, socket, 0} ->
+        {:noreply, put_flash(socket, :info, "Messages are already up to date.")}
+
+      {:ok, socket, 1} ->
+        {:noreply, put_flash(socket, :info, "Synced 1 missing message.")}
+
+      {:ok, socket, count} ->
+        {:noreply, put_flash(socket, :info, "Synced #{count} missing messages.")}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "No session file found for this session.")}
+
+      {:error, :no_project_path} ->
+        {:noreply, put_flash(socket, :error, "No project path configured.")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Sync failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
   def handle_event("reload_from_session_file", _params, socket) do
     Process.send_after(self(), :do_reload_from_session_file, 50)
     {:noreply, assign(socket, :reloading, true)}

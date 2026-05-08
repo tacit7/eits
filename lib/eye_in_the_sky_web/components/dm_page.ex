@@ -137,7 +137,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="modal-box pb-[env(safe-area-inset-bottom)]">
           <h3 class="font-semibold text-base">Reload from file?</h3>
           <p class="py-3 text-sm text-base-content/70">
-            This will delete all messages and re-import from the JSONL file.
+            This will <strong class="text-warning">delete all messages</strong> and re-import from the transcript file. Use "Sync messages" instead if you only want to recover missed messages.
           </p>
           <div class="form-control mb-4">
             <label class="label cursor-pointer gap-2 justify-start min-h-[44px] flex items-center">
@@ -300,6 +300,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           schedule_btn_id="dm-schedule-timer-btn"
           cancel_btn_id="dm-cancel-timer-btn"
           session_uuid={@session_uuid}
+          session_active={@agent.status in ~w(working compacting)}
         />
       </div>
 
@@ -373,11 +374,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 show_jsonl_export={true}
                 show_push_setup={true}
                 show_iterm={true}
-                reload_label="Reload"
+                reload_label="Reload from file"
                 active_timer={@overlay_data.active_timer}
                 cancel_btn_id="dm-cancel-timer-btn-desktop"
                 notify_on_stop={@notify_on_stop}
                 session_uuid={@session_uuid}
+                session_active={@agent.status in ~w(working compacting)}
               />
             </div>
           </div>

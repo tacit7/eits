@@ -19,6 +19,8 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponent do
 
   use EyeInTheSkyWeb, :live_component
 
+  alias EyeInTheSky.Terminal.PtyServer
+
   @impl true
   def update(%{pty_output: data} = assigns, socket) do
     # Route PTY output to the xterm.js hook using a component-scoped event name.
@@ -36,7 +38,7 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponent do
   @impl true
   def handle_event("pty_input", %{"data" => data}, socket) do
     if pid = socket.assigns[:pty_pid] do
-      EyeInTheSky.Terminal.PtyServer.write(pid, data)
+      PtyServer.write(pid, data)
     end
 
     {:noreply, socket}
@@ -44,7 +46,7 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponent do
 
   def handle_event("pty_resize", %{"cols" => cols, "rows" => rows}, socket) do
     if pid = socket.assigns[:pty_pid] do
-      EyeInTheSky.Terminal.PtyServer.resize(pid, cols, rows)
+      PtyServer.resize(pid, cols, rows)
     end
 
     {:noreply, socket}

@@ -5,6 +5,8 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
 
   use Phoenix.Component
 
+  alias EyeInTheSkyWeb.Helpers.ModelHelpers
+
   # Re-export so callers that `import ViewHelpers` get everything.
   defdelegate coerce_datetime(v), to: EyeInTheSkyWeb.Helpers.DateHelpers
   defdelegate parse_updated_at(v), to: EyeInTheSkyWeb.Helpers.DateHelpers
@@ -129,7 +131,7 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   Return a short display name for a Claude model ID.
   """
   def short_model(nil), do: "—"
-  def short_model(name), do: EyeInTheSkyWeb.Helpers.ModelHelpers.model_display_name(name)
+  def short_model(name), do: ModelHelpers.model_display_name(name)
 
   defdelegate open_in_system(path), to: EyeInTheSkyWeb.Helpers.SystemHelpers
 end

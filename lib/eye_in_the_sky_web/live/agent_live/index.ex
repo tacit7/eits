@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
+  alias EyeInTheSkyWeb.Helpers.SessionFilters
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Components.SessionCard
@@ -217,7 +218,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     updated_agents =
       socket.assigns.agents
       |> Enum.map(&AgentStatusHelpers.apply_agent_status(&1, session_id, new_status, now))
-      |> EyeInTheSkyWeb.Helpers.SessionFilters.sort_agents(socket.assigns.sort_by)
+      |> SessionFilters.sort_agents(socket.assigns.sort_by)
 
     assign(socket, :agents, updated_agents)
   end

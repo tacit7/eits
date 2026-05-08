@@ -3,6 +3,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnTeamContext do
 
   require Logger
 
+  alias EyeInTheSky.Agents.InstructionTemplates
   alias EyeInTheSky.Teams
 
   def resolve_team(nil), do: {:ok, nil}
@@ -19,7 +20,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnTeamContext do
 
   def apply_context(instructions, team, member_name) do
     instructions <>
-      "\n\n" <> EyeInTheSky.Agents.InstructionTemplates.team_context(team, member_name)
+      "\n\n" <> InstructionTemplates.team_context(team, member_name)
   end
 
   def record_spawn_failure(nil, _member_name), do: :ok

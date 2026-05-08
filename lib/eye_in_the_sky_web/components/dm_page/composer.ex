@@ -544,7 +544,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   defp format_cost(cost) when cost < 100, do: "$#{:erlang.float_to_binary(cost, decimals: 2)}"
   defp format_cost(cost), do: "$#{round(cost)}"
 
-  defp model_display_name(slug), do: EyeInTheSkyWeb.Helpers.ModelHelpers.model_display_name(slug)
+  defp model_display_name(slug), do: ModelHelpers.model_display_name(slug)
 
   defp format_number(n) when is_integer(n) do
     n

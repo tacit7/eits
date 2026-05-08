@@ -2,6 +2,8 @@ defmodule EyeInTheSkyWeb.Plugs.RequireAuth do
   @moduledoc false
   import Plug.Conn
 
+  alias EyeInTheSky.Accounts.ApiKey
+
   def init(opts), do: opts
 
   def call(conn, _opts) do
@@ -40,7 +42,7 @@ defmodule EyeInTheSkyWeb.Plugs.RequireAuth do
   end
 
   defp db_key_match?(token) do
-    EyeInTheSky.Accounts.ApiKey.valid_db_token?(token)
+    ApiKey.valid_db_token?(token)
   rescue
     DBConnection.ConnectionError -> false
   end

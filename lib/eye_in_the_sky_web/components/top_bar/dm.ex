@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
   attr :session_uuid, :string, default: nil
   attr :show_iterm, :boolean, default: false
   attr :notify_on_stop, :boolean, default: false
+  attr :session_active, :boolean, default: false
 
   def toolbar(assigns) do
     ~H"""
@@ -99,8 +100,13 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         <li>
           <button
             phx-click="sync_messages"
-            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
-            title="Re-read transcript and import missed messages"
+            class={[
+              "flex items-center gap-2 px-3 py-2 w-full text-left rounded",
+              !@session_active && "hover:bg-base-content/5",
+              @session_active && "opacity-40 cursor-not-allowed"
+            ]}
+            disabled={@session_active}
+            title={if @session_active, do: "Available after the session stops", else: "Re-read transcript and import missed messages"}
           >
             <.icon name="hero-arrow-path" class="size-3.5" /> Sync messages
           </button>

@@ -52,6 +52,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :task_data, :map, default: %{tasks: [], current_task: nil}
 
   attr :overlay_data, :map, default: %{active_overlay: nil, active_timer: nil, reloading: false}
+  attr :syncing, :boolean, default: false
 
   defp normalize_message_data(message_data) do
     Map.merge(
@@ -479,6 +480,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               stream={@stream}
               agent={@agent}
               codex_raw_lines={@codex_raw_lines}
+              syncing={@syncing}
             />
           <% "tasks" -> %>
             <TasksTab.tasks_tab tasks={@task_data.tasks} />
@@ -504,6 +506,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               stream={@stream}
               agent={@agent}
               codex_raw_lines={@codex_raw_lines}
+              syncing={@syncing}
             />
         <% end %>
       </div>
@@ -549,6 +552,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :stream, :map, required: true
   attr :agent, :map, required: true
   attr :codex_raw_lines, :list, required: true
+  attr :syncing, :boolean, default: false
 
   defp messages_tab_content(assigns) do
     ~H"""
@@ -561,6 +565,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       agent={@agent}
       message_search_query={@message_data.message_search_query}
       codex_raw_lines={@codex_raw_lines}
+      syncing={@syncing}
     />
     """
   end

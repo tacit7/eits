@@ -437,6 +437,42 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, assign(new_socket, :reloading, false)}
   end
 
+  # Fired by the mount sync Task. Dismisses the skeleton and loads messages.
+  # Both :clean (no new messages) and :dirty (imported new messages) trigger
+  # a DB load so messages appear all at once after the skeleton disappears.
+  @impl true
+  def handle_info({:sync_done, _result}, socket) do
+    socket =
+      socket
+      |> assign(:syncing, false)
+      |> TabHelpers.force_reload_messages(socket.assigns.session_id)
+      |> push_event("new_message", %{})
+
+    {:noreply, socket}
+  end
+
+  # 5-second failsafe — fires if sync Task hasn't reported back.
+  # Dismisses the skeleton and loads from DB directly so the user isn't stuck.
+  @impl true
+  def handle_info(:sync_timeout, %{assigns: %{syncing: true}} = socket) do
+    Logger.warning("DM mount sync timeout, loading from DB",
+      session_id: socket.assigns.session_id
+    )
+
+    socket =
+      socket
+      |> assign(:syncing, false)
+      |> TabHelpers.force_reload_messages(socket.assigns.session_id)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(:sync_timeout, socket) do
+    # Sync already completed before the timeout fired — no-op.
+    {:noreply, socket}
+  end
+
   @impl true
   def handle_info(:do_message_reload, socket) do
     socket =
@@ -634,6 +670,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         notify_on_stop={@notify_on_stop}
         dm_settings_scope={@dm_settings_scope}
         dm_settings_subtab={@dm_settings_subtab}
+        syncing={@syncing}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

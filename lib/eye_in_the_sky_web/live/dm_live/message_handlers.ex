@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [connected?: 1, put_flash: 3, push_event: 3, stream_insert: 3]
+  import Phoenix.LiveView, only: [connected?: 1, put_flash: 3, push_event: 3, stream: 4, stream_insert: 3]
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.SessionImporter
@@ -115,27 +115,26 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     end
   end
 
+  @sync_timeout_ms 5_000
+
   @doc """
-  On connected mount, loads messages from the DB immediately and kicks off an
-  async Task to sync from the session file. The sync can involve many individual
-  DB round-trips (one per message) and must not block the LiveView process —
-  holding a DB connection in the LV for the full sync duration triggers a
-  15 s DBConnection timeout for long sessions.
+  On mount, shows a loading skeleton and defers message loading until after the
+  session file sync completes. This prevents the "one by one" loading effect
+  caused by a stream reset mid-render.
 
-  The Task sends `:do_message_reload` when done so the LV picks up any newly
-  imported messages without the user seeing a blank conversation.
+  Both dead and connected renders start with `syncing: true` (set in
+  `assign_ui_flags`). The connected render kicks off an async sync Task that
+  sends `{:sync_done, result}` on completion. DmLive.handle_info dismisses the
+  skeleton and loads messages all at once.
 
-  ## Why skip sync for active sessions
+  A 5-second timeout fires `:sync_timeout` as a failsafe for large sessions
+  or slow disk — the skeleton is dismissed and messages load from DB directly.
 
-  When a session is actively running ("working" or "compacting"), the
-  event-driven pipeline — `handle_claude_complete` / `handle_agent_stopped` →
-  `sync_and_reload` — handles all JSONL imports. Running the mount Task sync
-  concurrently creates a race: both paths call `SessionImporter.sync` at the
-  same time, read the same `get_last_source_uuid` cursor before either commits,
-  and each inserts the same JSONL entry with its own distinct source_uuid.
-  `on_conflict: :nothing` only deduplicates identical UUIDs, so both rows land
-  in the DB and the message renders twice. Skipping the Task sync for active
-  sessions eliminates this window entirely.
+  ## Stream initialization
+
+  The `:grouped_messages` stream must be initialized in mount even when the
+  skeleton is showing, otherwise later `stream_insert` / `stream reset` calls
+  would crash with an uninitialized stream error.
   """
   def load_messages_on_mount(socket) do
     if connected?(socket) do
@@ -145,9 +144,9 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       session_uuid = socket.assigns.session_uuid
       lv_pid = self()
 
-      # Sync from the session transcript file on every mount. BulkImporter's
-      # source_uuid unique index + on_conflict: :nothing prevents duplicates
-      # even if the live pipeline and mount sync race.
+      # Schedule failsafe — dismisses skeleton if Task takes too long.
+      Process.send_after(lv_pid, :sync_timeout, @sync_timeout_ms)
+
       Task.start(fn ->
         result =
           case session.provider do
@@ -158,12 +157,11 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
         case result do
           {:ok, %{inserted: 0, updated: 0}} ->
-            # Nothing new from the session file — skip the reload to avoid a
-            # redundant stream reset that destroys + remounts every MarkdownMessage
-            # hook, causing a visible "one by one" re-render of already-loaded messages.
-            Logger.debug("DM mount sync: no new messages, skipping reload",
+            Logger.debug("DM mount sync: no new messages",
               session_id: session_id
             )
+
+            send(lv_pid, {:sync_done, :clean})
 
           {:ok, %{inserted: inserted, updated: updated}} ->
             Logger.info("DM mount sync imported messages",
@@ -172,22 +170,33 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
               updated: updated
             )
 
-            send(lv_pid, :do_message_reload)
+            send(lv_pid, {:sync_done, :dirty})
 
           {:error, reason} ->
             Logger.warning("DM mount sync failed",
               session_id: session_id,
               reason: inspect(reason)
             )
+
+            send(lv_pid, {:sync_done, :clean})
         end
       end)
 
-      TabHelpers.load_tab_data(socket, "messages", session_id)
+      init_empty_stream(socket)
     else
-      # Dead render: load messages only — skip usage stats (file read or 2 aggregate
-      # DB queries on all messages) that are discarded when the WebSocket connects.
-      TabHelpers.load_messages_only(socket, socket.assigns.session_id)
+      # Dead render: initialize stream empty and show skeleton.
+      # Messages load after the connected sync Task completes.
+      init_empty_stream(socket)
     end
+  end
+
+  # Initializes stream assigns for the skeleton state — no DB load.
+  # Messages are populated later by handle_info({:sync_done, _}).
+  defp init_empty_stream(socket) do
+    socket
+    |> assign(:messages, nil)
+    |> assign(:last_stream_tail, [])
+    |> stream(:grouped_messages, [], reset: true)
   end
 
   @doc """

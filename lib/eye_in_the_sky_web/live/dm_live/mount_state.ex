@@ -121,6 +121,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:dm_settings_effective, effective)
     |> assign(:dm_settings_session_overrides, session_overrides)
     |> assign(:dm_settings_agent_overrides, agent_overrides)
+    |> assign(:syncing, true)
   end
 
   defp assign_stream_defaults(socket) do

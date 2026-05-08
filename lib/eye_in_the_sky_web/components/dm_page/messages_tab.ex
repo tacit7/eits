@@ -39,6 +39,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :agent, :any, default: nil
   attr :message_search_query, :string, default: ""
   attr :codex_raw_lines, :list, default: []
+  attr :syncing, :boolean, default: false
 
   def messages_tab(assigns) do
     ~H"""
@@ -50,6 +51,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         data-has-more={if @has_more_messages, do: "true", else: "false"}
         style="scrollbar-width: none; -ms-overflow-style: none; overflow-anchor: none;"
       >
+          <%= if @syncing do %>
+            <.message_skeleton />
+          <% else %>
           <%= if @empty do %>
             <.empty_state
               title={if @agent, do: @agent.name, else: "No messages yet"}
@@ -136,6 +140,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <%!-- Scroll anchor --%>
               <div id="messages-scroll-anchor" style="height: 1px; overflow-anchor: auto;"></div>
             </div>
+          <% end %>
           <% end %>
       </div>
 
@@ -345,6 +350,34 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   end
 
   defdelegate stream_provider_label(session), to: DmHelpers
+
+  # ---------------------------------------------------------------------------
+  # Loading skeleton — shown while mount sync Task is running
+  # ---------------------------------------------------------------------------
+
+  defp message_skeleton(assigns) do
+    ~H"""
+    <div class="max-w-[860px] w-full mx-auto px-5 py-5 space-y-6 animate-pulse" aria-hidden="true">
+      <%= for _i <- 1..4 do %>
+        <div class="flex gap-3">
+          <%!-- Avatar circle --%>
+          <div class="size-7 rounded-full bg-base-content/10 flex-shrink-0 mt-0.5"></div>
+          <%!-- Text lines --%>
+          <div class="flex-1 space-y-2 pt-1">
+            <div class="h-2.5 bg-base-content/10 rounded-full w-1/4"></div>
+            <div class="h-2 bg-base-content/8 rounded-full w-full"></div>
+            <div class="h-2 bg-base-content/8 rounded-full w-11/12"></div>
+            <div class="h-2 bg-base-content/8 rounded-full w-4/5"></div>
+            <div class="flex gap-2 pt-1">
+              <div class="h-2 bg-base-content/6 rounded-full w-12"></div>
+              <div class="h-2 bg-base-content/6 rounded-full w-10"></div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+    """
+  end
 
   # ---------------------------------------------------------------------------
   # tool_cluster component

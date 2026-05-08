@@ -90,6 +90,7 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 | `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`, `"zombie_swept"`, `"billing_error"`, `"authentication_error"`, `"rate_limit_error"`, `"watchdog_timeout"`, `"retry_exhausted"`. Auto-cleared when transitioning away from waiting. Error values are normally set by the AgentWorker on systemic failure, not by API clients — they drive the red failure-tier badges in the session UI |
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
 | `read_only` | boolean | no | Session intent: `true` for read-only (review mode), `false` for work mode |
+| `worktree_path` | string | no | Absolute path to the git worktree for this session. Stored as `git_worktree_path` in DB. Set by agents after `git worktree add` |
 
 **Response:** `200 OK`
 

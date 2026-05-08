@@ -77,7 +77,8 @@ eits sessions create --session-id <uuid> [--name <n>] [--description <d>] \
 
 eits sessions update <uuid> [--status <s>] [--intent <text>] \
   [--entrypoint <e>] [--name <name>] [--description <desc>] \
-  [--clear-entrypoint] [--ended-at <ISO8601>]
+  [--clear-entrypoint] [--ended-at <ISO8601>] \
+  [--worktree-path <path>]
 
 eits sessions end <uuid> [--final-status <completed|failed|waiting>]
 

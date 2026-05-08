@@ -67,15 +67,13 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocomplete do
   defp resolve_base("project", session) do
     raw = Map.get(session, :git_worktree_path)
 
-    cond do
-      is_binary(raw) and File.dir?(raw) ->
-        {:ok, raw}
-
-      true ->
-        case File.cwd() do
-          {:ok, cwd} -> {:ok, cwd}
-          {:error, reason} -> {:error, {:no_cwd, reason}}
-        end
+    if is_binary(raw) and File.dir?(raw) do
+      {:ok, raw}
+    else
+      case File.cwd() do
+        {:ok, cwd} -> {:ok, cwd}
+        {:error, reason} -> {:error, {:no_cwd, reason}}
+      end
     end
   end
 

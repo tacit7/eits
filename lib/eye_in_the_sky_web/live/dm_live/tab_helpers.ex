@@ -232,9 +232,10 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       # Claude Code reports contextWindow: 200k even for 1M models.
       # Detect 1M from the model key suffix (e.g. "claude-opus-4-7[1m]").
       ctx_window =
-        cond do
-          String.contains?(model_key, "[1m]") -> @extended_context_window
-          true -> entry["contextWindow"] || @default_context_window
+        if String.contains?(model_key, "[1m]") do
+          @extended_context_window
+        else
+          entry["contextWindow"] || @default_context_window
         end
 
       used = input + cache_read + cache_creation

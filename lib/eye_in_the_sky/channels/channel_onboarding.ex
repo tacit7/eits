@@ -102,13 +102,11 @@ defmodule EyeInTheSky.Channels.ChannelOnboarding do
 
   defp format_snapshot(messages, _channel_id) do
     lines =
-      messages
-      |> Enum.map(fn msg ->
+      Enum.map_join(messages, "\n", fn msg ->
         sender = sender_name(msg)
         body = truncate(msg.body, @body_max)
         "  [#{sender}] #{body}"
       end)
-      |> Enum.join("\n")
 
     "\nRecent activity:\n#{lines}\n\n"
   end

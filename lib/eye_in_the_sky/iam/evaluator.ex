@@ -108,28 +108,26 @@ defmodule EyeInTheSky.IAM.Evaluator do
   # and ConditionEval — they own their match logic in an Elixir module.
   defp specialized_trace(%Policy{builtin_matcher: key} = p, %Context{} = ctx, opts)
        when is_binary(key) do
-    cond do
-      Keyword.get(opts, :skip_builtins, false) ->
-        :ok
+    if Keyword.get(opts, :skip_builtins, false) do
+      :ok
+    else
+      case EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key) do
+        {:ok, module} ->
+          case safe_builtin_trace(module, p, ctx) do
+            :match -> :ok
+            :no_match -> {:miss, :builtin_matcher}
+            :error -> {:miss, :builtin_error}
+          end
 
-      true ->
-        case EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key) do
-          {:ok, module} ->
-            case safe_builtin_trace(module, p, ctx) do
-              :match -> :ok
-              :no_match -> {:miss, :builtin_matcher}
-              :error -> {:miss, :builtin_error}
-            end
+        :error ->
+          :telemetry.execute(
+            [:eye_in_the_sky, :iam, :builtin_matcher, :unknown_key],
+            %{count: 1},
+            %{policy_id: p.id, key: key}
+          )
 
-          :error ->
-            :telemetry.execute(
-              [:eye_in_the_sky, :iam, :builtin_matcher, :unknown_key],
-              %{count: 1},
-              %{policy_id: p.id, key: key}
-            )
-
-            {:miss, :builtin_matcher}
-        end
+          {:miss, :builtin_matcher}
+      end
     end
   end
 

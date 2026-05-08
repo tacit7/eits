@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.SessionsTest do
 
   alias EyeInTheSky.{Factory, Projects, Workspaces}
   alias EyeInTheSkyWeb.Components.NewSessionModal
+  alias EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions
 
   setup %{user: user} do
     workspace = Workspaces.default_workspace_for_user!(user)
@@ -108,7 +109,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.SessionsTest do
       }
 
       {:noreply, result_socket} =
-        EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions.create_new_session(params, socket)
+        Actions.create_new_session(params, socket)
 
       assert result_socket.assigns.flash["error"] == "Project not found"
     end

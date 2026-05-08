@@ -183,14 +183,19 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   @impl true
-  def handle_event("toggle_section", params, socket),
-    do: SectionActions.handle_toggle_section(params, socket)
+  def handle_event("toggle_section", params, socket) do
+    {:noreply, new_socket} = SectionActions.handle_toggle_section(params, socket)
+    {:noreply, maybe_start_usage_async(new_socket, new_socket.assigns.active_section)}
+  end
 
   def handle_event("close_flyout", _params, socket),
     do: SectionActions.handle_close_flyout(socket)
 
   def handle_event("refresh_usage", _params, socket) do
-    {:noreply, assign(socket, :flyout_usage, RateLimitClient.force_refresh())}
+    {:noreply,
+     socket
+     |> assign(:flyout_usage, nil)
+     |> start_async(:load_usage, fn -> RateLimitClient.force_refresh() end)}
   end
 
   def handle_event("restore_section", %{"section" => section_str}, socket),
@@ -413,6 +418,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     do: FileActions.handle_file_refresh(socket)
 
   @impl true
+  def handle_async(:load_usage, {:ok, result}, socket) do
+    {:noreply, assign(socket, :flyout_usage, result)}
+  end
+
+  def handle_async(:load_usage, {:exit, reason}, socket) do
+    {:noreply, assign(socket, :flyout_usage, {:error, reason})}
+  end
+
   def handle_async(:pick_folder, {:ok, result}, socket),
     do: ProjectActions.handle_pick_folder(result, socket)
 
@@ -456,7 +469,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     |> Loader.maybe_load_skills(next_section, socket.assigns.sidebar_project)
     |> Loader.maybe_load_prompts(next_section, socket.assigns.sidebar_project)
     |> Loader.maybe_load_usage(next_section)
+    |> maybe_start_usage_async(next_section)
   end
+
+  defp maybe_start_usage_async(socket, :usage) do
+    start_async(socket, :load_usage, fn -> RateLimitClient.fetch() end)
+  end
+
+  defp maybe_start_usage_async(socket, _section), do: socket
 
   @impl true
   def render(assigns) do

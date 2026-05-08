@@ -20,7 +20,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
     Teams
   }
 
-  alias EyeInTheSky.Claude.RateLimitClient
   alias EyeInTheSky.Projects.FileTree
   alias EyeInTheSkyWeb.Live.Shared.{AgentsHelpers, SkillsHelpers}
 
@@ -291,8 +290,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
 
   defp filter_prompts_by_scope(prompts, _scope, _project_id), do: prompts
 
+  # Resets the usage assign to nil (loading state). The actual HTTP fetch
+  # is kicked off asynchronously via start_async/3 in rail.ex after this runs.
   def maybe_load_usage(socket, :usage) do
-    assign(socket, :flyout_usage, RateLimitClient.fetch())
+    assign(socket, :flyout_usage, nil)
   end
 
   def maybe_load_usage(socket, _section), do: socket

@@ -70,7 +70,8 @@ export const QuickCreateNote = createQuickHook("palette:create-note", {
     const title = (this.el.querySelector("[data-qcn-title]")?.value || "").trim()
     const body = (this.el.querySelector("[data-qcn-body]")?.value || "").trim()
     if (!title) return
-    this.pushEvent("palette:create-note", {title, body})
+    const projectId = this.el.dataset.projectId || null
+    this.pushEvent("palette:create-note", {title, body, project_id: projectId})
   },
   reset() {
     const t = this.el.querySelector("[data-qcn-title]")

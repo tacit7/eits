@@ -256,7 +256,9 @@
       </div>
     </nav>
 
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_note />
+    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_note project_id={
+      assigns[:sidebar_project] && assigns[:sidebar_project].id
+    } />
     <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_agent project_id={
       assigns[:sidebar_project] && assigns[:sidebar_project].id
     } />

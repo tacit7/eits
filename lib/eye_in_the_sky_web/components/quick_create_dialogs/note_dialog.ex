@@ -2,11 +2,14 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.NoteDialog do
   @moduledoc false
   use Phoenix.Component
 
+  attr :project_id, :any, default: nil
+
   def quick_create_note(assigns) do
     ~H"""
     <dialog
       id="quick-create-note"
       phx-hook="QuickCreateNote"
+      data-project-id={@project_id}
       class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
     >
       <div class="modal-box max-w-lg p-0 overflow-hidden">

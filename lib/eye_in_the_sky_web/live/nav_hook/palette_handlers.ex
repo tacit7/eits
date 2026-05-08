@@ -177,11 +177,18 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     body_param = (params["body"] || "") |> String.trim()
     body = if body_param == "", do: "(empty)", else: body_param
 
+    {parent_type, parent_id} =
+      case params["project_id"] do
+        id when is_binary(id) and id != "" -> {"project", id}
+        id when is_integer(id) -> {"project", to_string(id)}
+        _ -> {"system", "0"}
+      end
+
     attrs = %{
       title: (params["title"] || "") |> String.trim(),
       body: body,
-      parent_type: "system",
-      parent_id: "0"
+      parent_type: parent_type,
+      parent_id: parent_id
     }
 
     result =

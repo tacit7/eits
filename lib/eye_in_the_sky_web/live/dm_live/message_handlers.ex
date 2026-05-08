@@ -157,7 +157,21 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
           end
 
         case result do
-          {:ok, _} ->
+          {:ok, %{inserted: 0, updated: 0}} ->
+            # Nothing new from the session file — skip the reload to avoid a
+            # redundant stream reset that destroys + remounts every MarkdownMessage
+            # hook, causing a visible "one by one" re-render of already-loaded messages.
+            Logger.debug("DM mount sync: no new messages, skipping reload",
+              session_id: session_id
+            )
+
+          {:ok, stats} ->
+            Logger.info("DM mount sync imported messages",
+              session_id: session_id,
+              inserted: stats.inserted,
+              updated: stats.updated
+            )
+
             send(lv_pid, :do_message_reload)
 
           {:error, reason} ->

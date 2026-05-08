@@ -280,6 +280,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
                 phx-hook="MarkdownMessage"
                 data-raw-body={text}
               >
+                <pre class="whitespace-pre-wrap font-sans text-inherit m-0 p-0">{text}</pre>
               </div>
             <% _ -> %>
           <% end %>

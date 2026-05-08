@@ -286,10 +286,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
               {output, 0} ->
                 output
                 |> String.split("\n", trim: true)
-                |> Map.new(fn line ->
-                  [hash | rest] = String.split(line, "\t", parts: 2)
-                  {String.trim(hash), Enum.join(rest, "\t")}
-                end)
+                |> Map.new(&parse_git_log_line/1)
 
               _ ->
                 %{}
@@ -301,6 +298,11 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
           commits
       end
     end
+  end
+
+  defp parse_git_log_line(line) do
+    [hash | rest] = String.split(line, "\t", parts: 2)
+    {String.trim(hash), Enum.join(rest, "\t")}
   end
 
   defp enrich_commit_message(%{commit_message: nil} = commit, messages) do

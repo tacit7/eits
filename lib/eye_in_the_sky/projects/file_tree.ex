@@ -170,24 +170,27 @@ defmodule EyeInTheSky.Projects.FileTree do
       if parent == path do
         {:ok, path}
       else
-        with {:ok, real_parent} <- resolve_path_via_parent(parent, seen) do
-          full_path = Path.join(real_parent, basename)
+        resolve_via_real_parent(parent, basename, seen)
+      end
+    end
+  end
 
-          case File.read_link(full_path) do
-            {:ok, target} ->
-              resolved = resolve_link_target(target, real_parent)
-              resolve_path_via_parent(resolved, MapSet.put(seen, full_path))
+  defp resolve_via_real_parent(parent, basename, seen) do
+    with {:ok, real_parent} <- resolve_path_via_parent(parent, seen) do
+      full_path = Path.join(real_parent, basename)
 
-            {:error, :einval} ->
-              {:ok, full_path}
+      case File.read_link(full_path) do
+        {:ok, target} ->
+          resolve_path_via_parent(resolve_link_target(target, real_parent), MapSet.put(seen, full_path))
 
-            {:error, :enoent} ->
-              {:ok, full_path}
+        {:error, :einval} ->
+          {:ok, full_path}
 
-            {:error, reason} ->
-              {:error, reason}
-          end
-        end
+        {:error, :enoent} ->
+          {:ok, full_path}
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end

@@ -1,4 +1,5 @@
 # credo:disable-for-this-file Credo.Check.Warning.UnsafeToAtom
+# credo:disable-for-this-file Credo.Check.Refactor.Nesting
 defmodule EyeInTheSky.Claude.AgentWorkerBroadcastIsolationTest do
   use EyeInTheSky.DataCase, async: false
 
@@ -87,10 +88,10 @@ defmodule EyeInTheSky.Claude.AgentWorkerBroadcastIsolationTest do
 
   # Helpers (mirrored from AgentWorkerTest — not shared yet)
 
-  # credo:disable-for-next-line Credo.Check.Refactor.Nesting
   defp wait_for_mock_port(session_id, attempts \\ 20)
   defp wait_for_mock_port(_session_id, 0), do: nil
 
+  # credo:disable-for-next-line Credo.Check.Refactor.Nesting
   defp wait_for_mock_port(session_id, attempts) do
     case Registry.lookup(AgentRegistry, {:session, session_id}) do
       [{worker_pid, _}] when is_pid(worker_pid) ->

@@ -46,20 +46,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
                body: body
              }) do
           {:ok, message} ->
-            Enum.each(image_infos, fn {path, entry, size} ->
-              case FileAttachments.create_attachment(%{
-                     message_id: message.id,
-                     filename: Path.basename(path),
-                     original_filename: entry.client_name,
-                     content_type: entry.client_type || mime_from_ext(entry.client_name),
-                     size_bytes: size,
-                     storage_path: path
-                   }) do
-                {:ok, _} -> :ok
-                {:error, reason} -> Repo.rollback(reason)
-              end
-            end)
-
+            Enum.each(image_infos, &create_attachment_or_rollback(message.id, &1))
             message
 
           {:error, changeset} ->
@@ -271,6 +258,20 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   end
 
   # Private helpers
+
+  defp create_attachment_or_rollback(message_id, {path, entry, size}) do
+    case FileAttachments.create_attachment(%{
+           message_id: message_id,
+           filename: Path.basename(path),
+           original_filename: entry.client_name,
+           content_type: entry.client_type || mime_from_ext(entry.client_name),
+           size_bytes: size,
+           storage_path: path
+         }) do
+      {:ok, _} -> :ok
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
 
   defp get_session_id(socket), do: socket.assigns[:session_id]
 

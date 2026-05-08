@@ -3,8 +3,8 @@ defmodule EyeInTheSky.Search.PgSearchTest do
 
   import Ecto.Query
 
-  alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Notes.Note
+  alias EyeInTheSky.Search.PgSearch
 
   defp uniq, do: System.unique_integer([:positive])
 

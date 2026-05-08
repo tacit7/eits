@@ -3,8 +3,8 @@ defmodule EyeInTheSky.Claude.SessionReader do
   Reads Claude Code session files from ~/.claude/projects/ and extracts conversation messages.
   """
 
-  alias EyeInTheSky.Claude.SessionFileLocator
   alias EyeInTheSky.Claude.MessageFormatter
+  alias EyeInTheSky.Claude.SessionFileLocator
 
   @doc """
   Discovers all Claude Code sessions by scanning ~/.claude/projects/ directory.

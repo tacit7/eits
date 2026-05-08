@@ -1,9 +1,9 @@
 defmodule EyeInTheSky.Messages.NotifyListenerTest do
   use EyeInTheSky.DataCase, async: false
 
+  alias Ecto.Adapters.SQL.Sandbox
   alias EyeInTheSky.{Agents, Channels, Events, Messages, Sessions}
   alias EyeInTheSky.Messages.{Message, NotifyListener}
-  alias Ecto.Adapters.SQL.Sandbox
 
   defp uniq, do: System.unique_integer([:positive])
 

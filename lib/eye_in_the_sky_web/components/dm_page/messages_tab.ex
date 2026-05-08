@@ -24,8 +24,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, empty_state: 1]
 
-  alias Phoenix.LiveView.JS
   alias EyeInTheSkyWeb.Components.DmMessageComponents
+  alias Phoenix.LiveView.JS
 
   # ---------------------------------------------------------------------------
   # Function component

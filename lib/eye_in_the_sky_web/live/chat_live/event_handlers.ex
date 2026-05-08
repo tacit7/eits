@@ -6,8 +6,8 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [cancel_upload: 3, put_flash: 3, push_patch: 2]
 
-  alias EyeInTheSky.{ChannelMessages, Channels, FileAttachments, MessageReactions, Messages, Repo}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.{ChannelMessages, Channels, FileAttachments, MessageReactions, Messages, Repo}
   alias EyeInTheSky.Claude.ChannelProtocol
   alias EyeInTheSkyWeb.ChatLive.ChannelActions
   alias EyeInTheSkyWeb.ChatLive.ChannelDataLoader

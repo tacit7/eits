@@ -1,8 +1,8 @@
 defmodule EyeInTheSky.Teams do
   @moduledoc false
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Agents.Agent
+  alias EyeInTheSky.Repo
   alias EyeInTheSky.Tasks.Task, as: EitsTask
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Teams.{Team, TeamMember}

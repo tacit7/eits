@@ -2,8 +2,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
   use EyeInTheSkyWeb.ConnCase
 
   import Phoenix.LiveViewTest
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Factory
+  alias EyeInTheSky.Projects
 
   setup do
     # Create a test project

@@ -5,9 +5,9 @@ defmodule EyeInTheSky.Notes do
 
   import Ecto.Query, warn: false
   alias EyeInTheSky.Notes.Note
+  alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
-  alias EyeInTheSky.Notes.NoteQueries
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Tasks
 

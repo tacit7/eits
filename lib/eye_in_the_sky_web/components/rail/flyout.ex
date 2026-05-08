@@ -2,19 +2,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.Helpers
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.CanvasSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSection
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.JobsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.CanvasSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection
-  alias EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.Helpers
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.JobsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection
+  alias EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection
 
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.

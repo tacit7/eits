@@ -1,8 +1,8 @@
 defmodule EyeInTheSky.Messaging.DMDelivery do
   @moduledoc "Single entry point for delivering and persisting DMs."
 
-  alias EyeInTheSky.Messages
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Messages
 
   @doc """
   Send a DM to `to_session_id`, persist it, and broadcast a PubSub event.

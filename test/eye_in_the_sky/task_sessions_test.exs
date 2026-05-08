@@ -4,7 +4,7 @@ defmodule EyeInTheSky.TaskSessionsTest do
   import Ecto.Query, only: [from: 2]
   import EyeInTheSky.Factory
 
-  alias EyeInTheSky.{Repo, TaskSessions, Tasks}
+  alias EyeInTheSky.{Repo, Tasks, TaskSessions}
 
   defp create_task do
     {:ok, task} =

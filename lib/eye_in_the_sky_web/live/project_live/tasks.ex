@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.Components.TasksBulkActions
@@ -8,7 +9,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Live.Shared.BulkHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
-  alias EyeInTheSky.Tasks
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers

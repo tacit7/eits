@@ -1,8 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.{Commits, Contexts, Notes, Sessions, Tasks}
   alias EyeInTheSky.Accounts.ApiKey
+  alias EyeInTheSky.{Commits, Contexts, Notes, Sessions, Tasks}
 
   import EyeInTheSky.Factory
 

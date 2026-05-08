@@ -5,10 +5,10 @@ defmodule EyeInTheSky.ScheduledJobs do
   require Logger
 
   alias EyeInTheSky.Repo
-  alias EyeInTheSky.ScheduledJobs.ScheduledJob
   alias EyeInTheSky.ScheduledJobs.CronParser
   alias EyeInTheSky.ScheduledJobs.JobRunTracker
   alias EyeInTheSky.ScheduledJobs.JobScheduler
+  alias EyeInTheSky.ScheduledJobs.ScheduledJob
 
   # ---------------------------------------------------------------------------
   # Run tracking — delegated to JobRunTracker

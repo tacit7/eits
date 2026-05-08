@@ -195,14 +195,8 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
             Path.join([skills_dir, skill_name, "SKILL.md"]) |> File.exists?()
           end)
           |> Enum.flat_map(fn skill_name ->
-            case File.read(Path.join([skills_dir, skill_name, "SKILL.md"])) do
-              {:ok, content} ->
-                slug = "#{plugin_name}:#{skill_name}"
-                [%{slug: slug, type: "skill", description: extract_description(content)}]
-
-              {:error, _} ->
-                []
-            end
+            path = Path.join([skills_dir, skill_name, "SKILL.md"])
+            read_slash_skill(path, skill_name, plugin_name)
           end)
 
         {:error, _} ->
@@ -210,6 +204,17 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
       end
     else
       []
+    end
+  end
+
+  defp read_slash_skill(path, skill_name, plugin_name) do
+    case File.read(path) do
+      {:ok, content} ->
+        slug = "#{plugin_name}:#{skill_name}"
+        [%{slug: slug, type: "skill", description: extract_description(content)}]
+
+      {:error, _} ->
+        []
     end
   end
 

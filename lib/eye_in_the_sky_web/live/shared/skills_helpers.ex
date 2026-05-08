@@ -142,32 +142,35 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
           |> Enum.flat_map(fn filename ->
             path = Path.join(dir, filename)
             slug = String.replace_trailing(filename, ".md", "")
-
-            case File.read(path) do
-              {:error, _} ->
-                []
-
-              {:ok, content} ->
-                stat = File.stat!(path)
-
-                [
-                  %Skill{
-                    id: build_id(source, slug),
-                    slug: slug,
-                    filename: filename,
-                    path: "#{display_prefix}/#{filename}",
-                    source: source,
-                    description: extract_description(content),
-                    content: content,
-                    size: byte_size(content),
-                    mtime: stat.mtime
-                  }
-                ]
-            end
+            read_skill_entry(path, slug, filename, source, display_prefix)
           end)
       end
     else
       []
+    end
+  end
+
+  defp read_skill_entry(path, slug, filename, source, display_prefix) do
+    case File.read(path) do
+      {:error, _} ->
+        []
+
+      {:ok, content} ->
+        stat = File.stat!(path)
+
+        [
+          %Skill{
+            id: build_id(source, slug),
+            slug: slug,
+            filename: filename,
+            path: "#{display_prefix}/#{filename}",
+            source: source,
+            description: extract_description(content),
+            content: content,
+            size: byte_size(content),
+            mtime: stat.mtime
+          }
+        ]
     end
   end
 
@@ -184,32 +187,35 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
           end)
           |> Enum.flat_map(fn dir ->
             path = Path.join([skills_dir, dir, "SKILL.md"])
-
-            case File.read(path) do
-              {:error, _} ->
-                []
-
-              {:ok, content} ->
-                stat = File.stat!(path)
-
-                [
-                  %Skill{
-                    id: build_id(source, dir),
-                    slug: dir,
-                    filename: "SKILL.md",
-                    path: "#{display_prefix}/#{dir}/SKILL.md",
-                    source: source,
-                    description: extract_description(content),
-                    content: content,
-                    size: byte_size(content),
-                    mtime: stat.mtime
-                  }
-                ]
-            end
+            read_skills_dir_entry(path, dir, source, display_prefix)
           end)
       end
     else
       []
+    end
+  end
+
+  defp read_skills_dir_entry(path, dir, source, display_prefix) do
+    case File.read(path) do
+      {:error, _} ->
+        []
+
+      {:ok, content} ->
+        stat = File.stat!(path)
+
+        [
+          %Skill{
+            id: build_id(source, dir),
+            slug: dir,
+            filename: "SKILL.md",
+            path: "#{display_prefix}/#{dir}/SKILL.md",
+            source: source,
+            description: extract_description(content),
+            content: content,
+            size: byte_size(content),
+            mtime: stat.mtime
+          }
+        ]
     end
   end
 

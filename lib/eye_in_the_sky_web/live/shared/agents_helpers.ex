@@ -132,37 +132,40 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
           |> Enum.flat_map(fn filename ->
             path = Path.join(dir, filename)
             slug = String.replace_trailing(filename, ".md", "")
-
-            case File.read(path) do
-              {:error, _} ->
-                []
-
-              {:ok, content} ->
-                stat = File.stat!(path)
-                {name, description, model, tools} = parse_frontmatter(content)
-
-                [
-                  %AgentDef{
-                    id: build_id(source, slug),
-                    slug: slug,
-                    filename: filename,
-                    path: "#{display_prefix}/#{filename}",
-                    abs_path: path,
-                    source: source,
-                    name: name || slug,
-                    description: description,
-                    model: model,
-                    tools: tools,
-                    content: content,
-                    size: byte_size(content),
-                    mtime: stat.mtime
-                  }
-                ]
-            end
+            read_agent_entry(path, slug, filename, source, display_prefix)
           end)
       end
     else
       []
+    end
+  end
+
+  defp read_agent_entry(path, slug, filename, source, display_prefix) do
+    case File.read(path) do
+      {:error, _} ->
+        []
+
+      {:ok, content} ->
+        stat = File.stat!(path)
+        {name, description, model, tools} = parse_frontmatter(content)
+
+        [
+          %AgentDef{
+            id: build_id(source, slug),
+            slug: slug,
+            filename: filename,
+            path: "#{display_prefix}/#{filename}",
+            abs_path: path,
+            source: source,
+            name: name || slug,
+            description: description,
+            model: model,
+            tools: tools,
+            content: content,
+            size: byte_size(content),
+            mtime: stat.mtime
+          }
+        ]
     end
   end
 

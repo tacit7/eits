@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     SlashCommands
   }
 
+  alias EyeInTheSkyWeb.DmLive.FileAutocomplete
   alias EyeInTheSkyWeb.DmLive.SettingsHandlers
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.TaskHandlers
@@ -392,7 +393,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("list_files", %{"partial" => partial, "root" => root}, socket) do
     session = socket.assigns.session
-    result = EyeInTheSkyWeb.DmLive.FileAutocomplete.list_entries(partial, root, session)
+    result = FileAutocomplete.list_entries(partial, root, session)
     {:reply, result, socket}
   end
 

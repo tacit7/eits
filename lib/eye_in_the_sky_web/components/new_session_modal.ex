@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Components.CliFlags, only: [path_fields: 1, boolean_flags: 1]
 
+  alias EyeInTheSky.Agents.ModelConfig
   alias EyeInTheSky.Claude.AgentFileScanner
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Settings
@@ -55,8 +56,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
     default_model =
       case provider do
-        "codex" -> EyeInTheSky.Agents.ModelConfig.default_model("codex")
-        "gemini" -> EyeInTheSky.Agents.ModelConfig.default_model("gemini")
+        "codex" -> ModelConfig.default_model("codex")
+        "gemini" -> ModelConfig.default_model("gemini")
         _ -> default_claude_model()
       end
 

@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   import Phoenix.LiveView, only: [start_async: 3, push_navigate: 2, push_event: 3, put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
+  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.Components.Rail.Loader
 
@@ -164,7 +165,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     with project_id when not is_nil(project_id) <- parse_int(project_id_str),
          {:ok, project} <- Projects.get_project(project_id),
          {:ok, %{session: session}} <-
-           EyeInTheSky.Agents.AgentManager.create_agent(
+           AgentManager.create_agent(
              project_id: project.id,
              project_path: project.path,
              model: "sonnet",

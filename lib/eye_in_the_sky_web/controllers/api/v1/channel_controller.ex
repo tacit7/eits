@@ -6,6 +6,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{Channels, Sessions}
+  alias EyeInTheSky.Channels.Channel
+  alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -25,7 +27,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
          {:ok, project_id} <- resolve_project_id(params["project_id"]),
          {:ok, creator_session_id} <- resolve_creator_session(params["session_id"]) do
       channel_type = params["channel_type"] || "public"
-      channel_id = EyeInTheSky.Channels.Channel.generate_id(project_id, name)
+      channel_id = Channel.generate_id(project_id, name)
 
       attrs =
         %{
@@ -130,7 +132,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
       case Channels.add_member(channel.id, agent_id, session.id, role) do
         {:ok, member} ->
           Task.start(fn ->
-            EyeInTheSky.Messaging.DMDelivery.deliver_and_persist(
+            DMDelivery.deliver_and_persist(
               session.id,
               nil,
               channel_orientation_message(channel)

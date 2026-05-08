@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [read_file_for_display: 4]
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
@@ -111,7 +112,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
     if not is_nil(path) && not is_nil(claude_dir) && path_within?(path, claude_dir) &&
          File.exists?(path) do
-      EyeInTheSkyWeb.Helpers.ViewHelpers.open_in_system(path)
+      ViewHelpers.open_in_system(path)
     end
 
     {:noreply, socket}

@@ -9,6 +9,8 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
 
   alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Channels.Channel
+  alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ControllerHelpers
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   import Phoenix.LiveView, only: [put_flash: 3, push_patch: 2]
@@ -86,7 +88,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
       {:noreply, Phoenix.Component.assign(socket, :new_channel_name, nil)}
     else
       project_id = socket.assigns[:project_id] || 1
-      channel_id = EyeInTheSky.Channels.Channel.generate_id(project_id, name)
+      channel_id = Channel.generate_id(project_id, name)
 
       case Channels.create_channel(%{
              id: channel_id,
@@ -178,11 +180,11 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
 
   defp refresh_members_and_picker(socket) do
     channel_id = socket.assigns.active_channel_id
-    channel_members = EyeInTheSkyWeb.ChatLive.ChannelHelpers.load_channel_members(channel_id)
+    channel_members = ChannelHelpers.load_channel_members(channel_id)
     search = socket.assigns[:session_search] || ""
 
     sessions_by_project =
-      EyeInTheSkyWeb.ChatLive.ChannelHelpers.build_sessions_by_project(
+      ChannelHelpers.build_sessions_by_project(
         channel_members,
         socket.assigns.all_projects,
         search

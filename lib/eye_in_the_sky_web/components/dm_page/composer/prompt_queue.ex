@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
 
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSkyWeb.Helpers.ModelHelpers
+
   attr :prompts, :list, required: true
 
   def prompt_queue(assigns) do
@@ -41,5 +43,5 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
     """
   end
 
-  defp model_display_name(slug), do: EyeInTheSkyWeb.Helpers.ModelHelpers.model_display_name(slug)
+  defp model_display_name(slug), do: ModelHelpers.model_display_name(slug)
 end

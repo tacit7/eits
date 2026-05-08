@@ -13,6 +13,7 @@ defmodule EyeInTheSky.IAM do
   import Ecto.Query, warn: false
 
   alias EyeInTheSky.IAM.Policy
+  alias EyeInTheSky.IAM.PolicyCache
   alias EyeInTheSky.Repo
 
   # ── reads ───────────────────────────────────────────────────────────────────
@@ -199,5 +200,5 @@ defmodule EyeInTheSky.IAM do
 
   defp maybe_invalidate_cache(other), do: other
 
-  defp invalidate_cache, do: EyeInTheSky.IAM.PolicyCache.invalidate()
+  defp invalidate_cache, do: PolicyCache.invalidate()
 end

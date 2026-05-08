@@ -12,6 +12,8 @@ defmodule EyeInTheSky.Agents.AgentManager do
   alias EyeInTheSky.Agents.AgentManager.SessionBridge
   alias EyeInTheSky.Agents.AgentManager.SpawnParams
   alias EyeInTheSky.Agents.AgentManager.SpawnTeamContext
+  alias EyeInTheSky.Agents.InstructionBuilder
+  alias EyeInTheSky.Agents.RuntimeContext
   alias EyeInTheSky.Claude.AgentWorker
 
   @doc """
@@ -30,7 +32,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   """
   def create_agent(opts) do
     with {:ok, %{agent: agent, session: session}} <- RecordBuilder.create_records(opts) do
-      instructions = EyeInTheSky.Agents.InstructionBuilder.build(opts)
+      instructions = InstructionBuilder.build(opts)
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
 
@@ -182,7 +184,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
           "send_message: worker found/started for session_id=#{session_id}, pid=#{inspect(pid)}"
         )
 
-        context = EyeInTheSky.Agents.RuntimeContext.build(session_id, provider, opts)
+        context = RuntimeContext.build(session_id, provider, opts)
 
         try do
           case GenServer.call(pid, {:submit_message, message, context}) do

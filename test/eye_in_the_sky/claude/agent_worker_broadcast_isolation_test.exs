@@ -87,6 +87,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerBroadcastIsolationTest do
 
   # Helpers (mirrored from AgentWorkerTest — not shared yet)
 
+  # credo:disable-for-next-line Credo.Check.Refactor.Nesting
   defp wait_for_mock_port(session_id, attempts \\ 20)
   defp wait_for_mock_port(_session_id, 0), do: nil
 

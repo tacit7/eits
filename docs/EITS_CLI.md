@@ -382,6 +382,8 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Session linking**: `--parent-session-id` accepts integer session ID (preferred) or UUID, linking the spawned agent's session to a parent. Prefer `$EITS_SESSION_ID` (integer) for compatibility.
 
+**Parent agent ID derivation**: `--parent-agent-id` is now **optional** when `--parent-session-id` is provided. The server automatically looks up the parent session and derives the parent agent ID. This eliminates the need for a psql lookup to get the parent agent's integer ID. If `--parent-agent-id` is explicitly provided, it takes precedence.
+
 **Pre-flight validation**: `--dry-run` validates inputs without hitting the spawn endpoint. Validates team exists (if `--team-name` provided), parent session exists (if `--parent-session-id` provided), and instructions file is readable (if `--instructions-file` provided). Prints the fully-resolved curl command that would be sent. Exits 0 on success, 1 on any validation failure.
 
 **Valid models by provider:**
@@ -639,7 +641,11 @@ eits me
 eits whoami
 ```
 
-Prints current session UUID, session ID, agent UUID, project ID, and API URL. If session exists on server, fetches and displays server-side session state.
+Prints current session UUID, session ID, agent UUID, agent ID (integer), project ID, and API URL. If session exists on server, fetches and displays server-side session state.
+
+**Output includes:**
+- **Identity block**: Session UUID, Session ID, Agent UUID, Agent ID (integer), Project ID, API URL
+- **Tracking Status block**: Shows whether each required environment variable is set; flags if Agent ID is missing (needed for `--parent-agent-id` spawns)
 
 ---
 

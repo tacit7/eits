@@ -784,6 +784,41 @@ The `--project-id` flag in `eits sessions update` and the session startup script
 
 ---
 
+## Session Naming
+
+When spawning agents via `eits agents spawn`, the system resolves a display name for the session using a priority fallback chain:
+
+**Name Resolution Priority:**
+1. **Explicit `--name` parameter** (trimmed, non-empty) — direct user-provided name
+2. **Team member assignment** (`member_name @ team_name`) — when both `--member-name` and team are provided
+3. **Agent slug** (e.g., `setup-guardian`) — from the `--agent` parameter
+4. **Timestamp fallback** (e.g., `May 7 14:23:45`) — when no agent slug is provided
+
+**Previous behavior (deprecated):** Session names fell back to the first 250 characters of `--instructions` text, which was often unhelpful (verbose or truncated) and made sessions hard to identify in UIs.
+
+**New behavior:** The system now prefers the concise agent slug, and only generates a datetime stamp if no agent slug is available. This keeps session names human-readable and useful for filtering/searching.
+
+**Examples:**
+```bash
+# Uses agent slug "setup-guardian"
+eits agents spawn --agent setup-guardian --instructions "..."
+→ Session name: "setup-guardian"
+
+# Uses explicit name
+eits agents spawn --agent setup-guardian --name "My Custom Name" --instructions "..."
+→ Session name: "My Custom Name"
+
+# Uses timestamp when agent slug missing
+eits agents spawn --instructions "..." --parent-session-id 123
+→ Session name: "May 7 14:23:45"
+
+# Uses team member context
+eits agents spawn --agent setup-guardian --member-name alice --team-name builders --instructions "..."
+→ Session name: "alice @ builders"
+```
+
+---
+
 ## Worktree Management
 
 Agent workers use git worktrees to isolate CLI processes and prevent conflicts on concurrent spawns.
@@ -796,6 +831,15 @@ Agent workers use git worktrees to isolate CLI processes and prevent conflicts o
   - Untracked files are irrelevant to worktree creation since worktrees branch from HEAD
   - Allows multiple worktrees on repos without `.gitignore` rules for `.claude/worktrees/`
 - Each agent gets a dedicated worktree at `.claude/worktrees/<session-uuid>`
+- **Stale worktree detection:** Before calling `git worktree add`, the system pre-checks for stale branch entries via `check_stale_worktree/2`. If a branch is already registered in the worktree list from a prior pruned session, the spawn fails with a clear error message suggesting `git worktree prune` to clean up. This prevents confusing git errors and helps operators recover quickly.
+
+**Stale worktree error response:**
+```json
+{
+  "error_code": "worktree_conflict",
+  "message": "worktree \"<name>\" has a stale git entry (branch worktree-<name> still registered). Run `git worktree prune` in <project_path> to clean up, then retry."
+}
+```
 
 **Worktree fallback:**
 - If worktree creation fails, agent falls back to main project directory
@@ -1120,6 +1164,26 @@ This prevents callers from accidentally passing `limit: nil` and fetching unboun
 ## Zombie Session Sweep with Partial Indexes
 
 The zombie sweep scheduler detects sessions stuck in `working` status for >30 minutes with no activity, marking them as `failed`. The query uses partial indexes on `sessions(:last_activity_at)` and `sessions(:started_at)` for efficiency.
+
+**Schema:**
+- `last_activity_at` — `:utc_datetime_usec` type (DateTime struct, not a binary string)
+- `started_at` — `:utc_datetime_usec` type (DateTime struct)
+
+**Stale Session Detection:**
+The `stale?/2` function in `SessionController` accepts either a `DateTime` struct or an ISO8601 binary string and returns true if the timestamp is older than the specified minutes:
+
+```elixir
+defp stale?(%DateTime{} = dt, minutes) do
+  DateTime.diff(DateTime.utc_now(), dt, :second) > minutes * 60
+end
+
+defp stale?(iso_string, minutes) when is_binary(iso_string) do
+  case DateTime.from_iso8601(iso_string) do
+    {:ok, dt, _} -> stale?(dt, minutes)
+    _ -> false
+  end
+end
+```
 
 **Query Structure:**
 ```elixir

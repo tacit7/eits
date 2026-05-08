@@ -388,10 +388,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     members = Teams.list_members(team.id)
 
     with {:ok, from_session} <- resolve_broadcast_sender(from_raw),
-         {:from_active, false} <-
-           {:from_active, from_session.status in Sessions.terminated_statuses()},
-         {:member, true} <-
-           {:member, Enum.any?(members, &(&1.session_id == from_session.id))} do
+         :ok <- check_sender_not_terminated(from_session),
+         :ok <- check_is_team_member(members, from_session) do
       targets =
         Enum.filter(members, fn m ->
           not is_nil(m.session_id) and
@@ -431,13 +429,25 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       {:error, :not_found} ->
         {:error, :not_found, "Sender session not found"}
 
-      {:from_active, true} ->
+      {:error, :sender_terminated} ->
         {:error, :unprocessable_entity,
          "Sender session is terminated and cannot broadcast"}
 
-      {:member, false} ->
+      {:error, :not_member} ->
         {:error, :forbidden, "Sender is not a member of this team"}
     end
+  end
+
+  defp check_sender_not_terminated(session) do
+    if session.status in Sessions.terminated_statuses(),
+      do: {:error, :sender_terminated},
+      else: :ok
+  end
+
+  defp check_is_team_member(members, session) do
+    if Enum.any?(members, &(&1.session_id == session.id)),
+      do: :ok,
+      else: {:error, :not_member}
   end
 
   defp resolve_broadcast_sender(raw) do

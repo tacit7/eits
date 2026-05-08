@@ -88,7 +88,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
 
     case ToolHelpers.parse_int(id_str) do
       nil -> notify_error(from_session_id, "task done", {:invalid_id, id_str})
-      id -> do_task_done(id_str, id, from_session_id)
+      id -> do_task_done(id, from_session_id)
     end
   end
 
@@ -97,7 +97,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
 
     case ToolHelpers.parse_int(id_str) do
       nil -> notify_error(from_session_id, "task delete", {:invalid_id, id_str})
-      id -> do_task_delete(id_str, id, from_session_id)
+      id -> do_task_delete(id, from_session_id)
     end
   end
 
@@ -169,29 +169,31 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
     end
   end
 
-  defp do_task_done(id_str, id, from_session_id) do
-    if Tasks.task_linked_to_session?(id, from_session_id) do
-      with_task(id_str, from_session_id, "task done", fn id, task ->
-        case Tasks.update_task_state(task, WorkflowState.done_id()) do
-          {:ok, _} -> notify_success(from_session_id, "task #{id} -> done")
-          {:error, reason} -> notify_error(from_session_id, "task done", reason)
-        end
-      end)
+  defp do_task_done(id, from_session_id) do
+    with true <- Tasks.task_linked_to_session?(id, from_session_id),
+         {:ok, task} <- Tasks.get_task(id) do
+      case Tasks.update_task_state(task, WorkflowState.done_id()) do
+        {:ok, _} -> notify_success(from_session_id, "task #{id} -> done")
+        {:error, reason} -> notify_error(from_session_id, "task done", reason)
+      end
     else
-      notify_error(from_session_id, "task done", {:not_linked, id})
+      false -> notify_error(from_session_id, "task done", {:not_linked, id})
+      {:error, :not_found} -> notify_error(from_session_id, "task done", :not_found)
+      {:error, reason} -> notify_error(from_session_id, "task done", reason)
     end
   end
 
-  defp do_task_delete(id_str, id, from_session_id) do
-    if Tasks.task_linked_to_session?(id, from_session_id) do
-      with_task(id_str, from_session_id, "task delete", fn _id, task ->
-        case Tasks.delete_task(task) do
-          {:ok, _} -> notify_success(from_session_id, "task #{id} deleted")
-          {:error, reason} -> notify_error(from_session_id, "task delete", reason)
-        end
-      end)
+  defp do_task_delete(id, from_session_id) do
+    with true <- Tasks.task_linked_to_session?(id, from_session_id),
+         {:ok, task} <- Tasks.get_task(id) do
+      case Tasks.delete_task(task) do
+        {:ok, _} -> notify_success(from_session_id, "task #{id} deleted")
+        {:error, reason} -> notify_error(from_session_id, "task delete", reason)
+      end
     else
-      notify_error(from_session_id, "task delete", {:not_linked, id})
+      false -> notify_error(from_session_id, "task delete", {:not_linked, id})
+      {:error, :not_found} -> notify_error(from_session_id, "task delete", :not_found)
+      {:error, reason} -> notify_error(from_session_id, "task delete", reason)
     end
   end
 

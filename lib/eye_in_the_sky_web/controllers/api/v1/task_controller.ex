@@ -310,39 +310,35 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   Body: session_id (UUID or integer string) — required.
   """
   def claim(conn, %{"id" => task_id} = params) do
-    with {:session, {:ok, session_int_id}} <-
-           {:session, resolve_claimer_session(params["session_id"])},
-         {:task, {:ok, task}} <- {:task, Tasks.get_task(task_id)},
-         {:claim, {:ok, updated}} <- {:claim, Tasks.claim_task(task, session_int_id)} do
+    with {:ok, session_int_id} <- resolve_claimer_session(params["session_id"]),
+         {:ok, task} <- Tasks.get_task(task_id),
+         {:ok, updated} <- Tasks.claim_task(task, session_int_id) do
       json(conn, %{
         success: true,
         message: "Task claimed",
         task: ApiPresenter.present_task(updated)
       })
     else
-      {:session, {:error, :no_session}} ->
+      {:error, :no_session} ->
         {:error, :bad_request, "session_id is required"}
 
-      {:session, {:error, :invalid_session}} ->
+      {:error, :invalid_session} ->
         {:error, :bad_request, "session_id is invalid"}
 
-      {:session, _} ->
-        {:error, :bad_request, "session_id is required"}
-
-      {:task, {:error, :not_found}} ->
+      {:error, :not_found} ->
         {:error, :not_found, "Task not found"}
 
-      {:claim, {:error, :already_claimed}} ->
+      {:error, :already_claimed} ->
         hint = format_claim_owner_hint(task_id)
         {:error, :conflict, "Task is already in progress#{hint}"}
 
-      {:claim, {:error, :task_not_claimable}} ->
+      {:error, :task_not_claimable} ->
         {:error, :conflict, "Task cannot be claimed from its current state"}
 
-      {:claim, {:error, :task_not_found}} ->
+      {:error, :task_not_found} ->
         {:error, :not_found, "Task not found"}
 
-      {:claim, {:error, changeset}} ->
+      {:error, changeset} ->
         {:error, changeset}
     end
   end

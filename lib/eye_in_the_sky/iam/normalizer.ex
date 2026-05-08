@@ -100,11 +100,7 @@ defmodule EyeInTheSky.IAM.Normalizer do
   defp normalize_event(payload) do
     raw = Map.get(payload, "hook_event_name") || Map.get(payload, :event)
 
-    case raw do
-      "PreToolUse" -> :pre_tool_use
-      "PostToolUse" -> :post_tool_use
-      "Stop" -> :stop
-      "UserPromptSubmit" -> :user_prompt_submit
+    case coerce_event_key(raw) do
       :pre_tool_use -> :pre_tool_use
       :post_tool_use -> :post_tool_use
       :stop -> :stop
@@ -112,4 +108,14 @@ defmodule EyeInTheSky.IAM.Normalizer do
       _ -> :pre_tool_use
     end
   end
+
+  defp coerce_event_key(k) when is_atom(k), do: k
+
+  defp coerce_event_key(k) when is_binary(k) do
+    String.to_existing_atom(k)
+  rescue
+    ArgumentError -> nil
+  end
+
+  defp coerce_event_key(_), do: nil
 end

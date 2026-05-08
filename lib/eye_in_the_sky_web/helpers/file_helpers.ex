@@ -24,35 +24,7 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
 
   @spec detect_file_type(String.t()) :: atom
   def detect_file_type(path) do
-    extension = path |> Path.extname() |> String.downcase()
-
-    case extension do
-      ".md" -> :markdown
-      ".markdown" -> :markdown
-      ".ex" -> :elixir
-      ".exs" -> :elixir
-      ".js" -> :javascript
-      ".ts" -> :typescript
-      ".jsx" -> :javascript
-      ".tsx" -> :typescript
-      ".json" -> :json
-      ".yml" -> :yaml
-      ".yaml" -> :yaml
-      ".html" -> :html
-      ".css" -> :css
-      ".py" -> :python
-      ".rb" -> :ruby
-      ".go" -> :go
-      ".rs" -> :rust
-      ".java" -> :java
-      ".c" -> :c
-      ".cpp" -> :cpp
-      ".sh" -> :bash
-      ".sql" -> :sql
-      ".xml" -> :xml
-      ".toml" -> :toml
-      _ -> :text
-    end
+    path |> Path.extname() |> String.downcase() |> file_type_info() |> Map.get(:atom)
   end
 
   @spec language_class(atom) :: String.t()
@@ -107,19 +79,42 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     end
   end
 
-  @spec cm_language(atom) :: String.t()
-  def cm_language(file_type) do
-    case file_type do
-      :elixir -> "elixir"
-      :markdown -> "markdown"
-      :javascript -> "javascript"
-      :typescript -> "javascript"
-      :json -> "json"
-      :yaml -> "yaml"
-      :html -> "html"
-      :css -> "css"
-      :bash -> "shell"
-      _ -> "text"
+  @spec cm_language(String.t()) :: String.t()
+  def cm_language(path) when is_binary(path) do
+    path |> Path.extname() |> String.downcase() |> file_type_info() |> Map.get(:cm)
+  end
+
+  def cm_language(_), do: "text"
+
+  defp file_type_info(ext) do
+    case ext do
+      ".md" -> %{atom: :markdown, class: "markdown", cm: "markdown"}
+      ".markdown" -> %{atom: :markdown, class: "markdown", cm: "markdown"}
+      ".ex" -> %{atom: :elixir, class: "elixir", cm: "elixir"}
+      ".exs" -> %{atom: :elixir, class: "elixir", cm: "elixir"}
+      ".js" -> %{atom: :javascript, class: "javascript", cm: "javascript"}
+      ".jsx" -> %{atom: :javascript, class: "javascript", cm: "javascript"}
+      ".ts" -> %{atom: :typescript, class: "typescript", cm: "javascript"}
+      ".tsx" -> %{atom: :typescript, class: "typescript", cm: "javascript"}
+      ".json" -> %{atom: :json, class: "json", cm: "json"}
+      ".yml" -> %{atom: :yaml, class: "yaml", cm: "yaml"}
+      ".yaml" -> %{atom: :yaml, class: "yaml", cm: "yaml"}
+      ".html" -> %{atom: :html, class: "html", cm: "html"}
+      ".heex" -> %{atom: :html, class: "html", cm: "html"}
+      ".css" -> %{atom: :css, class: "css", cm: "css"}
+      ".py" -> %{atom: :python, class: "python", cm: "text"}
+      ".rb" -> %{atom: :ruby, class: "ruby", cm: "text"}
+      ".go" -> %{atom: :go, class: "go", cm: "text"}
+      ".rs" -> %{atom: :rust, class: "rust", cm: "text"}
+      ".java" -> %{atom: :java, class: "java", cm: "text"}
+      ".c" -> %{atom: :c, class: "c", cm: "text"}
+      ".cpp" -> %{atom: :cpp, class: "cpp", cm: "text"}
+      ".sh" -> %{atom: :bash, class: "bash", cm: "shell"}
+      ".bash" -> %{atom: :bash, class: "bash", cm: "shell"}
+      ".sql" -> %{atom: :sql, class: "sql", cm: "text"}
+      ".xml" -> %{atom: :xml, class: "xml", cm: "text"}
+      ".toml" -> %{atom: :toml, class: "toml", cm: "text"}
+      _ -> %{atom: :text, class: "plaintext", cm: "text"}
     end
   end
 

@@ -237,6 +237,138 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     Enum.member?(binary_extensions, extension)
   end
 
+  @base_icon_path "/images/file-icons"
+
+  @file_icon_map %{
+    # Elixir
+    ".ex" => "file_type_elixir",
+    ".exs" => "file_type_elixir",
+    # JavaScript
+    ".js" => "file_type_js",
+    ".jsx" => "file_type_js",
+    ".mjs" => "file_type_js",
+    # TypeScript
+    ".ts" => "file_type_typescript",
+    ".tsx" => "file_type_typescript",
+    # Svelte
+    ".svelte" => "file_type_svelte",
+    # Python
+    ".py" => "file_type_python",
+    # Ruby
+    ".rb" => "file_type_ruby",
+    # Go
+    ".go" => "file_type_go",
+    # Rust
+    ".rs" => "file_type_rust",
+    # Java
+    ".java" => "file_type_java",
+    # C/C++
+    ".c" => "file_type_c",
+    ".h" => "file_type_c",
+    ".cpp" => "file_type_cpp",
+    ".cc" => "file_type_cpp",
+    ".cxx" => "file_type_cpp",
+    ".hpp" => "file_type_cpp",
+    # Shell
+    ".sh" => "file_type_shell",
+    ".bash" => "file_type_shell",
+    ".zsh" => "file_type_shell",
+    # SQL
+    ".sql" => "file_type_sql",
+    # CSS
+    ".css" => "file_type_css",
+    ".scss" => "file_type_css",
+    ".sass" => "file_type_css",
+    # HTML
+    ".html" => "file_type_html",
+    ".heex" => "file_type_html",
+    ".htm" => "file_type_html",
+    # Markdown
+    ".md" => "file_type_markdown",
+    ".markdown" => "file_type_markdown",
+    # JSON
+    ".json" => "file_type_json",
+    # YAML
+    ".yml" => "file_type_yaml",
+    ".yaml" => "file_type_yaml",
+    # XML
+    ".xml" => "file_type_xml",
+    # TOML
+    ".toml" => "file_type_toml",
+    # Config / lock
+    ".lock" => "file_type_config",
+    ".conf" => "file_type_config"
+  }
+
+  @filename_icon_map %{
+    ".gitignore" => "file_type_git",
+    ".gitattributes" => "file_type_git",
+    ".gitmodules" => "file_type_git",
+    ".env" => "file_type_dotenv",
+    ".env.example" => "file_type_dotenv",
+    ".env.local" => "file_type_dotenv",
+    ".env.test" => "file_type_dotenv",
+    ".env.prod" => "file_type_dotenv",
+    "Dockerfile" => "file_type_docker",
+    "docker-compose.yml" => "file_type_yaml",
+    "docker-compose.yaml" => "file_type_yaml",
+    "mix.exs" => "file_type_elixir",
+    "mix.lock" => "file_type_config"
+  }
+
+  @folder_icon_map %{
+    "lib" => "folder_type_library",
+    "test" => "folder_type_test",
+    "tests" => "folder_type_test",
+    "spec" => "folder_type_test",
+    "config" => "folder_type_config",
+    ".git" => "folder_type_git",
+    "node_modules" => "folder_type_node",
+    "assets" => "folder_type_public",
+    "priv" => "folder_type_private",
+    "src" => "folder_type_src",
+    "deps" => "folder_type_library",
+    "_build" => "folder_type_library",
+    "docker" => "folder_type_docker"
+  }
+
+  @doc """
+  Returns the `/images/file-icons/` URL for a file path, based on filename then extension.
+  Falls back to the default file icon.
+  """
+  @spec file_icon_src(String.t()) :: String.t()
+  def file_icon_src(path) when is_binary(path) do
+    basename = Path.basename(path)
+    ext = path |> Path.extname() |> String.downcase()
+
+    icon =
+      Map.get(@filename_icon_map, basename) ||
+        Map.get(@file_icon_map, ext) ||
+        "default_file"
+
+    "#{@base_icon_path}/#{icon}.svg"
+  end
+
+  def file_icon_src(_), do: "#{@base_icon_path}/default_file.svg"
+
+  @doc """
+  Returns the `/images/file-icons/` URL for a directory, based on its name.
+  Pass `expanded: true` for the open-folder variant.
+  Falls back to the default folder icon.
+  """
+  @spec folder_icon_src(String.t(), keyword()) :: String.t()
+  def folder_icon_src(path, opts \\ [])
+
+  def folder_icon_src(path, opts) when is_binary(path) do
+    expanded = Keyword.get(opts, :expanded, false)
+    name = Path.basename(path)
+    base = Map.get(@folder_icon_map, name, "default_folder")
+    suffix = if expanded, do: "_opened", else: ""
+    "#{@base_icon_path}/#{base}#{suffix}.svg"
+  end
+
+  def folder_icon_src(_, _), do: "#{@base_icon_path}/default_folder.svg"
+
   @type file_entry :: %{
           name: String.t(),
           path: String.t(),

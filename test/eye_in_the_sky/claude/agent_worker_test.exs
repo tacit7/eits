@@ -1389,7 +1389,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         })
 
       assert {:ok, :started} =
-               EyeInTheSky.Agents.AgentManager.send_message(session.id, "test watchdog",
+               AgentManager.send_message(session.id, "test watchdog",
                  model: "haiku",
                  message_id: message.id
                )
@@ -1411,7 +1411,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       assert updated.failure_reason =~ "watchdog_timeout"
 
       # Primary: worker no longer :running (stop button condition cleared)
-      refute EyeInTheSky.Claude.AgentWorker.processing?(session.id)
+      refute AgentWorker.processing?(session.id)
 
       # Primary: session status updated away from "working"
       {:ok, session_after} = EyeInTheSky.Sessions.get_session(session.id)
@@ -1436,7 +1436,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         })
 
       assert {:ok, :started} =
-               EyeInTheSky.Agents.AgentManager.send_message(session.id, "run one",
+               AgentManager.send_message(session.id, "run one",
                  model: "haiku",
                  message_id: msg1.id
                )
@@ -1460,7 +1460,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
         })
 
       assert {:ok, :started} =
-               EyeInTheSky.Agents.AgentManager.send_message(session.id, "run two",
+               AgentManager.send_message(session.id, "run two",
                  model: "haiku",
                  message_id: msg2.id
                )
@@ -1471,7 +1471,7 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       Process.sleep(100)
 
       # Primary: run 2 must still be alive
-      assert EyeInTheSky.Claude.AgentWorker.processing?(session.id)
+      assert AgentWorker.processing?(session.id)
 
       # Primary: message 2 must not be failed — watchdog must not have touched it
       updated2 = EyeInTheSky.Repo.get!(EyeInTheSky.Messages.Message, msg2.id)

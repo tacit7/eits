@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
   alias EyeInTheSky.Accounts.ApiKey
+  alias EyeInTheSky.IAM.PolicyCache
   alias EyeInTheSky.Repo
 
   import Ecto.Query
@@ -92,7 +93,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
         condition: %{}
       })
 
-    EyeInTheSky.IAM.PolicyCache.invalidate()
+    PolicyCache.invalidate()
 
     payload =
       bash_pre_tool_use_payload(%{
@@ -180,7 +181,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
           editable_fields: ["enabled"]
         })
 
-      EyeInTheSky.IAM.PolicyCache.invalidate()
+      PolicyCache.invalidate()
       :ok
     end
 
@@ -278,7 +279,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
         condition: %{}
       })
 
-    EyeInTheSky.IAM.PolicyCache.invalidate()
+    PolicyCache.invalidate()
 
     payload =
       stop_event_payload(%{
@@ -313,7 +314,7 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
         condition: %{}
       })
 
-    EyeInTheSky.IAM.PolicyCache.invalidate()
+    PolicyCache.invalidate()
 
     payload =
       stop_event_payload(%{

@@ -165,11 +165,11 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
               session_id: session_id
             )
 
-          {:ok, stats} ->
+          {:ok, %{inserted: inserted, updated: updated}} ->
             Logger.info("DM mount sync imported messages",
               session_id: session_id,
-              inserted: stats.inserted,
-              updated: stats.updated
+              inserted: inserted,
+              updated: updated
             )
 
             send(lv_pid, :do_message_reload)

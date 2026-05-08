@@ -1,6 +1,6 @@
 [package]
 name = "eye-in-the-sky"
-version = "0.3.0"
+version = "0.3.1"
 description = "Eye in the Sky Desktop"
 edition = "2021"
 

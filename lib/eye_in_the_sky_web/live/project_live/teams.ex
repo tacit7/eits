@@ -342,23 +342,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     status_matches and project_matches and search_matches
   end
 
+  defp do_update_team_in_stream(socket, team) do
+    updated_all_teams = Enum.map(socket.assigns.all_teams, fn t ->
+      if t.id == team.id, do: team, else: t
+    end)
+
+    socket
+    |> update(:all_teams, fn _ -> updated_all_teams end)
+    |> stream_insert(:team_list, team)
+  end
+
   defp update_team_in_stream(socket, team_id) do
     case Teams.get_team(team_id) do
       {:ok, team} ->
         if should_include_team?(team, socket) do
-          updated_all_teams =
-            Enum.map(socket.assigns.all_teams, fn t ->
-              if t.id == team_id, do: team, else: t
-            end)
-
-          socket =
-            socket
-            |> update(:all_teams, fn _ -> updated_all_teams end)
-            |> stream_insert(:team_list, team)
-
-          {:noreply, socket}
+          {:noreply, do_update_team_in_stream(socket, team)}
         else
-          # Team no longer matches filters, remove it
           socket =
             socket
             |> update(:all_teams, &Enum.reject(&1, fn t -> t.id == team_id end))

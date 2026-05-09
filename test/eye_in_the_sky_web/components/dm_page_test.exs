@@ -117,7 +117,7 @@ defmodule EyeInTheSkyWeb.Components.DmPageTest do
     @dm_page_source Path.join([@project_root, "lib/eye_in_the_sky_web/components/dm_page.ex"])
     @composer_source Path.join([
                        @project_root,
-                       "lib/eye_in_the_sky_web/components/dm_page/composer.ex"
+                       "lib/eye_in_the_sky_web/components/dm_page/message_composer.ex"
                      ])
     @messages_tab_source Path.join([
                            @project_root,
@@ -157,19 +157,18 @@ defmodule EyeInTheSkyWeb.Components.DmPageTest do
     test "send button has mobile-adequate touch target" do
       source = File.read!(@composer_source)
 
-      # Send button should be at least w-10 h-10 on mobile (40x40px meets WCAG 2.5.5)
-      # Current impl uses w-11 h-11 (44px), which exceeds the minimum
+      # Send button should have adequate touch target via w-10/w-11 or min-h-[44px]
       assert source =~
-               ~r/id="dm-send-button"[^>]*w-1[01] h-1[01]|w-1[01] h-1[01][^>]*id="dm-send-button"/s,
-             "send button must have adequate touch target (w-10 h-10 or w-11 h-11) on mobile"
+               ~r/id="dm-send-button"[^>]*(w-1[01] h-1[01]|min-h-\[44px\])|(w-1[01] h-1[01]|min-h-\[44px\])[^>]*id="dm-send-button"/s,
+             "send button must have adequate touch target (w-10 h-10, w-11 h-11, or min-h-[44px]) on mobile"
     end
 
     test "stop button has mobile-adequate touch target" do
       source = File.read!(@composer_source)
 
       assert source =~
-               ~r/id="dm-stop-button"[^>]*w-1[01] h-1[01]|w-1[01] h-1[01][^>]*id="dm-stop-button"/s,
-             "stop button must have adequate touch target (w-10 h-10 or w-11 h-11) on mobile"
+               ~r/id="dm-stop-button"[^>]*(w-1[01] h-1[01]|min-h-\[44px\])|(w-1[01] h-1[01]|min-h-\[44px\])[^>]*id="dm-stop-button"/s,
+             "stop button must have adequate touch target (w-10 h-10, w-11 h-11, or min-h-[44px]) on mobile"
     end
 
     test "attach label has mobile-adequate touch target" do

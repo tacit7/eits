@@ -134,14 +134,15 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
   defp list_tree_files(base_path, current_path, ignored_dirs, max_depth, current_depth) do
     case File.ls(current_path) do
       {:ok, files} ->
-        for file <- files,
-            full_path = Path.join(current_path, file),
-            (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
-              file not in ignored_dirs and
-              (File.dir?(full_path) or !binary_file?(full_path)),
-            do:
-              build_tree_entry(base_path, current_path, file, max_depth, current_depth)
-              |> Enum.sort_by(&{&1.type != :directory, &1.name})
+        entries =
+          for file <- files,
+              full_path = Path.join(current_path, file),
+              (!String.starts_with?(file, ".") or file in [".claude", ".git"]) and
+                file not in ignored_dirs and
+                (File.dir?(full_path) or !binary_file?(full_path)),
+              do: build_tree_entry(base_path, current_path, file, max_depth, current_depth)
+
+        Enum.sort_by(entries, &{&1.type != :directory, &1.name})
 
       {:error, _reason} ->
         []

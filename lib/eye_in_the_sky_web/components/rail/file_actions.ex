@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
           end
         end
 
-      {:noreply, socket}
+      {:noreply, persist_file_expanded(socket)}
     else
       _ -> {:noreply, socket}
     end
@@ -106,7 +106,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
 
   def handle_file_collapse(%{"path" => path}, socket) do
     expanded = MapSet.delete(socket.assigns.flyout_file_expanded, path)
-    {:noreply, assign(socket, :flyout_file_expanded, expanded)}
+
+    socket =
+      socket
+      |> assign(:flyout_file_expanded, expanded)
+      |> persist_file_expanded()
+
+    {:noreply, socket}
   end
 
   def handle_file_refresh(socket) do
@@ -151,5 +157,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
     else
       _ -> {:noreply, socket}
     end
+  end
+
+  # Emits a save_rail_state patch with the current expanded path list.
+  # Called after any expand/collapse mutation so localStorage stays in sync.
+  defp persist_file_expanded(socket) do
+    paths = socket.assigns.flyout_file_expanded |> MapSet.to_list()
+    push_event(socket, "save_rail_state", %{file_expanded: paths})
   end
 end

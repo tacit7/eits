@@ -380,3 +380,84 @@ Use `--setting-sources` to control which sources are loaded:
 claude --setting-sources "user"           # only user settings
 claude --setting-sources "user,project"   # skip local overrides
 ```
+
+---
+
+## EITS-Specific Usage Patterns
+
+### Agent Spawning (Headless)
+
+EITS spawns agents non-interactively with `-p` (print mode). The three critical flags:
+
+```bash
+claude -p \
+  --output-format stream-json \
+  --dangerously-skip-permissions \
+  --permission-mode auto \
+  "Your task here"
+```
+
+| Flag | Why | Source |
+|------|-----|--------|
+| `-p` / `--print` | One-shot execution, no persistence | Required for automation |
+| `--output-format stream-json` | Parser expects NDJSON | `EyeInTheSky.Claude.Parser` |
+| `--dangerously-skip-permissions` | Skip permission dialogs in sandbox | Safe for headless agents |
+| `--permission-mode auto` | Auto-approve safe edits | Typical for feature agents |
+
+### Session Resumption (Interactive, iTerm)
+
+The "Open in iTerm" UI action (DMs panel) uses:
+
+```bash
+claude --dangerously-skip-permissions -r <session_uuid>
+```
+
+This avoids the permission prompt on resume. The session UUID must be valid UUID format; numeric IDs are rejected.
+
+### Config vs Caller Opts Precedence
+
+EITS uses three-way merge in `EyeInTheSky.Claude.CLI.Args.build_args/1`:
+
+1. **Hardcoded defaults**: `output_format: "stream-json"`
+2. **Database settings**: From `settings.use_anthropic_api_key`, etc.
+3. **Caller opts**: Highest priority (override all)
+
+Recommendation: Keep MCP servers, allowed tools, and permission mode in `.claude/settings.json` (checked in). Override only for specific agents via caller opts.
+
+### Environment Variable Blocking
+
+**Critical**: `ANTHROPIC_API_KEY` is **always stripped** from spawned agent environments in EITS.
+
+Why: Prevents leaked keys from silently overriding Max plan OAuth and causing `"Credit balance is too low"` billing errors.
+
+If a key *must* be passed (rare), enable `use_anthropic_api_key` toggle in `/settings` → Auth tab.
+
+### Debugging Agent Failures
+
+Enable debug logs to file with category filter:
+
+```bash
+claude --debug-file /tmp/claude-debug.log \
+  --debug "api,hooks" \
+  -p "task"
+```
+
+Categories: `api`, `hooks`, `1p`, `file` (prefix `!` to exclude).
+
+### Restricted Tool Access
+
+Read-only mode for audits (no edits, no bash):
+
+```bash
+claude --allowedTools "Read,Glob,Grep,Bash(git:*)" \
+  -p "explain auth flow"
+```
+
+### Environment Variable Handling
+
+Blocked vars (always stripped by `EyeInTheSky.Claude.CLI.Env`):
+- `ANTHROPIC_API_KEY` (unless `use_anthropic_api_key` is true)
+- `CLAUDECODE`
+- `CLAUDE_CODE_ENTRYPOINT`
+
+All other env vars are passed through. Project path is set via `cd` in port spawn, not env vars.

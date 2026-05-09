@@ -17,7 +17,20 @@ defmodule EyeInTheSkyWeb.AuthHook do
     disable_auth = Application.get_env(:eye_in_the_sky, :disable_auth, false)
 
     if disable_auth do
-      {:cont, assign(socket, :current_user, nil)}
+      # Auth disabled (Tauri / dev bypass). Still try to resolve a user from
+      # the session so that LiveViews requiring a workspace (e.g. WorkspaceLive)
+      # work correctly when a session cookie is present (e.g. in tests). Falls
+      # through to nil — anonymous access — when no session exists.
+      case session["user_id"] do
+        nil ->
+          {:cont, assign(socket, :current_user, nil)}
+
+        user_id ->
+          case Accounts.get_user(user_id) do
+            {:ok, user} -> {:cont, assign(socket, :current_user, user)}
+            {:error, _} -> {:cont, assign(socket, :current_user, nil)}
+          end
+      end
     else
       authenticate_from_session(session, socket)
     end

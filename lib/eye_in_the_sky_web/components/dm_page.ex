@@ -30,6 +30,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :commits_view, :atom, default: :list
+  attr :diff_mode, :atom, default: :unified
   attr :cumulative_diff, :any, default: nil
   attr :notes, :list, default: []
   attr :codex_raw_lines, :list, default: []
@@ -491,6 +492,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               commits={@commits}
               diff_cache={@diff_cache}
               commits_view={@commits_view}
+              diff_mode={@diff_mode}
               cumulative_diff={@cumulative_diff}
             />
           <% "notes" -> %>

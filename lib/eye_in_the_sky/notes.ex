@@ -58,31 +58,47 @@ defmodule EyeInTheSky.Notes do
   end
 
   @doc """
-  Returns notes for a specific task ID (integer).
+  Returns notes for a specific task.
+  Accepts an integer task ID or a UUID string.
   Options: `:limit` (default 500), `:starred` (boolean, default false)
 
-  Accepts a task ID as an integer. Callers are responsible for resolving task identifiers
-  (UUID or string IDs) to integer task IDs before calling this function.
+  Notes may be stored with either the integer string or the UUID as parent_id (migration
+  artifact). Resolves both forms by querying the Task schema directly to avoid the circular
+  dependency that would arise from calling the Tasks context.
   """
   def list_notes_for_task(task_id, opts \\ []) do
     starred_only = Keyword.get(opts, :starred, false)
     limit_val = Keyword.get(opts, :limit, 500)
 
-    # Fetch UUID to support notes stored with either integer string or UUID as parent_id.
-    # Uses the Task schema directly (not the Tasks context) to avoid circular dependency.
-    task_uuid =
-      from(t in TaskSchema, where: t.id == ^task_id, select: t.uuid)
-      |> Repo.one()
+    # Detect input shape to avoid CastError when task_id is a UUID string.
+    task_ids =
+      cond do
+        is_integer(task_id) ->
+          from(t in TaskSchema, where: t.id == ^task_id, select: {t.id, t.uuid})
+          |> Repo.one()
 
-    query =
-      Note
-      |> scope_by_parent("task", to_string(task_id), task_uuid || "")
-      |> order_by([n], desc: n.created_at)
-      |> limit(^limit_val)
+        is_binary(task_id) && uuid_format?(task_id) ->
+          from(t in TaskSchema, where: t.uuid == ^task_id, select: {t.id, t.uuid})
+          |> Repo.one()
 
-    query = if starred_only, do: where(query, [n], n.starred == true), else: query
+        true ->
+          nil
+      end
 
-    Repo.all(query)
+    case task_ids do
+      nil ->
+        []
+
+      {int_id, uuid} ->
+        query =
+          Note
+          |> scope_by_parent("task", to_string(int_id), uuid)
+          |> order_by([n], desc: n.created_at)
+          |> limit(^limit_val)
+
+        query = if starred_only, do: where(query, [n], n.starred == true), else: query
+        Repo.all(query)
+    end
   end
 
   @doc """
@@ -298,6 +314,8 @@ defmodule EyeInTheSky.Notes do
   defp scope_by_parent(query, type, id_str, uuid) do
     where(query, [n], n.parent_type == ^type and (n.parent_id == ^id_str or n.parent_id == ^uuid))
   end
+
+  defp uuid_format?(str), do: match?({:ok, _}, Ecto.UUID.cast(str))
 
   defp resolve_session(session_id) do
     Sessions.resolve(to_string(session_id))

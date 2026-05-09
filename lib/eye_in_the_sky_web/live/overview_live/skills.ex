@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                 "py-0.5",
                 selected? && "relative"
               ]}>
-                <div class="collapse overflow-visible">
+                <div id={"skill-collapse-#{skill.id}"} class="collapse overflow-visible">
                   <input
                     type="checkbox"
                     class="min-h-0 p-0"

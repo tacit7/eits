@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSkyWeb.AgentLive.IndexActions
-  alias EyeInTheSkyWeb.Helpers.SessionFilters
   alias EyeInTheSkyWeb.Live.Shared.AgentPubSubHandlers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers

@@ -10,10 +10,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentPubSubHandlers do
   """
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [stream_insert: 3]
 
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
-  alias EyeInTheSkyWeb.Helpers.SessionFilters
 
   @doc """
   Generic handle_info for :agent_working events that updates a list of agents.

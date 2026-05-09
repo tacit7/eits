@@ -61,7 +61,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.archive_session(session) do
       {:noreply,
        socket
-       |> Loader.remove_agent_from_list(session.id)
+       |> reload_sessions()
        |> push_event("evict-dm-history", %{uuids: [session.uuid]})
        |> put_flash(:info, "Session archived")}
     else
@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.delete_session(session) do
       {:noreply,
        socket
-       |> Loader.remove_agent_from_list(session.id)
+       |> reload_sessions()
        |> put_flash(:info, "Session deleted")}
     else
       {:error, :not_found} ->
@@ -288,6 +288,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     end)
   end
 
+  # Reload sessions from the database and rebuild the view.
+  # Replaces inline reload patterns in archive_session, delete_session, and save_session_name.
+  defp reload_sessions(socket) do
+    Loader.load_agents(socket)
+  end
+
   def delete_selected(_params, socket) do
     ids = MapSet.to_list(socket.assigns.selected_ids)
     {deleted, _} = Sessions.batch_delete_sessions(ids)
@@ -351,7 +357,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
         socket
       end
 
-    {:noreply, assign(socket, :editing_session_id, nil) |> Loader.load_agents()}
+    {:noreply, assign(socket, :editing_session_id, nil) |> reload_sessions()}
   end
 
   def cancel_rename(_params, socket) do

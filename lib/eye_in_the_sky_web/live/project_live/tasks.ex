@@ -202,8 +202,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
-  def handle_info(:tasks_changed, socket),
-    do: handle_tasks_changed(socket, &load_tasks/1)
+  def handle_info({:task_updated, task}, socket) do
+    loaded_ids = socket.assigns.loaded_task_ids
+    task_key = task.uuid || to_string(task.id)
+
+    if task_key in loaded_ids do
+      {:noreply, stream_insert(socket, :tasks, task)}
+    else
+      {:noreply, load_tasks(socket)}
+    end
+  end
 
   def handle_info(_, socket), do: {:noreply, socket}
 

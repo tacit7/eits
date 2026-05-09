@@ -146,7 +146,7 @@ defmodule EyeInTheSky.Events do
     broadcast("tasks", :tasks_changed)
 
     if task.project_id do
-      broadcast("tasks:#{task.project_id}", :tasks_changed)
+      broadcast("tasks:#{task.project_id}", {:task_updated, task})
     end
   end
 

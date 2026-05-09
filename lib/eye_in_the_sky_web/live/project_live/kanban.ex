@@ -236,7 +236,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_info(:tasks_changed, socket) do
+  def handle_info({:task_updated, _task}, socket) do
     socket =
       socket
       |> KanbanFilters.load_tasks()

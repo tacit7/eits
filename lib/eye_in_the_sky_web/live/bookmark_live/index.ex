@@ -50,12 +50,13 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
 
   @impl true
   def handle_event("delete", %{"id" => id}, socket) do
-    bookmark = Bookmarks.get_bookmark!(id)
-    {:ok, _} = Bookmarks.delete_bookmark(bookmark)
-
-    socket = load_bookmarks(socket)
-
-    {:noreply, socket}
+    case Bookmarks.get_bookmark(id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Bookmark not found.")}
+      bookmark ->
+        {:ok, _} = Bookmarks.delete_bookmark(bookmark)
+        {:noreply, load_bookmarks(socket)}
+    end
   end
 
   defp load_bookmarks(socket) do

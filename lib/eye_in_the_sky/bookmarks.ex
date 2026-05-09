@@ -40,6 +40,8 @@ defmodule EyeInTheSky.Bookmarks do
   """
   def get_bookmark!(id), do: Repo.get!(Bookmark, id)
 
+  def get_bookmark(id), do: Repo.get(Bookmark, id)
+
   @doc """
   Creates a bookmark.
   """

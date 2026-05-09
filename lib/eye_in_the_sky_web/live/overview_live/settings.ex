@@ -152,8 +152,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         key == "theme" ->
           push_event(socket, "apply_theme", %{theme: value})
 
-        key in ["cm_font_size", "cm_tab_size"] ->
-          push_event(socket, "apply_cm_settings", %{String.to_existing_atom(key) => value})
+        key == "cm_font_size" ->
+          push_event(socket, "apply_cm_settings", %{cm_font_size: value})
+
+        key == "cm_tab_size" ->
+          push_event(socket, "apply_cm_settings", %{cm_tab_size: value})
 
         key == "palette_shortcut" ->
           assign(socket, :palette_shortcut, value)

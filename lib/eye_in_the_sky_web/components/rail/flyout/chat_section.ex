@@ -46,8 +46,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
           phx-value-channel_id={channel.id}
           phx-target={@myself}
           title="Delete channel"
+          data-confirm={"Delete ##{channel.name}?"}
           class="opacity-0 group-hover:opacity-100 flex items-center justify-center text-base-content/35 hover:text-base-content/70 transition-all flex-shrink-0 size-5"
-          onclick="confirm('Delete this channel?') || event.stopImmediatePropagation()"
         >
           <.icon name="hero-x-mark-mini" class="size-3.5" />
         </button>

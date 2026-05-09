@@ -22,6 +22,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     if connected?(socket) do
       EyeInTheSky.Events.subscribe_notifications()
       EyeInTheSky.Events.subscribe_projects()
+      EyeInTheSky.Events.subscribe_channels()
     end
 
     socket =
@@ -226,6 +227,16 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     send_update(EyeInTheSkyWeb.Components.Rail,
       id: "app-rail",
       refresh_projects: true
+    )
+
+    {:halt, socket}
+  end
+
+  defp handle_fab_info({event, _channel}, socket)
+       when event in [:channel_created, :channel_deleted] do
+    send_update(EyeInTheSkyWeb.Components.Rail,
+      id: "app-rail",
+      refresh_channels: true
     )
 
     {:halt, socket}

@@ -132,6 +132,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     {:ok, assign(socket, :projects, Projects.list_projects_for_sidebar())}
   end
 
+  def update(%{refresh_channels: true}, socket) do
+    {:ok, assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
+  end
+
   # Targeted update from NavHook when a session is created/updated/stopped.
   # Replaces the session in-place if it's already in the list (status change).
   # Falls back to a full reload if the session is new (not yet in the list).
@@ -304,49 +308,65 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("create_channel", params, socket) do
     name = String.trim(params["channel_name"] || "")
 
-    if name == "" do
-      {:noreply, put_flash(socket, :error, "Channel name is required")}
-    else
-      project_id = socket.assigns.sidebar_project && socket.assigns.sidebar_project.id
+    cond do
+      name == "" ->
+        {:noreply, put_flash(socket, :error, "Channel name is required")}
 
-      case EyeInTheSky.Channels.create_channel(%{
-             name: name,
-             channel_type: "public",
-             project_id: project_id
-           }) do
-        {:ok, _channel} ->
-          socket =
-            socket
-            |> assign(:show_new_channel_form, false)
-            |> assign(
-              :flyout_channels,
-              Loader.load_flyout_channels(socket.assigns.sidebar_project)
-            )
+      String.length(name) > 80 ->
+        {:noreply, put_flash(socket, :error, "Channel name must be 80 characters or fewer")}
 
-          {:noreply, put_flash(socket, :info, "Channel created successfully")}
+      true ->
+        project_id = socket.assigns.sidebar_project && socket.assigns.sidebar_project.id
 
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to create channel")}
-      end
+        case EyeInTheSky.Channels.create_channel(%{
+               name: name,
+               channel_type: "public",
+               project_id: project_id
+             }) do
+          {:ok, channel} ->
+            EyeInTheSky.Events.channel_created(channel)
+
+            socket =
+              socket
+              |> assign(:show_new_channel_form, false)
+              |> assign(
+                :flyout_channels,
+                Loader.load_flyout_channels(socket.assigns.sidebar_project)
+              )
+
+            {:noreply, put_flash(socket, :info, "Channel ##{channel.name} created")}
+
+          {:error, %Ecto.Changeset{errors: [name: {msg, _}]}} ->
+            {:noreply, put_flash(socket, :error, "Channel name #{msg}")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to create channel")}
+        end
     end
   end
 
   def handle_event("delete_channel", %{"channel_id" => channel_id}, socket) do
-    case EyeInTheSky.Channels.update_channel(
-           EyeInTheSky.Channels.get_channel(channel_id),
-           %{archived_at: DateTime.utc_now()}
-         ) do
-      {:ok, _} ->
-        socket = assign(
-          socket,
-          :flyout_channels,
-          Loader.load_flyout_channels(socket.assigns.sidebar_project)
-        )
+    case EyeInTheSky.Channels.get_channel(channel_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Channel not found")}
 
-        {:noreply, put_flash(socket, :info, "Channel deleted")}
+      channel ->
+        case EyeInTheSky.Channels.update_channel(channel, %{archived_at: DateTime.utc_now()}) do
+          {:ok, updated} ->
+            EyeInTheSky.Events.channel_deleted(updated)
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete channel")}
+            socket =
+              assign(
+                socket,
+                :flyout_channels,
+                Loader.load_flyout_channels(socket.assigns.sidebar_project)
+              )
+
+            {:noreply, put_flash(socket, :info, "Channel ##{channel.name} deleted")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete ##{channel.name}")}
+        end
     end
   end
 

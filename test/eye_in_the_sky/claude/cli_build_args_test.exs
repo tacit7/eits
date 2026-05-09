@@ -6,6 +6,9 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
 
   setup do
     CLI.clear_binary_cache()
+    # Clear ETS settings cache to prevent cross-test pollution from other test modules
+    # that call Settings.put/2 (ETS survives sandbox rollback).
+    :ets.delete_all_objects(:settings_cache)
     :ok
   end
 

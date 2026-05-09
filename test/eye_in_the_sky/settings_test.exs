@@ -3,6 +3,14 @@ defmodule EyeInTheSky.SettingsTest do
 
   alias EyeInTheSky.Settings
 
+  # Clear the ETS cache before each test to prevent cross-test pollution.
+  # Settings.put/2 writes to the sandbox DB (rolled back after each test)
+  # but also populates the global ETS cache, which is NOT rolled back.
+  setup do
+    :ets.delete_all_objects(:settings_cache)
+    :ok
+  end
+
   # ---- get/1 ----
 
   test "get returns default when key has no stored value" do

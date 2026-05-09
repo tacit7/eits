@@ -17,11 +17,15 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
       view |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
       assert has_element?(view, "[phx-click='select_project']")
 
-      view
-      |> element("[phx-click='select_project'][phx-value-project_id='#{project.id}']")
-      |> render_click()
+      # Selecting a project triggers push_navigate → live_redirect to /projects/:id/sessions.
+      # The view process shuts down after sending the redirect; follow it to get the new view.
+      {:ok, view2, _html} =
+        view
+        |> element("[phx-click='select_project'][phx-value-project_id='#{project.id}']")
+        |> render_click()
+        |> follow_redirect(conn)
 
-      refute has_element?(view, "[phx-click='select_project']")
+      refute has_element?(view2, "[phx-click='select_project']")
     end
 
     test "reselecting the same project closes picker without crash", %{conn: conn} do
@@ -30,18 +34,22 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
 
       view |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
 
-      view
+      # First select navigates to the project page.
+      {:ok, view2, _html} =
+        view
+        |> element("[phx-click='select_project'][phx-value-project_id='#{project.id}']")
+        |> render_click()
+        |> follow_redirect(conn)
+
+      # Re-open picker and reselect the same project — this is a de-select (no navigate).
+      view2 |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
+      assert has_element?(view2, "[phx-click='select_project']")
+
+      view2
       |> element("[phx-click='select_project'][phx-value-project_id='#{project.id}']")
       |> render_click()
 
-      view |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
-      assert has_element?(view, "[phx-click='select_project']")
-
-      view
-      |> element("[phx-click='select_project'][phx-value-project_id='#{project.id}']")
-      |> render_click()
-
-      refute has_element?(view, "[phx-click='select_project']")
+      refute has_element?(view2, "[phx-click='select_project']")
     end
 
     test "selecting a different project closes picker", %{conn: conn} do
@@ -51,17 +59,23 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
 
       view |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
 
-      view
-      |> element("[phx-click='select_project'][phx-value-project_id='#{p1.id}']")
-      |> render_click()
+      # Select first project — navigates.
+      {:ok, view2, _html} =
+        view
+        |> element("[phx-click='select_project'][phx-value-project_id='#{p1.id}']")
+        |> render_click()
+        |> follow_redirect(conn)
 
-      view |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
+      # Re-open picker and select a different project — navigates again.
+      view2 |> element("[phx-click='toggle_proj_picker'][phx-target]") |> render_click()
 
-      view
-      |> element("[phx-click='select_project'][phx-value-project_id='#{p2.id}']")
-      |> render_click()
+      {:ok, view3, _html} =
+        view2
+        |> element("[phx-click='select_project'][phx-value-project_id='#{p2.id}']")
+        |> render_click()
+        |> follow_redirect(conn)
 
-      refute has_element?(view, "[phx-click='select_project']")
+      refute has_element?(view3, "[phx-click='select_project']")
     end
   end
 end

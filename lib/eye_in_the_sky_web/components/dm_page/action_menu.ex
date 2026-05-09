@@ -108,7 +108,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
         <%= if @show_push_setup do %>
           <li>
             <button
-              id="dm-push-setup-btn"
+              id={if @wrapper_id, do: "#{@wrapper_id}-push-setup-btn", else: "dm-push-setup-btn"}
               phx-hook="PushSetup"
               phx-update="ignore"
               data-push-state="disabled"

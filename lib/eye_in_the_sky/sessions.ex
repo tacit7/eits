@@ -325,7 +325,8 @@ defmodule EyeInTheSky.Sessions do
   def end_session(%Session{} = session, opts \\ %{}) do
     attrs = %{ended_at: DateTime.utc_now()}
     attrs = if s = opts[:summary], do: Map.put(attrs, :description, s), else: attrs
-    attrs = if s = opts[:final_status], do: Map.put(attrs, :status, s), else: attrs
+    final_status = opts[:final_status] || "completed"
+    attrs = Map.put(attrs, :status, final_status)
 
     with {:ok, updated} <- update_session(session, attrs) do
       Events.agent_stopped(updated)

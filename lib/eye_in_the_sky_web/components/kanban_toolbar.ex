@@ -72,6 +72,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
           <% end %>
         </button>
         <.link
+          :if={@project_id}
           navigate={~p"/projects/#{@project_id}/tasks"}
           class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 h-11 sm:h-7 min-h-0"
           title="List view"

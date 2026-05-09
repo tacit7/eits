@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityTest do
         priority: 50,
         state_id: 1,
         state: %{name: "To Do"},
+        project_id: nil,
         completed_at: nil,
         due_at: nil,
         created_at: DateTime.utc_now(),

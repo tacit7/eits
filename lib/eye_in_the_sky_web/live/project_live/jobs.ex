@@ -125,12 +125,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
   @impl true
   def render(assigns) do
     ~H"""
-    <%= if msg = @flash["error"] do %>
-      <div id="flash-error" role="alert" class="alert alert-error text-sm mx-4 mt-4">{msg}</div>
-    <% end %>
-    <%= if msg = @flash["info"] do %>
-      <div id="flash-info" role="alert" class="alert alert-info text-sm mx-4 mt-4">{msg}</div>
-    <% end %>
     <.live_component
       module={EyeInTheSkyWeb.Components.JobsPage}
       id="jobs-page"

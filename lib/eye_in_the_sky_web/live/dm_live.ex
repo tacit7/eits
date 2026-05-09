@@ -411,6 +411,12 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: ExternalActions.handle_load_cumulative_diff(socket)
 
   @impl true
+  def handle_event("set_diff_mode", %{"mode" => mode}, socket)
+      when mode in ["unified", "side_by_side"] do
+    {:noreply, assign(socket, :diff_mode, String.to_existing_atom(mode))}
+  end
+
+  @impl true
   def handle_event("set_commits_view", %{"view" => view}, socket)
       when view in ["list", "cumulative"] do
     socket = assign(socket, :commits_view, String.to_existing_atom(view))
@@ -681,6 +687,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         commits={@commits}
         diff_cache={@diff_cache}
         commits_view={@commits_view}
+        diff_mode={@diff_mode}
         cumulative_diff={@cumulative_diff}
         notes={@notes}
         codex_raw_lines={@codex_raw_lines}

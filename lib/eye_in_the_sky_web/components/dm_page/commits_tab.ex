@@ -5,9 +5,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
 
   import EyeInTheSkyWeb.Components.DmHelpers, only: [extract_commit_title: 1, to_utc_string: 1]
 
+  alias EyeInTheSky.Diff.Parser
+  alias EyeInTheSkyWeb.Components.DmPage.DiffSideBySide
+
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
   attr :commits_view, :atom, default: :list
+  attr :diff_mode, :atom, default: :unified
   attr :cumulative_diff, :any, default: nil
 
   def commits_tab(assigns) do
@@ -21,28 +25,55 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
       />
     <% else %>
       <div class="space-y-3">
-        <%!-- View toggle --%>
-        <div class="flex items-center gap-1 bg-base-300/50 rounded-lg p-1 w-fit">
-          <button
-            class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
-              if @commits_view == :list,
-                do: "bg-base-100 text-base-content shadow-sm",
-                else: "text-base-content/50 hover:text-base-content/70"}
-            phx-click="set_commits_view"
-            phx-value-view="list"
-          >
-            Commits
-          </button>
-          <button
-            class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
-              if @commits_view == :cumulative,
-                do: "bg-base-100 text-base-content shadow-sm",
-                else: "text-base-content/50 hover:text-base-content/70"}
-            phx-click="set_commits_view"
-            phx-value-view="cumulative"
-          >
-            Full diff
-          </button>
+        <%!-- Top controls: content toggle + view mode toggle --%>
+        <div class="flex items-center justify-between gap-3">
+          <%!-- Commits / Full diff --%>
+          <div class="flex items-center gap-1 bg-base-300/50 rounded-lg p-1">
+            <button
+              class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
+                if @commits_view == :list,
+                  do: "bg-base-100 text-base-content shadow-sm",
+                  else: "text-base-content/50 hover:text-base-content/70"}
+              phx-click="set_commits_view"
+              phx-value-view="list"
+            >
+              Commits
+            </button>
+            <button
+              class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
+                if @commits_view == :cumulative,
+                  do: "bg-base-100 text-base-content shadow-sm",
+                  else: "text-base-content/50 hover:text-base-content/70"}
+              phx-click="set_commits_view"
+              phx-value-view="cumulative"
+            >
+              Full diff
+            </button>
+          </div>
+
+          <%!-- Unified / Side by side --%>
+          <div class="flex items-center gap-1 bg-base-300/50 rounded-lg p-1">
+            <button
+              class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
+                if @diff_mode == :unified,
+                  do: "bg-base-100 text-base-content shadow-sm",
+                  else: "text-base-content/50 hover:text-base-content/70"}
+              phx-click="set_diff_mode"
+              phx-value-mode="unified"
+            >
+              Unified
+            </button>
+            <button
+              class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
+                if @diff_mode == :side_by_side,
+                  do: "bg-base-100 text-base-content shadow-sm",
+                  else: "text-base-content/50 hover:text-base-content/70"}
+              phx-click="set_diff_mode"
+              phx-value-mode="side_by_side"
+            >
+              Side by side
+            </button>
+          </div>
         </div>
 
         <%= if @commits_view == :list do %>
@@ -102,6 +133,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                       <div class="px-4 py-2 text-xs text-error/60">
                         Could not load diff — repo path unavailable
                       </div>
+                    <% @diff_mode == :side_by_side -> %>
+                      <DiffSideBySide.side_by_side diff={Parser.parse(diff, hash)} />
                     <% true -> %>
                       <div
                         id={"diff-#{commit.id}"}
@@ -126,6 +159,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                 <div class="py-4 text-xs text-error/60">
                   Could not load diff — repo path unavailable
                 </div>
+              <% @diff_mode == :side_by_side -> %>
+                <DiffSideBySide.side_by_side diff={Parser.parse(@cumulative_diff, "cumulative")} />
               <% true -> %>
                 <div
                   id="dm-cumulative-diff-viewer"

@@ -106,6 +106,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:slash_items, SlashItems.build())
     |> assign(:diff_cache, %{})
     |> assign(:commits_view, :list)
+    |> assign(:diff_mode, :unified)
     |> assign(:cumulative_diff, nil)
     |> assign(:reload_timer, nil)
     |> assign(:thinking_enabled, get_in(effective, ["general", "thinking_enabled"]))

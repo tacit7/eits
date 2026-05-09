@@ -6,19 +6,18 @@ end
 defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.Accounts.ApiKey
   alias EyeInTheSky.Teams
 
   import EyeInTheSky.Factory
 
-  defp api_conn do
-    token = "test_api_key_#{System.unique_integer([:positive])}"
-    {:ok, _} = ApiKey.create(token, "test")
-    Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
-  end
-
   setup do
-    {:ok, conn: api_conn()}
+    session = new_session()
+
+    conn =
+      Phoenix.ConnTest.build_conn()
+      |> Plug.Conn.put_req_header("x-eits-session", session.uuid)
+
+    {:ok, conn: conn, session: session}
   end
 
   defp create_team(overrides \\ %{}) do

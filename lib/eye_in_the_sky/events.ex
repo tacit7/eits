@@ -166,17 +166,16 @@ defmodule EyeInTheSky.Events do
 
   @doc "Task was created, updated, or deleted. Broadcasts to both global and project-scoped topics."
   def task_updated(task) do
-    # Enrich tasks_changed with task entity info for targeted subscriber updates
-    task_id = task.id || task.uuid
-    broadcast("tasks", {:tasks_changed, %{task_id: task_id, task: task}})
+    broadcast("tasks", :tasks_changed)
 
     if task.project_id do
+      broadcast("tasks:#{task.project_id}", :tasks_changed)
       broadcast("tasks:#{task.project_id}", {:task_updated, task})
     end
   end
 
   @doc "Tasks changed (no specific task). Global broadcast only."
-  def tasks_changed, do: broadcast("tasks", {:tasks_changed, %{}})
+  def tasks_changed, do: broadcast("tasks", :tasks_changed)
 
   # ---------------------------------------------------------------------------
   # Agent identity events — topic: "agents"

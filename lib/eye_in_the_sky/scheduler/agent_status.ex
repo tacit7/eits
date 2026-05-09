@@ -197,15 +197,13 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       agent_ids = zombies |> Enum.map(& &1.agent_id) |> Enum.reject(&is_nil/1) |> Enum.uniq()
 
       # H2 fix: single Repo.update_all replaces N individual Sessions.update_session calls.
-      # returning: [:id, :uuid] gives us enough to log and broadcast; no second SELECT needed.
-      {_count, updated_sessions} =
-        Repo.update_all(
-          from(s in Session, where: s.id in ^zombie_ids),
-          [set: [status: "failed", status_reason: "zombie_swept", updated_at: now]],
-          returning: [:id, :uuid]
-        )
+      # Iterate over pre-loaded zombies for logging/broadcast — no returning: needed.
+      Repo.update_all(
+        from(s in Session, where: s.id in ^zombie_ids),
+        set: [status: "failed", status_reason: "zombie_swept", updated_at: now]
+      )
 
-      Enum.each(updated_sessions, fn s ->
+      Enum.each(zombies, fn s ->
         Logger.warning("Swept zombie session id=#{s.id} uuid=#{s.uuid} (stuck in working)")
         Events.session_status(s.id, "failed")
       end)
@@ -214,7 +212,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       if agent_ids != [] do
         Repo.update_all(
           from(a in Agent, where: a.id in ^agent_ids),
-          set: [status: "failed", updated_at: now]
+          set: [status: "failed"]
         )
       end
 

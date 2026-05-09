@@ -11,16 +11,22 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams
   def index(conn, params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params) do
+    with {:ok, scope} <- get_project_scope(conn, params) do
       limit =
         case parse_int(params["limit"]) do
           n when is_integer(n) and n > 0 -> n
           _ -> nil
         end
 
-      # Use project_id filter if provided, otherwise use requester's project
+      # Use explicit project_id if provided, otherwise fall back to session's project (if any)
       project_id = params["project_id"] && parse_int(params["project_id"])
-      project_id = project_id || requester_session.project_id
+
+      project_id =
+        project_id ||
+          case scope do
+            :bearer_only -> nil
+            session -> session.project_id
+          end
 
       opts =
         []
@@ -43,9 +49,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams/:id
   def show(conn, %{"id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(id),
-         :ok <- validate_project_access(team, requester_session) do
+         :ok <- validate_project_access(team, scope) do
       members = Teams.list_members(team.id)
 
       json(conn, %{
@@ -71,8 +77,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # POST /api/v1/teams
   def create(conn, params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
-         {:ok, project_id} <- resolve_create_project_id(params, requester_session) do
+    with {:ok, scope} <- get_project_scope(conn, params),
+         {:ok, project_id} <- resolve_create_project_id(params, scope) do
       attrs = %{
         name: params["name"],
         description: params["description"],
@@ -112,9 +118,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     if map_size(attrs) == 0 do
       {:error, :bad_request, "at least one of name or description is required"}
     else
-      with {:ok, requester_session} <- get_authenticated_session(conn, params),
+      with {:ok, scope} <- get_project_scope(conn, params),
            {:ok, team} <- resolve_team(id),
-           :ok <- validate_project_access(team, requester_session) do
+           :ok <- validate_project_access(team, scope) do
         case Teams.update_team(team, attrs) do
           {:ok, updated} ->
             json(conn, %{
@@ -142,9 +148,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # DELETE /api/v1/teams/:id
   def delete(conn, %{"id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(id),
-         :ok <- validate_project_access(team, requester_session) do
+         :ok <- validate_project_access(team, scope) do
       case Teams.delete_team(team) do
         {:ok, _} ->
           json(conn, %{success: true, message: "Team archived", id: team.id})
@@ -164,9 +170,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams/:team_id/members
   def list_members(conn, %{"team_id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(id),
-         :ok <- validate_project_access(team, requester_session) do
+         :ok <- validate_project_access(team, scope) do
       members = Teams.list_members(team.id)
 
       json(conn, %{
@@ -186,9 +192,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # POST /api/v1/teams/:team_id/members
   def join(conn, %{"team_id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(id),
-         :ok <- validate_project_access(team, requester_session) do
+         :ok <- validate_project_access(team, scope) do
       attrs = %{
         team_id: team.id,
         name: params["name"],
@@ -225,11 +231,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # PATCH /api/v1/teams/:team_id/members/:member_id
   def update_member(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
-         :ok <- validate_project_access(team, requester_session),
-         {:ok, member} <- Teams.get_member(member_id) do
-      do_update_member(conn, member, params)
+         :ok <- validate_project_access(team, scope) do
+      case Teams.get_member(member_id) do
+        {:ok, member} -> do_update_member(conn, member, params)
+        {:error, :not_found} -> {:error, :not_found, "Member not found"}
+      end
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
@@ -242,11 +250,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # DELETE /api/v1/teams/:team_id/members/:member_id
   def leave(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
-         :ok <- validate_project_access(team, requester_session),
-         {:ok, member} <- Teams.get_member(member_id) do
-      do_leave_team(conn, member)
+         :ok <- validate_project_access(team, scope) do
+      case Teams.get_member(member_id) do
+        {:ok, member} -> do_leave_team(conn, member)
+        {:error, :not_found} -> {:error, :not_found, "Member not found"}
+      end
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
@@ -270,9 +280,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         {:error, :bad_request, "from_session_id is required"}
 
       true ->
-        with {:ok, requester_session} <- get_authenticated_session(conn, params),
+        with {:ok, scope} <- get_project_scope(conn, params),
              {:ok, team} <- resolve_team(id),
-             :ok <- validate_project_access(team, requester_session) do
+             :ok <- validate_project_access(team, scope) do
           do_broadcast(conn, team, from_raw, String.trim(body))
         else
           {:error, :not_found} ->
@@ -287,7 +297,11 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # ── helpers ──────────────────────────────────────────────────────────────────
 
-  defp get_authenticated_session(conn, params) do
+  # Returns {:ok, session} when a session/agent identifier is provided, or
+  # {:ok, :bearer_only} when the caller authenticated only with a Bearer API key.
+  # The caller is already authenticated by the plug pipeline; this is purely about
+  # resolving optional project-scope context for ownership checks.
+  defp get_project_scope(conn, params) do
     session_id_raw = params["session_id"]
     agent_id_raw = params["agent_id"]
     header_session = conn |> Plug.Conn.get_req_header("x-eits-session") |> List.first()
@@ -303,7 +317,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         resolve_session(header_session)
 
       true ->
-        {:error, :unauthorized}
+        {:ok, :bearer_only}
     end
   end
 
@@ -336,23 +350,32 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-  defp validate_project_access(team, requester_session) do
-    if team.project_id == requester_session.project_id do
+  # Bearer-only callers have no project context — skip ownership check.
+  defp validate_project_access(_team, :bearer_only), do: :ok
+
+  defp validate_project_access(team, session) do
+    if is_nil(team.project_id) or is_nil(session.project_id) or
+         team.project_id == session.project_id do
       :ok
     else
       {:error, :forbidden}
     end
   end
 
-  defp resolve_create_project_id(params, requester_session) do
+  # Bearer-only: use explicit project_id param (may be nil — that's fine for unrestricted teams)
+  defp resolve_create_project_id(params, :bearer_only) do
+    {:ok, params["project_id"] && parse_int(params["project_id"])}
+  end
+
+  defp resolve_create_project_id(params, session) do
     case parse_int(params["project_id"]) do
       nil ->
         # No project_id provided, use requester's project
-        {:ok, requester_session.project_id}
+        {:ok, session.project_id}
 
       project_id ->
-        # Project_id provided, validate it matches requester
-        if project_id == requester_session.project_id do
+        # Project_id provided, validate it matches requester's project
+        if is_nil(session.project_id) or project_id == session.project_id do
           {:ok, project_id}
         else
           {:error, :forbidden}

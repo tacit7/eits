@@ -107,8 +107,9 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
   @doc """
   POST /api/v1/agents - Spawn a new Claude Code agent.
-  Body: instructions, model, provider, project_path, project_id, name, member_name,
-        parent_agent_id, parent_session_id, worktree, team_name
+  Body: model, provider, project_path, project_id, name, member_name,
+        parent_agent_id, parent_session_id, worktree, team_name.
+        instructions is optional; if not provided, the session waits for the first message.
   """
   def create(conn, params) do
     with {:ok, params} <- SpawnValidator.validate(params) do

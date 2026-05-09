@@ -111,17 +111,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 placeholder="e.g., Code Reviewer, Bug Fixer..."
               />
             </.form_field>
-            
-    <!-- Instructions -->
-            <.form_field label="Instructions">
-              <textarea
-                name="description"
-                class="textarea textarea-bordered h-24 text-base"
-                placeholder="What should this agent do?"
-                required
-              ></textarea>
-            </.form_field>
-            
+
     <!-- Worktree / Branch -->
             <.form_field label="Worktree Branch" hint="Optional — isolates work + enables PR">
               <input

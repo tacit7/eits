@@ -251,7 +251,7 @@ defmodule EyeInTheSky.Search.PgSearch do
     Repo.all(query_result)
   end
 
-  defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, opts \\ []) do
+  defp pg_fts_search(table, schema, query, search_columns, sql_filter, sql_params, fallback_query, opts) do
     preloads = Keyword.get(opts, :preloads, [])
     limit = Keyword.get(opts, :limit)
     alias_letter = String.first(table)

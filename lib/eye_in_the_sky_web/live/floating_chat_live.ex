@@ -6,7 +6,6 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
 
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
-  import Ecto.Query
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{Messages, Repo, Sessions}

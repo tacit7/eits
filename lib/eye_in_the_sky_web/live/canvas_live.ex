@@ -114,19 +114,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
-  defp apply_canvas_rename(socket, id, updated) do
-    canvases = Enum.map(socket.assigns.canvases, fn c -> if c.id == id, do: updated, else: c end)
-
-    socket =
-      if socket.assigns.active_canvas_id == id do
-        assign(socket, :page_title, updated.name <> " — Canvas")
-      else
-        socket
-      end
-
-    socket |> assign(:canvases, canvases) |> assign(:renaming_canvas_id, nil)
-  end
-
   def handle_event("rename_canvas", _params, socket) do
     {:noreply, assign(socket, :renaming_canvas_id, nil)}
   end
@@ -279,6 +266,19 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     else
       socket
     end
+  end
+
+  defp apply_canvas_rename(socket, id, updated) do
+    canvases = Enum.map(socket.assigns.canvases, fn c -> if c.id == id, do: updated, else: c end)
+
+    socket =
+      if socket.assigns.active_canvas_id == id do
+        assign(socket, :page_title, updated.name <> " — Canvas")
+      else
+        socket
+      end
+
+    socket |> assign(:canvases, canvases) |> assign(:renaming_canvas_id, nil)
   end
 
   @impl true

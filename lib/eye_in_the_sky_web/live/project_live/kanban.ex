@@ -291,6 +291,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   @impl true
   def handle_info({:agent_deleted, _}, socket), do: {:noreply, socket}
 
+  @impl true
   def handle_info({:checklist_updated, task}, socket) do
     {:noreply, socket |> assign(:selected_task, task) |> KanbanFilters.load_tasks()}
   end
@@ -341,7 +342,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       task={@selected_task}
       notes={@task_notes}
       workflow_states={@workflow_states}
-      projects={if @all_projects.ok?, do: @all_projects.result, else: []}
+      projects={if @all_projects.ok, do: @all_projects.result, else: []}
       current_project_id={@project_id}
       focus={@task_detail_focus}
       toggle_event={JS.push("toggle_overlay", value: %{key: "show_task_detail_drawer"})}
@@ -431,7 +432,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     |> assign(:show_archived, false)
     |> assign(:selected_tasks, MapSet.new())
     |> assign(:bulk_mode, false)
-    |> assign_async(:all_projects, fn -> {:ok, %{all_projects: Projects.list_projects()}} end)
+    |> assign_async(:all_projects, fn -> {:ok, Projects.list_projects()} end)
     |> assign(:show_filters, false)
     |> assign(:show_filter_drawer, false)
     |> assign(:filter_due_date, nil)

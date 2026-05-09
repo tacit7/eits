@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   alias EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue
   alias EyeInTheSkyWeb.DmLive.SlashCommands
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ModelHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   attr :uploads, :map, required: true

@@ -34,7 +34,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
   defp project_path_for(socket) do
     case socket.assigns[:project] do
       %{path: path} when is_binary(path) and path != "" -> path
-      _ -> File.cwd!()
+      _ ->
+        case File.cwd() do
+          {:ok, path} -> path
+          {:error, _} -> Path.expand("~")
+        end
     end
   end
 
@@ -93,7 +97,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
 
     Enum.filter(skills, fn skill ->
       String.contains?(String.downcase(skill.slug), q) ||
-        String.contains?(String.downcase(skill.description), q)
+        String.contains?(String.downcase(skill.description || ""), q)
     end)
   end
 

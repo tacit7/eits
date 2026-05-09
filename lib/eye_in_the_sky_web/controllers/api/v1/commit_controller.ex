@@ -9,66 +9,93 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
-  GET /api/v1/commits - List commits for a session or agent.
-  Query params: session_id (UUID), agent_id (UUID), limit (default 20)
+  GET /api/v1/commits - List or search commits.
+  Query params:
+    q           - search commit messages via ILIKE (returns session_uuid/session_name alongside)
+    session_id  - filter by session UUID
+    agent_id    - filter by agent UUID
+    limit       - max results (default 20)
+    since_hash  - return only commits newer than this hash
   """
   def index(conn, params) do
     limit = parse_int(params["limit"], 20)
-    since_hash = params["since_hash"]
+    search_query = params["q"]
 
-    commits =
-      cond do
-        params["session_id"] ->
-          case Sessions.get_session_by_uuid(params["session_id"]) do
-            {:ok, session} -> Commits.list_commits_for_session(session.id, limit: limit)
-            _ -> []
-          end
+    # Search mode: full-text across commit messages, joins sessions for context.
+    if search_query && search_query != "" do
+      results = Commits.search_commits(search_query, limit: limit)
 
-        params["agent_id"] ->
-          case Agents.get_agent_by_uuid(params["agent_id"]) do
-            {:ok, agent} ->
-              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-                [session | _] -> Commits.list_recent_commits(session.id, limit)
-                [] -> []
-              end
+      json(conn, %{
+        success: true,
+        count: length(results),
+        commits:
+          Enum.map(results, fn c ->
+            %{
+              id: c.id,
+              commit_hash: c.commit_hash,
+              commit_message: c.commit_message,
+              created_at: c.created_at,
+              session_id: c.session_id,
+              session_uuid: c.session_uuid,
+              session_name: c.session_name
+            }
+          end)
+      })
+    else
+      since_hash = params["since_hash"]
 
-            _ ->
-              []
-          end
+      commits =
+        cond do
+          params["session_id"] ->
+            case Sessions.get_session_by_uuid(params["session_id"]) do
+              {:ok, session} -> Commits.list_commits_for_session(session.id, limit: limit)
+              _ -> []
+            end
 
-        true ->
-          Commits.list_commits(limit: limit)
-      end
+          params["agent_id"] ->
+            case Agents.get_agent_by_uuid(params["agent_id"]) do
+              {:ok, agent} ->
+                case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+                  [session | _] -> Commits.list_recent_commits(session.id, limit)
+                  [] -> []
+                end
 
-    # Apply since_hash filter: return only commits newer than the given hash.
-    # Commits are ordered oldest-first by list_commits_for_session; we find the
-    # anchor and drop everything up to and including it.
-    {commits, since_hash_found} =
-      if since_hash do
-        idx = Enum.find_index(commits, &(&1.commit_hash == since_hash))
+              _ ->
+                []
+            end
 
-        if idx do
-          {Enum.drop(commits, idx + 1), true}
-        else
-          {commits, false}
+          true ->
+            Commits.list_commits(limit: limit)
         end
-      else
-        {commits, nil}
-      end
 
-    resp = %{
-      success: true,
-      commits: Enum.map(commits, &ApiPresenter.present_commit/1)
-    }
+      # Apply since_hash filter: return only commits newer than the given hash.
+      {commits, since_hash_found} =
+        if since_hash do
+          idx = Enum.find_index(commits, &(&1.commit_hash == since_hash))
 
-    resp =
-      if since_hash do
-        Map.merge(resp, %{since_hash: since_hash, since_hash_found: since_hash_found})
-      else
-        resp
-      end
+          if idx do
+            {Enum.drop(commits, idx + 1), true}
+          else
+            {commits, false}
+          end
+        else
+          {commits, nil}
+        end
 
-    json(conn, resp)
+      resp = %{
+        success: true,
+        commits: Enum.map(commits, &ApiPresenter.present_commit/1)
+      }
+
+      resp =
+        if since_hash do
+          Map.merge(resp, %{since_hash: since_hash, since_hash_found: since_hash_found})
+        else
+          resp
+        end
+
+      json(conn, resp)
+    end
   end
 
   @doc """

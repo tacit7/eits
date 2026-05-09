@@ -2058,8 +2058,38 @@ cmd_tags() {
 
 cmd_commits() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create|search>"; return 0; }
   case "$sub" in
+    search)
+      # eits commits search <query> [--limit|-n <n>] [--json|-j]
+      local query="${1:-}"; shift || true
+      [[ -z "$query" ]] && die "usage: eits commits search <query> [--limit <n>] [--json]"
+      local limit=20 json_mode=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit|-n|-l) limit="$2"; shift 2 ;;
+          --json|-j)     json_mode=1; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local qs; qs="q=$(printf '%s' "$query" | jq -Rr @uri)&limit=${limit}"
+      local _resp; _resp=$(_curl "${BASE_URL}/commits?${qs}") || return 1
+      if [[ $json_mode -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      else
+        local count; count=$(printf '%s\n' "$_resp" | jq -r '.count // 0')
+        printf "(%s results)\n" "$count"
+        printf '%s\n' "$_resp" | jq -r \
+          '.commits[] | [
+            (.session_name // (.session_uuid // (.session_id | tostring))),
+            (.session_uuid // ""),
+            (.commit_hash | .[0:8]),
+            (.commit_message // "" | gsub("\n";" ") | .[0:60]),
+            (.created_at // "" | .[0:19])
+          ] | @tsv' \
+          | column -t -s $'\t'
+      fi
+      ;;
     list)
       # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] [--limit <n>]
       # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only
@@ -2177,7 +2207,7 @@ cmd_commits() {
       fi
       ;;
     *)
-      echo "usage: eits commits <list|create>"
+      echo "usage: eits commits <list|create|search>"
       ;;
   esac
 }
@@ -3611,13 +3641,14 @@ SEARCH_HELP
         local count; count=$(printf '%s\n' "$_resp" | jq -r '.count')
         printf '%s\n' "$_resp" | jq -r \
           '.messages[] | [
-            (.session_name // .session_uuid // (.session_id | tostring)),
+            (.session_name // (.session_id | tostring)),
+            (.session_uuid // ""),
             .role,
-            (.body_excerpt | gsub("\n";" ") | .[0:80]),
+            (.body_excerpt | gsub("\n";" ") | .[0:60]),
             (.inserted_at | tostring | .[0:19])
           ] | @tsv' \
           | column -t -s $'\t' \
-          | { printf "%-4s  %s\n" "($count results)" ""; cat; }
+          | { printf "(%s results)\n" "$count"; cat; }
       fi
       ;;
     *)

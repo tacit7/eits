@@ -123,4 +123,32 @@ defmodule EyeInTheSky.Commits do
   def change_commit(%Commit{} = commit, attrs \\ %{}) do
     Commit.changeset(commit, attrs)
   end
+
+  @doc """
+  Full-text search across commit messages using ILIKE.
+  Joins sessions to return session_uuid and session_name alongside each commit.
+  Default limit: 20.
+  """
+  def search_commits(query, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 20)
+    pattern = "%#{query}%"
+
+    from(c in Commit,
+      join: s in EyeInTheSky.Sessions.Session,
+      on: s.id == c.session_id,
+      where: ilike(c.commit_message, ^pattern),
+      order_by: [desc: c.created_at],
+      limit: ^limit,
+      select: %{
+        id: c.id,
+        commit_hash: c.commit_hash,
+        commit_message: c.commit_message,
+        created_at: c.created_at,
+        session_id: s.id,
+        session_uuid: s.uuid,
+        session_name: s.name
+      }
+    )
+    |> Repo.all()
+  end
 end

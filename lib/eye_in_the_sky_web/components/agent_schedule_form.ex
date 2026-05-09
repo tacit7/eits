@@ -90,13 +90,13 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       <% end %>
 
       <div class="grid grid-cols-2 gap-3">
-        <.schedule_type_tabs schedule_type={@schedule_type} />
+        <.schedule_type_fields schedule_type={@schedule_type} />
         <.model_selector model={@model} />
       </div>
 
       <%= if @schedule_type == "cron" do %>
         <.cron_fields schedule_value={@schedule_value} />
-        <.timezone_selector timezone={@timezone} />
+        <.timezone_picker timezone={@timezone} />
       <% else %>
         <.interval_fields schedule_value={@schedule_value} />
       <% end %>
@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   attr :schedule_type, :string, required: true
 
-  defp schedule_type_tabs(assigns) do
+  defp schedule_type_fields(assigns) do
     ~H"""
     <div class="form-control">
       <label class="label"><span class="label-text text-xs">Schedule Type</span></label>
@@ -210,7 +210,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   attr :timezone, :string, required: true
 
-  defp timezone_selector(assigns) do
+  defp timezone_picker(assigns) do
     all =
       if assigns.timezone in @common_timezones,
         do: @common_timezones,

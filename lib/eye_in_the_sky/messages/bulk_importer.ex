@@ -12,7 +12,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   index on source_uuid combined with `on_conflict: :nothing`.
   """
 
-  alias EyeInTheSky.Messages
+  alias EyeInTheSky.{Events, Messages}
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.Repo
 
@@ -76,20 +76,27 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     # Execute writes WITHOUT an enclosing transaction so one bad row does not
     # roll back other successful writes. Idempotency is guaranteed by the unique
     # index on source_uuid combined with on_conflict: :nothing.
-    insert_count = run_inserts(inserts)
-    update_count = run_updates(updates)
+    insert_count = run_inserts(inserts, session_id)
+    update_count = run_updates(updates, session_id)
 
     %{inserted: insert_count, updated: update_count, skipped: skip_count}
   end
 
-  defp run_inserts([]), do: 0
+  defp run_inserts([], _session_id), do: 0
 
-  defp run_inserts(inserts) do
+  defp run_inserts(inserts, session_id) do
     {count, _} =
       Repo.insert_all(Message, inserts,
         on_conflict: :nothing,
         conflict_target: :source_uuid
       )
+
+    # Broadcast inserted messages to PubSub so DM page gets real-time updates.
+    # Fetch the inserted messages using their source_uuids and broadcast each.
+    if count > 0 do
+      source_uuids = Enum.map(inserts, & &1.source_uuid)
+      broadcast_inserted_messages(session_id, source_uuids)
+    end
 
     count
   rescue
@@ -121,13 +128,15 @@ defmodule EyeInTheSky.Messages.BulkImporter do
         end
   end
 
-  defp run_updates(updates) do
-    Enum.count(updates, &run_single_update/1)
+  defp run_updates(updates, session_id) do
+    Enum.count(updates, fn update -> run_single_update(update, session_id) end)
   end
 
-  defp run_single_update({existing, update_attrs}) do
+  defp run_single_update({existing, update_attrs}, session_id) do
     case Messages.update_message(existing, update_attrs) do
-      {:ok, _} ->
+      {:ok, updated_message} ->
+        # Broadcast the updated message to PubSub so DM page gets real-time updates.
+        Events.session_new_message(session_id, updated_message)
         true
 
       {:error, reason} ->
@@ -261,4 +270,18 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   end
 
   defp parse_timestamp(_timestamp, fallback), do: fallback
+
+  # Fetch inserted messages by source_uuid and broadcast each to the session topic.
+  # This ensures the DM page receives real-time updates when BulkImporter inserts messages.
+  defp broadcast_inserted_messages(session_id, source_uuids) do
+    Enum.each(source_uuids, fn source_uuid ->
+      case Messages.get_message_by_source_uuid(source_uuid) do
+        {:ok, message} ->
+          Events.session_new_message(session_id, message)
+
+        {:error, :not_found} ->
+          Logger.debug("BulkImporter: inserted message not found for source_uuid #{source_uuid}")
+      end
+    end)
+  end
 end

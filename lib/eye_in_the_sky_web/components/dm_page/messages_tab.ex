@@ -178,7 +178,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :session, :map, default: nil
 
   defp message_item(assigns) do
-    role = if assigns.message.sender_role == "user", do: :user, else: :agent
+    role =
+      case assigns.message.sender_role do
+        "user" -> :user
+        "system" -> :system
+        _ -> :agent
+      end
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
     segments = parse_body_segments(assigns.message.body)
     body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
@@ -229,13 +234,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           )
         }
       >
-        <%= if @is_tool_event do %>
-          <%!-- Tool events: subordinate rendering — compact + muted --%>
-          <div class="pl-[33px]">
-            <.message_body message={@message} compact={true} />
+        <%= if @role == :system do %>
+          <%!-- System message: centered annotation with dividers --%>
+          <div class="flex items-center gap-3 my-1">
+            <div class="flex-1 h-px bg-[var(--border-subtle)]/[0.4]"></div>
+            <span class="text-[10px] text-base-content/25 select-none whitespace-nowrap">
+              {String.slice(@message.body || "system message", 0, 50)}
+            </span>
+            <div class="flex-1 h-px bg-[var(--border-subtle)]/[0.4]"></div>
           </div>
         <% else %>
-          <%= if @role == :user do %>
+          <%= if @is_tool_event do %>
+            <%!-- Tool events: subordinate rendering — compact + muted --%>
+            <div class="pl-[33px]">
+              <.message_body message={@message} compact={true} />
+            </div>
+          <% else %>
+            <%= if @role == :user do %>
             <%!-- ── User prompt ── --%>
             <div class="group">
               <%!-- Header row --%>
@@ -316,6 +331,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 <.message_metrics message={@message} />
               </div>
             </div>
+          <% end %>
           <% end %>
         <% end %>
       </div>

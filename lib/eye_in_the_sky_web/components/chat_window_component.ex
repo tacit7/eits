@@ -216,7 +216,12 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
   attr :agent_name, :string, required: true
 
   defp message_item(assigns) do
-    role = if assigns.message.sender_role == "user", do: :user, else: :agent
+    role =
+      case assigns.message.sender_role do
+        "user" -> :user
+        "system" -> :system
+        _ -> :agent
+      end
     is_dm = DmHelpers.dm_message?(assigns.message)
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
 
@@ -232,29 +237,40 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
 
     ~H"""
     <div id={"chat-msg-#{@cs_id}-#{@message.id}"} class="mb-1">
-      <%= if @is_tool_event do %>
-        <div class="max-w-[70%] px-1 my-0.5">
-          <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
+      <%= if @role == :system do %>
+        <!-- System message: centered annotation with dividers -->
+        <div class="flex items-center gap-2 my-1 px-1">
+          <div class="flex-1 h-px bg-base-content/[0.04]"></div>
+          <span class="text-[10px] text-base-content/25 select-none whitespace-nowrap">
+            {String.slice(@message.body || "system message", 0, 50)}
+          </span>
+          <div class="flex-1 h-px bg-base-content/[0.04]"></div>
         </div>
       <% else %>
-        <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
-          <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
-            <div class={[
-              "text-sm leading-snug break-words",
-              @role == :user && "px-3 py-2 bg-base-200 text-base-content rounded-2xl rounded-br-sm",
-              @role == :agent && "py-1 text-base-content/90",
-              @is_dm && @role == :user && "border border-primary/20"
-            ]}>
-              <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
-            </div>
-            <time
-              id={"msg-time-#{@cs_id}-#{@message.id}"}
-              class="text-nano text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-              data-utc={to_utc_string(@message.inserted_at)}
-              phx-hook="LocalTime"
-            />
+        <%= if @is_tool_event do %>
+          <div class="max-w-[70%] px-1 my-0.5">
+            <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
           </div>
-        </div>
+        <% else %>
+          <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
+            <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
+              <div class={[
+                "text-sm leading-snug break-words",
+                @role == :user && "px-3 py-2 bg-base-200 text-base-content rounded-2xl rounded-br-sm",
+                @role == :agent && "py-1 text-base-content/90",
+                @is_dm && @role == :user && "border border-primary/20"
+              ]}>
+                <DmMessageComponents.message_body message={@message} compact={true} extra_id={@cs_id} />
+              </div>
+              <time
+                id={"msg-time-#{@cs_id}-#{@message.id}"}
+                class="text-nano text-base-content/30 mt-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                data-utc={to_utc_string(@message.inserted_at)}
+                phx-hook="LocalTime"
+              />
+            </div>
+          </div>
+        <% end %>
       <% end %>
     </div>
     """

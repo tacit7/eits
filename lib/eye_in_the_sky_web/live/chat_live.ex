@@ -37,7 +37,26 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, setup_channel(params, socket)}
+    {:noreply, maybe_setup_channel(params, socket)}
+  end
+
+  defp maybe_setup_channel(params, socket) do
+    project_id = get_project_id(params)
+    new_channel_id = params["channel_id"]
+    current_channel_id = socket.assigns[:active_channel_id]
+    current_project_id = socket.assigns[:project_id]
+
+    thread_only_change? =
+      current_channel_id != nil and
+        to_string(new_channel_id) == to_string(current_channel_id) and
+        current_project_id == project_id
+
+    if thread_only_change? do
+      thread_id = params["thread_id"]
+      assign(socket, :active_thread, ChannelDataLoader.load_thread(thread_id))
+    else
+      setup_channel(params, socket)
+    end
   end
 
   defp setup_channel(params, socket) do

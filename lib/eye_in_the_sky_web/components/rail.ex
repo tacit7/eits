@@ -273,6 +273,71 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("not_implemented", _params, socket),
     do: {:noreply, put_flash(socket, :info, "Not implemented yet")}
 
+  def handle_event("archive_session", %{"session_id" => session_id_str}, socket) do
+    case Integer.parse(session_id_str) do
+      {session_id, ""} ->
+        case EyeInTheSky.Sessions.get_session(session_id) do
+          {:error, :not_found} ->
+            {:noreply, put_flash(socket, :error, "Session not found")}
+
+          {:ok, session} ->
+            case EyeInTheSky.Sessions.archive_session(session) do
+              {:ok, _} ->
+                socket =
+                  socket
+                  |> assign(:flyout_sessions, Loader.load_flyout_sessions(
+                    socket.assigns.sidebar_project,
+                    socket.assigns.session_sort,
+                    socket.assigns.session_name_filter,
+                    socket.assigns.session_show
+                  ))
+                  |> put_flash(:info, "Session archived")
+
+                {:noreply, socket}
+
+              {:error, _} ->
+                {:noreply, put_flash(socket, :error, "Could not archive session")}
+            end
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("rename_session", %{"session_id" => session_id_str, "name" => name}, socket)
+      when is_binary(name) and name != "" do
+    case Integer.parse(session_id_str) do
+      {session_id, ""} ->
+        case EyeInTheSky.Sessions.get_session(session_id) do
+          {:error, :not_found} ->
+            {:noreply, put_flash(socket, :error, "Session not found")}
+
+          {:ok, session} ->
+            case EyeInTheSky.Sessions.update_session(session, %{name: String.trim(name)}) do
+              {:ok, _} ->
+                socket =
+                  assign(socket, :flyout_sessions, Loader.load_flyout_sessions(
+                    socket.assigns.sidebar_project,
+                    socket.assigns.session_sort,
+                    socket.assigns.session_name_filter,
+                    socket.assigns.session_show
+                  ))
+
+                {:noreply, socket}
+
+              {:error, _} ->
+                {:noreply, put_flash(socket, :error, "Could not rename session")}
+            end
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("rename_session", _params, socket), do: {:noreply, socket}
+
   def handle_event("toggle_new_session_drawer", _params, socket),
     do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
 

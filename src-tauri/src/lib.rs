@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -26,16 +27,29 @@ macro_rules! log {
 }
 use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-#[cfg(not(debug_assertions))]
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_opener::OpenerExt;
 
 /// Monotonic counter for generating unique secondary window labels.
 static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(2);
 
 /// Always-on-top state — persisted in memory, toggled via menu/tray.
 static ALWAYS_ON_TOP: AtomicBool = AtomicBool::new(false);
+
+/// Session context stored when a context menu is shown — looked up in on_menu_event.
+#[derive(Clone)]
+struct SessionCtx {
+    id: i64,
+    uuid: String,
+    name: String,
+    worktree_path: Option<String>,
+}
+
+/// Per-session context map, keyed by session integer id.
+/// Written by show_session_context_menu, read by on_menu_event.
+type SessionCtxMap = Mutex<HashMap<i64, SessionCtx>>;
 
 /// Pending navigation path set when a notification fires while the app is in the
 /// background. Drained on the next window-focus event so that clicking a
@@ -72,6 +86,7 @@ pub fn run() {
     log!("[eits-tauri] pubsub listening on {}", pubsub.url());
 
     tauri::Builder::default()
+        .manage(SessionCtxMap::default())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             show_window(app);
             for arg in argv.iter().skip(1) {
@@ -208,7 +223,12 @@ pub fn run() {
                         }
                     }
                 }
-                _ => {}
+                id => {
+                    // Context menu items are prefixed "ctx_<action>::<session_id>".
+                    if id.starts_with("ctx_") {
+                        handle_session_ctx_menu(app, id);
+                    }
+                }
             });
 
 
@@ -485,7 +505,7 @@ pub fn run() {
                 _ => {}
             }
         })
-        .invoke_handler(tauri::generate_handler![pick_folder, open_window])
+        .invoke_handler(tauri::generate_handler![pick_folder, open_window, show_session_context_menu])
         .build(tauri::generate_context!())
         .expect("error building tauri application")
         .run(|app_handle, event| {
@@ -881,4 +901,168 @@ async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
 #[tauri::command]
 fn open_window(app: tauri::AppHandle, path: String) {
     open_new_window(&app, &path);
+}
+
+/// Shows a native context menu for a session row in the flyout.
+///
+/// Builds the menu dynamically, stores the session context in app state so
+/// on_menu_event can look it up, then calls popup() on the focused window.
+#[tauri::command]
+fn show_session_context_menu(
+    app: tauri::AppHandle,
+    session_id: i64,
+    uuid: String,
+    name: String,
+    worktree_path: Option<String>,
+) -> Result<(), String> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+
+    // Store context so on_menu_event can retrieve it by session_id.
+    {
+        let state = app.state::<SessionCtxMap>();
+        let mut map = state.lock().map_err(|e| e.to_string())?;
+        map.insert(session_id, SessionCtx {
+            id: session_id,
+            uuid: uuid.clone(),
+            name: name.clone(),
+            worktree_path: worktree_path.clone(),
+        });
+    }
+
+    let sid = session_id.to_string();
+    let has_worktree = worktree_path.is_some();
+
+    // Group 1 — chat management
+    let pin    = MenuItem::with_id(&app, format!("ctx_pin::{sid}"),    "Pin chat",        true,  None::<&str>).map_err(|e| e.to_string())?;
+    let rename = MenuItem::with_id(&app, format!("ctx_rename::{sid}"), "Rename chat",     true,  None::<&str>).map_err(|e| e.to_string())?;
+    let archive= MenuItem::with_id(&app, format!("ctx_archive::{sid}"),"Archive chat",    true,  None::<&str>).map_err(|e| e.to_string())?;
+    let unread = MenuItem::with_id(&app, format!("ctx_unread::{sid}"), "Mark as unread",  true,  None::<&str>).map_err(|e| e.to_string())?;
+    let sep1   = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+
+    // Group 2 — Finder / clipboard
+    let open_finder  = MenuItem::with_id(&app, format!("ctx_finder::{sid}"),   "Open in Finder",        has_worktree, None::<&str>).map_err(|e| e.to_string())?;
+    let copy_wd      = MenuItem::with_id(&app, format!("ctx_copy_wd::{sid}"),  "Copy working directory", has_worktree, None::<&str>).map_err(|e| e.to_string())?;
+    let copy_id      = MenuItem::with_id(&app, format!("ctx_copy_id::{sid}"),  "Copy session ID",        true,         None::<&str>).map_err(|e| e.to_string())?;
+    let copy_link    = MenuItem::with_id(&app, format!("ctx_copy_link::{sid}"),"Copy deeplink",           true,         None::<&str>).map_err(|e| e.to_string())?;
+    let sep2         = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+
+    // Group 3 — window
+    let open_window  = MenuItem::with_id(&app, format!("ctx_open_window::{sid}"), "Open in New Window", true, None::<&str>).map_err(|e| e.to_string())?;
+
+    let menu = Menu::with_items(&app, &[
+        &pin, &rename, &archive, &unread,
+        &sep1,
+        &open_finder, &copy_wd, &copy_id, &copy_link,
+        &sep2,
+        &open_window,
+    ]).map_err(|e| e.to_string())?;
+
+    // Popup on the main window. WebviewWindow::popup_menu is the correct API
+    // in Tauri 2.x — calling it on the window (not on the menu) avoids the
+    // Window<R> vs WebviewWindow<R> type mismatch.
+    let window = app.get_webview_window("main").ok_or("no main window")?;
+    window.popup_menu(&menu).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Handles context menu item selections for session rows (ctx_ prefixed IDs).
+///
+/// ID format: "ctx_<action>::<session_id>"
+///
+/// Tauri-native actions (window, clipboard, Finder) are handled inline.
+/// LiveView actions (archive, rename) eval a CustomEvent into the webview so
+/// the JS listener can pushEvent to the Rail LiveComponent.
+fn handle_session_ctx_menu(app: &tauri::AppHandle, id: &str) {
+    // Parse "ctx_<action>::<session_id>"
+    let parts: Vec<&str> = id.splitn(2, "::").collect();
+    let action = match parts.first() { Some(a) => *a, None => return };
+    let session_id: i64 = match parts.get(1).and_then(|s| s.parse().ok()) {
+        Some(n) => n,
+        None => return,
+    };
+
+    // Retrieve stored session context.
+    let ctx = {
+        let state = app.state::<SessionCtxMap>();
+        let map = match state.lock() {
+            Ok(m) => m,
+            Err(_) => return,
+        };
+        match map.get(&session_id).cloned() {
+            Some(c) => c,
+            None => return,
+        }
+    };
+
+    let window = match app.get_webview_window("main") {
+        Some(w) => w,
+        None => return,
+    };
+
+    match action {
+        // --- Open in New Window -------------------------------------------------
+        "ctx_open_window" => {
+            open_new_window(app, &format!("/dm/{}", ctx.id));
+        }
+
+        // --- Open in Finder -----------------------------------------------------
+        "ctx_finder" => {
+            if let Some(path) = &ctx.worktree_path {
+                let _ = app.opener().open_path(path, None::<&str>);
+            }
+        }
+
+        // --- Clipboard ----------------------------------------------------------
+        "ctx_copy_wd" => {
+            if let Some(path) = &ctx.worktree_path {
+                let _ = app.clipboard().write_text(path.clone());
+            }
+        }
+        "ctx_copy_id" => {
+            let _ = app.clipboard().write_text(ctx.uuid.clone());
+        }
+        "ctx_copy_link" => {
+            let link = format!("eits://sessions/{}", ctx.uuid);
+            let _ = app.clipboard().write_text(link);
+        }
+
+        // --- LiveView round-trips (emit CustomEvent into the webview) -----------
+        "ctx_archive" => {
+            let js = format!(
+                "window.dispatchEvent(new CustomEvent('tauri:session-action', \
+                 {{ detail: {{ action: 'archive_session', session_id: {} }} }}))",
+                ctx.id
+            );
+            let _ = window.eval(&js);
+        }
+        "ctx_rename" => {
+            // Prompt the user for a new name using a native dialog, then fire the action.
+            // We eval a browser prompt as a fallback since tauri-plugin-dialog has no
+            // text-input dialog in v2. The JS listener handles the pushEvent.
+            let js = format!(
+                r#"(function() {{
+                  var name = window.prompt('Rename session', {name_json});
+                  if (name && name.trim()) {{
+                    window.dispatchEvent(new CustomEvent('tauri:session-action', {{
+                      detail: {{ action: 'rename_session', session_id: {id}, extra: {{ name: name.trim() }} }}
+                    }}));
+                  }}
+                }})();"#,
+                name_json = serde_json::to_string(&ctx.name).unwrap_or_else(|_| "\"\"".to_string()),
+                id = ctx.id,
+            );
+            let _ = window.eval(&js);
+        }
+
+        // --- Stubs for unimplemented features -----------------------------------
+        "ctx_pin" | "ctx_unread" => {
+            let _ = window.eval(
+                "window.dispatchEvent(new CustomEvent('phx:flash', \
+                 { detail: { kind: 'info', msg: 'Coming soon' } }))"
+            );
+        }
+
+        _ => {}
+    }
 }

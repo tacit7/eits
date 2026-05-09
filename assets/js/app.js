@@ -379,6 +379,45 @@ if (window.__TAURI_INTERNALS__) {
     const path = e.detail?.path ?? '/'
     invoke('open_window', { path })
   })
+
+  // --- Session flyout context menu -------------------------------------------
+  // Right-click on a .flyout-session-row triggers a native Tauri popup menu.
+  // The Rust command builds the menu and handles Tauri-native actions
+  // (open window, clipboard, Finder). For LiveView actions (archive, rename),
+  // Rust evals a CustomEvent back; we catch it here and pushEvent to the Rail.
+  document.addEventListener('contextmenu', (e) => {
+    const row = e.target.closest('.flyout-session-row')
+    if (!row) return
+    e.preventDefault()
+
+    const sessionId   = row.dataset.sessionId   ?? ''
+    const sessionUuid = row.dataset.sessionUuid  ?? ''
+    const sessionName = row.dataset.sessionName  ?? ''
+    const worktree    = row.dataset.sessionWorktree ?? ''
+
+    invoke('show_session_context_menu', {
+      session_id:    parseInt(sessionId, 10) || 0,
+      uuid:          sessionUuid,
+      name:          sessionName,
+      worktree_path: worktree || null,
+    }).catch((err) => console.error('[tauri] context menu error:', err))
+  })
+
+  // tauri:session-action — fired by Rust after a context menu selection that
+  // needs a LiveView round-trip (archive, rename, etc).
+  // Payload: { action: 'archive_session', session_id: 123, extra: {} }
+  window.addEventListener('tauri:session-action', (e) => {
+    const rail = document.getElementById('app-rail')
+    if (!rail || !window.liveSocket) return
+    const view = window.liveSocket.getViewByEl(rail)
+    if (!view) return
+
+    const { action, session_id, extra } = e.detail ?? {}
+    if (!action) return
+
+    view.pushEventTo(rail, action, { session_id: String(session_id), ...(extra ?? {}) })
+  })
+
 } else {
   // Not in Tauri — fall back to showing the inline text input when the
   // server fires phx:pick_folder (no native dialog available).

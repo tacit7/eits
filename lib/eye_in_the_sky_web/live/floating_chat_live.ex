@@ -319,13 +319,13 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
             []
 
           {[], uuids} ->
-            Repo.all(from s in Session, where: s.uuid in ^uuids)
+            Repo.all(from s in Session, where: s.uuid in ^uuids, limit: 100)
 
           {ints, []} ->
-            Repo.all(from s in Session, where: s.id in ^ints)
+            Repo.all(from s in Session, where: s.id in ^ints, limit: 100)
 
           {ints, uuids} ->
-            Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids)
+            Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids, limit: 100)
         end
 
       sessions

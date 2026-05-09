@@ -137,24 +137,16 @@ defmodule EyeInTheSky.Claude.MessageFormatter do
 
   defp derive_tool_result_uuid(_), do: nil
 
-  defp extract_content(%{"message" => %{"content" => content}}) when is_binary(content) do
-    content
-  end
+  defp extract_content(msg) do
+    # Extract content from either nested message.content or direct content key
+    content = get_in(msg, ["message", "content"]) || msg["content"]
 
-  defp extract_content(%{"message" => %{"content" => content}}) when is_list(content) do
-    extract_content_from_blocks(content)
+    case content do
+      binary when is_binary(binary) -> binary
+      list when is_list(list) -> extract_content_from_blocks(list)
+      _ -> ""
+    end
   end
-
-  # Handle case where content is directly in message (not nested)
-  defp extract_content(%{"content" => content}) when is_binary(content) do
-    content
-  end
-
-  defp extract_content(%{"content" => content}) when is_list(content) do
-    extract_content_from_blocks(content)
-  end
-
-  defp extract_content(_), do: ""
 
   defp extract_content_from_blocks(content) do
     content

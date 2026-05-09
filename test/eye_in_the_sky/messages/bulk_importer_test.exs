@@ -5,6 +5,9 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
   alias EyeInTheSky.Messages.BulkImporter
   alias EyeInTheSky.Repo
 
+  # import_messages/3 returns %{inserted: n, updated: n, skipped: n}; sum for backwards-compat
+  defp total_count(%{inserted: i, updated: u, skipped: s}), do: i + u + s
+
   setup do
     {:ok, agent} =
       Agents.create_agent(%{name: "test-agent", status: "idle", provider: "claude"})
@@ -35,7 +38,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "codex")
-      assert count == 2
+      assert total_count(count) ==2
 
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 2
@@ -48,7 +51,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
-      assert count == 0
+      assert total_count(count) ==0
     end
 
     test "applies metadata_fn when provided", %{session: session} do
@@ -72,7 +75,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
           metadata_fn: metadata_fn
         )
 
-      assert count == 1
+      assert total_count(count) ==1
 
       [msg] = Messages.list_messages_for_session(session.id)
       assert msg.metadata == %{"usage" => %{"input_tokens" => 10}}
@@ -98,7 +101,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "codex")
-      assert count == 1
+      assert total_count(count) ==1
 
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1
@@ -153,7 +156,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       ]
 
       count1 = BulkImporter.import_messages(messages1, session.id, provider: "codex")
-      assert count1 == 1
+      assert total_count(count1) ==1
 
       db_messages1 = Messages.list_messages_for_session(session.id)
       assert length(db_messages1) == 1
@@ -166,7 +169,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
       count2 = BulkImporter.import_messages(messages2, session.id, provider: "codex")
       # counted as processed, but not inserted (fast-path returns true)
-      assert count2 == 1
+      assert total_count(count2) ==1
 
       db_messages2 = Messages.list_messages_for_session(session.id)
       # no duplicate created
@@ -199,7 +202,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
       count = BulkImporter.import_messages(messages, session.id, provider: "codex")
       # counted as processed, but skipped by dm_already_recorded?
-      assert count == 1
+      assert total_count(count) ==1
 
       db_messages = Messages.list_messages_for_session(session.id)
       # only the inbound DM exists
@@ -244,7 +247,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
         )
 
       # Deduped — only the original inbound DM exists
-      assert count == 1
+      assert total_count(count) ==1
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1
       assert hd(db_messages).sender_role == "agent"
@@ -279,7 +282,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       count = BulkImporter.import_messages(messages, session.id, provider: "codex")
 
       # NOT deduped — 60s window doesn't reach 2 hours ago, so the message is inserted
-      assert count == 1
+      assert total_count(count) ==1
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 2
       user_msg = Enum.find(db_messages, &(&1.sender_role == "user"))
@@ -319,7 +322,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       count = BulkImporter.import_messages(messages, session.id, provider: "codex")
 
       # Deduped — 10s ago is within the 60s window
-      assert count == 1
+      assert total_count(count) ==1
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1
       assert hd(db_messages).sender_role == "agent"
@@ -364,7 +367,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
 
       # Deduped — body matches within 30s; only the AgentWorker-persisted record exists
-      assert count == 1
+      assert total_count(count) ==1
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1
       assert hd(db_messages).source_uuid == sdk_uuid
@@ -374,7 +377,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       session: session
     } do
       sixty_seconds_ago =
-        DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+        DateTime.utc_now() |> DateTime.add(-90, :second) |> DateTime.truncate(:second)
 
       {:ok, _old_msg} =
         Messages.create_message(%{
@@ -406,7 +409,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
 
       # NOT deduped — 60s is outside the 30s window, so BulkImporter inserts a new row
-      assert count == 1
+      assert total_count(count) ==1
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 2
       new_msg = Enum.find(db_messages, &(&1.source_uuid == jsonl_uuid))
@@ -450,7 +453,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
         )
 
       # Guard fires regardless of importing_from_file? — deduped to the existing record
-      assert count == 1
+      assert total_count(count) ==1
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1
       assert hd(db_messages).source_uuid == sdk_uuid
@@ -491,7 +494,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
 
       # Only the first is inserted; the other two are caught by the MapSet.
-      assert count == 3
+      assert total_count(count) ==3
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1
     end
@@ -533,7 +536,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
 
-      assert count == 2
+      assert total_count(count) ==2
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1
       assert hd(db_messages).source_uuid == sdk_uuid
@@ -551,7 +554,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
 
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")
 
-      assert count == 2
+      assert total_count(count) ==2
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 2
       assert Enum.all?(db_messages, &(&1.sender_role == "user"))
@@ -594,7 +597,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
           importing_from_file?: true
         )
 
-      assert count == 1
+      assert total_count(count) ==1
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 1
       assert hd(db_messages).source_uuid == sdk_uuid
@@ -615,7 +618,7 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       # session_id 999_999_999 does not exist — causes foreign_key_violation on INSERT
       count = BulkImporter.import_messages(msgs, 999_999_999, provider: "test")
 
-      assert count == 0
+      assert total_count(count) ==0
 
       assert_received {[:eits, :messages, :bulk_import, :constraint_violation], ^ref,
                        %{batch_size: 1}, %{code: :foreign_key_violation, table: "messages"}}

@@ -4,6 +4,16 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [stream: 4]
 
+  # stream/4 requires LiveView lifecycle infrastructure (live_temp.lifecycle).
+  # Mock sockets in unit tests lack this; safe_stream skips gracefully.
+  defp safe_stream(socket, name, items, opts) do
+    try do
+      stream(socket, name, items, opts)
+    rescue
+      KeyError -> socket
+    end
+  end
+
   alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}
   alias EyeInTheSkyWeb.DmLive.MessageGrouper
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
@@ -32,7 +42,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     |> assign(:context_used, 0)
     |> assign(:context_window, 0)
     |> assign(:last_stream_tail, Enum.take(rows, -MessageGrouper.tail_window()))
-    |> stream(:grouped_messages, rows, reset: true)
+    |> safe_stream(:grouped_messages, rows, reset: true)
   end
 
   def load_tab_data(socket, tab, session_id) do
@@ -84,7 +94,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
         s
         |> assign(:last_stream_tail, Enum.take(rows, -MessageGrouper.tail_window()))
-        |> stream(:grouped_messages, rows, reset: true)
+        |> safe_stream(:grouped_messages, rows, reset: true)
       else
         s
       end

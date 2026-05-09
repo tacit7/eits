@@ -43,15 +43,21 @@ defmodule EyeInTheSkyWeb.Api.V1.ProjectController do
 
   @doc """
   POST /api/v1/projects - Create a new project.
+
+  Parameters:
+    - name (required): Project name
+    - slug: URL-friendly project identifier
+    - path: File system path to the project
+    - git_remote: Git remote URL (e.g., git@github.com:user/repo.git or https://github.com/user/repo)
+    - branch: Default git branch
+    - active: Whether project is active (default: true)
   """
   def create(conn, params) do
     attrs = %{
       name: params["name"],
       slug: params["slug"],
       path: params["path"],
-      remote_url: params["remote_url"],
       git_remote: params["git_remote"],
-      repo_url: params["repo_url"],
       branch: params["branch"],
       active: Map.get(params, "active", true)
     }

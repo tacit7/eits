@@ -49,7 +49,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
 
   @impl true
   def handle_params(_params, _uri, %{assigns: %{project: nil}} = socket) do
-    {:noreply, push_navigate(socket, to: ~p"/")}
+    if connected?(socket) do
+      {:noreply, push_navigate(socket, to: ~p"/")}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_params(params, _uri, socket) do

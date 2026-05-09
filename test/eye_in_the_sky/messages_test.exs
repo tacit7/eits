@@ -167,8 +167,14 @@ defmodule EyeInTheSky.MessagesTest do
           metadata: %{"usage" => usage}
         )
 
+      # Metadata was enriched correctly
       assert msg.metadata["usage"] == usage
-      assert Messages.total_tokens_for_session(session.id) == 700
+
+      # Verify the message DB record has the metadata (directly — session total_tokens
+      # is a separately-updated cache column, not driven by individual message updates).
+      updated = EyeInTheSky.Repo.get!(EyeInTheSky.Messages.Message, msg.id)
+      assert get_in(updated.metadata, ["usage", "input_tokens"]) == 500
+      assert get_in(updated.metadata, ["usage", "output_tokens"]) == 200
     end
   end
 

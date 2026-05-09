@@ -78,12 +78,15 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
     do: {:error, "invalid_parameter", "#{field} must be an integer or UUID"}
 
   defp validate_instructions(nil),
-    do: {:ok, ""}
+    do: {:error, "missing_required", "instructions is required"}
 
   defp validate_instructions(val) when is_binary(val) do
     trimmed = String.trim(val)
 
     cond do
+      trimmed == "" ->
+        {:error, "missing_required", "instructions is required"}
+
       String.length(trimmed) > 32_000 ->
         {:error, "instructions_too_long", "instructions exceeds 32000 character limit"}
 

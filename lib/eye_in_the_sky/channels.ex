@@ -151,14 +151,16 @@ defmodule EyeInTheSky.Channels do
       )
 
     case result do
-      {:ok, _} ->
+      {:ok, %{id: nil}} ->
+        {:error, :duplicate}
+
+      {:ok, _} = ok ->
         maybe_onboard(channel_id, session_id)
+        ok
 
-      {:error, _} ->
-        :ignore
+      {:error, _} = err ->
+        err
     end
-
-    result
   end
 
   defp maybe_onboard(channel_id, session_id) do

@@ -77,8 +77,10 @@ defmodule EyeInTheSky.ChannelMessages do
       |> Map.put(:status, "pending")
       |> EyeInTheSky.Messages.create_channel_message()
 
-    # broadcast_and_return in Messages.create_channel_message already fires
-    # Events.channel_message — no explicit re-broadcast needed here.
+    with {:ok, msg} <- result do
+      EyeInTheSky.Events.channel_message(msg.channel_id, msg)
+    end
+
     result
   end
 

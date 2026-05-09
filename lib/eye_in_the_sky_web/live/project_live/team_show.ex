@@ -67,8 +67,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
       when event in [:member_joined, :member_updated, :member_left] do
     socket =
       case Teams.get_team(socket.assigns.team_id) do
-        {:ok, team} -> assign(socket, :team, load_team_detail(team))
-        _ -> socket
+        {:ok, team} ->
+          # Re-verify team still belongs to current project after event
+          project = socket.assigns.project
+          if project && (!team.project_id || team.project_id != project.id) do
+            # Team no longer belongs to this project
+            push_navigate(socket, to: back_path(socket))
+          else
+            assign(socket, :team, load_team_detail(team))
+          end
+
+        _ ->
+          socket
       end
 
     {:noreply, socket}
@@ -79,8 +89,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
       when event in [:team_created, :team_deleted] do
     socket =
       case Teams.get_team(socket.assigns.team_id) do
-        {:ok, team} -> assign(socket, :team, load_team_detail(team))
-        _ -> push_navigate(socket, to: back_path(socket))
+        {:ok, team} ->
+          # Re-verify team still belongs to current project after event
+          project = socket.assigns.project
+          if project && (!team.project_id || team.project_id != project.id) do
+            # Team no longer belongs to this project
+            push_navigate(socket, to: back_path(socket))
+          else
+            assign(socket, :team, load_team_detail(team))
+          end
+
+        _ ->
+          push_navigate(socket, to: back_path(socket))
       end
 
     {:noreply, socket}
@@ -131,20 +151,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
   end
 
   @impl true
-  def handle_event(event, _params, socket)
-      when event in [
-             "archive_session",
-             "rename_session",
-             "save_session_name",
-             "cancel_rename",
-             "toggle_select",
-             "toggle_archived",
-             "search",
-             "set_notify_on_stop",
-             "noop"
-           ] do
-    {:noreply, socket}
-  end
+  def handle_event(_event, _params, socket), do: {:noreply, socket}
 
   @impl true
   def render(assigns) do

@@ -304,7 +304,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   end
 
   defp load_teams(socket, show_archived, show_all, search_query) do
-    project_id = if show_all, do: nil, else: socket.assigns[:project_id]
+    project_id = if show_all, do: nil, else: socket.assigns.project_id
     opts = if show_archived, do: [status: "archived"], else: []
     opts = if project_id, do: Keyword.put(opts, :project_id, project_id), else: opts
     opts = if search_query != "", do: Keyword.put(opts, :name, search_query), else: opts
@@ -325,7 +325,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       if socket.assigns.show_all do
         true
       else
-        team.project_id == socket.assigns[:project_id]
+        team.project_id == socket.assigns.project_id
       end
 
     # Check search filter

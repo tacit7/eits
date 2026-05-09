@@ -14,9 +14,11 @@ export EITS_API_KEY=<your-key>
 # Injected automatically by EITS hooks — set manually if needed
 export EITS_SESSION_UUID=<session-uuid>
 export EITS_SESSION_ID=<session-id>          # numeric session ID, exported by startup hook (preferred for --to/--from/--parent-session-id)
-export EITS_AGENT_UUID=<agent-uuid>
+export EITS_AGENT_UUID=<agent-uuid>          # auto-registered by startup hook; manual init only if server was down
 export EITS_PROJECT_ID=<project-id>
 ```
+
+**Session Auto-Registration:** The startup hook now automatically registers new sessions via `eits sessions create` when the session is not pre-registered. This covers all interactive `cli` and headless `sdk-cli` sessions. The `eits-init` skill is a fallback only for server-down scenarios, not a mandatory initialization step.
 
 Requires `curl` and `jq`.
 

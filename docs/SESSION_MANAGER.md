@@ -383,6 +383,51 @@ Pre-tool-use hooks (e.g., `eits-task-gate.sh`) can check the session's read_only
 
 ---
 
+## Session Auto-Registration (Startup Hook)
+
+The startup hook (`priv/scripts/eits-session-startup.sh`) now automatically registers new sessions when they are not pre-registered (e.g., not spawned by the orchestrator). This eliminates the need for manual `eits-init` invocation in normal operation.
+
+**Auto-Registration Flow:**
+
+1. **Check pre-registration**: Startup hook calls `eits sessions get $EITS_SESSION_UUID` to see if session was pre-created (spawned agent or spawn endpoint).
+2. **Auto-register if missing**: When `sessions get` returns nothing, the hook calls:
+   ```bash
+   eits sessions create \
+     --session-id "$SESSION_ID" \
+     --project "$(basename "$LOOKUP_DIR")" \
+     --project-path "$LOOKUP_DIR" \
+     --model "${MODEL:-}" \
+     --entrypoint "${ENTRYPOINT:-}"
+   ```
+3. **Extract agent UUID**: On success, extracts `EXISTING_AGENT_UUID` and `SESSION_INT_ID` from the create response and exports them.
+4. **Fallback on failure**: If create fails (server down), hook logs a message and proceeds — `EITS_AGENT_UUID` remains unset, and `eits-init` skill is available as a fallback.
+
+**Coverage:**
+- All new interactive `cli` sessions (normal user-initiated Claude Code)
+- All new headless `sdk-cli` sessions (spawned agents, resumed agents)
+- Spawned agents pre-registered by the orchestrator skip this path (already have `EXISTING_AGENT_UUID` set)
+
+**Fallback Skill (`eits-init`):**
+
+The `eits-init` skill is now a fallback for auto-registration failures (server down at session start). The skill description and behavior have been updated:
+
+**Before:** "MUST be called at the start of every session..."
+**After:** "Fallback session registration for EITS. Only needed when auto-registration in the startup hook failed (EITS server was down at session start). Check $EITS_AGENT_UUID first — if set, exit immediately."
+
+When auto-registration fails, the startup hook output includes:
+```
+[EITS] startup: auto-register failed — EITS server may be down
+**IMPORTANT**: Auto-registration failed (EITS server may be down). Invoke `skill: "eits-init"` before responding to the user.
+```
+
+When auto-registration succeeds, the output includes:
+```
+[EITS] startup: auto-registered session_int=$SESSION_INT_ID agent_uuid=$EXISTING_AGENT_UUID
+Session registered. EITS_AGENT_UUID is set — /eits-init is not needed.
+```
+
+---
+
 ## Session Usage Caching
 
 Session token and cost totals are cached on the `sessions` table for O(1) lookup when displaying per-session usage metrics.

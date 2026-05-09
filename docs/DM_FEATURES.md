@@ -1262,6 +1262,69 @@ The `AutoScroll` hook preserves the auto-scroll behavior when the DM message lis
 
 ---
 
+## DM Page Loading Skeleton on Mount
+
+**Commit:** `95d0d1d6`
+
+The DM page now displays a YouTube-style shimmer skeleton while the session file sync completes, instead of messages appearing incrementally. This prevents the "one by one" loading effect caused by a stream reset mid-render.
+
+**Mount flow:**
+
+1. **Initial render** (dead and connected both start here):
+   - `assign_ui_flags/2` sets `syncing: true`
+   - MessagesTab checks `@syncing` and renders skeleton instead of messages
+   - `:grouped_messages` stream is initialized empty (critical for later stream_insert/stream reset calls)
+
+2. **Connected render continues:**
+   - A 5-second `Process.send_after` schedules a `:sync_timeout` failsafe
+   - Async `Task.start` begins session file sync (calls `SessionImporter.sync`)
+   - Task sends `{:sync_done, result}` message on completion (regardless of sync outcome)
+
+3. **Sync task completes:**
+   - `handle_info({:sync_done, _result}, socket)` dismisses skeleton (`syncing: false`)
+   - `TabHelpers.force_reload_messages/2` loads all messages from DB in one pass
+   - `push_event("new_message", %{})` triggers AutoScroll hook to re-anchor
+   - Skeleton fades away; messages appear all at once
+
+4. **Timeout failsafe:**
+   - If Task takes > 5 seconds, `:sync_timeout` fires
+   - `handle_info(:sync_timeout, %{assigns: %{syncing: true}}, socket)` dismisses skeleton and loads from DB
+   - Prevents UI lock on large sessions or slow disk I/O
+   - No-op if sync already completed before timeout fires
+
+**Sync result states:**
+
+The Task sends `{:sync_done, result}` with:
+- `:clean` — No new messages imported from session file (0 inserted, 0 updated)
+- `:dirty` — New messages imported (N inserted and/or updated); new messages appear with existing ones
+- Error also sends `:clean` — treat import failure as no-op; messages load from DB unchanged
+
+Both states trigger `force_reload_messages`, so messages always load from DB after sync completes, ensuring atomic all-at-once rendering.
+
+**Skeleton UI:**
+
+Renders 4 shimmer rows while `syncing: true`:
+- **Avatar circle** — 28px rounded-full with base-content/10 opacity
+- **Skeleton text lines** — 4 lines with varying widths (1/4, 11/12, 4/5 of container)
+- **Pill tags** — 2 pseudo-pills below text lines with reduced opacity (base-content/6)
+- **Animation** — `animate-pulse` class for continuous fade effect
+- **Accessibility** — `aria-hidden="true"` prevents screen reader announcement
+
+**Implementation files:**
+
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — mount, `handle_info({:sync_done, _})`, `handle_info(:sync_timeout, ...)`
+- `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — `assign_ui_flags/2` sets `syncing: true`
+- `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex` — `load_messages_on_mount/1` orchestrates Task + timeout
+- `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex` — `message_skeleton/1` component + guard on `@syncing`
+
+**Why this approach:**
+
+Previously, `load_messages_on_mount` had a race: both the mount Task sync and event-driven handlers (e.g., `handle_claude_complete`) could call `SessionImporter.sync` concurrently for active sessions. Both paths would read the same cursor before either committed, causing duplicate message inserts with distinct `source_uuid` values.
+
+The skeleton defers all DB loads until after sync completes, eliminating the race entirely. For active sessions, the event-driven pipeline (`claude_complete → sync_and_reload`) handles imports; the mount Task only syncs when the session is already idle/finished.
+
+---
+
 ## DM Page Settings Tab
 
 **Commits:** `de1f085e` (UI), `c0550615` (persistence)

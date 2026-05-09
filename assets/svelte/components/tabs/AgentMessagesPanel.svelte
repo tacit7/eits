@@ -983,17 +983,17 @@
 
           <!-- @ Autocomplete Dropdown -->
           {#if showAutocomplete && autocompleteOptions.length > 0}
-            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-100 border border-base-content/8 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
+            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
               {#each autocompleteOptions as option, idx}
                 <button
                   type="button"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors {idx === selectedAutocompleteIndex ? 'bg-base-content/[0.06]' : 'hover:bg-base-content/[0.04]'}"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors {idx === selectedAutocompleteIndex ? 'bg-base-content/[0.12]' : 'hover:bg-base-content/[0.08]'}"
                   on:click={() => selectAutocomplete(option.id)}
                   on:mouseenter={() => selectedAutocompleteIndex = idx}
                 >
-                  <span class="font-mono text-[13px] font-semibold text-base-content/80">@{option.id}</span>
-                  <span class="text-[13px] text-base-content/50 flex-1 truncate">{option.name}</span>
-                  <span class="font-mono text-[11px] text-base-content/30">{option.provider}{option.model ? ` / ${option.model}` : ''}</span>
+                  <span class="font-mono text-[13px] font-semibold text-base-content">@{option.id}</span>
+                  <span class="text-[13px] text-base-content/70 flex-1 truncate">{option.name}</span>
+                  <span class="font-mono text-[11px] text-base-content/50">{option.provider}{option.model ? ` / ${option.model}` : ''}</span>
                 </button>
               {/each}
             </div>
@@ -1001,17 +1001,17 @@
 
           <!-- / Slash Command Autocomplete Dropdown -->
           {#if showSlashAutocomplete && slashOptions.length > 0}
-            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-100 border border-base-content/10 rounded-xl shadow-xl max-h-[280px] overflow-y-auto z-50">
+            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-xl shadow-xl max-h-[280px] overflow-y-auto z-50">
               {#each groupSlashItems(slashOptions) as entry, idx}
                 {#if entry.header}
-                  <div class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0">
+                  <div class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/60 bg-base-content/[0.06] sticky top-0">
                     {{ skill: 'Skills', command: 'Commands', agent: 'Agents', prompt: 'Prompts' }[entry.type] || entry.type}
                   </div>
                 {:else}
                   {@const flatIdx = slashOptions.indexOf(entry)}
                   <button
                     type="button"
-                    class="w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm {flatIdx === selectedSlashIndex ? 'bg-base-content/[0.06]' : 'hover:bg-base-content/[0.04]'}"
+                    class="w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm {flatIdx === selectedSlashIndex ? 'bg-base-content/[0.12]' : 'hover:bg-base-content/[0.08]'}"
                     on:click={() => selectSlashItem(entry)}
                     on:mouseenter={() => { selectedSlashIndex = flatIdx }}
                   >

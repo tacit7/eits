@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("copy_task_to_project", params, socket),
-    do: TasksHelpers.handle_copy_task_to_project(params, socket)
+    do: TaskEventHandlers.handle_copy_task_to_project(params, socket)
 
   # ---------------------------------------------------------------------------
   # Events: agent spawning

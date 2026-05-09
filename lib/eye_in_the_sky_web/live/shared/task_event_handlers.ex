@@ -29,6 +29,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TaskEventHandlers do
   defdelegate handle_search(params, socket, reload_fn), to: TasksHelpers
   defdelegate handle_load_more(params, socket, load_page_fn), to: TasksHelpers
   defdelegate handle_tasks_changed(socket, reload_fn), to: TasksHelpers
+  defdelegate handle_copy_task_to_project(params, socket), to: TasksHelpers
 
   @doc """
   Handles task delete event with optional pre-delete cleanup.

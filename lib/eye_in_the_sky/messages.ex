@@ -12,54 +12,22 @@ defmodule EyeInTheSky.Messages do
   alias EyeInTheSky.Messages.Aggregations
   alias EyeInTheSky.Messages.ChannelMessageNumbering
   alias EyeInTheSky.Messages.Deduplicator
-  alias EyeInTheSky.Messages.JsonlStorage
   alias EyeInTheSky.Messages.Listings
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.Messages.Search
   alias EyeInTheSky.Messages.StatusManager
+  alias EyeInTheSky.Messages.Sync
   alias EyeInTheSky.QueryHelpers
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Sessions
   require Logger
 
   # ---------------------------------------------------------------------------
-  # Session-scoped message loading (JSONL-aware)
+  # Session-scoped message loading (JSONL-aware) — delegated to Messages.Sync
   # ---------------------------------------------------------------------------
 
-  @spec list_messages_for_session(integer()) :: [Message.t()]
-  def list_messages_for_session(session_id), do: list_messages_for_session(session_id, nil)
-
-  @doc """
-  Returns messages for a session.
-
-  Two storage backends are supported:
-  - JSONL: used when `project_id` is a binary string (reads from
-    `~/.claude/projects/{project_id}/{session_id}.jsonl`, falls back to DB if empty).
-  - Database: used when `project_id` is nil or any non-binary value.
-  """
-  def list_messages_for_session(session_id, project_id) do
-    load_messages(session_id, project_id)
-  end
-
-  defp load_messages(session_id, project_id) when is_binary(project_id) do
-    Logger.debug("Loading messages from JSONL for session: #{session_id}, project: #{project_id}")
-
-    case JsonlStorage.read_session_messages(project_id, session_id) do
-      [] ->
-        Logger.debug("No messages found in JSONL file, falling back to database")
-        list_messages_for_session_db(session_id)
-
-      messages ->
-        Logger.debug("Loaded #{length(messages)} messages from JSONL file")
-        messages
-    end
-  end
-
-  defp load_messages(session_id, _), do: list_messages_for_session_db(session_id)
-
-  defp list_messages_for_session_db(session_id) do
-    QueryHelpers.for_session_direct(Message, session_id, order_by: [asc: :inserted_at])
-  end
+  defdelegate list_messages_for_session(session_id), to: Sync
+  defdelegate list_messages_for_session(session_id, project_id), to: Sync
 
   # ---------------------------------------------------------------------------
   # Listing delegates → Messages.Listings

@@ -156,7 +156,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   def maybe_load_tasks(socket, _section, _project), do: socket
 
   def maybe_load_jobs(socket, :jobs) do
-    assign(socket, :flyout_jobs, ScheduledJobs.list_jobs() |> Enum.take(15))
+    assign(socket, :flyout_jobs, ScheduledJobs.list_jobs(limit: 15))
   end
 
   def maybe_load_jobs(socket, _section), do: socket
@@ -179,24 +179,26 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
     type_str = parent_type && to_string(parent_type)
     project_scoped = is_nil(type_str) or type_str == "project"
 
-    opts = [limit: 50]
-
-    opts =
-      if project && project_scoped, do: Keyword.put(opts, :project_id, project.id), else: opts
-
-    opts = if type_str, do: Keyword.put(opts, :type_filter, type_str), else: opts
-
-    notes = Notes.list_notes_filtered(opts)
-
     if search != "" do
-      q = String.downcase(search)
+      # Use full-text search when search query is provided
+      search_opts = [limit: 50]
+      search_opts = if project && project_scoped, do: Keyword.put(search_opts, :project_id, project.id), else: search_opts
 
-      Enum.filter(notes, fn n ->
-        String.contains?(String.downcase(n.title || ""), q) ||
-          String.contains?(String.downcase(n.body || ""), q)
+      Notes.search_notes(search, [], search_opts)
+      |> then(fn notes ->
+        if type_str && type_str != "project" do
+          Enum.filter(notes, &(&1.parent_type == type_str))
+        else
+          notes
+        end
       end)
     else
-      notes
+      # Use list_notes_filtered when no search query
+      opts = [limit: 50]
+      opts = if project && project_scoped, do: Keyword.put(opts, :project_id, project.id), else: opts
+      opts = if type_str, do: Keyword.put(opts, :type_filter, type_str), else: opts
+
+      Notes.list_notes_filtered(opts)
     end
   end
 
@@ -261,10 +263,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
 
     cond do
       search != "" ->
-        prompts = Prompts.search_prompts(search, project_id)
-
-        filter_prompts_by_scope(prompts, scope, project_id)
-        |> Enum.take(30)
+        filter_prompts_by_scope(
+          Prompts.search_prompts(search, project_id, limit: 30),
+          scope,
+          project_id
+        )
 
       scope == "global" ->
         Prompts.list_global_prompts(limit: 30)

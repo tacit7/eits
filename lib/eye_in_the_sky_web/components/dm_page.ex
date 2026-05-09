@@ -29,6 +29,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :session_state, :map, required: true
   attr :commits, :list, default: []
   attr :diff_cache, :map, default: %{}
+  attr :commits_view, :atom, default: :list
+  attr :cumulative_diff, :any, default: nil
   attr :notes, :list, default: []
   attr :codex_raw_lines, :list, default: []
   attr :slash_items, :list, default: []
@@ -485,7 +487,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           <% "tasks" -> %>
             <TasksTab.tasks_tab tasks={@task_data.tasks} />
           <% "commits" -> %>
-            <CommitsTab.commits_tab commits={@commits} diff_cache={@diff_cache} />
+            <CommitsTab.commits_tab
+              commits={@commits}
+              diff_cache={@diff_cache}
+              commits_view={@commits_view}
+              cumulative_diff={@cumulative_diff}
+            />
           <% "notes" -> %>
             <NotesTab.notes_tab notes={@notes} />
           <% "context" -> %>

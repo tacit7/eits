@@ -105,6 +105,8 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:show_live_stream, get_in(effective, ["general", "show_live_stream"]))
     |> assign(:slash_items, SlashItems.build())
     |> assign(:diff_cache, %{})
+    |> assign(:commits_view, :list)
+    |> assign(:cumulative_diff, nil)
     |> assign(:reload_timer, nil)
     |> assign(:thinking_enabled, get_in(effective, ["general", "thinking_enabled"]))
     |> assign(:max_budget_usd, get_in(effective, ["general", "max_budget_usd"]))

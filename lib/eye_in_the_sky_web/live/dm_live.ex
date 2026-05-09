@@ -407,6 +407,23 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: ExternalActions.handle_load_diff(hash, socket)
 
   @impl true
+  def handle_event("load_cumulative_diff", _params, socket),
+    do: ExternalActions.handle_load_cumulative_diff(socket)
+
+  @impl true
+  def handle_event("set_commits_view", %{"view" => view}, socket)
+      when view in ["list", "cumulative"] do
+    socket = assign(socket, :commits_view, String.to_existing_atom(view))
+
+    socket =
+      if view == "cumulative" and socket.assigns.cumulative_diff == nil,
+        do: elem(ExternalActions.handle_load_cumulative_diff(socket), 1),
+        else: socket
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("open_iterm", _params, socket),
     do: ExternalActions.handle_open_iterm(socket)
 
@@ -663,6 +680,8 @@ defmodule EyeInTheSkyWeb.DmLive do
         }
         commits={@commits}
         diff_cache={@diff_cache}
+        commits_view={@commits_view}
+        cumulative_diff={@cumulative_diff}
         notes={@notes}
         codex_raw_lines={@codex_raw_lines}
         slash_items={@slash_items}

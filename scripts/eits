@@ -893,6 +893,10 @@ TASKS_HELP
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Mutual exclusion: --description and --description-file cannot both be set
+      if echo "$updates" | jq -e '.description' >/dev/null 2>&1; then
+        [[ -z "$description_file" ]] || die "--description and --description-file are mutually exclusive"
+      fi
       # Read description from file if provided
       if [[ -n "$description_file" ]]; then
         [[ -f "$description_file" ]] || die "--description-file: file not found: $description_file"

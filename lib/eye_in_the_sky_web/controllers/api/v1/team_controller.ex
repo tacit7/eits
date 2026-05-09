@@ -243,11 +243,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   def update_member(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
     with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
-         :ok <- validate_project_access(team, scope) do
-      case Teams.get_member(member_id) do
-        {:ok, member} -> do_update_member(conn, member, params)
-        {:error, :not_found} -> {:error, :not_found, "Member not found"}
-      end
+         :ok <- validate_project_access(team, scope),
+         {:ok, member} <- resolve_member(member_id) do
+      do_update_member(conn, member, params)
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
@@ -267,11 +265,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   def leave(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
     with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
-         :ok <- validate_project_access(team, scope) do
-      case Teams.get_member(member_id) do
-        {:ok, member} -> do_leave_team(conn, member)
-        {:error, :not_found} -> {:error, :not_found, "Member not found"}
-      end
+         :ok <- validate_project_access(team, scope),
+         {:ok, member} <- resolve_member(member_id) do
+      do_leave_team(conn, member)
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
@@ -406,6 +402,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   defp resolve_team(id) do
     if int_id = parse_int(id), do: Teams.get_team(int_id), else: Teams.get_team_by_name(id)
+  end
+
+  defp resolve_member(id) do
+    case Teams.get_member(id) do
+      {:ok, member} -> {:ok, member}
+      {:error, :not_found} -> {:error, :member_not_found}
+    end
   end
 
   defp do_update_member(conn, member, params) do

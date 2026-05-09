@@ -14,8 +14,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   import EyeInTheSkyWeb.Live.Shared.TasksHelpers
 
   @impl true
-  def mount(%{"id" => _} = params, _session, socket) do
-    if connected?(socket), do: subscribe_tasks()
+  def mount(%{"id" => id} = params, _session, socket) do
+    project_id = ControllerHelpers.parse_int(id)
+    if connected?(socket), do: subscribe_project_tasks(project_id)
 
     socket =
       socket

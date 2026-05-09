@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # i-project-add - Create a new project in Eye in the Sky
 # Usage:
-#   i-project-add --name STR [--slug STR] [--path STR] [--remote_url STR] [--branch STR]
+#   i-project-add --name STR [--slug STR] [--path STR] [--git_remote STR] [--branch STR]
+#
+# Parameters:
+#   --name: Project name (required)
+#   --slug: URL-friendly project identifier (optional)
+#   --path: File system path to the project (optional)
+#   --git_remote: Git remote URL, e.g., git@github.com:user/repo.git or https://github.com/user/repo (optional)
+#   --branch: Default git branch (optional)
 
 set -euo pipefail
 
@@ -14,9 +21,7 @@ while [[ $# -gt 0 ]]; do
     --name)       body=$(echo "$body" | jq --arg v "$2" '. + {name: $v}'); shift 2 ;;
     --slug)       body=$(echo "$body" | jq --arg v "$2" '. + {slug: $v}'); shift 2 ;;
     --path)       body=$(echo "$body" | jq --arg v "$2" '. + {path: $v}'); shift 2 ;;
-    --remote_url) body=$(echo "$body" | jq --arg v "$2" '. + {remote_url: $v}'); shift 2 ;;
     --git_remote) body=$(echo "$body" | jq --arg v "$2" '. + {git_remote: $v}'); shift 2 ;;
-    --repo_url)   body=$(echo "$body" | jq --arg v "$2" '. + {repo_url: $v}'); shift 2 ;;
     --branch)     body=$(echo "$body" | jq --arg v "$2" '. + {branch: $v}'); shift 2 ;;
     *) shift ;;
   esac

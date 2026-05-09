@@ -64,10 +64,18 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
         Channels.mark_as_read(channel_id, session_id)
         ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
 
-        {:noreply,
-         socket
-         |> assign(:messages, socket.assigns.messages ++ [serialized])
-         |> refresh_members_and_picker()}
+        # Guard against race where PubSub broadcast appends message before this assign.
+        # The broadcast fires after transaction commit but before this case block executes.
+        already_present = Enum.any?(socket.assigns.messages, &(&1.id == message.id))
+
+        updated_socket =
+          if already_present do
+            socket
+          else
+            assign(socket, :messages, socket.assigns.messages ++ [serialized])
+          end
+
+        {:noreply, updated_socket |> refresh_members_and_picker()}
 
       {:error, _} ->
         Enum.each(image_infos, fn {path, _entry, _size} -> File.rm(path) end)

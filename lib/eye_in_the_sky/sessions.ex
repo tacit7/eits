@@ -63,6 +63,54 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Returns sessions matching mixed ID types (integers or UUIDs).
+
+  Splits ids into integer and UUID lists, then queries by both.
+  Returns [] for an empty list or when no sessions are found.
+  """
+  def list_sessions_by_mixed_ids([]), do: []
+
+  def list_sessions_by_mixed_ids(ids) when is_list(ids) do
+    int_ids =
+      ids
+      |> Enum.flat_map(fn
+        id when is_integer(id) -> [id]
+        s when is_binary(s) ->
+          case Integer.parse(s) do
+            {n, ""} -> [n]
+            _ -> []
+          end
+        _ -> []
+      end)
+
+    uuid_ids =
+      ids
+      |> Enum.filter(fn
+        id when is_integer(id) -> false
+        s when is_binary(s) ->
+          case Ecto.UUID.cast(s) do
+            {:ok, _} -> true
+            _ -> false
+          end
+        _ -> false
+      end)
+
+    case {int_ids, uuid_ids} do
+      {[], []} ->
+        []
+
+      {[], uuids} ->
+        Repo.all(from s in Session, where: s.uuid in ^uuids, limit: 100)
+
+      {ints, []} ->
+        Repo.all(from s in Session, where: s.id in ^ints, limit: 100)
+
+      {ints, uuids} ->
+        Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids, limit: 100)
+    end
+  end
+
+  @doc """
   Returns a map of %{agent_id => most_recent_session_id} for a list of agent IDs.
   Used for @mention autocomplete — resolves the latest session per agent in one query.
   """

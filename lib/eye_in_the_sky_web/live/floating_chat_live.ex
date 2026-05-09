@@ -10,7 +10,6 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{Messages, Repo, Sessions}
-  alias EyeInTheSky.Sessions.Session
 
   require Logger
 
@@ -306,38 +305,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     if ids == [] do
       %{}
     else
-      int_ids =
-        ids
-        |> Enum.flat_map(fn s ->
-          case Integer.parse(s) do
-            {n, ""} -> [n]
-            _ -> []
-          end
-        end)
-
-      uuid_ids =
-        ids
-        |> Enum.filter(fn s ->
-          case Ecto.UUID.cast(s) do
-            {:ok, _} -> true
-            _ -> false
-          end
-        end)
-
-      sessions =
-        case {int_ids, uuid_ids} do
-          {[], []} ->
-            []
-
-          {[], uuids} ->
-            Repo.all(from s in Session, where: s.uuid in ^uuids, limit: 100)
-
-          {ints, []} ->
-            Repo.all(from s in Session, where: s.id in ^ints, limit: 100)
-
-          {ints, uuids} ->
-            Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids, limit: 100)
-        end
+      sessions = Sessions.list_sessions_by_mixed_ids(ids)
 
       sessions
       |> Enum.reduce(%{}, fn s, acc ->

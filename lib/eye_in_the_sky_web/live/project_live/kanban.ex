@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.{Notes, Projects, Tasks}
-  alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, NotificationHelpers, TasksHelpers}
+  alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, NotificationHelpers, TasksHelpers, TaskEventHandlers}
   alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, DatePickerHandlers, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -74,23 +74,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("update_task", params, socket),
-    do: TasksHelpers.handle_update_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_update_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("delete_task", params, socket),
-    do: TasksHelpers.handle_delete_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_delete_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("create_new_task", params, socket),
-    do: TasksHelpers.handle_create_new_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_create_new_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("quick_add_task", params, socket),
-    do: TasksHelpers.handle_quick_add_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_quick_add_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("archive_task", params, socket),
-    do: TasksHelpers.handle_archive_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_archive_task(params, socket, &KanbanFilters.load_tasks/1)
 
   # ---------------------------------------------------------------------------
   # Events: date picker (delegated to DatePickerHandlers)
@@ -126,7 +126,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("add_task_annotation", params, socket),
-    do: TasksHelpers.handle_add_task_annotation(params, socket)
+    do: TaskEventHandlers.handle_add_task_annotation(params, socket)
 
   @impl true
   def handle_event("copy_task_to_project", params, socket),

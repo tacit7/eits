@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSkyWeb.DmLive.TimerHandlers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
-  import EyeInTheSkyWeb.Live.Shared.TasksHelpers
+  import EyeInTheSkyWeb.Live.Shared.TaskEventHandlers
   import EyeInTheSkyWeb.Live.Shared.DmExportHelpers
   import EyeInTheSkyWeb.Live.Shared.DmModelHelpers
   import EyeInTheSkyWeb.Live.Shared.DmSessionHelpers
@@ -205,14 +205,14 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("delete_task", %{"task_id" => _} = params, socket) do
-    socket = assign(socket, :active_overlay, nil)
-    handle_delete_task(params, socket, &TabHelpers.reload_tasks/1)
+    cleanup_fn = fn s -> assign(s, :active_overlay, nil) end
+    handle_delete_task(params, socket, &TabHelpers.reload_tasks/1, cleanup_fn)
   end
 
   @impl true
   def handle_event("archive_task", %{"task_id" => _} = params, socket) do
-    socket = assign(socket, :active_overlay, nil)
-    handle_archive_task(params, socket, &TabHelpers.reload_tasks/1)
+    cleanup_fn = fn s -> assign(s, :active_overlay, nil) end
+    handle_archive_task(params, socket, &TabHelpers.reload_tasks/1, cleanup_fn)
   end
 
   @impl true

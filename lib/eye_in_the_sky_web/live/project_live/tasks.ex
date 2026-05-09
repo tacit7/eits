@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
-  import EyeInTheSkyWeb.Live.Shared.TasksHelpers
+  import EyeInTheSkyWeb.Live.Shared.TaskEventHandlers
 
   @impl true
   def mount(%{"id" => id} = params, _session, socket) do

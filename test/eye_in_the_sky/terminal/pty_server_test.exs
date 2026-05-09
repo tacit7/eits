@@ -12,31 +12,53 @@ defmodule EyeInTheSky.Terminal.PtyServerTest do
       end
     end)
 
-    _initial_output = collect_output()
+    # Drain any startup banner (shell prompt, etc.)
+    collect_until_idle(300)
 
     PtyServer.write(pid, "echo pty_echo_smoke\n")
 
-    output = collect_output()
+    # Collect until we see the command output line, up to 5s total.
+    # PTY echoes input in chunks; pattern-based collect is reliable where
+    # idle-timeout collect is not.
+    output = collect_until_pattern("pty_echo_smoke\r\n", 5_000)
 
     assert output =~ "echo pty_echo_smoke"
-    # Command output may arrive slightly after the echo — retry with fresh collect
-    output2 = if output =~ "pty_echo_smoke\r\n", do: output, else: output <> collect_output()
-    assert output2 =~ "pty_echo_smoke\r\n"
+    assert output =~ "pty_echo_smoke\r\n"
   end
 
-  defp collect_output(chunks \\ [], idle_ms \\ 300, total_ms \\ 3_000)
-
-  defp collect_output(chunks, _idle_ms, total_ms) when total_ms <= 0 do
-    IO.iodata_to_binary(Enum.reverse(chunks))
+  # Collect messages until `pattern` is found in the accumulated buffer,
+  # or `deadline_ms` milliseconds have elapsed since the call.
+  defp collect_until_pattern(pattern, deadline_ms) do
+    deadline = System.monotonic_time(:millisecond) + deadline_ms
+    collect_until_pattern(pattern, "", deadline)
   end
 
-  defp collect_output(chunks, idle_ms, total_ms) do
+  defp collect_until_pattern(pattern, acc, deadline) do
+    if acc =~ pattern do
+      acc
+    else
+      remaining = deadline - System.monotonic_time(:millisecond)
+
+      if remaining <= 0 do
+        acc
+      else
+        receive do
+          {:pty_output, data} ->
+            collect_until_pattern(pattern, acc <> data, deadline)
+        after
+          min(remaining, 100) ->
+            acc
+        end
+      end
+    end
+  end
+
+  # Drain all output until `idle_ms` passes with no new data.
+  defp collect_until_idle(idle_ms) do
     receive do
-      {:pty_output, data} ->
-        collect_output([data | chunks], idle_ms, total_ms - idle_ms)
+      {:pty_output, _data} -> collect_until_idle(idle_ms)
     after
-      idle_ms ->
-        IO.iodata_to_binary(Enum.reverse(chunks))
+      idle_ms -> :ok
     end
   end
 end

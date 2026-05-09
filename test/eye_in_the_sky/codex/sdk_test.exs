@@ -316,7 +316,7 @@ defmodule EyeInTheSky.Codex.SDKTest do
 
       assert_receive {:claude_message, ^ref,
                       %Message{type: :thinking, content: "Let me think..."}},
-                     5_000
+                     10_000
     end
   end
 

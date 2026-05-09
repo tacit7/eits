@@ -27,6 +27,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
        |> assign(:flyout_open, true)
        |> assign(:mobile_open, true)
        |> assign(:proj_picker_open, false)
+       |> assign(:session_scope, :current)
+       |> assign(:session_project_visible, %{})
+       |> assign(:session_project_collapsed, MapSet.new())
        |> assign(
          :flyout_sessions,
          Loader.load_flyout_sessions(

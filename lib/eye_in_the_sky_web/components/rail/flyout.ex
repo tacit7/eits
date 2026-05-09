@@ -36,6 +36,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
   attr :session_show, :atom, default: :twenty
+  attr :session_scope, :atom, default: :current
+  attr :session_project_visible, :map, default: %{}
+  attr :session_project_collapsed, :any, default: nil
+  attr :projects, :list, default: []
   attr :notification_count, :integer, default: 0
   attr :flyout_agents, :list, default: []
   attr :agent_search, :string, default: ""
@@ -198,6 +202,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         <%= if @active_section == :sessions do %>
           <SessionsSection.sessions_filters
             session_name_filter={@session_name_filter}
+            session_scope={@session_scope}
             myself={@myself}
           />
         <% end %>
@@ -255,7 +260,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <SessionsSection.sessions_content
                 sessions={@flyout_sessions}
                 session_name_filter={@session_name_filter}
+                session_scope={@session_scope}
+                projects={@projects}
+                session_project_visible={@session_project_visible}
+                session_project_collapsed={@session_project_collapsed}
                 sidebar_project={@sidebar_project}
+                myself={@myself}
               />
             <% :tasks -> %>
               <TasksSection.tasks_content

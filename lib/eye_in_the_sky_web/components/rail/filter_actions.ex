@@ -20,12 +20,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
   end
 
   def handle_update_session_name_filter(%{"value" => value}, socket) do
+    scope = socket.assigns[:session_scope] || :current
+    project = if scope == :all, do: nil, else: socket.assigns.sidebar_project
+    show = if scope == :all, do: :all_active, else: socket.assigns.session_show
+
     sessions =
       Loader.load_flyout_sessions(
-        socket.assigns.sidebar_project,
+        project,
         socket.assigns.session_sort,
         value,
-        socket.assigns.session_show
+        show
       )
 
     {:noreply,
@@ -44,6 +48,27 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
       )
 
     {:noreply, socket |> assign(:session_show, show) |> assign(:flyout_sessions, sessions)}
+  end
+
+  def handle_set_session_scope(%{"scope" => scope_str}, socket) do
+    scope = if scope_str == "all", do: :all, else: :current
+
+    project = if scope == :all, do: nil, else: socket.assigns.sidebar_project
+
+    sessions =
+      Loader.load_flyout_sessions(
+        project,
+        socket.assigns.session_sort,
+        socket.assigns.session_name_filter,
+        if(scope == :all, do: :all_active, else: socket.assigns.session_show)
+      )
+
+    {:noreply,
+     socket
+     |> assign(:session_scope, scope)
+     |> assign(:session_project_visible, %{})
+     |> assign(:session_project_collapsed, MapSet.new())
+     |> assign(:flyout_sessions, sessions)}
   end
 
   def handle_update_task_search(%{"value" => value}, socket) do

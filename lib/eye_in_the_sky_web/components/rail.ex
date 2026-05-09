@@ -72,6 +72,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_sort: :last_activity,
         session_name_filter: "",
         session_show: :twenty,
+        session_scope: :current,
+        session_project_visible: %{},
+        session_project_collapsed: MapSet.new(),
         rail_modal: nil,
         flyout_agents: [],
         agent_search: "",
@@ -297,6 +300,27 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("set_session_show", params, socket),
     do: FilterActions.handle_set_session_show(params, socket)
+
+  def handle_event("set_session_scope", params, socket),
+    do: FilterActions.handle_set_session_scope(params, socket)
+
+  def handle_event("show_more_project_sessions", %{"project_id" => pid_str}, socket) do
+    pid = String.to_integer(pid_str)
+    current = Map.get(socket.assigns.session_project_visible, pid, 5)
+    {:noreply, assign(socket, :session_project_visible, Map.put(socket.assigns.session_project_visible, pid, current + 5))}
+  end
+
+  def handle_event("toggle_project_sessions", %{"project_id" => pid_str}, socket) do
+    pid = String.to_integer(pid_str)
+    collapsed = socket.assigns.session_project_collapsed
+
+    updated =
+      if MapSet.member?(collapsed, pid),
+        do: MapSet.delete(collapsed, pid),
+        else: MapSet.put(collapsed, pid)
+
+    {:noreply, assign(socket, :session_project_collapsed, updated)}
+  end
 
   def handle_event("update_task_search", params, socket),
     do: FilterActions.handle_update_task_search(params, socket)
@@ -575,6 +599,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
         session_show={@session_show}
+        session_scope={@session_scope}
+        session_project_visible={@session_project_visible}
+        session_project_collapsed={@session_project_collapsed}
+        projects={@projects}
         notification_count={@notification_count}
         flyout_agents={@flyout_agents}
         agent_search={@agent_search}

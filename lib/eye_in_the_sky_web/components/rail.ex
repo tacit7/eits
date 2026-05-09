@@ -201,18 +201,23 @@ defmodule EyeInTheSkyWeb.Components.Rail do
      |> start_async(:load_usage, fn -> RateLimitClient.force_refresh() end)}
   end
 
-  def handle_event("restore_section", %{"section" => section_str}, socket),
-    do: {:noreply, assign(socket, :active_section, Loader.parse_section(section_str))}
+  # Unified restore from localStorage blob. Fires once on mount after the hook reads
+  # the rail_state key. Each helper is defensive — bad or missing keys are ignored.
+  # Order matters: project must be restored before file_expanded (needs sidebar_project.path).
+  def handle_event("restore_rail_state", params, socket) do
+    socket =
+      socket
+      |> maybe_restore_project(params)
+      |> maybe_restore_section(params)
+      |> maybe_restore_session_sort(params)
+      |> maybe_restore_session_scope(params)
+      |> maybe_restore_session_show(params)
+      |> maybe_restore_task_state_filter(params)
+      |> maybe_restore_team_status(params)
+      |> maybe_restore_file_expanded(params)
 
-  # Restore the last selected project from localStorage after a cross-LiveView navigation.
-  # Only applies when the parent has not already provided a project (sidebar_project is nil).
-  # Project-scoped pages set sidebar_project in update/2 before the hook fires, so we
-  # skip the restore in that case to avoid overriding the route-derived context.
-  def handle_event("restore_project", %{"project_id" => id_str}, socket)
-      when is_nil(socket.assigns.sidebar_project),
-    do: ProjectActions.handle_restore_project(id_str, socket)
-
-  def handle_event("restore_project", _params, socket), do: {:noreply, socket}
+    {:noreply, socket}
+  end
 
   def handle_event("toggle_proj_picker", _params, socket),
     do: {:noreply, assign(socket, :proj_picker_open, !socket.assigns.proj_picker_open)}
@@ -501,6 +506,105 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   defp maybe_start_usage_async(socket, _section), do: socket
+
+  # --- localStorage restore helpers ---
+  # Each guards against missing/bad data. A bad value is silently skipped so a
+  # corrupted localStorage entry never crashes the LiveComponent.
+
+  defp maybe_restore_project(socket, %{"project_id" => id}) when not is_nil(id) do
+    # Only restore when the parent LiveView hasn't already set a project.
+    # update/2 runs before the hook fires, so a route-scoped project wins.
+    if is_nil(socket.assigns.sidebar_project) do
+      ProjectActions.handle_restore_project(to_string(id), socket)
+      |> then(fn {:noreply, s} -> s end)
+    else
+      socket
+    end
+  end
+
+  defp maybe_restore_project(socket, _), do: socket
+
+  defp maybe_restore_section(socket, %{"section" => section}) when is_binary(section) do
+    assign(socket, :active_section, Loader.parse_section(section))
+  end
+
+  defp maybe_restore_section(socket, _), do: socket
+
+  defp maybe_restore_session_sort(socket, %{"session_sort" => sort}) when is_binary(sort) do
+    assign(socket, :session_sort, Loader.parse_session_sort(sort))
+  end
+
+  defp maybe_restore_session_sort(socket, _), do: socket
+
+  defp maybe_restore_session_scope(socket, %{"session_scope" => scope})
+       when scope in ["current", "all"] do
+    assign(socket, :session_scope, String.to_existing_atom(scope))
+  end
+
+  defp maybe_restore_session_scope(socket, _), do: socket
+
+  defp maybe_restore_session_show(socket, %{"session_show" => show}) when is_binary(show) do
+    assign(socket, :session_show, Loader.parse_session_show(show))
+  end
+
+  defp maybe_restore_session_show(socket, _), do: socket
+
+  defp maybe_restore_task_state_filter(socket, %{"task_state_filter" => id})
+       when id in [1, 2, 3, 4] do
+    assign(socket, :task_state_filter, id)
+  end
+
+  # Defensive: JSON may sometimes arrive as a string if the value was stored
+  # before integer encoding was guaranteed (e.g. migrated from an older blob).
+  defp maybe_restore_task_state_filter(socket, %{"task_state_filter" => id})
+       when is_binary(id) do
+    case Integer.parse(id) do
+      {parsed, ""} when parsed in [1, 2, 3, 4] ->
+        assign(socket, :task_state_filter, parsed)
+
+      _ ->
+        socket
+    end
+  end
+
+  defp maybe_restore_task_state_filter(socket, _), do: socket
+
+  defp maybe_restore_team_status(socket, %{"team_status" => status})
+       when status in ["active", "archived"] do
+    assign(socket, :team_status, status)
+  end
+
+  defp maybe_restore_team_status(socket, _), do: socket
+
+  defp maybe_restore_file_expanded(socket, %{"file_expanded" => paths}) when is_list(paths) do
+    # Cap at 100 paths to avoid excessive filesystem reads on mount.
+    valid_paths = paths |> Enum.filter(&is_binary/1) |> Enum.take(100)
+
+    # Re-fetch children for restored paths if a project with a disk path is set.
+    # Without this, the expanded state would render folders as open but with no children.
+    case socket.assigns.sidebar_project do
+      %{path: root} when not is_nil(root) ->
+        children =
+          Enum.reduce(valid_paths, %{}, fn path, acc ->
+            case EyeInTheSky.Projects.FileTree.children(root, path) do
+              {:ok, nodes} -> Map.put(acc, path, nodes)
+              {:error, _} -> acc
+            end
+          end)
+
+        # Only keep paths that successfully loaded children.
+        valid_expanded = MapSet.new(Map.keys(children))
+
+        socket
+        |> assign(:flyout_file_expanded, valid_expanded)
+        |> assign(:flyout_file_children, children)
+
+      _ ->
+        assign(socket, :flyout_file_expanded, MapSet.new(valid_paths))
+    end
+  end
+
+  defp maybe_restore_file_expanded(socket, _), do: socket
 
   @impl true
   def render(assigns) do

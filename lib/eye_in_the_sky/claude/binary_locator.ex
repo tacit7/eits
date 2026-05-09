@@ -1,4 +1,4 @@
-defmodule EyeInTheSky.Claude.BinaryFinder do
+defmodule EyeInTheSky.Claude.BinaryLocator do
   @moduledoc """
   Locates the `claude` binary by searching PATH, standard install paths,
   and NVM-managed Node.js version directories.

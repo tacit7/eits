@@ -70,7 +70,7 @@ defmodule EyeInTheSky.Notes do
     starred_only = Keyword.get(opts, :starred, false)
     limit_val = Keyword.get(opts, :limit, 500)
 
-    # Detect input shape to avoid CastError when task_id is a UUID string.
+    # Detect input shape to avoid CastError: integer, UUID string, or stringified integer.
     task_ids =
       cond do
         is_integer(task_id) ->
@@ -80,6 +80,16 @@ defmodule EyeInTheSky.Notes do
         is_binary(task_id) && uuid_format?(task_id) ->
           from(t in TaskSchema, where: t.uuid == ^task_id, select: {t.id, t.uuid})
           |> Repo.one()
+
+        is_binary(task_id) ->
+          case Integer.parse(task_id) do
+            {int_id, ""} ->
+              from(t in TaskSchema, where: t.id == ^int_id, select: {t.id, t.uuid})
+              |> Repo.one()
+
+            _ ->
+              nil
+          end
 
         true ->
           nil

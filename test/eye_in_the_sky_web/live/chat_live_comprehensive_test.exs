@@ -17,6 +17,10 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
   alias EyeInTheSky.{Agents, ChannelMessages, Channels, Messages, Projects, Sessions}
 
+  # Phoenix.LiveViewTest.View does not expose socket assigns directly in LV 1.x.
+  # Read them from the process state instead.
+  defp get_assigns(view), do: :sys.get_state(view.pid).socket.assigns
+
   setup %{conn: conn} do
     # Create test project
     {:ok, project} =
@@ -93,24 +97,29 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
+      assigns = get_assigns(view)
+
       # Verify session was created for connected socket
-      refute is_nil(view.assigns.session_id)
+      refute is_nil(assigns.session_id)
 
       # Verify uploads configured
-      assert view.assigns.uploads[:agent_images] != nil
-      upload = view.assigns.uploads.agent_images
+      assert assigns.uploads[:agent_images] != nil
+      upload = assigns.uploads.agent_images
       assert upload.max_entries == 5
       assert upload.max_file_size == 20_000_000
-      assert ".jpg" in upload.accept
+      # accept is a comma-separated string, not a list
+      assert String.contains?(upload.accept, ".jpg")
     end
 
     test "initializes with correct default assigns", %{conn: conn, channel: channel} do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      assert view.assigns.working_agents == %{}
-      assert view.assigns.sidebar_tab == :chat
-      assert view.assigns.show_members == false
-      assert view.assigns.show_agent_drawer == false
+      assigns = get_assigns(view)
+
+      assert assigns.working_agents == %{}
+      assert assigns.sidebar_tab == :chat
+      assert assigns.show_members == false
+      assert assigns.show_agent_drawer == false
     end
   end
 
@@ -220,7 +229,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      initial_count = length(view.assigns.messages)
+      initial_count = length(get_assigns(view).messages)
 
       # Create a reference message
       {:ok, ref_msg} =
@@ -239,7 +248,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
       })
 
       # Should have more messages now
-      assert length(view.assigns.messages) > initial_count
+      assert length(get_assigns(view).messages) > initial_count
     end
 
     test "sets has_more_messages flag correctly", %{
@@ -264,7 +273,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
       })
 
       # With few messages, has_more should be false
-      assert view.assigns.has_more_messages == false
+      assert get_assigns(view).has_more_messages == false
     end
   end
 
@@ -272,25 +281,25 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
     test "toggle_members toggles boolean", %{conn: conn, channel: channel} do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      assert view.assigns.show_members == false
+      assert get_assigns(view).show_members == false
 
       render_hook(view, "toggle_members", %{})
-      assert view.assigns.show_members == true
+      assert get_assigns(view).show_members == true
 
       render_hook(view, "toggle_members", %{})
-      assert view.assigns.show_members == false
+      assert get_assigns(view).show_members == false
     end
 
     test "toggle_agent_drawer toggles boolean", %{conn: conn, channel: channel} do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      assert view.assigns.show_agent_drawer == false
+      assert get_assigns(view).show_agent_drawer == false
 
       render_hook(view, "toggle_agent_drawer", %{})
-      assert view.assigns.show_agent_drawer == true
+      assert get_assigns(view).show_agent_drawer == true
 
       render_hook(view, "toggle_agent_drawer", %{})
-      assert view.assigns.show_agent_drawer == false
+      assert get_assigns(view).show_agent_drawer == false
     end
   end
 
@@ -302,11 +311,13 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      send(view.pid, {:agent_working, %{session_id: session2.id}})
-      :ok = render(view)
+      # Events.agent_working/1 broadcasts the Session struct; msg.id is the session PK.
+      send(view.pid, {:agent_working, session2})
+      render(view)
 
-      assert Map.has_key?(view.assigns.working_agents, session2.id)
-      assert view.assigns.working_agents[session2.id] == true
+      working = get_assigns(view).working_agents
+      assert Map.has_key?(working, session2.id)
+      assert working[session2.id] == true
     end
 
     test "agent_stopped removes session from working_agents map", %{
@@ -317,14 +328,14 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
       # Add to working
-      send(view.pid, {:agent_working, %{session_id: session2.id}})
-      :ok = render(view)
-      assert Map.has_key?(view.assigns.working_agents, session2.id)
+      send(view.pid, {:agent_working, session2})
+      render(view)
+      assert Map.has_key?(get_assigns(view).working_agents, session2.id)
 
       # Remove from working
-      send(view.pid, {:agent_stopped, %{session_id: session2.id}})
-      :ok = render(view)
-      assert not Map.has_key?(view.assigns.working_agents, session2.id)
+      send(view.pid, {:agent_stopped, session2})
+      render(view)
+      assert not Map.has_key?(get_assigns(view).working_agents, session2.id)
     end
   end
 
@@ -336,7 +347,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      initial_count = length(view.assigns.messages)
+      initial_count = length(get_assigns(view).messages)
 
       # Create message outside the view
       {:ok, new_msg} =
@@ -351,13 +362,13 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
       # Broadcast it
       EyeInTheSky.Events.channel_message(channel.id, new_msg)
-      :ok = render(view)
+      render(view)
 
       # Should have appended (list grows by 1)
-      assert length(view.assigns.messages) == initial_count + 1
+      assert length(get_assigns(view).messages) == initial_count + 1
 
       # Verify new message is in list
-      assert Enum.any?(view.assigns.messages, fn m ->
+      assert Enum.any?(get_assigns(view).messages, fn m ->
                m.body == "New from broadcast"
              end)
     end
@@ -369,7 +380,8 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
       render_hook(view, "change_channel", %{"channel_id" => to_string(channel2.id)})
 
-      assert view.assigns.active_channel_id == channel2.id
+      # handle_params receives channel_id as a string from URL params
+      assert get_assigns(view).active_channel_id == to_string(channel2.id)
     end
   end
 
@@ -393,7 +405,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
       render_hook(view, "open_thread", %{"message_id" => to_string(parent.id)})
 
-      refute is_nil(view.assigns.active_thread)
+      refute is_nil(get_assigns(view).active_thread)
     end
 
     test "close_thread clears active_thread", %{
@@ -416,7 +428,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
       render_hook(view, "close_thread", %{})
 
-      assert is_nil(view.assigns.active_thread)
+      assert is_nil(get_assigns(view).active_thread)
     end
   end
 end

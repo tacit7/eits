@@ -19,10 +19,12 @@ defmodule EyeInTheSky.Terminal.PtyServerTest do
     output = collect_output()
 
     assert output =~ "echo pty_echo_smoke"
-    assert output =~ "pty_echo_smoke\r\n"
+    # Command output may arrive slightly after the echo — retry with fresh collect
+    output2 = if output =~ "pty_echo_smoke\r\n", do: output, else: output <> collect_output()
+    assert output2 =~ "pty_echo_smoke\r\n"
   end
 
-  defp collect_output(chunks \\ [], idle_ms \\ 200, total_ms \\ 2_000)
+  defp collect_output(chunks \\ [], idle_ms \\ 300, total_ms \\ 3_000)
 
   defp collect_output(chunks, _idle_ms, total_ms) when total_ms <= 0 do
     IO.iodata_to_binary(Enum.reverse(chunks))

@@ -3246,31 +3246,6 @@ HELP
           total=$(echo "$resp" | jq '.members // [] | length')
           printf '[%s] waiting: %d/%d done, %d pending\n' "$(date -u +%H:%M:%S)" "$done_count" "$total" "$pending" >&2
           if [[ "$pending" -eq 0 ]]; then
-            # Check for hung agents among non-terminal members
-            local hung_agents=() members_json
-            members_json=$(echo "$resp" | jq '.members // []')
-
-            # For each member that is not done/spawn_failed, check if hung
-            while IFS= read -r member; do
-              local member_status session_uuid member_name
-              member_status=$(echo "$member" | jq -r '.member_status // .status')
-              session_uuid=$(echo "$member" | jq -r '.session_uuid // empty')
-              member_name=$(echo "$member" | jq -r '.name // "unknown"')
-
-              # Only check non-terminal members
-              if [[ "$member_status" != "done" && "$member_status" != "spawn_failed" ]]; then
-                if [[ -n "$session_uuid" ]]; then
-                  # Check worker status via /sessions/:uuid/worker
-                  local worker_resp worker_hung
-                  worker_resp=$(_curl "$BASE_URL/sessions/$session_uuid/worker" 2>/dev/null || echo '{}')
-                  worker_hung=$(echo "$worker_resp" | jq -r '.hung // false')
-                  if [[ "$worker_hung" == "true" ]]; then
-                    hung_agents+=("$member_name")
-                  fi
-                fi
-              fi
-            done < <(echo "$members_json" | jq -c '.[]')
-
             echo "$resp" | jq -r '
               . as $t |
               (.members // []) as $members |
@@ -3289,14 +3264,29 @@ HELP
                 "  \(.name) (\(.role)) — \($member_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
               )
             '
-
-            # Exit with code 2 if any hung agents found
-            if [[ "${#hung_agents[@]}" -gt 0 ]]; then
-              printf '\nHung agents detected: %s\n' "$(IFS=, ; echo "${hung_agents[*]}")" >&2
-              return 2
-            fi
-
             [[ "$spawn_failed_count" -gt 0 ]] && return 1 || return 0
+          fi
+          # Check pending members for hung workers before sleeping.
+          # A hung agent is alive but has had no activity for >10 minutes.
+          # Exit 2 immediately rather than polling forever.
+          local hung_agents=()
+          while IFS= read -r member; do
+            local member_status session_uuid member_name
+            member_status=$(echo "$member" | jq -r '.member_status // .status')
+            session_uuid=$(echo "$member" | jq -r '.session_uuid // empty')
+            member_name=$(echo "$member" | jq -r '.name // "unknown"')
+            if [[ "$member_status" != "done" && "$member_status" != "spawn_failed" && -n "$session_uuid" ]]; then
+              local worker_resp worker_hung
+              worker_resp=$(_curl "$BASE_URL/sessions/$session_uuid/worker" 2>/dev/null || echo '{}')
+              worker_hung=$(echo "$worker_resp" | jq -r '.hung // false')
+              if [[ "$worker_hung" == "true" ]]; then
+                hung_agents+=("$member_name")
+              fi
+            fi
+          done < <(echo "$resp" | jq -c '.members // [] | .[]')
+          if [[ "${#hung_agents[@]}" -gt 0 ]]; then
+            printf 'teams status --wait: hung agents detected: %s\n' "$(IFS=', '; echo "${hung_agents[*]}")" >&2
+            return 2
           fi
           sleep 5
         done

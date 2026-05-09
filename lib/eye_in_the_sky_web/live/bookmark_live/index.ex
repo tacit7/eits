@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.BookmarkLive.Index do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Bookmarks
+  alias EyeInTheSky.{Bookmarks, Events}
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
@@ -15,7 +15,13 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
       |> assign(:sidebar_project, nil)
       |> assign(:bookmarks, [])
 
-    socket = if connected?(socket), do: load_bookmarks(socket), else: socket
+    socket =
+      if connected?(socket) do
+        Events.subscribe_bookmarks()
+        load_bookmarks(socket)
+      else
+        socket
+      end
 
     {:ok, socket}
   end
@@ -58,6 +64,14 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
         {:noreply, load_bookmarks(socket)}
     end
   end
+
+  @impl true
+  def handle_info({event, _bookmark}, socket)
+      when event in [:bookmark_created, :bookmark_deleted] do
+    {:noreply, load_bookmarks(socket)}
+  end
+
+  def handle_info(_, socket), do: {:noreply, socket}
 
   defp load_bookmarks(socket) do
     bookmarks =

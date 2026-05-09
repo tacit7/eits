@@ -92,6 +92,15 @@ defmodule EyeInTheSky.Events do
   @doc "A project record was updated. Broadcasts to projects topic."
   def project_updated(project), do: broadcast("projects", {:project_updated, project})
 
+  @doc "Subscribe to bookmark changes (created, deleted)."
+  def subscribe_bookmarks, do: sub("bookmarks")
+
+  @doc "A bookmark was created. Broadcasts to bookmarks topic."
+  def bookmark_created(bookmark), do: broadcast("bookmarks", {:bookmark_created, bookmark})
+
+  @doc "A bookmark was deleted. Broadcasts to bookmarks topic."
+  def bookmark_deleted(bookmark), do: broadcast("bookmarks", {:bookmark_deleted, bookmark})
+
   @doc "Subscribe to settings changes."
   def subscribe_settings, do: sub("settings")
 

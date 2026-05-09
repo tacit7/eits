@@ -18,7 +18,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.PromptsHelpers do
   end
 
   defp list_prompts_for_scope(_) do
-    Prompts.list_global_prompts()
+    Prompts.list_prompts()
   end
 
   def handle_search(%{"query" => query}, socket, reload_fn) do

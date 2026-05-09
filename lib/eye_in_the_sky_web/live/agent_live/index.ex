@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Helpers.SessionFilters
-  alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
+  alias EyeInTheSkyWeb.Live.Shared.AgentPubSubHandlers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
   import EyeInTheSkyWeb.Components.SessionCard
@@ -167,27 +167,16 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   @impl true
   def handle_info({:agent_working, msg}, socket) do
-    AgentStatusHelpers.handle_agent_working(socket, msg, fn socket, session_id ->
-      update_agent_status_in_list(socket, session_id, "working")
-    end)
+    AgentPubSubHandlers.handle_agent_working_in_list(socket, msg, :agents, socket.assigns.sort_by)
   end
 
   @impl true
   def handle_info({:agent_stopped, msg}, socket) do
-    AgentStatusHelpers.handle_agent_stopped(socket, msg, fn socket, session_id ->
-      status = extract_stopped_status(msg)
-      update_agent_status_in_list(socket, session_id, status)
-    end)
+    AgentPubSubHandlers.handle_agent_stopped_in_list(socket, msg, :agents, socket.assigns.sort_by)
   end
 
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
-
-  defp extract_stopped_status(%{status: status}) when is_binary(status) and status != "",
-    do: status
-
-  defp extract_stopped_status(%{status: _}), do: "completed"
-  defp extract_stopped_status(_), do: "idle"
 
   defp apply_action(socket, :index, %{"new" => "1"}) do
     socket
@@ -216,17 +205,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   def terminate(_reason, socket) do
     cancel_timer(socket)
     :ok
-  end
-
-  defp update_agent_status_in_list(socket, session_id, new_status) do
-    now = DateTime.utc_now()
-
-    updated_agents =
-      socket.assigns.agents
-      |> Enum.map(&AgentStatusHelpers.apply_agent_status(&1, session_id, new_status, now))
-      |> SessionFilters.sort_agents(socket.assigns.sort_by)
-
-    assign(socket, :agents, updated_agents)
   end
 
   # -- Render ---------------------------------------------------------------

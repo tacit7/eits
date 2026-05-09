@@ -2,12 +2,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.{Notes, Projects, Tasks}
-  alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, NotificationHelpers, TasksHelpers, TaskEventHandlers}
+  alias EyeInTheSkyWeb.Live.Shared.{AgentPubSubHandlers, BulkHelpers, KanbanFilters, NotificationHelpers, TasksHelpers, TaskEventHandlers}
   alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, DatePickerHandlers, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentHelpers, only: [handle_start_agent_for_task: 2]
-  import EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
   import EyeInTheSkyWeb.Components.KanbanBulkBar, only: [kanban_bulk_bar: 1]
   import EyeInTheSkyWeb.Components.KanbanToolbar, only: [kanban_toolbar: 1]
@@ -257,30 +256,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_info({:agent_working, msg}, socket) do
-    handle_agent_working(socket, msg, fn socket, session_id ->
-      socket
-      |> update(:working_session_ids, &MapSet.put(&1, session_id))
-      |> update(:waiting_session_ids, &MapSet.delete(&1, session_id))
-    end)
+    AgentPubSubHandlers.handle_agent_working_mapsets(socket, msg)
   end
 
   @impl true
   def handle_info({:agent_stopped, %{status: "waiting", id: session_id}}, socket) do
-    socket =
-      socket
-      |> update(:working_session_ids, &MapSet.delete(&1, session_id))
-      |> update(:waiting_session_ids, &MapSet.put(&1, session_id))
-
-    {:noreply, socket}
+    AgentPubSubHandlers.handle_agent_stopped_waiting_mapsets(socket, %{status: "waiting", id: session_id})
   end
 
   @impl true
   def handle_info({:agent_stopped, msg}, socket) do
-    handle_agent_stopped(socket, msg, fn socket, session_id ->
-      socket
-      |> update(:working_session_ids, &MapSet.delete(&1, session_id))
-      |> update(:waiting_session_ids, &MapSet.delete(&1, session_id))
-    end)
+    AgentPubSubHandlers.handle_agent_stopped_mapsets(socket, msg)
   end
 
   @impl true

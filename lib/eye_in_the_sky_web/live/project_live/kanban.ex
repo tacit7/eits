@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   import EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
   import EyeInTheSkyWeb.Components.KanbanBulkBar, only: [kanban_bulk_bar: 1]
+  import EyeInTheSkyWeb.Components.KanbanToolbar, only: [kanban_toolbar: 1]
   import EyeInTheSkyWeb.Components.KanbanBoard, only: [kanban_board: 1]
 
   @impl true
@@ -315,6 +316,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         bulk_mode={@bulk_mode}
         selected_tasks={@selected_tasks}
         workflow_states={@workflow_states}
+      />
+
+      <.kanban_toolbar
+        project_id={@project_id}
+        search_query={@search_query}
+        show_completed={@show_completed}
+        bulk_mode={@bulk_mode}
+        active_filter_count={@active_filter_count}
       />
 
       <.kanban_board

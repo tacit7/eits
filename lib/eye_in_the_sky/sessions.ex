@@ -631,7 +631,7 @@ defmodule EyeInTheSky.Sessions do
   end
 
   def list_sessions_for_scope(%EyeInTheSky.Scope{type: :workspace, workspace_id: wid}, opts) do
-    limit_val = Keyword.get(opts, :limit)
+    limit_val = Keyword.get(opts, :limit, 500)
     offset_val = Keyword.get(opts, :offset)
     active_only = Keyword.get(opts, :active_only, false)
 

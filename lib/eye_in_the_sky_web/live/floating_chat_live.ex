@@ -338,18 +338,34 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp send_session_message(session_id, body) do
-    with {:ok, session} <- Sessions.resolve(session_id),
-         {:ok, _message} <-
-           Messages.send_message(%{
-             session_id: session.id,
-             sender_role: "user",
-             recipient_role: "agent",
-             provider: "claude",
-             body: body
-           }),
-         {:ok, _admission} <- AgentManager.continue_session(session.id, body, model: "sonnet") do
-      {:ok, session.id}
-    else
+    result =
+      Repo.transaction(fn ->
+        with {:ok, session} <- Sessions.resolve(session_id),
+             {:ok, _message} <-
+               Messages.send_message(%{
+                 session_id: session.id,
+                 sender_role: "user",
+                 recipient_role: "agent",
+                 provider: "claude",
+                 body: body
+               }) do
+          session
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+
+    case result do
+      {:ok, session} ->
+        case AgentManager.continue_session(session.id, body, model: "sonnet") do
+          {:ok, _} ->
+            {:ok, session.id}
+
+          {:error, reason} ->
+            Logger.warning("FAB continue_session failed after message saved: #{inspect(reason)}")
+            {:ok, session.id}
+        end
+
       {:error, reason} ->
         Logger.error("FAB send_session_message error: #{inspect(reason)}")
         {:error, to_string(reason)}

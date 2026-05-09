@@ -172,6 +172,34 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
     end
   end
 
+  # ── Project scope enforcement ─────────────────────────────────────────────
+
+  describe "project scope enforcement" do
+    test "session with nil project_id cannot access a project-scoped team", %{conn: conn} do
+      # Team is scoped to a real project; requester session has no project.
+      project = project_fixture()
+      team = create_team(%{project_id: project.id})
+      session = new_session()
+
+      conn = get(conn, ~p"/api/v1/teams/#{team.id}?session_id=#{session.id}")
+      assert json_response(conn, 403)["error"] =~ "Access denied"
+    end
+
+    test "session with nil project_id cannot create a team bound to an explicit project", %{conn: conn} do
+      project = project_fixture()
+      session = new_session()
+      name = "scope-test-#{uniq()}"
+
+      conn =
+        post(conn, ~p"/api/v1/teams?session_id=#{session.id}", %{
+          "name" => name,
+          "project_id" => "#{project.id}"
+        })
+
+      assert json_response(conn, 403)["error"] =~ "Access denied"
+    end
+  end
+
   # ── DELETE /api/v1/teams/:id ──────────────────────────────────────────────
 
   describe "DELETE /api/v1/teams/:id" do

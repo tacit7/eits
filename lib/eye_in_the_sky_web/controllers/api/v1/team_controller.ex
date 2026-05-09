@@ -352,30 +352,37 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # Bearer-only callers have no project context — skip ownership check.
   defp validate_project_access(_team, :bearer_only), do: :ok
+  # Unscoped team (no project) is accessible by any authenticated session.
+  defp validate_project_access(%{project_id: nil}, _session), do: :ok
+  # Session with no project cannot claim ownership of a scoped team.
+  defp validate_project_access(_team, %{project_id: nil}), do: {:error, :forbidden}
+  # Same project — allowed.
+  defp validate_project_access(%{project_id: p}, %{project_id: p}), do: :ok
+  # Different projects — denied.
+  defp validate_project_access(_, _), do: {:error, :forbidden}
 
-  defp validate_project_access(team, session) do
-    if is_nil(team.project_id) or is_nil(session.project_id) or
-         team.project_id == session.project_id do
-      :ok
-    else
-      {:error, :forbidden}
-    end
-  end
-
-  # Bearer-only: use explicit project_id param (may be nil — that's fine for unrestricted teams)
+  # Bearer-only: use explicit project_id param (may be nil — fine for unrestricted teams)
   defp resolve_create_project_id(params, :bearer_only) do
     {:ok, params["project_id"] && parse_int(params["project_id"])}
+  end
+
+  # Session with no project: cannot bind a new team to an explicit project_id either.
+  defp resolve_create_project_id(params, %{project_id: nil}) do
+    case parse_int(params["project_id"]) do
+      nil -> {:ok, nil}
+      _project_id -> {:error, :forbidden}
+    end
   end
 
   defp resolve_create_project_id(params, session) do
     case parse_int(params["project_id"]) do
       nil ->
-        # No project_id provided, use requester's project
+        # No project_id provided — inherit from session
         {:ok, session.project_id}
 
       project_id ->
-        # Project_id provided, validate it matches requester's project
-        if is_nil(session.project_id) or project_id == session.project_id do
+        # Explicit project_id must match the session's project
+        if project_id == session.project_id do
           {:ok, project_id}
         else
           {:error, :forbidden}

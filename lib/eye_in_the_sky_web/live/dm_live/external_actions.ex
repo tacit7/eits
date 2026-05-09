@@ -19,6 +19,56 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActions do
     end
   end
 
+  def handle_load_cumulative_diff(socket) do
+    if socket.assigns.cumulative_diff != nil do
+      {:noreply, socket}
+    else
+      diff = fetch_cumulative_diff(socket.assigns.commits, socket)
+      {:noreply, assign(socket, :cumulative_diff, diff)}
+    end
+  end
+
+  defp fetch_cumulative_diff([], _socket), do: :error
+
+  defp fetch_cumulative_diff(commits, socket) do
+    case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+      {:ok, project_path} ->
+        # commits list is newest-first; oldest is last
+        oldest = List.last(commits)
+        newest = List.first(commits)
+        old_hash = oldest.commit_hash
+        tip = newest.commit_hash || old_hash
+
+        if is_nil(old_hash) do
+          :error
+        else
+          parent =
+            case System.cmd("git", ["-C", project_path, "rev-parse", "#{old_hash}^"],
+                   stderr_to_stdout: false
+                 ) do
+              {out, 0} -> String.trim(out)
+              _ -> nil
+            end
+
+          {base, tip_hash} =
+            if parent, do: {parent, tip}, else: {old_hash, tip}
+
+          cmd_args =
+            if parent,
+              do: ["-C", project_path, "diff", "#{base}..#{tip_hash}", "--unified=5"],
+              else: ["-C", project_path, "show", base, "--unified=5"]
+
+          case System.cmd("git", cmd_args, stderr_to_stdout: false) do
+            {output, 0} -> output
+            _ -> :error
+          end
+        end
+
+      _ ->
+        :error
+    end
+  end
+
   defp fetch_git_diff(hash, socket) do
     case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
       {:ok, project_path} ->

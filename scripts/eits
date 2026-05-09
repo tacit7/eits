@@ -98,6 +98,40 @@ _post()   { _curl -X POST  -H "Content-Type: application/json" -d "$2" "$BASE_UR
 _patch()  { _curl -X PATCH -H "Content-Type: application/json" -d "$2" "$BASE_URL$1" | jq .; }
 _delete() { _curl -X DELETE "$BASE_URL$1" | jq .; }
 
+# _dm_post <endpoint> <payload> — POST with file-based lock to prevent parallel DM drops
+# Serializes DM calls to avoid connection pool conflicts when called concurrently.
+# Uses atomic mkdir for portable lock acquisition (works on macOS, Linux, etc.)
+_dm_post() {
+  local _dm_lock_dir="/tmp/eits_dm_${EITS_SESSION_UUID:-${EITS_SESSION_ID:-default}}.lock"
+  local _post_exit=0
+  local _wait_count=0
+  local _max_wait=60  # max 60 attempts * 0.5s = 30s timeout
+
+  # Acquire lock using atomic mkdir (portable across Unix systems)
+  while ! mkdir "$_dm_lock_dir" 2>/dev/null; do
+    _wait_count=$((_wait_count + 1))
+    if [[ $_wait_count -gt $_max_wait ]]; then
+      echo "error: DM lock acquire timeout (possible deadlock) — try again" >&2
+      return 1
+    fi
+    sleep 0.5
+  done
+
+  # Lock is held; execute the POST under lock
+  local _result
+  _result=$(_post "$1" "$2")
+  _post_exit=$?
+
+  # Release lock (cleanup the lock directory)
+  rmdir "$_dm_lock_dir" 2>/dev/null || true
+
+  # Return POST result/error
+  if [[ $_post_exit -ne 0 ]]; then
+    return "$_post_exit"
+  fi
+  printf '%s\n' "$_result"
+}
+
 die()  { echo "error: $*" >&2; exit 1; }
 need() { [[ -n "${!1:-}" ]] || die "$1 is required"; }
 
@@ -2498,7 +2532,7 @@ EOF
     payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
       '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
   fi
-  local _dm_resp; _dm_resp=$(_post "/dm" "$payload") || return 1
+  local _dm_resp; _dm_resp=$(_dm_post "/dm" "$payload") || return 1
   # Resolve recipient name — use $to (already known) rather than parsing response
   local _to_name; _to_name=$(_curl "$BASE_URL/sessions/$to" 2>/dev/null \
     | jq -r '.session.name // .name // empty' 2>/dev/null)
@@ -3865,13 +3899,7 @@ cmd_whoami() {
     --arg agent_uuid "$_agent_uuid" \
     --arg agent_id "$_agent_id" \
     --arg project_id "$_project_id" \
-    '{
-      session_uuid: $session_uuid,
-      session_id: ($session_id | tonumber),
-      agent_uuid: $agent_uuid,
-      agent_id: ($agent_id | tonumber),
-      project_id: ($project_id | tonumber)
-    }'
+    '{session_uuid: $session_uuid, session_id: ($session_id | tonumber), agent_uuid: $agent_uuid, agent_id: ($agent_id | tonumber), project_id: ($project_id | tonumber)}'
 }
 
 # ── standup ───────────────────────────────────────────────────────────────────

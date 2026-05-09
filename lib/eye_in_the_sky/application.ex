@@ -66,6 +66,8 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.IAM.PolicyCache,
           # DynamicSupervisor for per-session PTY processes
           EyeInTheSky.Terminal.PtySupervisor,
+          # Session store with TTL-based expiration (prevents unbounded ETS growth)
+          EyeInTheSky.SessionStore,
           # In-process cache for Anthropic rate-limit API responses (5-min TTL)
           EyeInTheSky.Claude.RateLimitClient
         ]

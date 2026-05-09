@@ -63,10 +63,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
       when event in [:team_created, :team_deleted, :member_joined, :member_updated, :member_left],
       do: {:noreply, socket}
 
-  def handle_info({event, _member}, socket)
-      when event in [:member_joined, :member_updated, :member_left] do
+  def handle_info({event, _member}, %{assigns: %{team_id: team_id}} = socket)
+      when event in [:member_joined, :member_updated, :member_left] and
+             not is_nil(team_id) do
     socket =
-      case Teams.get_team(socket.assigns.team_id) do
+      case Teams.get_team(team_id) do
         {:ok, team} ->
           # Re-verify team still belongs to current project after event
           project = socket.assigns.project
@@ -85,10 +86,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
   end
 
   # Team-level events: still need full reload
-  def handle_info({event, _payload}, socket)
-      when event in [:team_created, :team_deleted] do
+  def handle_info({event, _payload}, %{assigns: %{team_id: team_id}} = socket)
+      when event in [:team_created, :team_deleted] and not is_nil(team_id) do
     socket =
-      case Teams.get_team(socket.assigns.team_id) do
+      case Teams.get_team(team_id) do
         {:ok, team} ->
           # Re-verify team still belongs to current project after event
           project = socket.assigns.project
@@ -150,6 +151,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
     end
   end
 
+  # Catch-all silently ignores events bubbled up from sub-components (TeamDetailComponent,
+  # FAB chat, etc.) that this LiveView does not own — e.g. archive_session, rename_session,
+  # toggle_select, search, set_notify_on_stop. The component handles them itself; this LV
+  # just needs to not crash when the event reaches the parent. Replaces an explicit event
+  # allowlist that drifted out of sync with the sub-components.
   @impl true
   def handle_event(_event, _params, socket), do: {:noreply, socket}
 

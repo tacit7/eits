@@ -3201,7 +3201,8 @@ HELP
               (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
               (.session_uuid // "—") as $uuid_str |
               (.session_id | tostring) as $sid_str |
-              "  \(.name) (\(.role)) — member:\($member_str) session:\($session_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
+              (if .git_worktree_path then (.git_worktree_path | rtrimstr("/") | split("/") | .[-1]) else "—" end) as $branch_str |
+              "  \(.name) (\(.role)) — member:\($member_str) session:\($session_str) branch:\($branch_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
             )
           else empty end)
         '
@@ -3260,8 +3261,9 @@ HELP
                 (.member_status // .status // "unknown") as $member_str |
                 (.session_uuid // "—") as $uuid_str |
                 (.session_id | tostring) as $sid_str |
+                (if .git_worktree_path then (.git_worktree_path | rtrimstr("/") | split("/") | .[-1]) else "—" end) as $branch_str |
                 (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
-                "  \(.name) (\(.role)) — \($member_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
+                "  \(.name) (\(.role)) — \($member_str) branch:\($branch_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
               )
             '
             [[ "$spawn_failed_count" -gt 0 ]] && return 1 || return 0

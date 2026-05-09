@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.{Agents, Commits, Sessions}
+  alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
@@ -47,7 +48,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
       commits =
         cond do
           params["session_id"] ->
-            case Sessions.get_session_by_uuid(params["session_id"]) do
+            case SessionResolver.resolve(params["session_id"]) do
               {:ok, session} -> Commits.list_commits_for_session(session.id, limit: limit)
               _ -> []
             end

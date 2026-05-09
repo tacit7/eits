@@ -3,8 +3,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TimerController do
 
   action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
 
+  import EyeInTheSkyWeb.ControllerHelpers
+
   alias EyeInTheSky.OrchestratorTimers
-  alias EyeInTheSky.Utils.ToolHelpers
+  alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
 
   @presets_ms %{
     "5m" => 5 * 60 * 1_000,
@@ -104,12 +106,12 @@ defmodule EyeInTheSkyWeb.Api.V1.TimerController do
 
   # --- helpers ---
 
-  # Wraps ToolHelpers.resolve_session_int_id and maps its bare string errors to
-  # proper {:error, :not_found, msg} tuples so FallbackController returns 404.
+  # Resolve session and map errors to proper {:error, :not_found, msg} tuples
+  # so FallbackController returns 404.
   defp resolve_session(session_id) do
-    case ToolHelpers.resolve_session_int_id(session_id) do
+    case SessionResolver.resolve_int(session_id) do
       {:ok, int_id} -> {:ok, int_id}
-      {:error, msg} when is_binary(msg) -> {:error, :not_found, msg}
+      {:error, :not_found} -> {:error, :not_found, "Session not found: #{session_id}"}
     end
   end
 

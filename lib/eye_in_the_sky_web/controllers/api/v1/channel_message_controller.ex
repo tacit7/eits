@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   alias EyeInTheSky.{AsyncTask, ChannelMessages, Sessions, Teams}
   alias EyeInTheSky.Claude.ChannelFanout
   alias EyeInTheSky.Messaging.DMDelivery
-  alias EyeInTheSky.Utils.ToolHelpers
+  alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
@@ -20,9 +20,9 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   def create(conn, %{"channel_id" => channel_id} = params) do
     with :ok <- validate_required(params["session_id"], "session_id"),
          :ok <- validate_required(params["body"], "body") do
-      case ToolHelpers.resolve_session_int_id(params["session_id"]) do
+      case SessionResolver.resolve_int(params["session_id"]) do
         {:ok, int_id} -> do_create(conn, channel_id, int_id, params)
-        {:error, reason} -> {:error, :not_found, reason}
+        {:error, :not_found} -> {:error, :not_found, "Session not found"}
       end
     end
   end

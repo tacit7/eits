@@ -97,6 +97,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         file_tabs: [],
         active_tab_path: nil,
         show_new_session_form: false,
+        show_new_channel_form: false,
         prefill_agent_slug: nil,
         prefill_agent_name: nil
       )
@@ -276,6 +277,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("toggle_new_session_drawer", _params, socket),
     do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
 
+  def handle_event("toggle_new_channel_form", _params, socket),
+    do: {:noreply, assign(socket, :show_new_channel_form, !socket.assigns.show_new_channel_form)}
+
   def handle_event("open_new_session_with_agent", %{"slug" => slug, "name" => name}, socket) do
     {:noreply,
      socket
@@ -294,6 +298,55 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     case params["submit_action"] do
       "chat" -> IndexActions.handle_create_new_session(params, socket)
       _ -> IndexActions.handle_launch_new_session(params, socket)
+    end
+  end
+
+  def handle_event("create_channel", params, socket) do
+    name = String.trim(params["channel_name"] || "")
+
+    if name == "" do
+      {:noreply, put_flash(socket, :error, "Channel name is required")}
+    else
+      project_id = socket.assigns.sidebar_project && socket.assigns.sidebar_project.id
+
+      case EyeInTheSky.Channels.create_channel(%{
+             name: name,
+             channel_type: "public",
+             project_id: project_id
+           }) do
+        {:ok, _channel} ->
+          socket =
+            socket
+            |> assign(:show_new_channel_form, false)
+            |> assign(
+              :flyout_channels,
+              Loader.load_flyout_channels(socket.assigns.sidebar_project)
+            )
+
+          {:noreply, put_flash(socket, :info, "Channel created successfully")}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to create channel")}
+      end
+    end
+  end
+
+  def handle_event("delete_channel", %{"channel_id" => channel_id}, socket) do
+    case EyeInTheSky.Channels.update_channel(
+           EyeInTheSky.Channels.get_channel(channel_id),
+           %{archived_at: DateTime.utc_now()}
+         ) do
+      {:ok, _} ->
+        socket = assign(
+          socket,
+          :flyout_channels,
+          Loader.load_flyout_channels(socket.assigns.sidebar_project)
+        )
+
+        {:noreply, put_flash(socket, :info, "Channel deleted")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete channel")}
     end
   end
 

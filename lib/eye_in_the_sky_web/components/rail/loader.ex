@@ -327,4 +327,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   end
 
   def maybe_load_channels(socket, _section, _project), do: socket
+
+  # Helper to reload channels in the flyout (used when creating/deleting channels)
+  def load_flyout_channels(project) do
+    project_id = project && project.id
+
+    case Channels.list_channels_for_project(project_id) do
+      list when is_list(list) -> list
+      _ -> []
+    end
+  end
 end

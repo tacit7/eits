@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
                 type="button"
                 phx-click="cancel_upload"
                 phx-value-ref={entry.ref}
-                class="text-base-content/30 hover:text-error transition-colors min-w-[44px] min-h-[44px]"
+                class="flex items-center justify-center text-base-content/30 hover:text-error transition-colors min-w-[44px] min-h-[44px]"
                 id={"cancel-upload-#{entry.ref}"}
               >
                 <.icon name="hero-x-mark-mini" class="size-3.5" />
@@ -324,7 +324,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
             <%= if @processing do %>
               <button
                 type="submit"
-                class="flex items-center gap-1.5 px-3 h-7 rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors text-[12px] font-semibold"
+                class="flex items-center justify-center gap-1.5 px-3 h-7 min-h-[44px] rounded-lg bg-base-content/[0.06] text-base-content/40 hover:bg-base-content/10 transition-colors text-[12px] font-semibold"
                 id="dm-queue-button"
                 title="Add to queue"
               >
@@ -334,7 +334,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               <button
                 type="button"
                 phx-click="kill_session"
-                class="flex items-center gap-1.5 px-3 h-7 rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors text-[12px] font-semibold"
+                class="flex items-center justify-center gap-1.5 px-3 h-7 min-h-[44px] rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors text-[12px] font-semibold"
                 id="dm-stop-button"
               >
                 <.icon name="hero-stop-solid" class="size-3.5" />
@@ -343,7 +343,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
             <% else %>
               <button
                 type="submit"
-                class="flex items-center gap-1.5 px-3 h-7 rounded-lg bg-primary/80 text-primary-content hover:bg-primary transition-colors text-[12px] font-semibold"
+                class="flex items-center justify-center gap-1.5 px-3 h-7 min-h-[44px] rounded-lg bg-primary/80 text-primary-content hover:bg-primary transition-colors text-[12px] font-semibold"
                 id="dm-send-button"
               >
                 Send

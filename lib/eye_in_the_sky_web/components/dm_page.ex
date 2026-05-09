@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
     ~H"""
     <div
-      class="flex flex-col h-[calc(100dvh-4.25rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2.5rem)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative"
+      class="flex flex-col h-dvh px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative overflow-hidden"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
@@ -310,7 +310,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
       <%!-- Header card (desktop only) --%>
       <div
-        class="hidden max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
+        class="hidden md:flex max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">
@@ -474,7 +474,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       </div>
 
       <%!-- Tab content --%>
-      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full" id="dm-tab-content">
+      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto" id="dm-tab-content">
         <%= case @active_tab do %>
           <% "messages" -> %>
             <.messages_tab_content

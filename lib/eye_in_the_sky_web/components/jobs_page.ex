@@ -431,6 +431,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               running_ids={@running_ids}
               last_run_map={@last_run_map}
               last_failed_runs={@last_failed_runs}
+              scope="project"
+              project_name={@project.name}
               target={@myself}
             />
           </div>
@@ -460,6 +462,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               running_ids={@running_ids}
               last_run_map={@last_run_map}
               last_failed_runs={@last_failed_runs}
+              scope="global"
               target={@myself}
             />
           </div>
@@ -472,6 +475,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
             running_ids={@running_ids}
             last_run_map={@last_run_map}
             last_failed_runs={@last_failed_runs}
+            scope="overview"
             show_origin={true}
             target={@myself}
           />

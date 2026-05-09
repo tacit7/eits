@@ -34,6 +34,8 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   attr :last_failed_runs, :map, required: true
   attr :show_origin, :boolean, default: false
   attr :target, :any, default: nil
+  attr :scope, :string, default: nil, doc: "Context scope: 'project', 'global', or 'overview'"
+  attr :project_name, :string, default: nil, doc: "Project name for project-scoped views"
 
   def jobs_table(assigns) do
     ~H"""
@@ -354,9 +356,39 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
         </table>
       </div>
     <% else %>
-      <div class="text-center py-8 rounded-lg border border-base-300">
-        <.icon name="hero-calendar" class="size-6 text-base-content/30 mx-auto mb-2" />
-        <p class="text-sm text-base-content/50">No scheduled jobs</p>
+      <div class="text-center py-12 rounded-lg border border-base-300 bg-base-50 flex flex-col items-center">
+        <.icon name="hero-clock" class="size-12 text-base-content/20 mb-4" />
+        <h3 class="text-lg font-semibold text-base-content mb-2">No scheduled jobs yet</h3>
+        <p class="text-sm text-base-content/60 max-w-md mb-4">
+          Scheduled jobs run Claude agents automatically on a cron schedule.
+          <%= if @scope == "project" do %>
+            This project has no jobs yet.
+          <% else %>
+            Use them for recurring tasks like daily reports, monitoring, or automated reviews.
+          <% end %>
+        </p>
+        <p class="text-xs text-base-content/50 max-w-md mb-6">
+          <%= case @scope do %>
+            <% "project" -> %>
+              These jobs will run only for <strong>{@project_name}</strong>.
+            <% "global" -> %>
+              Global jobs run across all projects.
+            <% _ -> %>
+              You can create project-scoped or global jobs.
+          <% end %>
+        </p>
+        <%= if @target do %>
+          <div class="flex flex-col gap-2 sm:flex-row items-center justify-center">
+            <button
+              class="btn btn-primary btn-sm min-h-[44px]"
+              phx-click="new_job"
+              phx-value-scope={@scope || ""}
+              phx-target={@target}
+            >
+              <.icon name="hero-plus" class="size-4" /> Create Job
+            </button>
+          </div>
+        <% end %>
       </div>
     <% end %>
     """

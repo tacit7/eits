@@ -14,6 +14,8 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
 
   require Logger
 
+  # Polling interval for bookmark status refresh.
+  # Timer is owned by the consuming LiveView process; cleanup happens at view termination.
   @refresh_interval_ms 30_000
 
   def on_mount(:default, _params, _session, socket) do
@@ -265,6 +267,12 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     end
   end
 
+  # Schedules the next status poll, cancelling any outstanding timer first.
+  # NOTE: on_mount hooks have no destroy/terminate callback. This timer fires
+  # every @refresh_interval_ms until the consuming LiveView process exits — at
+  # which point the process dies and all pending timers are discarded automatically.
+  # Cancelling before each reschedule prevents accumulation when events arrive
+  # faster than the interval.
   defp schedule_fab_refresh(socket) do
     if socket.assigns[:fab_timer], do: Process.cancel_timer(socket.assigns.fab_timer)
     timer = Process.send_after(self(), :fab_refresh_statuses, @refresh_interval_ms)

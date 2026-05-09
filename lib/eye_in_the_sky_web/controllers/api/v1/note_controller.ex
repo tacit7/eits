@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.Notes
+  alias EyeInTheSky.Tasks
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -23,7 +24,12 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
           Notes.list_notes_for_session(params["session_id"], limit: limit, starred: starred_only)
 
         params["task_id"] ->
-          Notes.list_notes_for_task(params["task_id"], starred: starred_only)
+          case Tasks.get_task_ids(params["task_id"]) do
+            {:ok, {task_id, _uuid}} ->
+              Notes.list_notes_for_task(task_id, starred: starred_only)
+            {:error, :not_found} ->
+              []
+          end
 
         true ->
           query = params["q"] || ""

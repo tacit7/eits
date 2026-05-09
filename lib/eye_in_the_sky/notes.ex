@@ -9,7 +9,6 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Sessions
-  alias EyeInTheSky.Tasks
 
   # Delegate to NoteQueries to avoid a circular dependency with EyeInTheSky.Tasks.
   defdelegate with_notes_count(tasks), to: NoteQueries
@@ -58,31 +57,25 @@ defmodule EyeInTheSky.Notes do
   end
 
   @doc """
-  Returns notes for a specific task.
-  Accepts either an integer task ID or a UUID string.
-  Returns [] if the task does not exist (preserves prior behavior).
-  Resolves the task via the Tasks context, then matches notes on both integer ID (as string) and UUID.
+  Returns notes for a specific task ID (integer).
   Options: `:limit` (default 500), `:starred` (boolean, default false)
+
+  Accepts a task ID as an integer. Callers are responsible for resolving task identifiers
+  (UUID or string IDs) to integer task IDs before calling this function.
   """
   def list_notes_for_task(task_id, opts \\ []) do
-    case resolve_task_ids(task_id) do
-      nil ->
-        []
+    starred_only = Keyword.get(opts, :starred, false)
+    limit_val = Keyword.get(opts, :limit, 500)
 
-      {int_id, uuid} ->
-        starred_only = Keyword.get(opts, :starred, false)
-        limit_val = Keyword.get(opts, :limit, 500)
+    query =
+      Note
+      |> where([n], n.parent_type == "task" and n.parent_id == ^to_string(task_id))
+      |> order_by([n], desc: n.created_at)
+      |> limit(^limit_val)
 
-        query =
-          Note
-          |> scope_by_parent("task", to_string(int_id), uuid)
-          |> order_by([n], desc: n.created_at)
-          |> limit(^limit_val)
+    query = if starred_only, do: where(query, [n], n.starred == true), else: query
 
-        query = if starred_only, do: where(query, [n], n.starred == true), else: query
-
-        Repo.all(query)
-    end
+    Repo.all(query)
   end
 
   @doc """
@@ -345,12 +338,4 @@ defmodule EyeInTheSky.Notes do
     |> Repo.all()
   end
 
-  # Resolves a task identifier (integer ID or UUID string) via the Tasks context.
-  # Returns {integer_id, uuid_string} or nil if the task does not exist.
-  defp resolve_task_ids(task_id) do
-    case Tasks.get_task_ids(task_id) do
-      {:ok, ids} -> ids
-      {:error, :not_found} -> nil
-    end
-  end
 end

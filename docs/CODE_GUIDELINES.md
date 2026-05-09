@@ -1347,57 +1347,49 @@ end
 
 ### Codex.ToolMapper Extraction
 
-**ToolMapper** (`lib/eye_in_the_sky/codex/tool_mapper.ex`): Extracted from `Codex.SDK` to encapsulate tool description mapping logic. Enables reuse and isolated testing of tool description transformation.
+**ToolMapper** (`lib/eye_in_the_sky/codex/tool_mapper.ex`): Encapsulates Codex tool call normalization and message formatting. Normalizes tool names and inputs from Codex API responses into a canonical format for display in MessageFormatter.
 
-**Pattern (commit 499b70b6):**
+**Key functions:**
 
 ```elixir
-# Before: Tool mapping logic embedded in Codex.SDK
-defmodule Codex.SDK do
-  def start_session(context) do
-    tools = Enum.map(context.tools, fn tool ->
-      %{
-        name: tool.name,
-        description: "#{tool.description}\n\nUsage: #{tool.usage}",
-        input_schema: tool.schema
-      }
-    end)
-    # ... rest of session start
+defmodule EyeInTheSky.Codex.ToolMapper do
+  # Format a Codex tool call for human-readable display
+  def format_codex_tool_summary(name, input) when is_binary(name) do
+    {tool_name, tool_input} = normalize_codex_tool(name, input)
+    MessageFormatter.format_tool_call(tool_name, tool_input)
   end
-end
 
-# After: Extract to ToolMapper
-defmodule Codex.ToolMapper do
-  def map_tool_descriptions(tools) do
-    Enum.map(tools, fn tool ->
-      %{
-        name: tool.name,
-        description: "#{tool.description}\n\nUsage: #{tool.usage}",
-        input_schema: tool.schema
-      }
-    end)
+  # Normalize Codex tool names to canonical tool identifiers
+  def normalize_codex_tool("command_execution", input) do
+    command = get_field(input, "command")
+    {"Bash", %{"command" => command || ""}}
   end
-end
 
-# Codex.SDK now delegates
-defmodule Codex.SDK do
-  def start_session(context) do
-    tools = ToolMapper.map_tool_descriptions(context.tools)
-    # ... rest of session start
+  def normalize_codex_tool(name, input) when name in ["web_search", "web_searches"] do
+    query = get_field(input, "query")
+    {"WebSearch", %{"query" => query || ""}}
   end
+
+  # ... pattern matches for other tool types
 end
 ```
 
-**Why this pattern:**
-- **Single Responsibility:** ToolMapper owns the tool-to-description transformation logic
-- **Testability:** Tool mapping behavior can be unit-tested independently without starting a full Codex session
-- **Reusability:** Multiple SDK implementations (stream, resumption, initialization) can reuse the same tool mapping
-- **Clarity:** The mapping strategy is explicit, not buried in SDK initialization code
+**Pattern:**
+- `normalize_codex_tool/2` maps Codex tool names (snake_case, often plural) to canonical tool identifiers (PascalCase, singular)
+- Handles tool-specific field extraction (e.g., "command" for Bash, "query" for WebSearch)
+- `format_codex_tool_summary/2` chains normalization + formatting for use in message rendering
+- Gracefully handles missing/malformed input maps via `get_field/2`
 
-**When to use:** Extract domain logic (data transformation, mapping, validation) from orchestration modules (SDK, dispatcher, worker) when the logic is:
-1. Used in multiple places (DRY)
-2. Complex enough to warrant isolated tests
-3. Logically separate from orchestration concerns
+**Why this pattern:**
+- **Normalization:** Codex tool names are inconsistent (plural vs singular, snake_case). ToolMapper canonicalizes to a single format for display
+- **Reusability:** MessageFormatter is provider-agnostic; ToolMapper adapts Codex output to MessageFormatter's expected input
+- **Testability:** Tool normalization logic is independently testable without full session context
+- **Flexibility:** New tool types can be added as pattern matches without modifying callers
+
+**When to use:** Extract tool/message transformation logic from orchestration modules when:
+1. Multiple callers need the same transformation (DRY)
+2. The logic is complex enough to warrant isolated tests
+3. Adapting provider-specific output to canonical formats
 
 ---
 
@@ -1481,27 +1473,51 @@ budget_value = ViewHelpers.parse_budget(“p95”)
 - Overview Jobs page
 - Project Jobs page
 
-### Active Models in Agent Forms
+### Active Model Selection in Agent Forms
 
-Users can select from a list of configured active models when creating agents or selecting a model for DM messages.
+Users select models when creating agents or composing DM messages. Model availability depends on the provider (Claude, Codex, or Gemini), configured in `ModelConfig`.
 
-**Pattern (commit 830e2db3):**
+**Pattern (ModelConfig module):**
 
-**Backend (context module):**
+**Backend (model configuration):**
 ```elixir
-# In Agents context
-def get_active_models do
-  config_file = Application.get_env(:eye_in_the_sky, :config_file)
-  {:ok, config} = YamlConfig.load(config_file)
-  config.active_models  # Returns list of model strings: ["opus[1m]", "sonnet"]
+defmodule EyeInTheSky.Agents.ModelConfig do
+  # Returns list of Claude model slugs (includes aliases for backward compat)
+  def claude_models do
+    [
+      "claude-opus-4-7",
+      "claude-opus-4-6",
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5-20251001",
+      "opus",           # backward compat alias
+      "opus[1m]",       # 1M context window variant
+      "sonnet",
+      "haiku"
+    ]
+  end
+
+  # Returns list of valid model slugs for a provider
+  def valid_model_slugs(provider)
+  def valid_model_slugs("codex"), do: codex_models()
+  def valid_model_slugs("gemini"), do: gemini_models()
+  def valid_model_slugs(_), do: claude_models()
+
+  # Returns all valid model combos across providers
+  def valid_model_combos do
+    %{
+      "claude" => valid_model_slugs("claude"),
+      "codex" => valid_model_slugs("codex"),
+      "gemini" => valid_model_slugs("gemini")
+    }
+  end
 end
 ```
 
 **LiveView assignment:**
 ```elixir
 def mount(_params, _session, socket) do
-  active_models = Agents.get_active_models()
-  {:ok, assign(socket, active_models: active_models)}
+  models = ModelConfig.claude_models()
+  {:ok, assign(socket, available_models: models)}
 end
 ```
 
@@ -1511,19 +1527,21 @@ end
   field={@form[:model]}
   type="select"
   label="Model"
-  options={Enum.map(@active_models, &{ViewHelpers.model_display_name(&1), &1})}
+  options={Enum.map(@available_models, &{ViewHelpers.model_display_name(&1), &1})}
 />
 ```
 
 **Affects:**
-- New Agent form (`agent_live/index.ex`) — model selector dropdown
-- DM page model selector (`chat_live/index.ex`) — model picker for DM composition
-- Any form that needs to constrain model selection to configured/active models
+- New Agent forms — model selector dropdown
+- DM page — model picker for message composition
+- Agent spawn validation — model validation via `SpawnValidator.validate_model/2`
+- Session creation — default models per provider
 
 **Why this pattern:**
-- Models are sourced from config, not hardcoded in the UI
-- Users see only the models their instance supports
-- Adding new models to config automatically surfaces them in the UI (no code change)
+- **Provider support:** Different providers (Claude, Codex, Gemini) have different model lineups
+- **Backward compatibility:** Aliases (e.g., "opus" → "claude-opus-4-7") maintain old session compatibility
+- **Single source of truth:** `ModelConfig` is the authoritative list — no hardcoding in UI
+- **Display names:** Use `ViewHelpers.model_display_name/1` to render human-readable names (e.g., "Opus 4.7")
 
 ---
 
@@ -1610,11 +1628,13 @@ Kanban task cards use a `...` overflow menu for actions (copy, delete, move) ins
 
 ---
 
-## Canvas Submenu UI Pattern (DaisyUI Dropdown-Hover)
+## Dropdown & Submenu Patterns (DaisyUI)
 
-Submenu UI appears to the right of a parent menu item on hover, using DaisyUI's `dropdown-hover` class with `menu-dropdown` and `dropdown-content` styling.
+Two dropdown patterns are used depending on context:
 
-**Pattern (commits 2c68ae39, a80c2f40, d6a541e5):**
+### Hover-Triggered Submenu (dropdown-hover with details)
+
+For hierarchical menus where submenus appear on hover (e.g., parent menu item → submenu):
 
 ```heex
 <ul class="menu menu-dropdown">
@@ -1634,17 +1654,58 @@ Submenu UI appears to the right of a parent menu item on hover, using DaisyUI's 
 </ul>
 ```
 
-**Styling (CSS):**
-- `.dropdown-hover` — triggers on parent hover (no click needed)
-- `.dropdown-content` — positioned absolutely to the right
-- `.menu-dropdown` — applies menu styling to submenu container
-- Submenu appears to the right of parent item (not below)
+**When to use:**
+- Nested/hierarchical menus (menu within a menu)
+- Submenus appear on hover without click
+- Rich menu navigation experiences
 
-**Why this pattern:**
-- Seamless hover experience without JavaScript event handlers
-- DaisyUI handles positioning and z-stacking automatically
-- Keyboard accessible via `<details>` semantics
-- Mobile: Submenu is tappable (opens on first tap, closes on second)
+**Behavior:**
+- `.dropdown-hover` — auto-triggers on parent hover (no JS needed)
+- `.dropdown-content` — positioned absolutely, often to the right
+- `.menu-compact` — reduces padding for submenu items
+- Desktop: seamless hover; Mobile: tap to open/close
+
+### Button-Triggered Dropdown (dropdown with button)
+
+For action dropdowns triggered by a button click (e.g., "more actions" menu):
+
+```heex
+<div class="dropdown dropdown-top dropdown-end">
+  <button
+    type="button"
+    tabindex="0"
+    class="btn btn-sm btn-ghost"
+    title="Actions"
+  >
+    <.icon name="hero-ellipsis-horizontal" class="size-4" />
+  </button>
+  <ul
+    tabindex="0"
+    class="dropdown-content menu p-1 shadow-lg bg-base-200 rounded-lg w-48 z-50"
+  >
+    <li><button type="button" phx-click="action_one">Copy</button></li>
+    <li><button type="button" phx-click="action_two">Delete</button></li>
+  </ul>
+</div>
+```
+
+**When to use:**
+- Action menus on cards, rows, headers
+- Limited space (dropdown positioned relative to button)
+- Explicit click/tap to reveal actions
+- `dropdown-top`, `dropdown-bottom`, `dropdown-end`, `dropdown-start` position the menu
+
+**Behavior:**
+- `tabindex="0"` on button makes it focusable (required for keyboard nav)
+- `dropdown-end` positions menu to the right; `-start` to the left
+- `dropdown-top` pushes menu upward (for cards near bottom edge)
+- Menu stays open until another element is clicked
+
+**Why these patterns:**
+- **DaisyUI handles positioning:** z-stacking, overflow clipping, and positioning are automatic
+- **Keyboard accessible:** `<details>` and `tabindex` provide native keyboard navigation
+- **Mobile-friendly:** Tap-to-open for both patterns; no hover-dependence on touch
+- **No custom JS needed:** CSS classes and HTML semantics do the work
 
 ---
 

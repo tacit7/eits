@@ -43,6 +43,7 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   defdelegate models_for_provider(provider), to: EyeInTheSkyWeb.Helpers.ModelHelpers
   defdelegate valid_model_slugs(provider), to: EyeInTheSkyWeb.Helpers.ModelHelpers
   defdelegate valid_model_combos(), to: EyeInTheSkyWeb.Helpers.ModelHelpers
+  defdelegate model_display_name(slug), to: EyeInTheSkyWeb.Helpers.ModelHelpers
 
   # ── Parse helpers ──────────────────────────────────────────────────────────
 

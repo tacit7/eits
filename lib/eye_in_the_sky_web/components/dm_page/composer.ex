@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   alias EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue
   alias EyeInTheSkyWeb.DmLive.SlashCommands
   alias EyeInTheSkyWeb.Helpers.FileHelpers
-  alias EyeInTheSkyWeb.Helpers.ModelHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "claude-opus-4-7"
@@ -249,7 +249,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
               id="model-selector-button"
             >
               <span class="w-[5px] h-[5px] rounded-full bg-primary/60 flex-shrink-0"></span>
-              <span>{model_display_name(@selected_model)}</span>
+              <span>{ViewHelpers.model_display_name(@selected_model)}</span>
               <.icon name="hero-chevron-down-mini" class="size-3 flex-shrink-0" />
             </button>
 
@@ -543,8 +543,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer do
   defp format_cost(cost) when cost < 0.01, do: "<$0.01"
   defp format_cost(cost) when cost < 100, do: "$#{:erlang.float_to_binary(cost, decimals: 2)}"
   defp format_cost(cost), do: "$#{round(cost)}"
-
-  defp model_display_name(slug), do: ModelHelpers.model_display_name(slug)
 
   defp format_number(n) when is_integer(n) do
     n

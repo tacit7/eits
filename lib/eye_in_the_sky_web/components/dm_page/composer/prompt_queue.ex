@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
 
   use EyeInTheSkyWeb, :html
 
-  alias EyeInTheSkyWeb.Helpers.ModelHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   attr :prompts, :list, required: true
 
@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
         <%= for prompt <- @prompts do %>
           <div class="flex items-center gap-2 px-3 py-2">
             <span class="flex-shrink-0 text-xs font-mono font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-base-content/[0.06] text-base-content/40">
-              {model_display_name(prompt.context[:model] || "opus")}
+              {ViewHelpers.model_display_name(prompt.context[:model] || "opus")}
             </span>
             <span class="text-xs text-base-content/50 truncate flex-1 min-w-0">
               {String.slice(prompt.message || "", 0, 80)}{if String.length(prompt.message || "") > 80,
@@ -42,6 +42,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
     </details>
     """
   end
-
-  defp model_display_name(slug), do: ModelHelpers.model_display_name(slug)
 end

@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   @moduledoc """
-  Shared event handlers for the Schedule Agents tab.
+  Shared event handlers for the Recurring Agents tab.
   Import in OverviewLive.Jobs and ProjectLive.Jobs.
   """
 

@@ -330,7 +330,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           phx-value-tab="agent_schedules"
           phx-target={@myself}
         >
-          Schedule Agents
+          Recurring Agents
         </button>
       </div>
 

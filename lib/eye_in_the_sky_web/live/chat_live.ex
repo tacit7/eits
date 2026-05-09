@@ -83,7 +83,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
         channels: channels,
         session_id: get_session_id(socket),
         session_search: socket.assigns[:session_search] || "",
-        thread_id: params["thread_id"]
+        thread_id: params["thread_id"],
+        agent_templates: socket.assigns[:agent_templates]
       })
 
     serialized_channels = ChatPresenter.serialize_channels(channels)

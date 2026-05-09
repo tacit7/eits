@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   @impl true
   def handle_event("note_saved", %{"note_id" => note_id, "body" => body}, socket) do
     with {:id, id} when not is_nil(id) <- {:id, parse_id(note_id)},
-         note = Notes.get_note!(id),
+         {:ok, note} <- Notes.get_note(id),
          {:ok, _note} <- Notes.update_note(note, %{body: body}) do
       {:noreply,
        socket
@@ -167,6 +167,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     else
       {:id, nil} ->
         {:noreply, socket}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Note not found.")}
 
       {:error, _changeset} ->
         {:noreply, put_flash(socket, :error, "Failed to save note.")}

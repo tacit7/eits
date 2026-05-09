@@ -9,6 +9,7 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Tasks.Task, as: TaskSchema
 
   # Delegate to NoteQueries to avoid a circular dependency with EyeInTheSky.Tasks.
   defdelegate with_notes_count(tasks), to: NoteQueries
@@ -67,9 +68,15 @@ defmodule EyeInTheSky.Notes do
     starred_only = Keyword.get(opts, :starred, false)
     limit_val = Keyword.get(opts, :limit, 500)
 
+    # Fetch UUID to support notes stored with either integer string or UUID as parent_id.
+    # Uses the Task schema directly (not the Tasks context) to avoid circular dependency.
+    task_uuid =
+      from(t in TaskSchema, where: t.id == ^task_id, select: t.uuid)
+      |> Repo.one()
+
     query =
       Note
-      |> where([n], n.parent_type == "task" and n.parent_id == ^to_string(task_id))
+      |> scope_by_parent("task", to_string(task_id), task_uuid || "")
       |> order_by([n], desc: n.created_at)
       |> limit(^limit_val)
 

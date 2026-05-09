@@ -1633,6 +1633,7 @@ USAGE
         [[ -f "$instructions_file" ]] || die "--instructions-file: file not found: $instructions_file"
         [[ -r "$instructions_file" ]] || die "--instructions-file: file not readable: $instructions_file"
         instructions="$(cat "$instructions_file")"
+        [[ -n "$instructions" ]] || die "--instructions-file produced empty content: $instructions_file"
       fi
       need instructions
 
@@ -1681,7 +1682,7 @@ USAGE
         if command -v envsubst &>/dev/null; then
           instructions=$(printf '%s\n' "$instructions" | envsubst)
         elif command -v perl &>/dev/null; then
-          instructions=$(printf '%s' "$instructions" | perl -pe 's/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/my $k=$1//$2; defined $ENV{$k} ? $ENV{$k} : ""/ge')
+          instructions=$(printf '%s' "$instructions" | perl -pe 's!\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)!my $k=$1//$2; defined $ENV{$k} ? $ENV{$k} : ""!ge')
         else
           die "--interpolate-env requires envsubst (gettext) or perl"
         fi

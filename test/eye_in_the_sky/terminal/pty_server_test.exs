@@ -13,14 +13,14 @@ defmodule EyeInTheSky.Terminal.PtyServerTest do
     end)
 
     # Drain any startup banner (shell prompt, etc.)
-    collect_until_idle(300)
+    collect_until_idle(500)
 
     PtyServer.write(pid, "echo pty_echo_smoke\n")
 
-    # Collect until we see the command output line, up to 5s total.
+    # Collect until we see the command output line, up to 10s total.
     # PTY echoes input in chunks; pattern-based collect is reliable where
-    # idle-timeout collect is not.
-    output = collect_until_pattern("pty_echo_smoke\r\n", 5_000)
+    # idle-timeout collect is not. 10s gives headroom under full-suite load.
+    output = collect_until_pattern("pty_echo_smoke\r\n", 10_000)
 
     assert output =~ "echo pty_echo_smoke"
     assert output =~ "pty_echo_smoke\r\n"

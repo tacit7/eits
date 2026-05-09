@@ -398,13 +398,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     if int_id = parse_int(id), do: Teams.get_team(int_id), else: Teams.get_team_by_name(id)
   end
 
-  defp resolve_member(id) do
-    case Teams.get_member(id) do
-      {:ok, member} -> {:ok, member}
-      {:error, :not_found} -> {:error, :member_not_found}
-    end
-  end
-
   defp do_update_member(conn, member, params) do
     case Teams.update_member_status(member, params["status"]) do
       {:ok, updated} ->

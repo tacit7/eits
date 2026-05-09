@@ -225,6 +225,47 @@ curl -X POST localhost:5001/api/v1/sessions/abc-123/waiting \
 
 ---
 
+### POST /api/v1/sessions/:uuid/end
+
+End a session with optional final status. Implements the i-end-session MCP tool.
+
+Accepts integer session ID or UUID string. Sets `status` to the provided `final_status` (default: `"completed"`) and `ended_at=now` if the status is a terminal state.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session UUID or integer ID |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `final_status` | string | no | Final session status (default: `"completed"`). One of: `completed`, `failed`, `compacted` |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Session ended",
+  "status": "completed"
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/sessions/abc-123/end \
+  -H 'Content-Type: application/json' \
+  -d '{"final_status":"completed"}'
+
+curl -X POST localhost:5001/api/v1/sessions/42/end \
+  -H 'Content-Type: application/json'
+```
+
+---
+
 ### GET /sessions/:uuid
 
 Fetch session detail with related resources (tasks, notes, commits).
@@ -711,7 +752,7 @@ Track one or more git commits. Looks up the Agent by UUID to get the integer `se
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `agent_id` | string | yes | Agent/session UUID |
+| `agent_id` | string | yes | Agent UUID |
 | `commit_hashes` | string[] | yes | List of commit hashes |
 | `commit_messages` | string[] | no | Parallel list of commit messages |
 
@@ -883,34 +924,73 @@ curl 'localhost:5001/api/v1/notes?session_id=42&q=authentication'
 
 ---
 
-### POST /session-context
+### GET /api/v1/sessions/:uuid/context
 
-Save or update session context (markdown). Upserts based on session_id. Looks up the Agent by UUID to resolve integer IDs.
+Fetch session context (markdown). Accepts session UUID or integer session ID.
 
-**Request body:**
+**URL params:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `agent_id` | string | yes | Agent/session UUID |
-| `context` | string | yes | Markdown context content |
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session UUID or integer ID |
 
-**Response:** `201 Created`
+**Response:** `200 OK`
 
 ```json
 {
-  "id": 5,
-  "agent_id": 7,
-  "session_id": 42,
-  "context": "# Session Context\n\nWorking on..."
+  "success": true,
+  "context": "# Session Context\n\nKey findings...",
+  "metadata": {},
+  "updated_at": "2026-03-15T10:30:00Z"
 }
 ```
 
 **Example:**
 
 ```bash
-curl -X POST localhost:5001/api/v1/session-context \
+curl localhost:5001/api/v1/sessions/abc-123/context
+curl localhost:5001/api/v1/sessions/42/context
+```
+
+---
+
+### PATCH /api/v1/sessions/:uuid/context
+
+Save or update session context (markdown). Upserts based on session_id. Accepts session UUID or integer session ID.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session UUID or integer ID |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `context` | string | yes | Markdown context content |
+| `metadata` | object | no | Structured JSON metadata |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "context": "# Session Context\n\nKey findings...",
+  "metadata": {}
+}
+```
+
+**Example:**
+
+```bash
+curl -X PATCH localhost:5001/api/v1/sessions/abc-123/context \
   -H 'Content-Type: application/json' \
-  -d '{"agent_id":"abc-123","context":"# Context\n\nKey findings..."}'
+  -d '{"context":"# Context\n\nKey findings..."}'
+
+curl -X PATCH localhost:5001/api/v1/sessions/42/context \
+  -H 'Content-Type: application/json' \
+  -d '{"context":"# Context\n\nKey findings..."}'
 ```
 
 ---

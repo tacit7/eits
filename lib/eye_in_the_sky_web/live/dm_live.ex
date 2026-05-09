@@ -121,9 +121,6 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: toggle_active_overlay(socket, :context_meter)
 
   @impl true
-  def handle_event("toggle_new_session_drawer", _params, socket), do: {:noreply, socket}
-
-  @impl true
   def handle_event("toggle_new_task_drawer", _params, socket),
     do: toggle_active_overlay(socket, :task_drawer)
 

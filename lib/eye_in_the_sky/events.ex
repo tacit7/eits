@@ -32,6 +32,11 @@ defmodule EyeInTheSky.Events do
   All callers use the single-struct form:
   - `{:agent_working, %Session{}}` — agent transitioned to working state
   - `{:agent_stopped, %Session{}}` — agent transitioned to idle/stopped state
+
+  ## Payload shape for `tasks` topic
+
+  - `{:tasks_changed, %{task_id: id, task: %Task{}}}` — specific task created/updated/deleted
+  - `{:tasks_changed, %{}}` — generic task change (no entity info)
   """
 
   @pubsub EyeInTheSky.PubSub
@@ -161,7 +166,9 @@ defmodule EyeInTheSky.Events do
 
   @doc "Task was created, updated, or deleted. Broadcasts to both global and project-scoped topics."
   def task_updated(task) do
-    broadcast("tasks", :tasks_changed)
+    # Enrich tasks_changed with task entity info for targeted subscriber updates
+    task_id = task.id || task.uuid
+    broadcast("tasks", {:tasks_changed, %{task_id: task_id, task: task}})
 
     if task.project_id do
       broadcast("tasks:#{task.project_id}", {:task_updated, task})
@@ -169,7 +176,7 @@ defmodule EyeInTheSky.Events do
   end
 
   @doc "Tasks changed (no specific task). Global broadcast only."
-  def tasks_changed, do: broadcast("tasks", :tasks_changed)
+  def tasks_changed, do: broadcast("tasks", {:tasks_changed, %{}})
 
   # ---------------------------------------------------------------------------
   # Agent identity events — topic: "agents"

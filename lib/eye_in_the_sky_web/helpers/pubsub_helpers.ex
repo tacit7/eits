@@ -14,7 +14,8 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
 
   | Payload          | Broadcaster                | Subscribers                         |
   |------------------|----------------------------|-------------------------------------|
-  | `:tasks_changed` | `EyeInTheSky.Tasks`     | `DMLive` (via `subscribe_tasks/0`)  |
+  | `{:tasks_changed, %{task_id: id, task: %Task{}}}` | `EyeInTheSky.Events.task_updated/1`     | `DMLive` (via `subscribe_tasks/0`)  |
+  | `{:tasks_changed, %{}}` | `EyeInTheSky.Events.tasks_changed/0`     | `DMLive` (via `subscribe_tasks/0`)  |
 
   ### `"tasks:<project_id>"`
 

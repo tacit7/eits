@@ -558,6 +558,11 @@ defmodule EyeInTheSkyWeb.DmLive do
     do: AgentLifecycle.handle_agent_updated(updated_session, socket)
 
   @impl true
+  def handle_info({:tasks_changed, _entity}, socket),
+    do: AgentLifecycle.handle_tasks_changed(socket)
+
+  # Fallback for bare :tasks_changed (backward compat)
+  @impl true
   def handle_info(:tasks_changed, socket),
     do: AgentLifecycle.handle_tasks_changed(socket)
 

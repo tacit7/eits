@@ -30,6 +30,23 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
     {:noreply, assign(socket, :form_schedule_type, st)}
   end
 
+  def handle_validate_cron(%{"job" => %{"schedule_value" => cron_value}}, socket) do
+    # Validate the cron expression in real-time
+    job = socket.assigns.editing_job || %ScheduledJobs.ScheduledJob{}
+    form_data = %{"schedule_value" => cron_value, "schedule_type" => "cron"}
+
+    changeset =
+      job
+      |> ScheduledJobs.change_job(form_data)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :form, to_form(changeset))}
+  end
+
+  def handle_validate_cron(_params, socket) do
+    {:noreply, socket}
+  end
+
   def handle_toggle_claude_drawer(_params, socket) do
     {:noreply, assign(socket, :show_claude_drawer, !socket.assigns.show_claude_drawer)}
   end

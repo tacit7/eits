@@ -147,6 +147,9 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   defp dispatch_event("change_schedule_type", params, socket),
     do: handle_change_schedule_type(params, socket)
 
+  defp dispatch_event("validate_cron", params, socket),
+    do: handle_validate_cron(params, socket)
+
   defp dispatch_event("save_job", params, socket) do
     handle_save_job(params, socket, &load_jobs/1, scoping_project_id: socket.assigns.project_id)
   end

@@ -212,6 +212,12 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
   defp cancel_timer(socket), do: socket
 
+  @impl true
+  def terminate(_reason, socket) do
+    cancel_timer(socket)
+    :ok
+  end
+
   defp update_agent_status_in_list(socket, session_id, new_status) do
     now = DateTime.utc_now()
 

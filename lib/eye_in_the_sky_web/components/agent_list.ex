@@ -227,7 +227,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
   def canvas_submenu(assigns) do
     ~H"""
     <li>
-      <details>
+      <details id={"canvas-submenu-#{@agent.id}"} phx-update="ignore">
         <summary class="flex items-center gap-2">
           <.icon name="hero-squares-2x2-mini" class="size-3.5" /> Add to Canvas
         </summary>

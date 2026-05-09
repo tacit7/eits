@@ -60,6 +60,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_file_error, :string, default: nil
   attr :flyout_usage, :any, default: nil
   attr :rail_modal, :any, default: nil
+  attr :show_new_channel_form, :boolean, default: false
   attr :myself, :any, required: true
 
   def flyout(assigns) do

@@ -800,6 +800,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_error={@flyout_file_error}
         flyout_usage={@flyout_usage}
         rail_modal={@rail_modal}
+        show_new_channel_form={@show_new_channel_form}
         myself={@myself}
       />
 

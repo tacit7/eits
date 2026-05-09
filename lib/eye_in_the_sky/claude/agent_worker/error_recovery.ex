@@ -19,7 +19,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
     WatchdogTimer
   }
 
-  alias EyeInTheSky.Claude.{Job, StreamAssemblerProtocol}
+  alias EyeInTheSky.Claude.{Job, StreamAssemblerDispatcher}
   alias EyeInTheSky.Messages
 
   @doc """
@@ -29,7 +29,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
   """
   def handle_stale_session({:claude_result_error, %{errors: errors}} = reason, state) do
     WorkerEvents.broadcast_stream_clear(state.session_id)
-    state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
+    state = %{state | stream: StreamAssemblerDispatcher.reset(state.stream)}
     job = state.current_job
 
     if Enum.any?(errors, &String.contains?(&1, "No conversation found")) && not is_nil(job) do
@@ -50,7 +50,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
   """
   def handle_session_in_use({:cli_error, msg} = reason, state) do
     WorkerEvents.broadcast_stream_clear(state.session_id)
-    state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
+    state = %{state | stream: StreamAssemblerDispatcher.reset(state.stream)}
     job = state.current_job
 
     already_retried = if job, do: Map.get(job.context, :kill_retry, false), else: true
@@ -80,7 +80,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorRecovery do
   """
   def handle_generic_error(reason, state) do
     WorkerEvents.broadcast_stream_clear(state.session_id)
-    handle_sdk_error(reason, %{state | stream: StreamAssemblerProtocol.reset(state.stream)})
+    handle_sdk_error(reason, %{state | stream: StreamAssemblerDispatcher.reset(state.stream)})
   end
 
   @doc """

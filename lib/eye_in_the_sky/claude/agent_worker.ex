@@ -22,8 +22,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     WatchdogTimer
   }
 
-  alias EyeInTheSky.Claude.{Job, Message, StreamAssembler}
-  alias EyeInTheSky.Claude.StreamAssemblerProtocol
+  alias EyeInTheSky.Claude.{Job, Message, StreamAssembler, StreamAssemblerDispatcher}
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.Messages
 
@@ -209,7 +208,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def handle_call(:get_stream_state, _from, state) do
-    buf = if state.stream, do: StreamAssemblerProtocol.buffer(state.stream), else: ""
+    buf = if state.stream, do: StreamAssemblerDispatcher.buffer(state.stream), else: ""
     {:reply, buf, state}
   end
 
@@ -285,7 +284,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         %__MODULE__{sdk_ref: ref} = state
       )
       when is_binary(json) do
-    {stream, _events} = StreamAssemblerProtocol.handle_tool_delta(state.stream, json)
+    {stream, _events} = StreamAssemblerDispatcher.handle_tool_delta(state.stream, json)
     {:noreply, %{state | stream: stream}}
   end
 
@@ -293,7 +292,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %__MODULE__{sdk_ref: ref} = state) do
     msg = Reconciliation.maybe_dispatch_commands(msg, state)
-    {stream, events} = StreamAssemblerProtocol.handle_message(state.stream, msg)
+    {stream, events} = StreamAssemblerDispatcher.handle_message(state.stream, msg)
     Reconciliation.broadcast_events(events, state)
     {:noreply, %{state | stream: stream}}
   end
@@ -301,7 +300,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # Tool block complete - decode accumulated input and broadcast
   @impl true
   def handle_info({:tool_block_stop, ref}, %__MODULE__{sdk_ref: ref} = state) do
-    {stream, events} = StreamAssemblerProtocol.handle_tool_block_stop(state.stream)
+    {stream, events} = StreamAssemblerDispatcher.handle_tool_block_stop(state.stream)
     Reconciliation.broadcast_events(events, state)
     {:noreply, %{state | stream: stream}}
   end
@@ -327,7 +326,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   def handle_info({:claude_complete, ref, session_id}, %__MODULE__{sdk_ref: ref} = state) do
     state = Reconciliation.maybe_sync_provider_conversation_id(state, session_id)
     WorkerEvents.broadcast_stream_clear(state.session_id)
-    state = %{state | stream: StreamAssemblerProtocol.reset(state.stream)}
+    state = %{state | stream: StreamAssemblerDispatcher.reset(state.stream)}
 
     Logger.info("[#{state.session_id}] SDK complete")
 
@@ -451,7 +450,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         {:watchdog_timeout, timeout},
         %{
           state
-          | stream: StreamAssemblerProtocol.reset(state.stream),
+          | stream: StreamAssemblerDispatcher.reset(state.stream),
             watchdog_timer_ref: nil,
             watchdog_run_ref: nil
         }
@@ -485,7 +484,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
     ErrorRecovery.handle_sdk_error(
       {:handler_crash, reason},
-      %{state | stream: StreamAssemblerProtocol.reset(state.stream), handler_monitor: nil}
+      %{state | stream: StreamAssemblerDispatcher.reset(state.stream), handler_monitor: nil}
     )
   end
 

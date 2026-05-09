@@ -12,7 +12,6 @@ defmodule EyeInTheSky.Messages.Sync do
   alias EyeInTheSky.Messages.JsonlStorage
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.QueryHelpers
-  alias EyeInTheSky.Repo
   require Logger
 
   @spec list_messages_for_session(integer()) :: [Message.t()]

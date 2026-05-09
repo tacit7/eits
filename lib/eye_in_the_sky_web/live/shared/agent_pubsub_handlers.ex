@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentPubSubHandlers do
 
   import Phoenix.Component, only: [assign: 3]
 
+  alias EyeInTheSkyWeb.Helpers.SessionFilters
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
 
   @doc """

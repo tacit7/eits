@@ -17,7 +17,6 @@ defmodule EyeInTheSky.Messages do
   alias EyeInTheSky.Messages.Search
   alias EyeInTheSky.Messages.StatusManager
   alias EyeInTheSky.Messages.Sync
-  alias EyeInTheSky.QueryHelpers
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Sessions
   require Logger

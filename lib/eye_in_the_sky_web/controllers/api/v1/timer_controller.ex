@@ -3,9 +3,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TimerController do
 
   action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
 
-  import EyeInTheSkyWeb.ControllerHelpers
-
   alias EyeInTheSky.OrchestratorTimers
+  alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
 
   @presets_ms %{

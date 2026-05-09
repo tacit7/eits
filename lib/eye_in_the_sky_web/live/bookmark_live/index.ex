@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
         <% else %>
           <div class="space-y-2">
             <%= for bookmark <- @bookmarks do %>
-              <div class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow">
+              <div id={"bookmark-#{bookmark.id}"} class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow">
                 <div class="card-body p-4">
                   <div class="flex items-start justify-between gap-4">
                     <!-- Bookmark Icon -->

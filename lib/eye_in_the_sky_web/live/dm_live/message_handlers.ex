@@ -39,8 +39,6 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       {:ok, message} ->
         Logger.info("Message created in DB with id=#{message.id}")
 
-        socket = TabHelpers.force_reload_messages(socket, session_id)
-
         base_opts =
           SessionHelpers.continue_session_opts(
             model,

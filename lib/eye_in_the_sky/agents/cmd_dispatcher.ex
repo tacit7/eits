@@ -150,14 +150,34 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   # ---------------------------------------------------------------------------
 
   defp dispatch_commit(hash, from_session_id) when hash != "" do
-    case Commits.create_commit(%{commit_hash: hash, session_id: from_session_id}) do
-      {:ok, _} -> notify_success(from_session_id, "commit #{hash} logged")
-      {:error, reason} -> notify_error(from_session_id, "commit", reason)
+    case validate_session_exists(from_session_id) do
+      :ok ->
+        case Commits.create_commit(%{commit_hash: hash, session_id: from_session_id}) do
+          {:ok, _} -> notify_success(from_session_id, "commit #{hash} logged")
+          {:error, reason} -> notify_error(from_session_id, "commit", reason)
+        end
+
+      {:error, reason} ->
+        notify_error(from_session_id, "commit", reason)
     end
   end
 
   defp dispatch_commit(_, from_session_id),
     do: notify_error(from_session_id, "commit", :empty_hash)
+
+  # Validate that session_id refers to an existing session
+  defp validate_session_exists(nil),
+    do: {:error, "session_id is nil; cannot insert commit without valid session"}
+
+  defp validate_session_exists(session_id) when is_integer(session_id) do
+    case EyeInTheSky.Sessions.get_session(session_id) do
+      {:ok, _session} -> :ok
+      {:error, _} -> {:error, "session not found: #{session_id}"}
+    end
+  end
+
+  defp validate_session_exists(session_id),
+    do: {:error, "invalid session_id type: #{inspect(session_id)}"}
 
   # ---------------------------------------------------------------------------
   # spawn

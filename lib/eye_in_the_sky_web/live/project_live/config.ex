@@ -24,31 +24,34 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
       |> assign(:sidebar_project, nil)
       |> assign(:claude_dir, nil)
 
-    socket =
-      cond do
-        is_nil(project_id) ->
-          socket
-          |> assign(:page_title, "Project Not Found")
-          |> put_flash(:error, "Invalid project ID")
+    if is_nil(project_id) do
+      {:ok, redirect(socket, to: "/projects")}
+    else
+      socket =
+        cond do
+          connected?(socket) ->
+            project = Projects.get_project!(project_id)
+            claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 
-        connected?(socket) ->
-          project = Projects.get_project!(project_id)
-          claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
+            socket
+            |> assign(:page_title, "Config - #{project.name}")
+            |> assign(:project, project)
+            |> assign(:sidebar_project, project)
+            |> assign(:claude_dir, claude_dir)
 
-          socket
-          |> assign(:page_title, "Config - #{project.name}")
-          |> assign(:project, project)
-          |> assign(:sidebar_project, project)
-          |> assign(:claude_dir, claude_dir)
+          true ->
+            socket
+        end
 
-        true ->
-          socket
-      end
-
-    {:ok, socket}
+      {:ok, socket}
+    end
   end
 
   @impl true
+  def handle_params(_params, _uri, %{assigns: %{project: nil}} = socket) do
+    {:noreply, push_navigate(socket, to: ~p"/")}
+  end
+
   def handle_params(params, _uri, socket) do
     mode =
       case Map.get(params, "mode") do

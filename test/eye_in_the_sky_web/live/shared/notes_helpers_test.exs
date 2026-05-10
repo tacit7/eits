@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
 
     %Phoenix.LiveView.Socket{
       assigns: Map.merge(base_assigns, assigns),
-      private: %{root_view: __MODULE__, connect_info: %{}},
+      private: %{root_view: __MODULE__, connect_info: %{}, live_temp: %{}},
       transport_pid: nil
     }
   end

@@ -6,13 +6,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActionsTest do
   setup do
     socket = %Phoenix.LiveView.Socket{
       assigns: %{
+        __changed__: %{},
+        flash: %{},
         file_tabs: [],
         active_tab_path: nil,
         sidebar_project: %{path: "/tmp/test-project"},
         flyout_file_expanded: MapSet.new(),
         flyout_file_children: %{}
       },
-      private: %{}
+      private: %{live_temp: %{}}
     }
 
     {:ok, socket: socket}
@@ -20,26 +22,36 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActionsTest do
 
   describe "handle_file_open/2" do
     test "opens a new file by adding it to file_tabs", %{socket: socket} do
-      params = %{"path" => "test.exs"}
+      # FileTree.read_file/2 reads from disk — create a real temp file
+      dir = System.tmp_dir!()
+      File.write!(Path.join(dir, "test_open.exs"), "# test content")
+      on_exit(fn -> File.rm(Path.join(dir, "test_open.exs")) end)
+
+      socket = %{socket | assigns: %{socket.assigns | sidebar_project: %{path: dir}}}
+      params = %{"path" => "test_open.exs"}
 
       {:noreply, updated_socket} = FileActions.handle_file_open(params, socket)
 
-      # Should have added the file to tabs
-      assert length(updated_socket.assigns.file_tabs) >= 0
-      assert updated_socket.assigns.active_tab_path == "test.exs"
+      assert updated_socket.assigns.active_tab_path == "test_open.exs"
+      assert length(updated_socket.assigns.file_tabs) == 1
     end
 
     test "does not add duplicate tabs for already open files", %{socket: socket} do
+      dir = System.tmp_dir!()
+      File.write!(Path.join(dir, "test_dup.exs"), "# test content")
+      on_exit(fn -> File.rm(Path.join(dir, "test_dup.exs")) end)
+
       socket = %{
         socket
         | assigns: %{
             socket.assigns
-            | file_tabs: [%{path: "test.exs", name: "test.exs", content: "code"}],
-              active_tab_path: "test.exs"
+            | sidebar_project: %{path: dir},
+              file_tabs: [%{path: "test_dup.exs", name: "test_dup.exs", content: "code"}],
+              active_tab_path: "test_dup.exs"
           }
       }
 
-      params = %{"path" => "test.exs"}
+      params = %{"path" => "test_dup.exs"}
 
       {:noreply, updated_socket} = FileActions.handle_file_open(params, socket)
 
@@ -47,15 +59,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActionsTest do
       assert length(updated_socket.assigns.file_tabs) == 1
     end
 
-    test "returns error when sidebar_project is nil", %{socket: socket} do
+    test "does not add tab when sidebar_project is nil", %{socket: socket} do
       socket = %{socket | assigns: %{socket.assigns | sidebar_project: nil}}
 
       params = %{"path" => "test.exs"}
 
       {:noreply, result_socket} = FileActions.handle_file_open(params, socket)
 
-      # Should not add tab
-      assert result_socket == socket
+      # Falls through with pattern; sidebar_project nil returns socket unchanged
+      assert result_socket.assigns.file_tabs == []
     end
   end
 

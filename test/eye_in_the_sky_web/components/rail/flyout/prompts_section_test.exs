@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSectionTest do
           &PromptsSection.prompts_filters/1,
           prompt_search: "",
           prompt_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "Search prompts"
@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSectionTest do
           &PromptsSection.prompts_filters/1,
           prompt_search: "system",
           prompt_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "value=\"system\""
@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSectionTest do
           &PromptsSection.prompts_filters/1,
           prompt_search: "",
           prompt_scope: "project",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "All"
@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSectionTest do
           &PromptsSection.prompts_filters/1,
           prompt_search: "",
           prompt_scope: "project",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "bg-primary/15"

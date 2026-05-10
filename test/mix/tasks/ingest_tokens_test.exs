@@ -19,13 +19,15 @@ defmodule Mix.Tasks.IngestTokensTest do
       Mix.Tasks.IngestTokens.run([])
 
       assert_receive {:mix_shell, :info, [banner]}
+      assert_receive {:mix_shell, :info, _}
       assert banner =~ "incremental"
     end
 
     test "prints summary with ingested/skipped/errors counts" do
       Mix.Tasks.IngestTokens.run([])
 
-      messages = drain_shell_messages(3)
+      # ingest_all emits exactly 2 messages: the banner and the Done heredoc.
+      messages = drain_shell_messages(2)
       full = Enum.join(messages, "\n")
 
       assert full =~ "Ingested:"
@@ -36,7 +38,9 @@ defmodule Mix.Tasks.IngestTokensTest do
     test "prints 'force' mode label when --force flag is set" do
       Mix.Tasks.IngestTokens.run(["--force"])
 
+      # Drain both messages (banner + Done summary) to keep the mailbox clean.
       assert_receive {:mix_shell, :info, [banner]}
+      assert_receive {:mix_shell, :info, _}
       assert banner =~ "force"
     end
 
@@ -44,6 +48,7 @@ defmodule Mix.Tasks.IngestTokensTest do
       Mix.Tasks.IngestTokens.run(["-f"])
 
       assert_receive {:mix_shell, :info, [banner]}
+      assert_receive {:mix_shell, :info, _}
       assert banner =~ "force"
     end
 
@@ -52,7 +57,7 @@ defmodule Mix.Tasks.IngestTokensTest do
       # be skipped because the UUID lookup in the DB returns nil.
       Mix.Tasks.IngestTokens.run([])
 
-      messages = drain_shell_messages(3)
+      messages = drain_shell_messages(2)
       full = Enum.join(messages, "\n")
 
       assert full =~ "Ingested: 0"

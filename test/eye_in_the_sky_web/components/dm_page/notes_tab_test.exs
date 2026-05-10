@@ -80,8 +80,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTabTest do
           notes: notes
         )
 
-      assert html =~ "very-long"
-      refute html =~ "very-long-uuid"
+      # Display span shows 8 chars; full UUID also appears in data-copy attribute.
+      # Span has surrounding whitespace so match the truncated prefix directly.
+      assert html =~ "very-lon"
     end
 
     test "renders fallback to note id when uuid not present" do
@@ -145,7 +146,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTabTest do
           notes: notes
         )
 
-      assert html =~ "hero-star\""
+      # Icon renders as class="hero-star size-4 ..." — use a prefix that
+      # matches hero-star but not hero-star-solid.
+      assert html =~ "hero-star size-4"
       assert html =~ "text-base-content/15"
     end
 

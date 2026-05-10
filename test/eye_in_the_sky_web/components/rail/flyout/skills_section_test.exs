@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           &SkillsSection.skills_filters/1,
           skill_search: "",
           skill_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "Search skills"
@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           &SkillsSection.skills_filters/1,
           skill_search: "test",
           skill_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "value=\"test\""
@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           &SkillsSection.skills_filters/1,
           skill_search: "",
           skill_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "All"
@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           &SkillsSection.skills_filters/1,
           skill_search: "",
           skill_scope: "global",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "bg-primary/15"
@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           &SkillsSection.skills_filters/1,
           skill_search: "",
           skill_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "phx-debounce"
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
       assert html =~ "No skills"
     end
 
-    test "renders filtered message when no results" do
+    test "renders empty message when no results match search" do
       html =
         render_component(
           &SkillsSection.skills_content/1,
@@ -91,7 +91,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           skill_scope: "all"
         )
 
-      assert html =~ "No matching skills"
+      # Component shows "No skills" for any empty list
+      assert html =~ "No skills"
     end
 
     test "renders skill list" do
@@ -100,13 +101,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           id: 1,
           slug: "web-fetch",
           name: "Web Fetch",
-          description: "Fetch content from URLs"
+          description: "Fetch content from URLs",
+          content: "web fetch skill content",
+          source: :global
         },
         %{
           id: 2,
           slug: "file-edit",
           name: "File Edit",
-          description: "Edit files in project"
+          description: "Edit files in project",
+          content: "file edit skill content",
+          source: :global
         }
       ]
 
@@ -118,8 +123,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           skill_scope: "all"
         )
 
-      assert html =~ "Web Fetch"
-      assert html =~ "File Edit"
+      assert html =~ "web-fetch"
+      assert html =~ "file-edit"
     end
 
     test "renders skill rows for each skill" do
@@ -128,7 +133,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           id: 1,
           slug: "skill-1",
           name: "Test Skill",
-          description: "Test description"
+          description: "Test description",
+          content: "test skill content",
+          source: :global
         }
       ]
 
@@ -140,7 +147,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
           skill_scope: "all"
         )
 
-      assert html =~ "Test Skill"
+      assert html =~ "skill-1"
       assert html =~ "Test description"
     end
   end

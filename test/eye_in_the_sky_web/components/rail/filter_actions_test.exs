@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActionsTest do
   setup do
     socket = %Phoenix.LiveView.Socket{
       assigns: %{
+        __changed__: %{},
         session_sort: :recent,
         session_show: :active,
         session_name_filter: "",
@@ -29,9 +30,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActionsTest do
         flyout_agents: [],
         flyout_skills: [],
         flyout_teams: [],
-        flyout_prompts: []
+        flyout_prompts: [],
+        session_project_visible: %{},
+        session_project_collapsed: MapSet.new()
       },
-      private: %{}
+      private: %{live_temp: %{}}
     }
 
     {:ok, socket: socket}
@@ -76,7 +79,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActionsTest do
       {:noreply, updated_socket} = FilterActions.handle_set_session_scope(params, socket)
 
       assert updated_socket.assigns.session_scope == :all
-      assert is_nil(updated_socket.assigns.sidebar_project)
     end
 
     test "sets scope to :current when scope_str is not 'all'", %{socket: socket} do

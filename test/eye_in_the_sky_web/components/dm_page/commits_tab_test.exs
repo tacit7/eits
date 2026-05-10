@@ -4,11 +4,25 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTabTest do
 
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
 
-  describe "commits_tab/1" do
+  # Controls (Commits/Full-diff toggle, Unified/Side-by-side toggle) are only
+  # rendered when commits is non-empty — the empty-state branch short-circuits.
+
+  defp commit(overrides \\ %{}) do
+    Map.merge(
+      %{
+        id: 1,
+        commit_hash: "abc123def456",
+        commit_message: "Fix: resolve issue with widget rendering",
+        created_at: DateTime.utc_now()
+      },
+      overrides
+    )
+  end
+
+  describe "commits_tab/1 — empty state" do
     test "renders empty state when commits list is empty" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
+        render_component(&CommitsTab.commits_tab/1,
           commits: [],
           diff_cache: %{},
           commits_view: :list,
@@ -19,27 +33,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTabTest do
       assert html =~ "No commits yet"
       assert html =~ "Commits from this session will appear here"
     end
+  end
 
-    test "renders commits list when commits are provided" do
-      commits = [
-        %{
-          id: 1,
-          commit_hash: "abc123def456",
-          commit_message: "Fix: resolve issue with widget rendering",
-          created_at: DateTime.utc_now()
-        },
-        %{
-          id: 2,
-          commit_hash: "def456ghi789",
-          commit_message: "Feat: add new settings panel",
-          created_at: DateTime.utc_now()
-        }
-      ]
-
+  describe "commits_tab/1 — list view" do
+    test "renders commit title" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: commits,
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit()],
           diff_cache: %{},
           commits_view: :list,
           diff_mode: :unified,
@@ -47,65 +47,73 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTabTest do
         )
 
       assert html =~ "Fix: resolve issue with widget rendering"
-      assert html =~ "Feat: add new settings panel"
-      assert html =~ "abc123de"
-      assert html =~ "def456gh"
     end
 
-    test "renders commit hash truncated to 8 characters" do
-      commits = [
-        %{
-          id: 1,
-          commit_hash: "abcdefghijklmnop",
-          commit_message: "Test commit",
-          created_at: DateTime.utc_now()
-        }
-      ]
-
+    test "renders multiple commits" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: commits,
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [
+            commit(%{id: 1, commit_hash: "aaa111", commit_message: "First"}),
+            commit(%{id: 2, commit_hash: "bbb222", commit_message: "Second"})
+          ],
           diff_cache: %{},
           commits_view: :list,
           diff_mode: :unified,
           cumulative_diff: nil
         )
 
-      assert html =~ "abcdefgh"
-      refute html =~ "abcdefghij"
+      assert html =~ "First"
+      assert html =~ "Second"
     end
 
-    test "renders diff viewer when diff_cache has content" do
-      commits = [
-        %{
-          id: 1,
-          commit_hash: "abc123",
-          commit_message: "Test",
-          created_at: DateTime.utc_now()
-        }
-      ]
-
-      diff_content = "--- a/test.ex\n+++ b/test.ex\n@@ -1,1 +1,2 @@\n-old line\n+new line"
-
+    test "displays hash truncated to 8 characters in the span" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: commits,
-          diff_cache: %{"abc123" => diff_content},
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit(%{commit_hash: "abcdefghijklmnop"})],
+          diff_cache: %{},
           commits_view: :list,
           diff_mode: :unified,
           cumulative_diff: nil
         )
 
-      assert html =~ "phx-hook=\"DiffViewer\""
+      # 8-char truncation visible in font-mono span
+      assert html =~ ">abcdefgh<"
     end
 
-    test "renders commits and full diff toggle buttons" do
+    test "renders diff viewer when diff_cache has content" do
+      c = commit(%{commit_hash: "abc123"})
+
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: [],
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [c],
+          diff_cache: %{"abc123" => "--- a/test.ex\n+++ b/test.ex\n@@ -1 +1 @@\n-old\n+new"},
+          commits_view: :list,
+          diff_mode: :unified,
+          cumulative_diff: nil
+        )
+
+      assert html =~ ~s(phx-hook="DiffViewer")
+    end
+
+    test "renders error message when diff cache entry is :error" do
+      c = commit(%{commit_hash: "abc123"})
+
+      html =
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [c],
+          diff_cache: %{"abc123" => :error},
+          commits_view: :list,
+          diff_mode: :unified,
+          cumulative_diff: nil
+        )
+
+      assert html =~ "Could not load diff"
+    end
+
+    test "renders view toggle buttons" do
+      html =
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit()],
           diff_cache: %{},
           commits_view: :list,
           diff_mode: :unified,
@@ -116,11 +124,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTabTest do
       assert html =~ "Full diff"
     end
 
-    test "renders unified and side-by-side toggle buttons" do
+    test "renders diff mode toggle buttons" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: [],
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit()],
           diff_cache: %{},
           commits_view: :list,
           diff_mode: :unified,
@@ -131,27 +138,38 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTabTest do
       assert html =~ "Side by side"
     end
 
-    test "renders cumulative diff view" do
-      cumulative_diff = "--- a/file.ex\n+++ b/file.ex\n@@ -1,2 +1,3 @@"
-
+    test "commit with nil hash renders without error" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: [],
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit(%{commit_hash: nil, commit_message: "Nil hash commit"})],
+          diff_cache: %{},
+          commits_view: :list,
+          diff_mode: :unified,
+          cumulative_diff: nil
+        )
+
+      assert html =~ "Nil hash commit"
+    end
+  end
+
+  describe "commits_tab/1 — cumulative diff view" do
+    test "renders cumulative diff element" do
+      html =
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit()],
           diff_cache: %{},
           commits_view: :cumulative,
           diff_mode: :unified,
-          cumulative_diff: cumulative_diff
+          cumulative_diff: "--- a/f.ex\n+++ b/f.ex\n@@ -1 +1 @@"
         )
 
       assert html =~ "dm-cumulative-diff"
     end
 
-    test "shows loading spinner for nil cumulative diff" do
+    test "shows loading state when cumulative_diff is nil" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: [],
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit()],
           diff_cache: %{},
           commits_view: :cumulative,
           diff_mode: :unified,
@@ -161,11 +179,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTabTest do
       assert html =~ "Loading full diff"
     end
 
-    test "shows error message for failed diff load" do
+    test "shows error message when cumulative_diff is :error" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: [],
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit()],
           diff_cache: %{},
           commits_view: :cumulative,
           diff_mode: :unified,
@@ -175,50 +192,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTabTest do
       assert html =~ "Could not load diff"
     end
 
-    test "renders error message when diff cache value is :error" do
-      commits = [
-        %{
-          id: 1,
-          commit_hash: "abc123",
-          commit_message: "Test",
-          created_at: DateTime.utc_now()
-        }
-      ]
-
+    test "renders diff viewer for cumulative diff string" do
       html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: commits,
-          diff_cache: %{"abc123" => :error},
-          commits_view: :list,
-          diff_mode: :unified,
-          cumulative_diff: nil
-        )
-
-      assert html =~ "Could not load diff"
-    end
-
-    test "commit with nil hash still renders" do
-      commits = [
-        %{
-          id: 1,
-          commit_hash: nil,
-          commit_message: "Test commit",
-          created_at: DateTime.utc_now()
-        }
-      ]
-
-      html =
-        render_component(
-          &CommitsTab.commits_tab/1,
-          commits: commits,
+        render_component(&CommitsTab.commits_tab/1,
+          commits: [commit()],
           diff_cache: %{},
-          commits_view: :list,
+          commits_view: :cumulative,
           diff_mode: :unified,
-          cumulative_diff: nil
+          cumulative_diff: "--- a/f.ex\n+++ b/f.ex"
         )
 
-      assert html =~ "Test commit"
+      assert html =~ "dm-cumulative-diff-viewer"
     end
   end
 end

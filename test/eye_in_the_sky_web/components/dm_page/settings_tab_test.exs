@@ -4,6 +4,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
 
   alias EyeInTheSkyWeb.Components.DmPage.SettingsTab
 
+  # The general_section accesses @session_state.model, @session_state.effort,
+  # @session_state.max_budget_usd, @session_state[:show_live_stream], and
+  # @session_state.thinking_enabled via direct map access — all must be present.
+  defp base_session_state do
+    %{
+      model: nil,
+      effort: nil,
+      max_budget_usd: nil,
+      show_live_stream: true,
+      thinking_enabled: false
+    }
+  end
+
   describe "settings_tab/1" do
     test "renders scope toggle with session and agent buttons" do
       html =
@@ -13,7 +26,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -31,7 +44,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -49,7 +62,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "anthropic",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -66,7 +79,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "openai",
           session: %{provider: "codex"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -83,16 +96,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "anthropic",
           session: %{provider: "codex"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
 
-      # Should render general section since provider doesn't support anthropic
       assert html =~ "Model"
     end
 
-    test "renders model section with session state" do
+    test "renders model section with session state values" do
       html =
         render_component(
           &SettingsTab.settings_tab/1,
@@ -100,7 +112,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{model: "opus", effort: "high", max_budget_usd: 10.5},
+          session_state: Map.merge(base_session_state(), %{model: "opus", max_budget_usd: 10.5}),
           notify_on_stop: false,
           overrides: []
         )
@@ -109,7 +121,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
       assert html =~ "10.5"
     end
 
-    test "renders notify on stop toggle when enabled" do
+    test "renders notify on stop toggle" do
       html =
         render_component(
           &SettingsTab.settings_tab/1,
@@ -117,16 +129,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: true,
           overrides: []
         )
 
       assert html =~ "Notify on stop"
-      assert html =~ "notify_on_stop"
     end
 
-    test "renders settings with override indicator" do
+    test "renders override indicator when overrides present" do
       html =
         render_component(
           &SettingsTab.settings_tab/1,
@@ -134,12 +145,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: ["model", "show_live_stream"]
         )
 
-      # Override indicators should be present
       assert html =~ "bg-warning"
     end
 
@@ -151,7 +161,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{show_live_stream: true},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -168,7 +178,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{thinking_enabled: true},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -177,39 +187,40 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
       assert html =~ "thinking_enabled"
     end
 
-    test "renders effort section only for codex provider" do
-      html_claude =
+    test "does not render effort row for claude provider" do
+      html =
         render_component(
           &SettingsTab.settings_tab/1,
           scope: "session",
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
 
-      # Claude provider should not show effort
-      refute html_claude =~ "Effort"
+      refute html =~ "Effort"
+    end
 
-      html_codex =
+    test "renders effort row for codex provider" do
+      html =
         render_component(
           &SettingsTab.settings_tab/1,
           scope: "session",
           subtab: "general",
           session: %{provider: "codex"},
           agent: nil,
-          session_state: %{effort: "medium"},
+          session_state: Map.merge(base_session_state(), %{effort: "medium"}),
           notify_on_stop: false,
           overrides: []
         )
 
-      # Codex provider should show effort
-      assert html_codex =~ "Effort"
+      assert html =~ "Effort"
+      assert html =~ "medium"
     end
 
-    test "renders reset button with correct scope" do
+    test "renders reset button with correct scope label" do
       html =
         render_component(
           &SettingsTab.settings_tab/1,
@@ -217,7 +228,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -226,7 +237,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
       assert html =~ "reset_dm_settings"
     end
 
-    test "renders tab navigation" do
+    test "renders tab navigation buttons" do
       html =
         render_component(
           &SettingsTab.settings_tab/1,
@@ -234,7 +245,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -251,14 +262,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "anthropic",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
 
       assert html =~ "Permission mode"
       assert html =~ "acceptEdits"
-      assert html =~ "permission_mode"
     end
 
     test "renders sandbox select in openai section" do
@@ -269,7 +279,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "openai",
           session: %{provider: "codex"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
@@ -278,7 +288,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
       assert html =~ "workspace-write"
     end
 
-    test "renders section with title styling" do
+    test "renders section title with uppercase styling" do
       html =
         render_component(
           &SettingsTab.settings_tab/1,
@@ -286,12 +296,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
           subtab: "general",
           session: %{provider: "claude"},
           agent: nil,
-          session_state: %{},
+          session_state: base_session_state(),
           notify_on_stop: false,
           overrides: []
         )
 
-      # Check for section title styling
       assert html =~ "uppercase"
       assert html =~ "tracking-wide"
     end

@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
           &AgentsSection.agents_filters/1,
           agent_search: "",
           agent_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "Search agents"
@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
           &AgentsSection.agents_filters/1,
           agent_search: "test-agent",
           agent_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "value=\"test-agent\""
@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
           &AgentsSection.agents_filters/1,
           agent_search: "",
           agent_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "All"
@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
           &AgentsSection.agents_filters/1,
           agent_search: "",
           agent_scope: "global",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "Global"
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
           &AgentsSection.agents_filters/1,
           agent_search: "",
           agent_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "phx-debounce"
@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
           &AgentsSection.agents_filters/1,
           agent_search: "",
           agent_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "update_agent_search"
@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
           &AgentsSection.agents_filters/1,
           agent_search: "",
           agent_scope: "all",
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "phx-target"
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agents_content/1,
           agents: [],
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "No agents"
@@ -118,14 +118,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agents_content/1,
           agents: agents,
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "Code Reviewer"
       assert html =~ "Test Writer"
     end
 
-    test "renders agent row for each agent" do
+    test "renders agent row icon for each agent" do
       agents = [
         %{id: 1, slug: "agent-1", name: "Code Reviewer"},
         %{id: 2, slug: "agent-2", name: "Test Writer"}
@@ -135,10 +135,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agents_content/1,
           agents: agents,
-          myself: self()
+          myself: 1
         )
 
-      assert html =~ "lucide-robot"
+      # Robot icon renders as inline SVG; assert on a distinctive path segment
+      assert html =~ "M12 8V4H8"
     end
   end
 
@@ -150,7 +151,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agent_row/1,
           agent: agent,
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "Code Reviewer"
@@ -163,7 +164,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agent_row/1,
           agent: agent,
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "reviewer"
@@ -176,10 +177,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agent_row/1,
           agent: agent,
-          myself: self()
+          myself: 1
         )
 
-      assert html =~ "lucide-robot"
+      # Robot icon renders as inline SVG; assert on a distinctive path segment
+      assert html =~ "M12 8V4H8"
     end
 
     test "renders button with open_new_session_with_agent event" do
@@ -189,7 +191,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agent_row/1,
           agent: agent,
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "open_new_session_with_agent"
@@ -204,7 +206,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agent_row/1,
           agent: agent,
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "data-vim-flyout-item"
@@ -217,7 +219,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agent_row/1,
           agent: agent,
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "hover:bg-base-content/5"
@@ -230,7 +232,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
         render_component(
           &AgentsSection.agent_row/1,
           agent: agent,
-          myself: self()
+          myself: 1
         )
 
       assert html =~ "truncate"

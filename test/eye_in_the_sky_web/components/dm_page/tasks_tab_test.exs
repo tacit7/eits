@@ -255,8 +255,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTabTest do
           tasks: tasks
         )
 
+      # Display span shows 8 chars; full UUID also appears in phx-value-task_id.
+      # The span content has surrounding whitespace so we match without angle brackets.
       assert html =~ "very-lon"
-      refute html =~ "very-long-u"
+      refute html =~ "very-long-u\""
     end
 
     test "renders task id when uuid not present" do

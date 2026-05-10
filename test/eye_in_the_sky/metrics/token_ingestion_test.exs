@@ -344,14 +344,15 @@ defmodule EyeInTheSky.Metrics.TokenIngestionTest do
       # Create a session bypassing the changeset so agent_id stays NULL.
       # This mirrors what happens when an agent is deleted (on_delete: :nilify_all).
       uuid = Ecto.UUID.generate()
+      {:ok, uuid_bin} = Ecto.UUID.dump(uuid)
 
       Repo.query!(
         "INSERT INTO sessions (uuid, name, status, started_at) VALUES ($1, $2, $3, $4)",
-        [uuid, "agentless-#{uuid}", "working", DateTime.to_iso8601(DateTime.utc_now())]
+        [uuid_bin, "agentless-#{uuid}", "working", DateTime.to_iso8601(DateTime.utc_now())]
       )
 
       %{rows: [[session_id]]} =
-        Repo.query!("SELECT id FROM sessions WHERE uuid = $1", [uuid])
+        Repo.query!("SELECT id FROM sessions WHERE uuid = $1", [uuid_bin])
 
       create_jsonl_session(home, "-Users-agentless", uuid, [
         assistant_jsonl("claude-sonnet-4-5", 500, 250)

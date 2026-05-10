@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpersTest do
       "schedule_type" => "interval",
       "schedule_value" => "3600",
       "config" => "{}",
-      "enabled" => 1
+      "enabled" => true
     }
 
     {:ok, job} = ScheduledJobs.create_job(Map.merge(defaults, attrs))

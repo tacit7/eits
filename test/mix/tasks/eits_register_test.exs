@@ -20,19 +20,12 @@ defmodule Mix.Tasks.Eits.RegisterTest do
     test "stores a hashed token, not the raw token" do
       Mix.Tasks.Eits.Register.run(["alice"])
 
-      assert_receive {:mix_shell, :info, [output]}
+      # The task emits 3 info messages: header, URL line, expiry notice.
+      # The raw token is embedded in the second message (the URL line).
+      assert_receive {:mix_shell, :info, [_header]}
+      assert_receive {:mix_shell, :info, [url_line]}
 
-      raw_token =
-        output
-        |> String.split("\n")
-        |> Enum.find_value(fn line ->
-          case Regex.run(~r/token=(\S+)/, line) do
-            [_, token] -> token
-            _ -> nil
-          end
-        end)
-
-      refute is_nil(raw_token), "expected raw token in output"
+      [_, raw_token] = Regex.run(~r/token=(\S+)/, url_line)
 
       rt = Repo.one!(RegistrationToken)
       refute rt.token == raw_token
@@ -41,10 +34,14 @@ defmodule Mix.Tasks.Eits.RegisterTest do
     test "prints a URL containing the raw token" do
       Mix.Tasks.Eits.Register.run(["bob"])
 
-      assert_receive {:mix_shell, :info, [output]}
-      assert output =~ "bob"
-      assert output =~ "token="
-      assert output =~ "register"
+      # First message is the header ("Passkey registration link for bob:")
+      assert_receive {:mix_shell, :info, [header]}
+      assert header =~ "bob"
+
+      # Second message is the URL line containing the token
+      assert_receive {:mix_shell, :info, [url_line]}
+      assert url_line =~ "token="
+      assert url_line =~ "register"
     end
 
     test "prints expiry notice" do

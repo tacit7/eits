@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
   use EyeInTheSky.DataCase, async: false
 
   alias EyeInTheSky.Factory
+  alias EyeInTheSky.Repo
   alias EyeInTheSkyWeb.DmLive.ExternalActions
 
   # Helper to build a bare socket with assigns
@@ -12,55 +13,45 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
     }
   end
 
+  # resolve_project_path/2 accesses agent.project.path — must preload before
+  # putting agent in the socket.
+  defp create_agent_preloaded do
+    Factory.create_agent() |> Repo.preload(:project)
+  end
+
   describe "handle_load_diff/2" do
     test "caches a diff when not already cached" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
       hash = "abc123"
 
-      socket =
-        build_socket(%{
-          session: session,
-          agent: agent,
-          diff_cache: %{}
-        })
+      socket = build_socket(%{session: session, agent: agent, diff_cache: %{}})
 
       {:noreply, result} = ExternalActions.handle_load_diff(hash, socket)
 
-      # When git is not available, diff will be :error
-      # The important thing is that it's in the cache now
+      # resolve_project_path returns :error (no git repo here), stored as :error in cache
       assert Map.has_key?(result.assigns.diff_cache, hash)
     end
 
     test "skips loading diff when already cached" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
       hash = "abc123"
       cached_diff = "already cached"
 
       socket =
-        build_socket(%{
-          session: session,
-          agent: agent,
-          diff_cache: %{hash => cached_diff}
-        })
+        build_socket(%{session: session, agent: agent, diff_cache: %{hash => cached_diff}})
 
       {:noreply, result} = ExternalActions.handle_load_diff(hash, socket)
 
-      # Should preserve the cached value
       assert result.assigns.diff_cache[hash] == cached_diff
     end
 
-    test "handles multiple different hashes" do
+    test "populates independent cache entries for different hashes" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
 
-      socket =
-        build_socket(%{
-          session: session,
-          agent: agent,
-          diff_cache: %{}
-        })
+      socket = build_socket(%{session: session, agent: agent, diff_cache: %{}})
 
       {:noreply, result1} = ExternalActions.handle_load_diff("hash1", socket)
       {:noreply, result2} = ExternalActions.handle_load_diff("hash2", result1)
@@ -68,12 +59,25 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert Map.has_key?(result2.assigns.diff_cache, "hash1")
       assert Map.has_key?(result2.assigns.diff_cache, "hash2")
     end
+
+    test "does not re-fetch already-cached hash" do
+      session = Factory.new_session()
+      agent = create_agent_preloaded()
+      sentinel = "sentinel_value"
+
+      socket = build_socket(%{session: session, agent: agent, diff_cache: %{"hash1" => sentinel}})
+
+      {:noreply, result} = ExternalActions.handle_load_diff("hash1", socket)
+
+      # Cache should be unchanged — no re-fetch
+      assert result.assigns.diff_cache["hash1"] == sentinel
+    end
   end
 
   describe "handle_load_cumulative_diff/1" do
     test "skips loading when already loaded" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
 
       socket =
         build_socket(%{
@@ -85,13 +89,12 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
 
       {:noreply, result} = ExternalActions.handle_load_cumulative_diff(socket)
 
-      # Should not change the cumulative_diff
       assert result.assigns.cumulative_diff == "already loaded"
     end
 
-    test "loads cumulative diff when not already loaded" do
+    test "returns :error when commits list is empty" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
 
       socket =
         build_socket(%{
@@ -103,32 +106,53 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
 
       {:noreply, result} = ExternalActions.handle_load_cumulative_diff(socket)
 
-      # When commits list is empty, diff will be :error
       assert result.assigns.cumulative_diff == :error
     end
 
-    test "returns error when commits list is empty" do
+    test "attempts git diff when commits are present" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
+
+      fake_commits = [
+        %{commit_hash: "abc123"},
+        %{commit_hash: "def456"}
+      ]
 
       socket =
         build_socket(%{
           session: session,
           agent: agent,
           cumulative_diff: nil,
-          commits: []
+          commits: fake_commits
         })
 
       {:noreply, result} = ExternalActions.handle_load_cumulative_diff(socket)
 
-      assert result.assigns.cumulative_diff == :error
+      # project path will not resolve for test agent — result is :error
+      assert result.assigns.cumulative_diff != nil
     end
   end
 
   describe "handle_open_iterm/1" do
-    test "returns error flash when session_uuid is invalid" do
+    test "returns error flash for empty session_uuid (not a valid UUID)" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
+
+      socket =
+        build_socket(%{
+          session_uuid: "",
+          session: %{session | provider: "claude"},
+          agent: agent
+        })
+
+      {:noreply, result} = ExternalActions.handle_open_iterm(socket)
+
+      assert result.assigns.flash["error"] =~ "Invalid"
+    end
+
+    test "returns error flash when session_uuid is not a valid UUID" do
+      session = Factory.new_session()
+      agent = create_agent_preloaded()
 
       socket =
         build_socket(%{
@@ -142,9 +166,9 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert result.assigns.flash["error"] == "Invalid session UUID"
     end
 
-    test "returns error flash for codex provider with invalid thread id" do
+    test "returns error flash for codex provider with whitespace thread id" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
 
       socket =
         build_socket(%{
@@ -160,7 +184,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
 
     test "returns error flash for unsupported provider" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
       valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
 
       socket =
@@ -175,26 +199,9 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert result.assigns.flash["error"] == "Unsupported provider: unknown"
     end
 
-    test "returns error flash when no valid session UUID" do
+    test "passes validation for valid codex thread id" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
-
-      socket =
-        build_socket(%{
-          session_uuid: nil,
-          session: %{session | provider: "claude"},
-          agent: agent
-        })
-
-      {:noreply, result} = ExternalActions.handle_open_iterm(socket)
-
-      assert result.assigns.flash["error"] =~ "Invalid"
-    end
-
-    test "handles valid codex provider with valid thread id" do
-      session = Factory.new_session()
-      agent = Factory.create_agent()
-      # Codex thread IDs are non-whitespace strings, not UUIDs
+      agent = create_agent_preloaded()
       thread_id = "thread-123"
 
       socket =
@@ -204,16 +211,14 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
           agent: agent
         })
 
-      # When osascript is not available (CI), this will try to execute but not crash
       {:noreply, result} = ExternalActions.handle_open_iterm(socket)
 
-      # Should not have an error flash (successful execution or osascript not available)
       assert result.assigns.flash["error"] == nil
     end
 
-    test "handles valid claude provider with valid uuid" do
+    test "passes validation for valid claude UUID" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
       valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
 
       socket =
@@ -223,16 +228,14 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
           agent: agent
         })
 
-      # When osascript is not available (CI), this will try to execute but not crash
       {:noreply, result} = ExternalActions.handle_open_iterm(socket)
 
-      # Should not have an error flash
       assert result.assigns.flash["error"] == nil
     end
 
-    test "handles valid gemini provider with valid uuid" do
+    test "passes validation for valid gemini UUID" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
       valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
 
       socket =
@@ -244,33 +247,31 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
 
       {:noreply, result} = ExternalActions.handle_open_iterm(socket)
 
-      # Should not have an error flash
       assert result.assigns.flash["error"] == nil
     end
 
-    test "uses home directory when project path cannot be resolved" do
+    test "defaults provider to claude when session.provider is nil" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
-      valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
+      agent = create_agent_preloaded()
 
       socket =
         build_socket(%{
-          session_uuid: valid_uuid,
-          session: %{session | provider: "claude"},
+          session_uuid: "not-a-uuid",
+          session: %{session | provider: nil},
           agent: agent
         })
 
       {:noreply, result} = ExternalActions.handle_open_iterm(socket)
 
-      # Should handle gracefully - the socket should be returned
-      assert is_map(result.assigns)
+      # nil provider falls back to "claude" — invalid UUID is rejected
+      assert result.assigns.flash["error"] == "Invalid session UUID"
     end
   end
 
-  describe "validate_resume_id/2 (via handle_open_iterm)" do
-    test "accepts valid UUID for non-codex providers" do
+  describe "validate_resume_id/2 (exercised via handle_open_iterm)" do
+    test "accepts valid UUID for claude" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
       valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
 
       socket =
@@ -282,13 +283,12 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
 
       {:noreply, result} = ExternalActions.handle_open_iterm(socket)
 
-      # No error flash means validation passed
       assert result.assigns.flash["error"] == nil
     end
 
-    test "rejects non-UUID for non-codex providers" do
+    test "rejects non-UUID string for claude" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
 
       socket =
         build_socket(%{
@@ -302,9 +302,9 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert result.assigns.flash["error"] == "Invalid session UUID"
     end
 
-    test "accepts non-whitespace strings for codex" do
+    test "accepts non-whitespace string for codex" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
 
       socket =
         build_socket(%{
@@ -315,13 +315,12 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
 
       {:noreply, result} = ExternalActions.handle_open_iterm(socket)
 
-      # No error flash means validation passed
       assert result.assigns.flash["error"] == nil
     end
 
-    test "rejects whitespace strings for codex" do
+    test "rejects whitespace-containing string for codex" do
       session = Factory.new_session()
-      agent = Factory.create_agent()
+      agent = create_agent_preloaded()
 
       socket =
         build_socket(%{

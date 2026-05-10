@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Live.FileBrowserHelpers do
       <%= for file <- @files do %>
         <.link
           patch={@patch_fn.(file.path)}
-          class="flex items-center gap-3 rounded-lg border border-base-content/10 bg-base-100 px-3 py-2"
+          class="flex items-center gap-3 rounded-lg border border-base-content/10 bg-base-100 px-3 py-3 min-h-[44px]"
         >
           <%= if file.is_dir do %>
             <.icon name="hero-folder-solid" class="size-4 text-primary shrink-0" />

@@ -5,20 +5,21 @@ Bash script at `scripts/eits`. Talks to the Eye in the Sky REST API.
 ## Setup
 
 ```bash
-# Default URL
+# API endpoint URL (configurable; defaults shown)
 export EITS_URL=http://localhost:5001/api/v1
 
-# Optional auth
+# Optional API key for authentication
 export EITS_API_KEY=<your-key>
 
-# Injected automatically by EITS hooks — set manually if needed
-export EITS_SESSION_UUID=<session-uuid>
-export EITS_SESSION_ID=<session-id>          # numeric session ID, exported by startup hook (preferred for --to/--from/--parent-session-id)
-export EITS_AGENT_UUID=<agent-uuid>          # auto-registered by startup hook; manual init only if server was down
-export EITS_PROJECT_ID=<project-id>
+# Session and agent identity — injected automatically by startup hook
+# Set manually only if needed (server was down at startup or manual session init)
+export EITS_SESSION_UUID=<session-uuid>      # session UUID; primary identifier for session linkage
+export EITS_SESSION_ID=<session-id>          # numeric session ID; preferred for --to/--from/--parent-session-id flags
+export EITS_AGENT_UUID=<agent-uuid>          # agent UUID; auto-registered by startup hook; used in --parent-agent-id
+export EITS_PROJECT_ID=<project-id>          # project context; required for many spawned agents; can be overridden with --project-id flag
 ```
 
-**Session Auto-Registration:** The startup hook now automatically registers new sessions via `eits sessions create` when the session is not pre-registered. This covers all interactive `cli` and headless `sdk-cli` sessions. The `eits-init` skill is a fallback only for server-down scenarios, not a mandatory initialization step.
+**Session Auto-Registration:** The startup hook automatically registers new sessions via `eits sessions create` for both interactive (`cli`) and headless (`sdk-cli`) agent sessions. The `eits-init` skill is a fallback for server-down scenarios only, not a mandatory initialization step. All agents use the `eits` script directly (no EITS-CMD directives).
 
 Requires `curl` and `jq`.
 
@@ -220,18 +221,24 @@ eits tasks states
 
 ### Agent task workflow (canonical)
 
+**Session Linkage Rules:**
+- `tasks begin` (create or claim), `tasks annotate`, and `tasks complete` automatically link the task to the current session (`$EITS_SESSION_UUID` or `$EITS_SESSION_ID`).
+- `tasks update` and other state mutations **do not** change session linkage — they operate on existing task state only.
+- `tasks link-session` and `tasks unlink-session` provide explicit session management when needed.
+- **CRITICAL**: When no session context is available, these commands fail with a session-linkage error. Ensure `EITS_SESSION_UUID` or `EITS_SESSION_ID` is set before running task lifecycle commands.
+
 **Option 1: Create new task (agent-initiated)**
 ```bash
 eits tasks begin --title "Implement X"              # create + start in one shot
 eits tasks update 42 --state-name in-review        # move to review when ready
 eits tasks complete 42 "Implemented feature X"     # CANONICAL close: annotate + mark Done + DM lead
 eits tasks complete 42 --message "done" --commit $SHA  # close + track commit atomically
-eits tasks complete 42 --message "done" --commit $SHA1 --commit $SHA2  # track multiple commits
+eits tasks complete 42 --message "done" --commit $SHA1 --commit $SHA2  # track multiple commits (--commit is repeatable)
 ```
 
 **Option 2: Claim pre-created task (orchestrator-assigned)**
 ```bash
-eits tasks begin --id 42                           # claim task 42 (no title required)
+eits tasks begin --id 42                           # claim task 42 (no title required); links to current session
                                                    # conflict: shows holding session ID, UUID, name
 eits tasks update 42 --state-name in-review        # move to review when ready
 eits tasks complete 42 "Implemented feature X"     # CANONICAL close
@@ -239,8 +246,8 @@ eits tasks complete 42 "Implemented feature X"     # CANONICAL close
 
 **Manual close (two round-trips, avoid if possible)**
 ```bash
-eits tasks annotate 42 --body "Work summary"
-eits tasks update 42 --state done                  # or --state 3, or --state-name done
+eits tasks annotate 42 --body "Work summary"       # requires session linkage
+eits tasks update 42 --state done                  # or --state 3, or --state-name done (does NOT require session)
 ```
 
 ---
@@ -371,7 +378,10 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Project context warning**: If neither `EITS_PROJECT_ID` is set in instructions nor `--project-id` flag is provided, spawn will emit a warning to stderr — spawned agents will have null project context and may fail. Either add `EITS_PROJECT_ID=<id>` to instructions or use `--project-id <n>` flag.
 
-**Project defaults**: `--project-id` defaults to `$EITS_PROJECT_ID`; `--project-path` defaults to `$PWD`.
+**Project defaults and --project-id universality**: 
+- `--project-id` defaults to `$EITS_PROJECT_ID` and is broadly available on most commands that need project context (not just `spawn`).
+- `--project-path` defaults to `$PWD`.
+- When `EITS_PROJECT_ID` is unset, explicitly pass `--project-id <n>` to override.
 
 **Worktree cleanup**: `--stash-if-dirty` auto-stashes uncommitted changes before worktree creation (instead of failing with dirty_working_tree error).
 

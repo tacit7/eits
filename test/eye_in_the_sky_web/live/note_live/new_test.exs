@@ -62,9 +62,10 @@ defmodule EyeInTheSkyWeb.NoteLive.NewTest do
     end
 
     test "back link uses return_to parameter", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/notes/new?return_to=/tasks")
+      # /projects/1/notes is a whitelisted path in safe_return_to/1
+      {:ok, _view, html} = live(conn, ~p"/notes/new?return_to=/projects/1/notes")
 
-      assert html =~ ~s(href="/tasks")
+      assert html =~ ~s(/projects/1/notes)
     end
 
     test "rejects unsafe return_to (falls back to /notes)", %{conn: conn} do
@@ -78,18 +79,16 @@ defmodule EyeInTheSkyWeb.NoteLive.NewTest do
     test "updates title on blur", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/notes/new")
 
-      # phx-blur triggers update_title
-      render_blur(view, "input#note-title-input", value: "My Note")
+      # phx-blur="update_title" — must send event name, not CSS selector
+      render_blur(view, "update_title", %{"value" => "My Note"})
 
-      # The title is stored in assigns and reflected in the data attribute
-      # The input still shows the same id/name
       assert has_element?(view, "input#note-title-input")
     end
 
     test "accepts whitespace-only title (trimmed to empty internally)", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/notes/new")
 
-      render_blur(view, "input#note-title-input", value: "   ")
+      render_blur(view, "update_title", %{"value" => "   "})
 
       assert has_element?(view, "input#note-title-input")
     end
@@ -113,14 +112,14 @@ defmodule EyeInTheSkyWeb.NoteLive.NewTest do
     end
 
     test "creates note with valid body and navigates", %{conn: conn} do
-      count_before = length(Notes.list_notes())
+      count_before = length(Notes.list_notes_filtered())
 
       {:ok, view, _html} = live(conn, ~p"/notes/new?parent_type=system")
 
       assert {:error, {:live_redirect, %{to: "/notes"}}} =
                render_hook(view, "note_saved", %{"body" => "A valid note body"})
 
-      assert length(Notes.list_notes()) == count_before + 1
+      assert length(Notes.list_notes_filtered()) == count_before + 1
     end
 
     test "creates note for each valid parent_type", %{conn: conn} do
@@ -136,23 +135,23 @@ defmodule EyeInTheSkyWeb.NoteLive.NewTest do
     end
 
     test "navigates to custom return_to after save", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/notes/new?return_to=/tasks")
+      # /projects/1/notes is whitelisted in safe_return_to/1; /tasks would be rejected
+      {:ok, view, _html} = live(conn, ~p"/notes/new?return_to=/projects/1/notes")
 
-      assert {:error, {:live_redirect, %{to: "/tasks"}}} =
+      assert {:error, {:live_redirect, %{to: "/projects/1/notes"}}} =
                render_hook(view, "note_saved", %{"body" => "Note content"})
     end
 
     test "invalid parent_type falls back to 'system'", %{conn: conn} do
-      count_before = length(Notes.list_notes())
+      count_before = length(Notes.list_notes_filtered())
 
       {:ok, view, _html} = live(conn, ~p"/notes/new?parent_type=nonsense")
 
-      render_hook(view, "note_saved", %{"body" => "Test body"})
+      # parent_type "nonsense" falls back to "system"; note saves and redirects
+      assert {:error, {:live_redirect, _}} =
+               render_hook(view, "note_saved", %{"body" => "Test body"})
 
-      # Falls back to system; a note is created or an error is shown — either is acceptable
-      # Just verify it doesn't crash
-      assert has_element?(view, "#note-title-input") or
-               length(Notes.list_notes()) > count_before
+      assert length(Notes.list_notes_filtered()) > count_before
     end
   end
 

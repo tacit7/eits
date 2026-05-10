@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_change(%{
         "form" => %{
           "event" => "post_tool_use",
@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
 
       # Simulating form change without the skip_builtins field (unchecked checkbox)
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_change(%{"form" => %{"tool" => "Write"}})
 
       html = render(view)
@@ -171,7 +171,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_submit(%{
         "form" => %{
           "event" => "pre_tool_use",
@@ -192,7 +192,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_submit(%{
         "form" => %{
           "event" => "pre_tool_use",
@@ -210,7 +210,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_submit(%{
         "form" => %{
           "tool" => "Bash",
@@ -227,7 +227,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_submit(%{
         "form" => %{
           "tool" => "Bash",
@@ -245,7 +245,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
         {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
         view
-        |> element("form")
+        |> element("form[phx-submit='simulate']")
         |> render_submit(%{
           "form" => %{
             "event" => event,
@@ -265,7 +265,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_submit(%{
         "form" => %{"project_id" => "", "skip_builtins" => "true", "fallback_permission" => "allow"}
       })
@@ -278,7 +278,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_submit(%{
         "form" => %{
           "project_id" => "1",
@@ -298,7 +298,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
 
       # First simulate
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_submit(%{
         "form" => %{
           "tool" => "Bash",
@@ -335,7 +335,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
       view
-      |> element("form")
+      |> element("form[phx-submit='simulate']")
       |> render_change(%{"form" => %{"tool" => "Bash"}})
 
       html = render(view)
@@ -347,7 +347,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
         {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
         view
-        |> element("form")
+        |> element("form[phx-submit='simulate']")
         |> render_submit(%{
           "form" => %{
             "tool" => tool,
@@ -367,7 +367,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
         {:ok, view, _html} = live(conn, ~p"/iam/simulator")
 
         view
-        |> element("form")
+        |> element("form[phx-submit='simulate']")
         |> render_submit(%{
           "form" => %{
             "tool" => tool,

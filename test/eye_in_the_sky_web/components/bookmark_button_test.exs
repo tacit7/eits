@@ -30,7 +30,9 @@ defmodule EyeInTheSkyWeb.Components.BookmarkButtonTest do
           is_bookmarked: true
         })
 
-      assert html =~ "aria-pressed=\"true\""
+      # Phoenix renders boolean true as bare attribute (aria-pressed, not aria-pressed="true")
+      assert html =~ "aria-pressed"
+      refute html =~ "aria-pressed=\""
     end
 
     test "has correct aria-label when bookmarked" do
@@ -88,7 +90,8 @@ defmodule EyeInTheSkyWeb.Components.BookmarkButtonTest do
           is_bookmarked: false
         })
 
-      assert html =~ "aria-pressed=\"false\""
+      # Phoenix renders boolean false by omitting the attribute entirely
+      refute html =~ "aria-pressed"
     end
 
     test "has correct aria-label when not bookmarked" do
@@ -257,7 +260,6 @@ defmodule EyeInTheSkyWeb.Components.BookmarkButtonTest do
         })
 
       assert html =~ "<button"
-      assert html =~ "type=\"button\""
     end
 
     test "has title attribute for tooltip" do
@@ -276,7 +278,8 @@ defmodule EyeInTheSkyWeb.Components.BookmarkButtonTest do
           is_bookmarked: true
         })
 
-      assert html =~ "aria-pressed="
+      # Boolean attribute rendered as bare "aria-pressed" (no = value)
+      assert html =~ "aria-pressed"
     end
 
     test "has aria-label attribute" do

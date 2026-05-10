@@ -251,7 +251,8 @@ defmodule EyeInTheSkyWeb.Components.FileEditorTest do
           file_error: "Error: 'file.txt' not found"
         })
 
-      assert html =~ "Error: 'file.txt' not found"
+      # Phoenix HTML-escapes single quotes to &#39; in rendered output
+      assert html =~ "Error: &#39;file.txt&#39; not found"
     end
   end
 end

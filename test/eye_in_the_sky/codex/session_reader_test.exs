@@ -18,6 +18,17 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
     dir
   end
 
+  defp with_home(home, fun) do
+    original = System.get_env("HOME")
+    System.put_env("HOME", home)
+
+    try do
+      fun.()
+    after
+      System.put_env("HOME", original)
+    end
+  end
+
   defp user_event(text, ts \\ "2024-01-01T00:00:00Z") do
     %{"type" => "event_msg", "payload" => %{"type" => "user_message", "message" => text}, "timestamp" => ts}
   end
@@ -56,19 +67,18 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       session_file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
       File.write!(session_file, "")
 
-      System.put_env("HOME", home)
-      assert {:ok, ^session_file} = SessionReader.find_session_file(thread_id)
-      System.put_env("HOME", System.get_env("HOME"))
-    after
-      System.put_env("HOME", System.get_env("HOME"))
+      with_home(home, fn ->
+        assert {:ok, ^session_file} = SessionReader.find_session_file(thread_id)
+      end)
     end
 
     test "returns :not_found when no file matches" do
       home = System.tmp_dir!() |> Path.join("sr_miss_#{:rand.uniform(999_999)}")
       make_sessions_dir(home)
 
-      System.put_env("HOME", home)
-      assert {:error, :not_found} = SessionReader.find_session_file("nonexistent-thread")
+      with_home(home, fn ->
+        assert {:error, :not_found} = SessionReader.find_session_file("nonexistent-thread")
+      end)
     end
 
     test "returns first match when multiple files exist" do
@@ -80,9 +90,10 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       File.write!(file1, "")
       File.write!(file2, "")
 
-      System.put_env("HOME", home)
-      {:ok, found} = SessionReader.find_session_file(thread_id)
-      assert found in [file1, file2]
+      with_home(home, fn ->
+        {:ok, found} = SessionReader.find_session_file(thread_id)
+        assert found in [file1, file2]
+      end)
     end
   end
 
@@ -134,13 +145,14 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert hd(messages).content == "msg"
     end
 
-    test "skips events without a timestamp field", %{session_file: session_file, thread_id: thread_id} do
+    test "extracts events missing a timestamp field with timestamp set to nil",
+         %{session_file: session_file, thread_id: thread_id} do
       no_ts = %{"type" => "event_msg", "payload" => %{"type" => "user_message", "message" => "no ts"}}
       write_jsonl(session_file, [no_ts, user_event("with ts")])
 
       {:ok, messages} = SessionReader.read_messages(thread_id)
       assert length(messages) == 2
-      # The message without timestamp is still extracted, timestamp is nil
+
       [no_ts_msg, ts_msg] = messages
       assert no_ts_msg.timestamp == nil
       assert ts_msg.timestamp == "2024-01-01T00:00:00Z"
@@ -187,7 +199,6 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       {:ok, [msg]} = SessionReader.read_messages(thread_id)
       uuid1 = msg.uuid
 
-      # Re-read, should be same
       {:ok, [msg2]} = SessionReader.read_messages(thread_id)
       assert msg2.uuid == uuid1
     end

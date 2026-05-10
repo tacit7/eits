@@ -1,5 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.BookmarkButtonTest do
-  use EyeInTheSkyWeb.ComponentCase
+  use EyeInTheSkyWeb.ConnCase
+  import Phoenix.LiveViewTest
 
   import EyeInTheSkyWeb.Components.BookmarkButton
 

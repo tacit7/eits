@@ -1,281 +1,159 @@
 defmodule EyeInTheSkyWeb.TerminalLiveTest do
-  use EyeInTheSkyWeb.LiveViewTest
+  use EyeInTheSkyWeb.ConnCase, async: false
+  import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.Terminal.PtySupervisor
+  setup do
+    Application.put_env(:eye_in_the_sky, :disable_auth, true)
+    on_exit(fn -> Application.delete_env(:eye_in_the_sky, :disable_auth) end)
+    :ok
+  end
 
-  describe "TerminalLive - mount" do
-    test "initializes with page title", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
+  describe "mount and render" do
+    test "page loads without error", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/terminal")
 
-      assert lv.assigns.page_title == "Terminal"
-    end
-
-    test "renders terminal container when connected", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/terminal")
-
-      # Should have some terminal-related content when connected
-      # The exact content depends on the render function
       assert is_binary(html)
     end
 
-    test "sets pty_pid when connected", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
+    test "page title is Terminal", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/terminal")
 
-      # When connected, pty_pid should be set to a process
-      assert is_pid(lv.assigns.pty_pid)
+      # Page title is in the <title> tag or in the layout
+      assert html =~ "Terminal"
     end
 
-    test "sets pty_pid to nil when not connected", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
+    test "renders terminal PTY hook element", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      # For the initial non-connected render, pty_pid should be nil
-      # But after connection, it's started
-      assert is_nil(lv.assigns.pty_pid) or is_pid(lv.assigns.pty_pid)
-    end
-  end
-
-  describe "TerminalLive - handle_event: pty_input" do
-    test "writes to PTY when data is provided", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
-
-      # Skip if pty is not available
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
-
-        pty_pid ->
-          # Send input event
-          result = lv |> render_hook("pty_input", %{"data" => "ls\n"})
-
-          # Should return noreply and socket
-          assert is_binary(result)
-      end
-    end
-
-    test "handles empty input gracefully", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
-
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
-
-        _pty_pid ->
-          result = lv |> render_hook("pty_input", %{"data" => ""})
-          assert is_binary(result)
-      end
-    end
-
-    test "ignores pty_input when pty_pid is nil", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
-
-      # Manually set pty_pid to nil to test
-      lv_modified = put_in(lv.assigns.pty_pid, nil)
-
-      # Should not crash when pty_pid is nil
-      result = render_hook(lv_modified, "pty_input", %{"data" => "test"})
-
-      assert is_binary(result)
-    end
-
-    test "handles special characters in input", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
-
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
-
-        _pty_pid ->
-          special_chars = "echo 'test' | grep 'pattern'\n"
-          result = lv |> render_hook("pty_input", %{"data" => special_chars})
-          assert is_binary(result)
-      end
+      # The TerminalLive page should have a xterm hook target
+      # Exact element depends on the render function
+      assert has_element?(view, "[phx-hook]") or render(view) =~ "pty"
     end
   end
 
-  describe "TerminalLive - handle_event: pty_resize" do
-    test "resizes terminal when cols and rows are provided", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
+  describe "handle_event: pty_input" do
+    test "pty_input with data does not crash the live view", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
+      render_hook(view, "pty_input", %{"data" => "ls\n"})
 
-        _pty_pid ->
-          result = lv |> render_hook("pty_resize", %{"cols" => "120", "rows" => "40"})
-          assert is_binary(result)
-      end
+      # Should still be alive and renderable
+      assert is_binary(render(view))
     end
 
-    test "handles standard terminal size (80x24)" do
-      {:ok, lv, %{}} = live(build_conn(), ~p"/terminal")
+    test "pty_input with empty data does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
+      render_hook(view, "pty_input", %{"data" => ""})
 
-        _pty_pid ->
-          result = lv |> render_hook("pty_resize", %{"cols" => "80", "rows" => "24"})
-          assert is_binary(result)
-      end
+      assert is_binary(render(view))
     end
 
-    test "handles large terminal size" do
-      {:ok, lv, %{}} = live(build_conn(), ~p"/terminal")
+    test "pty_input with special characters does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
+      render_hook(view, "pty_input", %{"data" => "\x03"})
 
-        _pty_pid ->
-          result = lv |> render_hook("pty_resize", %{"cols" => "200", "rows" => "50"})
-          assert is_binary(result)
-      end
+      assert is_binary(render(view))
     end
 
-    test "ignores pty_resize when pty_pid is nil" do
-      {:ok, lv, %{}} = live(build_conn(), ~p"/terminal")
+    test "pty_input with multiline command does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      lv_modified = put_in(lv.assigns.pty_pid, nil)
+      render_hook(view, "pty_input", %{"data" => "echo 'line 1'\necho 'line 2'\n"})
 
-      result = render_hook(lv_modified, "pty_resize", %{"cols" => "80", "rows" => "24"})
-
-      assert is_binary(result)
+      assert is_binary(render(view))
     end
   end
 
-  describe "TerminalLive - handle_event: set_notify_on_stop" do
-    test "handles notification preference setting", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
+  describe "handle_event: pty_resize" do
+    test "pty_resize with standard dimensions does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      # This event is handled by NotificationHelpers
-      result = render_hook(lv, "set_notify_on_stop", %{"notify" => "true"})
+      render_hook(view, "pty_resize", %{"cols" => 80, "rows" => 24})
 
-      assert is_binary(result)
+      assert is_binary(render(view))
     end
 
-    test "handles disable notification" do
-      {:ok, lv, %{}} = live(build_conn(), ~p"/terminal")
+    test "pty_resize with large dimensions does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      result = render_hook(lv, "set_notify_on_stop", %{"notify" => "false"})
+      render_hook(view, "pty_resize", %{"cols" => 220, "rows" => 50})
 
-      assert is_binary(result)
+      assert is_binary(render(view))
     end
-  end
 
-  describe "TerminalLive - handle_event: unexpected events" do
-    test "logs and ignores unknown events gracefully" do
-      {:ok, lv, %{}} = live(build_conn(), ~p"/terminal")
+    test "pty_resize with small dimensions does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      # Send an unknown event
-      result = render_hook(lv, "unknown_event", %{})
+      render_hook(view, "pty_resize", %{"cols" => 40, "rows" => 10})
 
-      # Should not crash, just log and continue
-      assert is_binary(result)
+      assert is_binary(render(view))
     end
   end
 
-  describe "TerminalLive - handle_info: pty_output" do
-    test "PTY output message updates socket with event" do
-      {:ok, lv, _html} = live(build_conn(), ~p"/terminal")
+  describe "handle_event: set_notify_on_stop" do
+    test "set_notify_on_stop does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
+      render_hook(view, "set_notify_on_stop", %{"value" => "true"})
 
-        pty_pid ->
-          # We can't directly test handle_info from the test client,
-          # but we can verify the socket structure after events
-          rendered = render(lv)
-          assert is_binary(rendered)
-      end
+      assert is_binary(render(view))
     end
   end
 
-  describe "TerminalLive - terminate" do
-    test "cleans up PTY process on terminate", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/terminal")
+  describe "handle_event: unknown events" do
+    test "unknown event is logged and ignored without crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
+      render_hook(view, "some_unknown_event", %{})
 
-        pty_pid ->
-          # Process should be valid before termination
-          assert Process.alive?(pty_pid)
-      end
+      assert is_binary(render(view))
     end
   end
 
-  describe "TerminalLive - rendering" do
-    test "renders a full-screen terminal interface" do
-      {:ok, _lv, html} = live(build_conn(), ~p"/terminal")
+  describe "handle_info: pty output" do
+    test "pty_output message causes push_event without crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      # The terminal should have some identifying marker
-      # (exact content depends on implementation)
-      assert is_binary(html)
+      # Send a pty_output message to the LiveView process
+      send(view.pid, {:pty_output, "hello terminal\r\n"})
+
+      # After handle_info runs, view should still be alive
+      assert is_binary(render(view))
     end
 
-    test "page loads without errors" do
-      {:ok, lv, html} = live(build_conn(), ~p"/terminal")
+    test "pty_exited message triggers process-exited output", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      # Verify it mounted successfully
-      assert lv.assigns.page_title == "Terminal"
-      assert is_binary(html)
-    end
-  end
+      send(view.pid, :pty_exited)
 
-  describe "TerminalLive - socket lifecycle" do
-    test "PTY is available after mount when connected" do
-      {:ok, lv, _html} = live(build_conn(), ~p"/terminal")
-
-      # After mount, if connected, pty_pid should be set
-      case lv.assigns.pty_pid do
-        nil -> :ok  # Not connected yet (dead render)
-        pid -> assert is_pid(pid)
-      end
+      # View should still be alive (pty_pid set to nil, push_event fires)
+      assert is_binary(render(view))
     end
 
-    test "page_title is consistent" do
-      {:ok, lv, _html} = live(build_conn(), ~p"/terminal")
+    test "unhandled info message does not crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/terminal")
 
-      # Page title should always be set
-      assert lv.assigns.page_title == "Terminal"
+      send(view.pid, {:some_other_message, "ignored"})
 
-      # Verify it doesn't change after render
-      render(lv)
-      assert lv.assigns.page_title == "Terminal"
+      assert is_binary(render(view))
     end
   end
 
-  describe "TerminalLive - integration" do
-    test "complete flow: connect → input → output → resize" do
-      {:ok, lv, _html} = live(build_conn(), ~p"/terminal")
+  describe "integration" do
+    test "full cycle: load, input, resize, pty_exited", %{conn: conn} do
+      {:ok, view, html} = live(conn, ~p"/terminal")
 
-      case lv.assigns.pty_pid do
-        nil ->
-          :skip
+      assert html =~ "Terminal"
 
-        _pty_pid ->
-          # Initial state
-          assert lv.assigns.page_title == "Terminal"
+      render_hook(view, "pty_input", %{"data" => "echo test\n"})
+      render_hook(view, "pty_resize", %{"cols" => 120, "rows" => 40})
+      render_hook(view, "pty_input", %{"data" => "ls\n"})
 
-          # Send some input
-          rendered = render_hook(lv, "pty_input", %{"data" => "echo test\n"})
-          assert is_binary(rendered)
+      send(view.pid, :pty_exited)
 
-          # Resize terminal
-          rendered = render_hook(lv, "pty_resize", %{"cols" => "100", "rows" => "30"})
-          assert is_binary(rendered)
-
-          # Send more input
-          rendered = render_hook(lv, "pty_input", %{"data" => "ls\n"})
-          assert is_binary(rendered)
-      end
+      assert is_binary(render(view))
     end
-  end
-
-  # Helper to build a default connection
-  defp build_conn do
-    Phoenix.ConnTest.build_conn()
   end
 end

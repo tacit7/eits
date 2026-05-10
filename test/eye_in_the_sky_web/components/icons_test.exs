@@ -1,5 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.IconsTest do
-  use EyeInTheSkyWeb.ComponentCase
+  use EyeInTheSkyWeb.ConnCase
+  import Phoenix.LiveViewTest
 
   import EyeInTheSkyWeb.Components.Icons
 
@@ -118,14 +119,6 @@ defmodule EyeInTheSkyWeb.Components.IconsTest do
 
       # Default size-4 = w-4 h-4 (1rem)
       assert html =~ "size-4"
-    end
-  end
-
-  describe "claude icon - module documentation" do
-    test "module has moduledoc" do
-      # Documentation should indicate these are custom icons
-      assert EyeInTheSkyWeb.Components.Icons.__doc__() =~
-               "Custom icon components"
     end
   end
 

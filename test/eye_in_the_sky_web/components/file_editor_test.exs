@@ -1,5 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.FileEditorTest do
-  use EyeInTheSkyWeb.ComponentCase
+  use EyeInTheSkyWeb.ConnCase
+  import Phoenix.LiveViewTest
 
   import EyeInTheSkyWeb.Components.FileEditorComponent
 

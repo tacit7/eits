@@ -1,39 +1,30 @@
 defmodule EyeInTheSkyWeb.Components.TerminalWindowComponentTest do
-  use EyeInTheSkyWeb.ComponentCase
+  use EyeInTheSkyWeb.ConnCase
+  import Phoenix.LiveViewTest
 
   alias EyeInTheSkyWeb.Components.TerminalWindowComponent
 
+  # Build a minimal assigns map suitable for rendering the component's render/1
+  defp base_assigns(overrides \\ %{}) do
+    Map.merge(
+      %{
+        id: "term-1",
+        myself: %Phoenix.LiveComponent.CID{cid: 1},
+        ct: %{id: 1, pos_x: 100, pos_y: 50, width: 500, height: 300}
+      },
+      overrides
+    )
+  end
+
   describe "TerminalWindowComponent - render" do
     test "renders terminal window with correct structure" do
-      assigns = %{
-        id: "term-1",
-        myself: nil,
-        ct: %{id: 1, pos_x: 100, pos_y: 50, width: 500, height: 300}
-      }
-
-      {:ok, _lv, html} =
-        live_isolated(fn assigns ->
-          render_component(&TerminalWindowComponent.render/1, assigns)
-        end,
-        session: %{}
-        )
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
       assert html =~ "terminal-window-term-1"
     end
 
     test "renders with correct positioning and dimensions" do
-      assigns = %{
-        id: "term-1",
-        myself: nil,
-        ct: %{id: 1, pos_x: 100, pos_y: 50, width: 500, height: 300}
-      }
-
-      {:ok, _lv, html} =
-        live_isolated(fn assigns ->
-          render_component(&TerminalWindowComponent.render/1, assigns)
-        end,
-        session: %{}
-        )
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
       assert html =~ "left: 100px"
       assert html =~ "top: 50px"
@@ -42,18 +33,7 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponentTest do
     end
 
     test "renders title bar with command icon" do
-      assigns = %{
-        id: "term-1",
-        myself: nil,
-        ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
-      }
-
-      {:ok, _lv, html} =
-        live_isolated(fn assigns ->
-          render_component(&TerminalWindowComponent.render/1, assigns)
-        end,
-        session: %{}
-        )
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
       assert html =~ "Terminal"
       assert html =~ "bash"
@@ -61,200 +41,165 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponentTest do
     end
 
     test "renders close button" do
-      assigns = %{
-        id: "term-1",
-        myself: nil,
-        ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
-      }
-
-      {:ok, _lv, html} =
-        live_isolated(fn assigns ->
-          render_component(&TerminalWindowComponent.render/1, assigns)
-        end,
-        session: %{}
-        )
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
       assert html =~ "Close terminal"
     end
 
     test "renders PTY mount point with correct id" do
-      assigns = %{
-        id: "term-1",
-        myself: nil,
-        ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
-      }
-
-      {:ok, _lv, html} =
-        live_isolated(fn assigns ->
-          render_component(&TerminalWindowComponent.render/1, assigns)
-        end,
-        session: %{}
-        )
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
       assert html =~ "terminal-pty-1"
-      assert html =~ "phx-hook=\"TerminalHook\""
+      assert html =~ ~s(phx-hook="TerminalHook")
     end
 
     test "renders with drag handle" do
-      assigns = %{
-        id: "term-1",
-        myself: nil,
-        ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
-      }
-
-      {:ok, _lv, html} =
-        live_isolated(fn assigns ->
-          render_component(&TerminalWindowComponent.render/1, assigns)
-        end,
-        session: %{}
-        )
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
       assert html =~ "data-drag-handle"
     end
 
     test "renders with correct styling classes" do
-      assigns = %{
-        id: "term-1",
-        myself: nil,
-        ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
-      }
-
-      {:ok, _lv, html} =
-        live_isolated(fn assigns ->
-          render_component(&TerminalWindowComponent.render/1, assigns)
-        end,
-        session: %{}
-        )
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
       assert html =~ "bg-zinc-950"
       assert html =~ "rounded-xl"
       assert html =~ "shadow-2xl"
       assert html =~ "border border-zinc-800"
     end
-  end
 
-  describe "TerminalWindowComponent - update" do
-    test "assigns attrs when no pty_output" do
-      socket = %Phoenix.LiveComponent.Socket{
-        assigns: %{id: "term-1", ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}}
-      }
+    test "renders with TerminalWindowHook" do
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
-      assigns = %{id: "term-1", ct: %{id: 1, pos_x: 200, pos_y: 100, width: 500, height: 400}}
-
-      {:ok, updated_socket} = TerminalWindowComponent.update(assigns, socket)
-
-      assert updated_socket.assigns.ct.pos_x == 200
-      assert updated_socket.assigns.ct.pos_y == 100
-    end
-  end
-
-  describe "TerminalWindowComponent - handle_event" do
-    test "handles pty_input event when pty_pid exists" do
-      socket = %Phoenix.LiveComponent.Socket{
-        assigns: %{
-          id: "term-1",
-          ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300},
-          pty_pid: nil
-        }
-      }
-
-      # When pty_pid is nil, it should just return noreply without crashing
-      {:noreply, result_socket} =
-        TerminalWindowComponent.handle_event("pty_input", %{"data" => "test"}, socket)
-
-      assert result_socket == socket
+      assert html =~ ~s(phx-hook="TerminalWindowHook")
     end
 
-    test "handles pty_resize event" do
-      socket = %Phoenix.LiveComponent.Socket{
-        assigns: %{
-          id: "term-1",
-          ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300},
-          pty_pid: nil
-        }
-      }
+    test "renders with data-terminal-window attribute" do
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
-      {:noreply, result_socket} =
-        TerminalWindowComponent.handle_event(
-          "pty_resize",
-          %{"cols" => 80, "rows" => 24},
-          socket
+      assert html =~ "data-terminal-window"
+    end
+
+    test "renders with phx-update=ignore on PTY container" do
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
+
+      assert html =~ ~s(phx-update="ignore")
+    end
+
+    test "renders with data-terminal-id matching ct.id" do
+      html = render_component(&TerminalWindowComponent.render/1, base_assigns())
+
+      assert html =~ ~s(data-terminal-id="1")
+    end
+
+    test "different pos_x/pos_y/width/height are reflected in style" do
+      assigns =
+        base_assigns(%{
+          ct: %{id: 2, pos_x: 300, pos_y: 200, width: 800, height: 600}
+        })
+
+      html = render_component(&TerminalWindowComponent.render/1, assigns)
+
+      assert html =~ "left: 300px"
+      assert html =~ "top: 200px"
+      assert html =~ "width: 800px"
+      assert html =~ "height: 600px"
+    end
+
+    test "different terminal ids produce different DOM ids" do
+      html1 =
+        render_component(
+          &TerminalWindowComponent.render/1,
+          base_assigns(%{id: "term-1", ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}})
         )
 
-      assert result_socket == socket
-    end
-
-    test "handles close event and sends remove message" do
-      socket = %Phoenix.LiveComponent.Socket{
-        assigns: %{
-          id: "term-1",
-          ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
-        }
-      }
-
-      # close event should send a message to self
-      {:noreply, result_socket} =
-        TerminalWindowComponent.handle_event("close", %{}, socket)
-
-      # Socket should be returned unchanged (the message is sent separately)
-      assert result_socket == socket
-    end
-
-    test "handles unknown event gracefully" do
-      socket = %Phoenix.LiveComponent.Socket{
-        assigns: %{
-          id: "term-1",
-          ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
-        }
-      }
-
-      {:noreply, result_socket} =
-        TerminalWindowComponent.handle_event("unknown_event", %{}, socket)
-
-      assert result_socket == socket
-    end
-  end
-
-  describe "TerminalWindowComponent - phx-hook and data attributes" do
-    test "terminal hook has correct attributes" do
-      assigns = %{
-        id: "term-1",
-        myself: nil,
-        ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
-      }
-
-      {:ok, _lv, html} =
-        live_isolated(fn assigns ->
-          render_component(&TerminalWindowComponent.render/1, assigns)
-        end,
-        session: %{}
+      html2 =
+        render_component(
+          &TerminalWindowComponent.render/1,
+          base_assigns(%{id: "term-2", ct: %{id: 2, pos_x: 0, pos_y: 0, width: 400, height: 300}})
         )
 
-      assert html =~ "phx-hook=\"TerminalHook\""
-      assert html =~ "data-terminal-id=\"1\""
-      assert html =~ "phx-update=\"ignore\""
+      assert html1 =~ "terminal-window-term-1"
+      assert html2 =~ "terminal-window-term-2"
+      assert html1 =~ "terminal-pty-1"
+      assert html2 =~ "terminal-pty-2"
     end
   end
 
-  describe "TerminalWindowComponent - integration" do
-    test "multiple terminal windows can be rendered with different ids" do
-      for id <- 1..3 do
-        assigns = %{
-          id: "term-#{id}",
-          myself: nil,
-          ct: %{id: id, pos_x: id * 100, pos_y: id * 50, width: 400, height: 300}
-        }
+  describe "TerminalWindowComponent - update/2" do
+    test "assigns all fields when no pty_output key" do
+      # Build a socket using Phoenix.LiveView.Socket (not LiveComponent.Socket)
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{
+          __changed__: %{},
+          id: "term-1",
+          ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
+        },
+        private: %{live_temp: %{}}
+      }
 
-        {:ok, _lv, html} =
-          live_isolated(fn assigns ->
-            render_component(&TerminalWindowComponent.render/1, assigns)
-          end,
-          session: %{}
-          )
+      new_assigns = %{id: "term-1", ct: %{id: 1, pos_x: 200, pos_y: 100, width: 500, height: 400}}
 
-        assert html =~ "terminal-window-term-#{id}"
-        assert html =~ "terminal-pty-#{id}"
-      end
+      {:ok, updated} = TerminalWindowComponent.update(new_assigns, socket)
+
+      assert updated.assigns.ct.pos_x == 200
+      assert updated.assigns.ct.pos_y == 100
+      assert updated.assigns.ct.width == 500
+      assert updated.assigns.ct.height == 400
+    end
+  end
+
+  describe "TerminalWindowComponent - handle_event/3" do
+    defp bare_socket(extra_assigns \\ %{}) do
+      assigns =
+        Map.merge(
+          %{
+            __changed__: %{},
+            id: "term-1",
+            ct: %{id: 1, pos_x: 0, pos_y: 0, width: 400, height: 300}
+          },
+          extra_assigns
+        )
+
+      %Phoenix.LiveView.Socket{
+        assigns: assigns,
+        private: %{live_temp: %{}}
+      }
+    end
+
+    test "pty_input with nil pty_pid is a no-op" do
+      socket = bare_socket(%{pty_pid: nil})
+
+      {:noreply, result} =
+        TerminalWindowComponent.handle_event("pty_input", %{"data" => "ls\n"}, socket)
+
+      assert result.assigns == socket.assigns
+    end
+
+    test "pty_resize with nil pty_pid is a no-op" do
+      socket = bare_socket(%{pty_pid: nil})
+
+      {:noreply, result} =
+        TerminalWindowComponent.handle_event("pty_resize", %{"cols" => 80, "rows" => 24}, socket)
+
+      assert result.assigns == socket.assigns
+    end
+
+    test "close sends :remove_terminal_window message to self" do
+      socket = bare_socket()
+
+      {:noreply, _result} = TerminalWindowComponent.handle_event("close", %{}, socket)
+
+      assert_received {:remove_terminal_window, 1}
+    end
+
+    test "unknown event is a no-op" do
+      socket = bare_socket()
+
+      {:noreply, result} =
+        TerminalWindowComponent.handle_event("totally_unknown", %{}, socket)
+
+      assert result.assigns == socket.assigns
     end
   end
 end

@@ -90,9 +90,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
 
   describe "list_agents_for_flyout_filtered/3" do
     setup do
-      {global, proj_root} = tmp_agent_dirs()
+      {_global, proj_root} = tmp_agent_dirs()
 
-      write_agent(global, "search-agent", """
+      proj_agents_dir = Path.join(proj_root, ".claude/agents")
+
+      # Write all fixtures into the project agents dir — global (~/.claude/agents)
+      # is always hardcoded by do_load_agents and we cannot control it in tests.
+      write_agent(proj_agents_dir, "search-agent", """
       ---
       name: Search Agent
       description: Finds things fast
@@ -100,15 +104,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       Content
       """)
 
-      write_agent(global, "deploy-helper", """
+      write_agent(proj_agents_dir, "deploy-helper", """
       ---
       name: Deploy Helper
       description: Runs deploys
       ---
       Content
       """)
-
-      proj_agents_dir = Path.join(proj_root, ".claude/agents")
 
       write_agent(proj_agents_dir, "project-linter", """
       ---
@@ -118,13 +120,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       Content
       """)
 
-      {:ok, global: global, proj_root: proj_root}
+      {:ok, proj_root: proj_root}
     end
 
-    test "scope 'all' returns both global and project agents", %{proj_root: proj_root} do
+    test "scope 'all' includes project agents", %{proj_root: proj_root} do
       agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "all")
-      sources = Enum.map(agents, & &1.source) |> Enum.uniq() |> Enum.sort()
-      assert :agents in sources
+      sources = Enum.map(agents, & &1.source) |> Enum.uniq()
+      # project agents are always present; global may or may not exist on CI
       assert :project_agents in sources
     end
 
@@ -135,11 +137,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
 
     test "scope 'project' returns only :project_agents", %{proj_root: proj_root} do
       agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "project")
+      assert length(agents) >= 3
       Enum.each(agents, &assert(&1.source == :project_agents))
     end
 
     test "search filters by slug (case-insensitive)", %{proj_root: proj_root} do
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "SEARCH", "all")
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "SEARCH", "project")
       assert Enum.any?(agents, &String.contains?(String.downcase(&1.slug), "search"))
       Enum.each(agents, fn a ->
         match =
@@ -151,13 +154,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
     end
 
     test "search filters by description", %{proj_root: proj_root} do
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "deploys", "all")
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "deploys", "project")
       assert Enum.any?(agents, &String.contains?(String.downcase(&1.description || ""), "deploys"))
     end
 
-    test "empty search returns all agents", %{proj_root: proj_root} do
-      all   = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "all")
-      empty = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "   zzz_no_match_zzz   ", "all")
+    test "empty search returns all project agents", %{proj_root: proj_root} do
+      all   = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "project")
+      empty = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "zzz_no_match_zzz", "project")
       assert length(all) > 0
       assert length(empty) == 0
     end
@@ -229,13 +232,17 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
   # ---------------------------------------------------------------------------
 
   describe "frontmatter parsing via loaded agents" do
+    # Write fixtures to proj_root/.claude/agents and use scope "project" so
+    # tests are isolated from the developer's real ~/.claude/agents directory.
     setup do
-      {global, _proj} = tmp_agent_dirs()
-      {:ok, global: global}
+      {_global, proj_root} = tmp_agent_dirs()
+      proj_agents_dir = Path.join(proj_root, ".claude/agents")
+      {:ok, proj_root: proj_root, proj_agents_dir: proj_agents_dir}
     end
 
-    test "parses name, description, and model from YAML frontmatter", %{global: global} do
-      write_agent(global, "full-fm", """
+    test "parses name, description, and model from YAML frontmatter",
+         %{proj_root: proj_root, proj_agents_dir: dir} do
+      write_agent(dir, "full-fm", """
       ---
       name: Full FM Agent
       description: Has all fields
@@ -244,15 +251,15 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       Body text
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(nil, "full-fm", "global")
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "full-fm", "project")
       assert [agent] = agents
       assert agent.name == "Full FM Agent"
       assert agent.description == "Has all fields"
       assert agent.model == "sonnet"
     end
 
-    test "parses tools as YAML list", %{global: global} do
-      write_agent(global, "tool-list", """
+    test "parses tools as YAML list", %{proj_root: proj_root, proj_agents_dir: dir} do
+      write_agent(dir, "tool-list", """
       ---
       name: Tool Agent
       tools:
@@ -262,70 +269,73 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       ---
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(nil, "tool-list", "global")
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "tool-list", "project")
       assert [agent] = agents
       assert "bash" in agent.tools
       assert "read" in agent.tools
       assert "write" in agent.tools
     end
 
-    test "parses tools as inline list", %{global: global} do
-      write_agent(global, "tool-inline", """
+    test "parses tools as inline list", %{proj_root: proj_root, proj_agents_dir: dir} do
+      write_agent(dir, "tool-inline", """
       ---
       name: Inline Tool Agent
       tools: [bash, read]
       ---
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(nil, "tool-inline", "global")
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "tool-inline", "project")
       assert [agent] = agents
       assert length(agent.tools) == 2
     end
 
-    test "falls back to first # heading when no frontmatter", %{global: global} do
-      write_agent(global, "no-fm", """
+    test "falls back to first # heading when no frontmatter",
+         %{proj_root: proj_root, proj_agents_dir: dir} do
+      write_agent(dir, "no-fm", """
       # My Heading Agent
 
       Just some content without frontmatter.
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(nil, "no-fm", "global")
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "no-fm", "project")
       assert [agent] = agents
       assert agent.description == "My Heading Agent"
     end
 
-    test "returns 'No description' when no frontmatter and no heading", %{global: global} do
-      write_agent(global, "empty-agent", "Just prose, no heading.\n")
+    test "returns 'No description' when no frontmatter and no heading",
+         %{proj_root: proj_root, proj_agents_dir: dir} do
+      write_agent(dir, "empty-agent", "Just prose, no heading.\n")
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(nil, "empty-agent", "global")
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "empty-agent", "project")
       assert [agent] = agents
       assert agent.description == "No description"
     end
 
-    test "uses slug as name when frontmatter has no name field", %{global: global} do
-      write_agent(global, "no-name-fm", """
+    test "uses slug as name when frontmatter has no name field",
+         %{proj_root: proj_root, proj_agents_dir: dir} do
+      write_agent(dir, "no-name-fm", """
       ---
       description: I have no name field
       ---
       Content
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(nil, "no-name-fm", "global")
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "no-name-fm", "project")
       assert [agent] = agents
       assert agent.name == "no-name-fm"
     end
 
-    test "skips README.md files", %{global: global} do
-      File.write!(Path.join(global, "README.md"), "# Readme\n\nShould be ignored.")
+    test "skips README.md files", %{proj_root: proj_root, proj_agents_dir: dir} do
+      File.write!(Path.join(dir, "README.md"), "# Readme\n\nShould be ignored.")
 
-      all = AgentsHelpers.list_agents_for_flyout_filtered(nil, "", "global")
+      all = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "project")
       refute Enum.any?(all, &(&1.slug == "README"))
     end
 
-    test "ignores non-.md files", %{global: global} do
-      File.write!(Path.join(global, "script.sh"), "#!/bin/bash\necho hi")
+    test "ignores non-.md files", %{proj_root: proj_root, proj_agents_dir: dir} do
+      File.write!(Path.join(dir, "script.sh"), "#!/bin/bash\necho hi")
 
-      all = AgentsHelpers.list_agents_for_flyout_filtered(nil, "", "global")
+      all = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "project")
       refute Enum.any?(all, &(&1.slug == "script"))
     end
   end

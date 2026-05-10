@@ -3,6 +3,8 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandlerTest do
 
   alias EyeInTheSky.Agents.CmdDispatcher.TaskHandler
   alias EyeInTheSky.Factory
+  alias EyeInTheSky.Repo
+  alias EyeInTheSky.TaskTags
   alias EyeInTheSky.Tasks
   alias EyeInTheSky.Notes
 
@@ -167,15 +169,14 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandlerTest do
     test "creates a note on the task", %{session: session, task: task} do
       TaskHandler.dispatch("annotate #{task.id} This is a note", session.id)
 
-      # Verify note was created
-      task_notes = Notes.list_notes(limit: 10) |> Enum.filter(&(&1.parent_id == task.id))
+      task_notes = Notes.list_notes_for_task(task.id)
       assert Enum.any?(task_notes, &(&1.body == "This is a note"))
     end
 
     test "handles multi-word annotation", %{session: session, task: task} do
       TaskHandler.dispatch("annotate #{task.id} Multiple word annotation", session.id)
 
-      task_notes = Notes.list_notes(limit: 10) |> Enum.filter(&(&1.parent_id == task.id))
+      task_notes = Notes.list_notes_for_task(task.id)
       assert Enum.any?(task_notes, &(&1.body == "Multiple word annotation"))
     end
 
@@ -236,16 +237,16 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandlerTest do
     setup %{session: session} do
       {:ok, task} = Tasks.create_task(%{title: "Tag Test", state_id: 1, project_id: nil})
       Tasks.link_session_to_task(task.id, session.id)
-      {:ok, tag} = EyeInTheSky.Tags.create_tag(%{name: "urgent"})
+      {:ok, tag} = TaskTags.get_or_create_tag("urgent-#{System.unique_integer([:positive])}")
       {:ok, task: task, tag: tag}
     end
 
     test "links tag to task", %{session: session, task: task, tag: tag} do
       TaskHandler.dispatch("tag #{task.id} #{tag.id}", session.id)
 
-      # Verify tag is linked
-      task_tags = EyeInTheSky.Tags.list_tags_for_task(task.id)
-      assert Enum.any?(task_tags, &(&1.id == tag.id))
+      # Preload tags through the many_to_many association
+      task_with_tags = Repo.preload(Tasks.get_task!(task.id), :tags)
+      assert Enum.any?(task_with_tags.tags, &(&1.id == tag.id))
     end
 
     test "rejects invalid task ID" do

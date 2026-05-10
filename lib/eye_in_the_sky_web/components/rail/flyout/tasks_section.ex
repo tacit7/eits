@@ -116,10 +116,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
     """
   end
 
-  def nav_links(%{section: :tasks} = assigns) do
-    ~H"""
-    <></>
-    """
+  def nav_links(%{section: :tasks}) do
+    nil
   end
 
   def nav_links(%{section: :prompts} = assigns) do

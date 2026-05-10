@@ -207,7 +207,5 @@ defmodule EyeInTheSky.Workers.SpeakWorkerTest do
     end
   end
 
-  defp perform_job(worker, args) do
-    worker.perform(%Oban.Job{args: args, id: 123, attempt: 1})
-  end
+  # perform_job/2 is injected by Oban.Testing — do NOT define it here.
 end

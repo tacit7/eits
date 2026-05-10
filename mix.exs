@@ -10,6 +10,7 @@ defmodule EyeInTheSky.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      docs: docs(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader],
       releases: [
@@ -115,6 +116,83 @@ defmodule EyeInTheSky.MixProject do
     else
       release
     end
+  end
+
+  defp docs do
+    [
+      main: "EyeInTheSky",
+      source_url: "https://github.com/tacit7/eits-web",
+      extras: [
+        "README.md",
+        "docs/SETUP.md": [title: "Setup"],
+        "docs/REST_API.md": [title: "REST API"],
+        "docs/EITS_CLI.md": [title: "EITS CLI"],
+        "docs/AGENT_WORKER_QUEUE.md": [title: "Agent Worker Queue"],
+        "docs/AGENT_DEFINITIONS.md": [title: "Agent Definitions"],
+        "docs/IAM_POLICY.md": [title: "IAM Policy"],
+        "docs/IAM_HOOK_INSTALL.md": [title: "IAM Hook Install"],
+        "docs/CHAT.md": [title: "Chat"],
+        "docs/DM_FEATURES.md": [title: "DM Features"],
+        "docs/KANBAN.md": [title: "Kanban"],
+        "docs/CANVAS.md": [title: "Canvas"],
+        "docs/TERMINAL_PTY.md": [title: "Terminal / PTY"],
+        "docs/VIM_NAV.md": [title: "Vim Navigation"],
+        "docs/COMMAND_PALETTE.md": [title: "Command Palette"],
+        "docs/SEARCH.md": [title: "Search"],
+        "docs/WORKERS.md": [title: "Workers"],
+        "docs/EVENTS.md": [title: "Events"],
+        "docs/SESSION_MANAGER.md": [title: "Session Manager"],
+        "docs/CODEX_SDK.md": [title: "Codex SDK"],
+        "docs/RAIL_MENU.md": [title: "Rail Menu"],
+        "docs/EITS_HOOKS.md": [title: "EITS Hooks"],
+        "docs/SECURITY.md": [title: "Security"],
+        "docs/MOBILE.md": [title: "Mobile"],
+        "docs/ATTACHMENTS.md": [title: "Attachments"],
+        "docs/PRODUCTION.md": [title: "Production"],
+        "docs/CODE_GUIDELINES.md": [title: "Code Guidelines"]
+      ],
+      groups_for_extras: [
+        "Getting Started": [
+          "README.md",
+          "docs/SETUP.md",
+          "docs/PRODUCTION.md",
+          "docs/CODE_GUIDELINES.md"
+        ],
+        "API & CLI": [
+          "docs/REST_API.md",
+          "docs/EITS_CLI.md"
+        ],
+        "Core Features": [
+          "docs/AGENT_WORKER_QUEUE.md",
+          "docs/AGENT_DEFINITIONS.md",
+          "docs/SESSION_MANAGER.md",
+          "docs/EVENTS.md",
+          "docs/WORKERS.md"
+        ],
+        "IAM": [
+          "docs/IAM_POLICY.md",
+          "docs/IAM_HOOK_INSTALL.md",
+          "docs/SECURITY.md"
+        ],
+        "UI Features": [
+          "docs/CHAT.md",
+          "docs/DM_FEATURES.md",
+          "docs/KANBAN.md",
+          "docs/CANVAS.md",
+          "docs/TERMINAL_PTY.md",
+          "docs/VIM_NAV.md",
+          "docs/COMMAND_PALETTE.md",
+          "docs/RAIL_MENU.md",
+          "docs/MOBILE.md",
+          "docs/SEARCH.md"
+        ],
+        "Integrations": [
+          "docs/CODEX_SDK.md",
+          "docs/EITS_HOOKS.md",
+          "docs/ATTACHMENTS.md"
+        ]
+      ]
+    ]
   end
 
   defp aliases do

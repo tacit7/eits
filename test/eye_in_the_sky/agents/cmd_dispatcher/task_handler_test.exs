@@ -6,9 +6,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandlerTest do
   alias EyeInTheSky.Notes
 
   setup do
-    {:ok, project} = Ecto.Adapters.SQL.Sandbox.checkout(EyeInTheSky.Repo)
-    Ecto.Adapters.SQL.Sandbox.allow(EyeInTheSky.Repo, self(), project)
-
     {:ok, session} =
       EyeInTheSky.Sessions.create_session(%{
         uuid: Ecto.UUID.generate(),

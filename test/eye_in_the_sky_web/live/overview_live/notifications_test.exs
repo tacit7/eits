@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWeb.OverviewLive.NotificationsTest do
-  use ExUnit.Case, async: true
+  use EyeInTheSky.DataCase, async: false
 
   alias EyeInTheSkyWeb.OverviewLive.Notifications, as: NotificationsLive
 

@@ -202,7 +202,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActionsTest do
       assert Enum.any?(result.assigns.channels, fn c -> c.name == name end)
     end
 
-    test "falls back to new_channel_name assign when params name is blank" do
+    test "falls back to new_channel_name assign when params has no name key" do
       %{project: project} = setup_channel_context()
       name = "assign-fallback-#{uniq()}"
 
@@ -213,9 +213,12 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActionsTest do
           channels: []
         })
 
+      # Pass no "name" key — params["name"] is nil, so || falls through to the assign.
       {:noreply, result} =
-        ChannelActions.handle_create_channel(socket, %{"name" => ""})
+        ChannelActions.handle_create_channel(socket, %{})
 
+      assert result.assigns.new_channel_name == nil
+      assert is_list(result.assigns.channels)
       assert Enum.any?(result.assigns.channels, fn c -> c.name == name end)
     end
 

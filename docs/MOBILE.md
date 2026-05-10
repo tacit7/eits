@@ -214,6 +214,115 @@ This was applied across mobile bottom nav tabs and interactive elements during t
 
 ---
 
+## Standardized Responsive Patterns
+
+This section documents shared responsive UI patterns that are consistently applied across overview/project screens.
+
+### Action Bars
+
+Action bars (bulk action controls, header button groups) must wrap on mobile to prevent overflow.
+
+**Pattern:**
+```heex
+<div class="flex flex-wrap items-center gap-3 p-3 sm:p-4 bg-base-100 border border-base-300 rounded-lg">
+  <span class="text-sm font-medium">Content</span>
+  <div class="flex flex-wrap gap-2 ml-auto">
+    <button class="btn btn-sm btn-outline">Action 1</button>
+    <button class="btn btn-sm btn-outline">Action 2</button>
+  </div>
+</div>
+```
+
+**Rules:**
+- Add `flex-wrap` to all action bars so buttons stack on mobile
+- Use `gap-3` for spacing between content areas
+- Use `gap-2` for button groups
+- Use `ml-auto` on the button group div to right-align actions
+- Padding: `p-3 sm:p-4 lg:p-6` for adaptive spacing across breakpoints
+
+**Examples:**
+- Bulk action bar in jobs table (`jobs_table.ex`)
+- Bulk selection bar in agent list (`agent_list.ex`)
+- Overview header with action buttons (`jobs_page.ex`)
+
+### Search and Filter Rows
+
+Search inputs and filter dropdowns must remain responsive and avoid overflow.
+
+**Pattern:**
+```heex
+<form phx-change="filter" class="flex flex-wrap gap-2 my-4">
+  <input
+    type="text"
+    name="search"
+    class="input input-bordered input-sm flex-1 min-w-[200px] text-base min-h-[44px]"
+    placeholder="Search…"
+  />
+  <select name="filter" class="select select-bordered select-sm min-h-[44px]">
+    <option>Filter</option>
+  </select>
+</form>
+```
+
+**Rules:**
+- Use `flex flex-wrap gap-2` on the form container
+- Search inputs use `flex-1 min-w-[200px]` for responsive width
+- Dropdowns maintain their natural width with `min-h-[44px]`
+- All inputs use `text-base` to prevent iOS auto-zoom
+- Controls stack on mobile (<sm) and wrap as needed
+
+**Examples:**
+- Jobs page filter toolbar (`jobs_page.ex`)
+- Agent list search toolbar (`agent_list.ex`)
+
+### Table Overflow Handling
+
+Tables must be wrapped in `overflow-x-auto` on mobile to prevent content from breaking the layout.
+
+**Pattern:**
+```heex
+<div class="overflow-x-auto">
+  <table class="table table-sm">
+    <!-- table content -->
+  </table>
+</div>
+```
+
+**Rules:**
+- All data tables must have an `overflow-x-auto` wrapper div
+- Wrapper allows horizontal scroll on small screens without breaking the layout
+- Hidden on desktop if a separate mobile card layout exists using `hidden md:block`
+
+**Examples:**
+- Jobs table (`jobs_table.ex`)
+- Config browser file listing (`config_browser.ex`)
+- Agent schedule cron reference (`agent_schedule_form.ex`)
+
+### Adaptive Padding
+
+Container padding adjusts across breakpoints for consistent spacing.
+
+**Pattern:**
+```heex
+<div class="p-3 sm:p-4 lg:p-6">
+  <!-- content -->
+</div>
+```
+
+**Rules:**
+- Mobile (default): `p-3` (12px)
+- Small screens (sm): `p-4` (16px)
+- Large screens (lg): `p-6` (24px)
+- Apply to: action bars, cards, filter containers, drawers
+- Consistency: use the same pattern across similar components
+
+**Examples:**
+- Action bars with adaptive padding
+- Filter sheet containers
+- Drawer content areas
+
+---
+
 ## Reference Commits
 
 | PR | Scope |

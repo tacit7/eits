@@ -267,7 +267,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         <.icon name="hero-question-mark-circle" class="size-3.5" /> Cron syntax reference
       </div>
       <div class="collapse-content px-3 pb-3">
-        <table class="table table-xs w-full">
+        <div class="overflow-x-auto">
+          <table class="table table-xs w-full">
           <thead>
             <tr class="text-base-content/40">
               <th class="pl-0">Position</th>
@@ -303,6 +304,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
             </tr>
           </tbody>
         </table>
+        </div>
         <div class="divider my-1"></div>
         <p class="text-xs font-medium text-base-content/50 mb-1">Examples</p>
         <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">

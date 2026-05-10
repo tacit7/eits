@@ -53,9 +53,9 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
     <%= if @jobs != [] do %>
       <%!-- Bulk Action Bar --%>
       <%= if @selected_count > 0 do %>
-        <div class="mb-4 flex items-center gap-3 bg-base-100 border border-base-300 rounded-lg p-3">
+        <div class="mb-4 flex flex-wrap items-center gap-3 bg-base-100 border border-base-300 rounded-lg p-3 sm:p-4">
           <span class="text-sm font-medium">{@selected_count} selected</span>
-          <div class="flex gap-2 ml-auto">
+          <div class="flex flex-wrap gap-2 ml-auto">
             <button
               class="btn btn-sm btn-outline"
               phx-click="bulk_enable"

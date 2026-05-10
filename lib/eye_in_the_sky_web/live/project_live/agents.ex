@@ -4,8 +4,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
-  alias EyeInTheSky.AgentManager
-  alias EyeInTheSky.Agents.AgentCreationHelpers
+  alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
 
@@ -467,7 +467,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       |> Keyword.put(:name, agent_name)
 
     case AgentManager.create_agent(opts) do
-      {:ok, result} ->
+      {:ok, _result} ->
         {:noreply,
          socket
          |> assign(:show_new_agent_form, false)

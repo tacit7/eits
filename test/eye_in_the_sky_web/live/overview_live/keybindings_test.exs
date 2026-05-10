@@ -3,21 +3,25 @@ defmodule EyeInTheSkyWeb.OverviewLive.KeybindingsTest do
 
   alias EyeInTheSkyWeb.OverviewLive.Keybindings, as: KeybindingsLive
 
-  defp socket_with(assigns) do
+  defp build_socket(assigns \\ %{}) do
     base = %{
       page_title: "Keybinding Reference",
       sidebar_tab: :keybindings,
       sidebar_project: nil,
       commands: [],
+      flash: %{},
       __changed__: %{}
     }
 
-    %Phoenix.LiveView.Socket{assigns: Map.merge(base, assigns)}
+    %Phoenix.LiveView.Socket{
+      assigns: Map.merge(base, assigns),
+      private: %{live_temp: %{}}
+    }
   end
 
   describe "mount/3" do
     test "initializes socket with correct assigns" do
-      socket = %Phoenix.LiveView.Socket{assigns: %{}}
+      socket = build_socket()
       {:ok, result} = KeybindingsLive.mount(%{}, %{}, socket)
 
       assert result.assigns.page_title == "Keybinding Reference"
@@ -28,7 +32,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.KeybindingsTest do
     end
 
     test "commands list contains expected groups" do
-      socket = %Phoenix.LiveView.Socket{assigns: %{}}
+      socket = build_socket()
       {:ok, result} = KeybindingsLive.mount(%{}, %{}, socket)
 
       groups = Enum.map(result.assigns.commands, &Map.get(&1, :group))
@@ -40,8 +44,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.KeybindingsTest do
       assert "context" in groups
     end
 
-    test "navigation group has 'Go to' label and keybindings" do
-      socket = %Phoenix.LiveView.Socket{assigns: %{}}
+    test "navigation 'Go to' group has keybindings" do
+      socket = build_socket()
       {:ok, result} = KeybindingsLive.mount(%{}, %{}, socket)
 
       nav_group =
@@ -55,7 +59,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.KeybindingsTest do
     end
 
     test "each command has required fields" do
-      socket = %Phoenix.LiveView.Socket{assigns: %{}}
+      socket = build_socket()
       {:ok, result} = KeybindingsLive.mount(%{}, %{}, socket)
 
       Enum.each(result.assigns.commands, fn cmd ->
@@ -75,19 +79,18 @@ defmodule EyeInTheSkyWeb.OverviewLive.KeybindingsTest do
   end
 
   describe "handle_event/3 - set_notify_on_stop" do
-    test "forwards to NotificationHelpers.set_notify_on_stop without crashing" do
-      socket = socket_with(%{})
+    test "returns noreply without crashing" do
+      socket = build_socket()
 
-      result = KeybindingsLive.handle_event("set_notify_on_stop", %{}, socket)
+      {tag, _result} = KeybindingsLive.handle_event("set_notify_on_stop", %{}, socket)
 
-      assert is_tuple(result)
-      assert elem(result, 0) == :noreply
+      assert tag == :noreply
     end
   end
 
   describe "keybindings completeness" do
     test "sessions page keybindings include archive and delete" do
-      socket = %Phoenix.LiveView.Socket{assigns: %{}}
+      socket = build_socket()
       {:ok, result} = KeybindingsLive.mount(%{}, %{}, socket)
 
       sessions_group =
@@ -101,8 +104,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.KeybindingsTest do
       assert "Delete focused session" in descs
     end
 
-    test "leader prefix group with 'Space' keybindings exists" do
-      socket = %Phoenix.LiveView.Socket{assigns: %{}}
+    test "leader prefix groups have Space-prefixed keybindings" do
+      socket = build_socket()
       {:ok, result} = KeybindingsLive.mount(%{}, %{}, socket)
 
       leader_groups =
@@ -112,29 +115,37 @@ defmodule EyeInTheSkyWeb.OverviewLive.KeybindingsTest do
 
       assert length(leader_groups) > 0
 
-      # Verify at least one group has Space-prefixed keybindings
       has_space_keys =
         Enum.any?(leader_groups, fn group ->
-          Enum.any?(group.bindings, fn binding ->
-            "Space" in binding.keys
-          end)
+          Enum.any?(group.bindings, fn binding -> "Space" in binding.keys end)
         end)
 
       assert has_space_keys
     end
 
-    test "create group has new agent, task, note keybindings" do
-      socket = %Phoenix.LiveView.Socket{assigns: %{}}
+    test "create group has new agent, task, and note keybindings" do
+      socket = build_socket()
       {:ok, result} = KeybindingsLive.mount(%{}, %{}, socket)
 
       create_group = Enum.find(result.assigns.commands, fn cmd -> cmd.label == "Create" end)
 
       assert create_group != nil
-
       descs = Enum.map(create_group.bindings, &Map.get(&1, :desc))
       assert "New agent" in descs
       assert "New task" in descs
       assert "New note" in descs
+    end
+
+    test "global group contains command palette and back/forward bindings" do
+      socket = build_socket()
+      {:ok, result} = KeybindingsLive.mount(%{}, %{}, socket)
+
+      global_group = Enum.find(result.assigns.commands, fn cmd -> cmd.group == "global" end)
+
+      assert global_group != nil
+      descs = Enum.map(global_group.bindings, &Map.get(&1, :desc))
+      assert Enum.any?(descs, &String.contains?(&1, "palette"))
+      assert Enum.any?(descs, &String.contains?(&1, "back"))
     end
   end
 end

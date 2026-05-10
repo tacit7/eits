@@ -91,6 +91,18 @@ defmodule EyeInTheSky.Diff.ParserTest do
       types = Enum.map(hunk.lines, & &1.type)
       assert types == [:removed, :added]
     end
+
+    test "skips old mode line" do
+      raw = "old mode 100755\n@@ -1,1 +1,1 @@\n foo"
+      result = Parser.parse(raw, "foo")
+      assert length(result.hunks) == 1
+    end
+
+    test "skips new mode line" do
+      raw = "new mode 100644\n@@ -1,1 +1,1 @@\n foo"
+      result = Parser.parse(raw, "foo")
+      assert length(result.hunks) == 1
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -274,6 +286,26 @@ defmodule EyeInTheSky.Diff.ParserTest do
   # pair_lines/1
   # ---------------------------------------------------------------------------
 
+  # ---------------------------------------------------------------------------
+  # parse/2 — unrecognized line sigil inside a hunk (true -> fallback)
+  # ---------------------------------------------------------------------------
+
+  describe "parse/2 — unrecognized sigil inside hunk" do
+    test "empty string line inside hunk is silently skipped" do
+      raw = "@@ -1,2 +1,2 @@\n foo\n\n bar"
+      result = Parser.parse(raw)
+      [hunk] = result.hunks
+      # only the two space-prefixed context lines should appear
+      assert length(hunk.lines) == 2
+      types = Enum.map(hunk.lines, & &1.type)
+      assert types == [:context, :context]
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # pair_lines/1
+  # ---------------------------------------------------------------------------
+
   describe "pair_lines/1 — empty" do
     test "returns empty list for empty input" do
       assert Parser.pair_lines([]) == []
@@ -355,6 +387,16 @@ defmodule EyeInTheSky.Diff.ParserTest do
       a2 = %{type: :added, content: "a2", old_line_number: nil, new_line_number: 2}
       rows = Parser.pair_lines([r1, a1, a2])
       assert rows == [{r1, a1}, {nil, a2}]
+    end
+  end
+
+  describe "pair_lines/1 — more removes than adds" do
+    test "extra removes after adds exhaust buffer and become {remove, nil}" do
+      r1 = %{type: :removed, content: "r1", old_line_number: 1, new_line_number: nil}
+      r2 = %{type: :removed, content: "r2", old_line_number: 2, new_line_number: nil}
+      a1 = %{type: :added, content: "a1", old_line_number: nil, new_line_number: 1}
+      rows = Parser.pair_lines([r1, r2, a1])
+      assert rows == [{r1, a1}, {r2, nil}]
     end
   end
 

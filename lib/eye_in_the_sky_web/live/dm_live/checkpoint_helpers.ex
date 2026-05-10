@@ -7,8 +7,6 @@ defmodule EyeInTheSkyWeb.DmLive.CheckpointHelpers do
   functionality integrates with the EyeInTheSky.Checkpoints context.
   """
 
-  import Phoenix.Component, only: [assign: 3]
-
   # Future: add checkpoint helpers here as checkpoint UI is developed
   # Examples:
   # - assign_checkpoint_defaults/1

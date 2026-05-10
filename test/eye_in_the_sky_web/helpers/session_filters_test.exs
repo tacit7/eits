@@ -7,10 +7,25 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFiltersTest do
   # Test helpers
   # ---------------------------------------------------------------------------
 
+  # ISO8601 format (T separator) — used by sort_datetime/1 via DateTime.from_iso8601
   defp now_iso, do: DateTime.utc_now() |> DateTime.to_iso8601()
 
   defp ago_iso(seconds),
     do: DateTime.utc_now() |> DateTime.add(-seconds, :second) |> DateTime.to_iso8601()
+
+  # Space-separated format expected by VH.coerce_datetime/parse_datetime
+  # ("YYYY-MM-DD HH:MM:SS") — this is how Ecto serializes datetimes as strings
+  defp now_db do
+    DateTime.utc_now() |> DateTime.to_naive() |> NaiveDateTime.to_string() |> String.slice(0..18)
+  end
+
+  defp ago_db(seconds) do
+    DateTime.utc_now()
+    |> DateTime.add(-seconds, :second)
+    |> DateTime.to_naive()
+    |> NaiveDateTime.to_string()
+    |> String.slice(0..18)
+  end
 
   defp session(overrides \\ %{}) do
     Map.merge(
@@ -39,6 +54,9 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFiltersTest do
 
   # ---------------------------------------------------------------------------
   # filter_and_sort_sessions/1
+  # Note: search_match?/2 calls String.downcase(session.id) directly, so
+  # session.id must be a string (or nil) for non-empty search queries.
+  # filter_agents_by_search/2 handles this correctly via to_string_or_empty/1.
   # ---------------------------------------------------------------------------
 
   describe "filter_and_sort_sessions/1" do
@@ -58,8 +76,9 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFiltersTest do
     end
 
     test "filters by search_query matching session name" do
-      match = session(%{id: 1, name: "deployment runner"})
-      no_match = session(%{id: 2, name: "unrelated"})
+      # session.id must be nil/string — search_match? calls String.downcase(id) directly
+      match = session(%{id: nil, name: "deployment runner"})
+      no_match = session(%{id: nil, name: "unrelated"})
 
       result =
         SessionFilters.filter_and_sort_sessions(%{
@@ -71,7 +90,7 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFiltersTest do
     end
 
     test "returns empty list when search_query matches nothing" do
-      s = session(%{name: "my session"})
+      s = session(%{id: nil, name: "my session"})
 
       result =
         SessionFilters.filter_and_sort_sessions(%{
@@ -135,8 +154,9 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFiltersTest do
     end
 
     test "sorts by recent (started_at) descending by default" do
-      old = session(%{id: 1, started_at: ago_iso(3600)})
-      new = session(%{id: 2, started_at: now_iso()})
+      # VH.coerce_datetime/parse_datetime expects space-separated format "YYYY-MM-DD HH:MM:SS"
+      old = session(%{id: 1, started_at: ago_db(3600)})
+      new = session(%{id: 2, started_at: now_db()})
 
       result =
         SessionFilters.filter_and_sort_sessions(%{

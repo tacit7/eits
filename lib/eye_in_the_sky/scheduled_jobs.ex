@@ -18,6 +18,7 @@ defmodule EyeInTheSky.ScheduledJobs do
   defdelegate last_run_status_map(), to: JobRunTracker
   defdelegate list_runs_for_job(job_id, opts \\ []), to: JobRunTracker
   defdelegate last_run_per_job(job_ids), to: JobRunTracker
+  defdelegate last_n_runs_for_jobs(job_ids, limit \\ 10), to: JobRunTracker
   defdelegate record_run_start(job), to: JobRunTracker
   defdelegate record_run_complete(run, status, opts \\ []), to: JobRunTracker
 

@@ -478,6 +478,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
             running_ids={@running_ids}
             last_run_map={@last_run_map}
             last_failed_runs={@last_failed_runs}
+            last_n_runs_map={@last_n_runs_map}
             scope="overview"
             show_origin={true}
             target={@myself}

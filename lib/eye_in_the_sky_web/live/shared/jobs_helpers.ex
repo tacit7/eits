@@ -144,6 +144,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
     |> Map.new()
   end
 
+  # Returns %{job_id => [%JobRun{}, ...]} for the last 10 runs of each job.
+  def load_last_n_runs(jobs, limit \\ 10) do
+    ids = Enum.map(jobs, & &1.id)
+    ScheduledJobs.last_n_runs_for_jobs(ids, limit)
+  end
+
   # ---------------------------------------------------------------------------
   # Job filtering (Task 1409)
   # ---------------------------------------------------------------------------

@@ -197,6 +197,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <th>Last Run</th>
               <th>Next Run</th>
               <th>Runs</th>
+              <th>Trend</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -278,6 +279,19 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   {format_relative_time(job.next_run_at)}
                 </td>
                 <td class="text-xs">{job.run_count || 0}</td>
+                <td class="text-xs">
+                  <div class="flex items-center gap-0.5 flex-wrap">
+                    <%= for run <- (Map.get(@last_n_runs_map, job.id) || []) |> Enum.reverse() do %>
+                      <% run_color = case run.status do
+                        "completed" -> "bg-success"
+                        "failed" -> "bg-error"
+                        "running" -> "bg-warning"
+                        _ -> "bg-base-300"
+                      end %>
+                      <span class={"inline-block w-2 h-2 rounded-full #{run_color}"} title={run.status}></span>
+                    <% end %>
+                  </div>
+                </td>
                 <td>
                   <div class="flex items-center gap-1">
                     <button
@@ -318,7 +332,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               </tr>
               <%= if @expanded_job_id == job.id do %>
                 <tr>
-                  <td colspan={if @show_origin, do: "9", else: "8"} class="bg-base-200 p-4">
+                  <td colspan={if @show_origin, do: "10", else: "9"} class="bg-base-200 p-4">
                     <div class="text-sm font-medium mb-2">Recent Runs</div>
                     <%= if @runs != [] do %>
                       <table class="table table-xs">

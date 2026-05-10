@@ -299,6 +299,73 @@ defmodule EyeInTheSky.Metrics.TokenIngestionTest do
       [_, _, _, _, _, _, model | _] = metrics_row(session.id)
       assert model == "unknown"
     end
+
+    test "skips malformed JSONL lines and processes valid entries in the same file", %{home: home} do
+      session = Factory.new_session()
+
+      lines = [
+        "not valid json at all",
+        "{broken: json",
+        assistant_jsonl("claude-sonnet-4-5", 300, 200),
+        "another bad line }}}",
+        assistant_jsonl("claude-haiku-4-5", 100, 50)
+      ]
+
+      create_jsonl_session(home, "-Users-mixed", session.uuid, lines)
+
+      assert :ok = TokenIngestion.ingest_session(session.uuid)
+
+      [tokens_used, input, output | _] = metrics_row(session.id)
+      # Only the 2 valid assistant entries contribute to totals.
+      assert tokens_used == 650
+      assert input == 400
+      assert output == 250
+    end
+
+    test "returns :ok with zero tokens when JSONL contains only malformed lines", %{home: home} do
+      session = Factory.new_session()
+
+      lines = [
+        "definitely not json",
+        "{broken",
+        "also bad }"
+      ]
+
+      create_jsonl_session(home, "-Users-allbad", session.uuid, lines)
+
+      assert :ok = TokenIngestion.ingest_session(session.uuid)
+
+      [tokens_used, _, _, _, _, _, _, requests | _] = metrics_row(session.id)
+      assert tokens_used == 0
+      assert requests == 0
+    end
+
+    test "ingests successfully when session has no linked agent (agent_id is nil)", %{home: home} do
+      # Create a session bypassing the changeset so agent_id stays NULL.
+      # This mirrors what happens when an agent is deleted (on_delete: :nilify_all).
+      uuid = Ecto.UUID.generate()
+
+      Repo.query!(
+        "INSERT INTO sessions (uuid, name, status, started_at) VALUES ($1, $2, $3, $4)",
+        [uuid, "agentless-#{uuid}", "working", DateTime.to_iso8601(DateTime.utc_now())]
+      )
+
+      %{rows: [[session_id]]} =
+        Repo.query!("SELECT id FROM sessions WHERE uuid = $1", [uuid])
+
+      create_jsonl_session(home, "-Users-agentless", uuid, [
+        assistant_jsonl("claude-sonnet-4-5", 500, 250)
+      ])
+
+      assert :ok = TokenIngestion.ingest_session(uuid)
+
+      %{rows: [[agent_id_in_metrics]]} =
+        Repo.query!("SELECT agent_id FROM session_metrics WHERE session_id = $1", [session_id])
+
+      assert agent_id_in_metrics == nil
+      [tokens_used | _] = metrics_row(session_id)
+      assert tokens_used == 750
+    end
   end
 
   # ---------------------------------------------------------------------------

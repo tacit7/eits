@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpersTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp uniq, do: System.unique_integer([:positive])
+  defp unique_n, do: System.unique_integer([:positive])
 
   defp build_socket(project) do
     %Phoenix.LiveView.Socket{

@@ -111,6 +111,20 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmSessionHelpersTest do
 
       assert result.assigns.session.description == "padded"
     end
+
+    test "persists updated description to database" do
+      agent = Factory.create_agent()
+      session = Factory.create_session(agent)
+      socket = build_socket(%{session: session})
+
+      DmSessionHelpers.handle_update_session_description(
+        %{"value" => "Persisted description"},
+        socket
+      )
+
+      {:ok, reloaded} = Sessions.get_session(session.id)
+      assert reloaded.description == "Persisted description"
+    end
   end
 
   describe "handle_toggle_star/3" do

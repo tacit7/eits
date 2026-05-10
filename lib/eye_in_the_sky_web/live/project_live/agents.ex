@@ -4,6 +4,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  alias EyeInTheSky.AgentManager
+  alias EyeInTheSky.Agents.AgentCreationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
 
@@ -19,6 +21,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       |> assign(:filtered_agents, [])
       |> assign(:selected_agent, nil)
       |> assign(:detail_tab, :preview)
+      |> assign(:show_new_agent_form, false)
+      |> assign(:new_agent_name, "")
+      |> assign(:new_agent_description, "")
 
     socket = if connected?(socket), do: load_agents(socket), else: socket
 
@@ -77,6 +82,40 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     do: {:noreply, assign(socket, :detail_tab, :raw)}
 
   def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("toggle_new_agent_form", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_new_agent_form, !socket.assigns.show_new_agent_form)
+     |> assign(:new_agent_name, "")
+     |> assign(:new_agent_description, "")}
+  end
+
+  @impl true
+  def handle_event("update_agent_form", params, socket) do
+    {:noreply,
+     socket
+     |> assign(:new_agent_name, params["agent_name"] || "")
+     |> assign(:new_agent_description, params["agent_description"] || "")}
+  end
+
+  @impl true
+  def handle_event("create_agent", params, socket) do
+    agent_name = String.trim(params["agent_name"] || "")
+    description = String.trim(params["agent_description"] || "")
+
+    cond do
+      agent_name == "" ->
+        {:noreply, put_flash(socket, :error, "Agent name is required")}
+
+      description == "" ->
+        {:noreply, put_flash(socket, :error, "Description is required")}
+
+      true ->
+        create_new_agent(agent_name, description, socket)
+    end
+  end
 
   @impl true
   def handle_event("set_notify_on_stop", params, socket),
@@ -139,6 +178,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
               class="input input-xs bg-base-200/50 border-base-content/8 text-base-content/70 placeholder:text-base-content/30 min-h-[28px] text-xs w-40 focus:w-56 transition-all"
             />
           </form>
+          <button
+            phx-click="toggle_new_agent_form"
+            title="Create new agent"
+            class="btn btn-ghost btn-xs gap-1.5 min-h-[28px] h-7 text-xs text-base-content/60 hover:text-primary hover:bg-primary/5"
+          >
+            <.icon name="hero-plus-mini" class="size-3.5" />
+            New
+          </button>
         </div>
 
         <%= if @filtered_agents != [] do %>
@@ -311,6 +358,73 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
         </div>
       <% end %>
     </div>
+
+    <!-- New Agent Modal -->
+    <%= if @show_new_agent_form do %>
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" phx-click="toggle_new_agent_form">
+        <div
+          class="bg-base-100 border border-base-content/10 rounded-lg shadow-xl w-96 p-6 flex flex-col gap-4"
+          phx-click="JS.stop_propagation()"
+        >
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-base-content">Create New Agent</h2>
+            <button
+              type="button"
+              phx-click="toggle_new_agent_form"
+              class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+            >
+              <.icon name="hero-x-mark" class="size-4" />
+            </button>
+          </div>
+
+          <form phx-submit="create_agent" class="flex flex-col gap-3">
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent Name</label>
+              <input
+                type="text"
+                name="agent_name"
+                value={@new_agent_name}
+                placeholder="e.g., Code Review Agent"
+                autofocus
+                required
+                phx-change="update_agent_form"
+                class="input input-bordered w-full text-base focus:outline-none focus:border-primary/40"
+              />
+            </div>
+
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Description</label>
+              <textarea
+                name="agent_description"
+                value={@new_agent_description}
+                placeholder="What should this agent do?"
+                rows="4"
+                required
+                phx-change="update_agent_form"
+                class="textarea textarea-bordered w-full text-base focus:outline-none focus:border-primary/40 resize-none"
+              ></textarea>
+            </div>
+
+            <div class="flex gap-2 mt-2">
+              <button
+                type="button"
+                phx-click="toggle_new_agent_form"
+                class="btn btn-ghost flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="btn btn-primary flex-1"
+                disabled={@new_agent_name == "" or @new_agent_description == ""}
+              >
+                Create Agent
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    <% end %>
     """
   end
 
@@ -334,5 +448,34 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     File.exists?(path) &&
       (String.starts_with?(path, user_dir) ||
          (not is_nil(project_dir) && String.starts_with?(path, project_dir)))
+  end
+
+  defp create_new_agent(agent_name, description, socket) do
+    project = socket.assigns.project
+    project_id = socket.assigns.project_id
+
+    opts =
+      AgentCreationHelpers.build_opts(%{},
+        project_path: project.path,
+        description: agent_name,
+        instructions: description
+      )
+
+    opts =
+      opts
+      |> Keyword.put(:project_id, project_id)
+      |> Keyword.put(:name, agent_name)
+
+    case AgentManager.create_agent(opts) do
+      {:ok, result} ->
+        {:noreply,
+         socket
+         |> assign(:show_new_agent_form, false)
+         |> put_flash(:info, "Agent created successfully: #{agent_name}")
+         |> load_agents()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to create agent: #{inspect(reason)}")}
+    end
   end
 end

@@ -138,7 +138,7 @@ defmodule EyeInTheSky.MixProject do
         "docs/TERMINAL_PTY.md": [title: "Terminal / PTY"],
         "docs/VIM_NAV.md": [title: "Vim Navigation"],
         "docs/COMMAND_PALETTE.md": [title: "Command Palette"],
-        "docs/SEARCH.md": [title: "Search"],
+        "docs/SEARCH.md": [title: "Search", filename: "search-guide"],
         "docs/WORKERS.md": [title: "Workers"],
         "docs/EVENTS.md": [title: "Events"],
         "docs/SESSION_MANAGER.md": [title: "Session Manager"],
@@ -214,7 +214,8 @@ defmodule EyeInTheSky.MixProject do
         "cmd --cd assets npx vite build --ssr js/server.js --outDir ../priv/svelte",
         "phx.digest"
       ],
-      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"],
+      "gen.docs": ["cmd ERL_LIBS=_build/dev/lib mix docs"]
     ]
   end
 end

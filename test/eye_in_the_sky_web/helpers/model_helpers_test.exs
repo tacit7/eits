@@ -337,8 +337,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.model_display_name("some-unknown-model") == "some-unknown-model"
     end
 
-    test "nil returns \"nil\"" do
-      assert ModelHelpers.model_display_name(nil) == "nil"
+    test "nil returns empty string" do
+      assert ModelHelpers.model_display_name(nil) == ""
     end
 
     test "integer input is converted to string" do

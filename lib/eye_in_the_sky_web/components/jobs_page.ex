@@ -93,6 +93,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       |> assign_new(:running_ids, fn -> MapSet.new(ScheduledJobs.list_running_job_ids()) end)
       |> assign_new(:last_run_map, fn -> ScheduledJobs.last_run_status_map() end)
       |> assign_new(:active_tab, fn -> :all_jobs end)
+      |> assign_new(:bulk_selected_jobs, fn -> MapSet.new() end)
 
     socket =
       if is_nil(prev_project_id) or assigns.project_id != prev_project_id do
@@ -232,6 +233,81 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     else
       handle_filter_jobs(params, socket, [{:all_jobs, :jobs}])
     end
+  end
+
+  defp dispatch_event("toggle_job_select", %{"id" => id}, socket) do
+    {:ok, int_id} = parse_job_id(id)
+    selected = socket.assigns.bulk_selected_jobs
+
+    updated =
+      if MapSet.member?(selected, int_id),
+        do: MapSet.delete(selected, int_id),
+        else: MapSet.put(selected, int_id)
+
+    {:noreply, assign(socket, :bulk_selected_jobs, updated)}
+  rescue
+    _ -> {:noreply, socket}
+  end
+
+  defp dispatch_event("select_all_jobs", %{"scope" => scope}, socket) do
+    jobs =
+      case scope do
+        "project" -> socket.assigns[:project_jobs] || []
+        "global" -> socket.assigns[:global_jobs] || []
+        "overview" -> socket.assigns[:jobs] || []
+        _ -> []
+      end
+
+    job_ids = Enum.map(jobs, & &1.id)
+    selected = socket.assigns.bulk_selected_jobs
+
+    all_selected =
+      Enum.all?(job_ids, &MapSet.member?(selected, &1))
+
+    updated =
+      if all_selected,
+        do: Enum.reduce(job_ids, selected, &MapSet.delete(&2, &1)),
+        else: Enum.reduce(job_ids, selected, &MapSet.put(&2, &1))
+
+    {:noreply, assign(socket, :bulk_selected_jobs, updated)}
+  end
+
+  defp dispatch_event("bulk_enable", %{"scope" => _scope}, socket) do
+    selected = socket.assigns.bulk_selected_jobs
+
+    if MapSet.size(selected) == 0 do
+      {:noreply, socket}
+    else
+      job_ids = MapSet.to_list(selected)
+      {updated_count, _} = ScheduledJobs.bulk_update_enabled(job_ids, true, socket.assigns.project_id)
+
+      {:noreply,
+       socket
+       |> assign(:bulk_selected_jobs, MapSet.new())
+       |> load_jobs()
+       |> then(&put_flash(&1, :info, "Enabled #{updated_count} job#{if updated_count != 1, do: "s"}"))}
+    end
+  end
+
+  defp dispatch_event("bulk_disable", %{"scope" => _scope}, socket) do
+    selected = socket.assigns.bulk_selected_jobs
+
+    if MapSet.size(selected) == 0 do
+      {:noreply, socket}
+    else
+      job_ids = MapSet.to_list(selected)
+      {updated_count, _} = ScheduledJobs.bulk_update_enabled(job_ids, false, socket.assigns.project_id)
+
+      {:noreply,
+       socket
+       |> assign(:bulk_selected_jobs, MapSet.new())
+       |> load_jobs()
+       |> then(&put_flash(&1, :info, "Disabled #{updated_count} job#{if updated_count != 1, do: "s"}"))}
+    end
+  end
+
+  defp dispatch_event("clear_bulk_selection", _params, socket) do
+    {:noreply, assign(socket, :bulk_selected_jobs, MapSet.new())}
   end
 
   defp dispatch_event(_event, _params, socket), do: {:noreply, socket}
@@ -436,6 +512,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               last_failed_runs={@last_failed_runs}
               scope="project"
               project_name={@project.name}
+              bulk_selected_jobs={@bulk_selected_jobs}
               target={@myself}
             />
           </div>
@@ -466,6 +543,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               last_run_map={@last_run_map}
               last_failed_runs={@last_failed_runs}
               scope="global"
+              bulk_selected_jobs={@bulk_selected_jobs}
               target={@myself}
             />
           </div>
@@ -480,6 +558,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
             last_failed_runs={@last_failed_runs}
             scope="overview"
             show_origin={true}
+            bulk_selected_jobs={@bulk_selected_jobs}
             target={@myself}
           />
         <% end %>

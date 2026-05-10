@@ -129,10 +129,21 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <%= if @attachments != [] do %>
       <div class="mt-2 space-y-1">
         <%= for attachment <- @attachments do %>
-          <div class="flex items-center gap-2 rounded-md bg-base-content/[0.04] px-2.5 py-1.5 text-mini font-mono">
+          <div class="flex items-center gap-2 rounded-md bg-base-content/[0.04] px-2.5 py-1.5 text-mini hover:bg-base-content/[0.08] transition-colors group">
             <.icon name="hero-paper-clip" class="size-3 text-base-content/30" />
-            <span class="text-base-content/60">{attachment.original_filename}</span>
-            <span class="ml-auto text-base-content/25">{attachment.storage_path}</span>
+            <span class="text-base-content/60 truncate">{attachment.original_filename}</span>
+            <%= if attachment.size_bytes do %>
+              <span class="text-base-content/40 font-mono">{EyeInTheSkyWeb.Helpers.FileHelpers.format_size(attachment.size_bytes)}</span>
+            <% end %>
+            <button
+              type="button"
+              phx-click="delete_attachment"
+              phx-value-id={attachment.id}
+              class="ml-auto flex items-center justify-center size-5 rounded text-base-content/30 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Delete attachment"
+            >
+              <.icon name="hero-x-mark-mini" class="size-3.5" />
+            </button>
           </div>
         <% end %>
       </div>

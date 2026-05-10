@@ -394,6 +394,25 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("delete_attachment", %{"id" => attachment_id}, socket) do
+    case Integer.parse(attachment_id) do
+      {id, _} ->
+        case EyeInTheSky.FileAttachments.delete_attachment(id) do
+          :ok ->
+            {:noreply,
+             put_flash(socket, :info, "Attachment deleted successfully")
+             |> push_event("refresh_messages", %{})}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete attachment: #{inspect(reason)}")}
+        end
+
+      :error ->
+        {:noreply, put_flash(socket, :error, "Invalid attachment ID")}
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # File autocomplete
   # ---------------------------------------------------------------------------

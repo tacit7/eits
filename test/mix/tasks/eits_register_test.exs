@@ -11,10 +11,12 @@ defmodule Mix.Tasks.Eits.RegisterTest do
   end
 
   describe "run/1 with a single username argument" do
-    test "inserts a registration token row into the database" do
+    test "inserts a registration token row with correct username" do
       Mix.Tasks.Eits.Register.run(["alice"])
 
       assert Repo.aggregate(RegistrationToken, :count, :id) == 1
+      rt = Repo.one!(RegistrationToken)
+      assert rt.username == "alice"
     end
 
     test "stores a hashed token, not the raw token" do

@@ -63,7 +63,7 @@ defmodule Mix.Tasks.IngestTokensTest do
   end
 
   describe "run/1 — single session mode (--session / -s)" do
-    test "prints 'Ingesting session <uuid>' banner" do
+    test "prints 'Ingesting session <uuid>' banner with --session" do
       uuid = Ecto.UUID.generate()
       Mix.Tasks.IngestTokens.run(["--session", uuid])
 
@@ -72,32 +72,32 @@ defmodule Mix.Tasks.IngestTokensTest do
       assert banner =~ uuid
     end
 
-    test "prints failure message when session UUID is not in DB" do
-      uuid = Ecto.UUID.generate()
-      Mix.Tasks.IngestTokens.run(["--session", uuid])
-
-      # banner first
-      assert_receive {:mix_shell, :info, [_banner]}
-      assert_receive {:mix_shell, :error, [msg]}
-      assert msg =~ "Failed"
-    end
-
-    test "prints failure message when -s shorthand is used with unknown UUID" do
+    test "prints -s shorthand banner with the UUID" do
       uuid = Ecto.UUID.generate()
       Mix.Tasks.IngestTokens.run(["-s", uuid])
 
-      assert_receive {:mix_shell, :info, [_banner]}
-      assert_receive {:mix_shell, :error, [msg]}
-      assert msg =~ "Failed"
+      assert_receive {:mix_shell, :info, [banner]}
+      assert banner =~ uuid
     end
 
-    test "prints 'session_not_found' in error for unknown UUID" do
+    test "emits 'Failed' error with session_not_found for unknown UUID" do
       uuid = Ecto.UUID.generate()
       Mix.Tasks.IngestTokens.run(["--session", uuid])
 
       assert_receive {:mix_shell, :info, [_banner]}
       assert_receive {:mix_shell, :error, [msg]}
+      assert msg =~ "Failed"
       assert msg =~ "session_not_found"
+    end
+
+    test "--session takes precedence over --force (runs single-session, not ingest_all)" do
+      uuid = Ecto.UUID.generate()
+      Mix.Tasks.IngestTokens.run(["--session", uuid, "--force"])
+
+      # Banner should be the single-session format, not the force/incremental ingest_all banner
+      assert_receive {:mix_shell, :info, [banner]}
+      assert banner =~ "Ingesting session"
+      assert banner =~ uuid
     end
   end
 

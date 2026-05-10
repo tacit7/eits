@@ -53,11 +53,11 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       home = System.tmp_dir!() |> Path.join("sr_find_#{:rand.uniform(999_999)}")
       dir = make_sessions_dir(home)
       thread_id = "abc123"
-      file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
-      File.write!(file, "")
+      session_file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
+      File.write!(session_file, "")
 
       System.put_env("HOME", home)
-      assert {:ok, ^file} = SessionReader.find_session_file(thread_id)
+      assert {:ok, ^session_file} = SessionReader.find_session_file(thread_id)
       System.put_env("HOME", System.get_env("HOME"))
     after
       System.put_env("HOME", System.get_env("HOME"))
@@ -95,17 +95,17 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       home = System.tmp_dir!() |> Path.join("sr_msgs_#{:rand.uniform(999_999)}")
       dir = make_sessions_dir(home)
       thread_id = "thread-#{:rand.uniform(999_999)}"
-      file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
+      session_file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
       original_home = System.get_env("HOME")
       System.put_env("HOME", home)
 
       on_exit(fn -> System.put_env("HOME", original_home) end)
 
-      {:ok, dir: dir, file: file, thread_id: thread_id}
+      {:ok, session_file: session_file, thread_id: thread_id}
     end
 
-    test "reads user and agent messages", %{file: file, thread_id: thread_id} do
-      write_jsonl(file, [
+    test "reads user and agent messages", %{session_file: session_file, thread_id: thread_id} do
+      write_jsonl(session_file, [
         user_event("hello"),
         agent_event("hi there")
       ])
@@ -122,8 +122,8 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert agent_msg.content == "hi there"
     end
 
-    test "skips token_count and session_meta events", %{file: file, thread_id: thread_id} do
-      write_jsonl(file, [
+    test "skips token_count and session_meta events", %{session_file: session_file, thread_id: thread_id} do
+      write_jsonl(session_file, [
         session_meta_event(),
         user_event("msg"),
         token_event(500)
@@ -134,9 +134,9 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert hd(messages).content == "msg"
     end
 
-    test "skips events without a timestamp field", %{file: file, thread_id: thread_id} do
+    test "skips events without a timestamp field", %{session_file: session_file, thread_id: thread_id} do
       no_ts = %{"type" => "event_msg", "payload" => %{"type" => "user_message", "message" => "no ts"}}
-      write_jsonl(file, [no_ts, user_event("with ts")])
+      write_jsonl(session_file, [no_ts, user_event("with ts")])
 
       {:ok, messages} = SessionReader.read_messages(thread_id)
       assert length(messages) == 2
@@ -146,25 +146,25 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert ts_msg.timestamp == "2024-01-01T00:00:00Z"
     end
 
-    test "skips empty user_message and agent_message", %{file: file, thread_id: thread_id} do
+    test "skips empty user_message and agent_message", %{session_file: session_file, thread_id: thread_id} do
       empty_user = %{"type" => "event_msg", "payload" => %{"type" => "user_message", "message" => ""}, "timestamp" => "2024-01-01T00:00:00Z"}
       empty_agent = %{"type" => "event_msg", "payload" => %{"type" => "agent_message", "message" => ""}, "timestamp" => "2024-01-01T00:00:00Z"}
-      write_jsonl(file, [empty_user, empty_agent, user_event("real")])
+      write_jsonl(session_file, [empty_user, empty_agent, user_event("real")])
 
       {:ok, messages} = SessionReader.read_messages(thread_id)
       assert length(messages) == 1
       assert hd(messages).content == "real"
     end
 
-    test "returns empty list for empty file", %{file: file, thread_id: thread_id} do
-      File.write!(file, "")
+    test "returns empty list for empty file", %{session_file: session_file, thread_id: thread_id} do
+      File.write!(session_file, "")
       {:ok, messages} = SessionReader.read_messages(thread_id)
       assert messages == []
     end
 
-    test "skips malformed JSON lines", %{file: file, thread_id: thread_id} do
+    test "skips malformed JSON lines", %{session_file: session_file, thread_id: thread_id} do
       content = "{\"type\":\"event_msg\",\"payload\":{\"type\":\"user_message\",\"message\":\"ok\"},\"timestamp\":\"2024-01-01T00:00:00Z\"}\nNOT JSON\n"
-      File.write!(file, content)
+      File.write!(session_file, content)
 
       {:ok, messages} = SessionReader.read_messages(thread_id)
       assert length(messages) == 1
@@ -174,16 +174,16 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert {:error, :not_found} = SessionReader.read_messages("no-such-thread")
     end
 
-    test "each message has a uuid", %{file: file, thread_id: thread_id} do
-      write_jsonl(file, [user_event("a"), agent_event("b")])
+    test "each message has a uuid", %{session_file: session_file, thread_id: thread_id} do
+      write_jsonl(session_file, [user_event("a"), agent_event("b")])
       {:ok, [m1, m2]} = SessionReader.read_messages(thread_id)
       assert is_binary(m1.uuid)
       assert is_binary(m2.uuid)
       assert m1.uuid != m2.uuid
     end
 
-    test "same content + timestamp yields same uuid (stable derivation)", %{file: file, thread_id: thread_id} do
-      write_jsonl(file, [user_event("stable", "2024-06-01T12:00:00Z")])
+    test "same content + timestamp yields same uuid (stable derivation)", %{session_file: session_file, thread_id: thread_id} do
+      write_jsonl(session_file, [user_event("stable", "2024-06-01T12:00:00Z")])
       {:ok, [msg]} = SessionReader.read_messages(thread_id)
       uuid1 = msg.uuid
 
@@ -202,12 +202,12 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       home = System.tmp_dir!() |> Path.join("sr_after_#{:rand.uniform(999_999)}")
       dir = make_sessions_dir(home)
       thread_id = "thread-#{:rand.uniform(999_999)}"
-      file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
+      session_file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
       original_home = System.get_env("HOME")
       System.put_env("HOME", home)
       on_exit(fn -> System.put_env("HOME", original_home) end)
 
-      write_jsonl(file, [
+      write_jsonl(session_file, [
         user_event("first", "2024-01-01T00:00:00Z"),
         agent_event("second", "2024-01-01T00:01:00Z"),
         user_event("third", "2024-01-01T00:02:00Z")
@@ -255,15 +255,15 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       home = System.tmp_dir!() |> Path.join("sr_usage_#{:rand.uniform(999_999)}")
       dir = make_sessions_dir(home)
       thread_id = "thread-#{:rand.uniform(999_999)}"
-      file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
+      session_file = Path.join(dir, "rollout-1234567890-#{thread_id}.jsonl")
       original_home = System.get_env("HOME")
       System.put_env("HOME", home)
       on_exit(fn -> System.put_env("HOME", original_home) end)
-      {:ok, file: file, thread_id: thread_id}
+      {:ok, session_file: session_file, thread_id: thread_id}
     end
 
-    test "returns total tokens from last token_count event", %{file: file, thread_id: thread_id} do
-      write_jsonl(file, [
+    test "returns total tokens from last token_count event", %{session_file: session_file, thread_id: thread_id} do
+      write_jsonl(session_file, [
         user_event("hello"),
         token_event(300),
         token_event(500)
@@ -272,18 +272,18 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert {:ok, 500, 0.0} = SessionReader.read_usage(thread_id)
     end
 
-    test "returns 0 tokens when no token_count events present", %{file: file, thread_id: thread_id} do
-      write_jsonl(file, [user_event("hi"), agent_event("ho")])
+    test "returns 0 tokens when no token_count events present", %{session_file: session_file, thread_id: thread_id} do
+      write_jsonl(session_file, [user_event("hi"), agent_event("ho")])
       assert {:ok, 0, 0.0} = SessionReader.read_usage(thread_id)
     end
 
-    test "returns 0 tokens for empty file", %{file: file, thread_id: thread_id} do
-      File.write!(file, "")
+    test "returns 0 tokens for empty file", %{session_file: session_file, thread_id: thread_id} do
+      File.write!(session_file, "")
       assert {:ok, 0, 0.0} = SessionReader.read_usage(thread_id)
     end
 
-    test "cost is always 0.0", %{file: file, thread_id: thread_id} do
-      write_jsonl(file, [token_event(9999)])
+    test "cost is always 0.0", %{session_file: session_file, thread_id: thread_id} do
+      write_jsonl(session_file, [token_event(9999)])
       {:ok, _tokens, cost} = SessionReader.read_usage(thread_id)
       assert cost == 0.0
     end
@@ -292,8 +292,8 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert {:error, :not_found} = SessionReader.read_usage("no-such-thread")
     end
 
-    test "handles single token_count event", %{file: file, thread_id: thread_id} do
-      write_jsonl(file, [token_event(1234)])
+    test "handles single token_count event", %{session_file: session_file, thread_id: thread_id} do
+      write_jsonl(session_file, [token_event(1234)])
       assert {:ok, 1234, 0.0} = SessionReader.read_usage(thread_id)
     end
   end

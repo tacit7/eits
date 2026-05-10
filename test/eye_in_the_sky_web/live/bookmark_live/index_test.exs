@@ -217,7 +217,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.IndexTest do
 
     test "shows flash error when bookmark not found", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/bookmarks")
-      html = render_hook(lv, "delete", %{"id" => 9_999_999})
+      html = render_click(lv, "delete", %{"id" => 9_999_999})
       assert html =~ "Bookmark not found"
     end
 

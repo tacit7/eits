@@ -70,14 +70,15 @@ defmodule EyeInTheSky.CheckpointsTest do
       assert %{session_id: [_ | _]} = errors_on(changeset)
     end
 
-    test "invalid when message_index missing" do
-      changeset = Checkpoint.changeset(%Checkpoint{}, %{session_id: 1})
+    test "invalid when message_index is set to nil explicitly" do
+      # The schema default is 0, so omitting the key passes. Explicit nil triggers the error.
+      changeset = Checkpoint.changeset(%Checkpoint{message_index: nil}, %{session_id: 1, message_index: nil})
       refute changeset.valid?
       assert %{message_index: [_ | _]} = errors_on(changeset)
     end
 
-    test "invalid when both required fields missing" do
-      changeset = Checkpoint.changeset(%Checkpoint{}, %{})
+    test "invalid when both session_id and message_index explicitly nil" do
+      changeset = Checkpoint.changeset(%Checkpoint{message_index: nil}, %{session_id: nil, message_index: nil})
       refute changeset.valid?
       errors = errors_on(changeset)
       assert Map.has_key?(errors, :session_id)

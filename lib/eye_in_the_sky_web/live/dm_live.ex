@@ -34,23 +34,33 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
-    session_result = Sessions.resolve(session_id_param)
+    mount_with_session(socket, session_id_param, params)
+  end
 
-    case session_result do
-      {:ok, session} ->
-        case Agents.get_agent(session.agent_id) do
-          {:ok, agent} ->
-            MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
-            {:ok, mount_session_assigns(socket, params, session, agent, connected?(socket))}
+  # ---------------------------------------------------------------------------
+  # Mount helpers — decomposed from mount/3
+  # ---------------------------------------------------------------------------
 
-          {:error, :not_found} ->
-            {:ok,
-             socket |> put_flash(:error, "Agent not found for this session") |> redirect(to: "/")}
-        end
+  defp mount_with_session(socket, session_id_param, params) do
+    case Sessions.resolve(session_id_param) do
+      {:ok, session} -> mount_with_agent(socket, params, session)
+      {:error, :not_found} -> handle_mount_error(socket, "Session not found")
+    end
+  end
+
+  defp mount_with_agent(socket, params, session) do
+    case Agents.get_agent(session.agent_id) do
+      {:ok, agent} ->
+        MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
+        {:ok, mount_session_assigns(socket, params, session, agent, connected?(socket))}
 
       {:error, :not_found} ->
-        {:ok, socket |> put_flash(:error, "Session not found") |> redirect(to: "/")}
+        handle_mount_error(socket, "Agent not found for this session")
     end
+  end
+
+  defp handle_mount_error(socket, error_message) do
+    {:ok, socket |> put_flash(:error, error_message) |> redirect(to: "/")}
   end
 
   defp mount_session_assigns(socket, params, session, agent, connected) do

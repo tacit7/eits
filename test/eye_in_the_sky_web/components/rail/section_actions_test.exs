@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
       assert updated_socket.assigns.flyout_open == true
     end
 
-    test "resets proj_picker_open when toggling section" do
+    test "resets proj_picker_open when toggling section", %{socket: socket} do
       socket = %{
         socket
         | assigns: %{socket.assigns | proj_picker_open: true}
@@ -100,7 +100,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
       assert updated_socket.assigns.proj_picker_open == false
     end
 
-    test "resets session project filters when toggling section" do
+    test "resets session project filters when toggling section", %{socket: socket} do
       socket = %{
         socket
         | assigns: %{
@@ -120,7 +120,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
   end
 
   describe "handle_close_flyout/2" do
-    test "closes flyout when no sticky section" do
+    test "closes flyout when no sticky section", %{socket: socket} do
       socket = %{
         socket
         | assigns: %{
@@ -141,7 +141,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
       assert updated_socket.assigns.show_new_session_form == false
     end
 
-    test "switches to sticky section when available" do
+    test "switches to sticky section when available", %{socket: socket} do
       socket = %{
         socket
         | assigns: %{
@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
       assert updated_socket.assigns.flyout_open == true
     end
 
-    test "clears proj_picker_open when closing" do
+    test "clears proj_picker_open when closing", %{socket: socket} do
       socket = %{
         socket
         | assigns: %{
@@ -173,7 +173,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
       assert updated_socket.assigns.proj_picker_open == false
     end
 
-    test "clears show_new_session_form when closing" do
+    test "clears show_new_session_form when closing", %{socket: socket} do
       socket = %{
         socket
         | assigns: %{

@@ -1,6 +1,8 @@
 defmodule Mix.Tasks.Eits.RegisterTest do
   use EyeInTheSky.DataCase
 
+  alias EyeInTheSky.Accounts.RegistrationToken
+
   # Mix.Shell.Process captures shell output as messages to this process.
   # Restore the real shell on exit so other tests are not affected.
   setup do
@@ -9,78 +11,82 @@ defmodule Mix.Tasks.Eits.RegisterTest do
     :ok
   end
 
+  # Collect N shell messages; returns the list of message strings.
+  defp drain_shell_messages(count) do
+    for _ <- 1..count do
+      receive do
+        {:mix_shell, :info, [msg]} -> msg
+        {:mix_shell, :error, [msg]} -> msg
+      after
+        500 -> ""
+      end
+    end
+  end
+
   describe "run/1 — happy path" do
     test "prints registration URL containing the raw token" do
       Mix.Tasks.Eits.Register.run(["alice"])
 
-      assert_receive {:mix_shell, :info, [line1]}
-      assert_receive {:mix_shell, :info, [line2]}
-      assert_receive {:mix_shell, :info, [line3]}
+      messages = drain_shell_messages(3)
+      full = Enum.join(messages, "\n")
 
-      full_output = [line1, line2, line3] |> Enum.join("\n")
-
-      assert full_output =~ "alice"
-      assert full_output =~ "/auth/register?token="
+      assert full =~ "alice"
+      assert full =~ "/auth/register?token="
     end
 
     test "URL contains the configured wax_ origin" do
       origin = Application.get_env(:wax_, :origin, "https://localhost:5001")
       Mix.Tasks.Eits.Register.run(["bob"])
 
-      messages =
-        for _ <- 1..3 do
-          receive do
-            {:mix_shell, :info, [msg]} -> msg
-          after
-            500 -> ""
-          end
-        end
+      messages = drain_shell_messages(3)
+      url_line = Enum.find(messages, &String.contains?(&1, "/auth/register?token="))
 
-      assert Enum.any?(messages, &String.starts_with?(&1, "  #{origin}"))
+      assert url_line =~ origin
     end
 
-    test "URL includes username in the registration link output" do
+    test "URL includes the username" do
       Mix.Tasks.Eits.Register.run(["carol"])
 
-      messages =
-        for _ <- 1..3 do
-          receive do
-            {:mix_shell, :info, [msg]} -> msg
-          after
-            500 -> ""
-          end
-        end
+      messages = drain_shell_messages(3)
+      full = Enum.join(messages, "\n")
 
-      assert Enum.any?(messages, &(&1 =~ "carol"))
+      assert full =~ "carol"
     end
 
     test "prints expiry reminder" do
       Mix.Tasks.Eits.Register.run(["dave"])
 
-      messages =
-        for _ <- 1..3 do
-          receive do
-            {:mix_shell, :info, [msg]} -> msg
-          after
-            500 -> ""
-          end
-        end
+      messages = drain_shell_messages(3)
+      full = Enum.join(messages, "\n")
 
-      assert Enum.any?(messages, &(&1 =~ "15 minutes"))
+      assert full =~ "15 minutes"
     end
 
-    test "persists a RegistrationToken to the database" do
+    test "persists a RegistrationToken to the database with the correct username" do
       Mix.Tasks.Eits.Register.run(["eve"])
 
-      # Drain shell messages
-      for _ <- 1..3, do: receive(do: ({:mix_shell, :info, _} -> :ok), after: (500 -> :ok))
+      drain_shell_messages(3)
 
-      count =
-        Repo.query!("SELECT COUNT(*) FROM registration_tokens", []).rows
-        |> hd()
-        |> hd()
+      rt = Repo.one!(RegistrationToken)
 
-      assert count == 1
+      assert rt.username == "eve"
+      assert is_binary(rt.token)
+      # Token is stored as an HMAC hash — not the raw value printed to stdout.
+      assert byte_size(rt.token) > 0
+      assert rt.expires_at != nil
+    end
+
+    test "token in URL differs from hashed token stored in DB" do
+      Mix.Tasks.Eits.Register.run(["frank"])
+
+      messages = drain_shell_messages(3)
+      url_line = Enum.find(messages, &String.contains?(&1, "/auth/register?token="))
+      raw_token = url_line |> String.split("token=") |> List.last() |> String.trim()
+
+      rt = Repo.one!(RegistrationToken)
+
+      # DB stores a hashed form; raw token from output must differ.
+      refute rt.token == raw_token
     end
   end
 
@@ -98,6 +104,19 @@ defmodule Mix.Tasks.Eits.RegisterTest do
 
       assert_receive {:mix_shell, :error, [message]}
       assert message =~ "Usage"
+    end
+
+    test "does not create any DB record when arity is wrong" do
+      Mix.Tasks.Eits.Register.run([])
+
+      drain_shell_messages(1)
+
+      count =
+        Repo.query!("SELECT COUNT(*) FROM registration_tokens", []).rows
+        |> hd()
+        |> hd()
+
+      assert count == 0
     end
   end
 end

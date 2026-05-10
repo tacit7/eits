@@ -118,11 +118,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
 
   def nav_links(%{section: :tasks} = assigns) do
     ~H"""
-    <Helpers.simple_link
-      href={"/projects/#{@project.id}/kanban"}
-      label={"#{@project.name} Board"}
-      icon="hero-squares-2x2"
-    />
+    <></>
     """
   end
 

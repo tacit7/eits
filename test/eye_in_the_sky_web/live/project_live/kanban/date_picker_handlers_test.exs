@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
-  use EyeInTheSkyWeb.DataCase
+  use EyeInTheSky.DataCase
   import Phoenix.LiveViewTest
 
   alias EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlers

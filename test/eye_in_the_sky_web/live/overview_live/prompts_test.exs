@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWeb.OverviewLive.PromptsTest do
-  use ExUnit.Case, async: true
+  use EyeInTheSky.DataCase, async: false
 
   alias EyeInTheSkyWeb.OverviewLive.Prompts, as: PromptsLive
 
@@ -162,16 +162,16 @@ defmodule EyeInTheSkyWeb.OverviewLive.PromptsTest do
   end
 
   describe "handle_event/3 - select_prompt" do
-    test "selects a prompt by integer id" do
+    test "selects a prompt by string id" do
       p = prompt(id: 1)
       socket = build_socket(%{prompts: [p], selected_prompt: nil})
 
-      {:noreply, result} = PromptsLive.handle_event("select_prompt", %{"id" => 1}, socket)
+      {:noreply, result} = PromptsLive.handle_event("select_prompt", %{"id" => "1"}, socket)
 
       assert result.assigns.selected_prompt == p
     end
 
-    test "selects a prompt by string id" do
+    test "selects a prompt with a multi-digit id" do
       p = prompt(id: 42)
       socket = build_socket(%{prompts: [p], selected_prompt: nil})
 
@@ -184,7 +184,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.PromptsTest do
       p = prompt(id: 1)
       socket = build_socket(%{prompts: [p], selected_prompt: p})
 
-      {:noreply, result} = PromptsLive.handle_event("select_prompt", %{"id" => 1}, socket)
+      {:noreply, result} = PromptsLive.handle_event("select_prompt", %{"id" => "1"}, socket)
 
       assert is_nil(result.assigns.selected_prompt)
     end
@@ -194,7 +194,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.PromptsTest do
       p2 = prompt(id: 2, slug: "second")
       socket = build_socket(%{prompts: [p1, p2], selected_prompt: p1})
 
-      {:noreply, result} = PromptsLive.handle_event("select_prompt", %{"id" => 2}, socket)
+      {:noreply, result} = PromptsLive.handle_event("select_prompt", %{"id" => "2"}, socket)
 
       assert result.assigns.selected_prompt == p2
     end
@@ -203,7 +203,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.PromptsTest do
       p = prompt(id: 1)
       socket = build_socket(%{prompts: [p], selected_prompt: nil, detail_tab: :raw})
 
-      {:noreply, result} = PromptsLive.handle_event("select_prompt", %{"id" => 1}, socket)
+      {:noreply, result} = PromptsLive.handle_event("select_prompt", %{"id" => "1"}, socket)
 
       assert result.assigns.detail_tab == :preview
     end

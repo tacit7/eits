@@ -32,9 +32,9 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
 
   defp execute(job) do
     config = ScheduledJobs.decode_config(job)
-    session_uuid = Ecto.UUID.generate()
+    provider_conversation_id = Ecto.UUID.generate()
     base_url = server_base_url()
-    dm_link = "#{base_url}/dm/#{session_uuid}"
+    dm_link = "#{base_url}/dm/#{provider_conversation_id}"
 
     base_instructions = config["instructions"] || "Scheduled agent task"
 
@@ -42,7 +42,7 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
       base_instructions <>
         "\n\nYour DM page link (include this in any notifications): #{dm_link}"
 
-    opts = build_agent_opts(config, session_uuid, instructions, job)
+    opts = build_agent_opts(config, provider_conversation_id, instructions, job)
 
     log_opts = Keyword.drop(opts, [:instructions])
 
@@ -59,14 +59,14 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorker do
     end
   end
 
-  defp build_agent_opts(config, session_uuid, instructions, job) do
+  defp build_agent_opts(config, provider_conversation_id, instructions, job) do
     [
       instructions: instructions,
       model: config["model"],
       project_path: config["project_path"],
       description: config["description"] || job.name,
       project_id: job.project_id,
-      session_uuid: session_uuid
+      provider_conversation_id: provider_conversation_id
     ]
     |> maybe_put(:agent, config["agent"])
     |> maybe_put(:max_budget_usd, parse_float(config["max_budget_usd"]))

@@ -14,7 +14,9 @@ defmodule EyeInTheSky.MessageReactionsTest do
         sender_role: "user",
         direction: "inbound",
         body: "hello",
-        session_id: session.id
+        session_id: session.id,
+        inserted_at: DateTime.utc_now(),
+        updated_at: DateTime.utc_now()
       })
       |> Repo.insert()
 

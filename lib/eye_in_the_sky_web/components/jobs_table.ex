@@ -36,20 +36,76 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   attr :target, :any, default: nil
   attr :scope, :string, default: nil, doc: "Context scope: 'project', 'global', or 'overview'"
   attr :project_name, :string, default: nil, doc: "Project name for project-scoped views"
+  attr :bulk_selected_jobs, :any, default: nil, doc: "MapSet of selected job IDs for bulk operations"
+  attr :last_n_runs_map, :map, default: %{}, doc: "Map of job_id to list of recent run structs"
 
   def jobs_table(assigns) do
+    assigns =
+      assign(assigns, :selected_count,
+        if assigns.bulk_selected_jobs do
+          MapSet.size(assigns.bulk_selected_jobs)
+        else
+          0
+        end
+      )
+
     ~H"""
     <%= if @jobs != [] do %>
+      <%!-- Bulk Action Bar --%>
+      <%= if @selected_count > 0 do %>
+        <div class="mb-4 flex items-center gap-3 bg-base-100 border border-base-300 rounded-lg p-3">
+          <span class="text-sm font-medium">{@selected_count} selected</span>
+          <div class="flex gap-2 ml-auto">
+            <button
+              class="btn btn-sm btn-outline"
+              phx-click="bulk_enable"
+              phx-value-scope={@scope}
+              phx-target={@target}
+              title="Enable selected jobs"
+            >
+              <.icon name="hero-check" class="size-3.5" /> Enable
+            </button>
+            <button
+              class="btn btn-sm btn-outline"
+              phx-click="bulk_disable"
+              phx-value-scope={@scope}
+              phx-target={@target}
+              title="Disable selected jobs"
+            >
+              <.icon name="hero-x-mark" class="size-3.5" /> Disable
+            </button>
+            <button
+              class="btn btn-sm btn-ghost"
+              phx-click="clear_bulk_selection"
+              phx-target={@target}
+              title="Clear selection"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      <% end %>
+
       <div class="md:hidden space-y-3">
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
-          <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
-            <button
-              class="w-full text-left"
-              phx-click="expand_job"
-              phx-value-id={job.id}
-              phx-target={@target}
-            >
+          <% is_selected = @bulk_selected_jobs && MapSet.member?(@bulk_selected_jobs, job.id) %>
+          <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)} #{if is_selected, do: "ring-2 ring-primary"}"}>
+            <div class="flex items-start gap-3">
+              <input
+                type="checkbox"
+                class="checkbox checkbox-sm mt-1"
+                checked={is_selected}
+                phx-click="toggle_job_select"
+                phx-value-id={job.id}
+                phx-target={@target}
+              />
+              <button
+                class="w-full text-left"
+                phx-click="expand_job"
+                phx-value-id={job.id}
+                phx-target={@target}
+              >
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
@@ -70,7 +126,8 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   {type_label(job.job_type)}
                 </span>
               </div>
-            </button>
+              </button>
+            </div>
 
             <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
             <%= if mobile_failed_run do %>
@@ -187,6 +244,16 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
         <table class="table table-sm">
           <thead>
             <tr>
+              <th style="width: 32px;">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm"
+                  checked={@bulk_selected_jobs && MapSet.size(@bulk_selected_jobs) > 0 && Enum.all?(@jobs, &MapSet.member?(@bulk_selected_jobs, &1.id))}
+                  phx-click="select_all_jobs"
+                  phx-value-scope={@scope}
+                  phx-target={@target}
+                />
+              </th>
               <th>Name</th>
               <%= if @show_origin do %>
                 <th>Origin</th>
@@ -204,7 +271,18 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
           <tbody>
             <%= for job <- @jobs do %>
               <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
-              <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
+              <% is_selected = @bulk_selected_jobs && MapSet.member?(@bulk_selected_jobs, job.id) %>
+              <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"} #{if is_selected, do: "bg-primary/10"}"}>
+                <td style="width: 32px;">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    checked={is_selected}
+                    phx-click="toggle_job_select"
+                    phx-value-id={job.id}
+                    phx-target={@target}
+                  />
+                </td>
                 <td
                   class={"cursor-pointer #{row_border_class(row_state)}"}
                   phx-click="expand_job"

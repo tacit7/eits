@@ -48,6 +48,21 @@ defmodule EyeInTheSky.ScheduledJobs.JobRunTracker do
     |> Map.new(fn r -> {r.job_id, r} end)
   end
 
+  def last_n_runs_for_jobs([], _limit), do: %{}
+
+  def last_n_runs_for_jobs(job_ids, limit \\ 10) when is_list(job_ids) do
+    from(r in JobRun,
+      where: r.job_id in ^job_ids,
+      order_by: [asc: r.job_id, desc: r.started_at],
+      limit: ^(length(job_ids) * limit)
+    )
+    |> Repo.all()
+    |> Enum.group_by(& &1.job_id)
+    |> Map.new(fn {job_id, runs} ->
+      {job_id, Enum.take(runs, limit)}
+    end)
+  end
+
   def record_run_start(job) do
     %JobRun{}
     |> JobRun.changeset(%{

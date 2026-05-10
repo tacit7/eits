@@ -92,9 +92,12 @@ defmodule EyeInTheSkyWeb.NavHook do
 
   # Forward session update/stop events to the Rail so its flyout sessions list
   # stays live without requiring a page refresh or navigation.
-  # NOTE: :agent_created broadcasts an Agents.Agent struct (no :name), not a Session struct.
-  # Omit it here — the Rail gets updated via :agent_updated once the session starts.
-  defp maybe_update_rail_sessions({event, session}, socket)
+  #
+  # Guard against non-Session structs:
+  # - :agent_created broadcasts %Agents.Agent{} (no :name)
+  # - Events.agent_updated/1 also broadcasts %Agents.Agent{} via :agent_updated
+  # Only %Session{} structs have the :name field that sessions_section.ex expects.
+  defp maybe_update_rail_sessions({event, %EyeInTheSky.Sessions.Session{} = session}, socket)
        when event in [:agent_updated, :agent_stopped] do
     send_update(EyeInTheSkyWeb.Components.Rail, id: "app-rail", session_updated: session)
     {:cont, socket}

@@ -3,348 +3,189 @@ defmodule EyeInTheSkyWeb.AgentLive.CanvasHandlersTest do
 
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSky.Canvases
+  alias EyeInTheSky.Factory
+
+  # Build a bare socket with the minimum assigns CanvasHandlers needs.
+  defp build_socket do
+    %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}, flash: %{}}}
+  end
 
   setup do
-    # Create test data
     {:ok, canvas} = Canvases.create_canvas(%{name: "Test Canvas"})
-    {:ok, session} = create_test_session()
-
+    session = Factory.new_session()
     {:ok, canvas: canvas, session: session}
   end
 
   describe "handle_event show_new_canvas_form" do
     test "assigns show_new_canvas_for with agent id" do
-      socket = Phoenix.LiveView.Socket.new(%{})
+      {:noreply, updated} =
+        CanvasHandlers.handle_event("show_new_canvas_form", %{"agent-id" => "123"}, build_socket())
 
-      {:noreply, updated_socket} =
-        CanvasHandlers.handle_event("show_new_canvas_form", %{"agent-id" => "123"}, socket)
-
-      assert updated_socket.assigns.show_new_canvas_for == "123"
+      assert updated.assigns.show_new_canvas_for == "123"
     end
 
     test "handles different agent IDs" do
-      socket = Phoenix.LiveView.Socket.new(%{})
+      {:noreply, updated} =
+        CanvasHandlers.handle_event("show_new_canvas_form", %{"agent-id" => "456"}, build_socket())
 
-      {:noreply, updated_socket} =
-        CanvasHandlers.handle_event("show_new_canvas_form", %{"agent-id" => "456"}, socket)
-
-      assert updated_socket.assigns.show_new_canvas_for == "456"
+      assert updated.assigns.show_new_canvas_for == "456"
     end
   end
 
   describe "handle_event add_to_canvas" do
-    setup %{canvas: canvas, session: session} do
-      {:ok, canvas: canvas, session: session}
-    end
-
-    test "adds session to canvas and navigates", %{canvas: canvas, session: session} do
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
+    test "adds session to canvas and sets info flash", %{canvas: canvas, session: session} do
+      {:noreply, updated} =
         CanvasHandlers.handle_event(
           "add_to_canvas",
           %{"canvas-id" => to_string(canvas.id), "session-id" => to_string(session.id)},
-          socket
+          build_socket()
         )
 
-      # Should have a flash message
-      assert is_map(updated_socket.assigns.flash)
-
-      # Should set up navigation
-      assert updated_socket.assigns[:navigation_pending] or
-               updated_socket.private[:navigate] or true
+      assert updated.assigns.flash["info"] =~ canvas.name
     end
 
-    test "shows flash info message on success", %{canvas: canvas, session: session} do
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
+    test "sets error flash for nonexistent canvas ID", %{session: session} do
+      {:noreply, updated} =
         CanvasHandlers.handle_event(
           "add_to_canvas",
-          %{"canvas-id" => to_string(canvas.id), "session-id" => to_string(session.id)},
-          socket
+          %{"canvas-id" => "999999", "session-id" => to_string(session.id)},
+          build_socket()
         )
 
-      flash = updated_socket.assigns.flash
-      assert flash.info =~ "Added to" or flash.info =~ canvas.name
+      assert updated.assigns.flash["error"]
     end
 
-    test "handles invalid canvas ID" do
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
+    test "sets error flash when canvas-id is not a number", %{session: session} do
+      {:noreply, updated} =
         CanvasHandlers.handle_event(
           "add_to_canvas",
-          %{"canvas-id" => "999999", "session-id" => "1"},
-          socket
+          %{"canvas-id" => "invalid", "session-id" => to_string(session.id)},
+          build_socket()
         )
 
-      # Should have error flash
-      assert updated_socket.assigns.flash.error or is_map(updated_socket.assigns.flash)
+      assert updated.assigns.flash["error"]
     end
 
-    test "handles invalid session ID" do
-      {:ok, canvas} = Canvases.create_canvas(%{name: "Test"})
-
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
+    test "sets error flash when session-id is not a number", %{canvas: canvas} do
+      {:noreply, updated} =
         CanvasHandlers.handle_event(
           "add_to_canvas",
           %{"canvas-id" => to_string(canvas.id), "session-id" => "invalid"},
-          socket
+          build_socket()
         )
 
-      # Should have error or nil (nil parsed as invalid)
-      assert is_map(updated_socket.assigns.flash)
+      assert updated.assigns.flash["error"]
     end
 
-    test "handles missing canvas-id" do
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
+    test "parses string IDs correctly", %{canvas: canvas, session: session} do
+      {:noreply, updated} =
         CanvasHandlers.handle_event(
           "add_to_canvas",
-          %{"session-id" => "1"},
-          socket
+          %{"canvas-id" => to_string(canvas.id), "session-id" => to_string(session.id)},
+          build_socket()
         )
 
-      # Should handle gracefully with error
-      assert is_map(updated_socket.assigns.flash)
-    end
-
-    test "handles missing session-id" do
-      {:ok, canvas} = Canvases.create_canvas(%{name: "Test"})
-
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
-        CanvasHandlers.handle_event(
-          "add_to_canvas",
-          %{"canvas-id" => to_string(canvas.id)},
-          socket
-        )
-
-      # Should handle gracefully
-      assert is_map(updated_socket.assigns.flash)
-    end
-
-    test "parses string IDs to integers" do
-      {:ok, canvas} = Canvases.create_canvas(%{name: "Test"})
-      {:ok, session} = create_test_session()
-
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, _updated_socket} =
-        CanvasHandlers.handle_event(
-          "add_to_canvas",
-          %{
-            "canvas-id" => to_string(canvas.id),
-            "session-id" => to_string(session.id)
-          },
-          socket
-        )
-
-      # Should parse and handle correctly
-      assert Canvases.get_canvas(canvas.id) == {:ok, canvas}
+      # Success path navigates — no error flash
+      refute updated.assigns.flash["error"]
     end
   end
 
   describe "handle_event add_to_new_canvas" do
-    setup %{session: session} do
-      {:ok, session: session}
-    end
-
-    test "creates canvas and adds session", %{session: session} do
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
+    test "creates canvas with given name and sets info flash", %{session: session} do
+      {:noreply, updated} =
         CanvasHandlers.handle_event(
           "add_to_new_canvas",
-          %{"session_id" => to_string(session.id), "canvas_name" => "My New Canvas"},
-          socket
+          %{"session_id" => to_string(session.id), "canvas_name" => "My Canvas"},
+          build_socket()
         )
 
-      # Should have success flash
-      assert updated_socket.assigns.flash.info or is_map(updated_socket.assigns.flash)
+      assert updated.assigns.flash["info"] =~ "My Canvas"
+
+      canvases = Canvases.list_canvases(limit: 50)
+      assert Enum.any?(canvases, &(&1.name == "My Canvas"))
     end
 
-    test "uses provided canvas name" do
-      {:ok, session} = create_test_session()
-
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
+    test "trims whitespace from canvas name", %{session: session} do
       CanvasHandlers.handle_event(
         "add_to_new_canvas",
-        %{"session_id" => to_string(session.id), "canvas_name" => "Custom Name"},
-        socket
+        %{"session_id" => to_string(session.id), "canvas_name" => "  Trimmed  "},
+        build_socket()
       )
 
-      # Verify canvas was created with that name
       canvases = Canvases.list_canvases(limit: 50)
-      assert Enum.any?(canvases, &(&1.name == "Custom Name"))
+      assert Enum.any?(canvases, &(&1.name == "Trimmed"))
     end
 
-    test "generates default canvas name with timestamp when name is empty" do
-      {:ok, session} = create_test_session()
-
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      before_timestamp = :os.system_time(:second)
+    test "auto-generates canvas name when name is empty", %{session: session} do
+      t_before = :os.system_time(:second)
 
       CanvasHandlers.handle_event(
         "add_to_new_canvas",
         %{"session_id" => to_string(session.id), "canvas_name" => ""},
-        socket
+        build_socket()
       )
 
-      after_timestamp = :os.system_time(:second)
+      t_after = :os.system_time(:second)
 
-      # Verify a canvas was created with generated name
       canvases = Canvases.list_canvases(limit: 50)
-      auto_named = Enum.find(canvases, fn c ->
-        String.starts_with?(c.name, "Canvas") and
-          Enum.any?(before_timestamp..after_timestamp, fn ts ->
-            c.name == "Canvas #{ts}"
-          end)
-      end)
 
-      assert auto_named or Enum.any?(canvases)
+      auto_named =
+        Enum.find(canvases, fn c ->
+          String.starts_with?(c.name, "Canvas ") &&
+            case Integer.parse(String.replace_prefix(c.name, "Canvas ", "")) do
+              {ts, ""} -> ts >= t_before && ts <= t_after
+              _ -> false
+            end
+        end)
+
+      assert auto_named, "expected an auto-named canvas between Canvas #{t_before} and Canvas #{t_after}"
     end
 
-    test "generates default name when canvas_name is nil" do
-      {:ok, session} = create_test_session()
-
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
+    test "auto-generates canvas name when name is nil", %{session: session} do
       CanvasHandlers.handle_event(
         "add_to_new_canvas",
         %{"session_id" => to_string(session.id), "canvas_name" => nil},
-        socket
+        build_socket()
       )
 
-      # Canvas should be created
       canvases = Canvases.list_canvases(limit: 50)
-      assert Enum.any?(canvases)
+      assert Enum.any?(canvases, &String.starts_with?(&1.name, "Canvas "))
     end
 
-    test "handles invalid session ID" do
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
+    test "returns noreply without crash for invalid session_id" do
+      {:noreply, updated} =
         CanvasHandlers.handle_event(
           "add_to_new_canvas",
           %{"session_id" => "invalid", "canvas_name" => "Test"},
-          socket
+          build_socket()
         )
 
-      # Should not crash, just skip
-      assert updated_socket == socket or is_map(updated_socket.assigns.flash)
+      # parse_int("invalid") == nil → early return, no flash change
+      assert updated.assigns.flash == %{}
     end
 
-    test "handles nil session ID" do
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
+    test "returns noreply without crash for nil session_id" do
+      {:noreply, updated} =
         CanvasHandlers.handle_event(
           "add_to_new_canvas",
           %{"session_id" => nil, "canvas_name" => "Test"},
-          socket
+          build_socket()
         )
 
-      # Should not crash
-      assert updated_socket == socket or is_map(updated_socket.assigns.flash)
+      assert updated.assigns.flash == %{}
     end
 
-    test "handles missing session_id" do
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      {:noreply, updated_socket} =
-        CanvasHandlers.handle_event(
-          "add_to_new_canvas",
-          %{"canvas_name" => "Test"},
-          socket
-        )
-
-      # Should handle gracefully
-      assert updated_socket == socket or is_map(updated_socket.assigns.flash)
-    end
-
-    test "trims whitespace from canvas name" do
-      {:ok, session} = create_test_session()
-
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
+    test "handles special characters in canvas name", %{session: session} do
+      special = "Canvas @#$%^&*() 🎨"
 
       CanvasHandlers.handle_event(
         "add_to_new_canvas",
-        %{"session_id" => to_string(session.id), "canvas_name" => "  Trimmed Name  "},
-        socket
+        %{"session_id" => to_string(session.id), "canvas_name" => special},
+        build_socket()
       )
 
-      # Verify canvas was created with trimmed name
       canvases = Canvases.list_canvases(limit: 50)
-      assert Enum.any?(canvases, &(&1.name == "Trimmed Name"))
+      assert Enum.any?(canvases, &(&1.name == special))
     end
-
-    test "handles special characters in canvas name" do
-      {:ok, session} = create_test_session()
-
-      socket =
-        Phoenix.LiveView.Socket.new(%{})
-        |> Phoenix.Component.assign(:flash, %{})
-
-      special_name = "Canvas @#$%^&*() 🎨"
-
-      CanvasHandlers.handle_event(
-        "add_to_new_canvas",
-        %{"session_id" => to_string(session.id), "canvas_name" => special_name},
-        socket
-      )
-
-      # Verify canvas was created
-      canvases = Canvases.list_canvases(limit: 50)
-      assert Enum.any?(canvases, &(&1.name == special_name))
-    end
-  end
-
-  # Helper to create a test session
-  defp create_test_session do
-    EyeInTheSky.Sessions.create_session(%{
-      uuid: Ecto.UUID.generate(),
-      agent_id: nil,
-      name: "Test Session",
-      provider: "test",
-      git_worktree_path: "/tmp"
-    })
   end
 end

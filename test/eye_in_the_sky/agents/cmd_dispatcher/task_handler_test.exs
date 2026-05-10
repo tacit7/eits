@@ -2,19 +2,12 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandlerTest do
   use EyeInTheSky.DataCase, async: true
 
   alias EyeInTheSky.Agents.CmdDispatcher.TaskHandler
+  alias EyeInTheSky.Factory
   alias EyeInTheSky.Tasks
   alias EyeInTheSky.Notes
 
   setup do
-    {:ok, session} =
-      EyeInTheSky.Sessions.create_session(%{
-        uuid: Ecto.UUID.generate(),
-        agent_id: nil,
-        name: "Test Session",
-        provider: "test",
-        git_worktree_path: "/tmp"
-      })
-
+    session = Factory.new_session()
     {:ok, session: session}
   end
 

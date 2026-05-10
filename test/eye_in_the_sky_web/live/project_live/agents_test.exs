@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.AgentsTest do
   import Phoenix.LiveViewTest
 
   alias EyeInTheSky.Projects
-  alias EyeInTheSky.Agents.AgentDef
 
   setup do
     {:ok, project} =
@@ -105,20 +104,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.AgentsTest do
     test "selects an agent", %{conn: conn, project: project} do
       {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/agents")
 
-      # Create a mock agent
-      agent = %AgentDef{
-        id: "test-1",
-        name: "Test Agent",
-        description: "A test agent",
-        source: :agents,
-        size: 1024,
-        path: "/tmp/test.md",
-        content: "# Test"
-      }
-
-      lv |> element("form[phx-change='search']")
-
-      assert lv.assigns.selected_agent == nil || is_nil(lv.assigns.selected_agent)
+      # Agents are loaded from disk; in test env none will be present
+      assert is_nil(lv.assigns.selected_agent)
     end
 
     test "deselects agent when clicking same agent", %{conn: conn, project: project} do

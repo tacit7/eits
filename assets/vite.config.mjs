@@ -49,17 +49,12 @@ export default defineConfig({
         rollupOptions: {
           input: ["js/app.js"],
           output: {
-            manualChunks(id) {
-              // Split heavy syntax-highlighting libs into a separate lazy chunk.
-              // These are only loaded when markdown or code blocks are rendered.
-              if (id.includes('highlight.js') || id.includes('marked')) {
-                return 'syntax'
-              }
-              // Split codemirror into its own chunk — loaded only when the editor hook mounts.
-              if (id.includes('@codemirror') || id.includes('codemirror-lang') || id.includes('@uiw/codemirror') || id.includes('@replit/codemirror')) {
-                return 'editor'
-              }
-            },
+            // CRITICAL: Keep app.js in a single chunk to prevent double LiveSocket binding
+            // in production. Code-splitting caused the main app initialization to run
+            // in a different order vs dev, resulting in duplicate data-phx-root-id.
+            // Dynamic imports from split chunks (editor, syntax) were causing module
+            // re-evaluation, leading to "Cannot bind multiple views" error on DM page.
+            manualChunks: undefined,
           },
         },
         outDir: "../priv/static",

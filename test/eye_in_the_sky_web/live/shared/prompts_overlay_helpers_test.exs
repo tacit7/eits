@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.PromptsOverlayHelpersTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp prompt(overrides \\ %{}) do
+  defp prompt(overrides) do
     Map.merge(
       %{
         slug: "my-prompt",
@@ -210,11 +210,11 @@ defmodule EyeInTheSkyWeb.Live.Shared.PromptsOverlayHelpersTest do
       result =
         PromptsHelpers.apply_filters_and_sort(prompts, %{
           scope_filter: "global",
-          search_query: "er",
+          search_query: "e",
           sort_by: "name_asc"
         })
 
-      # "Zephyr" and "Amber" both contain "er"; project prompt excluded by scope
+      # scope: "global" excludes project-p; search "e" matches "Zephyr" (z-e-phyr) and "Amber" (amb-e-r)
       assert Enum.map(result, & &1.name) == ["Amber", "Zephyr"]
     end
   end

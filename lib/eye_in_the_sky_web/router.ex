@@ -303,6 +303,18 @@ defmodule EyeInTheSkyWeb.Router do
     post "/teams/:team_id/broadcast", TeamController, :broadcast
   end
 
+  # Bookmarks — in EyeInTheSkyWeb namespace (not Api.V1)
+  scope "/api/v1", EyeInTheSkyWeb do
+    pipe_through :api
+
+    get "/bookmarks", BookmarkController, :index
+    post "/bookmarks", BookmarkController, :create
+    get "/bookmarks/check", BookmarkController, :check
+    get "/bookmarks/:id", BookmarkController, :show
+    patch "/bookmarks/:id", BookmarkController, :update
+    delete "/bookmarks/:id", BookmarkController, :delete
+  end
+
   # IAM hook endpoint — unauthenticated (hooks run in Claude CLI process with no user session)
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
     pipe_through [:accepts_json]

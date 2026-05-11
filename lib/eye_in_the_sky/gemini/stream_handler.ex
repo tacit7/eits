@@ -195,10 +195,33 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
         send(caller_pid, {:codex_session_id, sdk_ref, session_id})
         %{state | session_id: session_id}
 
-      %Types.MessageEvent{role: "assistant", content: content} when is_binary(content) ->
-        msg = Message.text(content)
+      # Gemini CLI emits TWO kinds of assistant MessageEvents:
+      #   * delta: true   — incremental streaming chunk
+      #   * delta: false  — final aggregated content (sum of all preceding deltas)
+      # If we accumulate both into state.text, the final message gets the chunks
+      # concatenated with the full text → doubled output. So:
+      #   * On a delta, append to state.text and send a delta Message for live
+      #     streaming display.
+      #   * On a final non-delta, REPLACE state.text (don't append) so the
+      #     :result event carries the correct single copy. Don't emit a
+      #     duplicate :text Message — the StreamAssembler already shows the
+      #     accumulated deltas and the final :result will commit it.
+      %Types.MessageEvent{role: "assistant", content: content, delta: true}
+      when is_binary(content) ->
+        msg = Message.text(content, true)
         send(caller_pid, {:claude_message, sdk_ref, msg})
         %{state | text: state.text <> content}
+
+      %Types.MessageEvent{role: "assistant", content: content}
+      when is_binary(content) ->
+        # Non-delta (delta: false or nil) — final aggregated message.
+        # If we accumulated deltas, replace; otherwise treat as the only emit.
+        if state.text == "" do
+          msg = Message.text(content, false)
+          send(caller_pid, {:claude_message, sdk_ref, msg})
+        end
+
+        %{state | text: content}
 
       %Types.MessageEvent{role: "user"} ->
         state

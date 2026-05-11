@@ -364,6 +364,16 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     end
   end
 
+  defp sync_gemini_async(session_id, session_uuid, session, agent) do
+    project_path =
+      case SessionHelpers.resolve_project_path(session, agent) do
+        {:ok, path} -> path
+        _ -> nil
+      end
+
+    GeminiImporter.sync(session_uuid, project_path, session_id)
+  end
+
   defp cleanup_rejected_message(message, uploaded_files) do
     Messages.delete_message(message)
     cleanup_uploaded_files(uploaded_files)

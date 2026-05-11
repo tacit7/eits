@@ -6,6 +6,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
   alias EyeInTheSky.Claude.SessionReader
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
+  alias EyeInTheSky.Gemini.SessionImporter, as: GeminiImporter
+  alias EyeInTheSky.Gemini.SessionReader, as: GeminiReader
   alias EyeInTheSky.Messages
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 

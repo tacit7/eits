@@ -64,21 +64,24 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionResolver do
         {:ok, session}
 
       {:error, :not_found} ->
-        # Try agent UUID lookup
         if _int_id = ToolHelpers.parse_int(ref) do
           {:error, :not_found}
         else
-          case Agents.get_agent_by_uuid(ref) do
-            {:ok, agent} ->
-              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-                [session | _] -> {:ok, session}
-                [] -> {:error, :not_found}
-              end
-
-            {:error, :not_found} ->
-              {:error, :not_found}
-          end
+          session_for_agent_uuid(ref)
         end
+    end
+  end
+
+  defp session_for_agent_uuid(ref) do
+    case Agents.get_agent_by_uuid(ref) do
+      {:ok, agent} ->
+        case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+          [session | _] -> {:ok, session}
+          [] -> {:error, :not_found}
+        end
+
+      {:error, :not_found} ->
+        {:error, :not_found}
     end
   end
 

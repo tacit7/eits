@@ -129,41 +129,39 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
     rows = legacy_agent_rows(session.id)
     scanned = length(rows)
 
-    cond do
-      scanned == 0 ->
-        Mix.shell().info("[#{session.id}] #{session.name || "(unnamed)"}: no legacy rows")
-        Map.update!(acc, :scanned, &(&1 + scanned))
+    if scanned == 0 do
+      Mix.shell().info("[#{session.id}] #{session.name || "(unnamed)"}: no legacy rows")
+      Map.update!(acc, :scanned, &(&1 + scanned))
+    else
+      case load_turns(session) do
+        {:ok, turn_index} ->
+          {matched, updated} = apply_backfill(session, rows, turn_index, dry_run?)
 
-      true ->
-        case load_turns(session) do
-          {:ok, turn_index} ->
-            {matched, updated} = apply_backfill(session, rows, turn_index, dry_run?)
+          Mix.shell().info(
+            "[#{session.id}] #{session.name || "(unnamed)"}: #{scanned} scanned, #{matched} matched, #{updated} updated"
+          )
 
-            Mix.shell().info(
-              "[#{session.id}] #{session.name || "(unnamed)"}: #{scanned} scanned, #{matched} matched, #{updated} updated"
-            )
+          acc
+          |> Map.update!(:scanned, &(&1 + scanned))
+          |> Map.update!(:matched, &(&1 + matched))
+          |> Map.update!(:updated, &(&1 + updated))
 
-            acc
-            |> Map.update!(:scanned, &(&1 + scanned))
-            |> Map.update!(:matched, &(&1 + matched))
-            |> Map.update!(:updated, &(&1 + updated))
+        {:error, :not_found} ->
+          Mix.shell().info(
+            "[#{session.id}] #{session.name || "(unnamed)"}: no session file, skipping"
+          )
 
-          {:error, :not_found} ->
-            Mix.shell().info(
-              "[#{session.id}] #{session.name || "(unnamed)"}: no session file, skipping"
-            )
+          acc
+          |> Map.update!(:scanned, &(&1 + scanned))
+          |> Map.update!(:missing_file, &(&1 + 1))
 
-            acc
-            |> Map.update!(:scanned, &(&1 + scanned))
-            |> Map.update!(:missing_file, &(&1 + 1))
+        {:error, reason} ->
+          Mix.shell().error(
+            "[#{session.id}] failed to read session file: #{inspect(reason)}"
+          )
 
-          {:error, reason} ->
-            Mix.shell().error(
-              "[#{session.id}] failed to read session file: #{inspect(reason)}"
-            )
-
-            acc |> Map.update!(:scanned, &(&1 + scanned))
-        end
+          acc |> Map.update!(:scanned, &(&1 + scanned))
+      end
     end
   end
 
@@ -216,34 +214,35 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
   defp apply_backfill(session, rows, turn_index, dry_run?) do
     Enum.reduce(rows, {0, 0}, fn row, {matched, updated} ->
       case Map.get(turn_index, row.source_uuid) do
-        nil ->
-          {matched, updated}
-
-        {turn, idx, all_turns} ->
-          new_fields = build_metadata(turn, idx, all_turns)
-          merged = Map.merge(row.metadata || %{}, new_fields)
-
-          if dry_run? do
-            Mix.shell().info(
-              "  would update row #{row.id} (turn #{row.source_uuid}) with #{inspect(new_fields)}"
-            )
-
-            {matched + 1, updated}
-          else
-            case update_metadata(row.id, merged) do
-              {1, _} ->
-                {matched + 1, updated + 1}
-
-              other ->
-                Mix.shell().error(
-                  "[#{session.id}] update_all returned #{inspect(other)} for row #{row.id}"
-                )
-
-                {matched + 1, updated}
-            end
-          end
+        nil -> {matched, updated}
+        {turn, idx, all_turns} -> apply_turn(session, row, turn, idx, all_turns, dry_run?, matched, updated)
       end
     end)
+  end
+
+  defp apply_turn(session, row, turn, idx, all_turns, dry_run?, matched, updated) do
+    new_fields = build_metadata(turn, idx, all_turns)
+    merged = Map.merge(row.metadata || %{}, new_fields)
+
+    if dry_run? do
+      Mix.shell().info(
+        "  would update row #{row.id} (turn #{row.source_uuid}) with #{inspect(new_fields)}"
+      )
+
+      {matched + 1, updated}
+    else
+      case update_metadata(row.id, merged) do
+        {1, _} ->
+          {matched + 1, updated + 1}
+
+        other ->
+          Mix.shell().error(
+            "[#{session.id}] update_all returned #{inspect(other)} for row #{row.id}"
+          )
+
+          {matched + 1, updated}
+      end
+    end
   end
 
   defp build_metadata(turn, idx, all_turns) do

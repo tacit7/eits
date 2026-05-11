@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
     test "renders the prompt content", %{conn: conn, project: project, prompt: prompt} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
-      assert html =~ "helpful assistant" || is_binary(html)
+      assert html =~ "helpful assistant"
     end
   end
 
@@ -44,28 +44,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
     test "renders edit affordance", %{conn: conn, project: project, prompt: prompt} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
-      assert html =~ "Edit" || html =~ "edit"
+      assert html =~ ~s(phx-click="edit")
     end
 
     test "renders delete affordance", %{conn: conn, project: project, prompt: prompt} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
-      assert html =~ "Delete" || html =~ "delete"
+      assert html =~ "Deactivate"
     end
 
   end
 
   describe "handle_event/delete" do
-    test "deleting a prompt removes it from the database", %{conn: conn, project: project, prompt: prompt} do
+    test "deactivating a prompt navigates back to the prompts list", %{conn: conn, project: project, prompt: prompt} do
       {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
-      if has_element?(lv, "[phx-click='delete_prompt']") do
-        lv |> element("[phx-click='delete_prompt']") |> render_click()
+      assert has_element?(lv, "[phx-click='delete']")
 
-        assert is_nil(Prompts.get_prompt(prompt.id))
-      else
-        assert is_binary(render(lv))
-      end
+      result = lv |> element("[phx-click='delete']") |> render_click()
+
+      assert {:error, {:live_redirect, %{to: path}}} = result
+      assert path =~ "/projects/#{project.id}/prompts"
     end
   end
 end

@@ -18,27 +18,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNewTest do
     test "renders a form for creating a new prompt", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
 
-      assert html =~ "form" || html =~ "New" || html =~ "Create"
+      assert html =~ "New Prompt"
     end
 
     test "renders name/content input fields", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
 
-      assert html =~ "input" || html =~ "textarea"
+      assert html =~ "Prompt Text"
     end
   end
 
   describe "render/1" do
-    test "renders a save or create button", %{conn: conn, project: project} do
+    test "renders the create prompt submit button", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
 
-      assert html =~ "Save" || html =~ "Create" || html =~ "save" || html =~ "create"
+      assert html =~ "Create Prompt"
     end
 
-    test "renders a cancel or back link", %{conn: conn, project: project} do
+    test "renders a back link to the prompts list", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
 
-      assert html =~ "Cancel" || html =~ "Back" || html =~ "cancel" || html =~ "back"
+      assert html =~ "Back to Prompts"
     end
   end
 

@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GithubWebhookController do
          [event_header] <- get_req_header(conn, "x-github-event"),
          [delivery_id] <- get_req_header(conn, "x-github-delivery") do
       hook_id = get_req_header(conn, "x-github-hook-id") |> List.first()
-      payload = conn.body_params || %{}
+      payload = resolve_payload(conn.body_params)
       action = payload["action"]
       event_type = Webhook.normalize_event_type(event_header, action)
       repo = get_in(payload, ["repository", "full_name"])
@@ -55,4 +55,14 @@ defmodule EyeInTheSkyWeb.Api.V1.GithubWebhookController do
         send_resp(conn, 400, "")
     end
   end
+
+  # smee forwards payloads as form-encoded `payload=<json>` instead of raw JSON.
+  defp resolve_payload(%{"payload" => json}) when is_binary(json) do
+    case Jason.decode(json) do
+      {:ok, map} -> map
+      _ -> %{}
+    end
+  end
+
+  defp resolve_payload(params), do: params || %{}
 end

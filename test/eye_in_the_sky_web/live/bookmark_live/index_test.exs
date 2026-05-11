@@ -66,14 +66,15 @@ defmodule EyeInTheSkyWeb.BookmarkLive.IndexTest do
         priority: 2
       })
 
-      {:ok, _lv, html} = live(conn, ~p"/bookmarks")
-      assert html =~ "P2"
+      {:ok, lv, _html} = live(conn, ~p"/bookmarks")
+      assert has_element?(lv, ".badge-warning", "P2")
     end
 
     test "does not show priority badge when priority is 0", %{conn: conn} do
       bookmark_fixture(%{bookmark_type: "note", bookmark_id: "n4", title: "No prio", priority: 0})
-      {:ok, _lv, html} = live(conn, ~p"/bookmarks")
-      refute html =~ "P0"
+      {:ok, lv, _html} = live(conn, ~p"/bookmarks")
+      # Use element selector — plain string match hits session tokens / hashes
+      refute has_element?(lv, ".badge-warning", "P0")
     end
 
     test "shows description when present", %{conn: conn} do

@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamsTest do
           project_id: project.id,
           name: "Hidden Team",
           description: "Archived",
-          archived_at: DateTime.utc_now()
+          status: "archived"
         })
 
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/teams")

@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.AgentsTest do
 
       refute has_element?(lv, "form[phx-submit='create_agent']")
 
-      lv |> element("button[phx-click='toggle_new_agent_form']") |> render_click()
+      lv |> element("button[phx-click='toggle_new_agent_form'][title='Create new agent']") |> render_click()
 
       assert has_element?(lv, "form[phx-submit='create_agent']")
     end
@@ -156,10 +156,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.AgentsTest do
     test "clicking New again hides the create-agent form", %{conn: conn, project: project} do
       {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/agents")
 
-      lv |> element("button[phx-click='toggle_new_agent_form']") |> render_click()
+      lv |> element("button[phx-click='toggle_new_agent_form'][title='Create new agent']") |> render_click()
       assert has_element?(lv, "form[phx-submit='create_agent']")
 
-      lv |> element("button[phx-click='toggle_new_agent_form']") |> render_click()
+      # Click the cancel button (also toggles the form off)
+      lv |> element("button[phx-click='toggle_new_agent_form'][title='Create new agent']") |> render_click()
       refute has_element?(lv, "form[phx-submit='create_agent']")
     end
   end

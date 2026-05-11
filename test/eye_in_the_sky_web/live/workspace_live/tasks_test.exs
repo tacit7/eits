@@ -2,13 +2,15 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.TasksTest do
   use EyeInTheSkyWeb.ConnCase
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.Workspaces
+  alias EyeInTheSky.{Accounts, Workspaces}
 
   setup do
+    {:ok, user} = Accounts.get_or_create_user("workspace_tasks_test_user")
+
     {:ok, workspace} =
       Workspaces.create_workspace(%{
         name: "Test Workspace",
-        description: "A test workspace"
+        owner_user_id: user.id
       })
 
     %{workspace: workspace}
@@ -37,7 +39,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.TasksTest do
       assert html =~ "Tasks"
     end
 
-    test "renders scope badge", %{conn: conn, workspace: workspace} do
+    test "renders workspace content", %{conn: conn, workspace: workspace} do
       {:ok, _lv, html} = live(conn, ~p"/workspaces/#{workspace.id}/tasks")
 
       assert is_binary(html) && byte_size(html) > 0

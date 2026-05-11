@@ -2,13 +2,15 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.NotesTest do
   use EyeInTheSkyWeb.ConnCase
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.Workspaces
+  alias EyeInTheSky.{Accounts, Workspaces}
 
   setup do
+    {:ok, user} = Accounts.get_or_create_user("workspace_notes_test_user")
+
     {:ok, workspace} =
       Workspaces.create_workspace(%{
         name: "Test Workspace",
-        description: "A test workspace"
+        owner_user_id: user.id
       })
 
     %{workspace: workspace}
@@ -37,10 +39,9 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.NotesTest do
       assert html =~ "Notes"
     end
 
-    test "renders scope badge", %{conn: conn, workspace: workspace} do
+    test "renders workspace content", %{conn: conn, workspace: workspace} do
       {:ok, _lv, html} = live(conn, ~p"/workspaces/#{workspace.id}/notes")
 
-      # scope_badge component renders something workspace-related
       assert is_binary(html) && byte_size(html) > 0
     end
   end

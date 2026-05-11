@@ -1,10 +1,11 @@
 defmodule Mix.Tasks.Audit.EctoTest do
-  use ExUnit.Case, async: true
+  # async: false — each test spawns a System.cmd mix subprocess.
+  # Running these concurrently saturates CI runners and causes timeouts.
+  use ExUnit.Case, async: false
 
-  # Each test spawns a mix subprocess via System.cmd. The default ExUnit
-  # per-test timeout of 60 s is too tight on slow CI runners. Raise it here
-  # so the entire module runs at 120 s per test.
-  @moduletag timeout: 120_000
+  # Each test spawns a mix subprocess via System.cmd. Give CI runners
+  # generous headroom — 5 minutes per test.
+  @moduletag timeout: 300_000
 
   # Mix.Tasks.Audit.Ecto always calls System.halt/1 (both the clean and findings
   # paths). Running it in-process with CaptureIO would terminate the BEAM.

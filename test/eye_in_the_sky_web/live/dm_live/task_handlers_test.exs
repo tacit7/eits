@@ -1,5 +1,10 @@
 defmodule EyeInTheSkyWeb.DmLive.TaskHandlersTest do
+  # TaskHandlers.handle_start_agent_for_task/2 calls AgentManager.create_agent/1
+  # which spawns the Claude CLI binary. CI has no Claude binary — all tests
+  # that exercise the happy path will fail with {:error, reason} instead of
+  # {:ok, %{session: _}}. Tag the whole module host_dependent.
   use EyeInTheSky.DataCase, async: false
+  @moduletag :host_dependent
 
   alias EyeInTheSky.Factory
   alias EyeInTheSky.Repo

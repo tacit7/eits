@@ -65,6 +65,12 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
         process_session(s, dry_run?, acc)
       end)
 
+    if not dry_run? do
+      Mix.shell().info("")
+      Mix.shell().info("Rebuilding session-level total_cost_usd / total_tokens caches ...")
+      Enum.each(sessions, &rebuild_session_cache/1)
+    end
+
     Mix.shell().info("""
 
     Backfill summary:
@@ -73,6 +79,38 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
       updated rows ..... #{totals.updated}#{if dry_run?, do: " (dry run — no writes)", else: ""}
       sessions w/o file. #{totals.missing_file}
     """)
+  end
+
+  # The session table caches total_cost_usd + total_tokens, incremented on each
+  # message insert by Messages.maybe_increment_session_cache/1. The backfill
+  # mutates message metadata in place, so that cache never gets the delta and
+  # ends up stale. Recompute from messages in one SQL pass per session.
+  defp rebuild_session_cache(%Session{id: id, name: name}) do
+    sums_q =
+      from m in Message,
+        where: m.session_id == ^id,
+        select: %{
+          cost:
+            fragment(
+              "COALESCE(SUM(CAST(COALESCE(?->>'total_cost_usd','0') AS FLOAT)), 0.0)",
+              m.metadata
+            ),
+          tokens:
+            fragment(
+              "COALESCE(SUM( COALESCE(CAST(?->'usage'->>'input_tokens' AS INTEGER),0) + COALESCE(CAST(?->'usage'->>'output_tokens' AS INTEGER),0) ), 0)",
+              m.metadata,
+              m.metadata
+            )
+        }
+
+    %{cost: cost, tokens: tokens} = Repo.one(sums_q)
+
+    Repo.update_all(
+      from(s in Session, where: s.id == ^id),
+      set: [total_cost_usd: cost, total_tokens: tokens]
+    )
+
+    Mix.shell().info("  [#{id}] #{name || "(unnamed)"}: cost=#{cost}, tokens=#{tokens}")
   end
 
   defp list_gemini_sessions(nil) do

@@ -202,7 +202,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
       case Notes.create_note(%{
              title: "Agent annotation",
              body: body,
-             parent_id: id,
+             parent_id: to_string(id),
              parent_type: "task"
            }) do
         {:ok, _} -> notify_success(from_session_id, "task #{id} annotated")

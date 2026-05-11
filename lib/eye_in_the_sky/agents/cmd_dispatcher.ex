@@ -269,7 +269,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
 
   defp do_add_task_note(id, body, from_session_id) do
     if Tasks.task_linked_to_session?(id, from_session_id) do
-      Notes.create_note(%{body: body, parent_id: id, parent_type: "task"})
+      Notes.create_note(%{body: body, parent_id: to_string(id), parent_type: "task"})
       notify_success(from_session_id, "note added to task #{id}")
     else
       notify_error(from_session_id, "note task", {:not_linked, id})

@@ -308,6 +308,14 @@ defmodule EyeInTheSkyWeb.Router do
     post "/teams/:team_id/broadcast", TeamController, :broadcast
   end
 
+  # GitHub PR subscriptions — agents subscribe to PR events
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through :api
+
+    post "/webhooks/pr_subscriptions", PrSubscriptionController, :subscribe
+    post "/webhooks/pr_subscriptions/unsubscribe", PrSubscriptionController, :unsubscribe
+  end
+
   # Bookmarks — in EyeInTheSkyWeb namespace (not Api.V1)
   scope "/api/v1", EyeInTheSkyWeb do
     pipe_through :api

@@ -7,10 +7,13 @@ defmodule EyeInTheSky.Github.WebhookDispatcher do
   alias EyeInTheSky.Events
   alias EyeInTheSky.Github.CheckRunHandler
   alias EyeInTheSky.Github.EventContext
+  alias EyeInTheSky.Github.PrSubscriptions
   alias EyeInTheSky.Github.PullRequestHandler
   alias EyeInTheSky.Github.PushHandler
   alias EyeInTheSky.Github.WebhookDeliveries
   alias EyeInTheSky.Github.WebhookRulesExecutor
+  alias EyeInTheSky.Messages
+  alias EyeInTheSky.Sessions
 
   @stale_minutes 5
   @recovery_interval_ms 60_000
@@ -56,6 +59,7 @@ defmodule EyeInTheSky.Github.WebhookDispatcher do
         try do
           run_built_ins(ctx, delivery.event_type)
           WebhookRulesExecutor.run(ctx)
+          notify_pr_subscribers(ctx)
           WebhookDeliveries.mark_processed(delivery.id)
         rescue
           e ->
@@ -66,6 +70,36 @@ defmodule EyeInTheSky.Github.WebhookDispatcher do
       {:error, :not_claimable} ->
         :ok
     end
+  end
+
+  defp notify_pr_subscribers(%EventContext{pr_number: pr_number, repository_full_name: repo} = ctx)
+       when is_integer(pr_number) and is_binary(repo) do
+    subs = PrSubscriptions.subscribers_for(pr_number, repo)
+
+    body = format_pr_dm(ctx)
+
+    Enum.each(subs, fn sub ->
+      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+        with {:ok, session_id} <- Sessions.get_session_id_by_uuid(sub.session_uuid) do
+          Messages.create_message(%{
+            session_id: session_id,
+            body: body,
+            sender_role: "system",
+            recipient_role: "user",
+            direction: "outbound",
+            status: "pending"
+          })
+        end
+      end)
+    end)
+  end
+
+  defp notify_pr_subscribers(_ctx), do: :ok
+
+  defp format_pr_dm(%EventContext{event_type: event_type, pr_number: pr, head_branch: branch, sender_login: sender}) do
+    branch_part = if branch, do: " on `#{branch}`", else: ""
+    sender_part = if sender, do: " by #{sender}", else: ""
+    "PR ##{pr} [#{event_type}]#{branch_part}#{sender_part}"
   end
 
   defp run_built_ins(ctx, "pull_request" <> _), do: PullRequestHandler.handle(ctx)

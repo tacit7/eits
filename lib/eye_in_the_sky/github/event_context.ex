@@ -52,8 +52,18 @@ defmodule EyeInTheSky.Github.EventContext do
 
   defp extract_fields(ctx, "check_run" <> _, payload) do
     head_branch = get_in(payload, ["check_run", "check_suite", "head_branch"])
-    %{ctx | head_branch: head_branch}
+    pr_number = get_in(payload, ["check_run", "pull_requests"]) |> List.first() |> safe_get("number")
+    %{ctx | head_branch: head_branch, pr_number: pr_number}
+  end
+
+  defp extract_fields(ctx, "workflow_job" <> _, payload) do
+    pr_number = get_in(payload, ["workflow_job", "pull_requests"]) |> List.first() |> safe_get("number")
+    head_branch = get_in(payload, ["workflow_job", "head_branch"])
+    %{ctx | pr_number: pr_number, head_branch: head_branch}
   end
 
   defp extract_fields(ctx, _, _), do: ctx
+
+  defp safe_get(nil, _key), do: nil
+  defp safe_get(map, key), do: map[key]
 end

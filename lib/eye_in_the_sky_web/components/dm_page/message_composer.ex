@@ -506,7 +506,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
             <span class="text-xs text-base-content/40 font-mono">
               {format_number(@context_used)} / {format_number(@context_window)}
             </span>
-            <%= if @total_cost > 0 do %>
+            <%!--
+              Session-level total_cost_usd cache is intentionally hidden for
+              Gemini sessions for now. Per-message metrics still render in
+              the bubble footer. The cache + backfill code stays in place
+              (see Sessions.increment_usage_cache, mix gemini.backfill_metadata)
+              so we can flip this back on when we trust the numbers.
+            --%>
+            <%= if @total_cost > 0 and @provider != "gemini" do %>
               <span class="text-xs font-mono text-base-content/40">
                 {format_cost(@total_cost)}
               </span>

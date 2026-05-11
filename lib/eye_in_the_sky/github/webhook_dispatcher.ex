@@ -78,7 +78,7 @@ defmodule EyeInTheSky.Github.WebhookDispatcher do
   end
 
   defp recover_stale do
-    cutoff = DateTime.add(DateTime.utc_now(), @stale_minutes * 60)
+    cutoff = DateTime.add(DateTime.utc_now(), -@stale_minutes * 60)
 
     WebhookDeliveries.stale_processing(cutoff)
     |> Enum.each(fn delivery ->

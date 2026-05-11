@@ -1,6 +1,8 @@
 defmodule EyeInTheSky.Github.WebhookDeliveriesTest do
   use EyeInTheSky.DataCase, async: true
 
+  import Ecto.Query
+
   alias EyeInTheSky.Github.WebhookDeliveries
   alias EyeInTheSky.Github.WebhookDelivery
 
@@ -80,13 +82,27 @@ defmodule EyeInTheSky.Github.WebhookDeliveriesTest do
   end
 
   describe "stale_processing/1" do
-    test "returns processing rows older than the given cutoff" do
-      {:ok, d} = WebhookDeliveries.insert(@valid_attrs)
-      {:ok, claimed} = WebhookDeliveries.claim(d.delivery_id)
+    test "returns processing rows started before the cutoff, excludes recent ones" do
+      {:ok, d1} = WebhookDeliveries.insert(@valid_attrs)
+      {:ok, old} = WebhookDeliveries.claim(d1.delivery_id)
 
-      past = DateTime.add(DateTime.utc_now(), 600)
-      stale = WebhookDeliveries.stale_processing(past)
-      assert Enum.any?(stale, &(&1.id == claimed.id))
+      # Backdate the first claim to simulate a stuck row
+      ten_minutes_ago = DateTime.add(DateTime.utc_now(), -600)
+
+      EyeInTheSky.Repo.update_all(
+        from(d in WebhookDelivery, where: d.id == ^old.id),
+        set: [processing_started_at: ten_minutes_ago]
+      )
+
+      {:ok, d2} = WebhookDeliveries.insert(%{@valid_attrs | delivery_id: "fresh"})
+      {:ok, fresh} = WebhookDeliveries.claim(d2.delivery_id)
+
+      # Cutoff = now - 5min. Old (10min ago) is stale; fresh (just now) is not.
+      cutoff = DateTime.add(DateTime.utc_now(), -300)
+      stale_ids = WebhookDeliveries.stale_processing(cutoff) |> Enum.map(& &1.id)
+
+      assert old.id in stale_ids
+      refute fresh.id in stale_ids
     end
   end
 end

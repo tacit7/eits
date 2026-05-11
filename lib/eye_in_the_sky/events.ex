@@ -369,6 +369,20 @@ defmodule EyeInTheSky.Events do
     broadcast("editor:#{editor_id}", {:editor_push, op, payload})
   end
 
+  @doc "Subscribe to GitHub webhook delivery notifications."
+  def subscribe_github_webhook, do: sub("github:webhook_received")
+
+  @doc "Broadcast a delivery ID to wake the WebhookDispatcher."
+  def github_webhook_received(delivery_id),
+    do: broadcast("github:webhook_received", {:github_webhook_received, delivery_id})
+
+  @doc "Subscribe to pull request update events."
+  def subscribe_pull_requests, do: sub("pull_requests:updated")
+
+  @doc "Broadcast that a pull request record was updated."
+  def pull_request_updated(pr),
+    do: broadcast("pull_requests:updated", {:pull_request_updated, pr})
+
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)
   defp unsub(topic), do: Phoenix.PubSub.unsubscribe(@pubsub, topic)

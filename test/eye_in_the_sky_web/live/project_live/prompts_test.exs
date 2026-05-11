@@ -60,10 +60,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
   end
 
   describe "handle_event/sort_prompts" do
-    test "sort controls are rendered on the page", %{conn: conn, project: project} do
+    test "prompts list shows empty state when no prompts exist", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
-      assert html =~ "Sort" || html =~ "sort" || is_binary(html)
+      assert html =~ "No prompts yet"
     end
   end
 

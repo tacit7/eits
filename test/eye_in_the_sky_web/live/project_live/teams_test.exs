@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamsTest do
     test "renders the teams page", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/teams")
 
-      assert html =~ "team" || html =~ "Team"
+      assert html =~ "0 teams"
     end
 
     test "renders search bar", %{conn: conn, project: project} do
@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamsTest do
     test "renders empty state when no teams exist", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/teams")
 
-      assert html =~ "team" || html =~ "Team" || html =~ "No teams"
+      assert html =~ "No active teams"
     end
   end
 
@@ -39,21 +39,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamsTest do
     test "renders the global teams page", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/teams")
 
-      assert html =~ "team" || html =~ "Team"
+      assert html =~ "0 teams"
     end
   end
 
   describe "handle_params/3" do
-    test "page renders when navigating to show_all=true", %{conn: conn, project: project} do
+    test "show_all=true renders all-projects indicator", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/teams?show_all=true")
 
-      assert html =~ "team" || html =~ "Team"
+      assert html =~ "(all projects)"
     end
 
-    test "page renders without show_all param", %{conn: conn, project: project} do
+    test "without show_all param renders Show all link", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/teams")
 
-      assert html =~ "team" || html =~ "Team"
+      assert html =~ "Show all"
     end
   end
 

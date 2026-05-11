@@ -74,21 +74,30 @@ defmodule EyeInTheSkyWeb.TopBar.SkillsTest do
       assert html =~ "Project"
     end
 
-    test "handles all type filter values without error" do
-      for type <- ["all", "skills", "commands"] do
-        assert render_component(&Skills.toolbar/1, %{type_filter: type}) |> is_binary()
+    test "each type filter value sets the correct data-label" do
+      for {type, label} <- [{"all", "All"}, {"skills", "Skills"}, {"commands", "Commands"}] do
+        html = render_component(&Skills.toolbar/1, %{type_filter: type})
+        assert html =~ ~s(data-label="#{label}"), "expected data-label=#{label} for type=#{type}"
       end
     end
 
-    test "handles all scope filter values without error" do
-      for scope <- ["all", "global", "project"] do
-        assert render_component(&Skills.toolbar/1, %{scope_filter: scope}) |> is_binary()
+    test "each scope filter value sets the correct data-label" do
+      for {scope, label} <- [{"all", "All"}, {"global", "Global"}, {"project", "Project"}] do
+        html = render_component(&Skills.toolbar/1, %{scope_filter: scope})
+        assert html =~ ~s(data-label="#{label}"), "expected data-label=#{label} for scope=#{scope}"
       end
     end
 
-    test "handles all sort order values without error" do
-      for sort <- ["name_asc", "name_desc", "recent", "size_desc", "size_asc"] do
-        assert render_component(&Skills.toolbar/1, %{sort_by: sort}) |> is_binary()
+    test "each sort order value sets the correct data-label" do
+      for {sort, label} <- [
+            {"name_asc", "Name A–Z"},
+            {"name_desc", "Name Z–A"},
+            {"recent", "Recent"},
+            {"size_desc", "Largest"},
+            {"size_asc", "Smallest"}
+          ] do
+        html = render_component(&Skills.toolbar/1, %{sort_by: sort})
+        assert html =~ ~s(data-label="#{label}"), "expected data-label=#{label} for sort=#{sort}"
       end
     end
 
@@ -98,8 +107,11 @@ defmodule EyeInTheSkyWeb.TopBar.SkillsTest do
       assert html =~ "dropdown"
     end
 
-    test "renders with defaults when no props passed" do
-      assert render_component(&Skills.toolbar/1, %{}) |> is_binary()
+    test "renders with default type, scope, and sort labels when no props passed" do
+      html = render_component(&Skills.toolbar/1, %{})
+
+      assert html =~ ~s(data-label="All")
+      assert html =~ ~s(data-label="Name A–Z")
     end
   end
 end

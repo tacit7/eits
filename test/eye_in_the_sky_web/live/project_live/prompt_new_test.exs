@@ -51,9 +51,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNewTest do
         |> form("form[phx-submit='save']")
         |> render_submit(%{"prompt" => %{"prompt_text" => "Content here", "name" => "My Prompt"}})
 
-      # Either redirects (assert_redirect pattern) or shows success message
-      assert is_binary(result) || match?({:error, {:redirect, _}}, result) ||
-               match?({:error, {:live_redirect, _}}, result)
+      assert {:error, {:live_redirect, %{to: path}}} = result
+      assert path =~ "/projects/#{project.id}/prompts"
     end
 
     test "submitting blank name re-renders form with error", %{conn: conn, project: project} do
@@ -64,7 +63,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNewTest do
         |> form("form[phx-submit='save']")
         |> render_submit(%{"prompt" => %{"name" => "", "prompt_text" => "Content"}})
 
-      assert html =~ "form" || html =~ "error" || html =~ "required" || is_binary(html)
+      assert html =~ "can&#39;t be blank"
     end
   end
 end

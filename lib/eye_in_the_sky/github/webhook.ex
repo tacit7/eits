@@ -2,6 +2,10 @@ defmodule EyeInTheSky.Github.Webhook do
   @moduledoc false
 
   @doc "Verify X-Hub-Signature-256 header against the raw body and secret."
+  # When no secret is configured (e.g. local dev via smee), skip verification.
+  def verify(_sig_header, _raw_body, ""), do: :ok
+  def verify(_sig_header, _raw_body, nil), do: :ok
+
   def verify(sig_header, raw_body, secret) when is_binary(sig_header) do
     with "sha256=" <> hex <- sig_header,
          hex <- String.downcase(hex),

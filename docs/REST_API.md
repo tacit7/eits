@@ -702,18 +702,19 @@ eits agents update 1 --status working
 
 ### GET /api/v1/commits
 
-List commits for a session or agent with optional filtering.
+List or search commits. Passing `q` activates search mode; omitting it returns the standard list.
 
 **Query params:**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `session_id` | string | no | Session UUID to list commits for |
-| `agent_id` | string | no | Agent UUID to list commits for |
-| `limit` | integer | no | Max results (default 20, max 100) |
-| `since_hash` | string | no | Return only commits newer than this hash; includes `since_hash_found` in response |
+| `q` | string | no | Search commit messages via ILIKE; activates search mode (returns session context) |
+| `session_id` | string | no | Session UUID to list commits for (list mode only) |
+| `agent_id` | string | no | Agent UUID to list commits for (list mode only) |
+| `limit` | integer | no | Max results (default 20) |
+| `since_hash` | string | no | Return only commits newer than this hash; includes `since_hash_found` in response (list mode only) |
 
-**Response:** `200 OK`
+**Response — list mode:** `200 OK`
 
 ```json
 {
@@ -735,11 +736,39 @@ With `since_hash`:
 }
 ```
 
+**Response — search mode (`q` present):** `200 OK`
+
+Joins sessions so you can immediately DM the session that made the commit.
+
+```json
+{
+  "success": true,
+  "count": 3,
+  "commits": [
+    {
+      "id": 42,
+      "commit_hash": "7a4f3921",
+      "commit_message": "feat: add PubSub support to BookmarkLive",
+      "created_at": "2026-05-09T08:01:33Z",
+      "session_id": 408,
+      "session_uuid": "a41ec59d-0f2e-4319-9788-4cf9e1d161c4",
+      "session_name": "liveview-vite-expert"
+    }
+  ]
+}
+```
+
 **Example:**
 
 ```bash
+# List mode
 curl localhost:5001/api/v1/commits?session_id=abc-123&limit=10
 curl localhost:5001/api/v1/commits?session_id=abc-123&since_hash=a1b2c3
+
+# Search mode — find which sessions worked on bookmarks
+curl 'localhost:5001/api/v1/commits?q=bookmark&limit=20'
+eits commits search "bookmark" --limit 20
+eits commits search "PubSub" --json
 ```
 
 ---

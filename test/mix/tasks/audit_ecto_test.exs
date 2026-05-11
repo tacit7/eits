@@ -1,6 +1,11 @@
 defmodule Mix.Tasks.Audit.EctoTest do
   use ExUnit.Case, async: true
 
+  # Each test spawns a mix subprocess via System.cmd. The default ExUnit
+  # per-test timeout of 60 s is too tight on slow CI runners. Raise it here
+  # so the entire module runs at 120 s per test.
+  @moduletag timeout: 120_000
+
   # Mix.Tasks.Audit.Ecto always calls System.halt/1 (both the clean and findings
   # paths). Running it in-process with CaptureIO would terminate the BEAM.
   # We spawn each invocation via System.cmd so the halt stays in a subprocess
@@ -398,6 +403,7 @@ defmodule Mix.Tasks.Audit.EctoTest do
   # ---------------------------------------------------------------------------
 
   describe "multiple anti-patterns" do
+    @tag timeout: 120_000
     test "reports all distinct findings from a single file", %{tmp: tmp} do
       fixture(tmp, "everything.ex", """
       defmodule Everything do

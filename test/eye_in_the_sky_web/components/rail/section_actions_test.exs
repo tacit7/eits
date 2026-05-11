@@ -6,6 +6,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
   setup do
     socket = %Phoenix.LiveView.Socket{
       assigns: %{
+        __changed__: %{},
+        flash: %{},
         active_section: :sessions,
         flyout_open: false,
         mobile_open: false,
@@ -21,7 +23,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
         session_project_collapsed: MapSet.new(),
         flyout_sessions: []
       },
-      private: %{}
+      private: %{live_temp: %{}}
     }
 
     {:ok, socket: socket}
@@ -61,6 +63,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
     test "changes section when different section is selected" do
       socket = %Phoenix.LiveView.Socket{
         assigns: %{
+          __changed__: %{},
+          flash: %{},
           active_section: :sessions,
           flyout_open: true,
           mobile_open: true,
@@ -76,7 +80,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
           session_project_collapsed: MapSet.new(),
           flyout_sessions: []
         },
-        private: %{}
+        private: %{live_temp: %{}}
       }
 
       params = %{"section" => "agents"}

@@ -187,7 +187,17 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
               sync_codex_async(session_id, session_uuid)
 
             "gemini" ->
-              sync_gemini_async(session_id, session_uuid, session, agent)
+              # Auto-sync on mount is intentionally disabled for Gemini.
+              # The live-stream persistence path generates a random
+              # source_uuid (record_incoming_reply default), while the file
+              # importer uses the real Gemini turn id. Different UUIDs ⇒
+              # BulkImporter doesn't dedupe ⇒ every page mount inserts a
+              # second copy of every agent turn already streamed.
+              #
+              # The explicit Sync + Reload buttons in the topbar still
+              # work — they're the right place for the user to opt into
+              # pulling state from disk. Skip the auto-pass entirely.
+              {:ok, %{inserted: 0, updated: 0}}
 
             _ ->
               sync_claude_async(session_id, session_uuid, session, agent)
@@ -343,16 +353,6 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     with {:ok, messages} <- CodexReader.read_messages(session_uuid) do
       {:ok, CodexImporter.import_messages(messages, session_id)}
     end
-  end
-
-  defp sync_gemini_async(session_id, session_uuid, session, agent) do
-    project_path =
-      case SessionHelpers.resolve_project_path(session, agent) do
-        {:ok, path} -> path
-        _ -> nil
-      end
-
-    GeminiImporter.sync(session_uuid, project_path, session_id)
   end
 
   defp cleanup_rejected_message(message, uploaded_files) do

@@ -95,7 +95,9 @@ defmodule EyeInTheSky.Application do
           # React to session lifecycle events and update team member state
           EyeInTheSky.Teams.Subscriber,
           # Poll for external task changes from spawned agents
-          EyeInTheSky.Tasks.Poller
+          EyeInTheSky.Tasks.Poller,
+          # Process incoming GitHub webhook deliveries
+          EyeInTheSky.Github.WebhookDispatcher
         ]
       else
         []

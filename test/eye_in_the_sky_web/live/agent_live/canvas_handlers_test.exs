@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWeb.AgentLive.CanvasHandlersTest do
-  use EyeInTheSky.DataCase, async: true
+  use EyeInTheSky.DataCase, async: false
 
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSky.Canvases

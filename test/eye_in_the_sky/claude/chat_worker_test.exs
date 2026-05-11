@@ -82,7 +82,7 @@ defmodule EyeInTheSky.Claude.ChatWorkerTest do
 
     test "becomes true when processing a message" do
       channel_id = "proc-true-#{:rand.uniform(100_000)}"
-      {:ok, _pid} = ChatWorker.start_link(channel_id: channel_id)
+      {:ok, pid} = ChatWorker.start_link(channel_id: channel_id)
 
       # Send a message — should start processing
       ChatWorker.send_to_channel(channel_id, "Message", 1)
@@ -90,41 +90,39 @@ defmodule EyeInTheSky.Claude.ChatWorkerTest do
       # Give it a moment to process
       :timer.sleep(50)
 
-      # Should be processing (or just finished)
-      processing = ChatWorker.processing?(channel_id)
-      assert processing == true or processing == false
+      # Worker must survive even when the fanout task crashes
+      # (fake channel_id causes Ecto CastError in fanout — worker should not die)
+      :timer.sleep(100)
+      assert Process.alive?(pid)
     end
   end
 
   describe "message queueing" do
     test "queues multiple messages and processes in order" do
       channel_id = "multi-queue-#{:rand.uniform(100_000)}"
-      {:ok, _pid} = ChatWorker.start_link(channel_id: channel_id)
+      {:ok, pid} = ChatWorker.start_link(channel_id: channel_id)
 
       # Send multiple messages in quick succession
       ChatWorker.send_to_channel(channel_id, "Message 1", 1)
       ChatWorker.send_to_channel(channel_id, "Message 2", 2)
       ChatWorker.send_to_channel(channel_id, "Message 3", 3)
 
-      # Wait for processing to complete
+      # Worker must remain alive after accepting all messages
       :timer.sleep(200)
-
-      # After processing, should not be processing anymore
-      assert ChatWorker.processing?(channel_id) == false or true
+      assert Process.alive?(pid)
     end
 
     test "processes queued messages after current fanout completes" do
       channel_id = "queue-order-#{:rand.uniform(100_000)}"
-      {:ok, _pid} = ChatWorker.start_link(channel_id: channel_id)
+      {:ok, pid} = ChatWorker.start_link(channel_id: channel_id)
 
       # Send message while processing (queue it)
       ChatWorker.send_to_channel(channel_id, "First", 1)
       ChatWorker.send_to_channel(channel_id, "Second", 2)
 
+      # Worker must remain alive after queuing messages
       :timer.sleep(200)
-
-      # Should eventually process both
-      assert ChatWorker.processing?(channel_id) == false or true
+      assert Process.alive?(pid)
     end
   end
 
@@ -178,16 +176,15 @@ defmodule EyeInTheSky.Claude.ChatWorkerTest do
 
     test "processes next queued message after fanout completes" do
       channel_id = "queue-fanout-#{:rand.uniform(100_000)}"
-      {:ok, _pid} = ChatWorker.start_link(channel_id: channel_id)
+      {:ok, pid} = ChatWorker.start_link(channel_id: channel_id)
 
       # Queue messages
       ChatWorker.send_to_channel(channel_id, "First", 1)
       ChatWorker.send_to_channel(channel_id, "Second", 2)
 
+      # Worker must remain alive after queuing and attempting fanout
       :timer.sleep(200)
-
-      # Should have processed both or be idle
-      assert ChatWorker.processing?(channel_id) == false or true
+      assert Process.alive?(pid)
     end
   end
 
@@ -228,17 +225,16 @@ defmodule EyeInTheSky.Claude.ChatWorkerTest do
 
     test "handles multiple senders in rapid succession" do
       channel_id = "multi-sender-#{:rand.uniform(100_000)}"
-      {:ok, _pid} = ChatWorker.start_link(channel_id: channel_id)
+      {:ok, pid} = ChatWorker.start_link(channel_id: channel_id)
 
       # Send from multiple "senders" quickly
       Enum.each(1..10, fn i ->
         ChatWorker.send_to_channel(channel_id, "Message #{i}", i)
       end)
 
+      # Worker must survive rapid concurrent sends
       :timer.sleep(200)
-
-      # Should handle gracefully
-      assert ChatWorker.processing?(channel_id) == false or true
+      assert Process.alive?(pid)
     end
   end
 end

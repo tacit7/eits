@@ -1,5 +1,5 @@
 defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandlerTest do
-  use EyeInTheSky.DataCase, async: true
+  use EyeInTheSky.DataCase, async: false
 
   alias EyeInTheSky.Agents.CmdDispatcher.TaskHandler
   alias EyeInTheSky.Factory

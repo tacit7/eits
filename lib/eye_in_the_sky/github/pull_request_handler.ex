@@ -1,9 +1,10 @@
 defmodule EyeInTheSky.Github.PullRequestHandler do
+  @moduledoc false
   require Logger
 
-  alias EyeInTheSky.Repo
-  alias EyeInTheSky.PullRequests.PullRequest
   alias EyeInTheSky.Events
+  alias EyeInTheSky.PullRequests.PullRequest
+  alias EyeInTheSky.Repo
 
   def handle(%{event_type: "pull_request" <> _, github_pr_id: nil}), do: :ok
 

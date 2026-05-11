@@ -66,8 +66,8 @@ defmodule EyeInTheSkyWeb.BookmarkLive.IndexTest do
         priority: 2
       })
 
-      {:ok, _lv, html} = live(conn, ~p"/bookmarks")
-      assert html =~ "P2"
+      {:ok, lv, _html} = live(conn, ~p"/bookmarks")
+      assert has_element?(lv, ".badge-warning", "P2")
     end
 
     test "does not show priority badge when priority is 0", %{conn: conn} do

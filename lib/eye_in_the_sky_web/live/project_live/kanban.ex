@@ -2,7 +2,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.{Notes, Projects, Tasks}
-  alias EyeInTheSkyWeb.Live.Shared.{AgentPubSubHandlers, BulkHelpers, KanbanFilters, NotificationHelpers, TasksHelpers, TaskEventHandlers}
+
+  alias EyeInTheSkyWeb.Live.Shared.{
+    AgentPubSubHandlers,
+    BulkHelpers,
+    KanbanFilters,
+    NotificationHelpers,
+    TasksHelpers,
+    TaskEventHandlers
+  }
+
   alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, DatePickerHandlers, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -261,7 +270,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_info({:agent_stopped, %{status: "waiting", id: session_id}}, socket) do
-    AgentPubSubHandlers.handle_agent_stopped_waiting_mapsets(socket, %{status: "waiting", id: session_id})
+    AgentPubSubHandlers.handle_agent_stopped_waiting_mapsets(socket, %{
+      status: "waiting",
+      id: session_id
+    })
   end
 
   @impl true

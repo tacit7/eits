@@ -298,13 +298,17 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       {:noreply, socket}
     else
       job_ids = MapSet.to_list(selected)
-      {updated_count, _} = ScheduledJobs.bulk_update_enabled(job_ids, true, socket.assigns.project_id)
+
+      {updated_count, _} =
+        ScheduledJobs.bulk_update_enabled(job_ids, true, socket.assigns.project_id)
 
       {:noreply,
        socket
        |> assign(:bulk_selected_jobs, MapSet.new())
        |> load_jobs()
-       |> then(&put_flash(&1, :info, "Enabled #{updated_count} job#{if updated_count != 1, do: "s"}"))}
+       |> then(
+         &put_flash(&1, :info, "Enabled #{updated_count} job#{if updated_count != 1, do: "s"}")
+       )}
     end
   end
 
@@ -315,13 +319,17 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       {:noreply, socket}
     else
       job_ids = MapSet.to_list(selected)
-      {updated_count, _} = ScheduledJobs.bulk_update_enabled(job_ids, false, socket.assigns.project_id)
+
+      {updated_count, _} =
+        ScheduledJobs.bulk_update_enabled(job_ids, false, socket.assigns.project_id)
 
       {:noreply,
        socket
        |> assign(:bulk_selected_jobs, MapSet.new())
        |> load_jobs()
-       |> then(&put_flash(&1, :info, "Disabled #{updated_count} job#{if updated_count != 1, do: "s"}"))}
+       |> then(
+         &put_flash(&1, :info, "Disabled #{updated_count} job#{if updated_count != 1, do: "s"}")
+       )}
     end
   end
 

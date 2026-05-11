@@ -459,7 +459,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               required
               class="w-full px-2.5 py-1.5 text-sm bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
             />
-            <div class="text-xs text-base-content/40 mt-1">Use lowercase letters, numbers, and hyphens</div>
+            <div class="text-xs text-base-content/40 mt-1">
+              Use lowercase letters, numbers, and hyphens
+            </div>
           </div>
 
           <div class="flex items-center justify-end gap-2">

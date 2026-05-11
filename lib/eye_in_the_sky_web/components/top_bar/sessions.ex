@@ -74,7 +74,8 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
             "model" -> "Model"
             _ -> "Last msg"
           end}
-        </span> <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
+        </span>
+         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
         <%= for {value, label} <- [{"last_message", "Last msg"}, {"name", "Name"}, {"agent", "Agent"}, {"model", "Model"}] do %>

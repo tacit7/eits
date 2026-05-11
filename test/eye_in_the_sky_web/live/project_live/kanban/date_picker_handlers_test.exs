@@ -124,7 +124,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
 
   describe "handle_date_picker_prev_month/1" do
     test "moves to previous month", %{socket: socket} do
-      socket = %{socket | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 3}}
+      socket = %{
+        socket
+        | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 3}
+      }
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_date_picker_prev_month(socket)
 
@@ -133,7 +136,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
     end
 
     test "wraps to previous year when moving from January", %{socket: socket} do
-      socket = %{socket | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 1}}
+      socket = %{
+        socket
+        | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 1}
+      }
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_date_picker_prev_month(socket)
 
@@ -144,7 +150,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
 
   describe "handle_date_picker_next_month/1" do
     test "moves to next month", %{socket: socket} do
-      socket = %{socket | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 3}}
+      socket = %{
+        socket
+        | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 3}
+      }
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_date_picker_next_month(socket)
 
@@ -153,7 +162,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
     end
 
     test "wraps to next year when moving from December", %{socket: socket} do
-      socket = %{socket | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 12}}
+      socket = %{
+        socket
+        | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 12}
+      }
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_date_picker_next_month(socket)
 

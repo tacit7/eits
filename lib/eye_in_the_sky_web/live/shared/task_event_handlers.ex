@@ -18,7 +18,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.TaskEventHandlers do
   defdelegate handle_add_task_annotation(params, socket), to: TasksHelpers
   defdelegate handle_quick_add_task(params, socket, reload_fn), to: TasksHelpers
   defdelegate handle_open_task_detail(params, socket), to: TasksHelpers
-  defdelegate handle_open_task_detail_with_overlay(params, socket, overlay_value), to: TasksHelpers
+
+  defdelegate handle_open_task_detail_with_overlay(params, socket, overlay_value),
+    to: TasksHelpers
+
   defdelegate handle_toggle_task_detail_drawer(params, socket), to: TasksHelpers
   defdelegate handle_toggle_select_task(task_id, socket), to: TasksHelpers
   defdelegate handle_toggle_select_all_tasks(socket), to: TasksHelpers

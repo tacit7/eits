@@ -152,8 +152,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
             <%= cond do %>
               <% is_nil(@cumulative_diff) -> %>
                 <div class="flex items-center gap-2 py-4 text-xs text-base-content/40">
-                  <span class="loading loading-spinner loading-xs"></span>
-                  Loading full diff&hellip;
+                  <span class="loading loading-spinner loading-xs"></span> Loading full diff&hellip;
                 </div>
               <% @cumulative_diff == :error -> %>
                 <div class="py-4 text-xs text-error/60">

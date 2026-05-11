@@ -89,13 +89,13 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
     changeset
     |> validate_schedule_value(schedule_type)
     |> (fn cs ->
-      case job_type do
-        "mix_task" -> validate_mix_task_config(cs, config)
-        "spawn_agent" -> validate_spawn_agent_config(cs, config)
-        "daily_digest" -> validate_daily_digest_config(cs, config)
-        _ -> cs
-      end
-    end).()
+          case job_type do
+            "mix_task" -> validate_mix_task_config(cs, config)
+            "spawn_agent" -> validate_spawn_agent_config(cs, config)
+            "daily_digest" -> validate_daily_digest_config(cs, config)
+            _ -> cs
+          end
+        end).()
   end
 
   defp validate_schedule_value(changeset, "cron") do

@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
   # Helper to build a bare socket with assigns
   defp build_socket(assigns) do
     base = %{__changed__: %{}, flash: %{}, private: %{live_temp: %{}}}
+
     %Phoenix.LiveView.Socket{
       assigns: Map.merge(base, assigns)
     }
@@ -123,7 +124,12 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
         })
 
       {:noreply, result} =
-        SettingsHandlers.handle_setting_update_with_value("session", "nonexistent_key", "value", socket)
+        SettingsHandlers.handle_setting_update_with_value(
+          "session",
+          "nonexistent_key",
+          "value",
+          socket
+        )
 
       # Should have an error flash for unknown setting
       assert result.assigns.flash["error"] =~ "Setting update failed"
@@ -169,7 +175,8 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
           notify_on_stop: false
         })
 
-      {:noreply, result} = SettingsHandlers.handle_setting_toggle("session", "show_live_stream", socket)
+      {:noreply, result} =
+        SettingsHandlers.handle_setting_toggle("session", "show_live_stream", socket)
 
       # Setting should be toggled
       assert result.assigns.session.id == session.id
@@ -191,7 +198,8 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
           notify_on_stop: false
         })
 
-      {:noreply, result} = SettingsHandlers.handle_setting_toggle("session", "show_live_stream", socket)
+      {:noreply, result} =
+        SettingsHandlers.handle_setting_toggle("session", "show_live_stream", socket)
 
       # Setting should be toggled
       assert result.assigns.session.id == session.id
@@ -213,7 +221,8 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
           notify_on_stop: false
         })
 
-      {:noreply, result} = SettingsHandlers.handle_setting_toggle("session", "nonexistent", socket)
+      {:noreply, result} =
+        SettingsHandlers.handle_setting_toggle("session", "nonexistent", socket)
 
       assert result.assigns.flash["error"] =~ "Setting update failed"
     end
@@ -234,7 +243,8 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
           notify_on_stop: false
         })
 
-      {:noreply, result} = SettingsHandlers.handle_setting_toggle("agent", "show_live_stream", socket)
+      {:noreply, result} =
+        SettingsHandlers.handle_setting_toggle("agent", "show_live_stream", socket)
 
       assert result.assigns.flash["error"] =~ "agent not loaded"
     end

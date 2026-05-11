@@ -27,9 +27,27 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSection do
 
       <%!-- Scope pills --%>
       <div class="flex items-center gap-0.5">
-        <.scope_pill label="All" value="all" current={@agent_scope} myself={@myself} event="set_agent_scope" />
-        <.scope_pill label="Global" value="global" current={@agent_scope} myself={@myself} event="set_agent_scope" />
-        <.scope_pill label="Project" value="project" current={@agent_scope} myself={@myself} event="set_agent_scope" />
+        <.scope_pill
+          label="All"
+          value="all"
+          current={@agent_scope}
+          myself={@myself}
+          event="set_agent_scope"
+        />
+        <.scope_pill
+          label="Global"
+          value="global"
+          current={@agent_scope}
+          myself={@myself}
+          event="set_agent_scope"
+        />
+        <.scope_pill
+          label="Project"
+          value="project"
+          current={@agent_scope}
+          myself={@myself}
+          event="set_agent_scope"
+        />
       </div>
     </div>
     """

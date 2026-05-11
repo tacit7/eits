@@ -183,8 +183,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
             title="Create new agent"
             class="btn btn-ghost btn-xs gap-1.5 min-h-[28px] h-7 text-xs text-base-content/60 hover:text-primary hover:bg-primary/5"
           >
-            <.icon name="hero-plus-mini" class="size-3.5" />
-            New
+            <.icon name="hero-plus-mini" class="size-3.5" /> New
           </button>
         </div>
 
@@ -361,7 +360,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
     <!-- New Agent Modal -->
     <%= if @show_new_agent_form do %>
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" phx-click="toggle_new_agent_form">
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        phx-click="toggle_new_agent_form"
+      >
         <div
           class="bg-base-100 border border-base-content/10 rounded-lg shadow-xl w-96 p-6 flex flex-col gap-4"
           phx-click="JS.stop_propagation()"

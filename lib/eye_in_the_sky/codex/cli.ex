@@ -103,6 +103,7 @@ defmodule EyeInTheSky.Codex.CLI do
 
     # Resume flag (if present)
     resume_id = opts[:resume]
+
     args =
       if resume_id do
         args ++ ["--resume", to_string(resume_id)]

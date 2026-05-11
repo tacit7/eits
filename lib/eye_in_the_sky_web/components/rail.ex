@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   alias EyeInTheSky.Claude.RateLimitClient
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Components.NewSessionModal
+
   alias EyeInTheSkyWeb.Components.Rail.{
     FileActions,
     FilterActions,
@@ -133,7 +134,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   def update(%{refresh_channels: true}, socket) do
-    {:ok, assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
+    {:ok,
+     assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
   end
 
   # Targeted update from NavHook when a session is created/updated/stopped.
@@ -385,7 +387,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("show_more_project_sessions", %{"project_id" => pid_str}, socket) do
     pid = String.to_integer(pid_str)
     current = Map.get(socket.assigns.session_project_visible, pid, 5)
-    {:noreply, assign(socket, :session_project_visible, Map.put(socket.assigns.session_project_visible, pid, current + 5))}
+
+    {:noreply,
+     assign(
+       socket,
+       :session_project_visible,
+       Map.put(socket.assigns.session_project_visible, pid, current + 5)
+     )}
   end
 
   def handle_event("toggle_project_sessions", %{"project_id" => pid_str}, socket) do
@@ -478,7 +486,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           socket =
             case modal_type do
               :new_task ->
-                assign(socket, :flyout_tasks,
+                assign(
+                  socket,
+                  :flyout_tasks,
                   Loader.load_flyout_tasks(
                     socket.assigns.sidebar_project,
                     socket.assigns.task_search,
@@ -714,34 +724,137 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         </button>
 
         <div class="mb-3" />
-        <.rail_item section={:files} active_section={@active_section} flyout_open={@flyout_open} icon="hero-folder" label="Files" myself={@myself} />
-        <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-bot-message-square" label="Sessions" myself={@myself} />
-        <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-check-circle" label="Tasks" myself={@myself} />
-        <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-pencil-square" label="Notes" myself={@myself} />
-        <.rail_item section={:agents} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-robot" label="Agents" myself={@myself} />
-        <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
-        <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Prompts" myself={@myself} />
-        <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
-        <.rail_item section={:jobs} active_section={@active_section} flyout_open={@flyout_open} icon="hero-clock" label="Jobs" myself={@myself} />
-        <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
-        <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
-        <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
+        <.rail_item
+          section={:files}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-folder"
+          label="Files"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:sessions}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="lucide-bot-message-square"
+          label="Sessions"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:tasks}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-check-circle"
+          label="Tasks"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:notes}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-pencil-square"
+          label="Notes"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:agents}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="lucide-robot"
+          label="Agents"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:skills}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-bolt"
+          label="Skills"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:prompts}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-document-text"
+          label="Prompts"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:teams}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-users"
+          label="Teams"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:jobs}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-clock"
+          label="Jobs"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:canvas}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-squares-2x2"
+          label="Canvas"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:chat}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-chat-bubble-left-ellipsis"
+          label="Chat"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:usage}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-chart-bar"
+          label="Usage"
+          myself={@myself}
+        />
 
         <div class="flex-1" />
         <div class="mb-3" />
 
-        <.link navigate="/notifications" class={["relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors", "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"]} aria-label="Notifications">
+        <.link
+          navigate="/notifications"
+          class={[
+            "relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+            "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"
+          ]}
+          aria-label="Notifications"
+        >
           <.icon name="hero-bell-mini" class="size-4" />
-          <span :if={@notification_count > 0} class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5">
+          <span
+            :if={@notification_count > 0}
+            class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5"
+          >
             {@notification_count}
           </span>
         </.link>
 
-        <.link navigate="/settings" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Settings">
+        <.link
+          navigate="/settings"
+          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+          aria-label="Settings"
+        >
           <.icon name="hero-cog-6-tooth-mini" class="size-4" />
         </.link>
 
-        <.link href="/auth/logout" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Sign out">
+        <.link
+          href="/auth/logout"
+          method="delete"
+          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+          aria-label="Sign out"
+        >
           <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
         </.link>
       </nav>
@@ -804,7 +917,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         myself={@myself}
       />
 
-      <.file_panel file_tabs={@file_tabs} active_tab_path={@active_tab_path} myself={@myself} socket={@socket} />
+      <.file_panel
+        file_tabs={@file_tabs}
+        active_tab_path={@active_tab_path}
+        myself={@myself}
+        socket={@socket}
+      />
       <%!-- Splitter handle for split-view mode. Visibility driven by data-editor-mode on <html>. --%>
       <%!-- role=separator makes this a keyboard-focusable resize handle per ARIA spec.
            aria-valuenow/min/max are kept in sync by the EditorLayout hook. --%>
@@ -817,7 +935,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         aria-valuemin="320"
         aria-valuemax="9999"
         tabindex="0"
-      ></div>
+      >
+      </div>
 
       <.live_component
         module={NewSessionModal}

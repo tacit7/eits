@@ -17,7 +17,11 @@ defmodule EyeInTheSkyWeb.Helpers.SystemHelpersTest do
     end
 
     test "returns non-zero exit code for a path that does not exist" do
-      {_output, status} = SystemHelpers.open_in_system("/tmp/eits_nonexistent_#{System.unique_integer([:positive])}")
+      {_output, status} =
+        SystemHelpers.open_in_system(
+          "/tmp/eits_nonexistent_#{System.unique_integer([:positive])}"
+        )
+
       # On macOS `open` returns 1 for missing paths; on Linux `xdg-open` may
       # return 2 or 4. Either way it must be non-zero.
       assert status != 0

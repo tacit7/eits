@@ -158,9 +158,7 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
             |> Map.update!(:missing_file, &(&1 + 1))
 
           {:error, reason} ->
-            Mix.shell().error(
-              "[#{session.id}] failed to read session file: #{inspect(reason)}"
-            )
+            Mix.shell().error("[#{session.id}] failed to read session file: #{inspect(reason)}")
 
             acc |> Map.update!(:scanned, &(&1 + scanned))
         end
@@ -200,8 +198,11 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
         |> String.split("\n", trim: true)
         |> Enum.map(&Jason.decode/1)
         |> Enum.flat_map(fn
-          {:ok, %{"id" => id, "timestamp" => ts} = turn} -> [Map.put(turn, "_ts_iso", ts) |> Map.put("_id", id)]
-          _ -> []
+          {:ok, %{"id" => id, "timestamp" => ts} = turn} ->
+            [Map.put(turn, "_ts_iso", ts) |> Map.put("_id", id)]
+
+          _ ->
+            []
         end)
 
       index =

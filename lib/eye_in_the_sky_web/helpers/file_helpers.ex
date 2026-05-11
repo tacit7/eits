@@ -114,7 +114,8 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     ".toml" => %{atom: :toml, class: "toml", cm: "text"}
   }
 
-  defp file_type_info(ext), do: Map.get(@file_types, ext, %{atom: :text, class: "plaintext", cm: "text"})
+  defp file_type_info(ext),
+    do: Map.get(@file_types, ext, %{atom: :text, class: "plaintext", cm: "text"})
 
   @doc """
   Recursively builds a file tree up to `max_depth`.

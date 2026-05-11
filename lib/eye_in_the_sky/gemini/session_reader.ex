@@ -189,11 +189,13 @@ defmodule EyeInTheSky.Gemini.SessionReader do
   # We bake the tool calls into the body as `> `ToolName` <json-args>` lines
   # so the DM renderer parses them out via DmHelpers.parse_body_segment/1.
   # Empty turns (no prose AND no tool calls) are dropped.
-  defp extract_decoded(%{
-         "id" => id,
-         "type" => "gemini",
-         "timestamp" => ts
-       } = msg) do
+  defp extract_decoded(
+         %{
+           "id" => id,
+           "type" => "gemini",
+           "timestamp" => ts
+         } = msg
+       ) do
     raw_text = Map.get(msg, "content", "")
     raw_text = if is_binary(raw_text), do: raw_text, else: ""
     body = merge_tool_calls(raw_text, Map.get(msg, "toolCalls"))

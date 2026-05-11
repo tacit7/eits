@@ -10,7 +10,10 @@ defmodule EyeInTheSky.Metrics.TokenParserTest do
   # Writes lines to a temp file and returns the path. Caller owns cleanup via
   # on_exit or the tmpdir approach below.
   defp write_jsonl(lines) do
-    path = System.tmp_dir!() |> Path.join("token_parser_test_#{System.unique_integer([:positive])}.jsonl")
+    path =
+      System.tmp_dir!()
+      |> Path.join("token_parser_test_#{System.unique_integer([:positive])}.jsonl")
+
     File.write!(path, Enum.join(lines, "\n"))
     path
   end
@@ -223,7 +226,9 @@ defmodule EyeInTheSky.Metrics.TokenParserTest do
 
   describe "parse_file/1 filtering" do
     test "ignores user messages" do
-      path = write_jsonl([user_entry("hello"), assistant_entry("req-1", "claude-3-5-sonnet", 10, 5)])
+      path =
+        write_jsonl([user_entry("hello"), assistant_entry("req-1", "claude-3-5-sonnet", 10, 5)])
+
       on_exit(fn -> File.rm(path) end)
 
       assert {:ok, usage} = TokenParser.parse_file(path)
@@ -348,7 +353,12 @@ defmodule EyeInTheSky.Metrics.TokenParserTest do
 
       File.mkdir_p!(subagent_dir)
       File.write!(main_path, assistant_entry("main-req", "claude-3-5-sonnet", 100, 50))
-      File.write!(Path.join(subagent_dir, "agent-1.jsonl"), assistant_entry("sub-req", "claude-3-5-sonnet", 10, 5))
+
+      File.write!(
+        Path.join(subagent_dir, "agent-1.jsonl"),
+        assistant_entry("sub-req", "claude-3-5-sonnet", 10, 5)
+      )
+
       File.write!(Path.join(subagent_dir, "README.txt"), "not a jsonl file")
       File.write!(Path.join(subagent_dir, "metadata.json"), "{}")
 

@@ -6,7 +6,13 @@ defmodule EyeInTheSky.ProjectFilesTest do
   # Build a unique temp dir per test to avoid collisions in async mode.
   defp tmp_dir(context) do
     name = context.test |> to_string() |> String.replace(~r/[^\w]/, "_")
-    dir = Path.join(System.tmp_dir!(), "project_files_test_#{name}_#{:erlang.unique_integer([:positive])}")
+
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "project_files_test_#{name}_#{:erlang.unique_integer([:positive])}"
+      )
+
     File.mkdir_p!(dir)
     on_exit(fn -> File.rm_rf!(dir) end)
     dir

@@ -169,7 +169,7 @@ defmodule EyeInTheSky.MixProject do
           "docs/EVENTS.md",
           "docs/WORKERS.md"
         ],
-        "IAM": [
+        IAM: [
           "docs/IAM_POLICY.md",
           "docs/IAM_HOOK_INSTALL.md",
           "docs/SECURITY.md"
@@ -186,7 +186,7 @@ defmodule EyeInTheSky.MixProject do
           "docs/MOBILE.md",
           "docs/SEARCH.md"
         ],
-        "Integrations": [
+        Integrations: [
           "docs/CODEX_SDK.md",
           "docs/EITS_HOOKS.md",
           "docs/ATTACHMENTS.md"

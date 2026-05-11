@@ -277,6 +277,6 @@ if config_env() == :prod do
   #
   # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
 
-config :eye_in_the_sky,
-  github_webhook_secret: System.get_env("GITHUB_WEBHOOK_SECRET", "")
+  config :eye_in_the_sky,
+    github_webhook_secret: System.get_env("GITHUB_WEBHOOK_SECRET", "")
 end

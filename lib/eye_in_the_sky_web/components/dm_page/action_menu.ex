@@ -74,7 +74,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               @session_active && "opacity-40 cursor-not-allowed"
             ]}
             disabled={@session_active}
-            title={if @session_active, do: "Available after the session stops", else: "Re-read transcript and import missed messages"}
+            title={
+              if @session_active,
+                do: "Available after the session stops",
+                else: "Re-read transcript and import missed messages"
+            }
           >
             <.icon name="hero-arrow-path" class="size-3.5" /> Sync messages
           </button>

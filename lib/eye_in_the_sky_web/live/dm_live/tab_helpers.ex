@@ -269,7 +269,9 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
     # If usage exceeds 200k, the session must be on a 1M model
     ctx_window =
-      if used > @default_context_window, do: @extended_context_window, else: @default_context_window
+      if used > @default_context_window,
+        do: @extended_context_window,
+        else: @default_context_window
 
     if used > 0, do: {used, ctx_window}
   end

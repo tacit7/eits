@@ -99,8 +99,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
          put_flash(socket, :info, "Reloaded #{inserted} messages from Gemini session file")}
 
       {:error, :not_found} ->
-        {:noreply,
-         put_flash(socket, :error, "No Gemini session file found for #{session_uuid}")}
+        {:noreply, put_flash(socket, :error, "No Gemini session file found for #{session_uuid}")}
 
       {:error, reason} ->
         {:noreply,

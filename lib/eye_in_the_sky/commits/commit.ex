@@ -30,10 +30,14 @@ defmodule EyeInTheSky.Commits.Commit do
   # Validate that session_id refers to an existing session
   defp validate_session_exists(changeset) do
     case get_change(changeset, :session_id) do
-      nil -> changeset
+      nil ->
+        changeset
+
       session_id ->
         case EyeInTheSky.Sessions.get_session(session_id) do
-          {:ok, _} -> changeset
+          {:ok, _} ->
+            changeset
+
           {:error, _} ->
             add_error(changeset, :session_id, "session not found")
         end

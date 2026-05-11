@@ -75,11 +75,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
     end
 
     test "all three toggle settings appear in output" do
-      html = render_tab(%{
-        "log_claude_raw" => "true",
-        "log_codex_raw" => "false",
-        "rate_limit_per_session" => "true"
-      })
+      html =
+        render_tab(%{
+          "log_claude_raw" => "true",
+          "log_codex_raw" => "false",
+          "rate_limit_per_session" => "true"
+        })
 
       assert html =~ "log_claude_raw"
       assert html =~ "log_codex_raw"

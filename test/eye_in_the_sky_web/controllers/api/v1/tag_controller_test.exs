@@ -95,7 +95,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TagControllerTest do
     test "search with no matches returns empty list with success: true", %{conn: conn} do
       _ = create_tag!("real-tag-#{System.unique_integer([:positive])}")
 
-      conn = get(conn, ~p"/api/v1/tags?q=zzz-no-such-tag-zzz-#{System.unique_integer([:positive])}")
+      conn =
+        get(conn, ~p"/api/v1/tags?q=zzz-no-such-tag-zzz-#{System.unique_integer([:positive])}")
+
       resp = json_response(conn, 200)
 
       assert resp["success"] == true

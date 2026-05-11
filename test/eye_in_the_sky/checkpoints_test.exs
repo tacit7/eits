@@ -72,13 +72,20 @@ defmodule EyeInTheSky.CheckpointsTest do
 
     test "invalid when message_index is set to nil explicitly" do
       # The schema default is 0, so omitting the key passes. Explicit nil triggers the error.
-      changeset = Checkpoint.changeset(%Checkpoint{message_index: nil}, %{session_id: 1, message_index: nil})
+      changeset =
+        Checkpoint.changeset(%Checkpoint{message_index: nil}, %{session_id: 1, message_index: nil})
+
       refute changeset.valid?
       assert %{message_index: [_ | _]} = errors_on(changeset)
     end
 
     test "invalid when both session_id and message_index explicitly nil" do
-      changeset = Checkpoint.changeset(%Checkpoint{message_index: nil}, %{session_id: nil, message_index: nil})
+      changeset =
+        Checkpoint.changeset(%Checkpoint{message_index: nil}, %{
+          session_id: nil,
+          message_index: nil
+        })
+
       refute changeset.valid?
       errors = errors_on(changeset)
       assert Map.has_key?(errors, :session_id)
@@ -241,7 +248,11 @@ defmodule EyeInTheSky.CheckpointsTest do
     test "respects limit option", %{session: session} do
       for i <- 1..5 do
         now = DateTime.utc_now() |> DateTime.truncate(:second)
-        insert_checkpoint(session.id, %{name: "cp#{i}", inserted_at: DateTime.add(now, i, :second)})
+
+        insert_checkpoint(session.id, %{
+          name: "cp#{i}",
+          inserted_at: DateTime.add(now, i, :second)
+        })
       end
 
       results = Checkpoints.list_checkpoints_for_session(session.id, limit: 3)

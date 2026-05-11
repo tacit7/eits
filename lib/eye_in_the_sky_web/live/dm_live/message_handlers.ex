@@ -2,7 +2,9 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [connected?: 1, put_flash: 3, push_event: 3, stream: 4, stream_insert: 3]
+
+  import Phoenix.LiveView,
+    only: [connected?: 1, put_flash: 3, push_event: 3, stream: 4, stream_insert: 3]
 
   # stream/4 requires LiveView lifecycle infrastructure (live_temp.lifecycle).
   # Mock sockets in unit tests lack this; safe_stream skips gracefully.

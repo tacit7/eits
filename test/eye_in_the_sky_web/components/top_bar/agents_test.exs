@@ -62,7 +62,9 @@ defmodule EyeInTheSkyWeb.TopBar.AgentsTest do
     test "each scope filter value sets the correct data-label" do
       for {scope, label} <- [{"all", "All"}, {"global", "Global"}, {"project", "Project"}] do
         html = render_component(&Agents.toolbar/1, %{scope_filter: scope})
-        assert html =~ ~s(data-label="#{label}"), "expected data-label=#{label} for scope=#{scope}"
+
+        assert html =~ ~s(data-label="#{label}"),
+               "expected data-label=#{label} for scope=#{scope}"
       end
     end
 

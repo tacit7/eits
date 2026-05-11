@@ -126,8 +126,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
           <.icon
             name="hero-arrow-right-mini"
             class="size-3 group-hover:translate-x-0.5 transition-transform duration-100"
-          />
-          View all sessions
+          /> View all sessions
         </.link>
       </div>
     </div>

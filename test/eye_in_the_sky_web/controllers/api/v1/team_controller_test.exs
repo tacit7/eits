@@ -184,7 +184,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       assert json_response(conn, 403)["error"] =~ "Access denied"
     end
 
-    test "session with nil project_id cannot create a team bound to an explicit project", %{conn: conn} do
+    test "session with nil project_id cannot create a team bound to an explicit project", %{
+      conn: conn
+    } do
       project = project_fixture()
       session = new_session()
       name = "scope-test-#{uniq()}"

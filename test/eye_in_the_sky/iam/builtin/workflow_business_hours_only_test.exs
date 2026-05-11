@@ -69,6 +69,7 @@ defmodule EyeInTheSky.IAM.Builtin.WorkflowBusinessHoursOnlyTest do
   describe "instruction_message/2" do
     test "returns the policy's message when set" do
       policy = %Policy{message: "Outside business hours."}
+
       assert WorkflowBusinessHoursOnly.instruction_message(policy, ctx()) ==
                "Outside business hours."
     end

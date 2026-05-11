@@ -101,31 +101,31 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     count
   rescue
     e in Postgrex.Error ->
-        if is_map(e.postgres) and e.postgres.code in @constraint_codes do
-          :telemetry.execute(
-            [:eits, :messages, :bulk_import, :constraint_violation],
-            %{batch_size: length(inserts)},
-            %{code: e.postgres.code, table: "messages"}
-          )
+      if is_map(e.postgres) and e.postgres.code in @constraint_codes do
+        :telemetry.execute(
+          [:eits, :messages, :bulk_import, :constraint_violation],
+          %{batch_size: length(inserts)},
+          %{code: e.postgres.code, table: "messages"}
+        )
 
-          Logger.warning(
-            "BulkImporter: constraint violation on batch of #{length(inserts)}: #{inspect(e.postgres.code)}"
-          )
+        Logger.warning(
+          "BulkImporter: constraint violation on batch of #{length(inserts)}: #{inspect(e.postgres.code)}"
+        )
 
-          0
-        else
-          :telemetry.execute(
-            [:eits, :messages, :bulk_import, :failed],
-            %{batch_size: length(inserts)},
-            %{error: inspect(e), table: "messages"}
-          )
+        0
+      else
+        :telemetry.execute(
+          [:eits, :messages, :bulk_import, :failed],
+          %{batch_size: length(inserts)},
+          %{error: inspect(e), table: "messages"}
+        )
 
-          Logger.error(
-            "BulkImporter: systemic insert_all failure (batch=#{length(inserts)}): #{inspect(e)}"
-          )
+        Logger.error(
+          "BulkImporter: systemic insert_all failure (batch=#{length(inserts)}): #{inspect(e)}"
+        )
 
-          reraise e, __STACKTRACE__
-        end
+        reraise e, __STACKTRACE__
+      end
   end
 
   defp run_updates(updates, session_id) do

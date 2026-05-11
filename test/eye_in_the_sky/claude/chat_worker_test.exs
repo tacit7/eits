@@ -11,11 +11,10 @@ defmodule EyeInTheSky.Claude.ChatWorkerTest do
     unless Process.whereis(ChatSupervisor), do: DynamicSupervisor.start_link(name: ChatSupervisor)
 
     on_exit(fn ->
-      # Clean up any started ChatWorkers
-      Registry.select(ChatRegistry, [{{:_, :_}, :_, :_}])
-      |> Enum.each(fn {_key, pid, _val} ->
-        if Process.alive?(pid), do: DynamicSupervisor.terminate_child(ChatSupervisor, pid)
-      end)
+      for {_, pid, _, _} <- DynamicSupervisor.which_children(ChatSupervisor),
+          is_pid(pid) and Process.alive?(pid) do
+        DynamicSupervisor.terminate_child(ChatSupervisor, pid)
+      end
     end)
 
     :ok

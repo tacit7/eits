@@ -177,24 +177,26 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
 
   describe "apply_filters_and_sort/2" do
     setup do
-      {global, _proj} = tmp_agent_dirs()
+      {_global, proj_root} = tmp_agent_dirs()
+      proj_agents_dir = Path.join(proj_root, ".claude/agents")
 
-      write_agent(global, "zebra", """
+      # Write to proj_agents_dir — do_load_agents hardcodes ~/.claude/agents for
+      # global, so temp global dirs are never read. Use project scope instead.
+      write_agent(proj_agents_dir, "zebra", """
       ---
       name: Zebra Tool
       description: Last alphabetically
       ---
       """)
 
-      write_agent(global, "alpha", """
+      write_agent(proj_agents_dir, "alpha", """
       ---
       name: Alpha Tool
       description: First alphabetically
       ---
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout(nil)
-      # Narrow to just our freshly-created ones to avoid ambient ~/.claude/agents noise
+      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "project")
       own = Enum.filter(agents, &(&1.slug in ["zebra", "alpha"]))
       {:ok, agents: own}
     end

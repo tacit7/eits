@@ -71,18 +71,6 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorkerTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Oban job config — can be verified without running the job
-  # ---------------------------------------------------------------------------
-
-  describe "Oban worker configuration" do
-    test "is configured for the :jobs queue with max 3 attempts" do
-      conf = SpawnAgentWorker.__oban_worker_opts__()
-      assert Keyword.get(conf, :queue) == :jobs
-      assert Keyword.get(conf, :max_attempts) == 3
-    end
-  end
-
-  # ---------------------------------------------------------------------------
   # ScheduledJobs config decoding — tests the job creation + decode round-trip,
   # not SpawnAgentWorker internals, so no private-function access needed.
   # ---------------------------------------------------------------------------

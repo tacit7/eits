@@ -12,11 +12,12 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
     unless Process.whereis(ChatSupervisor), do: DynamicSupervisor.start_link(name: ChatSupervisor)
 
     on_exit(fn ->
-      # Clean up any started ChatWorkers
-      Registry.select(ChatRegistry, [{{:_, :_}, :_, :_}])
-      |> Enum.each(fn {_key, pid, _val} ->
-        if Process.alive?(pid), do: DynamicSupervisor.terminate_child(ChatSupervisor, pid)
-      end)
+      # Terminate all ChatWorker children via the supervisor, not Registry.select,
+      # to avoid depending on Registry's internal ETS storage format.
+      for {_, pid, _, _} <- DynamicSupervisor.which_children(ChatSupervisor),
+          is_pid(pid) and Process.alive?(pid) do
+        DynamicSupervisor.terminate_child(ChatSupervisor, pid)
+      end
     end)
 
     :ok
@@ -32,8 +33,8 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
       # Send a message
       result = ChatManager.send_to_channel(channel_id, "Hello", 999)
 
-      # Should succeed and start the worker
-      assert result == {:ok, :started} or match?({:ok, _}, result)
+      # ChatManager -> ChatWorker.send_to_channel -> GenServer.cast -> :ok
+      assert result == :ok
 
       # Worker should now be registered
       assert Registry.lookup(ChatRegistry, {:channel, channel_id}) != []
@@ -61,18 +62,18 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
 
       result = ChatManager.send_to_channel(channel_id, "Test", 999, timeout: 5000)
 
-      assert result == {:ok, :started} or match?({:ok, _}, result)
+      assert result == :ok
     end
   end
 
   describe "send_to_channel/3 failure handling" do
-    test "returns error if message is not binary" do
+    test "raises FunctionClauseError if message is not binary" do
       channel_id = "invalid-channel-#{:rand.uniform(100_000)}"
 
-      # This should fail during worker startup or in handle_cast
-      result = ChatManager.send_to_channel(channel_id, 123, 999)
-
-      assert match?({:error, _}, result) or result == :ok
+      # send_to_channel/4 has `when is_binary(message)` guard — non-binary raises
+      assert_raise FunctionClauseError, fn ->
+        ChatManager.send_to_channel(channel_id, 123, 999)
+      end
     end
   end
 
@@ -83,7 +84,7 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
 
       result = ChatManager.send_to_channel(channel_id, "Test", 999, opts)
 
-      assert result == {:ok, :started} or match?({:ok, _}, result)
+      assert result == :ok
     end
   end
 
@@ -132,8 +133,8 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
       result1 = ChatManager.send_to_channel(channel_1, "Ch1 Message", 1)
       result2 = ChatManager.send_to_channel(channel_2, "Ch2 Message", 2)
 
-      assert match?({:ok, _}, result1) or result1 == {:ok, :started}
-      assert match?({:ok, _}, result2) or result2 == {:ok, :started}
+      assert result1 == :ok
+      assert result2 == :ok
 
       # Both should have separate workers
       assert Registry.lookup(ChatRegistry, {:channel, channel_1}) != []

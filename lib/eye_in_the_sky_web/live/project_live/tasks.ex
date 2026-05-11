@@ -199,6 +199,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: handle_create_new_task(params, socket, &load_tasks/1)
 
   @impl true
+  def handle_event("add_task_annotation", params, socket),
+    do: handle_add_task_annotation(params, socket)
+
+  @impl true
   def handle_event("set_notify_on_stop", params, socket),
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 

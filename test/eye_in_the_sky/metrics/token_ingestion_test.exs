@@ -210,8 +210,18 @@ defmodule EyeInTheSky.Metrics.TokenIngestionTest do
 
       assert :ok = TokenIngestion.ingest_session(session.uuid)
 
-      [tokens_used, input, output, cache_creation, cache_read, _cost, model, requests,
-       subagents, notes] = metrics_row(session.id)
+      [
+        tokens_used,
+        input,
+        output,
+        cache_creation,
+        cache_read,
+        _cost,
+        model,
+        requests,
+        subagents,
+        notes
+      ] = metrics_row(session.id)
 
       assert tokens_used == 1_700_000
       assert input == 1_000_000

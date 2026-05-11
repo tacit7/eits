@@ -177,7 +177,10 @@ defmodule EyeInTheSky.SessionStore do
 
     # Schedule the cleanup timer
     schedule_cleanup()
-    Logger.info("SessionStore started with TTL=#{@default_ttl_ms}ms, cleanup interval=#{@cleanup_interval_ms}ms")
+
+    Logger.info(
+      "SessionStore started with TTL=#{@default_ttl_ms}ms, cleanup interval=#{@cleanup_interval_ms}ms"
+    )
 
     {:ok, %{}}
   end
@@ -188,9 +191,10 @@ defmodule EyeInTheSky.SessionStore do
     cutoff = now - @default_ttl_ms
 
     # Delete all entries with timestamp older than cutoff
-    deleted = :ets.select_delete(@table, [
-      {{:_, :_, :"$1"}, [{:<, :"$1", cutoff}], [true]}
-    ])
+    deleted =
+      :ets.select_delete(@table, [
+        {{:_, :_, :"$1"}, [{:<, :"$1", cutoff}], [true]}
+      ])
 
     if deleted > 0 do
       Logger.debug("SessionStore cleanup: deleted #{deleted} expired sessions")

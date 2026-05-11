@@ -7,11 +7,9 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   # stream/4 requires LiveView lifecycle infrastructure (live_temp.lifecycle).
   # Mock sockets in unit tests lack this; safe_stream skips gracefully.
   defp safe_stream(socket, name, items, opts) do
-    try do
-      stream(socket, name, items, opts)
-    rescue
-      KeyError -> socket
-    end
+    stream(socket, name, items, opts)
+  rescue
+    KeyError -> socket
   end
 
   alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}
@@ -269,7 +267,9 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
     # If usage exceeds 200k, the session must be on a 1M model
     ctx_window =
-      if used > @default_context_window, do: @extended_context_window, else: @default_context_window
+      if used > @default_context_window,
+        do: @extended_context_window,
+        else: @default_context_window
 
     if used > 0, do: {used, ctx_window}
   end

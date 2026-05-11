@@ -1,14 +1,15 @@
 defmodule EyeInTheSky.Github.WebhookDispatcher do
+  @moduledoc false
   use GenServer
 
   require Logger
 
   alias EyeInTheSky.Events
-  alias EyeInTheSky.Github.WebhookDeliveries
+  alias EyeInTheSky.Github.CheckRunHandler
   alias EyeInTheSky.Github.EventContext
   alias EyeInTheSky.Github.PullRequestHandler
   alias EyeInTheSky.Github.PushHandler
-  alias EyeInTheSky.Github.CheckRunHandler
+  alias EyeInTheSky.Github.WebhookDeliveries
   alias EyeInTheSky.Github.WebhookRulesExecutor
 
   @stale_minutes 5

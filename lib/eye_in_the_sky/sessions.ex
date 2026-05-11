@@ -74,25 +74,33 @@ defmodule EyeInTheSky.Sessions do
     int_ids =
       ids
       |> Enum.flat_map(fn
-        id when is_integer(id) -> [id]
+        id when is_integer(id) ->
+          [id]
+
         s when is_binary(s) ->
           case Integer.parse(s) do
             {n, ""} -> [n]
             _ -> []
           end
-        _ -> []
+
+        _ ->
+          []
       end)
 
     uuid_ids =
       ids
       |> Enum.filter(fn
-        id when is_integer(id) -> false
+        id when is_integer(id) ->
+          false
+
         s when is_binary(s) ->
           case Ecto.UUID.cast(s) do
             {:ok, _} -> true
             _ -> false
           end
-        _ -> false
+
+        _ ->
+          false
       end)
 
     case {int_ids, uuid_ids} do

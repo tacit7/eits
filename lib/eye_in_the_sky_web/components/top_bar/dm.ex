@@ -41,18 +41,42 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         active={@active_tab in ["messages", nil]}
         on_click="change_tab"
         value="messages"
-        active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium"
+        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
       />
-      <:item label="Tasks" active={@active_tab == "tasks"} on_click="change_tab" value="tasks" active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium" />
-      <:item label="Commits" active={@active_tab == "commits"} on_click="change_tab" value="commits" active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium" />
-      <:item label="Notes" active={@active_tab == "notes"} on_click="change_tab" value="notes" active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium" />
-      <:item label="Context" active={@active_tab == "context"} on_click="change_tab" value="context" active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium" />
+      <:item
+        label="Tasks"
+        active={@active_tab == "tasks"}
+        on_click="change_tab"
+        value="tasks"
+        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+      />
+      <:item
+        label="Commits"
+        active={@active_tab == "commits"}
+        on_click="change_tab"
+        value="commits"
+        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+      />
+      <:item
+        label="Notes"
+        active={@active_tab == "notes"}
+        on_click="change_tab"
+        value="notes"
+        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+      />
+      <:item
+        label="Context"
+        active={@active_tab == "context"}
+        on_click="change_tab"
+        value="context"
+        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+      />
       <:item
         label="Settings"
         active={@active_tab == "settings"}
         on_click="change_tab"
         value="settings"
-        active_class="bg-base-content/[0.10] rounded-md px-3 py-1 text-base-content/92 font-medium"
+        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
       />
     </.tab_pills>
     <div class="flex-1" />
@@ -106,7 +130,11 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
               @session_active && "opacity-40 cursor-not-allowed"
             ]}
             disabled={@session_active}
-            title={if @session_active, do: "Available after the session stops", else: "Re-read transcript and import missed messages"}
+            title={
+              if @session_active,
+                do: "Available after the session stops",
+                else: "Re-read transcript and import missed messages"
+            }
           >
             <.icon name="hero-arrow-path" class="size-3.5" /> Sync messages
           </button>

@@ -73,7 +73,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
   describe "handle_sort_notes/3" do
     test "assigns the sort_by value from params" do
       socket = socket(%{sort_by: "newest"})
-      {:noreply, result} = NotesHelpers.handle_sort_notes(%{"by" => "oldest"}, socket, &noop_reload/1)
+
+      {:noreply, result} =
+        NotesHelpers.handle_sort_notes(%{"by" => "oldest"}, socket, &noop_reload/1)
+
       assert result.assigns.sort_by == "oldest"
     end
 
@@ -99,12 +102,17 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
   describe "handle_filter_type/3" do
     test "assigns the type_filter from params" do
       socket = socket(%{type_filter: "all"})
-      {:noreply, result} = NotesHelpers.handle_filter_type(%{"type" => "session"}, socket, &noop_reload/1)
+
+      {:noreply, result} =
+        NotesHelpers.handle_filter_type(%{"type" => "session"}, socket, &noop_reload/1)
+
       assert result.assigns.type_filter == "session"
     end
 
     test "accepts any string value for type_filter" do
-      {:noreply, result} = NotesHelpers.handle_filter_type(%{"type" => "task"}, socket(), &noop_reload/1)
+      {:noreply, result} =
+        NotesHelpers.handle_filter_type(%{"type" => "task"}, socket(), &noop_reload/1)
+
       assert result.assigns.type_filter == "task"
     end
   end
@@ -136,7 +144,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
         s
       end
 
-      {:noreply, _} = NotesHelpers.handle_toggle_starred_filter(%{}, socket(%{starred_filter: false}), reload_fn)
+      {:noreply, _} =
+        NotesHelpers.handle_toggle_starred_filter(
+          %{},
+          socket(%{starred_filter: false}),
+          reload_fn
+        )
+
       assert :ets.lookup(counter, :n) == [{:n, 1}]
     end
   end
@@ -166,6 +180,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
 
     test "accepts note-id (hyphenated) key" do
       note = create_note(%{starred: false})
+
       {:noreply, _result} =
         NotesHelpers.handle_toggle_star(%{"note-id" => note.id}, socket(), &noop_reload/1)
 
@@ -175,6 +190,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
 
     test "accepts value key" do
       note = create_note(%{starred: true})
+
       {:noreply, _result} =
         NotesHelpers.handle_toggle_star(%{"value" => note.id}, socket(), &noop_reload/1)
 
@@ -216,6 +232,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
 
     test "accepts note-id (hyphenated) key" do
       note = create_note()
+
       {:noreply, _} =
         NotesHelpers.handle_delete_note(%{"note-id" => note.id}, socket(), &noop_reload/1)
 
@@ -224,6 +241,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
 
     test "accepts value key" do
       note = create_note()
+
       {:noreply, _} =
         NotesHelpers.handle_delete_note(%{"value" => note.id}, socket(), &noop_reload/1)
 
@@ -232,6 +250,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.NotesHelpersTest do
 
     test "accepts item_id key" do
       note = create_note()
+
       {:noreply, _} =
         NotesHelpers.handle_delete_note(%{"item_id" => note.id}, socket(), &noop_reload/1)
 

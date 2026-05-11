@@ -52,11 +52,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
 
       assert html =~ "Deactivate"
     end
-
   end
 
   describe "handle_event/delete" do
-    test "deactivating a prompt navigates back to the prompts list", %{conn: conn, project: project, prompt: prompt} do
+    test "deactivating a prompt navigates back to the prompts list", %{
+      conn: conn,
+      project: project,
+      prompt: prompt
+    } do
       {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
       assert has_element?(lv, "[phx-click='delete']")

@@ -85,5 +85,4 @@ defmodule EyeInTheSkyWeb.Live.Shared.KanbanFilters do
     |> assign(:tag_counts, tag_counts)
     |> apply_filters()
   end
-
 end

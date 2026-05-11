@@ -47,6 +47,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
        |> Loader.maybe_load_notes(section, socket.assigns.sidebar_project)
        |> Loader.maybe_load_files(section)
        |> Loader.maybe_load_agents(section, socket.assigns.sidebar_project)
+       |> Loader.maybe_load_skills(section, socket.assigns.sidebar_project)
        |> Loader.maybe_load_usage(section)}
     end
   end

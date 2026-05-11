@@ -372,5 +372,4 @@ defmodule EyeInTheSky.Notes do
     |> limit(^limit_val)
     |> Repo.all()
   end
-
 end

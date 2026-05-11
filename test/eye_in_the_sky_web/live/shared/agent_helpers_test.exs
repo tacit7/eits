@@ -58,7 +58,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpersTest do
       task = create_task(project)
       socket = build_socket(project)
 
-      result = AgentHelpers.handle_start_agent_for_task(%{"task_id" => to_string(task.id)}, socket)
+      result =
+        AgentHelpers.handle_start_agent_for_task(%{"task_id" => to_string(task.id)}, socket)
 
       assert {:noreply, %Phoenix.LiveView.Socket{}} = result
     end

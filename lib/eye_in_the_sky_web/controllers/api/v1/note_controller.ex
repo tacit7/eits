@@ -27,6 +27,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
           case Tasks.get_task_ids(params["task_id"]) do
             {:ok, {task_id, _uuid}} ->
               Notes.list_notes_for_task(task_id, starred: starred_only)
+
             {:error, :not_found} ->
               []
           end

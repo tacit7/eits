@@ -114,6 +114,7 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
 
       # Worker should be gone
       :timer.sleep(50)
+
       assert Registry.lookup(ChatRegistry, {:channel, channel_id}) == [] or
                not Process.alive?(worker_pid)
 

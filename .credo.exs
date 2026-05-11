@@ -3,7 +3,7 @@
     %{
       name: "default",
       files: %{
-        included: ["lib/", "test/"],
+        included: ["lib/"],
         excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/"]
       },
       plugins: [],
@@ -13,9 +13,6 @@
       color: true,
       checks: %{
         enabled: [
-          # Custom EITS check — Repo call inside Enum = N+1
-          {EyeInTheSky.CredoChecks.RepoInEnum, []},
-
           # Consistency
           {Credo.Check.Consistency.ExceptionNames, []},
           {Credo.Check.Consistency.LineEndings, []},

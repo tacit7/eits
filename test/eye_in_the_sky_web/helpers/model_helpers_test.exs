@@ -54,7 +54,10 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "values match the base claude_models/0 list" do
       base_values = ModelHelpers.claude_models() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
-      meta_values = ModelHelpers.claude_models_with_meta() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
+
+      meta_values =
+        ModelHelpers.claude_models_with_meta() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
+
       assert meta_values == base_values
     end
   end
@@ -104,7 +107,10 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "values match the base codex_models/0 list" do
       base_values = ModelHelpers.codex_models() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
-      meta_values = ModelHelpers.codex_models_with_meta() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
+
+      meta_values =
+        ModelHelpers.codex_models_with_meta() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
+
       assert meta_values == base_values
     end
   end
@@ -154,7 +160,10 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "values match the base gemini_models/0 list" do
       base_values = ModelHelpers.gemini_models() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
-      meta_values = ModelHelpers.gemini_models_with_meta() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
+
+      meta_values =
+        ModelHelpers.gemini_models_with_meta() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
+
       assert meta_values == base_values
     end
   end

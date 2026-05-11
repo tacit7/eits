@@ -68,8 +68,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -103,6 +105,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: cannot create team in this project"}
     end
@@ -138,8 +141,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       else
         {:error, :not_found} ->
           {:error, :not_found, "Team not found"}
+
         {:error, :unauthorized} ->
           {:error, :unauthorized, "Unauthorized"}
+
         {:error, :forbidden} ->
           {:error, :forbidden, "Access denied: team does not belong to your project"}
       end
@@ -161,8 +166,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -183,8 +190,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -200,8 +209,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         name: params["name"],
         role: params["role"] || "member",
         agent_id: resolve_id(params["agent_id"], &Agents.get_agent_by_uuid/1),
-        session_id:
-          resolve_id(params["session_id"], &Sessions.get_session_by_uuid/1)
+        session_id: resolve_id(params["session_id"], &Sessions.get_session_by_uuid/1)
       }
 
       case Teams.join_team(attrs) do
@@ -222,8 +230,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -241,10 +251,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :member_not_found} ->
         {:error, :not_found, "Member not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -262,10 +275,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :member_not_found} ->
         {:error, :not_found, "Member not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -291,8 +307,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         else
           {:error, :not_found} ->
             {:error, :not_found, "Team not found"}
+
           {:error, :unauthorized} ->
             {:error, :unauthorized, "Unauthorized"}
+
           {:error, :forbidden} ->
             {:error, :forbidden, "Access denied: team does not belong to your project"}
         end
@@ -464,8 +482,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         {:error, :not_found, "Sender session not found"}
 
       {:error, :sender_terminated} ->
-        {:error, :unprocessable_entity,
-         "Sender session is terminated and cannot broadcast"}
+        {:error, :unprocessable_entity, "Sender session is terminated and cannot broadcast"}
 
       {:error, :not_member} ->
         {:error, :forbidden, "Sender is not a member of this team"}

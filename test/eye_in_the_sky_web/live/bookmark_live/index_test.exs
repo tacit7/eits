@@ -165,8 +165,21 @@ defmodule EyeInTheSkyWeb.BookmarkLive.IndexTest do
 
   describe "filter_category event" do
     test "filters bookmarks by category", %{conn: conn} do
-      important = bookmark_fixture(%{bookmark_type: "note", bookmark_id: "imp1", title: "Important one", category: "important"})
-      idea = bookmark_fixture(%{bookmark_type: "note", bookmark_id: "idea1", title: "Idea one", category: "ideas"})
+      important =
+        bookmark_fixture(%{
+          bookmark_type: "note",
+          bookmark_id: "imp1",
+          title: "Important one",
+          category: "important"
+        })
+
+      idea =
+        bookmark_fixture(%{
+          bookmark_type: "note",
+          bookmark_id: "idea1",
+          title: "Idea one",
+          category: "ideas"
+        })
 
       {:ok, lv, _html} = live(conn, ~p"/bookmarks")
 
@@ -180,8 +193,21 @@ defmodule EyeInTheSkyWeb.BookmarkLive.IndexTest do
     end
 
     test "clearing category filter shows all bookmarks", %{conn: conn} do
-      important = bookmark_fixture(%{bookmark_type: "note", bookmark_id: "imp2", title: "Imp two", category: "important"})
-      idea = bookmark_fixture(%{bookmark_type: "note", bookmark_id: "idea2", title: "Idea two", category: "ideas"})
+      important =
+        bookmark_fixture(%{
+          bookmark_type: "note",
+          bookmark_id: "imp2",
+          title: "Imp two",
+          category: "important"
+        })
+
+      idea =
+        bookmark_fixture(%{
+          bookmark_type: "note",
+          bookmark_id: "idea2",
+          title: "Idea two",
+          category: "ideas"
+        })
 
       {:ok, lv, _html} = live(conn, ~p"/bookmarks")
 

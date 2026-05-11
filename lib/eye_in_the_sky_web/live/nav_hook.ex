@@ -40,7 +40,11 @@ defmodule EyeInTheSkyWeb.NavHook do
       |> attach_hook(:palette_sessions, :handle_event, &PaletteHandlers.handle_palette_event/3)
       |> attach_hook(:session_nav, :handle_event, &PaletteHandlers.handle_session_nav_event/3)
       |> attach_hook(:task_nav, :handle_event, &PaletteHandlers.handle_task_nav_event/3)
-      |> attach_hook(:toggle_task_done, :handle_event, &PaletteHandlers.handle_toggle_task_done_event/3)
+      |> attach_hook(
+        :toggle_task_done,
+        :handle_event,
+        &PaletteHandlers.handle_toggle_task_done_event/3
+      )
       |> attach_hook(
         :palette_create_task,
         :handle_event,
@@ -77,6 +81,7 @@ defmodule EyeInTheSkyWeb.NavHook do
         :handle_event,
         &PaletteAgentHandlers.handle_delete_agent/3
       )
+      |> attach_hook(:vim_quick_dm, :handle_event, &PaletteHandlers.handle_quick_dm_event/3)
 
     {:cont, socket}
   end

@@ -112,7 +112,11 @@
             session_uuid={assigns[:session_uuid]}
             show_iterm={true}
             notify_on_stop={assigns[:notify_on_stop] || false}
-            session_active={(assigns[:agent] || %{}) |> Map.get(:status) |> then(&(&1 in ~w(working compacting)))}
+            session_active={
+              (assigns[:agent] || %{})
+              |> Map.get(:status)
+              |> then(&(&1 in ~w(working compacting)))
+            }
           />
         <% :notes -> %>
           <EyeInTheSkyWeb.TopBar.Notes.toolbar

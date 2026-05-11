@@ -509,6 +509,8 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   # Provider-polymorphic stream assembler factory
   defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
-  defp stream_assembler_for("gemini"), do: StreamAssembler.new()
+  # Gemini uses the Codex assembler because both emit complete (non-delta)
+  # items per event and use the same {name, input} tool_use shape.
+  defp stream_assembler_for("gemini"), do: CodexStreamAssembler.new()
   defp stream_assembler_for(_provider), do: StreamAssembler.new()
 end

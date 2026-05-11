@@ -16,7 +16,9 @@ defmodule EyeInTheSkyWeb.Plugs.CaptureRawBodyTest do
   describe "read_body/2 — full body in one read ({:ok, ...})" do
     test "returns the body and assigns it to :raw_body" do
       body = ~s({"hello":"world"})
-      conn = conn(:post, "/", body) |> Plug.Conn.put_req_header("content-type", "application/json")
+
+      conn =
+        conn(:post, "/", body) |> Plug.Conn.put_req_header("content-type", "application/json")
 
       assert {:ok, ^body, conn} = CaptureRawBody.read_body(conn, [])
       assert conn.assigns[:raw_body] == body

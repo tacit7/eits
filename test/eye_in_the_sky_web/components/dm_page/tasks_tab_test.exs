@@ -264,7 +264,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTabTest do
     test "renders task id when uuid not present" do
       tasks = [
         %{
-          id: 123456789,
+          id: 123_456_789,
           uuid: nil,
           title: "Task",
           state_id: 1,

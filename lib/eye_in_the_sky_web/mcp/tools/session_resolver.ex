@@ -13,7 +13,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionResolver do
 
   Returns `{:ok, session}` or `{:error, :not_found}`.
   """
-  @spec resolve(integer() | String.t() | nil) :: {:ok, Sessions.Session.t()} | {:error, :not_found}
+  @spec resolve(integer() | String.t() | nil) ::
+          {:ok, Sessions.Session.t()} | {:error, :not_found}
   def resolve(nil), do: {:error, :not_found}
   def resolve(""), do: {:error, :not_found}
   def resolve(id) when is_integer(id), do: Sessions.get_session(id)
@@ -63,21 +64,24 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionResolver do
         {:ok, session}
 
       {:error, :not_found} ->
-        # Try agent UUID lookup
         if _int_id = ToolHelpers.parse_int(ref) do
           {:error, :not_found}
         else
-          case Agents.get_agent_by_uuid(ref) do
-            {:ok, agent} ->
-              case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-                [session | _] -> {:ok, session}
-                [] -> {:error, :not_found}
-              end
-
-            {:error, :not_found} ->
-              {:error, :not_found}
-          end
+          session_for_agent_uuid(ref)
         end
+    end
+  end
+
+  defp session_for_agent_uuid(ref) do
+    case Agents.get_agent_by_uuid(ref) do
+      {:ok, agent} ->
+        case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+          [session | _] -> {:ok, session}
+          [] -> {:error, :not_found}
+        end
+
+      {:error, :not_found} ->
+        {:error, :not_found}
     end
   end
 
@@ -109,7 +113,8 @@ defmodule EyeInTheSkyWeb.MCP.Tools.SessionResolver do
   @doc """
   Resolve an optional session ID to an integer. Returns nil if input is nil/empty.
   """
-  @spec resolve_optional_int(integer() | String.t() | nil) :: {:ok, integer() | nil} | {:error, :not_found}
+  @spec resolve_optional_int(integer() | String.t() | nil) ::
+          {:ok, integer() | nil} | {:error, :not_found}
   def resolve_optional_int(nil), do: {:ok, nil}
   def resolve_optional_int(""), do: {:ok, nil}
 

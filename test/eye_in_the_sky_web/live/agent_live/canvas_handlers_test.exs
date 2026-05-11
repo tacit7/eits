@@ -19,14 +19,22 @@ defmodule EyeInTheSkyWeb.AgentLive.CanvasHandlersTest do
   describe "handle_event show_new_canvas_form" do
     test "assigns show_new_canvas_for with agent id" do
       {:noreply, updated} =
-        CanvasHandlers.handle_event("show_new_canvas_form", %{"agent-id" => "123"}, build_socket())
+        CanvasHandlers.handle_event(
+          "show_new_canvas_form",
+          %{"agent-id" => "123"},
+          build_socket()
+        )
 
       assert updated.assigns.show_new_canvas_for == "123"
     end
 
     test "handles different agent IDs" do
       {:noreply, updated} =
-        CanvasHandlers.handle_event("show_new_canvas_form", %{"agent-id" => "456"}, build_socket())
+        CanvasHandlers.handle_event(
+          "show_new_canvas_form",
+          %{"agent-id" => "456"},
+          build_socket()
+        )
 
       assert updated.assigns.show_new_canvas_for == "456"
     end
@@ -138,7 +146,8 @@ defmodule EyeInTheSkyWeb.AgentLive.CanvasHandlersTest do
             end
         end)
 
-      assert auto_named, "expected an auto-named canvas between Canvas #{t_before} and Canvas #{t_after}"
+      assert auto_named,
+             "expected an auto-named canvas between Canvas #{t_before} and Canvas #{t_after}"
     end
 
     test "auto-generates canvas name when name is nil", %{session: session} do

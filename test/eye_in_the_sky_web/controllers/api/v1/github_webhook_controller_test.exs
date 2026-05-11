@@ -13,8 +13,7 @@ defmodule EyeInTheSkyWeb.Api.V1.GithubWebhookControllerTest do
   end
 
   defp sign(body),
-    do:
-      "sha256=" <> (:crypto.mac(:hmac, :sha256, @secret, body) |> Base.encode16(case: :lower))
+    do: "sha256=" <> (:crypto.mac(:hmac, :sha256, @secret, body) |> Base.encode16(case: :lower))
 
   defp post_webhook(conn, body, opts \\ []) do
     sig = Keyword.get(opts, :signature, sign(body))

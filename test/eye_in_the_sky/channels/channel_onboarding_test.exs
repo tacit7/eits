@@ -16,7 +16,11 @@ defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
     )
 
     on_exit(fn ->
-      Application.put_env(:eye_in_the_sky, :agent_manager_module, EyeInTheSky.Agents.MockAgentManager)
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSky.Agents.MockAgentManager
+      )
     end)
 
     agent = Factory.create_agent()

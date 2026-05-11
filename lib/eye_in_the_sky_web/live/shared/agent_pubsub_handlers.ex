@@ -81,7 +81,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentPubSubHandlers do
     AgentStatusHelpers.handle_agent_working(socket, msg, fn socket, session_id ->
       socket
       |> assign(:working_session_ids, MapSet.put(socket.assigns.working_session_ids, session_id))
-      |> assign(:waiting_session_ids, MapSet.delete(socket.assigns.waiting_session_ids, session_id))
+      |> assign(
+        :waiting_session_ids,
+        MapSet.delete(socket.assigns.waiting_session_ids, session_id)
+      )
     end)
   end
 
@@ -93,7 +96,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentPubSubHandlers do
   def handle_agent_stopped_waiting_mapsets(socket, %{status: "waiting", id: session_id}) do
     socket =
       socket
-      |> assign(:working_session_ids, MapSet.delete(socket.assigns.working_session_ids, session_id))
+      |> assign(
+        :working_session_ids,
+        MapSet.delete(socket.assigns.working_session_ids, session_id)
+      )
       |> assign(:waiting_session_ids, MapSet.put(socket.assigns.waiting_session_ids, session_id))
 
     {:noreply, socket}
@@ -114,8 +120,14 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentPubSubHandlers do
   def handle_agent_stopped_mapsets(socket, msg) do
     AgentStatusHelpers.handle_agent_stopped(socket, msg, fn socket, session_id ->
       socket
-      |> assign(:working_session_ids, MapSet.delete(socket.assigns.working_session_ids, session_id))
-      |> assign(:waiting_session_ids, MapSet.delete(socket.assigns.waiting_session_ids, session_id))
+      |> assign(
+        :working_session_ids,
+        MapSet.delete(socket.assigns.working_session_ids, session_id)
+      )
+      |> assign(
+        :waiting_session_ids,
+        MapSet.delete(socket.assigns.waiting_session_ids, session_id)
+      )
     end)
   end
 

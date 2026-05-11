@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
     ~H"""
     <div
-      class="flex flex-col h-dvh px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative overflow-hidden"
+      class="flex flex-col h-full px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative overflow-hidden"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
@@ -86,8 +86,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <form id="create-note-form" phx-submit="create_note">
               <div class="mb-4">
                 <label class="text-xs font-medium text-base-content/60 mb-1.5 block">
-                  Title
-                  <span class="text-base-content/30">(optional)</span>
+                  Title <span class="text-base-content/30">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -141,7 +140,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <div class="modal-box pb-[env(safe-area-inset-bottom)]">
           <h3 class="font-semibold text-base">Reload from file?</h3>
           <p class="py-3 text-sm text-base-content/70">
-            This will <strong class="text-warning">delete all messages</strong> and re-import from the transcript file. Use "Sync messages" instead if you only want to recover missed messages.
+            This will <strong class="text-warning">delete all messages</strong>
+            and re-import from the transcript file. Use "Sync messages" instead if you only want to recover missed messages.
           </p>
           <div class="form-control mb-4">
             <label class="label cursor-pointer gap-2 justify-start min-h-[44px] flex items-center">
@@ -310,7 +310,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
       <%!-- Header card (desktop only) --%>
       <div
-        class="hidden md:flex max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
+        class="hidden max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">
@@ -430,7 +430,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 class={[
                   "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] font-medium transition-all duration-150",
                   @active_tab == tab && "bg-primary/10 text-primary",
-                  @active_tab != tab && "text-base-content/40 hover:text-base-content/65 hover:bg-base-content/5"
+                  @active_tab != tab &&
+                    "text-base-content/40 hover:text-base-content/65 hover:bg-base-content/5"
                 ]}
                 phx-click="change_tab"
                 phx-value-tab={tab}

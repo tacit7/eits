@@ -222,6 +222,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         "system" -> :system
         _ -> :agent
       end
+
     is_dm = DmHelpers.dm_message?(assigns.message)
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
 

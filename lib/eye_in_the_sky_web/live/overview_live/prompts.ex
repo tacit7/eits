@@ -47,7 +47,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
   @impl true
   def handle_event("select_prompt", %{"id" => id}, socket) do
     selected =
-      if socket.assigns.selected_prompt && socket.assigns.selected_prompt.id == String.to_integer(id) do
+      if socket.assigns.selected_prompt &&
+           socket.assigns.selected_prompt.id == String.to_integer(id) do
         nil
       else
         Enum.find(socket.assigns.prompts, &(Integer.to_string(&1.id) == id))

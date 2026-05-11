@@ -55,14 +55,8 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
           params["agent_id"] ->
             case Agents.get_agent_by_uuid(params["agent_id"]) do
-              {:ok, agent} ->
-                case Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-                  [session | _] -> Commits.list_recent_commits(session.id, limit)
-                  [] -> []
-                end
-
-              _ ->
-                []
+              {:ok, agent} -> recent_commits_for_agent(agent.id, limit)
+              _ -> []
             end
 
           true ->
@@ -122,6 +116,13 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
       true ->
         do_create_commits(conn, agent_uuid, hashes, messages)
+    end
+  end
+
+  defp recent_commits_for_agent(agent_id, limit) do
+    case Sessions.list_sessions_for_agent(agent_id, limit: 1) do
+      [session | _] -> Commits.list_recent_commits(session.id, limit)
+      [] -> []
     end
   end
 

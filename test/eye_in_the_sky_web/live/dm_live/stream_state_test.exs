@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.DmLive.StreamStateTest do
   # Helper to build a bare socket with assigns
   defp build_socket(assigns) do
     base = %{__changed__: %{}, flash: %{}}
+
     %Phoenix.LiveView.Socket{
       assigns: Map.merge(base, assigns)
     }
@@ -208,7 +209,11 @@ defmodule EyeInTheSkyWeb.DmLive.StreamStateTest do
       socket = build_socket(%{stream_tool: nil})
 
       {:noreply, result} =
-        StreamState.handle_stream_tool_input("command_execution", %{:command => "echo test"}, socket)
+        StreamState.handle_stream_tool_input(
+          "command_execution",
+          %{:command => "echo test"},
+          socket
+        )
 
       assert result.assigns.stream_tool == "Bash: echo test"
     end
@@ -346,7 +351,9 @@ defmodule EyeInTheSkyWeb.DmLive.StreamStateTest do
       {:noreply, result1} = StreamState.handle_stream_delta(:text, "Processing...", socket)
       assert result1.assigns.stream_content == "Processing..."
 
-      {:noreply, result2} = StreamState.handle_stream_delta(:tool_use, "command_execution", result1)
+      {:noreply, result2} =
+        StreamState.handle_stream_delta(:tool_use, "command_execution", result1)
+
       assert result2.assigns.stream_tool == "Bash"
 
       {:noreply, result3} = StreamState.handle_stream_clear(result2)

@@ -30,11 +30,19 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
   end
 
   defp user_event(text, ts \\ "2024-01-01T00:00:00Z") do
-    %{"type" => "event_msg", "payload" => %{"type" => "user_message", "message" => text}, "timestamp" => ts}
+    %{
+      "type" => "event_msg",
+      "payload" => %{"type" => "user_message", "message" => text},
+      "timestamp" => ts
+    }
   end
 
   defp agent_event(text, ts \\ "2024-01-01T00:01:00Z") do
-    %{"type" => "event_msg", "payload" => %{"type" => "agent_message", "message" => text}, "timestamp" => ts}
+    %{
+      "type" => "event_msg",
+      "payload" => %{"type" => "agent_message", "message" => text},
+      "timestamp" => ts
+    }
   end
 
   defp token_event(total) do
@@ -133,7 +141,10 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert agent_msg.content == "hi there"
     end
 
-    test "skips token_count and session_meta events", %{session_file: session_file, thread_id: thread_id} do
+    test "skips token_count and session_meta events", %{
+      session_file: session_file,
+      thread_id: thread_id
+    } do
       write_jsonl(session_file, [
         session_meta_event(),
         user_event("msg"),
@@ -147,7 +158,11 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
 
     test "extracts events missing a timestamp field with timestamp set to nil",
          %{session_file: session_file, thread_id: thread_id} do
-      no_ts = %{"type" => "event_msg", "payload" => %{"type" => "user_message", "message" => "no ts"}}
+      no_ts = %{
+        "type" => "event_msg",
+        "payload" => %{"type" => "user_message", "message" => "no ts"}
+      }
+
       write_jsonl(session_file, [no_ts, user_event("with ts")])
 
       {:ok, messages} = SessionReader.read_messages(thread_id)
@@ -158,9 +173,22 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert ts_msg.timestamp == "2024-01-01T00:00:00Z"
     end
 
-    test "skips empty user_message and agent_message", %{session_file: session_file, thread_id: thread_id} do
-      empty_user = %{"type" => "event_msg", "payload" => %{"type" => "user_message", "message" => ""}, "timestamp" => "2024-01-01T00:00:00Z"}
-      empty_agent = %{"type" => "event_msg", "payload" => %{"type" => "agent_message", "message" => ""}, "timestamp" => "2024-01-01T00:00:00Z"}
+    test "skips empty user_message and agent_message", %{
+      session_file: session_file,
+      thread_id: thread_id
+    } do
+      empty_user = %{
+        "type" => "event_msg",
+        "payload" => %{"type" => "user_message", "message" => ""},
+        "timestamp" => "2024-01-01T00:00:00Z"
+      }
+
+      empty_agent = %{
+        "type" => "event_msg",
+        "payload" => %{"type" => "agent_message", "message" => ""},
+        "timestamp" => "2024-01-01T00:00:00Z"
+      }
+
       write_jsonl(session_file, [empty_user, empty_agent, user_event("real")])
 
       {:ok, messages} = SessionReader.read_messages(thread_id)
@@ -175,7 +203,9 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
     end
 
     test "skips malformed JSON lines", %{session_file: session_file, thread_id: thread_id} do
-      content = "{\"type\":\"event_msg\",\"payload\":{\"type\":\"user_message\",\"message\":\"ok\"},\"timestamp\":\"2024-01-01T00:00:00Z\"}\nNOT JSON\n"
+      content =
+        "{\"type\":\"event_msg\",\"payload\":{\"type\":\"user_message\",\"message\":\"ok\"},\"timestamp\":\"2024-01-01T00:00:00Z\"}\nNOT JSON\n"
+
       File.write!(session_file, content)
 
       {:ok, messages} = SessionReader.read_messages(thread_id)
@@ -194,7 +224,10 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert m1.uuid != m2.uuid
     end
 
-    test "same content + timestamp yields same uuid (stable derivation)", %{session_file: session_file, thread_id: thread_id} do
+    test "same content + timestamp yields same uuid (stable derivation)", %{
+      session_file: session_file,
+      thread_id: thread_id
+    } do
       write_jsonl(session_file, [user_event("stable", "2024-06-01T12:00:00Z")])
       {:ok, [msg]} = SessionReader.read_messages(thread_id)
       uuid1 = msg.uuid
@@ -228,7 +261,10 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       {:ok, messages: messages, thread_id: thread_id}
     end
 
-    test "returns all messages when after_uuid is nil", %{messages: messages, thread_id: thread_id} do
+    test "returns all messages when after_uuid is nil", %{
+      messages: messages,
+      thread_id: thread_id
+    } do
       {:ok, result} = SessionReader.read_messages_after_uuid(thread_id, nil)
       assert length(result) == 3
       assert result == messages
@@ -241,19 +277,28 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       refute Enum.any?(result, fn m -> m.uuid == first.uuid end)
     end
 
-    test "returns all messages when uuid not found (rotated file)", %{messages: messages, thread_id: thread_id} do
-      {:ok, result} = SessionReader.read_messages_after_uuid(thread_id, "uuid-that-does-not-exist")
+    test "returns all messages when uuid not found (rotated file)", %{
+      messages: messages,
+      thread_id: thread_id
+    } do
+      {:ok, result} =
+        SessionReader.read_messages_after_uuid(thread_id, "uuid-that-does-not-exist")
+
       assert length(result) == length(messages)
     end
 
-    test "returns empty list when after_uuid is the last message", %{messages: messages, thread_id: thread_id} do
+    test "returns empty list when after_uuid is the last message", %{
+      messages: messages,
+      thread_id: thread_id
+    } do
       last = List.last(messages)
       {:ok, result} = SessionReader.read_messages_after_uuid(thread_id, last.uuid)
       assert result == []
     end
 
     test "returns :not_found when thread does not exist" do
-      assert {:error, :not_found} = SessionReader.read_messages_after_uuid("no-thread", "any-uuid")
+      assert {:error, :not_found} =
+               SessionReader.read_messages_after_uuid("no-thread", "any-uuid")
     end
   end
 
@@ -273,7 +318,10 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       {:ok, session_file: session_file, thread_id: thread_id}
     end
 
-    test "returns total tokens from last token_count event", %{session_file: session_file, thread_id: thread_id} do
+    test "returns total tokens from last token_count event", %{
+      session_file: session_file,
+      thread_id: thread_id
+    } do
       write_jsonl(session_file, [
         user_event("hello"),
         token_event(300),
@@ -283,7 +331,10 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert {:ok, 500, 0.0} = SessionReader.read_usage(thread_id)
     end
 
-    test "returns 0 tokens when no token_count events present", %{session_file: session_file, thread_id: thread_id} do
+    test "returns 0 tokens when no token_count events present", %{
+      session_file: session_file,
+      thread_id: thread_id
+    } do
       write_jsonl(session_file, [user_event("hi"), agent_event("ho")])
       assert {:ok, 0, 0.0} = SessionReader.read_usage(thread_id)
     end
@@ -317,7 +368,14 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
     test "returns the list unchanged" do
       msgs = [
         %{role: "user", content: "hi", uuid: "abc", timestamp: nil, usage: nil, stream_type: nil},
-        %{role: "assistant", content: "hello", uuid: "def", timestamp: nil, usage: nil, stream_type: nil}
+        %{
+          role: "assistant",
+          content: "hello",
+          uuid: "def",
+          timestamp: nil,
+          usage: nil,
+          stream_type: nil
+        }
       ]
 
       assert SessionReader.format_messages(msgs) == msgs
@@ -328,7 +386,15 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
     end
 
     test "is an identity function — does not mutate" do
-      msg = %{role: "user", content: "test", uuid: "xyz", timestamp: "now", usage: nil, stream_type: nil}
+      msg = %{
+        role: "user",
+        content: "test",
+        uuid: "xyz",
+        timestamp: "now",
+        usage: nil,
+        stream_type: nil
+      }
+
       result = SessionReader.format_messages([msg])
       assert hd(result) === msg
     end

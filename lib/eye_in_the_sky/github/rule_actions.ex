@@ -1,7 +1,11 @@
 defmodule EyeInTheSky.Github.RuleActions do
+  @moduledoc false
   require Logger
 
+  alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Github.Template
+  alias EyeInTheSky.Messages
+  alias EyeInTheSky.Tasks
 
   def dispatch(rule, ctx) do
     template_ctx = build_template_ctx(ctx)
@@ -23,7 +27,7 @@ defmodule EyeInTheSky.Github.RuleActions do
     agent_name = config["agent"]
     instructions = config["instructions"]
 
-    case EyeInTheSky.Agents.AgentManager.spawn_agent(%{
+    case AgentManager.spawn_agent(%{
            "agent" => agent_name,
            "instructions" => instructions
          }) do
@@ -36,7 +40,7 @@ defmodule EyeInTheSky.Github.RuleActions do
   defp execute("create_task", config, _ctx) do
     title = config["title"]
 
-    case EyeInTheSky.Tasks.create_task(%{title: title}) do
+    case Tasks.create_task(%{title: title}) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, "create_task failed: #{inspect(reason)}"}
     end
@@ -55,7 +59,7 @@ defmodule EyeInTheSky.Github.RuleActions do
       status: "pending"
     }
 
-    case EyeInTheSky.Messages.create_message(attrs) do
+    case Messages.create_message(attrs) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, "dm_session failed: #{inspect(reason)}"}
     end

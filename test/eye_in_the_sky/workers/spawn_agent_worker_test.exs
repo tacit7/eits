@@ -59,7 +59,10 @@ defmodule EyeInTheSky.Workers.SpawnAgentWorkerTest do
     test "records a failed run and broadcasts :jobs_updated when agent spawn fails" do
       Events.subscribe_scheduled_jobs()
       # Nonexistent project path → AgentManager will fail to spawn
-      job = create_spawn_agent_job(%{"project_path" => "/nonexistent/path/#{System.unique_integer()}"})
+      job =
+        create_spawn_agent_job(%{
+          "project_path" => "/nonexistent/path/#{System.unique_integer()}"
+        })
 
       result = perform_job(SpawnAgentWorker, %{"job_id" => job.id})
 

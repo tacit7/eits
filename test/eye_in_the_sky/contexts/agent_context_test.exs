@@ -66,9 +66,10 @@ defmodule EyeInTheSky.Contexts.AgentContextTest do
       changeset = AgentContext.changeset(%AgentContext{}, attrs)
       assert changeset.valid?
 
-      constraint = Enum.find(changeset.constraints, fn c ->
-        c.constraint == "agent_context_agent_id_project_id_index"
-      end)
+      constraint =
+        Enum.find(changeset.constraints, fn c ->
+          c.constraint == "agent_context_agent_id_project_id_index"
+        end)
 
       assert constraint != nil
       assert constraint.type == :unique

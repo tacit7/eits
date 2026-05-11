@@ -74,6 +74,7 @@ defmodule EyeInTheSky.ChecklistItemsTest do
   describe "create_checklist_item/1" do
     test "creates an item with required attrs and defaults" do
       task = task_fixture()
+
       assert {:ok, %ChecklistItem{} = item} =
                ChecklistItems.create_checklist_item(%{title: "thing", task_id: task.id})
 
@@ -85,6 +86,7 @@ defmodule EyeInTheSky.ChecklistItemsTest do
 
     test "respects supplied position and completed" do
       task = task_fixture()
+
       assert {:ok, item} =
                ChecklistItems.create_checklist_item(%{
                  title: "thing",
@@ -99,6 +101,7 @@ defmodule EyeInTheSky.ChecklistItemsTest do
 
     test "errors when title missing" do
       task = task_fixture()
+
       assert {:error, changeset} =
                ChecklistItems.create_checklist_item(%{task_id: task.id})
 

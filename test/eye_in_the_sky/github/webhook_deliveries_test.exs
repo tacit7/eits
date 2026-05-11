@@ -73,7 +73,14 @@ defmodule EyeInTheSky.Github.WebhookDeliveriesTest do
   describe "pending/0" do
     test "returns only pending deliveries ordered by received_at asc" do
       now = DateTime.utc_now()
-      {:ok, _} = WebhookDeliveries.insert(%{@valid_attrs | delivery_id: "old", received_at: DateTime.add(now, -10)})
+
+      {:ok, _} =
+        WebhookDeliveries.insert(%{
+          @valid_attrs
+          | delivery_id: "old",
+            received_at: DateTime.add(now, -10)
+        })
+
       {:ok, _} = WebhookDeliveries.insert(%{@valid_attrs | delivery_id: "new", received_at: now})
 
       ids = WebhookDeliveries.pending() |> Enum.map(& &1.delivery_id)

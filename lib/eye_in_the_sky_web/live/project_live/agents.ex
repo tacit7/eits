@@ -1,11 +1,11 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
-  alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
 

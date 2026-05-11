@@ -9,11 +9,9 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   # stream/4 requires LiveView lifecycle infrastructure (live_temp.lifecycle).
   # Mock sockets in unit tests lack this; safe_stream skips gracefully.
   defp safe_stream(socket, name, items, opts) do
-    try do
-      stream(socket, name, items, opts)
-    rescue
-      KeyError -> socket
-    end
+    stream(socket, name, items, opts)
+  rescue
+    KeyError -> socket
   end
 
   alias EyeInTheSky.Agents.AgentManager
@@ -189,33 +187,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
               sync_codex_async(session_id, session_uuid)
 
             "gemini" ->
-              # Conditional auto-sync for Gemini:
-              #
-              # * DB has messages: live-stream rows already exist. Their
-              #   source_uuid is a deterministic hash of (session_id,
-              #   turn_timestamp), while JSONL turn "id"s are different.
-              #   BulkImporter can't dedup across UUID spaces — syncing here
-              #   would insert duplicates on every mount. Skip.
-              #
-              # * DB is empty: JSONL-only session (e.g. resumed from
-              #   gemini-cli directly, or DB was cleared). Do a full file
-              #   sync so the conversation history appears on first load.
-              db_count = EyeInTheSky.Messages.count_messages_for_session(session_id)
-
-              if db_count > 0 do
-                {:ok, %{inserted: 0, updated: 0}}
-              else
-                project_path =
-                  case EyeInTheSkyWeb.Live.Shared.SessionHelpers.resolve_project_path(
-                         session,
-                         agent
-                       ) do
-                    {:ok, path} -> path
-                    _ -> nil
-                  end
-
-                EyeInTheSky.Gemini.SessionImporter.sync(session_uuid, project_path, session_id)
-              end
+              sync_gemini_async(session_id, session_uuid, session, agent)
 
             _ ->
               sync_claude_async(session_id, session_uuid, session, agent)
@@ -230,10 +202,9 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
             send(lv_pid, {:sync_done, :clean})
 
           {:ok, %{inserted: inserted, updated: updated}} ->
-            Logger.info("DM mount sync imported messages",
-              session_id: session_id,
-              inserted: inserted,
-              updated: updated
+            Logger.info(
+              "DM mount sync imported messages inserted=#{inserted} updated=#{updated}",
+              session_id: session_id
             )
 
             send(lv_pid, {:sync_done, :dirty})
@@ -361,6 +332,26 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   end
 
   # Async-safe variants — take plain data, no socket. Used by load_messages_on_mount/1.
+
+  # Conditional auto-sync for Gemini:
+  # * DB has messages: skip to avoid duplicate inserts (UUID spaces differ).
+  # * DB is empty: full file sync so conversation history appears on first load.
+  defp sync_gemini_async(session_id, session_uuid, session, agent) do
+    db_count = EyeInTheSky.Messages.count_messages_for_session(session_id)
+
+    if db_count > 0 do
+      {:ok, %{inserted: 0, updated: 0}}
+    else
+      project_path =
+        case SessionHelpers.resolve_project_path(session, agent) do
+          {:ok, path} -> path
+          _ -> nil
+        end
+
+      GeminiImporter.sync(session_uuid, project_path, session_id)
+    end
+  end
+
   defp sync_claude_async(session_id, session_uuid, session, agent) do
     with {:ok, project_path} <- SessionHelpers.resolve_project_path(session, agent) do
       SessionImporter.sync(session_uuid, project_path, session_id)

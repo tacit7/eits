@@ -12,11 +12,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
         path: "/tmp/test_project"
       })
 
+    uuid = Ecto.UUID.generate()
+
     {:ok, prompt} =
       Prompts.create_prompt(%{
         project_id: project.id,
         name: "Test Prompt",
-        slug: "test-prompt",
+        uuid: uuid,
+        slug: "test-prompt-#{System.unique_integer([:positive])}",
         prompt_text: "You are a helpful assistant."
       })
 
@@ -25,7 +28,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
 
   describe "mount/3" do
     test "renders the prompt name", %{conn: conn, project: project, prompt: prompt} do
-      # Route uses UUID, not integer id
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
       assert html =~ prompt.name
@@ -62,13 +64,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
     test "deleting a prompt removes it from the database", %{conn: conn, project: project, prompt: prompt} do
       {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
-      # Trigger delete event if the element exists
       if has_element?(lv, "[phx-click='delete_prompt']") do
         lv |> element("[phx-click='delete_prompt']") |> render_click()
 
         assert is_nil(Prompts.get_prompt(prompt.id))
       else
-        # The delete mechanism may use a different event name or confirmation dialog
         assert is_binary(render(lv))
       end
     end

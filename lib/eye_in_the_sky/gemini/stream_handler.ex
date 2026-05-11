@@ -259,8 +259,14 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
         send(caller_pid, {:claude_message, sdk_ref, msg})
         state
 
-      %Types.ResultEvent{status: status, stats: stats} when status in ["ok", "success"] ->
-        stats_map = stats_to_map(stats, state.model)
+      %Types.ResultEvent{status: status, stats: stats, timestamp: ts}
+      when status in ["ok", "success"] ->
+        # Derive a stable per-turn UUID so a subsequent Sync from JSONL can't
+        # insert a duplicate row. We can't know the JSONL turn "id" during the
+        # live stream, but a deterministic hash of (session_id, turn_timestamp)
+        # is stable enough for the dedup unique index on source_uuid.
+        turn_uuid = derive_turn_uuid(state.session_id, ts)
+        stats_map = stats_to_map(stats, state.model, turn_uuid)
         body = build_result_body(state.text, state.tool_calls)
         msg = %Message{type: :result, content: body, metadata: stats_map}
         send(caller_pid, {:claude_message, sdk_ref, msg})
@@ -308,12 +314,13 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
 
   defp format_tool_args(other), do: to_string(other)
 
-  defp stats_to_map(nil, _model), do: %{}
+  defp stats_to_map(nil, _model, _turn_uuid), do: %{}
 
   defp stats_to_map(
          %{total_tokens: total, input_tokens: input, output_tokens: output, duration_ms: duration} =
            stats,
-         model
+         model,
+         turn_uuid
        ) do
     # Atom keys — AgentWorkerEvents.build_db_metadata/1 looks them up via
     # `metadata[:duration_ms]` / `metadata[:usage]`. String keys here cause
@@ -321,10 +328,15 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
     # metadata = NULL (verified empirically). The encoder turns atoms into
     # JSON keys on persist, and consumers read them back as strings — the
     # roundtrip is one-way so the storage shape stays string-keyed.
+    #
+    # :uuid is forwarded by AgentWorker → WorkerEvents.on_result_received as
+    # source_uuid on the persisted message row. A stable per-turn UUID prevents
+    # duplicate rows when the user later clicks Sync to import from JSONL.
     cost = Pricing.cost(model, input, output)
     model_usage = Pricing.model_usage(model, input, output)
 
     %{
+      uuid: turn_uuid,
       usage: %{
         input_tokens: input,
         output_tokens: output,
@@ -336,4 +348,20 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
       model_usage: model_usage
     }
   end
+
+  # Derive a deterministic UUID from the Gemini session_id and per-turn
+  # timestamp. The JSONL turn "id" is not available in the live stream, so
+  # this is a best-effort stable key for dedup. Falls back to a random UUID
+  # if session_id is nil (should not happen in practice).
+  defp derive_turn_uuid(session_id, timestamp) when is_binary(session_id) do
+    input = "#{session_id}:#{timestamp || Ecto.UUID.generate()}"
+    hash = :crypto.hash(:sha256, input) |> binary_part(0, 16)
+
+    case Ecto.UUID.cast(hash) do
+      {:ok, uuid} -> uuid
+      _ -> Ecto.UUID.generate()
+    end
+  end
+
+  defp derive_turn_uuid(_, _), do: Ecto.UUID.generate()
 end

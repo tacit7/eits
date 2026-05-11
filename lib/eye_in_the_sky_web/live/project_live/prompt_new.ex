@@ -35,9 +35,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
     project_id_str = if project, do: Integer.to_string(project.id), else: nil
 
     prompt_params =
-      if project_id_str,
-        do: Map.put(prompt_params, "project_id", project_id_str),
-        else: prompt_params
+      prompt_params
+      |> maybe_generate_slug()
+      |> then(fn p ->
+        if project_id_str, do: Map.put(p, "project_id", project_id_str), else: p
+      end)
 
     case Prompts.create_prompt(prompt_params) do
       {:ok, prompt} ->

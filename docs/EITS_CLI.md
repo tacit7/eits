@@ -428,14 +428,9 @@ eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] .
 # If no --message provided, uses git log -1 --format=%s
 # Response includes top-level boolean: already_tracked=true when ALL submitted hashes were duplicates
 # (easier to check than inspecting array lengths)
-
-eits commits search <query> [--limit|-n <n>] [--json]
-# ILIKE search across all commit messages in the DB
-# Returns: session_name | session_uuid | short-hash | message | timestamp
-# session_uuid is copy-pasteable for eits dm --to
 ```
 
-`--mine`, `--session`, and `--agent` are mutually exclusive (list/create only).
+`--mine`, `--session`, and `--agent` are mutually exclusive.
 
 ---
 
@@ -493,18 +488,6 @@ eits messages search <query> [--session <uuid|id>] [--limit <n>] [--include-arch
 # --limit: max results (default 10, max 100)
 # --include-archived: include messages from archived sessions (excluded by default)
 # --json: raw JSON output
-```
-
-Default table output columns: `session_name | session_uuid | role | excerpt | timestamp`
-
-The `session_uuid` column is always present so you can pipe directly to `eits dm --to`:
-
-```bash
-eits messages search "bookmark" --json \
-  | jq -r '.messages[0].session_uuid'
-# → a41ec59d-0f2e-4319-9788-4cf9e1d161c4
-
-eits dm --to a41ec59d-0f2e-4319-9788-4cf9e1d161c4 --message "saw your bookmark work, quick question..."
 ```
 
 **Examples:**

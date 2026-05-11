@@ -272,22 +272,20 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
          %{total_tokens: total, input_tokens: input, output_tokens: output, duration_ms: duration} =
            stats
        ) do
-    # Shape matches what the DM metrics renderer expects:
-    #   * "usage.input_tokens" / "usage.output_tokens" — drives the
-    #     "<n> in · <n> out" metrics line in DmMessageComponents.format_metrics/1
-    #   * "duration_ms" at top level — drives the "<seconds>s" segment
-    # Keys are strings so they survive the JSONB roundtrip with no re-keying.
+    # Atom keys — AgentWorkerEvents.build_db_metadata/1 looks them up via
+    # `metadata[:duration_ms]` / `metadata[:usage]`. String keys here cause
+    # every db_metadata field to come back nil and the row persists with
+    # metadata = NULL (verified empirically). The encoder turns atoms into
+    # JSON keys on persist, and consumers read them back as strings — the
+    # roundtrip is one-way so the storage shape stays string-keyed.
     %{
-      "usage" => %{
-        "input_tokens" => input,
-        "output_tokens" => output,
-        "total_tokens" => total
+      usage: %{
+        input_tokens: input,
+        output_tokens: output,
+        total_tokens: total
       },
-      "input_tokens" => input,
-      "output_tokens" => output,
-      "total_tokens" => total,
-      "duration_ms" => duration,
-      "tool_calls" => Map.get(stats, :tool_calls, 0)
+      duration_ms: duration,
+      tool_calls: Map.get(stats, :tool_calls, 0)
     }
   end
 end

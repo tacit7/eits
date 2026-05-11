@@ -324,6 +324,13 @@ defmodule EyeInTheSkyWeb.Router do
     post "/iam/hook", IAMController, :decide
   end
 
+  # GitHub webhook endpoint — unauthenticated; auth via HMAC per-controller
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through [:accepts_json]
+
+    post "/webhooks/github", GithubWebhookController, :receive
+  end
+
   # Unauthenticated settings reads (read-only, no sensitive data)
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
     pipe_through [:accepts_json]

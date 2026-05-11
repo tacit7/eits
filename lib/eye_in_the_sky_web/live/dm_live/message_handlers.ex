@@ -187,33 +187,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
               sync_codex_async(session_id, session_uuid)
 
             "gemini" ->
-              # Conditional auto-sync for Gemini:
-              #
-              # * DB has messages: live-stream rows already exist. Their
-              #   source_uuid is a deterministic hash of (session_id,
-              #   turn_timestamp), while JSONL turn "id"s are different.
-              #   BulkImporter can't dedup across UUID spaces — syncing here
-              #   would insert duplicates on every mount. Skip.
-              #
-              # * DB is empty: JSONL-only session (e.g. resumed from
-              #   gemini-cli directly, or DB was cleared). Do a full file
-              #   sync so the conversation history appears on first load.
-              db_count = EyeInTheSky.Messages.count_messages_for_session(session_id)
-
-              if db_count > 0 do
-                {:ok, %{inserted: 0, updated: 0}}
-              else
-                project_path =
-                  case EyeInTheSkyWeb.Live.Shared.SessionHelpers.resolve_project_path(
-                         session,
-                         agent
-                       ) do
-                    {:ok, path} -> path
-                    _ -> nil
-                  end
-
-                EyeInTheSky.Gemini.SessionImporter.sync(session_uuid, project_path, session_id)
-              end
+              sync_gemini_async(session_id, session_uuid, session, agent)
 
             _ ->
               sync_claude_async(session_id, session_uuid, session, agent)

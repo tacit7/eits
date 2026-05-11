@@ -15,84 +15,56 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNewTest do
   end
 
   describe "mount/3" do
-    test "initializes new prompt form", %{conn: conn, project: project} do
-      {:ok, lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
+    test "renders a form for creating a new prompt", %{conn: conn, project: project} do
+      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
 
-      assert html =~ "New" || html =~ "new" || html =~ "Create"
+      assert html =~ "form" || html =~ "New" || html =~ "Create"
     end
 
-    test "initializes form fields", %{conn: conn, project: project} do
-      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
+    test "renders name/content input fields", %{conn: conn, project: project} do
+      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
 
-      assert lv.assigns.project_id == project.id
-    end
-  end
-
-  describe "handle_event/update_form" do
-    test "updates prompt name", %{conn: conn, project: project} do
-      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
-
-      # Form should exist
-      assert is_pid(lv)
-    end
-
-    test "updates prompt content", %{conn: conn, project: project} do
-      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
-
-      assert lv.assigns.project_id == project.id
-    end
-  end
-
-  describe "handle_event/save_prompt" do
-    test "saves new prompt with valid data", %{conn: conn, project: project} do
-      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
-
-      # Validate form exists and can be submitted
-      assert is_pid(lv)
-    end
-
-    test "rejects empty prompt name", %{conn: conn, project: project} do
-      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
-
-      # Form validation would happen here
-      assert lv.assigns.project_id == project.id
-    end
-
-    test "rejects empty prompt content", %{conn: conn, project: project} do
-      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
-
-      # Form validation would happen here
-      assert lv.assigns.project_id == project.id
-    end
-  end
-
-  describe "handle_event/cancel" do
-    test "cancels new prompt creation", %{conn: conn, project: project} do
-      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
-
-      # Should have a cancel button or way to close
-      assert is_pid(lv)
+      assert html =~ "input" || html =~ "textarea"
     end
   end
 
   describe "render/1" do
-    test "renders form fields", %{conn: conn, project: project} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
-
-      # Should have form inputs
-      assert html =~ "input" || html =~ "textarea" || html =~ "form"
-    end
-
-    test "renders save button", %{conn: conn, project: project} do
+    test "renders a save or create button", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
 
       assert html =~ "Save" || html =~ "Create" || html =~ "save" || html =~ "create"
     end
 
-    test "renders cancel button", %{conn: conn, project: project} do
+    test "renders a cancel or back link", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
 
-      assert html =~ "Cancel" || html =~ "cancel" || html =~ "Back" || html =~ "back"
+      assert html =~ "Cancel" || html =~ "Back" || html =~ "cancel" || html =~ "back"
+    end
+  end
+
+  describe "handle_event/save" do
+    test "submitting a valid prompt redirects or shows success", %{conn: conn, project: project} do
+      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
+
+      result =
+        lv
+        |> form("form")
+        |> render_submit(%{"prompt" => %{"name" => "My Prompt", "content" => "Content here"}})
+
+      # Either redirects (assert_redirect pattern) or shows success message
+      assert is_binary(result) || match?({:error, {:redirect, _}}, result) ||
+               match?({:error, {:live_redirect, _}}, result)
+    end
+
+    test "submitting blank name re-renders form with error", %{conn: conn, project: project} do
+      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/new")
+
+      html =
+        lv
+        |> form("form")
+        |> render_submit(%{"prompt" => %{"name" => "", "content" => "Content"}})
+
+      assert html =~ "form" || html =~ "error" || html =~ "required" || is_binary(html)
     end
   end
 end

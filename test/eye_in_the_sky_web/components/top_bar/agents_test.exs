@@ -5,97 +5,80 @@ defmodule EyeInTheSkyWeb.TopBar.AgentsTest do
   alias EyeInTheSkyWeb.TopBar.Agents
 
   describe "toolbar/1 component" do
-    test "renders search input with default value", %{conn: conn} do
+    test "renders search input" do
       html = render_component(&Agents.toolbar/1, %{})
 
       assert html =~ "Search agents"
       assert html =~ "agents-top-bar-search"
     end
 
-    test "renders search input with custom value", %{conn: conn} do
+    test "renders search input with custom query value" do
       html = render_component(&Agents.toolbar/1, %{search_query: "test-query"})
 
       assert html =~ "test-query"
     end
 
-    test "renders scope filter dropdown", %{conn: conn} do
+    test "renders scope filter dropdown" do
       html = render_component(&Agents.toolbar/1, %{})
 
       assert html =~ "Source:"
       assert html =~ "agents-scope-dropdown"
     end
 
-    test "renders sort dropdown", %{conn: conn} do
+    test "renders sort dropdown" do
       html = render_component(&Agents.toolbar/1, %{})
 
       assert html =~ "Sort:"
       assert html =~ "agents-sort-dropdown"
     end
 
-    test "renders all scope options", %{conn: conn} do
+    test "renders all scope options" do
       html = render_component(&Agents.toolbar/1, %{scope_filter: "all"})
 
-      assert html =~ "All Sources" || html =~ "All"
-      assert html =~ "Global" || html =~ "global"
-      assert html =~ "Project" || html =~ "project"
+      assert html =~ "All Sources"
+      assert html =~ "Global"
+      assert html =~ "Project"
     end
 
-    test "renders all sort options", %{conn: conn} do
+    test "renders all sort options" do
       html = render_component(&Agents.toolbar/1, %{sort_by: "name_asc"})
 
-      assert html =~ "Name" || html =~ "name"
-      assert html =~ "Recent" || html =~ "recent"
+      assert html =~ "Name A"
+      assert html =~ "Recent"
     end
 
-    test "highlights selected scope filter", %{conn: conn} do
+    test "selected scope is highlighted in label" do
       html = render_component(&Agents.toolbar/1, %{scope_filter: "project"})
 
-      assert html =~ "Project" || html =~ "project"
+      assert html =~ "Project"
     end
 
-    test "highlights selected sort order", %{conn: conn} do
+    test "selected sort is highlighted in label" do
       html = render_component(&Agents.toolbar/1, %{sort_by: "recent"})
 
-      # Sort should be highlighted in the component
-      assert is_binary(html)
+      assert html =~ "Recent"
     end
 
-    test "renders with vim search attribute", %{conn: conn} do
-      html = render_component(&Agents.toolbar/1, %{})
-
-      assert html =~ "vim" || html =~ "Vim" || is_binary(html)
-    end
-
-    test "handles all scope filter values", %{conn: conn} do
+    test "handles all scope filter values without error" do
       for scope <- ["all", "global", "project"] do
-        html = render_component(&Agents.toolbar/1, %{scope_filter: scope})
-        assert is_binary(html)
+        assert render_component(&Agents.toolbar/1, %{scope_filter: scope}) |> is_binary()
       end
     end
 
-    test "handles all sort order values", %{conn: conn} do
+    test "handles all sort order values without error" do
       for sort <- ["name_asc", "name_desc", "recent", "size_desc", "size_asc"] do
-        html = render_component(&Agents.toolbar/1, %{sort_by: sort})
-        assert is_binary(html)
+        assert render_component(&Agents.toolbar/1, %{sort_by: sort}) |> is_binary()
       end
     end
 
-    test "renders dropdown triggers", %{conn: conn} do
+    test "renders dropdown detail elements" do
       html = render_component(&Agents.toolbar/1, %{})
 
-      # Should have clickable elements to open dropdowns
-      assert html =~ "dropdown" || html =~ "details"
+      assert html =~ "dropdown"
     end
 
-    test "component renders without errors with empty attributes", %{conn: conn} do
+    test "renders with defaults when no props passed" do
       assert render_component(&Agents.toolbar/1, %{}) |> is_binary()
-    end
-
-    test "component renders separator between search and filters", %{conn: conn} do
-      html = render_component(&Agents.toolbar/1, %{})
-
-      # Should have visual separator
-      assert is_binary(html)
     end
   end
 end

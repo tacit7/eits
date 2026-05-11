@@ -107,18 +107,16 @@ defmodule EyeInTheSky.Gemini.SessionReader do
 
   defp candidate_chat_dirs(base, project_path) do
     explicit =
-      cond do
-        is_binary(project_path) and project_path != "" ->
-          hash = :crypto.hash(:sha256, project_path) |> Base.encode16(case: :lower)
-          basename = Path.basename(project_path)
+      if is_binary(project_path) and project_path != "" do
+        hash = :crypto.hash(:sha256, project_path) |> Base.encode16(case: :lower)
+        basename = Path.basename(project_path)
 
-          [
-            Path.join([base, hash, "chats"]),
-            Path.join([base, basename, "chats"])
-          ]
-
-        true ->
-          []
+        [
+          Path.join([base, hash, "chats"]),
+          Path.join([base, basename, "chats"])
+        ]
+      else
+        []
       end
 
     fallback = Path.wildcard(Path.join([base, "*", "chats"]))
@@ -220,12 +218,10 @@ defmodule EyeInTheSky.Gemini.SessionReader do
   defp extract_decoded(_), do: []
 
   defp extract_user_text(content) when is_list(content) do
-    content
-    |> Enum.map(fn
+    Enum.map_join(content, "", fn
       %{"text" => t} when is_binary(t) -> t
       _ -> ""
     end)
-    |> Enum.join("")
   end
 
   defp extract_user_text(text) when is_binary(text), do: text

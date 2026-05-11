@@ -292,7 +292,7 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
   defp build_result_body(text, []), do: text
 
   defp build_result_body(text, tool_calls) do
-    lines = Enum.map(tool_calls, &format_tool_call_line/1) |> Enum.join("\n")
+    lines = Enum.map_join(tool_calls, "\n", &format_tool_call_line/1)
 
     case String.trim(text) do
       "" -> lines

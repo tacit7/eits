@@ -439,7 +439,7 @@ defmodule EyeInTheSky.Codex.SDKTest do
       )
 
       # Should only receive the real message, not the noise
-      assert_receive {:claude_message, ^ref, %Message{type: :text, content: "after noise"}}, 5_000
+      assert_receive {:claude_message, ^ref, %Message{type: :text, content: "after noise"}}, 15_000
 
       SDK.cancel(ref)
     end

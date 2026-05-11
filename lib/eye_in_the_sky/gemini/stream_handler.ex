@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
   """
 
   alias EyeInTheSky.Claude.Message
+  alias EyeInTheSky.Gemini.Pricing
   alias EyeInTheSky.Gemini.StreamHandler.Registry, as: StreamRegistry
   alias GeminiCliSdk.Types
 
@@ -26,11 +27,12 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
           {:ok, sdk_ref :: reference(), handler_pid :: pid()} | {:error, term()}
   def start(prompt, opts, caller_pid, test_opts \\ []) do
     sdk_ref = make_ref()
+    model = opts_model(opts)
 
     stream_fn =
       Keyword.get(test_opts, :stream_fn, fn -> GeminiCliSdk.execute(prompt, opts) end)
 
-    case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid) do
+    case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid, model) do
       {:ok, pid} ->
         StreamRegistry.register(sdk_ref, pid)
         {:ok, sdk_ref, pid}
@@ -49,13 +51,14 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
           {:ok, sdk_ref :: reference(), handler_pid :: pid()} | {:error, term()}
   def resume(session_id, prompt, opts, caller_pid, test_opts \\ []) do
     sdk_ref = make_ref()
+    model = opts_model(opts)
 
     stream_fn =
       Keyword.get(test_opts, :stream_fn, fn ->
         GeminiCliSdk.resume_session(session_id, opts, prompt)
       end)
 
-    case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid) do
+    case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid, model) do
       {:ok, pid} ->
         StreamRegistry.register(sdk_ref, pid)
         {:ok, sdk_ref, pid}
@@ -165,22 +168,28 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
 
   # --- Private ---
 
-  defp spawn_stream_consumer(sdk_ref, stream_fn, caller_pid) do
+  defp opts_model(%{model: model}) when is_binary(model), do: model
+  defp opts_model(_), do: nil
+
+  defp spawn_stream_consumer(sdk_ref, stream_fn, caller_pid, model) do
     Task.Supervisor.start_child(
       EyeInTheSky.TaskSupervisor,
       fn ->
         Process.monitor(caller_pid)
-        consume_stream(sdk_ref, stream_fn.(), caller_pid)
+        consume_stream(sdk_ref, stream_fn.(), caller_pid, model)
       end,
       restart: :temporary
     )
   end
 
-  defp consume_stream(sdk_ref, stream, caller_pid) do
+  defp consume_stream(sdk_ref, stream, caller_pid, model) do
     # State carries the accumulated assistant text and the session_id from InitEvent
     # so we can emit a non-empty result (enabling DB persistence) and a correct
-    # :claude_complete payload when the terminal ResultEvent arrives.
-    Enum.reduce(stream, %{text: "", session_id: nil}, fn event, state ->
+    # :claude_complete payload when the terminal ResultEvent arrives. `model` is
+    # threaded through from build_opts so stats_to_map can price the result.
+    initial = %{text: "", session_id: nil, model: model}
+
+    Enum.reduce(stream, initial, fn event, state ->
       handle_event(sdk_ref, event, caller_pid, state)
     end)
   rescue
@@ -247,7 +256,7 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
         state
 
       %Types.ResultEvent{status: status, stats: stats} when status in ["ok", "success"] ->
-        stats_map = stats_to_map(stats)
+        stats_map = stats_to_map(stats, state.model)
         msg = %Message{type: :result, content: state.text, metadata: stats_map}
         send(caller_pid, {:claude_message, sdk_ref, msg})
         send(caller_pid, {:claude_complete, sdk_ref, state.session_id})
@@ -266,11 +275,12 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
     end
   end
 
-  defp stats_to_map(nil), do: %{}
+  defp stats_to_map(nil, _model), do: %{}
 
   defp stats_to_map(
          %{total_tokens: total, input_tokens: input, output_tokens: output, duration_ms: duration} =
-           stats
+           stats,
+         model
        ) do
     # Atom keys — AgentWorkerEvents.build_db_metadata/1 looks them up via
     # `metadata[:duration_ms]` / `metadata[:usage]`. String keys here cause
@@ -278,6 +288,9 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
     # metadata = NULL (verified empirically). The encoder turns atoms into
     # JSON keys on persist, and consumers read them back as strings — the
     # roundtrip is one-way so the storage shape stays string-keyed.
+    cost = Pricing.cost(model, input, output)
+    model_usage = Pricing.model_usage(model, input, output)
+
     %{
       usage: %{
         input_tokens: input,
@@ -285,7 +298,9 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
         total_tokens: total
       },
       duration_ms: duration,
-      tool_calls: Map.get(stats, :tool_calls, 0)
+      tool_calls: Map.get(stats, :tool_calls, 0),
+      total_cost_usd: cost,
+      model_usage: model_usage
     }
   end
 end

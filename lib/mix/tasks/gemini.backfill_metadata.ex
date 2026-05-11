@@ -28,6 +28,7 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
 
   use Mix.Task
 
+  alias EyeInTheSky.Gemini.Pricing
   alias EyeInTheSky.Gemini.SessionReader
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.Repo
@@ -129,11 +130,22 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
   end
 
   defp legacy_agent_rows(session_id) do
+    # Rows that need backfill: missing entirely, missing usage block, or
+    # missing total_cost_usd. The last condition catches rows produced by
+    # the first backfill pass (which didn't write cost yet).
     from(m in Message,
       where: m.session_id == ^session_id,
       where: m.sender_role == "agent",
-      where: is_nil(m.metadata) or fragment("?->'usage' IS NULL", m.metadata),
-      select: %{id: m.id, source_uuid: m.source_uuid, inserted_at: m.inserted_at}
+      where:
+        is_nil(m.metadata) or
+          fragment("?->'usage' IS NULL", m.metadata) or
+          fragment("?->'total_cost_usd' IS NULL", m.metadata),
+      select: %{
+        id: m.id,
+        source_uuid: m.source_uuid,
+        inserted_at: m.inserted_at,
+        metadata: m.metadata
+      }
     )
     |> Repo.all()
   end
@@ -170,16 +182,17 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
           {matched, updated}
 
         {turn, idx, all_turns} ->
-          metadata = build_metadata(turn, idx, all_turns)
+          new_fields = build_metadata(turn, idx, all_turns)
+          merged = Map.merge(row.metadata || %{}, new_fields)
 
           if dry_run? do
             Mix.shell().info(
-              "  would update row #{row.id} (turn #{row.source_uuid}) with #{inspect(metadata)}"
+              "  would update row #{row.id} (turn #{row.source_uuid}) with #{inspect(new_fields)}"
             )
 
             {matched + 1, updated}
           else
-            case update_metadata(row.id, metadata) do
+            case update_metadata(row.id, merged) do
               {1, _} ->
                 {matched + 1, updated + 1}
 
@@ -201,6 +214,7 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
     input = Map.get(tokens, "input")
     output = Map.get(tokens, "output")
     total = Map.get(tokens, "total")
+    model = Map.get(turn, "model")
 
     duration_ms = duration_from_previous(turn, idx, all_turns)
 
@@ -210,9 +224,14 @@ defmodule Mix.Tasks.Gemini.BackfillMetadata do
       |> maybe_put("output_tokens", output)
       |> maybe_put("total_tokens", total)
 
+    cost = Pricing.cost(model, input, output)
+    model_usage = Pricing.model_usage(model, input, output)
+
     %{}
     |> maybe_put("usage", if(usage == %{}, do: nil, else: usage))
     |> maybe_put("duration_ms", duration_ms)
+    |> maybe_put("total_cost_usd", cost)
+    |> maybe_put("model_usage", model_usage)
   end
 
   defp maybe_put(map, _key, nil), do: map

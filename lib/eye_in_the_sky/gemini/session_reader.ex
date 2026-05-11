@@ -185,27 +185,34 @@ defmodule EyeInTheSky.Gemini.SessionReader do
     end
   end
 
-  # Gemini turn: content is a string. Empty content turns (tool-call-only
-  # turns where the model produced no prose) are dropped so the imported
-  # transcript matches what the UI rendered.
+  # Gemini turn: content is a string and there may be a `toolCalls` array.
+  # We bake the tool calls into the body as `> `ToolName` <json-args>` lines
+  # so the DM renderer parses them out via DmHelpers.parse_body_segment/1.
+  # Empty turns (no prose AND no tool calls) are dropped.
   defp extract_decoded(%{
          "id" => id,
          "type" => "gemini",
-         "content" => content,
          "timestamp" => ts
-       } = msg)
-       when is_binary(content) and content != "" do
-    [
-      %{
-        uuid: id,
-        role: "assistant",
-        content: content,
-        timestamp: ts,
-        usage: Map.get(msg, "tokens"),
-        model: Map.get(msg, "model"),
-        stream_type: nil
-      }
-    ]
+       } = msg) do
+    raw_text = Map.get(msg, "content", "")
+    raw_text = if is_binary(raw_text), do: raw_text, else: ""
+    body = merge_tool_calls(raw_text, Map.get(msg, "toolCalls"))
+
+    if body == "" do
+      []
+    else
+      [
+        %{
+          uuid: id,
+          role: "assistant",
+          content: body,
+          timestamp: ts,
+          usage: Map.get(msg, "tokens"),
+          model: Map.get(msg, "model"),
+          stream_type: nil
+        }
+      ]
+    end
   end
 
   defp extract_decoded(_), do: []
@@ -221,4 +228,39 @@ defmodule EyeInTheSky.Gemini.SessionReader do
 
   defp extract_user_text(text) when is_binary(text), do: text
   defp extract_user_text(_), do: ""
+
+  # Append `> `name` <json-args>` lines for each tool call so the DM renderer
+  # picks them up via parse_body_segment/1 (the `> `Tool` ...` regex).
+  defp merge_tool_calls(text, nil), do: text
+  defp merge_tool_calls(text, []), do: text
+
+  defp merge_tool_calls(text, tool_calls) when is_list(tool_calls) do
+    lines =
+      tool_calls
+      |> Enum.map(&format_tool_call_line/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.join("\n")
+
+    cond do
+      lines == "" -> text
+      String.trim(text) == "" -> lines
+      true -> text <> "\n\n" <> lines
+    end
+  end
+
+  defp merge_tool_calls(text, _), do: text
+
+  defp format_tool_call_line(%{"name" => name} = call) do
+    args = Map.get(call, "args") || %{}
+
+    args_json =
+      case Jason.encode(args) do
+        {:ok, json} -> json
+        _ -> inspect(args)
+      end
+
+    "> `#{name}` #{args_json}"
+  end
+
+  defp format_tool_call_line(_), do: ""
 end

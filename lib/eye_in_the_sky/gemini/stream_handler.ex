@@ -183,11 +183,12 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
   end
 
   defp consume_stream(sdk_ref, stream, caller_pid, model) do
-    # State carries the accumulated assistant text and the session_id from InitEvent
-    # so we can emit a non-empty result (enabling DB persistence) and a correct
-    # :claude_complete payload when the terminal ResultEvent arrives. `model` is
-    # threaded through from build_opts so stats_to_map can price the result.
-    initial = %{text: "", session_id: nil, model: model}
+    # State carries the accumulated assistant text, session_id from InitEvent,
+    # and per-turn tool_calls so the :result event can emit a body that has
+    # the tool invocations baked in. The DM renderer parses lines matching
+    # `> \`ToolName\` <args>` out of the persisted body to draw tool widgets
+    # — same convention Codex uses (e.g. `> \`Bash\` cd ... && ...`).
+    initial = %{text: "", session_id: nil, model: model, tool_calls: []}
 
     Enum.reduce(stream, initial, fn event, state ->
       handle_event(sdk_ref, event, caller_pid, state)
@@ -236,7 +237,10 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
         state
 
       # Codex-style tool_use: name + input live inside `content` so the
-      # CodexStreamAssembler can render rich tool blocks (name + parsed input).
+      # CodexStreamAssembler can render rich tool blocks (name + parsed input)
+      # in the live-stream indicator. We also remember the call in state so
+      # the final :result body can embed a `> \`name\` <args>` line that the
+      # persisted DM renderer picks up via parse_body_segment/1.
       %Types.ToolUseEvent{tool_name: name, parameters: params, tool_id: tool_id} ->
         msg = %Message{
           type: :tool_use,
@@ -245,7 +249,7 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
         }
 
         send(caller_pid, {:claude_message, sdk_ref, msg})
-        state
+        %{state | tool_calls: state.tool_calls ++ [{name, params}]}
 
       %Types.ToolResultEvent{tool_id: tool_id, output: output} ->
         # CodexStreamAssembler has no tool_result handler today — output is
@@ -257,7 +261,8 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
 
       %Types.ResultEvent{status: status, stats: stats} when status in ["ok", "success"] ->
         stats_map = stats_to_map(stats, state.model)
-        msg = %Message{type: :result, content: state.text, metadata: stats_map}
+        body = build_result_body(state.text, state.tool_calls)
+        msg = %Message{type: :result, content: body, metadata: stats_map}
         send(caller_pid, {:claude_message, sdk_ref, msg})
         send(caller_pid, {:claude_complete, sdk_ref, state.session_id})
         state
@@ -274,6 +279,34 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
         state
     end
   end
+
+  # Format the persisted assistant body. Tool calls are appended after the
+  # prose as `> \`ToolName\` <json-args>` lines so DmHelpers.parse_body_segment/1
+  # recognizes them and the DM renderer draws tool widgets.
+  defp build_result_body(text, []), do: text
+
+  defp build_result_body(text, tool_calls) do
+    lines = Enum.map(tool_calls, &format_tool_call_line/1) |> Enum.join("\n")
+
+    case String.trim(text) do
+      "" -> lines
+      _ -> text <> "\n\n" <> lines
+    end
+  end
+
+  defp format_tool_call_line({name, params}) do
+    args = format_tool_args(params)
+    "> `#{name}` #{args}"
+  end
+
+  defp format_tool_args(%{} = params) do
+    case Jason.encode(params) do
+      {:ok, json} -> json
+      {:error, _} -> inspect(params)
+    end
+  end
+
+  defp format_tool_args(other), do: to_string(other)
 
   defp stats_to_map(nil, _model), do: %{}
 

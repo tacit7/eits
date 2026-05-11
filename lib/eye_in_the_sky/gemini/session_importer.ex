@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Gemini.SessionImporter do
   shared import / dedup logic.
   """
 
+  alias EyeInTheSky.Gemini.Pricing
   alias EyeInTheSky.Gemini.SessionReader
   alias EyeInTheSky.Messages
   alias EyeInTheSky.Messages.BulkImporter
@@ -41,7 +42,43 @@ defmodule EyeInTheSky.Gemini.SessionImporter do
   def import_messages(messages, session_id) do
     BulkImporter.import_messages(messages, session_id,
       provider: "gemini",
-      importing_from_file?: true
+      importing_from_file?: true,
+      metadata_fn: &build_metadata/1
     )
   end
+
+  # Convert a SessionReader-shaped message into the metadata map persisted
+  # alongside the message row. Mirrors the live StreamHandler's stats_to_map/2
+  # output: usage block (with input/output/total_tokens) plus total_cost_usd
+  # and model_usage so the DM metrics footer renders identically for
+  # streamed-now vs reloaded-from-file turns.
+  defp build_metadata(%{role: "assistant"} = msg) do
+    tokens = msg[:usage] || %{}
+    model = msg[:model]
+
+    input = Map.get(tokens, "input")
+    output = Map.get(tokens, "output")
+    total = Map.get(tokens, "total")
+
+    cost = Pricing.cost(model, input, output)
+    model_usage = Pricing.model_usage(model, input, output)
+
+    usage = %{}
+    usage = if input, do: Map.put(usage, "input_tokens", input), else: usage
+    usage = if output, do: Map.put(usage, "output_tokens", output), else: usage
+    usage = if total, do: Map.put(usage, "total_tokens", total), else: usage
+
+    md =
+      %{}
+      |> maybe_put("usage", if(usage == %{}, do: nil, else: usage))
+      |> maybe_put("total_cost_usd", cost)
+      |> maybe_put("model_usage", model_usage)
+
+    if md == %{}, do: nil, else: md
+  end
+
+  defp build_metadata(_msg), do: nil
+
+  defp maybe_put(map, _k, nil), do: map
+  defp maybe_put(map, k, v), do: Map.put(map, k, v)
 end

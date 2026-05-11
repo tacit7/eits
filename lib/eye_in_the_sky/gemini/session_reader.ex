@@ -202,6 +202,7 @@ defmodule EyeInTheSky.Gemini.SessionReader do
         content: content,
         timestamp: ts,
         usage: Map.get(msg, "tokens"),
+        model: Map.get(msg, "model"),
         stream_type: nil
       }
     ]

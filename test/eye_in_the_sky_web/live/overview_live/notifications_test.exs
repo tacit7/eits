@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.NotificationsTest do
   use EyeInTheSky.DataCase, async: false
 
   alias EyeInTheSkyWeb.OverviewLive.Notifications, as: NotificationsLive
+  alias EyeInTheSky.Notifications
 
   defp build_socket(assigns \\ %{}) do
     base = %{
@@ -35,28 +36,34 @@ defmodule EyeInTheSkyWeb.OverviewLive.NotificationsTest do
 
   describe "handle_info/2" do
     test "notification_created reloads notifications list" do
+      {:ok, n} = Notifications.create_notification(%{title: "Created event", category: "system"})
       socket = build_socket(%{notifications: [], filter: "all"})
 
       {:noreply, result} = NotificationsLive.handle_info({:notification_created, %{}}, socket)
 
-      assert is_list(result.assigns.notifications)
+      ids = Enum.map(result.assigns.notifications, & &1.id)
+      assert n.id in ids
       assert result.assigns.filter == "all"
     end
 
     test "notification_read reloads notifications list" do
+      {:ok, n} = Notifications.create_notification(%{title: "Read event", category: "system"})
       socket = build_socket(%{notifications: [], filter: "all"})
 
-      {:noreply, result} = NotificationsLive.handle_info({:notification_read, 1}, socket)
+      {:noreply, result} = NotificationsLive.handle_info({:notification_read, n.id}, socket)
 
-      assert is_list(result.assigns.notifications)
+      ids = Enum.map(result.assigns.notifications, & &1.id)
+      assert n.id in ids
     end
 
     test "notifications_updated reloads notifications list" do
+      {:ok, n} = Notifications.create_notification(%{title: "Updated event", category: "job"})
       socket = build_socket(%{notifications: [], filter: "all"})
 
       {:noreply, result} = NotificationsLive.handle_info({:notifications_updated, nil}, socket)
 
-      assert is_list(result.assigns.notifications)
+      ids = Enum.map(result.assigns.notifications, & &1.id)
+      assert n.id in ids
     end
 
     test "unmatched info messages return socket unchanged" do

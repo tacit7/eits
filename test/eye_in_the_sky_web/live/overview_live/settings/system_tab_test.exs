@@ -40,16 +40,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
 
     test "log_claude_raw toggle is checked when value is 'true'" do
       html = render_tab(%{"log_claude_raw" => "true"})
-      # The checked attribute should appear on the claude raw input
-      assert html =~ "log_claude_raw"
-      assert html =~ "checked"
+      # Phoenix renders boolean true as bare 'checked' attr before phx-value-key in source order
+      assert Regex.match?(~r/checked[^>]*phx-value-key="log_claude_raw"/, html)
     end
 
     test "log_claude_raw toggle is not checked when value is 'false'" do
       html = render_tab(%{"log_claude_raw" => "false"})
-      # The checked attribute should NOT appear on the claude raw checkbox
-      # (Phoenix renders checked only when condition is true)
-      refute html =~ ~s(phx-value-key="log_claude_raw" checked)
+      # When false, Phoenix omits the checked attribute entirely
+      refute Regex.match?(~r/checked[^>]*phx-value-key="log_claude_raw"/, html)
     end
 
     test "renders Log Raw Codex Output toggle" do
@@ -98,7 +96,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
     test "renders Path label and value" do
       html = render_tab(%{}, db_info(path: "/var/lib/eits.db"))
       assert html =~ "Path"
+      # Value appears both as text content and as the title attribute on the container element
       assert html =~ "/var/lib/eits.db"
+      assert html =~ ~s(title="/var/lib/eits.db")
     end
 
     test "renders Size label" do
@@ -109,6 +109,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
     test "renders Table Counts section" do
       html = render_tab(%{}, db_info(table_counts: %{"sessions" => 42, "tasks" => 7}))
       assert html =~ "Table Counts"
+      # Each table/count pair is rendered as a badge element
+      assert html =~ ~s(class="badge badge-ghost badge-sm gap-1")
       assert html =~ "sessions"
       assert html =~ "42"
       assert html =~ "tasks"

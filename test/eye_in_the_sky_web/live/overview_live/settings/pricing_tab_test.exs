@@ -95,10 +95,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.PricingTabTest do
           "pricing_haiku_output" => "4.00"
         })
 
-      assert html =~ "15.00"
-      assert html =~ "75.00"
-      assert html =~ "3.00"
-      assert html =~ "4.00"
+      # Values must appear as input value= attributes, not just arbitrary text
+      assert html =~ ~s(value="15.00")
+      assert html =~ ~s(value="75.00")
+      assert html =~ ~s(value="3.00")
+      assert html =~ ~s(value="4.00")
     end
 
     test "renders with empty settings without crashing" do

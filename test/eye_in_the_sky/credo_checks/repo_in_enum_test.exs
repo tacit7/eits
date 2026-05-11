@@ -266,6 +266,7 @@ defmodule EyeInTheSky.CredoChecks.RepoInEnumTest do
 
   describe "module metadata" do
     test "exposes the standard Credo check explanations and category" do
+      Code.ensure_loaded!(RepoInEnum)
       assert function_exported?(RepoInEnum, :run, 2)
       assert RepoInEnum.category() == :warning
       assert RepoInEnum.base_priority() == :high

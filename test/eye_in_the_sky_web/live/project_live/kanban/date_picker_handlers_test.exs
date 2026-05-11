@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
     %Phoenix.LiveView.Socket{
       assigns: %{
         __changed__: %{},
+        flash: %{},
         date_picker_year: 2024,
         date_picker_month: 1,
         date_picker_selected: nil,
@@ -23,7 +24,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
         show_completed: false,
         tasks: [],
         filter_priority: nil,
-        filter_tags: [],
+        filter_tags: MapSet.new(),
         filter_tag_mode: :any,
         filter_due_date: nil,
         filter_activity: nil
@@ -181,7 +182,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
     test "saves due date to task — date picker closes", %{socket: socket, task: task} do
       {:noreply, updated_socket} =
         DatePickerHandlers.handle_save_due_date(
-          %{"task_id" => task.id, "due_at" => "2025-03-15"},
+          %{"task_id" => task.id, "due_at" => "2025-03-15T12:00:00Z"},
           socket
         )
 

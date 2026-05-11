@@ -41,7 +41,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
         Prompts.create_prompt(%{
           project_id: project.id,
           name: "My Test Prompt",
-          content: "You are a helpful assistant."
+          slug: "my-test-prompt",
+          prompt_text: "You are a helpful assistant."
         })
 
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
@@ -52,9 +53,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
 
   describe "handle_event/search" do
     test "search form is rendered on the page", %{conn: conn, project: project} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
+      {:ok, lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
-      assert html =~ "Search" || has_element?(_lv, "input[name='query']")
+      assert html =~ "Search" || has_element?(lv, "input[name='query']")
     end
   end
 
@@ -66,22 +67,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
     end
   end
 
-  describe "handle_event/select_prompt" do
-    test "clicking a prompt shows its detail view", %{conn: conn, project: project} do
+  describe "prompt list navigation" do
+    test "created prompt has a navigate link", %{conn: conn, project: project} do
       {:ok, prompt} =
         Prompts.create_prompt(%{
           project_id: project.id,
           name: "Clickable Prompt",
-          content: "Detail content here."
+          slug: "clickable-prompt",
+          prompt_text: "Detail content here."
         })
 
       {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
-      # Click prompt to select it
-      lv
-      |> element("[phx-click='select_prompt'][phx-value-id='#{prompt.id}']")
-      |> render_click()
-
+      # Prompts navigate via links, not phx-click events
+      assert has_element?(lv, "a[href*='#{prompt.uuid}']")
       assert render(lv) =~ "Clickable Prompt"
     end
   end

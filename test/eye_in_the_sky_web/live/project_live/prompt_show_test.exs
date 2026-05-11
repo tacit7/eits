@@ -25,13 +25,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
 
   describe "mount/3" do
     test "renders the prompt name", %{conn: conn, project: project, prompt: prompt} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.id}")
+      # Route uses UUID, not integer id
+      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
       assert html =~ prompt.name
     end
 
     test "renders the prompt content", %{conn: conn, project: project, prompt: prompt} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.id}")
+      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
       assert html =~ "helpful assistant" || is_binary(html)
     end
@@ -39,19 +40,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
 
   describe "render/1" do
     test "renders edit affordance", %{conn: conn, project: project, prompt: prompt} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.id}")
+      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
       assert html =~ "Edit" || html =~ "edit"
     end
 
     test "renders delete affordance", %{conn: conn, project: project, prompt: prompt} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.id}")
+      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
       assert html =~ "Delete" || html =~ "delete"
     end
 
     test "renders copy affordance", %{conn: conn, project: project, prompt: prompt} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.id}")
+      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
       assert html =~ "Copy" || html =~ "copy"
     end
@@ -59,7 +60,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
 
   describe "handle_event/delete" do
     test "deleting a prompt removes it from the database", %{conn: conn, project: project, prompt: prompt} do
-      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.id}")
+      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
 
       # Trigger delete event if the element exists
       if has_element?(lv, "[phx-click='delete_prompt']") do

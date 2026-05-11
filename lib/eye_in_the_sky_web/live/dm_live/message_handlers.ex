@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   alias EyeInTheSky.Claude.SessionImporter
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
+  alias EyeInTheSky.Gemini.SessionImporter, as: GeminiImporter
   alias EyeInTheSky.Messages
   alias EyeInTheSky.Repo
   alias EyeInTheSkyWeb.DmLive.MessageGrouper
@@ -106,14 +107,29 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
         sync_codex_session_file(socket)
 
       "gemini" ->
-        # Gemini has no on-disk session transcript — everything's in the DB
-        # already. Return the shape the manual "Sync messages" handler in
-        # dm_live.ex expects so we fall into the "up to date" flash branch
-        # instead of {:error, _}.
-        {:ok, socket, %{inserted: 0, updated: 0}}
+        sync_gemini_session_file(socket)
 
       _ ->
         sync_claude_session_file(socket)
+    end
+  end
+
+  defp sync_gemini_session_file(socket) do
+    session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
+
+    project_path =
+      case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        {:ok, path} -> path
+        _ -> nil
+      end
+
+    case GeminiImporter.sync(session_uuid, project_path, session_id) do
+      {:ok, %{inserted: _, updated: _} = counts} ->
+        {:ok, socket, counts}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -171,10 +187,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
               sync_codex_async(session_id, session_uuid)
 
             "gemini" ->
-              # No on-disk transcript for Gemini — go straight to the clean
-              # path so the mount skeleton dismisses immediately instead of
-              # logging a false "sync failed" warning.
-              {:ok, %{inserted: 0, updated: 0}}
+              sync_gemini_async(session_id, session_uuid, session, agent)
 
             _ ->
               sync_claude_async(session_id, session_uuid, session, agent)
@@ -330,6 +343,16 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     with {:ok, messages} <- CodexReader.read_messages(session_uuid) do
       {:ok, CodexImporter.import_messages(messages, session_id)}
     end
+  end
+
+  defp sync_gemini_async(session_id, session_uuid, session, agent) do
+    project_path =
+      case SessionHelpers.resolve_project_path(session, agent) do
+        {:ok, path} -> path
+        _ -> nil
+      end
+
+    GeminiImporter.sync(session_uuid, project_path, session_id)
   end
 
   defp cleanup_rejected_message(message, uploaded_files) do

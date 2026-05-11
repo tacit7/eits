@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
     assigns =
       assigns
       |> assign(:snippet, skill_snippet(assigns.skill))
-      |> assign(:skill_link, assigns.skills_route <> "?skill=" <> URI.encode(assigns.skill.id))
+      |> assign(:skill_link, assigns.skills_route <> "?skill=" <> URI.encode_www_form(assigns.skill.id))
 
     ~H"""
     <details

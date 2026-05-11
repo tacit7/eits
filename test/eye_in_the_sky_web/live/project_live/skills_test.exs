@@ -18,19 +18,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.SkillsTest do
     test "renders the skills page", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/skills")
 
-      assert html =~ "skill" || html =~ "Skill"
+      assert html =~ "No skills yet"
     end
 
     test "renders search controls", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/skills")
 
-      assert html =~ "Search" || html =~ "search"
+      assert html =~ "Search skills"
     end
 
     test "renders empty state when no skills exist on disk", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/skills")
 
-      assert html =~ "skill" || html =~ "Skill" || html =~ "No skill"
+      assert html =~ "No skills yet"
     end
   end
 
@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.SkillsTest do
     test "scope filter controls are rendered", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/skills")
 
-      assert html =~ "All Sources" || html =~ "Source" || is_binary(html)
+      assert html =~ "Source:"
     end
   end
 
@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.SkillsTest do
     test "type filter controls are rendered", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/skills")
 
-      assert html =~ "Type" || html =~ "type" || is_binary(html)
+      assert html =~ "Type:"
     end
   end
 
@@ -54,14 +54,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.SkillsTest do
     test "renders sort controls", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/skills")
 
-      assert html =~ "Sort" || html =~ "sort" || is_binary(html)
+      assert html =~ "Sort:"
     end
 
-    test "page is valid HTML with project context", %{conn: conn, project: project} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/skills")
+    test "page renders skills top bar", %{conn: conn, project: project} do
+      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/skills")
 
-      assert is_binary(html)
-      assert byte_size(html) > 0
+      assert has_element?(lv, "#skills-top-bar-search")
     end
   end
 end

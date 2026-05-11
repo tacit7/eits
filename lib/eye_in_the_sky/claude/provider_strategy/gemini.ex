@@ -6,7 +6,6 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Gemini do
   @behaviour EyeInTheSky.Claude.ProviderStrategy
 
   alias EyeInTheSky.Claude.ContentBlock
-  alias EyeInTheSky.Claude.ProviderStrategy.Claude
 
   require Logger
 
@@ -55,12 +54,17 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Gemini do
   end
 
   defp build_opts(state, context, resume_id \\ nil) do
+    # NOTE: We do NOT set `system_prompt`. The gemini_cli_sdk maps that field
+    # to the GEMINI_SYSTEM_MD env var, which Gemini CLI interprets as a *path*
+    # to a markdown file — not inline content. Passing the EITS init prompt
+    # verbatim caused the CLI to try to open the prompt text as a file path
+    # and crash. EITS context is still available to the agent via the env
+    # vars below; the agent reads them with the `eits` CLI.
     %GeminiCliSdk.Options{
       cwd: state.project_path,
       model: context[:model] || "gemini-2.5-flash",
       resume: resume_id,
       yolo: true,
-      system_prompt: Claude.eits_init_prompt(state),
       env: %{
         "EITS_SESSION_UUID" => state.eits_session_uuid,
         "EITS_SESSION_ID" => to_string(state.session_id),

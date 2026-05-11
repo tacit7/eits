@@ -301,6 +301,7 @@ defmodule EyeInTheSky.Codex.SDKTest do
   # ---------------------------------------------------------------------------
 
   describe "thinking messages" do
+    @tag :sdk_e2e
     test "reasoning items delivered as thinking messages" do
       {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)

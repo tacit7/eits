@@ -7,11 +7,9 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
   # stream/4 requires LiveView lifecycle infrastructure (live_temp.lifecycle).
   # Mock sockets in unit tests lack this; safe_stream skips gracefully.
   defp safe_stream(socket, name, items, opts) do
-    try do
-      stream(socket, name, items, opts)
-    rescue
-      KeyError -> socket
-    end
+    stream(socket, name, items, opts)
+  rescue
+    KeyError -> socket
   end
 
   alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}

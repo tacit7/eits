@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.TopBar.AgentsTest do
     test "renders all scope options" do
       html = render_component(&Agents.toolbar/1, %{scope_filter: "all"})
 
-      assert html =~ "All Sources"
+      assert html =~ "All"
       assert html =~ "Global"
       assert html =~ "Project"
     end

@@ -48,8 +48,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNewTest do
 
       result =
         lv
-        |> form("form")
-        |> render_submit(%{"prompt" => %{"name" => "My Prompt", "content" => "Content here"}})
+        |> form("form[phx-submit='save']")
+        |> render_submit(%{"prompt" => %{"prompt_text" => "Content here", "name" => "My Prompt"}})
 
       # Either redirects (assert_redirect pattern) or shows success message
       assert is_binary(result) || match?({:error, {:redirect, _}}, result) ||
@@ -61,8 +61,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNewTest do
 
       html =
         lv
-        |> form("form")
-        |> render_submit(%{"prompt" => %{"name" => "", "content" => "Content"}})
+        |> form("form[phx-submit='save']")
+        |> render_submit(%{"prompt" => %{"name" => "", "prompt_text" => "Content"}})
 
       assert html =~ "form" || html =~ "error" || html =~ "required" || is_binary(html)
     end

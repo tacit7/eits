@@ -1,10 +1,36 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
   use EyeInTheSky.DataCase
-  import Phoenix.LiveViewTest
 
   alias EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlers
   alias EyeInTheSky.Tasks
   alias EyeInTheSky.Projects
+
+  # Build a socket with the minimum assigns needed by handlers that call
+  # KanbanFilters.load_tasks/1 (project_id, search_query, show_archived,
+  # show_completed, filter_priority, filter_tags, filter_tag_mode,
+  # filter_due_date, filter_activity) plus :__changed__ for assign/3.
+  defp build_socket(project_id) do
+    %Phoenix.LiveView.Socket{
+      assigns: %{
+        __changed__: %{},
+        date_picker_year: 2024,
+        date_picker_month: 1,
+        date_picker_selected: nil,
+        show_date_picker: false,
+        project_id: project_id,
+        search_query: "",
+        show_archived: false,
+        show_completed: false,
+        tasks: [],
+        filter_priority: nil,
+        filter_tags: [],
+        filter_tag_mode: :any,
+        filter_due_date: nil,
+        filter_activity: nil
+      },
+      private: %{live_temp: %{}}
+    }
+  end
 
   setup do
     {:ok, project} =
@@ -20,15 +46,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
         status: "todo"
       })
 
-    socket = %Phoenix.LiveView.Socket{
-      assigns: %{
-        date_picker_year: 2024,
-        date_picker_month: 1,
-        date_picker_selected: nil,
-        show_date_picker: false
-      },
-      private: %{live_temp: %{}}
-    }
+    socket = build_socket(project.id)
 
     %{socket: socket, task: task, project: project}
   end
@@ -95,8 +113,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
 
   describe "handle_close_date_picker/1" do
     test "closes date picker", %{socket: socket} do
-      open_socket = Map.put(socket.assigns, :show_date_picker, true)
-      open_socket = socket |> Map.put(:assigns, open_socket)
+      open_socket = %{socket | assigns: %{socket.assigns | show_date_picker: true}}
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_close_date_picker(open_socket)
 
@@ -106,8 +123,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
 
   describe "handle_date_picker_prev_month/1" do
     test "moves to previous month", %{socket: socket} do
-      socket = put_in(socket.assigns, [:date_picker_year], 2024)
-      socket = put_in(socket.assigns, [:date_picker_month], 3)
+      socket = %{socket | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 3}}
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_date_picker_prev_month(socket)
 
@@ -116,8 +132,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
     end
 
     test "wraps to previous year when moving from January", %{socket: socket} do
-      socket = put_in(socket.assigns, [:date_picker_year], 2024)
-      socket = put_in(socket.assigns, [:date_picker_month], 1)
+      socket = %{socket | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 1}}
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_date_picker_prev_month(socket)
 
@@ -128,8 +143,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
 
   describe "handle_date_picker_next_month/1" do
     test "moves to next month", %{socket: socket} do
-      socket = put_in(socket.assigns, [:date_picker_year], 2024)
-      socket = put_in(socket.assigns, [:date_picker_month], 3)
+      socket = %{socket | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 3}}
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_date_picker_next_month(socket)
 
@@ -138,8 +152,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
     end
 
     test "wraps to next year when moving from December", %{socket: socket} do
-      socket = put_in(socket.assigns, [:date_picker_year], 2024)
-      socket = put_in(socket.assigns, [:date_picker_month], 12)
+      socket = %{socket | assigns: %{socket.assigns | date_picker_year: 2024, date_picker_month: 12}}
 
       {:noreply, updated_socket} = DatePickerHandlers.handle_date_picker_next_month(socket)
 
@@ -165,7 +178,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
   end
 
   describe "handle_save_due_date/2" do
-    test "saves due date to task", %{socket: socket, task: task} do
+    test "saves due date to task — date picker closes", %{socket: socket, task: task} do
       {:noreply, updated_socket} =
         DatePickerHandlers.handle_save_due_date(
           %{"task_id" => task.id, "due_at" => "2025-03-15"},
@@ -175,7 +188,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
       assert updated_socket.assigns.show_date_picker == false
     end
 
-    test "clears due date when empty string", %{socket: socket, task: task} do
+    test "clears due date when empty string — date picker closes", %{socket: socket, task: task} do
       {:noreply, updated_socket} =
         DatePickerHandlers.handle_save_due_date(
           %{"task_id" => task.id, "due_at" => ""},
@@ -187,7 +200,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlersTest do
   end
 
   describe "handle_remove_due_date/2" do
-    test "removes due date from task", %{socket: socket, project: project} do
+    test "removes due date from task — date picker closes", %{socket: socket, project: project} do
       due_date = DateTime.new!(~D[2025-03-15], ~T[12:00:00])
 
       {:ok, task_with_due} =

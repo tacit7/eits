@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.Github.CheckRunHandler do
+  @moduledoc false
   require Logger
 
   def handle(ctx) do

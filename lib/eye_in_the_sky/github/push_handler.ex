@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.Github.PushHandler do
+  @moduledoc false
   require Logger
 
   def handle(ctx) do

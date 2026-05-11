@@ -36,8 +36,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   def handle_switch_tab(_, socket), do: {:noreply, socket}
 
   def handle_schedule_prompt(%{"id" => id}, socket) do
-    prompt = resolve_prompt(id)
-    {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, nil)}
+    case resolve_prompt(id) do
+      {:ok, prompt} ->
+        {:noreply, socket |> assign(:scheduling_prompt, prompt) |> assign(:scheduling_job, nil)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Agent not found")}
+    end
   end
 
   def handle_edit_schedule(%{"job_id" => job_id}, socket) do
@@ -87,7 +92,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
           "config" => config,
           "prompt_id" =>
             if(prompt_source == :filesystem, do: nil, else: parse_int(prompt_id_raw)),
-          "enabled" => 1
+          "enabled" => true
         }
         |> put_if_present("timezone", params["timezone"])
 

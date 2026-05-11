@@ -226,12 +226,22 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
       %Types.MessageEvent{role: "user"} ->
         state
 
-      %Types.ToolUseEvent{tool_name: name, parameters: params} ->
-        msg = %Message{type: :tool_use, content: name, metadata: %{input: params}}
+      # Codex-style tool_use: name + input live inside `content` so the
+      # CodexStreamAssembler can render rich tool blocks (name + parsed input).
+      %Types.ToolUseEvent{tool_name: name, parameters: params, tool_id: tool_id} ->
+        msg = %Message{
+          type: :tool_use,
+          content: %{name: name, input: params},
+          metadata: %{tool_id: tool_id}
+        }
+
         send(caller_pid, {:claude_message, sdk_ref, msg})
         state
 
       %Types.ToolResultEvent{tool_id: tool_id, output: output} ->
+        # CodexStreamAssembler has no tool_result handler today — output is
+        # surfaced via the originating tool_use's input/output metadata.
+        # We still forward the message in case a future assembler picks it up.
         msg = %Message{type: :tool_result, content: output, metadata: %{tool_id: tool_id}}
         send(caller_pid, {:claude_message, sdk_ref, msg})
         state
@@ -262,12 +272,22 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
          %{total_tokens: total, input_tokens: input, output_tokens: output, duration_ms: duration} =
            stats
        ) do
+    # Shape matches what the DM metrics renderer expects:
+    #   * "usage.input_tokens" / "usage.output_tokens" — drives the
+    #     "<n> in · <n> out" metrics line in DmMessageComponents.format_metrics/1
+    #   * "duration_ms" at top level — drives the "<seconds>s" segment
+    # Keys are strings so they survive the JSONB roundtrip with no re-keying.
     %{
-      total_tokens: total,
-      input_tokens: input,
-      output_tokens: output,
-      duration_ms: duration,
-      tool_calls: Map.get(stats, :tool_calls, 0)
+      "usage" => %{
+        "input_tokens" => input,
+        "output_tokens" => output,
+        "total_tokens" => total
+      },
+      "input_tokens" => input,
+      "output_tokens" => output,
+      "total_tokens" => total,
+      "duration_ms" => duration,
+      "tool_calls" => Map.get(stats, :tool_calls, 0)
     }
   end
 end

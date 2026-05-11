@@ -348,7 +348,7 @@ defmodule EyeInTheSky.Metrics.TokenIngestionTest do
 
       Repo.query!(
         "INSERT INTO sessions (uuid, name, status, started_at) VALUES ($1, $2, $3, $4)",
-        [uuid_bin, "agentless-#{uuid}", "working", DateTime.to_iso8601(DateTime.utc_now())]
+        [uuid_bin, "agentless-#{uuid}", "working", DateTime.utc_now()]
       )
 
       %{rows: [[session_id]]} =

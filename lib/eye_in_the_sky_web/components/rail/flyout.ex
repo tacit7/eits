@@ -304,7 +304,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 note_parent_type={@note_parent_type}
               />
             <% :skills -> %>
-              <SkillsSection.skills_content skills={@flyout_skills} />
+              <SkillsSection.skills_content
+                skills={@flyout_skills}
+                skills_route={Helpers.skills_route(@sidebar_project)}
+              />
             <% :teams -> %>
               <TeamsSection.teams_content
                 teams={@flyout_teams}

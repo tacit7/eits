@@ -27,6 +27,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   end
 
   @impl true
+  def handle_params(%{"skill" => skill_id}, _uri, socket) do
+    selected = Enum.find(socket.assigns.skills, &(&1.id == skill_id))
+    {:noreply, socket |> assign(:selected_skill, selected) |> assign(:detail_tab, :preview)}
+  end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("search", params, socket),
     do: handle_search(params, socket, &load_skills/1)
 

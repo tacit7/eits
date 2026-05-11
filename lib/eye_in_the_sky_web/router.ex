@@ -192,10 +192,13 @@ defmodule EyeInTheSkyWeb.Router do
   end
 
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
-    pipe_through :api
+    pipe_through :accepts_json
 
-    # Health check
     get "/health", HealthController, :index
+  end
+
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through :api
 
     # Sessions
     get "/sessions", SessionController, :index

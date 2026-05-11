@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
     test "renders the prompts page", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
-      assert html =~ "prompt" || html =~ "Prompt"
+      assert html =~ "No prompts yet"
     end
 
     test "renders search controls", %{conn: conn, project: project} do
@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
     test "renders empty state when no prompts exist", %{conn: conn, project: project} do
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
-      assert html =~ "prompt" || html =~ "Prompt" || html =~ "No prompt"
+      assert html =~ "No prompts yet"
     end
   end
 
@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
     test "search form is rendered on the page", %{conn: conn, project: project} do
       {:ok, lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
-      assert html =~ "Search" || has_element?(lv, "input[name='query']")
+      assert has_element?(lv, "#top-bar-generic-search")
     end
   end
 

@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.TasksTest do
     test "renders workspace content", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/workspace/tasks")
 
-      assert is_binary(html) && byte_size(html) > 0
+      assert html =~ "Workspace tasks view — coming soon."
     end
   end
 end

@@ -199,6 +199,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert result.assigns.flash["error"] == "Unsupported provider: unknown"
     end
 
+    @tag :host_dependent
     test "passes validation for valid codex thread id" do
       session = Factory.new_session()
       agent = create_agent_preloaded()
@@ -216,6 +217,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert result.assigns.flash["error"] == nil
     end
 
+    @tag :host_dependent
     test "passes validation for valid claude UUID" do
       session = Factory.new_session()
       agent = create_agent_preloaded()
@@ -233,6 +235,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert result.assigns.flash["error"] == nil
     end
 
+    @tag :host_dependent
     test "passes validation for valid gemini UUID" do
       session = Factory.new_session()
       agent = create_agent_preloaded()
@@ -269,6 +272,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
   end
 
   describe "validate_resume_id/2 (exercised via handle_open_iterm)" do
+    @tag :host_dependent
     test "accepts valid UUID for claude" do
       session = Factory.new_session()
       agent = create_agent_preloaded()
@@ -302,6 +306,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert result.assigns.flash["error"] == "Invalid session UUID"
     end
 
+    @tag :host_dependent
     test "accepts non-whitespace string for codex" do
       session = Factory.new_session()
       agent = create_agent_preloaded()

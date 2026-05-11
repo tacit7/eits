@@ -10,7 +10,8 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
   import Phoenix.LiveView, only: [push_event: 3]
 
-  alias EyeInTheSky.{Agents, Notes, Projects, Sessions, Tasks}
+  alias EyeInTheSky.{Agents, Messages, Notes, Projects, Sessions, Tasks}
+  alias EyeInTheSky.Agents.AgentManager
 
   # ---------------------------------------------------------------------------
   # palette:sessions
@@ -119,6 +120,69 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   end
 
   def handle_palette_event(_event, _params, socket), do: {:cont, socket}
+
+  # ---------------------------------------------------------------------------
+  # vim:quick-dm-sessions  — fetch sessions list for the quick-DM picker
+  # ---------------------------------------------------------------------------
+
+  def handle_quick_dm_event("vim:quick-dm-sessions", _params, socket) do
+    sessions =
+      Sessions.list_sessions_filtered(status_filter: "all", sort_by: :last_activity, limit: 20)
+
+    results =
+      Enum.map(sessions, fn s ->
+        %{id: s.id, uuid: s.uuid, name: s.name || "Unnamed session", status: s.status}
+      end)
+
+    {:halt, push_event(socket, "vim:quick-dm-sessions-result", %{sessions: results})}
+  end
+
+  # ---------------------------------------------------------------------------
+  # vim:quick-dm  — send a DM and continue the target session
+  # ---------------------------------------------------------------------------
+
+  def handle_quick_dm_event("vim:quick-dm", %{"session_uuid" => uuid, "body" => body}, socket)
+      when is_binary(uuid) and is_binary(body) and body != "" do
+    with {:ok, _} <- Ecto.UUID.cast(uuid),
+         %Sessions.Session{} = session <- Sessions.get_session_by_uuid(uuid) do
+      provider = session.provider || "claude"
+
+      case Messages.send_message(%{
+             session_id: session.id,
+             sender_role: "user",
+             recipient_role: "agent",
+             provider: provider,
+             body: body
+           }) do
+        {:ok, message} ->
+          cli_opts = [message_id: message.id]
+
+          case AgentManager.continue_session(session.id, body, cli_opts) do
+            {:ok, _} ->
+              {:halt, push_event(socket, "vim:quick-dm-result", %{ok: true})}
+
+            {:error, :queue_full} ->
+              Logger.warning("vim:quick-dm queue_full for session=#{session.id}")
+              {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Session queue is full"})}
+
+            {:error, reason} ->
+              Logger.warning("vim:quick-dm continue_session error: #{inspect(reason)}")
+              {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Failed to send"})}
+          end
+
+        {:error, _changeset} ->
+          {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Failed to create message"})}
+      end
+    else
+      nil ->
+        {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Session not found"})}
+
+      :error ->
+        {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Invalid session UUID"})}
+    end
+  end
+
+  def handle_quick_dm_event(_event, _params, socket), do: {:cont, socket}
 
   # ---------------------------------------------------------------------------
   # palette:create-task

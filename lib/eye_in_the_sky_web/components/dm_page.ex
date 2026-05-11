@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
     ~H"""
     <div
-      class="flex flex-col h-dvh px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative overflow-hidden"
+      class="flex flex-col h-full px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative overflow-hidden"
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
@@ -310,7 +310,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
       <%!-- Header card (desktop only) --%>
       <div
-        class="hidden md:flex max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
+        class="hidden max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">

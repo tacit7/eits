@@ -120,7 +120,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             <% end %>
 
             <%!-- Agent name (replaces UUID — much more useful scan anchor) --%>
-            <%= if @task.agent do %>
+            <%= if is_struct(@task.agent, EyeInTheSky.Agents.Agent) do %>
               <span class="text-base-content/15">&middot;</span>
               <span class="text-base-content/40 truncate max-w-[160px]">
                 {@task.agent.description}

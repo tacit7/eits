@@ -6,6 +6,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
   alias EyeInTheSky.Claude.SessionReader
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
+  alias EyeInTheSky.Gemini.SessionImporter, as: GeminiImporter
+  alias EyeInTheSky.Gemini.SessionReader, as: GeminiReader
   alias EyeInTheSky.Messages
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
@@ -42,8 +44,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
         reload_codex_session(socket, load_messages_fn)
 
       "gemini" ->
-        {:noreply,
-         put_flash(socket, :info, "Gemini sessions are stored in the database; no file to reload")}
+        reload_gemini_session(socket, load_messages_fn)
 
       _ ->
         reload_claude_session(socket, load_messages_fn)
@@ -75,6 +76,35 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to reload: #{inspect(reason)}")}
+    end
+  end
+
+  defp reload_gemini_session(socket, load_messages_fn) do
+    session_id = socket.assigns.session_id
+    session_uuid = socket.assigns.session_uuid
+
+    project_path =
+      case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
+        {:ok, path} -> path
+        _ -> nil
+      end
+
+    case GeminiReader.read_messages(session_uuid, project_path) do
+      {:ok, messages} ->
+        Messages.delete_session_messages(session_id)
+        %{inserted: inserted} = GeminiImporter.import_messages(messages, session_id)
+        socket = load_messages_fn.(socket)
+
+        {:noreply,
+         put_flash(socket, :info, "Reloaded #{inserted} messages from Gemini session file")}
+
+      {:error, :not_found} ->
+        {:noreply,
+         put_flash(socket, :error, "No Gemini session file found for #{session_uuid}")}
+
+      {:error, reason} ->
+        {:noreply,
+         put_flash(socket, :error, "Failed to reload Gemini session: #{inspect(reason)}")}
     end
   end
 

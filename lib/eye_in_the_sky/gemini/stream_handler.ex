@@ -7,6 +7,7 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
   """
 
   alias EyeInTheSky.Claude.Message
+  alias EyeInTheSky.Gemini.Pricing
   alias EyeInTheSky.Gemini.StreamHandler.Registry, as: StreamRegistry
   alias GeminiCliSdk.Types
 
@@ -26,11 +27,12 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
           {:ok, sdk_ref :: reference(), handler_pid :: pid()} | {:error, term()}
   def start(prompt, opts, caller_pid, test_opts \\ []) do
     sdk_ref = make_ref()
+    model = opts_model(opts)
 
     stream_fn =
       Keyword.get(test_opts, :stream_fn, fn -> GeminiCliSdk.execute(prompt, opts) end)
 
-    case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid) do
+    case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid, model) do
       {:ok, pid} ->
         StreamRegistry.register(sdk_ref, pid)
         {:ok, sdk_ref, pid}
@@ -49,13 +51,14 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
           {:ok, sdk_ref :: reference(), handler_pid :: pid()} | {:error, term()}
   def resume(session_id, prompt, opts, caller_pid, test_opts \\ []) do
     sdk_ref = make_ref()
+    model = opts_model(opts)
 
     stream_fn =
       Keyword.get(test_opts, :stream_fn, fn ->
         GeminiCliSdk.resume_session(session_id, opts, prompt)
       end)
 
-    case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid) do
+    case spawn_stream_consumer(sdk_ref, stream_fn, caller_pid, model) do
       {:ok, pid} ->
         StreamRegistry.register(sdk_ref, pid)
         {:ok, sdk_ref, pid}
@@ -165,22 +168,29 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
 
   # --- Private ---
 
-  defp spawn_stream_consumer(sdk_ref, stream_fn, caller_pid) do
+  defp opts_model(%{model: model}) when is_binary(model), do: model
+  defp opts_model(_), do: nil
+
+  defp spawn_stream_consumer(sdk_ref, stream_fn, caller_pid, model) do
     Task.Supervisor.start_child(
       EyeInTheSky.TaskSupervisor,
       fn ->
         Process.monitor(caller_pid)
-        consume_stream(sdk_ref, stream_fn.(), caller_pid)
+        consume_stream(sdk_ref, stream_fn.(), caller_pid, model)
       end,
       restart: :temporary
     )
   end
 
-  defp consume_stream(sdk_ref, stream, caller_pid) do
-    # State carries the accumulated assistant text and the session_id from InitEvent
-    # so we can emit a non-empty result (enabling DB persistence) and a correct
-    # :claude_complete payload when the terminal ResultEvent arrives.
-    Enum.reduce(stream, %{text: "", session_id: nil}, fn event, state ->
+  defp consume_stream(sdk_ref, stream, caller_pid, model) do
+    # State carries the accumulated assistant text, session_id from InitEvent,
+    # and per-turn tool_calls so the :result event can emit a body that has
+    # the tool invocations baked in. The DM renderer parses lines matching
+    # `> \`ToolName\` <args>` out of the persisted body to draw tool widgets
+    # — same convention Codex uses (e.g. `> \`Bash\` cd ... && ...`).
+    initial = %{text: "", session_id: nil, model: model, tool_calls: []}
+
+    Enum.reduce(stream, initial, fn event, state ->
       handle_event(sdk_ref, event, caller_pid, state)
     end)
   rescue
@@ -195,27 +205,70 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
         send(caller_pid, {:codex_session_id, sdk_ref, session_id})
         %{state | session_id: session_id}
 
-      %Types.MessageEvent{role: "assistant", content: content} when is_binary(content) ->
-        msg = Message.text(content)
+      # Gemini CLI emits TWO kinds of assistant MessageEvents:
+      #   * delta: true   — incremental streaming chunk
+      #   * delta: false  — final aggregated content (sum of all preceding deltas)
+      # If we accumulate both into state.text, the final message gets the chunks
+      # concatenated with the full text → doubled output. So:
+      #   * On a delta, append to state.text and send a delta Message for live
+      #     streaming display.
+      #   * On a final non-delta, REPLACE state.text (don't append) so the
+      #     :result event carries the correct single copy. Don't emit a
+      #     duplicate :text Message — the StreamAssembler already shows the
+      #     accumulated deltas and the final :result will commit it.
+      %Types.MessageEvent{role: "assistant", content: content, delta: true}
+      when is_binary(content) ->
+        msg = Message.text(content, true)
         send(caller_pid, {:claude_message, sdk_ref, msg})
         %{state | text: state.text <> content}
+
+      %Types.MessageEvent{role: "assistant", content: content}
+      when is_binary(content) ->
+        # Non-delta (delta: false or nil) — final aggregated message.
+        # If we accumulated deltas, replace; otherwise treat as the only emit.
+        if state.text == "" do
+          msg = Message.text(content, false)
+          send(caller_pid, {:claude_message, sdk_ref, msg})
+        end
+
+        %{state | text: content}
 
       %Types.MessageEvent{role: "user"} ->
         state
 
-      %Types.ToolUseEvent{tool_name: name, parameters: params} ->
-        msg = %Message{type: :tool_use, content: name, metadata: %{input: params}}
+      # Codex-style tool_use: name + input live inside `content` so the
+      # CodexStreamAssembler can render rich tool blocks (name + parsed input)
+      # in the live-stream indicator. We also remember the call in state so
+      # the final :result body can embed a `> \`name\` <args>` line that the
+      # persisted DM renderer picks up via parse_body_segment/1.
+      %Types.ToolUseEvent{tool_name: name, parameters: params, tool_id: tool_id} ->
+        msg = %Message{
+          type: :tool_use,
+          content: %{name: name, input: params},
+          metadata: %{tool_id: tool_id}
+        }
+
         send(caller_pid, {:claude_message, sdk_ref, msg})
-        state
+        %{state | tool_calls: state.tool_calls ++ [{name, params}]}
 
       %Types.ToolResultEvent{tool_id: tool_id, output: output} ->
+        # CodexStreamAssembler has no tool_result handler today — output is
+        # surfaced via the originating tool_use's input/output metadata.
+        # We still forward the message in case a future assembler picks it up.
         msg = %Message{type: :tool_result, content: output, metadata: %{tool_id: tool_id}}
         send(caller_pid, {:claude_message, sdk_ref, msg})
         state
 
-      %Types.ResultEvent{status: status, stats: stats} when status in ["ok", "success"] ->
-        stats_map = stats_to_map(stats)
-        msg = %Message{type: :result, content: state.text, metadata: stats_map}
+      %Types.ResultEvent{status: status, stats: stats, timestamp: ts}
+      when status in ["ok", "success"] ->
+        # Derive a stable per-turn UUID so a subsequent Sync from JSONL can't
+        # insert a duplicate row. We can't know the JSONL turn "id" during the
+        # live stream, but a deterministic hash of (session_id, turn_timestamp)
+        # is stable enough for the dedup unique index on source_uuid.
+        turn_uuid = derive_turn_uuid(state.session_id, ts)
+        stats_map = stats_to_map(stats, state.model, turn_uuid)
+        body = build_result_body(state.text, state.tool_calls)
+        msg = %Message{type: :result, content: body, metadata: stats_map}
         send(caller_pid, {:claude_message, sdk_ref, msg})
         send(caller_pid, {:claude_complete, sdk_ref, state.session_id})
         state
@@ -233,18 +286,82 @@ defmodule EyeInTheSky.Gemini.StreamHandler do
     end
   end
 
-  defp stats_to_map(nil), do: %{}
+  # Format the persisted assistant body. Tool calls are appended after the
+  # prose as `> \`ToolName\` <json-args>` lines so DmHelpers.parse_body_segment/1
+  # recognizes them and the DM renderer draws tool widgets.
+  defp build_result_body(text, []), do: text
+
+  defp build_result_body(text, tool_calls) do
+    lines = Enum.map(tool_calls, &format_tool_call_line/1) |> Enum.join("\n")
+
+    case String.trim(text) do
+      "" -> lines
+      _ -> text <> "\n\n" <> lines
+    end
+  end
+
+  defp format_tool_call_line({name, params}) do
+    args = format_tool_args(params)
+    "> `#{name}` #{args}"
+  end
+
+  defp format_tool_args(%{} = params) do
+    case Jason.encode(params) do
+      {:ok, json} -> json
+      {:error, _} -> inspect(params)
+    end
+  end
+
+  defp format_tool_args(other), do: to_string(other)
+
+  defp stats_to_map(nil, _model, _turn_uuid), do: %{}
 
   defp stats_to_map(
          %{total_tokens: total, input_tokens: input, output_tokens: output, duration_ms: duration} =
-           stats
+           stats,
+         model,
+         turn_uuid
        ) do
+    # Atom keys — AgentWorkerEvents.build_db_metadata/1 looks them up via
+    # `metadata[:duration_ms]` / `metadata[:usage]`. String keys here cause
+    # every db_metadata field to come back nil and the row persists with
+    # metadata = NULL (verified empirically). The encoder turns atoms into
+    # JSON keys on persist, and consumers read them back as strings — the
+    # roundtrip is one-way so the storage shape stays string-keyed.
+    #
+    # :uuid is forwarded by AgentWorker → WorkerEvents.on_result_received as
+    # source_uuid on the persisted message row. A stable per-turn UUID prevents
+    # duplicate rows when the user later clicks Sync to import from JSONL.
+    cost = Pricing.cost(model, input, output)
+    model_usage = Pricing.model_usage(model, input, output)
+
     %{
-      total_tokens: total,
-      input_tokens: input,
-      output_tokens: output,
+      uuid: turn_uuid,
+      usage: %{
+        input_tokens: input,
+        output_tokens: output,
+        total_tokens: total
+      },
       duration_ms: duration,
-      tool_calls: Map.get(stats, :tool_calls, 0)
+      tool_calls: Map.get(stats, :tool_calls, 0),
+      total_cost_usd: cost,
+      model_usage: model_usage
     }
   end
+
+  # Derive a deterministic UUID from the Gemini session_id and per-turn
+  # timestamp. The JSONL turn "id" is not available in the live stream, so
+  # this is a best-effort stable key for dedup. Falls back to a random UUID
+  # if session_id is nil (should not happen in practice).
+  defp derive_turn_uuid(session_id, timestamp) when is_binary(session_id) do
+    input = "#{session_id}:#{timestamp || Ecto.UUID.generate()}"
+    hash = :crypto.hash(:sha256, input) |> binary_part(0, 16)
+
+    case Ecto.UUID.cast(hash) do
+      {:ok, uuid} -> uuid
+      _ -> Ecto.UUID.generate()
+    end
+  end
+
+  defp derive_turn_uuid(_, _), do: Ecto.UUID.generate()
 end

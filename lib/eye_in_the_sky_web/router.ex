@@ -215,6 +215,7 @@ defmodule EyeInTheSkyWeb.Router do
     post "/sessions/:uuid/tool-events", SessionController, :tool_event
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context
+    get "/sessions/:uuid/messages", SessionMessageController, :index
     get "/sessions/:uuid/tasks", TaskController, :list_for_session
 
     # Timers

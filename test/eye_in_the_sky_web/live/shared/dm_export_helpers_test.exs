@@ -185,4 +185,52 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpersTest do
       assert result.assigns.flash["error"] =~ "project path"
     end
   end
+
+  describe "handle_reload_from_session_file/2 — claude provider, valid project path" do
+    test "returns info flash with reloaded message count on success" do
+      # Stub HOME so the JSONL locator finds the file we create below.
+      tmp_home =
+        Path.join(System.tmp_dir!(), "dm_export_claude_#{System.unique_integer([:positive])}")
+
+      prev_home = System.get_env("HOME")
+      System.put_env("HOME", tmp_home)
+
+      on_exit(fn ->
+        File.rm_rf!(tmp_home)
+        if prev_home, do: System.put_env("HOME", prev_home), else: System.delete_env("HOME")
+      end)
+
+      agent = Factory.create_agent()
+      project_path = "/tmp/dm-export-test-project"
+
+      session =
+        Factory.create_session(agent, %{
+          provider: "claude",
+          git_worktree_path: project_path
+        })
+
+      # Build the JSONL path that SessionFileLocator expects:
+      # $HOME/.claude/projects/<escaped_path>/<uuid>.jsonl
+      # escape_project_path replaces "/" and "." with "-"
+      escaped = String.replace(project_path, ~r|[/.]|, "-")
+      jsonl_dir = Path.join([tmp_home, ".claude", "projects", escaped])
+      File.mkdir_p!(jsonl_dir)
+      File.write!(Path.join(jsonl_dir, "#{session.uuid}.jsonl"), "")
+
+      socket =
+        build_socket(%{
+          session: session,
+          session_id: session.id,
+          session_uuid: session.uuid,
+          agent: agent
+        })
+
+      load_fn = fn s -> s end
+
+      {:noreply, result} = DmExportHelpers.handle_reload_from_session_file(socket, load_fn)
+
+      assert result.assigns.flash["info"] =~ "Reloaded"
+      assert result.assigns.flash["info"] =~ "messages"
+    end
+  end
 end

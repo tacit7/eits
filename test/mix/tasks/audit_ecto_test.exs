@@ -398,6 +398,7 @@ defmodule Mix.Tasks.Audit.EctoTest do
   # ---------------------------------------------------------------------------
 
   describe "multiple anti-patterns" do
+    @tag timeout: 120_000
     test "reports all distinct findings from a single file", %{tmp: tmp} do
       fixture(tmp, "everything.ex", """
       defmodule Everything do

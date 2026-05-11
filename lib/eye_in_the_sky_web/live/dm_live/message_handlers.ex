@@ -102,9 +102,18 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
   def sync_messages_from_session_file(socket) do
     case socket.assigns.session.provider do
-      "codex" -> sync_codex_session_file(socket)
-      "gemini" -> {:ok, socket, 0}
-      _ -> sync_claude_session_file(socket)
+      "codex" ->
+        sync_codex_session_file(socket)
+
+      "gemini" ->
+        # Gemini has no on-disk session transcript — everything's in the DB
+        # already. Return the shape the manual "Sync messages" handler in
+        # dm_live.ex expects so we fall into the "up to date" flash branch
+        # instead of {:error, _}.
+        {:ok, socket, %{inserted: 0, updated: 0}}
+
+      _ ->
+        sync_claude_session_file(socket)
     end
   end
 
@@ -158,9 +167,17 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       Task.start(fn ->
         result =
           case session.provider do
-            "codex" -> sync_codex_async(session_id, session_uuid)
-            "gemini" -> {:error, :no_file_sync}
-            _ -> sync_claude_async(session_id, session_uuid, session, agent)
+            "codex" ->
+              sync_codex_async(session_id, session_uuid)
+
+            "gemini" ->
+              # No on-disk transcript for Gemini — go straight to the clean
+              # path so the mount skeleton dismisses immediately instead of
+              # logging a false "sync failed" warning.
+              {:ok, %{inserted: 0, updated: 0}}
+
+            _ ->
+              sync_claude_async(session_id, session_uuid, session, agent)
           end
 
         case result do

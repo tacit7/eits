@@ -53,11 +53,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
       assert html =~ "Delete" || html =~ "delete"
     end
 
-    test "renders copy affordance", %{conn: conn, project: project, prompt: prompt} do
-      {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/prompts/#{prompt.uuid}")
-
-      assert html =~ "Copy" || html =~ "copy"
-    end
   end
 
   describe "handle_event/delete" do

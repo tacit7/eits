@@ -7,8 +7,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
 
-  alias EyeInTheSky.{Notifications, Projects, Prompts, Tasks}
   alias EyeInTheSky.Claude.RateLimitClient
+  alias EyeInTheSky.{Notifications, Projects, Prompts, Tasks}
+  alias EyeInTheSky.Projects.FileTree
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Components.NewSessionModal
   alias EyeInTheSkyWeb.Components.Rail.{
@@ -659,7 +660,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       %{path: root} when not is_nil(root) ->
         children =
           Enum.reduce(valid_paths, %{}, fn path, acc ->
-            case EyeInTheSky.Projects.FileTree.children(root, path) do
+            case FileTree.children(root, path) do
               {:ok, nodes} -> Map.put(acc, path, nodes)
               {:error, _} -> acc
             end

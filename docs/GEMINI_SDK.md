@@ -76,7 +76,7 @@ Gemini CLI persists each chat at `~/.gemini/tmp/<project_dir>/chats/session-<ts>
 
 ## Import metadata_fn (don't forget it)
 
-`Messages.BulkImporter.import_messages/3` defaults `metadata_fn` to `fn _ -> nil end`. If `Gemini.SessionImporter.import_messages/2` doesn't pass a custom one, **every Reload-from-file or Sync run silently wipes the cost + tokens off Gemini agent rows.** The importer now passes a `build_metadata/1` that mirrors `StreamHandler.stats_to_map/2`'s output (usage + total_cost_usd + model_usage). Live-streamed and reloaded rows now produce identical metadata shape.
+`Messages.BulkImporter.import_messages/3` defaults `metadata_fn` to `fn _ -> nil end`. If `Gemini.SessionImporter.import_messages/2` doesn't pass a custom one, **every Reload-from-file or Sync run silently wipes the cost + tokens off Gemini agent rows.** The importer now passes a `build_metadata/1` that mirrors `StreamHandler.stats_to_map/3`'s output (usage + total_cost_usd + model_usage). Live-streamed and reloaded rows now produce identical metadata shape.
 
 ## DM Protocol: How Agents Recognize a DM from Another Agent
 
@@ -133,7 +133,7 @@ When you add a new provider you must touch (this is what shipped for Gemini):
 - `DmMessageComponents.stream_provider_avatar/1`
 - `Rail.Flyout.canvas_provider_icon/1`
 - `priv/static/images/gemini.svg`
-- DM topbar Sync + Reload — both `MessageHandlers.sync_messages_from_session_file/1` AND `DmExportHelpers.handle_reload_from_session_file/2` need a `"gemini"` branch.
+- DM topbar Sync + Reload — both `MessageHandlers.sync_messages_from_session_file/1` AND `DmExportHelpers.handle_reload_from_session_file/2` now have a `"gemini"` branch (implemented in `4ff24598`). `sync_gemini_async/3` resolves the project path and delegates to `GeminiImporter.sync/3`. Reload drops all DB rows and re-imports from disk. `load_messages_on_mount/1` also syncs from the Gemini file on mount instead of returning an empty shape.
 
 ## `mix gemini.backfill_metadata`
 
@@ -155,6 +155,7 @@ mix gemini.backfill_metadata --dry-run     # preview only
 - `d76fd7a5` — backfill task
 - `0c645ba6` — Pricing + cost in metadata
 - `c7457d37` — import path passes metadata_fn (no more silent wipe)
+- `4ff24598` — real Reload + Sync wired for Gemini; sync_gemini_async helper; load_messages_on_mount syncs from Gemini file
 
 ## Dependencies
 

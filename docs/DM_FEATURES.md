@@ -1323,6 +1323,33 @@ Previously, `load_messages_on_mount` had a race: both the mount Task sync and ev
 
 The skeleton defers all DB loads until after sync completes, eliminating the race entirely. For active sessions, the event-driven pipeline (`claude_complete → sync_and_reload`) handles imports; the mount Task only syncs when the session is already idle/finished.
 
+**Gemini sessions** (`4ff24598`): `load_messages_on_mount/1` now performs an incremental sync from the Gemini session file (via `sync_gemini_async/3` → `GeminiImporter.sync/3`) instead of returning the empty `:clean` shape. This means opening a DM page for a completed or idle Gemini session will import any turns that were missed while the LiveView was disconnected.
+
+---
+
+## Gemini Reload + Sync (DM Toolbar)
+
+**Commit:** `4ff24598`
+
+The **Reload** and **Sync** toolbar buttons in the DM page now work for Gemini sessions:
+
+- **Reload** (`DmExportHelpers.handle_reload_from_session_file/2`, `"gemini"` branch): Drops all existing DB rows for the session and re-imports the full JSONL file from `~/.gemini/tmp/<proj>/chats/`. Mirrors the Claude/Codex Reload behavior.
+- **Sync** (`MessageHandlers.sync_messages_from_session_file/1`, `"gemini"` branch): Calls `sync_gemini_async/3` which resolves the project path via `SessionHelpers.resolve_project_path/2` and runs `GeminiImporter.sync/3` with the last persisted `source_uuid` as the cutoff watermark. Only new turns since the last sync are inserted.
+
+Helper function added to `message_handlers.ex`:
+
+```elixir
+defp sync_gemini_async(session_id, session_uuid, session, agent) do
+  project_path =
+    case SessionHelpers.resolve_project_path(session, agent) do
+      {:ok, path} -> path
+      _ -> nil
+    end
+
+  GeminiImporter.sync(session_uuid, project_path, session_id)
+end
+```
+
 ---
 
 ## DM Page Settings Tab

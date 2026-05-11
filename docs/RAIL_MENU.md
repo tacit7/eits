@@ -172,11 +172,11 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 - **Flyout header icon**: hero-bolt icon links to `/projects/:id/skills` (project-scoped only)
 - **Filter zone** (always visible):
   - **Search input**: filters skill name/description in real-time
-  - **Scope pills**: All / Global / Project (toggleable)
-    - **Global**: filters to `:agents` source (global skills)
+  - **Scope pills**: All / Project (toggleable; Global pill removed)
     - **Project**: filters to `:project_agents` source (project-specific skills)
     - **All**: shows both sources
-- **Skill list**: expandable rows show description/snippet on click via `<details>` element
+- **Skill list**: loads immediately when the section is toggled open (`maybe_load_skills` called from `handle_toggle_section`); expandable rows show description/snippet on click via `<details>` element
+- **Open link**: each skill row has an "Open" link that navigates to `/projects/:id/skills?skill=<slug>`, pre-selecting the skill via `handle_params`
 - **Skill icons**:
   - **Section header**: hero-bolt (for skills section)
   - **Command rows**: hero-slash (for slash commands)

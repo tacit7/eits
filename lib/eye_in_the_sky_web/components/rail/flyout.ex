@@ -466,9 +466,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     assigns = assign(assigns, :task_link, task_link)
 
     ~H"""
-    <div class="fixed left-[296px] top-[48px] z-[100] w-72 bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
+    <div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
         <%!-- Header --%>
-        <div class="flex items-start justify-between gap-2">
+        <div class="flex items-start justify-between gap-2 flex-shrink-0">
           <span class="text-sm font-semibold text-base-content/85 leading-snug">{@task.title}</span>
           <button
             type="button"
@@ -481,18 +481,22 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         </div>
 
         <%!-- State badge --%>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-shrink-0">
           <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", TasksSection.task_state_dot(@task.state_id)]} />
           <span class="text-xs text-base-content/55">{task_state_label(@task.state_id)}</span>
         </div>
 
         <%!-- Description --%>
-        <%= if @task.description && @task.description != "" do %>
-          <p class="text-xs text-base-content/60 leading-relaxed line-clamp-6">{@task.description}</p>
-        <% end %>
+        <div class="flex-1 min-h-0 overflow-y-auto">
+          <%= if @task.description && @task.description != "" do %>
+            <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">{@task.description}</p>
+          <% else %>
+            <p class="text-xs text-base-content/30 italic">No description.</p>
+          <% end %>
+        </div>
 
         <%!-- Footer: prev/next + counter + open link --%>
-        <div class="flex items-center justify-between pt-1 border-t border-base-content/8">
+        <div class="flex items-center justify-between pt-1 border-t border-base-content/8 flex-shrink-0">
           <%!-- Prev / counter / Next --%>
           <div class="flex items-center gap-1">
             <button
@@ -548,9 +552,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     assigns = assign(assigns, :edit_link, edit_link)
 
     ~H"""
-    <div class="fixed left-[296px] top-[48px] z-[100] w-72 bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
+    <div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
         <%!-- Header --%>
-        <div class="flex items-start justify-between gap-2">
+        <div class="flex items-start justify-between gap-2 flex-shrink-0">
           <div class="min-w-0 flex-1">
             <span class="text-sm font-semibold text-base-content/85 leading-snug block truncate">
               {note_label(@note)}
@@ -570,14 +574,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         </div>
 
         <%!-- Body --%>
-        <%= if @note.body && @note.body != "" do %>
-          <p class="text-xs text-base-content/60 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
-            {@note.body}
-          </p>
-        <% end %>
+        <div class="flex-1 min-h-0 overflow-y-auto">
+          <%= if @note.body && @note.body != "" do %>
+            <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">
+              {@note.body}
+            </p>
+          <% else %>
+            <p class="text-xs text-base-content/30 italic">No content.</p>
+          <% end %>
+        </div>
 
         <%!-- Footer: prev/next + counter + edit link --%>
-        <div class="flex items-center justify-between pt-1 border-t border-base-content/8">
+        <div class="flex items-center justify-between pt-1 border-t border-base-content/8 flex-shrink-0">
           <div class="flex items-center gap-1">
             <button
               type="button"

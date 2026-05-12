@@ -466,7 +466,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     assigns = assign(assigns, :task_link, task_link)
 
     ~H"""
-    <div class="fixed left-[268px] top-4 z-[100] w-72 bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
+    <div class="fixed left-[296px] top-[48px] z-[100] w-72 bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
         <%!-- Header --%>
         <div class="flex items-start justify-between gap-2">
           <span class="text-sm font-semibold text-base-content/85 leading-snug">{@task.title}</span>
@@ -548,7 +548,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     assigns = assign(assigns, :edit_link, edit_link)
 
     ~H"""
-    <div class="fixed left-[268px] top-4 z-[100] w-72 bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
+    <div class="fixed left-[296px] top-[48px] z-[100] w-72 bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
         <%!-- Header --%>
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0 flex-1">

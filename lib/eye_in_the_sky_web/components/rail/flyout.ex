@@ -352,6 +352,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         modal={@rail_modal}
         myself={@myself}
       />
+
+      <%!-- ── Task detail modal ── --%>
+      <.task_detail_modal
+        :if={match?({:view_task, _}, @rail_modal)}
+        task={elem(@rail_modal, 1)}
+        myself={@myself}
+      />
     </div>
     """
   end
@@ -430,6 +437,74 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     </div>
     """
   end
+
+  attr :task, :map, required: true
+  attr :myself, :any, required: true
+
+  defp task_detail_modal(assigns) do
+    task_link =
+      if assigns.task && assigns.task.project_id do
+        "/projects/#{assigns.task.project_id}/tasks?task_id=#{assigns.task.id}"
+      else
+        "/projects"
+      end
+
+    assigns = assign(assigns, :task_link, task_link)
+
+    ~H"""
+    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+      <div class="bg-base-100 border border-base-content/10 rounded-lg shadow-xl w-80 p-4 flex flex-col gap-3">
+        <%!-- Header --%>
+        <div class="flex items-start justify-between gap-2">
+          <span class="text-sm font-semibold text-base-content/85 leading-snug">{@task.title}</span>
+          <button
+            type="button"
+            phx-click="close_rail_modal"
+            phx-target={@myself}
+            class="size-5 flex-shrink-0 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+          >
+            <.icon name="hero-x-mark-mini" class="size-3.5" />
+          </button>
+        </div>
+
+        <%!-- State badge --%>
+        <div class="flex items-center gap-2">
+          <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0", TasksSection.task_state_dot(@task.state_id)]} />
+          <span class="text-xs text-base-content/55">{task_state_label(@task.state_id)}</span>
+        </div>
+
+        <%!-- Description --%>
+        <%= if @task.description && @task.description != "" do %>
+          <p class="text-xs text-base-content/60 leading-relaxed line-clamp-6">{@task.description}</p>
+        <% end %>
+
+        <%!-- Footer --%>
+        <div class="flex items-center justify-end gap-2 pt-1 border-t border-base-content/8">
+          <button
+            type="button"
+            phx-click="close_rail_modal"
+            phx-target={@myself}
+            class="px-3 py-1 text-xs text-base-content/55 hover:text-base-content/80 transition-colors"
+          >
+            Close
+          </button>
+          <.link
+            navigate={@task_link}
+            class="px-3 py-1 text-xs bg-primary text-primary-content rounded hover:opacity-90 transition-opacity font-medium"
+          >
+            Open task →
+          </.link>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp task_state_label(1), do: "To Do"
+  defp task_state_label(2), do: "In Progress"
+  defp task_state_label(3), do: "Done"
+  defp task_state_label(4), do: "In Review"
+  defp task_state_label(_), do: "Unknown"
 
   attr :myself, :any, required: true
 

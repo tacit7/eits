@@ -10,6 +10,18 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   """
   def format_due_date(nil), do: ""
 
+  def format_due_date(%DateTime{} = dt) do
+    date = DateTime.to_date(dt)
+    today = Date.utc_today()
+
+    cond do
+      Date.compare(date, today) == :eq -> "Today"
+      Date.compare(date, Date.add(today, 1)) == :eq -> "Tomorrow"
+      Date.compare(date, today) == :lt -> "Overdue"
+      true -> Calendar.strftime(date, "%b %d")
+    end
+  end
+
   def format_due_date(datetime) when is_binary(datetime) do
     case Date.from_iso8601(String.slice(datetime, 0..9)) do
       {:ok, date} ->
@@ -34,6 +46,17 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   """
   def due_date_class(nil), do: "text-base-content/30"
 
+  def due_date_class(%DateTime{} = dt) do
+    date = DateTime.to_date(dt)
+    today = Date.utc_today()
+
+    cond do
+      Date.compare(date, today) == :lt -> "text-error font-medium"
+      Date.compare(date, today) == :eq -> "text-warning font-medium"
+      true -> "text-base-content/30"
+    end
+  end
+
   def due_date_class(datetime) when is_binary(datetime) do
     case Date.from_iso8601(String.slice(datetime, 0..9)) do
       {:ok, date} ->
@@ -56,6 +79,7 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   Check if a due date is overdue.
   """
   def overdue?(nil), do: false
+  def overdue?(%DateTime{} = dt), do: Date.compare(DateTime.to_date(dt), Date.utc_today()) == :lt
 
   def overdue?(datetime) when is_binary(datetime) do
     case Date.from_iso8601(String.slice(datetime, 0..9)) do
@@ -70,6 +94,7 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   Check if a due date is today.
   """
   def due_today?(nil), do: false
+  def due_today?(%DateTime{} = dt), do: Date.compare(DateTime.to_date(dt), Date.utc_today()) == :eq
 
   def due_today?(datetime) when is_binary(datetime) do
     case Date.from_iso8601(String.slice(datetime, 0..9)) do
@@ -84,6 +109,7 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   Format a date for HTML date input (YYYY-MM-DD).
   """
   def format_date_input(nil), do: ""
+  def format_date_input(%DateTime{} = dt), do: Calendar.strftime(DateTime.to_date(dt), "%Y-%m-%d")
   def format_date_input(datetime) when is_binary(datetime), do: String.slice(datetime, 0..9)
   def format_date_input(_), do: ""
 

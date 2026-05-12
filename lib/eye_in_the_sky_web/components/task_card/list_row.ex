@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
   import EyeInTheSkyWeb.CoreComponents
 
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
-    only: [relative_time: 1]
+    only: [relative_time: 1, overdue?: 1, due_today?: 1, format_due_date: 1]
 
   alias EyeInTheSky.Tasks.WorkflowState
 
@@ -119,12 +119,39 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
               </span>
             <% end %>
 
-            <%!-- Agent name (replaces UUID — much more useful scan anchor) --%>
-            <%= if is_struct(@task.agent, EyeInTheSky.Agents.Agent) do %>
+            <%!-- Agent ID --%>
+            <%= if @task.agent_id do %>
               <span class="text-base-content/15">&middot;</span>
-              <span class="text-base-content/40 truncate max-w-[160px]">
-                {@task.agent.description}
+              <span class="flex items-center gap-0.5 text-base-content/40">
+                <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
+                <span class="font-mono">#{@task.agent_id}</span>
               </span>
+            <% end %>
+
+            <%!-- Due date --%>
+            <%= if @task.due_at do %>
+              <span class="text-base-content/15">&middot;</span>
+              <span class={[
+                "flex items-center gap-0.5 text-micro font-medium",
+                cond do
+                  overdue?(@task.due_at) -> "text-error"
+                  due_today?(@task.due_at) -> "text-warning"
+                  true -> "text-base-content/35"
+                end
+              ]}>
+                <.icon name="hero-calendar-mini" class="size-3" />
+                {format_due_date(@task.due_at)}
+              </span>
+            <% end %>
+
+            <%!-- Tags --%>
+            <%= if is_list(@task.tags) && @task.tags != [] do %>
+              <%= for tag <- Enum.take(@task.tags, 3) do %>
+                <span class="text-base-content/15">&middot;</span>
+                <span class="px-1 py-px rounded text-micro bg-base-content/8 text-base-content/40">
+                  {tag.name}
+                </span>
+              <% end %>
             <% end %>
 
             <%!-- Notes count --%>
@@ -192,4 +219,5 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
   defp priority_label(2), do: "Med"
   defp priority_label(1), do: "Low"
   defp priority_label(_), do: ""
+
 end

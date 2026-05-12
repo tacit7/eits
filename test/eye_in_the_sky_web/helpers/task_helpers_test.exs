@@ -53,6 +53,28 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpersTest do
       assert TaskHelpers.format_due_date(%{}) == ""
       assert TaskHelpers.format_due_date([:a]) == ""
     end
+
+    test "DateTime struct for today returns 'Today'" do
+      today_dt = DateTime.new!(Date.utc_today(), ~T[09:00:00], "Etc/UTC")
+      assert TaskHelpers.format_due_date(today_dt) == "Today"
+    end
+
+    test "DateTime struct for tomorrow returns 'Tomorrow'" do
+      tomorrow_dt = DateTime.new!(Date.add(Date.utc_today(), 1), ~T[09:00:00], "Etc/UTC")
+      assert TaskHelpers.format_due_date(tomorrow_dt) == "Tomorrow"
+    end
+
+    test "DateTime struct in the past returns 'Overdue'" do
+      past_dt = ~U[2020-01-01 00:00:00.000000Z]
+      assert TaskHelpers.format_due_date(past_dt) == "Overdue"
+    end
+
+    test "DateTime struct for future date returns month-day format" do
+      future_date = Date.add(Date.utc_today(), 10)
+      future_dt = DateTime.new!(future_date, ~T[09:00:00], "Etc/UTC")
+      expected = Calendar.strftime(future_date, "%b %d")
+      assert TaskHelpers.format_due_date(future_dt) == expected
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -91,6 +113,21 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpersTest do
     test "non-string non-nil returns muted class" do
       assert TaskHelpers.due_date_class(42) == "text-base-content/30"
       assert TaskHelpers.due_date_class(%{}) == "text-base-content/30"
+    end
+
+    test "DateTime struct overdue returns error class" do
+      past_dt = ~U[2020-01-01 00:00:00.000000Z]
+      assert TaskHelpers.due_date_class(past_dt) == "text-error font-medium"
+    end
+
+    test "DateTime struct for today returns warning class" do
+      today_dt = DateTime.new!(Date.utc_today(), ~T[09:00:00], "Etc/UTC")
+      assert TaskHelpers.due_date_class(today_dt) == "text-warning font-medium"
+    end
+
+    test "DateTime struct for future returns muted class" do
+      future_dt = DateTime.new!(Date.add(Date.utc_today(), 5), ~T[09:00:00], "Etc/UTC")
+      assert TaskHelpers.due_date_class(future_dt) == "text-base-content/30"
     end
   end
 
@@ -131,6 +168,16 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpersTest do
       refute TaskHelpers.overdue?(42)
       refute TaskHelpers.overdue?(%{})
     end
+
+    test "DateTime struct in the past is overdue" do
+      past_dt = ~U[2020-01-01 00:00:00.000000Z]
+      assert TaskHelpers.overdue?(past_dt)
+    end
+
+    test "DateTime struct in the future is not overdue" do
+      future_dt = DateTime.add(DateTime.utc_now(), 86_400 * 30, :second)
+      refute TaskHelpers.overdue?(future_dt)
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -169,6 +216,16 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpersTest do
     test "non-string non-nil is not due today" do
       refute TaskHelpers.due_today?(123)
     end
+
+    test "DateTime struct for today is due today" do
+      today_dt = DateTime.new!(Date.utc_today(), ~T[12:00:00], "Etc/UTC")
+      assert TaskHelpers.due_today?(today_dt)
+    end
+
+    test "DateTime struct for yesterday is not due today" do
+      yesterday_dt = DateTime.new!(Date.add(Date.utc_today(), -1), ~T[12:00:00], "Etc/UTC")
+      refute TaskHelpers.due_today?(yesterday_dt)
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -195,6 +252,11 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpersTest do
     test "non-string non-nil returns empty string" do
       assert TaskHelpers.format_date_input(20_250_115) == ""
       assert TaskHelpers.format_date_input(%{date: "2025-01-15"}) == ""
+    end
+
+    test "DateTime struct returns YYYY-MM-DD" do
+      dt = ~U[2025-06-20 14:00:00.000000Z]
+      assert TaskHelpers.format_date_input(dt) == "2025-06-20"
     end
   end
 

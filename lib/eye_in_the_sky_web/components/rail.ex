@@ -470,6 +470,20 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     {:noreply, assign(socket, :rail_modal, {:view_task, new_index, tasks})}
   end
 
+  def handle_event("open_note_detail", %{"note_id" => note_id_str}, socket) do
+    note_id = String.to_integer(note_id_str)
+    notes = socket.assigns.flyout_notes
+    index = Enum.find_index(notes, &(&1.id == note_id)) || 0
+    {:noreply, assign(socket, :rail_modal, {:view_note, index, notes})}
+  end
+
+  def handle_event("note_detail_nav", %{"dir" => dir}, socket) do
+    {:view_note, index, notes} = socket.assigns.rail_modal
+    count = length(notes)
+    new_index = rem(index + if(dir == "next", do: 1, else: count - 1), count)
+    {:noreply, assign(socket, :rail_modal, {:view_note, new_index, notes})}
+  end
+
   def handle_event("close_rail_modal", _params, socket),
     do: {:noreply, assign(socket, :rail_modal, nil)}
 

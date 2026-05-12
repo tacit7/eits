@@ -302,6 +302,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 notes={@flyout_notes}
                 note_search={@note_search}
                 note_parent_type={@note_parent_type}
+                myself={@myself}
               />
             <% :skills -> %>
               <SkillsSection.skills_content
@@ -357,6 +358,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
       <.task_detail_modal
         :if={match?({:view_task, _, _}, @rail_modal)}
         task={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
+        index={elem(@rail_modal, 1)}
+        total={length(elem(@rail_modal, 2))}
+        myself={@myself}
+      />
+
+      <%!-- ── Note detail modal ── --%>
+      <.note_detail_modal
+        :if={match?({:view_note, _, _}, @rail_modal)}
+        note={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
         index={elem(@rail_modal, 1)}
         total={length(elem(@rail_modal, 2))}
         myself={@myself}
@@ -529,6 +539,90 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   defp task_state_label(3), do: "Done"
   defp task_state_label(4), do: "In Review"
   defp task_state_label(_), do: "Unknown"
+
+  attr :note, :map, required: true
+  attr :index, :integer, required: true
+  attr :total, :integer, required: true
+  attr :myself, :any, required: true
+
+  defp note_detail_modal(assigns) do
+    edit_link = "/notes/#{assigns.note.id}/edit"
+    assigns = assign(assigns, :edit_link, edit_link)
+
+    ~H"""
+    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+      <div class="bg-base-100 border border-base-content/10 rounded-lg shadow-xl w-80 p-4 flex flex-col gap-3">
+        <%!-- Header --%>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <span class="text-sm font-semibold text-base-content/85 leading-snug block truncate">
+              {note_label(@note)}
+            </span>
+            <span class="text-micro text-base-content/30 uppercase tracking-wide">
+              {@note.parent_type}
+            </span>
+          </div>
+          <button
+            type="button"
+            phx-click="close_rail_modal"
+            phx-target={@myself}
+            class="size-5 flex-shrink-0 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+          >
+            <.icon name="hero-x-mark-mini" class="size-3.5" />
+          </button>
+        </div>
+
+        <%!-- Body --%>
+        <%= if @note.body && @note.body != "" do %>
+          <p class="text-xs text-base-content/60 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
+            {@note.body}
+          </p>
+        <% end %>
+
+        <%!-- Footer: prev/next + counter + edit link --%>
+        <div class="flex items-center justify-between pt-1 border-t border-base-content/8">
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              phx-click="note_detail_nav"
+              phx-value-dir="prev"
+              phx-target={@myself}
+              disabled={@total <= 1}
+              class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+            >
+              <.icon name="hero-chevron-left-mini" class="size-3.5" />
+            </button>
+            <span class="text-nano text-base-content/35 tabular-nums">
+              {@index + 1}/{@total}
+            </span>
+            <button
+              type="button"
+              phx-click="note_detail_nav"
+              phx-value-dir="next"
+              phx-target={@myself}
+              disabled={@total <= 1}
+              class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+            >
+              <.icon name="hero-chevron-right-mini" class="size-3.5" />
+            </button>
+          </div>
+
+          <.link
+            navigate={@edit_link}
+            class="px-3 py-1 text-xs bg-primary text-primary-content rounded hover:opacity-90 transition-opacity font-medium"
+          >
+            Edit note →
+          </.link>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp note_label(note) do
+    label = note.title || String.slice(note.body || "", 0, 60)
+    if label == "", do: "(empty)", else: label
+  end
 
   attr :myself, :any, required: true
 

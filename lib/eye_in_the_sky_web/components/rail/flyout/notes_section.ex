@@ -38,12 +38,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection do
   attr :notes, :list, default: []
   attr :note_search, :string, default: ""
   attr :note_parent_type, :any, default: nil
+  attr :myself, :any, required: true
 
   def notes_content(assigns) do
     ~H"""
-    <%= for note <- @notes do %>
-      <.note_row note={note} />
-    <% end %>
+    <.note_row :for={note <- @notes} note={note} myself={@myself} />
     <%= if @notes == [] do %>
       <% filtering = @note_search != "" or not is_nil(@note_parent_type) %>
       <div class="px-3 py-4 text-xs text-base-content/35 text-center">
@@ -79,84 +78,38 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection do
   end
 
   attr :note, :map, required: true
+  attr :myself, :any, required: true
 
   defp note_row(assigns) do
-    assigns = assign(assigns, :small, small_note?(assigns.note))
-
     ~H"""
-    <%= if @small do %>
-      <%!-- Small note: expandable inline popup via <details> --%>
-      <%!--
-        We can't use phx-update="ignore" here since this is not a stream.
-        <details> open/close is native browser state — LiveView won't interfere
-        unless morphdom reinserts the element. The stable key is note.id.
-      --%>
-      <details
-        id={"note-row-#{@note.id}"}
-        class="group px-3 py-2 text-xs text-base-content/65 hover:bg-base-content/5 transition-colors cursor-pointer [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+    <button
+      phx-click="open_note_detail"
+      phx-value-note_id={@note.id}
+      phx-target={@myself}
+      data-vim-flyout-item
+      class="w-full flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+    >
+      <span class={[
+        "truncate",
+        if(@note.title && @note.title != "", do: "font-medium text-base-content/80")
+      ]}>
+        {note_label(@note)}
+      </span>
+      <span
+        :if={@note.body && @note.body != ""}
+        class="truncate text-base-content/35"
       >
-        <summary class="flex items-start gap-2 list-none select-none" data-vim-flyout-item>
-          <.icon
-            name="hero-chevron-right-mini"
-            class="size-3 flex-shrink-0 mt-px text-base-content/30 group-open:rotate-90 transition-transform"
-          />
-          <div class="min-w-0 flex-1">
-            <span class={[
-              "truncate block",
-              if(@note.title && @note.title != "", do: "font-medium text-base-content/80")
-            ]}>
-              {note_label(@note)}
-            </span>
-            <span class="text-micro text-base-content/30 uppercase tracking-wide">
-              {@note.parent_type}
-            </span>
-          </div>
-        </summary>
-        <div class="mt-1 ml-5 text-base-content/60 whitespace-pre-wrap break-words leading-relaxed">
-          {@note.body}
-        </div>
-        <div class="mt-1.5 ml-5">
-          <.link
-            navigate={"/notes/#{@note.id}/edit"}
-            class="text-nano text-primary/60 hover:text-primary transition-colors"
-          >
-            Edit →
-          </.link>
-        </div>
-      </details>
-    <% else %>
-      <%!-- Large note: navigate to edit page --%>
-      <.link
-        navigate={"/notes/#{@note.id}/edit"}
-        data-vim-flyout-item
-        class="flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
-      >
-        <span class={[
-          "truncate",
-          if(@note.title && @note.title != "", do: "font-medium text-base-content/80")
-        ]}>
-          {note_label(@note)}
-        </span>
-        <span
-          :if={@note.title && @note.title != "" && @note.body && @note.body != ""}
-          class="truncate text-base-content/40"
-        >
-          {@note.body}
-        </span>
-        <span class="text-micro text-base-content/30 uppercase tracking-wide">
-          {@note.parent_type}
-        </span>
-      </.link>
-    <% end %>
+        {String.slice(@note.body, 0, 60)}
+      </span>
+      <span class="text-micro text-base-content/30 uppercase tracking-wide">
+        {@note.parent_type}
+      </span>
+    </button>
     """
   end
 
   defp note_label(note) do
     label = note.title || String.slice(note.body || "", 0, 60)
     if label == "", do: "(empty)", else: label
-  end
-
-  defp small_note?(note) do
-    byte_size(note.body || "") < 200
   end
 end

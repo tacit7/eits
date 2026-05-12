@@ -152,6 +152,38 @@ Merged in PR #273. Sections with both a global and project-scoped page show two 
 
 **Icon library note**: Globe uses Lucide inline SVG by explicit user preference — do NOT replace with `hero-globe-alt`. Lucide not installed as a package; inline the SVG directly in HEEx.
 
+## Flyout Detail Cards (tasks + notes)
+
+Non-blocking detail cards float to the right of the flyout. Clicking a row opens the card; clicking another row swaps it in-place — flyout list stays interactive.
+
+**Positioning** (both task and note cards):
+- `fixed left-[296px] top-[48px]` — rail (52px) + flyout (236px) + 8px gap; 40px top nav + 8px clearance
+- `w-[420px] h-[480px]` — fixed size, content area scrollable
+- `z-[100]` — above flyout but no backdrop
+
+**Layout structure**:
+```heex
+<div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] ... flex flex-col gap-3">
+  <%!-- Header: flex-shrink-0 --%>
+  <%!-- State badge (task) or type label (note): flex-shrink-0 --%>
+  <%!-- Content: flex-1 min-h-0 overflow-y-auto --%>
+  <%!-- Footer (prev/next + CTA): flex-shrink-0, border-t --%>
+</div>
+```
+
+**State shape**: `rail_modal: nil | {:view_task, index, tasks} | {:view_note, index, notes}`
+
+**Event handlers in `rail.ex`**:
+- `open_task_detail` — finds task by id in `flyout_tasks`, sets `rail_modal: {:view_task, index, tasks}`
+- `task_detail_nav` — wraps index with `rem(index + delta, count)`
+- `open_note_detail` / `note_detail_nav` — same pattern for notes
+- `close_rail_modal` — sets `rail_modal: nil`
+
+**"Open task" deep link**: `/projects/:project_id/tasks?task_id=:id`
+`ProjectLive.Tasks.handle_params/3` has a clause for `task_id` that loads the task and opens the task detail drawer directly. Added `alias EyeInTheSky.{Notes, Tasks}` to that module.
+
+**Call sites** in `flyout.ex` use `match?({:view_task, _, _}, @rail_modal)` guard with `elem/2` to extract fields.
+
 ## Known Gotchas
 
 1. `transition-all` inside stream items causes flicker on reinsert — don't use it

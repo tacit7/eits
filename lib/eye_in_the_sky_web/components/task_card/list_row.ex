@@ -100,7 +100,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           <%!-- Metadata line --%>
           <div class="flex items-center gap-1.5 flex-wrap mt-1 text-mini">
             <%!-- State pill --%>
-            <%= if @task.state do %>
+            <%= if is_struct(@task.state, EyeInTheSky.Tasks.WorkflowState) do %>
               <span class={[
                 "px-1.5 py-px rounded-full font-medium text-micro",
                 state_pill_class(@task.state_id)

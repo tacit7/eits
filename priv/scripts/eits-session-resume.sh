@@ -132,3 +132,98 @@ eits commits create --hash <hash>
 \`\`\`"
 
 echo "$CONTEXT"
+
+# --- Channel Resume Context Injection ---
+# Inject recent channel messages from channels where this session was @mentioned
+# in the last hour. Skips pure ambient-observer channels (no direct mention).
+# Only runs when we have a numeric session ID and psql is available.
+
+_inject_channel_context() {
+  local session_int="$1"
+  local session_uuid="$2"
+
+  [ -z "$session_int" ] && return
+
+  local psql_bin
+  psql_bin=$(command -v psql 2>/dev/null) || psql_bin="/opt/homebrew/bin/psql"
+  [ -x "$psql_bin" ] || { _log "psql not found, skipping channel context"; return; }
+
+  export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
+  local pg_user="${EITS_PG_USER:-postgres}"
+  local pg_host="${EITS_PG_HOST:-localhost}"
+  local pg_db="${EITS_PG_DB:-eits_dev}"
+
+  # Query: channels where this session is a member AND was @mentioned in last hour.
+  # For each qualifying channel, return the 3 most recent messages (chronological order).
+  local sql
+  sql="
+WITH mentioned_channels AS (
+  SELECT DISTINCT m.channel_id
+  FROM messages m
+  JOIN channel_members cm ON cm.channel_id = m.channel_id
+  WHERE cm.session_id = ${session_int}
+    AND m.channel_id IS NOT NULL
+    AND m.inserted_at > NOW() - INTERVAL '1 hour'
+    AND m.session_id != ${session_int}
+    AND (
+      m.body ILIKE '%@${session_int}%'
+      OR m.body ILIKE '%@${session_uuid}%'
+    )
+),
+recent_msgs AS (
+  SELECT
+    c.id    AS channel_id,
+    c.name  AS channel_name,
+    REPLACE(REPLACE(m.body, E'\n', ' '), E'\r', '') AS body,
+    COALESCE(s.name, 'session:' || m.session_id::text) AS from_name,
+    to_char(m.inserted_at AT TIME ZONE 'UTC', 'HH24:MI') AS ts,
+    ROW_NUMBER() OVER (PARTITION BY m.channel_id ORDER BY m.id DESC) AS rn
+  FROM mentioned_channels mc
+  JOIN channels c ON c.id = mc.channel_id
+  JOIN messages m ON m.channel_id = mc.channel_id
+  LEFT JOIN sessions s ON s.id = m.session_id
+)
+SELECT channel_id, channel_name, from_name, ts, body
+FROM recent_msgs
+WHERE rn <= 3
+ORDER BY channel_id, rn DESC;
+"
+
+  local rows
+  rows=$("$psql_bin" --no-psqlrc -U "$pg_user" -h "$pg_host" -d "$pg_db" \
+    -t -A -F $'\x1f' -c "$sql" 2>/dev/null || true)
+
+  [ -z "$rows" ] && return
+
+  # Group rows by channel and format output
+  local output=""
+  local current_channel_id=""
+  local current_channel_name=""
+
+  while IFS=$'\x1f' read -r ch_id ch_name from_name ts body; do
+    [ -z "$ch_id" ] && continue
+
+    if [ "$ch_id" != "$current_channel_id" ]; then
+      current_channel_id="$ch_id"
+      current_channel_name="$ch_name"
+      output="${output}
+### #${ch_name} (channel:${ch_id})"
+    fi
+
+    # Truncate body to 200 chars to keep context lean
+    local short_body="${body:0:200}"
+    [ "${#body}" -gt 200 ] && short_body="${short_body}…"
+
+    output="${output}
+- **${from_name}** [${ts}]: ${short_body}"
+  done <<< "$rows"
+
+  if [ -n "$output" ]; then
+    echo ""
+    echo "## Recent Channel Activity (last 1h — you were @mentioned)"
+    echo "$output"
+    _log "injected channel context: $(echo "$rows" | wc -l | tr -d ' ') messages"
+  fi
+}
+
+_inject_channel_context "${SESSION_INT_ID:-}" "${SESSION_ID:-}"

@@ -355,8 +355,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
       <%!-- ── Task detail modal ── --%>
       <.task_detail_modal
-        :if={match?({:view_task, _}, @rail_modal)}
-        task={elem(@rail_modal, 1)}
+        :if={match?({:view_task, _, _}, @rail_modal)}
+        task={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
+        index={elem(@rail_modal, 1)}
+        total={length(elem(@rail_modal, 2))}
         myself={@myself}
       />
     </div>
@@ -439,6 +441,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   end
 
   attr :task, :map, required: true
+  attr :index, :integer, required: true
+  attr :total, :integer, required: true
   attr :myself, :any, required: true
 
   defp task_detail_modal(assigns) do
@@ -478,16 +482,36 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           <p class="text-xs text-base-content/60 leading-relaxed line-clamp-6">{@task.description}</p>
         <% end %>
 
-        <%!-- Footer --%>
-        <div class="flex items-center justify-end gap-2 pt-1 border-t border-base-content/8">
-          <button
-            type="button"
-            phx-click="close_rail_modal"
-            phx-target={@myself}
-            class="px-3 py-1 text-xs text-base-content/55 hover:text-base-content/80 transition-colors"
-          >
-            Close
-          </button>
+        <%!-- Footer: prev/next + counter + open link --%>
+        <div class="flex items-center justify-between pt-1 border-t border-base-content/8">
+          <%!-- Prev / counter / Next --%>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              phx-click="task_detail_nav"
+              phx-value-dir="prev"
+              phx-target={@myself}
+              disabled={@total <= 1}
+              class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+            >
+              <.icon name="hero-chevron-left-mini" class="size-3.5" />
+            </button>
+            <span class="text-nano text-base-content/35 tabular-nums">
+              {@index + 1}/{@total}
+            </span>
+            <button
+              type="button"
+              phx-click="task_detail_nav"
+              phx-value-dir="next"
+              phx-target={@myself}
+              disabled={@total <= 1}
+              class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+            >
+              <.icon name="hero-chevron-right-mini" class="size-3.5" />
+            </button>
+          </div>
+
+          <%!-- Open link --%>
           <.link
             navigate={@task_link}
             class="px-3 py-1 text-xs bg-primary text-primary-content rounded hover:opacity-90 transition-opacity font-medium"

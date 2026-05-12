@@ -6,8 +6,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
   alias EyeInTheSky.Claude.SessionReader
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
-  alias EyeInTheSky.Gemini.SessionImporter, as: GeminiImporter
-  alias EyeInTheSky.Gemini.SessionReader, as: GeminiReader
   alias EyeInTheSky.Messages
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
@@ -80,31 +78,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
   end
 
   defp reload_gemini_session(socket, load_messages_fn) do
-    session_id = socket.assigns.session_id
-    session_uuid = socket.assigns.session_uuid
-
-    project_path =
-      case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-        {:ok, path} -> path
-        _ -> nil
-      end
-
-    case GeminiReader.read_messages(session_uuid, project_path) do
-      {:ok, messages} ->
-        Messages.delete_session_messages(session_id)
-        %{inserted: inserted} = GeminiImporter.import_messages(messages, session_id)
-        socket = load_messages_fn.(socket)
-
-        {:noreply,
-         put_flash(socket, :info, "Reloaded #{inserted} messages from Gemini session file")}
-
-      {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, "No Gemini session file found for #{session_uuid}")}
-
-      {:error, reason} ->
-        {:noreply,
-         put_flash(socket, :error, "Failed to reload Gemini session: #{inspect(reason)}")}
-    end
+    # Gemini sessions are continuously synced from the database via BulkImporter.
+    # File-based reload is unreliable because the Gemini CLI uses its own session
+    # UUID space that differs from ours — attempting a file read consistently
+    # returns :not_found and confuses users. Just reload from the database directly.
+    socket = load_messages_fn.(socket)
+    {:noreply, put_flash(socket, :info, "Messages loaded from database")}
   end
 
   defp reload_codex_session(socket, load_messages_fn) do

@@ -30,20 +30,28 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
            "Expected push_event '#{event_name}' to be in #{inspect(events)}"
   end
 
-  # sync_and_reload/1 calls sync_messages_from_session_file/1 which reads
-  # socket.assigns.session.provider. Setting provider: "gemini" makes it
-  # return {:ok, socket, 0} immediately — no agent, session_uuid, or file
-  # system access needed.
+  # sync_and_reload/1 → sync_messages_from_session_file/1 → sync_gemini_session_file/1
+  # accesses socket.assigns.session_uuid and socket.assigns.agent (for resolve_project_path).
+  # Tests that use gemini provider must supply both assigns. Use gemini_session_with_agent/0
+  # to get {session, agent} pair, then build_socket with session_uuid + agent included.
   defp gemini_session(session), do: %{session | provider: "gemini"}
+
+  defp gemini_session_with_agent do
+    agent = Factory.create_agent()
+    session = Factory.create_session(agent)
+    {gemini_session(session), agent}
+  end
 
   describe "handle_claude_response/3" do
     test "sets processing to false" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           processing: true,
           active_tab: "messages"
         })
@@ -55,12 +63,14 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
     end
 
     test "pushes focus-input event" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           processing: true,
           active_tab: "messages"
         })
@@ -72,12 +82,14 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
     end
 
     test "accepts any response type" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           processing: true,
           active_tab: "messages"
         })
@@ -91,12 +103,14 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
 
   describe "handle_claude_complete/3" do
     test "sets processing to false and clears session_ref" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           session_ref: "ref_123",
           processing: true,
           active_tab: "messages"
@@ -109,12 +123,14 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
     end
 
     test "pushes focus-input event" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           session_ref: "ref_123",
           processing: true,
           active_tab: "messages"
@@ -126,12 +142,14 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
     end
 
     test "handles non-zero exit codes the same as zero" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           session_ref: "ref_123",
           processing: true,
           active_tab: "messages"
@@ -216,12 +234,14 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
 
   describe "handle_agent_stopped/2" do
     test "sets processing and compacting to false" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           compacting: true,
           processing: true,
           notify_on_stop: false,
@@ -235,12 +255,14 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
     end
 
     test "pushes focus-input event" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           compacting: true,
           processing: true,
           notify_on_stop: false,
@@ -253,13 +275,15 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
     end
 
     test "ignores messages for a different session_id" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
       other_id = System.unique_integer([:positive])
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           compacting: true,
           processing: true,
           notify_on_stop: false,
@@ -273,12 +297,14 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
     end
 
     test "does not crash when notify_on_stop is false and desktop mode is off" do
-      session = Factory.new_session()
+      {session, agent} = gemini_session_with_agent()
 
       socket =
         build_socket(%{
           session_id: session.id,
-          session: gemini_session(session),
+          session: session,
+          session_uuid: session.uuid,
+          agent: agent,
           compacting: false,
           processing: true,
           notify_on_stop: false,

@@ -2,7 +2,6 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
   use ExUnit.Case, async: false
 
   alias EyeInTheSky.Claude.ChatManager
-  alias EyeInTheSky.Claude.ChatWorker
   alias EyeInTheSky.Claude.ChatRegistry
   alias EyeInTheSky.Claude.ChatSupervisor
 

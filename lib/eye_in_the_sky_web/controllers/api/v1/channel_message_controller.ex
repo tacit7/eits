@@ -99,32 +99,50 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   end
 
   # Fan out DMs to channel members with notifications="all", excluding the sender.
+  #
+  # Skips sessions that will receive a direct/broadcast MSG prompt from
+  # ChannelFanout.fanout_all — sending both is redundant and confusing for agents.
+  # Specifically:
+  #   - @all → skip all notifications (every member gets a broadcast MSG prompt)
+  #   - @{session_id} mentions → skip those sessions (they get a direct MSG prompt)
+  # Ambient-only members still receive the channel notification.
   defp notify_channel_members(channel_id, sender_session_id, body) do
-    AsyncTask.start(fn ->
-      members =
-        EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
+    mention_all = Regex.match?(~r/@all\b/i, body)
 
-      sender_label = get_sender_name(sender_session_id)
+    # If @all, ChannelFanout delivers broadcast MSG prompts to everyone — skip all DM notifications.
+    unless mention_all do
+      mentioned_ids =
+        Regex.scan(~r/@(\d+)/, body)
+        |> Enum.map(fn [_, id_str] -> String.to_integer(id_str) end)
+        |> MapSet.new()
 
-      for member <- members do
-        dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
+      AsyncTask.start(fn ->
+        members =
+          EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
 
-        case DMDelivery.deliver_and_persist(
-               member.session_id,
-               sender_session_id,
-               dm_body,
-               %{channel_id: channel_id, channel_notification: true}
-             ) do
-          {:ok, _} ->
-            :ok
+        sender_label = get_sender_name(sender_session_id)
 
-          {:error, reason} ->
-            Logger.warning(
-              "channel notify failed for session #{member.session_id}: #{inspect(reason)}"
-            )
+        for member <- members,
+            not MapSet.member?(mentioned_ids, member.session_id) do
+          dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
+
+          case DMDelivery.deliver_and_persist(
+                 member.session_id,
+                 sender_session_id,
+                 dm_body,
+                 %{channel_id: channel_id, channel_notification: true}
+               ) do
+            {:ok, _} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning(
+                "channel notify failed for session #{member.session_id}: #{inspect(reason)}"
+              )
+          end
         end
-      end
-    end)
+      end)
+    end
 
     :ok
   end

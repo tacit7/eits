@@ -144,7 +144,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   def handle_quick_dm_event("vim:quick-dm", %{"session_uuid" => uuid, "body" => body}, socket)
       when is_binary(uuid) and is_binary(body) and body != "" do
     with {:ok, _} <- Ecto.UUID.cast(uuid),
-         %Sessions.Session{} = session <- Sessions.get_session_by_uuid(uuid) do
+         {:ok, session} <- Sessions.get_session_by_uuid(uuid) do
       provider = session.provider || "claude"
 
       case Messages.send_message(%{
@@ -163,22 +163,35 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
             {:error, :queue_full} ->
               Logger.warning("vim:quick-dm queue_full for session=#{session.id}")
-              {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Session queue is full"})}
+
+              {:halt,
+               push_event(socket, "vim:quick-dm-result", %{
+                 ok: false,
+                 error: "Session queue is full"
+               })}
 
             {:error, reason} ->
               Logger.warning("vim:quick-dm continue_session error: #{inspect(reason)}")
-              {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Failed to send"})}
+
+              {:halt,
+               push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Failed to send"})}
           end
 
         {:error, _changeset} ->
-          {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Failed to create message"})}
+          {:halt,
+           push_event(socket, "vim:quick-dm-result", %{
+             ok: false,
+             error: "Failed to create message"
+           })}
       end
     else
-      nil ->
-        {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Session not found"})}
+      {:error, :not_found} ->
+        {:halt,
+         push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Session not found"})}
 
       :error ->
-        {:halt, push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Invalid session UUID"})}
+        {:halt,
+         push_event(socket, "vim:quick-dm-result", %{ok: false, error: "Invalid session UUID"})}
     end
   end
 

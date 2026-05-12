@@ -38,16 +38,24 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
       <%= if @task do %>
         <%!-- Header --%>
         <div class="flex items-center justify-between px-6 py-4 border-b border-base-content/5 flex-shrink-0">
-          <div class="flex items-center gap-2 text-xs text-base-content/30">
+          <div class="flex items-center gap-2 text-xs text-base-content/30 flex-wrap">
             <span class="font-mono">
-              {String.slice(@task.uuid || to_string(@task.id), 0..7)}
+              #{@task.id}
             </span>
             <.priority_badge priority={@task.priority} />
+            <%!-- Tag pills --%>
+            <%= if is_list(@task.tags) && @task.tags != [] do %>
+              <%= for tag <- @task.tags do %>
+                <span class="px-1.5 py-px rounded text-micro bg-base-content/8 text-base-content/50 font-medium">
+                  {tag.name}
+                </span>
+              <% end %>
+            <% end %>
             <button
               type="button"
               phx-hook="CopyToClipboard"
               id={"copy-task-detail-#{@task.id}"}
-              data-copy={@task.uuid || to_string(@task.id)}
+              data-copy={to_string(@task.id)}
               onclick="event.stopPropagation(); event.preventDefault();"
               class="hover:text-primary transition-colors"
             >
@@ -195,14 +203,26 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <span>Updated {relative_time(@task.updated_at)}</span>
               <span class="text-base-content/10">&middot;</span>
             <% end %>
-            <%= if @task.agent_id do %>
-              <span class="font-mono">
-                <%= if is_list(@task.sessions) && @task.sessions != [] do %>
-                  {(List.first(@task.sessions).description || "Agent") |> String.slice(0..30)}
-                <% else %>
-                  Agent #{@task.agent_id}
-                <% end %>
-              </span>
+            <%!-- Agent link — navigates to the agent's active session DM --%>
+            <%= if is_list(@task.sessions) && @task.sessions != [] do %>
+              <% session = List.first(@task.sessions) %>
+              <.link
+                navigate={"/dm/#{session.uuid}"}
+                class="flex items-center gap-1 text-base-content/40 hover:text-primary transition-colors"
+                title="Open agent session"
+              >
+                <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
+                <span class="font-mono truncate max-w-[180px]">
+                  {session_label(session)}
+                </span>
+              </.link>
+            <% else %>
+              <%= if @task.agent_id do %>
+                <span class="flex items-center gap-1 text-base-content/25">
+                  <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
+                  <span class="font-mono">Agent #{@task.agent_id}</span>
+                </span>
+              <% end %>
             <% end %>
           </div>
 
@@ -235,11 +255,21 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
           <button type="submit" form="task-edit-form" class="btn btn-sm btn-primary text-xs px-4">
             Save
           </button>
+          <%!-- Start Agent: disabled when an agent is already assigned or session exists --%>
+          <% has_agent = not is_nil(@task.agent_id) || (is_list(@task.sessions) && @task.sessions != []) %>
           <button
             type="button"
             phx-click="start_agent_for_task"
             phx-value-task_id={@task.uuid || to_string(@task.id)}
-            class="btn btn-sm btn-ghost text-xs gap-1.5 text-base-content/50 hover:text-base-content/80"
+            disabled={has_agent}
+            class={[
+              "btn btn-sm btn-ghost text-xs gap-1.5",
+              if(has_agent,
+                do: "text-base-content/25 cursor-not-allowed",
+                else: "text-base-content/50 hover:text-base-content/80"
+              )
+            ]}
+            title={if has_agent, do: "Agent already assigned", else: "Start agent for this task"}
           >
             <.icon name="hero-play" class="size-3.5" /> Start Agent
           </button>
@@ -313,4 +343,15 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   defp format_tags(tags) when is_list(tags) do
     Enum.map_join(tags, ", ", & &1.name)
   end
+
+  # Strip raw "agent-id <uuid>" descriptions down to a short readable label.
+  defp session_label(%{description: "agent-id " <> uuid}) do
+    "agent " <> String.slice(uuid, 0..7)
+  end
+
+  defp session_label(%{description: desc}) when is_binary(desc) and desc != "" do
+    String.slice(desc, 0..30)
+  end
+
+  defp session_label(_), do: "Agent"
 end

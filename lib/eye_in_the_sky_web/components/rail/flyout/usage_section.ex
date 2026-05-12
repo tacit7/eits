@@ -15,6 +15,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
         <.usage_error message="OAuth token expired. Re-authenticate via Claude CLI." />
       <% {:error, :no_credentials} -> %>
         <.usage_error message="No Claude credentials found." />
+      <% {:error, :rate_limited} -> %>
+        <.usage_error message="Anthropic API rate limited. Try again shortly." />
       <% {:error, _} -> %>
         <.usage_error message="Could not load rate limits." />
       <% {:ok, data} -> %>

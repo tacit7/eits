@@ -142,12 +142,15 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
       {"anthropic-beta", "oauth-2025-04-20"}
     ]
 
-    case Req.get(url, headers: headers, receive_timeout: 10_000) do
+    case Req.get(url, headers: headers, receive_timeout: 10_000, retry: false) do
       {:ok, %Req.Response{status: 200, body: body}} when is_map(body) ->
         {:ok, body}
 
       {:ok, %Req.Response{status: 401}} ->
         {:error, :unauthorized}
+
+      {:ok, %Req.Response{status: 429}} ->
+        {:error, :rate_limited}
 
       {:ok, %Req.Response{status: status}} ->
         {:error, {:http_error, status}}

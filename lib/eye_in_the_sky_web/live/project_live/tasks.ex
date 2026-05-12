@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Tasks
+  alias EyeInTheSky.{Notes, Tasks}
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.Components.TasksBulkActions
@@ -63,6 +63,29 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       socket
       |> assign(:show_all, true)
       |> then(fn s -> if connected?(s), do: load_tasks(s), else: s end)
+
+    {:noreply, socket}
+  end
+
+  def handle_params(%{"task_id" => task_id} = params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:show_all, Map.get(params, "show_all") == "true")
+      |> then(fn s -> if connected?(s), do: load_tasks(s), else: s end)
+
+    socket =
+      if connected?(socket) do
+        task = Tasks.get_task_by_uuid_or_id!(task_id)
+        notes = Notes.list_notes_for_task(task.id)
+
+        socket
+        |> assign(:selected_task, task)
+        |> assign(:task_notes, notes)
+        |> assign(:task_detail_focus, nil)
+        |> assign(:show_task_detail_drawer, true)
+      else
+        socket
+      end
 
     {:noreply, socket}
   end

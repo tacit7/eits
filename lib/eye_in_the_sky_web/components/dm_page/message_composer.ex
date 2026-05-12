@@ -328,8 +328,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
                 id="dm-queue-button"
                 title="Add to queue"
               >
-                Queue
-                <kbd class="text-[10px] font-mono opacity-55 leading-none">↵</kbd>
+                Queue <kbd class="text-[10px] font-mono opacity-55 leading-none">↵</kbd>
               </button>
               <button
                 type="button"
@@ -337,8 +336,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
                 class="flex items-center justify-center gap-1.5 px-3 h-7 min-h-[44px] rounded-lg bg-error/80 text-error-content hover:bg-error transition-colors text-[12px] font-semibold"
                 id="dm-stop-button"
               >
-                <.icon name="hero-stop-solid" class="size-3.5" />
-                Stop
+                <.icon name="hero-stop-solid" class="size-3.5" /> Stop
               </button>
             <% else %>
               <button
@@ -346,8 +344,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
                 class="flex items-center justify-center gap-1.5 px-3 h-7 min-h-[44px] rounded-lg bg-primary/80 text-primary-content hover:bg-primary transition-colors text-[12px] font-semibold"
                 id="dm-send-button"
               >
-                Send
-                <kbd class="text-[10px] font-mono opacity-55 leading-none">↵</kbd>
+                Send <kbd class="text-[10px] font-mono opacity-55 leading-none">↵</kbd>
               </button>
             <% end %>
           </div>
@@ -415,8 +412,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
             cond do
               i < @filled_floor ->
                 "h-full " <> @bar_color
+
               i == @filled_floor and @partial_frac > 0.02 ->
                 "relative h-full bg-base-content/10 overflow-hidden"
+
               true ->
                 "h-full bg-base-content/10"
             end
@@ -477,22 +476,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
           <div class="space-y-1 mb-3">
             <div class="flex items-center justify-between text-xs text-base-content/50">
               <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-sm bg-base-content/30 flex-shrink-0" />
-                System + tools
+                <span class="w-2 h-2 rounded-sm bg-base-content/30 flex-shrink-0" /> System + tools
               </span>
               <span class="font-mono">{format_number(round(@system_share * @context_window))}</span>
             </div>
             <div class="flex items-center justify-between text-xs text-base-content/50">
               <span class="flex items-center gap-1.5">
-                <span class={"w-2 h-2 rounded-sm flex-shrink-0 " <> @bar_color} />
-                Conversation
+                <span class={"w-2 h-2 rounded-sm flex-shrink-0 " <> @bar_color} /> Conversation
               </span>
               <span class="font-mono">{format_number(round(@conv_share * @context_window))}</span>
             </div>
             <div class="flex items-center justify-between text-xs text-base-content/50">
               <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-sm bg-info/50 flex-shrink-0" />
-                Latest files
+                <span class="w-2 h-2 rounded-sm bg-info/50 flex-shrink-0" /> Latest files
               </span>
               <span class="font-mono">{format_number(round(@files_share * @context_window))}</span>
             </div>
@@ -506,7 +502,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
             <span class="text-xs text-base-content/40 font-mono">
               {format_number(@context_used)} / {format_number(@context_window)}
             </span>
-            <%= if @total_cost > 0 do %>
+            <%!--
+              Session-level total_cost_usd cache is intentionally hidden for
+              Gemini sessions for now. Per-message metrics still render in
+              the bubble footer. The cache + backfill code stays in place
+              (see Sessions.increment_usage_cache, mix gemini.backfill_metadata)
+              so we can flip this back on when we trust the numbers.
+            --%>
+            <%= if @total_cost > 0 and @provider != "gemini" do %>
               <span class="text-xs font-mono text-base-content/40">
                 {format_cost(@total_cost)}
               </span>

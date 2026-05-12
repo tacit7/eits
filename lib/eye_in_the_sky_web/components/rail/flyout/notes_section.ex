@@ -82,6 +82,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection do
 
   defp note_row(assigns) do
     assigns = assign(assigns, :small, small_note?(assigns.note))
+
     ~H"""
     <%= if @small do %>
       <%!-- Small note: expandable inline popup via <details> --%>
@@ -136,8 +137,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection do
         ]}>
           {note_label(@note)}
         </span>
-        <span :if={@note.title && @note.title != "" && @note.body && @note.body != ""}
-              class="truncate text-base-content/40">
+        <span
+          :if={@note.title && @note.title != "" && @note.body && @note.body != ""}
+          class="truncate text-base-content/40"
+        >
           {@note.body}
         </span>
         <span class="text-micro text-base-content/30 uppercase tracking-wide">

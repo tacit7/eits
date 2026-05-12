@@ -30,11 +30,26 @@ defmodule EyeInTheSky.Github.WebhookDelivery do
   def changeset(delivery, attrs) do
     delivery
     |> cast(attrs, [
-      :delivery_id, :hook_id, :event_type, :event_header, :action,
-      :repository_full_name, :sender_login, :pr_number, :head_branch,
-      :base_branch, :payload, :status, :error_message, :processing_started_at,
-      :processed_at, :attempt_count, :max_attempts, :duplicate_count,
-      :last_duplicate_at, :received_at
+      :delivery_id,
+      :hook_id,
+      :event_type,
+      :event_header,
+      :action,
+      :repository_full_name,
+      :sender_login,
+      :pr_number,
+      :head_branch,
+      :base_branch,
+      :payload,
+      :status,
+      :error_message,
+      :processing_started_at,
+      :processed_at,
+      :attempt_count,
+      :max_attempts,
+      :duplicate_count,
+      :last_duplicate_at,
+      :received_at
     ])
     |> validate_required([:delivery_id, :event_type, :event_header, :received_at])
     |> unique_constraint(:delivery_id)

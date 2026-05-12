@@ -28,19 +28,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
       {:ok, redirect(socket, to: "/projects")}
     else
       socket =
-        cond do
-          connected?(socket) ->
-            project = Projects.get_project!(project_id)
-            claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
+        if connected?(socket) do
+          project = Projects.get_project!(project_id)
+          claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 
-            socket
-            |> assign(:page_title, "Config - #{project.name}")
-            |> assign(:project, project)
-            |> assign(:sidebar_project, project)
-            |> assign(:claude_dir, claude_dir)
-
-          true ->
-            socket
+          socket
+          |> assign(:page_title, "Config - #{project.name}")
+          |> assign(:project, project)
+          |> assign(:sidebar_project, project)
+          |> assign(:claude_dir, claude_dir)
+        else
+          socket
         end
 
       {:ok, socket}

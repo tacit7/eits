@@ -136,6 +136,13 @@ export const VimNav = {
   hintBuffer: "" as string,
   hintLabels: [] as Array<{ label: string; index: number }>,
   hintOverlayEl: null as HTMLElement | null,
+  quickDmOverlayEl: null as HTMLElement | null,
+  _quickDmStep: "pick" as "pick" | "compose",
+  _quickDmFilter: "" as string,
+  _quickDmPickIndex: 0 as number,
+  _quickDmSessions: [] as Array<{ id: number; uuid: string; name: string; status: string }>,
+  _quickDmTargetUuid: "" as string,
+  _quickDmTargetName: "" as string,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -177,6 +184,16 @@ export const VimNav = {
       const item = items.find(el => el.dataset.vimItemId === task_id)
       if (item) item.dataset.vimItemDone = done ? "true" : "false"
     })
+    this.handleEvent("vim:quick-dm-sessions-result", ({ sessions }: { sessions: Array<{ id: number; uuid: string; name: string; status: string }> }) => {
+      this._quickDmSessions = sessions
+      this._quickDmFilter = ""
+      this._quickDmPickIndex = 0
+      this._renderQuickDmPicker()
+    })
+    this.handleEvent("vim:quick-dm-result", ({ ok, error }: { ok: boolean; error?: string }) => {
+      this._hideQuickDm()
+      if (!ok && error) console.warn("[vim-nav] quick DM failed:", error)
+    })
   },
 
   destroyed() {
@@ -189,6 +206,7 @@ export const VimNav = {
     this.hideHelp()
     this.hideWhichKey()
     this.clearListFocus()
+    this._hideQuickDm()
     this.statusbarEl?.remove()
     this.statusbarEl = null
     this._onKeydown = null
@@ -210,6 +228,19 @@ export const VimNav = {
     if (!this.isEnabled()) return
     if (event.defaultPrevented) return
     if (event.isComposing) return
+
+    // Quick DM picker step intercepts all keys while overlay is open
+    if (this.quickDmOverlayEl && this._quickDmStep === "pick") {
+      event.preventDefault()
+      this._handleQuickDmPickerKey(event)
+      return
+    }
+    // Quick DM compose step: intercept Esc before insert-mode handling closes the textarea
+    if (this.quickDmOverlayEl && this._quickDmStep === "compose" && event.key === "Escape") {
+      event.preventDefault()
+      this._hideQuickDm()
+      return
+    }
 
     // Phase 1: insert mode — only Esc exits
     if (this.mode === "insert") {
@@ -660,6 +691,28 @@ export const VimNav = {
         this.pushEvent("vim:task-nav", { direction, task_uuid, current_path: window.location.pathname })
         return
       }
+      if (action.name === "quick_dm_compose") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const uuid = item.dataset.sessionUuid
+        const name = item.dataset.vimItemTitle || "Session"
+        if (!uuid) return
+        this._quickDmTargetUuid = uuid
+        this._quickDmTargetName = name
+        this._quickDmStep = "compose"
+        this._showQuickDmCompose()
+        return
+      }
+      if (action.name === "quick_dm_pick") {
+        this._quickDmStep = "pick"
+        this._quickDmSessions = []
+        this._quickDmFilter = ""
+        this._quickDmPickIndex = 0
+        // Show loading state while waiting for sessions from backend
+        this._showQuickDmLoading()
+        this.pushEvent("vim:quick-dm-sessions", {})
+        return
+      }
       if (action.name === "list_group_prev" || action.name === "list_group_next") {
         const items = this.currentListItems()
         if (items.length === 0) return
@@ -857,6 +910,137 @@ export const VimNav = {
       sessionStorage.setItem(key, JSON.stringify(updated))
     } catch { /* ignore quota/parse errors */ }
   },
+
+  // ── Quick DM overlay ────────────────────────────────────────────────────────
+
+  _quickDmFilteredSessions(): Array<{ id: number; uuid: string; name: string; status: string }> {
+    if (!this._quickDmFilter) return this._quickDmSessions
+    const q = this._quickDmFilter.toLowerCase()
+    return this._quickDmSessions.filter(s => (s.name || "").toLowerCase().includes(q))
+  },
+
+  _quickDmOverlayBase(): HTMLElement {
+    if (this.quickDmOverlayEl) {
+      this.quickDmOverlayEl.remove()
+      this.quickDmOverlayEl = null
+    }
+    const overlay = document.createElement("div")
+    overlay.id = "vim-nav-quick-dm"
+    overlay.setAttribute("aria-label", "Quick DM")
+    overlay.style.cssText = [
+      "position:fixed", "inset:0", "z-index:10000",
+      "display:flex", "align-items:center", "justify-content:center",
+      "background:rgba(0,0,0,0.6)",
+    ].join(";")
+    this.quickDmOverlayEl = overlay
+    document.body.appendChild(overlay)
+    return overlay
+  },
+
+  _showQuickDmLoading(): void {
+    const overlay = this._quickDmOverlayBase()
+    overlay.innerHTML = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:20px 24px;width:420px;max-width:90vw;font-family:monospace;color:var(--color-base-content)"><div style="font-size:12px;opacity:0.6">Loading sessions…</div></div>`
+  },
+
+  _renderQuickDmPicker(): void {
+    if (!this.quickDmOverlayEl) this._quickDmOverlayBase()
+    const overlay = this.quickDmOverlayEl!
+    const sessions = this._quickDmFilteredSessions()
+    // Clamp pick index
+    this._quickDmPickIndex = Math.max(0, Math.min(this._quickDmPickIndex, sessions.length - 1))
+
+    const filterDisplay = this._quickDmFilter
+      ? `<span style="color:var(--color-base-content)">${escapeHtml(this._quickDmFilter)}</span>`
+      : `<span style="opacity:0.35">type to filter…</span>`
+
+    let rows = ""
+    sessions.forEach((s, i) => {
+      const focused = i === this._quickDmPickIndex
+      const bg = focused ? "background:var(--color-primary);color:var(--color-primary-content)" : ""
+      rows += `<div data-qdm-idx="${i}" style="padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;${bg}">${escapeHtml(s.name || "Unnamed session")}</div>`
+    })
+
+    const emptyMsg = sessions.length === 0
+      ? `<div style="padding:8px;font-size:12px;opacity:0.5">No sessions found</div>`
+      : rows
+
+    overlay.innerHTML = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:16px 20px;width:420px;max-width:90vw;font-family:monospace;color:var(--color-base-content)"><div style="font-size:13px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">Quick DM — Pick session</div><div style="padding:4px 8px;border:1px solid var(--color-base-300);border-radius:4px;margin-bottom:8px;font-size:12px;min-height:22px">${filterDisplay}</div><div style="max-height:200px;overflow-y:auto">${emptyMsg}</div><div style="margin-top:8px;font-size:9px;opacity:0.4">j/k or arrows to move &nbsp;|&nbsp; type to filter &nbsp;|&nbsp; Enter select &nbsp;|&nbsp; Esc cancel</div></div>`
+  },
+
+  _showQuickDmCompose(): void {
+    const overlay = this._quickDmOverlayBase()
+    overlay.innerHTML = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:16px 20px;width:420px;max-width:90vw;font-family:monospace;color:var(--color-base-content)"><div style="font-size:13px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">DM: ${escapeHtml(this._quickDmTargetName)}</div><textarea id="vim-qdm-input" placeholder="Type your message…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--color-base-300);border-radius:4px;font-family:monospace;font-size:12px;background:var(--color-base-200);color:var(--color-base-content);resize:none;min-height:72px" rows="3"></textarea><div style="margin-top:8px;font-size:9px;opacity:0.4">Enter to send &nbsp;|&nbsp; Esc cancel</div></div>`
+
+    const textarea = overlay.querySelector<HTMLTextAreaElement>("#vim-qdm-input")
+    if (textarea) {
+      textarea.focus()
+      textarea.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault()
+          const body = textarea.value.trim()
+          if (body) this._submitQuickDm(body)
+        }
+      })
+    }
+  },
+
+  _handleQuickDmPickerKey(event: KeyboardEvent): void {
+    const key = event.key
+    const sessions = this._quickDmFilteredSessions()
+
+    if (key === "Escape") {
+      this._hideQuickDm()
+      return
+    }
+    if (key === "Enter") {
+      const s = sessions[this._quickDmPickIndex]
+      if (!s) return
+      this._quickDmTargetUuid = s.uuid
+      this._quickDmTargetName = s.name || "Session"
+      this._quickDmStep = "compose"
+      this._showQuickDmCompose()
+      return
+    }
+    if (key === "ArrowDown" || key === "j") {
+      this._quickDmPickIndex = Math.min(this._quickDmPickIndex + 1, sessions.length - 1)
+      this._renderQuickDmPicker()
+      return
+    }
+    if (key === "ArrowUp" || key === "k") {
+      this._quickDmPickIndex = Math.max(this._quickDmPickIndex - 1, 0)
+      this._renderQuickDmPicker()
+      return
+    }
+    if (key === "Backspace") {
+      this._quickDmFilter = this._quickDmFilter.slice(0, -1)
+      this._quickDmPickIndex = 0
+      this._renderQuickDmPicker()
+      return
+    }
+    // Printable single character — add to filter
+    if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      this._quickDmFilter += key
+      this._quickDmPickIndex = 0
+      this._renderQuickDmPicker()
+    }
+  },
+
+  _submitQuickDm(body: string): void {
+    this.pushEvent("vim:quick-dm", { session_uuid: this._quickDmTargetUuid, body })
+    // Overlay hidden on vim:quick-dm-result from backend
+  },
+
+  _hideQuickDm(): void {
+    this.quickDmOverlayEl?.remove()
+    this.quickDmOverlayEl = null
+    this._quickDmSessions = []
+    this._quickDmFilter = ""
+    this._quickDmPickIndex = 0
+    this._quickDmTargetUuid = ""
+    this._quickDmTargetName = ""
+  },
+
+  // ── End Quick DM ────────────────────────────────────────────────────────────
 
   showHelp(prefix?: string[]) {
     if (this.helpOverlayEl) { this.hideHelp(); return }

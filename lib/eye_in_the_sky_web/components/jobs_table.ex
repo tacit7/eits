@@ -36,12 +36,18 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   attr :target, :any, default: nil
   attr :scope, :string, default: nil, doc: "Context scope: 'project', 'global', or 'overview'"
   attr :project_name, :string, default: nil, doc: "Project name for project-scoped views"
-  attr :bulk_selected_jobs, :any, default: nil, doc: "MapSet of selected job IDs for bulk operations"
+
+  attr :bulk_selected_jobs, :any,
+    default: nil,
+    doc: "MapSet of selected job IDs for bulk operations"
+
   attr :last_n_runs_map, :map, default: %{}, doc: "Map of job_id to list of recent run structs"
 
   def jobs_table(assigns) do
     assigns =
-      assign(assigns, :selected_count,
+      assign(
+        assigns,
+        :selected_count,
         if assigns.bulk_selected_jobs do
           MapSet.size(assigns.bulk_selected_jobs)
         else
@@ -106,26 +112,30 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 phx-value-id={job.id}
                 phx-target={@target}
               >
-              <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <div class="flex items-center gap-1.5">
-                    <h3 class="font-medium text-sm truncate">{job.name}</h3>
-                    <%= if job_state == :running do %>
-                      <span class="badge badge-warning badge-xs animate-pulse shrink-0">running</span>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                      <%= if job_state == :running do %>
+                        <span class="badge badge-warning badge-xs animate-pulse shrink-0">
+                          running
+                        </span>
+                      <% end %>
+                    </div>
+                    <%= if job.description do %>
+                      <p class="text-mini text-base-content/60 mt-0.5 truncate">{job.description}</p>
                     <% end %>
+                    <p class="text-mini font-mono text-base-content/50 mt-1 truncate">
+                      {format_schedule(job)}
+                      <span class="text-base-content/30 not-italic ml-1">
+                        {job.timezone || "UTC"}
+                      </span>
+                    </p>
                   </div>
-                  <%= if job.description do %>
-                    <p class="text-mini text-base-content/60 mt-0.5 truncate">{job.description}</p>
-                  <% end %>
-                  <p class="text-mini font-mono text-base-content/50 mt-1 truncate">
-                    {format_schedule(job)}
-                    <span class="text-base-content/30 not-italic ml-1">{job.timezone || "UTC"}</span>
-                  </p>
+                  <span class="badge badge-xs badge-ghost">
+                    {type_label(job.job_type)}
+                  </span>
                 </div>
-                <span class="badge badge-xs badge-ghost">
-                  {type_label(job.job_type)}
-                </span>
-              </div>
               </button>
             </div>
 
@@ -248,7 +258,10 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <input
                   type="checkbox"
                   class="checkbox checkbox-sm"
-                  checked={@bulk_selected_jobs && MapSet.size(@bulk_selected_jobs) > 0 && Enum.all?(@jobs, &MapSet.member?(@bulk_selected_jobs, &1.id))}
+                  checked={
+                    @bulk_selected_jobs && MapSet.size(@bulk_selected_jobs) > 0 &&
+                      Enum.all?(@jobs, &MapSet.member?(@bulk_selected_jobs, &1.id))
+                  }
                   phx-click="select_all_jobs"
                   phx-value-scope={@scope}
                   phx-target={@target}
@@ -360,13 +373,18 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 <td class="text-xs">
                   <div class="flex items-center gap-0.5 flex-wrap">
                     <%= for run <- (Map.get(@last_n_runs_map, job.id) || []) |> Enum.reverse() do %>
-                      <% run_color = case run.status do
-                        "completed" -> "bg-success"
-                        "failed" -> "bg-error"
-                        "running" -> "bg-warning"
-                        _ -> "bg-base-300"
-                      end %>
-                      <span class={"inline-block w-2 h-2 rounded-full #{run_color}"} title={run.status}></span>
+                      <% run_color =
+                        case run.status do
+                          "completed" -> "bg-success"
+                          "failed" -> "bg-error"
+                          "running" -> "bg-warning"
+                          _ -> "bg-base-300"
+                        end %>
+                      <span
+                        class={"inline-block w-2 h-2 rounded-full #{run_color}"}
+                        title={run.status}
+                      >
+                      </span>
                     <% end %>
                   </div>
                 </td>

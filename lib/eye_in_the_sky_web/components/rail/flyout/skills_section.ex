@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
     assigns =
       assigns
       |> assign(:snippet, skill_snippet(assigns.skill))
-      |> assign(:skill_link, assigns.skills_route <> "?skill=" <> URI.encode(assigns.skill.id))
+      |> assign(:skill_link, assigns.skills_route <> "?skill=" <> URI.encode_www_form(assigns.skill.id))
 
     ~H"""
     <details
@@ -64,7 +64,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
     >
       <summary class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <.icon
-          name={if @skill.source in [:commands, :project_commands], do: "hero-slash", else: "hero-bolt"}
+          name={
+            if @skill.source in [:commands, :project_commands], do: "hero-slash", else: "hero-bolt"
+          }
           class="size-3 flex-shrink-0 text-base-content/30"
         />
         <span class="truncate flex-1">{@skill.slug}</span>
@@ -75,7 +77,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
       </summary>
       <div class="px-3 pt-0.5 pb-2.5 flex flex-col gap-1.5 border-b border-base-content/5">
         <p class="text-xs text-base-content/50 leading-relaxed">{@snippet}</p>
-        <.link navigate={@skill_link} class="text-micro text-primary/70 hover:text-primary transition-colors self-start">
+        <.link
+          navigate={@skill_link}
+          class="text-micro text-primary/70 hover:text-primary transition-colors self-start"
+        >
           Open →
         </.link>
       </div>

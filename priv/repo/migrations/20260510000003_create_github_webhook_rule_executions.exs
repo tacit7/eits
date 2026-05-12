@@ -14,7 +14,8 @@ defmodule EyeInTheSky.Repo.Migrations.CreateGithubWebhookRuleExecutions do
       timestamps(type: :utc_datetime_usec, updated_at: false)
     end
 
-    create index(:github_webhook_rule_executions,
+    create index(
+             :github_webhook_rule_executions,
              [:rule_id, :repository_full_name, :pr_number, :status]
            )
   end

@@ -16,7 +16,15 @@ defmodule EyeInTheSky.Github.WebhookRuleExecution do
 
   def changeset(exec, attrs) do
     exec
-    |> cast(attrs, [:rule_id, :delivery_id, :repository_full_name, :pr_number, :status, :result, :error_message])
+    |> cast(attrs, [
+      :rule_id,
+      :delivery_id,
+      :repository_full_name,
+      :pr_number,
+      :status,
+      :result,
+      :error_message
+    ])
     |> validate_required([:rule_id, :delivery_id, :status])
     |> validate_inclusion(:status, ~w[ok failed skipped])
   end

@@ -2885,3 +2885,269 @@ describe("x toggle task done (list_toggle_done)", () => {
     h.destroyed()
   })
 })
+
+// ── Quick DM ─────────────────────────────────────────────────────────────────
+
+describe("quick DM commands (m on sessions page, Space d m global)", () => {
+  it("session.quick_dm command exists with correct definition", () => {
+    const cmd = COMMANDS.find(c => c.id === "session.quick_dm")!
+    expect(cmd).toBeDefined()
+    expect(cmd.label).toBe("Quick DM")
+    expect(cmd.keys).toEqual(["m"])
+    expect(cmd.scope).toBe("page:sessions")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("quick_dm_compose")
+  })
+
+  it("leader.dm.quick command exists with correct definition", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.dm.quick")!
+    expect(cmd).toBeDefined()
+    expect(cmd.label).toBe("Quick DM session")
+    expect(cmd.keys).toEqual(["Space", "d", "m"])
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("quick_dm_pick")
+  })
+
+  it("quick_dm_compose opens compose overlay for focused session item", () => {
+    const li = document.createElement("div")
+    li.dataset.vimListItem = ""
+    li.dataset.sessionUuid = "abc-123"
+    li.dataset.vimItemTitle = "Test Session"
+    document.body.appendChild(li)
+
+    const list = document.createElement("div")
+    list.dataset.vimList = ""
+    list.appendChild(li)
+    document.body.appendChild(list)
+
+    const h = makeHook()
+    h.listFocusIndex = 0
+
+    const cmd = COMMANDS.find(c => c.id === "session.quick_dm")!
+    h.executeCommand(cmd)
+
+    expect(h.quickDmOverlayEl).not.toBeNull()
+    expect(h._quickDmStep).toBe("compose")
+    expect(h._quickDmTargetUuid).toBe("abc-123")
+    expect(h._quickDmTargetName).toBe("Test Session")
+    expect(document.getElementById("vim-nav-quick-dm")).not.toBeNull()
+
+    h._hideQuickDm()
+    li.remove()
+    list.remove()
+  })
+
+  it("quick_dm_compose does nothing when no list item is focused", () => {
+    const h = makeHook()
+    h.listFocusIndex = -1
+    const cmd = COMMANDS.find(c => c.id === "session.quick_dm")!
+    h.executeCommand(cmd)
+    expect(h.quickDmOverlayEl).toBeNull()
+  })
+
+  it("quick_dm_compose does nothing when focused item has no session UUID", () => {
+    const li = document.createElement("div")
+    li.dataset.vimListItem = ""
+    // no data-session-uuid
+    const list = document.createElement("div")
+    list.dataset.vimList = ""
+    list.appendChild(li)
+    document.body.appendChild(list)
+
+    const h = makeHook()
+    h.listFocusIndex = 0
+    const cmd = COMMANDS.find(c => c.id === "session.quick_dm")!
+    h.executeCommand(cmd)
+    expect(h.quickDmOverlayEl).toBeNull()
+
+    li.remove()
+    list.remove()
+  })
+
+  it("quick_dm_pick fires vim:quick-dm-sessions pushEvent and shows loading overlay", () => {
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.dm.quick")!
+    h.executeCommand(cmd)
+    expect(h.pushEvent).toHaveBeenCalledWith("vim:quick-dm-sessions", {})
+    expect(h.quickDmOverlayEl).not.toBeNull()
+    expect(h._quickDmStep).toBe("pick")
+    h._hideQuickDm()
+  })
+
+  it("vim:quick-dm-sessions-result renders picker with sessions", () => {
+    const h = makeHook()
+    h.mounted()
+    const [_evt, callback] = (h.handleEvent as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([evt]: [string]) => evt === "vim:quick-dm-sessions-result"
+    )!
+    // Simulate overlay already open (loading state)
+    h._quickDmStep = "pick"
+    h._quickDmOverlayBase()
+
+    callback({ sessions: [{ id: 1, uuid: "u-1", name: "Alpha", status: "idle" }, { id: 2, uuid: "u-2", name: "Beta", status: "working" }] })
+
+    expect(h._quickDmSessions).toHaveLength(2)
+    expect(h.quickDmOverlayEl).not.toBeNull()
+    expect(h.quickDmOverlayEl!.textContent).toContain("Alpha")
+    expect(h.quickDmOverlayEl!.textContent).toContain("Beta")
+
+    h._hideQuickDm()
+    h.destroyed()
+  })
+
+  it("picker key j moves selection down", () => {
+    const h = makeHook()
+    h._quickDmSessions = [
+      { id: 1, uuid: "u-1", name: "Alpha", status: "idle" },
+      { id: 2, uuid: "u-2", name: "Beta", status: "idle" },
+    ]
+    h._quickDmStep = "pick"
+    h._quickDmPickIndex = 0
+    h._quickDmOverlayBase()
+    h._renderQuickDmPicker()
+
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "j" }))
+    expect(h._quickDmPickIndex).toBe(1)
+    h._hideQuickDm()
+  })
+
+  it("picker key k moves selection up", () => {
+    const h = makeHook()
+    h._quickDmSessions = [
+      { id: 1, uuid: "u-1", name: "Alpha", status: "idle" },
+      { id: 2, uuid: "u-2", name: "Beta", status: "idle" },
+    ]
+    h._quickDmStep = "pick"
+    h._quickDmPickIndex = 1
+    h._quickDmOverlayBase()
+    h._renderQuickDmPicker()
+
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "k" }))
+    expect(h._quickDmPickIndex).toBe(0)
+    h._hideQuickDm()
+  })
+
+  it("picker key j does not exceed last session", () => {
+    const h = makeHook()
+    h._quickDmSessions = [{ id: 1, uuid: "u-1", name: "Only", status: "idle" }]
+    h._quickDmStep = "pick"
+    h._quickDmPickIndex = 0
+    h._quickDmOverlayBase()
+
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "j" }))
+    expect(h._quickDmPickIndex).toBe(0)
+    h._hideQuickDm()
+  })
+
+  it("picker typing characters filters sessions", () => {
+    const h = makeHook()
+    h._quickDmSessions = [
+      { id: 1, uuid: "u-1", name: "Alpha", status: "idle" },
+      { id: 2, uuid: "u-2", name: "Beta", status: "idle" },
+    ]
+    h._quickDmStep = "pick"
+    h._quickDmOverlayBase()
+    h._renderQuickDmPicker()
+
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "l" }))
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "p" }))
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "h" }))
+    expect(h._quickDmFilter).toBe("lph")
+    const filtered = h._quickDmFilteredSessions()
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0].name).toBe("Alpha")
+    h._hideQuickDm()
+  })
+
+  it("picker Backspace removes last filter character", () => {
+    const h = makeHook()
+    h._quickDmSessions = [{ id: 1, uuid: "u-1", name: "Alpha", status: "idle" }]
+    h._quickDmFilter = "alp"
+    h._quickDmStep = "pick"
+    h._quickDmOverlayBase()
+
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "Backspace" }))
+    expect(h._quickDmFilter).toBe("al")
+    h._hideQuickDm()
+  })
+
+  it("picker Enter selects session and transitions to compose step", () => {
+    const h = makeHook()
+    h._quickDmSessions = [{ id: 1, uuid: "u-1", name: "Alpha", status: "idle" }]
+    h._quickDmStep = "pick"
+    h._quickDmPickIndex = 0
+    h._quickDmOverlayBase()
+
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "Enter" }))
+    expect(h._quickDmTargetUuid).toBe("u-1")
+    expect(h._quickDmTargetName).toBe("Alpha")
+    expect(h._quickDmStep).toBe("compose")
+    expect(h.quickDmOverlayEl).not.toBeNull()
+    h._hideQuickDm()
+  })
+
+  it("picker Escape closes overlay", () => {
+    const h = makeHook()
+    h._quickDmSessions = [{ id: 1, uuid: "u-1", name: "Alpha", status: "idle" }]
+    h._quickDmStep = "pick"
+    h._quickDmOverlayBase()
+
+    h._handleQuickDmPickerKey(new KeyboardEvent("keydown", { key: "Escape" }))
+    expect(h.quickDmOverlayEl).toBeNull()
+  })
+
+  it("_submitQuickDm pushes vim:quick-dm with uuid and body", () => {
+    const h = makeHook()
+    h._quickDmTargetUuid = "uuid-123"
+    h._submitQuickDm("hello agent")
+    expect(h.pushEvent).toHaveBeenCalledWith("vim:quick-dm", { session_uuid: "uuid-123", body: "hello agent" })
+  })
+
+  it("vim:quick-dm-result ok:true closes overlay", () => {
+    const h = makeHook()
+    h.mounted()
+    h._quickDmOverlayBase()
+    expect(h.quickDmOverlayEl).not.toBeNull()
+
+    const [_evt, callback] = (h.handleEvent as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([evt]: [string]) => evt === "vim:quick-dm-result"
+    )!
+    callback({ ok: true })
+    expect(h.quickDmOverlayEl).toBeNull()
+    h.destroyed()
+  })
+
+  it("_hideQuickDm clears all quick DM state", () => {
+    const h = makeHook()
+    h._quickDmSessions = [{ id: 1, uuid: "u-1", name: "Alpha", status: "idle" }]
+    h._quickDmFilter = "al"
+    h._quickDmTargetUuid = "u-1"
+    h._quickDmTargetName = "Alpha"
+    h._quickDmOverlayBase()
+
+    h._hideQuickDm()
+    expect(h.quickDmOverlayEl).toBeNull()
+    expect(h._quickDmSessions).toHaveLength(0)
+    expect(h._quickDmFilter).toBe("")
+    expect(h._quickDmTargetUuid).toBe("")
+    expect(h._quickDmTargetName).toBe("")
+  })
+
+  it("handleKey intercepts all keys in picker step and prevents default", () => {
+    const h = makeHook()
+    h.mounted()
+    h._quickDmStep = "pick"
+    h._quickDmSessions = [{ id: 1, uuid: "u-1", name: "Alpha", status: "idle" }]
+    h._quickDmOverlayBase()
+    h._renderQuickDmPicker()
+
+    // 'j' should be intercepted by picker, not trigger normal vim-nav list_next
+    const event = new KeyboardEvent("keydown", { key: "j", bubbles: true, cancelable: true })
+    document.dispatchEvent(event)
+    // picker j increments index (starts at 0, capped at 0 since only 1 session)
+    expect(h._quickDmPickIndex).toBe(0)
+
+    h._hideQuickDm()
+    h.destroyed()
+  })
+})

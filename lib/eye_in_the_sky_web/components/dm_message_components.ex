@@ -53,6 +53,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   end
 
   defp classify_tier(true, _body), do: :secondary
+
   defp classify_tier(false, body) do
     if String.trim(body) == "", do: :secondary, else: :primary
   end
@@ -133,7 +134,9 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
             <.icon name="hero-paper-clip" class="size-3 text-base-content/30" />
             <span class="text-base-content/60 truncate">{attachment.original_filename}</span>
             <%= if attachment.size_bytes do %>
-              <span class="text-base-content/40 font-mono">{EyeInTheSkyWeb.Helpers.FileHelpers.format_size(attachment.size_bytes)}</span>
+              <span class="text-base-content/40 font-mono">
+                {EyeInTheSkyWeb.Helpers.FileHelpers.format_size(attachment.size_bytes)}
+              </span>
             <% end %>
             <button
               type="button"
@@ -300,5 +303,4 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     </div>
     """
   end
-
 end

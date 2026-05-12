@@ -1,9 +1,10 @@
 defmodule EyeInTheSky.Github.WebhookRules do
+  @moduledoc false
   import Ecto.Query
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Github.WebhookRule
   alias EyeInTheSky.Github.WebhookRuleExecution
+  alias EyeInTheSky.Repo
 
   def create(attrs) do
     %WebhookRule{}

@@ -25,10 +25,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
     proj = Path.join(proj_root, ".claude/agents")
     File.mkdir_p!(global)
     File.mkdir_p!(proj)
+
     on_exit(fn ->
       File.rm_rf!(Path.dirname(Path.dirname(global)))
       File.rm_rf!(proj_root)
     end)
+
     {global, proj_root}
   end
 
@@ -142,25 +144,41 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
     end
 
     test "search filters by slug (case-insensitive)", %{proj_root: proj_root} do
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "SEARCH", "project")
+      agents =
+        AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "SEARCH", "project")
+
       assert Enum.any?(agents, &String.contains?(String.downcase(&1.slug), "search"))
+
       Enum.each(agents, fn a ->
         match =
           String.contains?(String.downcase(a.slug), "search") or
             String.contains?(String.downcase(a.name || ""), "search") or
             String.contains?(String.downcase(a.description || ""), "search")
+
         assert match
       end)
     end
 
     test "search filters by description", %{proj_root: proj_root} do
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "deploys", "project")
-      assert Enum.any?(agents, &String.contains?(String.downcase(&1.description || ""), "deploys"))
+      agents =
+        AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "deploys", "project")
+
+      assert Enum.any?(
+               agents,
+               &String.contains?(String.downcase(&1.description || ""), "deploys")
+             )
     end
 
     test "empty search returns all project agents", %{proj_root: proj_root} do
-      all   = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "project")
-      empty = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "zzz_no_match_zzz", "project")
+      all = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "", "project")
+
+      empty =
+        AgentsHelpers.list_agents_for_flyout_filtered(
+          %{path: proj_root},
+          "zzz_no_match_zzz",
+          "project"
+        )
+
       assert length(all) > 0
       assert length(empty) == 0
     end
@@ -253,7 +271,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       Body text
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "full-fm", "project")
+      agents =
+        AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "full-fm", "project")
+
       assert [agent] = agents
       assert agent.name == "Full FM Agent"
       assert agent.description == "Has all fields"
@@ -271,7 +291,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       ---
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "tool-list", "project")
+      agents =
+        AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "tool-list", "project")
+
       assert [agent] = agents
       assert "bash" in agent.tools
       assert "read" in agent.tools
@@ -286,7 +308,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       ---
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "tool-inline", "project")
+      agents =
+        AgentsHelpers.list_agents_for_flyout_filtered(
+          %{path: proj_root},
+          "tool-inline",
+          "project"
+        )
+
       assert [agent] = agents
       assert length(agent.tools) == 2
     end
@@ -299,7 +327,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       Just some content without frontmatter.
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "no-fm", "project")
+      agents =
+        AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "no-fm", "project")
+
       assert [agent] = agents
       assert agent.description == "My Heading Agent"
     end
@@ -308,7 +338,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
          %{proj_root: proj_root, proj_agents_dir: dir} do
       write_agent(dir, "empty-agent", "Just prose, no heading.\n")
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "empty-agent", "project")
+      agents =
+        AgentsHelpers.list_agents_for_flyout_filtered(
+          %{path: proj_root},
+          "empty-agent",
+          "project"
+        )
+
       assert [agent] = agents
       assert agent.description == "No description"
     end
@@ -322,7 +358,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpersTest do
       Content
       """)
 
-      agents = AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "no-name-fm", "project")
+      agents =
+        AgentsHelpers.list_agents_for_flyout_filtered(%{path: proj_root}, "no-name-fm", "project")
+
       assert [agent] = agents
       assert agent.name == "no-name-fm"
     end

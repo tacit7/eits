@@ -151,9 +151,15 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFilters do
   end
 
   defp agent_sort_key(%{agent: nil}), do: ""
-  defp agent_sort_key(%{agent: %{agent_definition: %{display_name: dn}}}) when is_binary(dn), do: String.downcase(dn)
-  defp agent_sort_key(%{agent: %{agent_definition: %{slug: slug}}}) when is_binary(slug), do: String.downcase(slug)
-  defp agent_sort_key(%{agent: agent}), do: (agent.description || agent.project_name || "") |> String.downcase()
+
+  defp agent_sort_key(%{agent: %{agent_definition: %{display_name: dn}}}) when is_binary(dn),
+    do: String.downcase(dn)
+
+  defp agent_sort_key(%{agent: %{agent_definition: %{slug: slug}}}) when is_binary(slug),
+    do: String.downcase(slug)
+
+  defp agent_sort_key(%{agent: agent}),
+    do: (agent.description || agent.project_name || "") |> String.downcase()
 
   defp sort_by_last_message(sessions) do
     Enum.sort_by(

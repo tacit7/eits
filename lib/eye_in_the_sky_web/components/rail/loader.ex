@@ -182,7 +182,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
     if search != "" do
       # Use full-text search when search query is provided
       search_opts = [limit: 50]
-      search_opts = if project && project_scoped, do: Keyword.put(search_opts, :project_id, project.id), else: search_opts
+
+      search_opts =
+        if project && project_scoped,
+          do: Keyword.put(search_opts, :project_id, project.id),
+          else: search_opts
 
       Notes.search_notes(search, [], search_opts)
       |> then(fn notes ->
@@ -195,7 +199,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
     else
       # Use list_notes_filtered when no search query
       opts = [limit: 50]
-      opts = if project && project_scoped, do: Keyword.put(opts, :project_id, project.id), else: opts
+
+      opts =
+        if project && project_scoped, do: Keyword.put(opts, :project_id, project.id), else: opts
+
       opts = if type_str, do: Keyword.put(opts, :type_filter, type_str), else: opts
 
       Notes.list_notes_filtered(opts)

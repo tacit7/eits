@@ -123,6 +123,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpersTest do
 
     test "switching to agent_schedules sets active_tab to :agent_schedules" do
       socket = bare_socket()
+
       {:noreply, result} =
         AgentScheduleHelpers.handle_switch_tab(%{"tab" => "agent_schedules"}, socket)
 
@@ -131,6 +132,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpersTest do
 
     test "unknown tab param is a no-op" do
       socket = bare_socket(%{active_tab: :all_jobs})
+
       {:noreply, result} =
         AgentScheduleHelpers.handle_switch_tab(%{"tab" => "nonexistent_tab"}, socket)
 
@@ -280,7 +282,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpersTest do
       # A job with no prompt_id and no agent_file_id in config will resolve nil prompt.
       # We only test that the function doesn't flash an error when the job IS accessible.
       job = create_job()
-      socket = bare_socket()  # no project_id in assigns => overview context
+      # no project_id in assigns => overview context
+      socket = bare_socket()
 
       {:noreply, result} =
         AgentScheduleHelpers.handle_edit_schedule(%{"job_id" => to_string(job.id)}, socket)

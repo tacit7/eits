@@ -8,8 +8,10 @@ defmodule EyeInTheSky.ScheduledJobs.CronPreview do
     "0 0 1 * *" -> "Runs on the 1st of each month at 12:00 AM"
   """
 
+  alias Crontab.CronExpression.Parser, as: CrontabParser
+
   def preview(cron_expression) when is_binary(cron_expression) do
-    case Crontab.CronExpression.Parser.parse(cron_expression) do
+    case CrontabParser.parse(cron_expression) do
       {:ok, cron} -> build_description(cron)
       {:error, _} -> nil
     end

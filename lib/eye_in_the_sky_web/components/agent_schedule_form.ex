@@ -269,41 +269,41 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       <div class="collapse-content px-3 pb-3">
         <div class="overflow-x-auto">
           <table class="table table-xs w-full">
-          <thead>
-            <tr class="text-base-content/40">
-              <th class="pl-0">Position</th>
-              <th>Values</th>
-              <th class="pr-0">Specials</th>
-            </tr>
-          </thead>
-          <tbody class="text-xs">
-            <tr>
-              <td class="pl-0 font-medium">Minute</td>
-              <td>0 - 59</td>
-              <td class="pr-0 font-mono text-base-content/50">* , - /</td>
-            </tr>
-            <tr>
-              <td class="pl-0 font-medium">Hour</td>
-              <td>0 - 23</td>
-              <td class="pr-0 font-mono text-base-content/50">* , - /</td>
-            </tr>
-            <tr>
-              <td class="pl-0 font-medium">Day of month</td>
-              <td>1 - 31</td>
-              <td class="pr-0 font-mono text-base-content/50">* , - /</td>
-            </tr>
-            <tr>
-              <td class="pl-0 font-medium">Month</td>
-              <td>1 - 12</td>
-              <td class="pr-0 font-mono text-base-content/50">* , - /</td>
-            </tr>
-            <tr>
-              <td class="pl-0 font-medium">Day of week</td>
-              <td>0 - 6 (Sun=0)</td>
-              <td class="pr-0 font-mono text-base-content/50">* , - /</td>
-            </tr>
-          </tbody>
-        </table>
+            <thead>
+              <tr class="text-base-content/40">
+                <th class="pl-0">Position</th>
+                <th>Values</th>
+                <th class="pr-0">Specials</th>
+              </tr>
+            </thead>
+            <tbody class="text-xs">
+              <tr>
+                <td class="pl-0 font-medium">Minute</td>
+                <td>0 - 59</td>
+                <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+              </tr>
+              <tr>
+                <td class="pl-0 font-medium">Hour</td>
+                <td>0 - 23</td>
+                <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+              </tr>
+              <tr>
+                <td class="pl-0 font-medium">Day of month</td>
+                <td>1 - 31</td>
+                <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+              </tr>
+              <tr>
+                <td class="pl-0 font-medium">Month</td>
+                <td>1 - 12</td>
+                <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+              </tr>
+              <tr>
+                <td class="pl-0 font-medium">Day of week</td>
+                <td>0 - 6 (Sun=0)</td>
+                <td class="pr-0 font-mono text-base-content/50">* , - /</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <div class="divider my-1"></div>
         <p class="text-xs font-medium text-base-content/50 mb-1">Examples</p>

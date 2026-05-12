@@ -88,7 +88,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTabTest do
     test "renders fallback to note id when uuid not present" do
       notes = [
         %{
-          id: 123456789,
+          id: 123_456_789,
           uuid: nil,
           title: "Note",
           body: "Content",

@@ -96,7 +96,9 @@ defmodule EyeInTheSky.FileAttachmentsTest do
         |> Map.delete(:original_filename)
         |> Map.delete(:storage_path)
 
-      assert {:error, %Ecto.Changeset{valid?: false} = cs} = FileAttachments.create_attachment(attrs)
+      assert {:error, %Ecto.Changeset{valid?: false} = cs} =
+               FileAttachments.create_attachment(attrs)
+
       errors = errors_on(cs)
       assert errors[:filename]
       assert errors[:original_filename]
@@ -137,6 +139,7 @@ defmodule EyeInTheSky.FileAttachmentsTest do
 
     test "still deletes the DB record when the file is already missing", %{message: msg} do
       path = tmp_file()
+
       {:ok, att} =
         FileAttachments.create_attachment(valid_attrs(msg.id) |> Map.put(:storage_path, path))
 
@@ -174,6 +177,7 @@ defmodule EyeInTheSky.FileAttachmentsTest do
 
     test "looks up by id and deletes both file and record", %{message: msg} do
       path = tmp_file("xyz")
+
       {:ok, att} =
         FileAttachments.create_attachment(valid_attrs(msg.id) |> Map.put(:storage_path, path))
 

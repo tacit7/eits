@@ -2,6 +2,8 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Crontab.CronExpression.Parser, as: CrontabParser
+
   @primary_key {:id, :id, autogenerate: true}
 
   schema "scheduled_jobs" do
@@ -88,14 +90,7 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
 
     changeset
     |> validate_schedule_value(schedule_type)
-    |> (fn cs ->
-      case job_type do
-        "mix_task" -> validate_mix_task_config(cs, config)
-        "spawn_agent" -> validate_spawn_agent_config(cs, config)
-        "daily_digest" -> validate_daily_digest_config(cs, config)
-        _ -> cs
-      end
-    end).()
+    |> apply_job_type_config(job_type, config)
   end
 
   defp validate_schedule_value(changeset, "cron") do
@@ -107,7 +102,7 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
         add_error(changeset, :schedule_value, "is required")
 
       cron_expr ->
-        case Crontab.CronExpression.Parser.parse(cron_expr) do
+        case CrontabParser.parse(cron_expr) do
           {:ok, _} -> changeset
           {:error, _} -> add_error(changeset, :schedule_value, "is not a valid cron expression")
         end
@@ -134,6 +129,11 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
   end
 
   defp validate_schedule_value(changeset, _), do: changeset
+
+  defp apply_job_type_config(cs, "mix_task", config), do: validate_mix_task_config(cs, config)
+  defp apply_job_type_config(cs, "spawn_agent", config), do: validate_spawn_agent_config(cs, config)
+  defp apply_job_type_config(cs, "daily_digest", config), do: validate_daily_digest_config(cs, config)
+  defp apply_job_type_config(cs, _, _config), do: cs
 
   defp validate_mix_task_config(changeset, config) do
     if (config["task"] || "") |> String.trim() == "" do

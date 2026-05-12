@@ -71,6 +71,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
         {:ok, team} ->
           # Re-verify team still belongs to current project after event
           project = socket.assigns.project
+
           if project && (!team.project_id || team.project_id != project.id) do
             # Team no longer belongs to this project
             push_navigate(socket, to: back_path(socket))
@@ -93,6 +94,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
         {:ok, team} ->
           # Re-verify team still belongs to current project after event
           project = socket.assigns.project
+
           if project && (!team.project_id || team.project_id != project.id) do
             # Team no longer belongs to this project
             push_navigate(socket, to: back_path(socket))

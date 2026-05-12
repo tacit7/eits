@@ -4052,6 +4052,130 @@ ${report}"
   esac
 }
 
+# ── webhooks ──────────────────────────────────────────────────────────────────
+
+cmd_webhooks() {
+  local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && {
+    cat <<'WEBHOOKS_HELP'
+usage: eits webhooks <subcommand> [options]
+
+Subcommands:
+  subscribe    --pr <n> [--repo <owner/repo>]
+                 Subscribe the current session to all GitHub webhook events for a PR.
+                 DMs are sent to this session when any event touches that PR.
+
+                 --pr <n>            PR number (required)
+                 --repo <owner/repo> GitHub repo (default: EITS_REPO env var or git remote)
+
+  unsubscribe  --pr <n> [--repo <owner/repo>]
+                 Remove the webhook subscription for a PR.
+
+                 --pr <n>            PR number (required)
+                 --repo <owner/repo> GitHub repo (default: EITS_REPO env var or git remote)
+
+Env vars:
+  EITS_SESSION_UUID  used as subscriber identity (required)
+  EITS_REPO          default repo (owner/repo) if --repo is not specified
+WEBHOOKS_HELP
+    return 0; }
+
+  # Resolve session UUID
+  local _session_uuid="${EITS_SESSION_UUID:-}"
+  [[ -n "$_session_uuid" ]] || die "EITS_SESSION_UUID is not set — cannot determine subscriber identity"
+
+  # Helper: infer repo from EITS_REPO or git remote
+  _infer_repo() {
+    if [[ -n "${EITS_REPO:-}" ]]; then
+      echo "$EITS_REPO"
+      return 0
+    fi
+    local _remote
+    _remote=$(git remote get-url origin 2>/dev/null || true)
+    local _inferred
+    _inferred=$(echo "$_remote" | sed -E 's|.*github\.com[:/]([^/]+/[^/.]+)(\.git)?$|\1|')
+    if [[ -n "$_inferred" && "$_inferred" != "$_remote" ]]; then
+      echo "$_inferred"
+    fi
+  }
+
+  case "$sub" in
+    subscribe)
+      local pr="" repo=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --pr)   pr="$2";   shift 2 ;;
+          --repo) repo="$2"; shift 2 ;;
+          --help|-h)
+            echo "usage: eits webhooks subscribe --pr <n> [--repo <owner/repo>]"
+            return 0 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$pr" ]] || die "--pr is required"
+      if [[ -z "$repo" ]]; then
+        repo=$(_infer_repo)
+        [[ -n "$repo" ]] || die "--repo is required (could not infer from EITS_REPO or git remote)"
+      fi
+
+      local _payload
+      _payload=$(jq -n \
+        --argjson pr_number "$pr" \
+        --arg repository_full_name "$repo" \
+        --arg session_uuid "$_session_uuid" \
+        '{pr_number: $pr_number, repository_full_name: $repository_full_name, session_uuid: $session_uuid}')
+
+      local _result
+      _result=$(_curl -X POST -H "Content-Type: application/json" -d "$_payload" \
+        "$BASE_URL/webhooks/pr_subscriptions") || exit $?
+
+      local _status
+      _status=$(echo "$_result" | jq -r '.id // empty' 2>/dev/null)
+
+      # 409 already-subscribed is treated as success (idempotent)
+      echo "$_result" | jq .
+      echo "subscribed to PR #${pr} in ${repo}" >&2
+      ;;
+
+    unsubscribe)
+      local pr="" repo=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --pr)   pr="$2";   shift 2 ;;
+          --repo) repo="$2"; shift 2 ;;
+          --help|-h)
+            echo "usage: eits webhooks unsubscribe --pr <n> [--repo <owner/repo>]"
+            return 0 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$pr" ]] || die "--pr is required"
+      if [[ -z "$repo" ]]; then
+        repo=$(_infer_repo)
+        [[ -n "$repo" ]] || die "--repo is required (could not infer from EITS_REPO or git remote)"
+      fi
+
+      local _payload
+      _payload=$(jq -n \
+        --argjson pr_number "$pr" \
+        --arg repository_full_name "$repo" \
+        --arg session_uuid "$_session_uuid" \
+        '{pr_number: $pr_number, repository_full_name: $repository_full_name, session_uuid: $session_uuid}')
+
+      _post "/webhooks/pr_subscriptions/unsubscribe" "$_payload"
+      echo "unsubscribed from PR #${pr} in ${repo}" >&2
+      ;;
+
+    ""|--help|-h)
+      echo "usage: eits webhooks <subscribe|unsubscribe> [options]"
+      echo "Run 'eits webhooks --help' for details."
+      ;;
+    *)
+      die "unknown subcommand: $sub (expected: subscribe, unsubscribe)"
+      ;;
+  esac
+}
+
 # ── help ──────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -4094,6 +4218,7 @@ Commands:
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
+  webhooks      subscribe|unsubscribe --pr <n> [--repo <owner/repo>]   subscribe session to PR webhook events (DMs on match)
   me            Print current session/agent/project context and verify server-side
   whoami        JSON output: {session_uuid, session_id, agent_uuid, agent_id, project_id} — for scripting
 
@@ -4136,6 +4261,7 @@ case "$cmd" in
   messages)      cmd_messages      "$@" ;;
   codex)         cmd_codex         "$@" ;;
   standup)       cmd_standup      "$@" ;;
+  webhooks)      cmd_webhooks     "$@" ;;
   me)            cmd_me ;;
   whoami)        cmd_whoami ;;
   help|--help|-h) usage ;;

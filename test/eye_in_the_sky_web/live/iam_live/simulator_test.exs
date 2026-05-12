@@ -267,7 +267,11 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorTest do
       view
       |> element("form[phx-submit='simulate']")
       |> render_submit(%{
-        "form" => %{"project_id" => "", "skip_builtins" => "true", "fallback_permission" => "allow"}
+        "form" => %{
+          "project_id" => "",
+          "skip_builtins" => "true",
+          "fallback_permission" => "allow"
+        }
       })
 
       html = render(view)

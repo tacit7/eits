@@ -46,7 +46,10 @@ defmodule EyeInTheSky.FileAttachments do
         end
 
       {:error, reason} ->
-        Logger.warning("Failed to delete attachment file #{attachment.storage_path}: #{inspect(reason)}")
+        Logger.warning(
+          "Failed to delete attachment file #{attachment.storage_path}: #{inspect(reason)}"
+        )
+
         {:error, {:file_delete_failed, reason}}
     end
   end

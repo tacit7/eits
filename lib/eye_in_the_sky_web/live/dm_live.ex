@@ -69,7 +69,9 @@ defmodule EyeInTheSkyWeb.DmLive do
     |> MountState.assign_sidebar_context(params)
     |> MountState.assign_session_state(session, agent)
     |> MountState.assign_essential_defaults(session)
-    |> then(fn s -> if connected, do: MountState.assign_connected_defaults(s, session), else: s end)
+    |> then(fn s ->
+      if connected, do: MountState.assign_connected_defaults(s, session), else: s
+    end)
     |> MessageHandlers.load_messages_on_mount()
   end
 
@@ -405,7 +407,8 @@ defmodule EyeInTheSkyWeb.DmLive do
              |> push_event("refresh_messages", %{})}
 
           {:error, reason} ->
-            {:noreply, put_flash(socket, :error, "Failed to delete attachment: #{inspect(reason)}")}
+            {:noreply,
+             put_flash(socket, :error, "Failed to delete attachment: #{inspect(reason)}")}
         end
 
       :error ->
@@ -751,5 +754,4 @@ defmodule EyeInTheSkyWeb.DmLive do
     </div>
     """
   end
-
 end

@@ -9,7 +9,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
 
   def handle_file_open(%{"path" => path}, socket) do
     with %{path: root} when not is_nil(root) <- socket.assigns.sidebar_project,
-         {:ok, %{content: content, language: language, hash: hash}} <- FileTree.read_file(root, path) do
+         {:ok, %{content: content, language: language, hash: hash}} <-
+           FileTree.read_file(root, path) do
       name = Path.basename(path)
       lang_str = to_string(language)
 
@@ -28,10 +29,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
       socket2 = if was_empty, do: push_event(socket2, "file-editor-open", %{}), else: socket2
       {:noreply, socket2}
     else
-      {:error, :binary_file} -> {:noreply, put_flash(socket, :info, "Binary file — cannot open")}
-      {:error, :file_too_large} -> {:noreply, put_flash(socket, :info, "File too large to open (over 1 MB)")}
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Cannot open file")}
-      _ -> {:noreply, socket}
+      {:error, :binary_file} ->
+        {:noreply, put_flash(socket, :info, "Binary file — cannot open")}
+
+      {:error, :file_too_large} ->
+        {:noreply, put_flash(socket, :info, "File too large to open (over 1 MB)")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Cannot open file")}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -71,10 +79,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
 
       {:noreply, assign(socket, :file_tabs, tabs)}
     else
-      {:error, :conflict} -> {:noreply, put_flash(socket, :error, "Save conflict — file changed on disk")}
-      {:error, :symlink_not_saveable} -> {:noreply, put_flash(socket, :error, "Cannot save symlinked files")}
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Save failed")}
-      _ -> {:noreply, socket}
+      {:error, :conflict} ->
+        {:noreply, put_flash(socket, :error, "Save conflict — file changed on disk")}
+
+      {:error, :symlink_not_saveable} ->
+        {:noreply, put_flash(socket, :error, "Cannot save symlinked files")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Save failed")}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 

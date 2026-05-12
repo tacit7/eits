@@ -280,7 +280,14 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFiltersTest do
     end
 
     test "matches by agent description" do
-      agent = %{uuid: "u1", id: 1, description: "code reviewer agent", project_name: nil, agent_definition: nil}
+      agent = %{
+        uuid: "u1",
+        id: 1,
+        description: "code reviewer agent",
+        project_name: nil,
+        agent_definition: nil
+      }
+
       match = session(%{agent: agent})
       no_match = session(%{id: 2})
 
@@ -289,7 +296,14 @@ defmodule EyeInTheSkyWeb.Helpers.SessionFiltersTest do
     end
 
     test "matches by agent project_name" do
-      agent = %{uuid: "u1", id: 1, description: nil, project_name: "Payments Platform", agent_definition: nil}
+      agent = %{
+        uuid: "u1",
+        id: 1,
+        description: nil,
+        project_name: "Payments Platform",
+        agent_definition: nil
+      }
+
       match = session(%{agent: agent})
       no_match = session(%{id: 2})
 

@@ -215,6 +215,7 @@ defmodule EyeInTheSkyWeb.Router do
     post "/sessions/:uuid/tool-events", SessionController, :tool_event
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context
+    get "/sessions/:uuid/messages", SessionMessageController, :index
     get "/sessions/:uuid/tasks", TaskController, :list_for_session
 
     # Timers
@@ -305,6 +306,14 @@ defmodule EyeInTheSkyWeb.Router do
     patch "/teams/:team_id/members/:member_id", TeamController, :update_member
     delete "/teams/:team_id/members/:member_id", TeamController, :leave
     post "/teams/:team_id/broadcast", TeamController, :broadcast
+  end
+
+  # GitHub PR subscriptions — agents subscribe to PR events
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through :api
+
+    post "/webhooks/pr_subscriptions", PrSubscriptionController, :subscribe
+    post "/webhooks/pr_subscriptions/unsubscribe", PrSubscriptionController, :unsubscribe
   end
 
   # Bookmarks — in EyeInTheSkyWeb namespace (not Api.V1)

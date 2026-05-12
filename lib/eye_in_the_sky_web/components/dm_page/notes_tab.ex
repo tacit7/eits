@@ -23,97 +23,95 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
             phx-click="open_create_note_modal"
             class="btn btn-primary btn-sm mt-4"
           >
-            <.icon name="hero-plus" class="size-4" />
-            Create Note
+            <.icon name="hero-plus" class="size-4" /> Create Note
           </button>
         </div>
       <% else %>
-      <div class="flex flex-col gap-3">
-        <button
-          type="button"
-          phx-click="open_create_note_modal"
-          class="btn btn-primary btn-sm self-start"
-        >
-          <.icon name="hero-plus" class="size-4" />
-          Create Note
-        </button>
-
-        <div
-          class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
-          id="dm-note-list"
-        >
-        <%= for note <- @notes do %>
-          <div
-            class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
-            id={"dm-note-#{note.id}"}
+        <div class="flex flex-col gap-3">
+          <button
+            type="button"
+            phx-click="open_create_note_modal"
+            class="btn btn-primary btn-sm self-start"
           >
-            <input type="checkbox" />
-            <div class="collapse-title py-3 px-4 min-h-0">
-              <div class="flex items-center gap-3">
-                <%!-- Star button --%>
-                <button
-                  type="button"
-                  phx-click={JS.push("toggle_star", value: %{note_id: note.id})}
-                  onclick="event.stopPropagation(); event.preventDefault();"
-                  class="flex-shrink-0 p-0.5 rounded transition-transform hover:scale-110"
-                  id={"toggle-note-star-#{note.id}"}
-                >
-                  <.icon
-                    name={if note.starred, do: "hero-star-solid", else: "hero-star"}
-                    class={"size-4 #{if note.starred, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
-                  />
-                </button>
-                <%!-- Title + meta --%>
-                <div class="flex-1 min-w-0">
-                  <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
-                    {note.title || extract_title(note.body)}
-                  </h3>
-                  <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30">
-                    <span class="font-mono">
-                      {String.slice(note.uuid || to_string(note.id), 0..7)}
-                    </span>
+            <.icon name="hero-plus" class="size-4" /> Create Note
+          </button>
 
+          <div
+            class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
+            id="dm-note-list"
+          >
+            <%= for note <- @notes do %>
+              <div
+                class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
+                id={"dm-note-#{note.id}"}
+              >
+                <input type="checkbox" />
+                <div class="collapse-title py-3 px-4 min-h-0">
+                  <div class="flex items-center gap-3">
+                    <%!-- Star button --%>
                     <button
                       type="button"
-                      class="z-10 cursor-pointer transition-colors hover:text-primary"
-                      phx-hook="CopyToClipboard"
-                      id={"copy-note-#{note.id}"}
-                      data-copy={note.uuid || to_string(note.id)}
+                      phx-click={JS.push("toggle_star", value: %{note_id: note.id})}
                       onclick="event.stopPropagation(); event.preventDefault();"
+                      class="flex-shrink-0 p-0.5 rounded transition-transform hover:scale-110"
+                      id={"toggle-note-star-#{note.id}"}
                     >
-                      <.icon name="hero-clipboard-document" class="size-3" />
+                      <.icon
+                        name={if note.starred, do: "hero-star-solid", else: "hero-star"}
+                        class={"size-4 #{if note.starred, do: "text-warning", else: "text-base-content/15 hover:text-base-content/30"}"}
+                      />
                     </button>
+                    <%!-- Title + meta --%>
+                    <div class="flex-1 min-w-0">
+                      <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
+                        {note.title || extract_title(note.body)}
+                      </h3>
+                      <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30">
+                        <span class="font-mono">
+                          {String.slice(note.uuid || to_string(note.id), 0..7)}
+                        </span>
 
-                    <span class="text-base-content/15">/</span>
-                    <time
-                      id={"note-time-#{note.id}"}
-                      class="tabular-nums"
-                      data-utc={to_utc_string(note.created_at)}
-                      data-fmt="short"
-                      phx-hook="LocalTime"
+                        <button
+                          type="button"
+                          class="z-10 cursor-pointer transition-colors hover:text-primary"
+                          phx-hook="CopyToClipboard"
+                          id={"copy-note-#{note.id}"}
+                          data-copy={note.uuid || to_string(note.id)}
+                          onclick="event.stopPropagation(); event.preventDefault();"
+                        >
+                          <.icon name="hero-clipboard-document" class="size-3" />
+                        </button>
+
+                        <span class="text-base-content/15">/</span>
+                        <time
+                          id={"note-time-#{note.id}"}
+                          class="tabular-nums"
+                          data-utc={to_utc_string(note.created_at)}
+                          data-fmt="short"
+                          phx-hook="LocalTime"
+                        >
+                        </time>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="collapse-content px-4 pb-4">
+                  <div class="pl-[30px]">
+                    <div
+                      id={"note-body-#{note.id}"}
+                      class="dm-markdown text-sm text-base-content/70 leading-relaxed"
+                      phx-hook="MarkdownMessage"
+                      data-raw-body={note.body}
                     >
-                    </time>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div class="collapse-content px-4 pb-4">
-              <div class="pl-[30px]">
-                <div
-                  id={"note-body-#{note.id}"}
-                  class="dm-markdown text-sm text-base-content/70 leading-relaxed"
-                  phx-hook="MarkdownMessage"
-                  data-raw-body={note.body}
-                >
-                </div>
-              </div>
-            </div>
+            <% end %>
           </div>
-        <% end %>
         </div>
-      </div>
-    <% end %>
+      <% end %>
     </div>
     """
   end

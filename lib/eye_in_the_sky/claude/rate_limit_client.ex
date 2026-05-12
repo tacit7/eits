@@ -121,7 +121,10 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
     now_ms = System.system_time(:millisecond)
 
     if expires_at_ms <= now_ms do
-      Logger.warning("RateLimitClient: Claude OAuth token expired; re-authenticate via Claude CLI")
+      Logger.warning(
+        "RateLimitClient: Claude OAuth token expired; re-authenticate via Claude CLI"
+      )
+
       {:error, :token_expired}
     else
       {:ok, token}

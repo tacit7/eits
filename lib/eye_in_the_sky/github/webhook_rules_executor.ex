@@ -1,8 +1,9 @@
 defmodule EyeInTheSky.Github.WebhookRulesExecutor do
+  @moduledoc false
   require Logger
 
-  alias EyeInTheSky.Github.WebhookRules
   alias EyeInTheSky.Github.RuleActions
+  alias EyeInTheSky.Github.WebhookRules
 
   def run(ctx) do
     rules = WebhookRules.matching_rules(ctx.event_type, ctx.repository_full_name)

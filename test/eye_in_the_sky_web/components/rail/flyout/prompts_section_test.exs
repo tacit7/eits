@@ -86,7 +86,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSectionTest do
 
     test "renders prompt list" do
       prompts = [
-        %{id: 1, name: "System Prompt", slug: "system", description: "Main system instructions", project_id: nil},
+        %{
+          id: 1,
+          name: "System Prompt",
+          slug: "system",
+          description: "Main system instructions",
+          project_id: nil
+        },
         %{id: 2, name: "Custom Prompt", slug: "custom", description: "", project_id: 1}
       ]
 

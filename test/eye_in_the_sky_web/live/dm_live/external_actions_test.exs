@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
   # Helper to build a bare socket with assigns
   defp build_socket(assigns) do
     base = %{__changed__: %{}, flash: %{}, private: %{live_temp: %{}}}
+
     %Phoenix.LiveView.Socket{
       assigns: Map.merge(base, assigns)
     }

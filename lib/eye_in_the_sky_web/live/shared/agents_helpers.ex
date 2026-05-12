@@ -52,7 +52,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
 
   defp project_path_for(socket) do
     case socket.assigns[:project] do
-      %{path: path} when is_binary(path) and path != "" -> path
+      %{path: path} when is_binary(path) and path != "" ->
+        path
+
       _ ->
         case File.cwd() do
           {:ok, path} -> path

@@ -99,8 +99,8 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
                        ^sdk_ref,
                        %Message{
                          type: :tool_use,
-                         content: "bash",
-                         metadata: %{input: %{"command" => "ls"}}
+                         content: %{name: "bash", input: %{"command" => "ls"}},
+                         metadata: %{tool_id: "tool-1"}
                        }
                      },
                      1000
@@ -161,7 +161,7 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
                        ^sdk_ref,
                        %Message{
                          type: :result,
-                         metadata: %{total_tokens: 100, input_tokens: 50, output_tokens: 50}
+                         metadata: %{usage: %{total_tokens: 100, input_tokens: 50, output_tokens: 50}}
                        }
                      },
                      1000
@@ -216,8 +216,8 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
 
       stream = [
         %Types.InitEvent{session_id: "session-abc"},
-        %Types.MessageEvent{role: "assistant", content: "Hello, "},
-        %Types.MessageEvent{role: "assistant", content: "world!"},
+        %Types.MessageEvent{role: "assistant", content: "Hello, ", delta: true},
+        %Types.MessageEvent{role: "assistant", content: "world!", delta: true},
         %Types.ResultEvent{status: "ok"}
       ]
 
@@ -340,7 +340,7 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
         %Types.MessageEvent{role: "assistant", content: "I will run a command"},
         %Types.ToolUseEvent{tool_name: "bash", tool_id: "tool-1", parameters: %{"cmd" => "pwd"}},
         %Types.ToolResultEvent{tool_id: "tool-1", output: "/home/user"},
-        %Types.MessageEvent{role: "assistant", content: "Done"},
+        %Types.MessageEvent{role: "assistant", content: "Done", delta: true},
         %Types.ResultEvent{status: "ok", stats: %GeminiCliSdk.Types.Stats{}}
       ]
 
@@ -355,7 +355,7 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
                       %Message{type: :text, content: "I will run a command"}},
                      1000
 
-      assert_receive {:claude_message, ^sdk_ref, %Message{type: :tool_use, content: "bash"}},
+      assert_receive {:claude_message, ^sdk_ref, %Message{type: :tool_use, content: %{name: "bash"}}},
                      1000
 
       assert_receive {:claude_message, ^sdk_ref,

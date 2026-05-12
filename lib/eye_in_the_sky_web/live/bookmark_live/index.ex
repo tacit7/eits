@@ -59,6 +59,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
     case Bookmarks.get_bookmark(id) do
       nil ->
         {:noreply, put_flash(socket, :error, "Bookmark not found.")}
+
       bookmark ->
         {:ok, _} = Bookmarks.delete_bookmark(bookmark)
         {:noreply, load_bookmarks(socket)}
@@ -144,7 +145,10 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
         <% else %>
           <div class="space-y-2">
             <%= for bookmark <- @bookmarks do %>
-              <div id={"bookmark-#{bookmark.id}"} class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow">
+              <div
+                id={"bookmark-#{bookmark.id}"}
+                class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"
+              >
                 <div class="card-body p-4">
                   <div class="flex items-start justify-between gap-4">
                     <!-- Bookmark Icon -->

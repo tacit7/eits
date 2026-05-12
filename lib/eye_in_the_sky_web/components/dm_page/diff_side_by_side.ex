@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
       <span class="w-10 flex-shrink-0 text-right pr-2 text-base-content/20 select-none border-r border-base-content/5">
         {@side.old_line_number}
       </span>
-      <span class="w-3 flex-shrink-0 text-center text-base-content/20 select-none"> </span>
+      <span class="w-3 flex-shrink-0 text-center text-base-content/20 select-none"></span>
       <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/60">
         {@side.content}
       </span>

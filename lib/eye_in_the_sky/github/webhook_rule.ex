@@ -30,9 +30,16 @@ defmodule EyeInTheSky.Github.WebhookRule do
   def changeset(rule, attrs) do
     rule
     |> cast(attrs, [
-      :event_type, :repository_full_name, :project_id, :branch_glob,
-      :target_branch_glob, :action_type, :action_config, :guard_config,
-      :enabled, :priority
+      :event_type,
+      :repository_full_name,
+      :project_id,
+      :branch_glob,
+      :target_branch_glob,
+      :action_type,
+      :action_config,
+      :guard_config,
+      :enabled,
+      :priority
     ])
     |> validate_required([:event_type, :action_type, :action_config])
     |> validate_inclusion(:action_type, @action_types)
@@ -57,7 +64,10 @@ defmodule EyeInTheSky.Github.WebhookRule do
 
   defp check_required_keys(config, required) do
     missing = Enum.reject(required, &Map.has_key?(config, &1))
-    if missing == [], do: :ok, else: {:error, "missing required keys: #{Enum.join(missing, ", ")}"}
+
+    if missing == [],
+      do: :ok,
+      else: {:error, "missing required keys: #{Enum.join(missing, ", ")}"}
   end
 
   defp validate_templates(config) do

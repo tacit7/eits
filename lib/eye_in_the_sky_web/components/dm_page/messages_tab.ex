@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   import EyeInTheSkyWeb.Components.DmMessageComponents,
     only: [message_body: 1, message_metrics: 1, message_attachments: 1]
+
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, empty_state: 1]
 
@@ -51,9 +52,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         data-has-more={if @has_more_messages, do: "true", else: "false"}
         style="scrollbar-width: none; -ms-overflow-style: none; overflow-anchor: none;"
       >
-          <%= if @syncing do %>
-            <.message_skeleton />
-          <% else %>
+        <%= if @syncing do %>
+          <.message_skeleton />
+        <% else %>
           <%= if @empty do %>
             <.empty_state
               title={if @agent, do: @agent.name, else: "No messages yet"}
@@ -141,7 +142,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <div id="messages-scroll-anchor" style="height: 1px; overflow-anchor: auto;"></div>
             </div>
           <% end %>
-          <% end %>
+        <% end %>
       </div>
 
       <%!-- Codex raw JSONL stream panel --%>
@@ -184,6 +185,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
         "system" -> :system
         _ -> :agent
       end
+
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
     segments = parse_body_segments(assigns.message.body)
     body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
@@ -193,6 +195,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
     is_empty_tool_result =
       stream_type == "tool_result" and String.trim(assigns.message.body || "") == ""
+
     tier =
       if role == :agent,
         do: DmMessageComponents.message_tier(is_tool_event, assigns.message.body),
@@ -251,87 +254,87 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             </div>
           <% else %>
             <%= if @role == :user do %>
-            <%!-- ── User prompt ── --%>
-            <div class="group">
-              <%!-- Header row --%>
-              <div :if={@show_header} class="flex items-center gap-2 mb-1.5">
-                <div class="size-5 rounded-full bg-[var(--surface-card)] border border-[var(--border-subtle)] flex items-center justify-center text-[9px] font-bold text-base-content/40 flex-shrink-0 select-none">
-                  U
+              <%!-- ── User prompt ── --%>
+              <div class="group">
+                <%!-- Header row --%>
+                <div :if={@show_header} class="flex items-center gap-2 mb-1.5">
+                  <div class="size-5 rounded-full bg-[var(--surface-card)] border border-[var(--border-subtle)] flex items-center justify-center text-[9px] font-bold text-base-content/40 flex-shrink-0 select-none">
+                    U
+                  </div>
+                  <span class="text-[11px] font-semibold text-base-content/40">you</span>
+                  <time
+                    id={"msg-time-#{@message.id}"}
+                    class="text-[10px] text-base-content/25"
+                    data-utc={to_utc_string(@message.inserted_at)}
+                    phx-hook="LocalTime"
+                  />
                 </div>
-                <span class="text-[11px] font-semibold text-base-content/40">you</span>
-                <time
-                  id={"msg-time-#{@message.id}"}
-                  class="text-[10px] text-base-content/25"
-                  data-utc={to_utc_string(@message.inserted_at)}
-                  phx-hook="LocalTime"
-                />
+                <%!-- Body --%>
+                <div class={[
+                  "px-3 py-2 bg-[var(--prompt-bg)] border border-[var(--border-subtle)] rounded-md text-[12.5px] leading-[1.5] break-words text-base-content/60",
+                  @show_header && "ml-7"
+                ]}>
+                  <.message_body message={@message} compact={false} />
+                </div>
+                <.message_attachments attachments={@message.attachments || []} />
               </div>
-              <%!-- Body --%>
+            <% else %>
+              <%!-- ── Agent message ── --%>
               <div class={[
-                "px-3 py-2 bg-[var(--prompt-bg)] border border-[var(--border-subtle)] rounded-md text-[12.5px] leading-[1.5] break-words text-base-content/60",
-                @show_header && "ml-7"
-              ]}>
-                <.message_body message={@message} compact={false} />
-              </div>
-              <.message_attachments attachments={@message.attachments || []} />
-            </div>
-          <% else %>
-            <%!-- ── Agent message ── --%>
-            <div class={[
-              "group",
-              @tier == :primary &&
-                "rounded-lg border bg-[var(--surface-card,theme(colors.base-200/40))] border-base-content/[0.08] px-3 py-2.5",
-              @tier == :secondary && "pl-[33px] py-1",
-              @tier not in [:primary, :secondary] &&
-                "rounded-lg bg-[var(--agent-bg)] hover:bg-base-content/[0.03] px-3 py-2.5 transition-colors duration-100"
-            ]}>
-              <%!-- Header row --%>
-              <div :if={@show_header && @tier == :primary} class="flex items-center gap-2 mb-3">
-                <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <.provider_avatar session={@session} />
-                </div>
-                <span class="text-[11px] font-semibold text-base-content/80">
-                  {if @agent, do: @agent.name, else: "agent"}
-                </span>
-                <time
-                  id={"msg-time-#{@message.id}"}
-                  class="text-[10px] text-base-content/25"
-                  data-utc={to_utc_string(@message.inserted_at)}
-                  phx-hook="LocalTime"
-                />
-                <div class="ml-auto opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 flex items-center gap-0.5">
-                  <button
-                    data-copy-btn
-                    data-copy-text={@message.body}
-                    class="p-1 rounded text-base-content/25 hover:text-base-content/55 hover:bg-base-content/8 transition-colors"
-                    title="Copy message"
-                    aria-label="Copy message"
-                  >
-                    <.icon name="hero-clipboard-document-mini" class="size-3.5" />
-                  </button>
-                </div>
-              </div>
-              <%!-- Body --%>
-              <div class={[
-                "break-words",
+                "group",
                 @tier == :primary &&
-                  "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content",
-                @tier == :secondary && "text-[var(--text-secondary)] text-sm",
+                  "rounded-lg border bg-[var(--surface-card,theme(colors.base-200/40))] border-base-content/[0.08] px-3 py-2.5",
+                @tier == :secondary && "pl-[33px] py-1",
                 @tier not in [:primary, :secondary] &&
-                  "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content"
+                  "rounded-lg bg-[var(--agent-bg)] hover:bg-base-content/[0.03] px-3 py-2.5 transition-colors duration-100"
               ]}>
-                <.message_body message={@message} compact={false} />
+                <%!-- Header row --%>
+                <div :if={@show_header && @tier == :primary} class="flex items-center gap-2 mb-3">
+                  <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <.provider_avatar session={@session} />
+                  </div>
+                  <span class="text-[11px] font-semibold text-base-content/80">
+                    {if @agent, do: @agent.name, else: "agent"}
+                  </span>
+                  <time
+                    id={"msg-time-#{@message.id}"}
+                    class="text-[10px] text-base-content/25"
+                    data-utc={to_utc_string(@message.inserted_at)}
+                    phx-hook="LocalTime"
+                  />
+                  <div class="ml-auto opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 flex items-center gap-0.5">
+                    <button
+                      data-copy-btn
+                      data-copy-text={@message.body}
+                      class="p-1 rounded text-base-content/25 hover:text-base-content/55 hover:bg-base-content/8 transition-colors"
+                      title="Copy message"
+                      aria-label="Copy message"
+                    >
+                      <.icon name="hero-clipboard-document-mini" class="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <%!-- Body --%>
+                <div class={[
+                  "break-words",
+                  @tier == :primary &&
+                    "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content",
+                  @tier == :secondary && "text-[var(--text-secondary)] text-sm",
+                  @tier not in [:primary, :secondary] &&
+                    "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content"
+                ]}>
+                  <.message_body message={@message} compact={false} />
+                </div>
+                <.message_attachments attachments={@message.attachments || []} />
+                <%!-- Metadata footer — only on primary tier --%>
+                <div
+                  :if={@tier == :primary && DmHelpers.has_message_metrics?(@message)}
+                  class="flex items-center gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]"
+                >
+                  <.message_metrics message={@message} />
+                </div>
               </div>
-              <.message_attachments attachments={@message.attachments || []} />
-              <%!-- Metadata footer — only on primary tier --%>
-              <div
-                :if={@tier == :primary && DmHelpers.has_message_metrics?(@message)}
-                class="flex items-center gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]"
-              >
-                <.message_metrics message={@message} />
-              </div>
-            </div>
-          <% end %>
+            <% end %>
           <% end %>
         <% end %>
       </div>
@@ -414,17 +417,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       class="group my-1 w-full pl-[33px]"
     >
       <summary class="flex items-center gap-2 px-1 py-0.5 cursor-pointer list-none text-[var(--text-muted)] hover:text-[var(--text-secondary)] select-none">
-        <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px]">&#9658;</span>
-        <span class="text-nano font-mono"><%= @meta.count %> tool events</span>
+        <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px]">
+          &#9658;
+        </span>
+        <span class="text-nano font-mono">{@meta.count} tool events</span>
         <%= for {type, count} <- @meta.type_counts do %>
           <span class="rounded-sm px-1 py-px bg-base-content/[0.05] text-nano font-mono text-[var(--text-disabled)]">
-            <%= type %> &times;<%= count %>
+            {type} &times;{count}
           </span>
         <% end %>
         <%= if @meta.duration_ms do %>
-          <span class="text-nano font-mono text-[var(--text-disabled)] ml-1">~<%= div(@meta.duration_ms, 1000) %>s</span>
+          <span class="text-nano font-mono text-[var(--text-disabled)] ml-1">
+            ~{div(@meta.duration_ms, 1000)}s
+          </span>
         <% end %>
-        <span class="ml-auto text-nano text-[var(--text-disabled)]"><%= relative_time(@meta.first_at) %></span>
+        <span class="ml-auto text-nano text-[var(--text-disabled)]">
+          {relative_time(@meta.first_at)}
+        </span>
       </summary>
       <div class="pl-5 mt-0.5 space-y-px">
         <%= for event <- @events do %>
@@ -436,5 +445,4 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     </details>
     """
   end
-
 end

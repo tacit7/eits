@@ -1,8 +1,9 @@
 defmodule EyeInTheSky.Github.WebhookDeliveries do
+  @moduledoc false
   import Ecto.Query
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Github.WebhookDelivery
+  alias EyeInTheSky.Repo
 
   def insert(attrs) do
     %WebhookDelivery{}

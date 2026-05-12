@@ -49,7 +49,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNewTest do
       result =
         lv
         |> form("form[phx-submit='save']")
-        |> render_submit(%{"prompt" => %{"prompt_text" => "Content here", "name" => "My Prompt", "slug" => ""}})
+        |> render_submit(%{
+          "prompt" => %{"prompt_text" => "Content here", "name" => "My Prompt", "slug" => ""}
+        })
 
       assert {:error, {:live_redirect, %{to: path}}} = result
       assert path =~ "/projects/#{project.id}/prompts"

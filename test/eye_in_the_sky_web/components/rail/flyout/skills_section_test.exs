@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
       assert html =~ "value=\"test\""
     end
 
-    test "renders scope pills with all options" do
+    test "renders scope pills — All and Project only" do
       html =
         render_component(
           &SkillsSection.skills_filters/1,
@@ -40,8 +40,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
         )
 
       assert html =~ "All"
-      assert html =~ "Global"
       assert html =~ "Project"
+      refute html =~ "Global"
     end
 
     test "renders correct scope pill as active" do
@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
         render_component(
           &SkillsSection.skills_filters/1,
           skill_search: "",
-          skill_scope: "global",
+          skill_scope: "project",
           myself: 1
         )
 
@@ -75,8 +75,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
         render_component(
           &SkillsSection.skills_content/1,
           skills: [],
-          skill_search: "",
-          skill_scope: "all"
+          skills_route: "/skills"
         )
 
       assert html =~ "No skills"
@@ -87,8 +86,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
         render_component(
           &SkillsSection.skills_content/1,
           skills: [],
-          skill_search: "nonexistent",
-          skill_scope: "all"
+          skills_route: "/skills"
         )
 
       # Component shows "No skills" for any empty list
@@ -98,20 +96,20 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
     test "renders skill list" do
       skills = [
         %{
-          id: 1,
+          id: "skills:web-fetch",
           slug: "web-fetch",
           name: "Web Fetch",
           description: "Fetch content from URLs",
           content: "web fetch skill content",
-          source: :global
+          source: :skills
         },
         %{
-          id: 2,
+          id: "skills:file-edit",
           slug: "file-edit",
           name: "File Edit",
           description: "Edit files in project",
           content: "file edit skill content",
-          source: :global
+          source: :skills
         }
       ]
 
@@ -119,23 +117,22 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
         render_component(
           &SkillsSection.skills_content/1,
           skills: skills,
-          skill_search: "",
-          skill_scope: "all"
+          skills_route: "/skills"
         )
 
       assert html =~ "web-fetch"
       assert html =~ "file-edit"
     end
 
-    test "renders skill rows for each skill" do
+    test "renders skill rows with Open link pointing to skill" do
       skills = [
         %{
-          id: 1,
+          id: "skills:skill-1",
           slug: "skill-1",
           name: "Test Skill",
           description: "Test description",
           content: "test skill content",
-          source: :global
+          source: :skills
         }
       ]
 
@@ -143,12 +140,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
         render_component(
           &SkillsSection.skills_content/1,
           skills: skills,
-          skill_search: "",
-          skill_scope: "all"
+          skills_route: "/skills"
         )
 
       assert html =~ "skill-1"
       assert html =~ "Test description"
+      assert html =~ "?skill="
     end
   end
 end

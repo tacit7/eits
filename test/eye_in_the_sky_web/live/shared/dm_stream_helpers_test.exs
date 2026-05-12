@@ -40,12 +40,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmStreamHelpersTest do
     end
 
     test "sets stream_tool label for :tool_use type with known tool" do
-      {:noreply, result} = DmStreamHelpers.handle_stream_delta(:tool_use, "command_execution", socket())
+      {:noreply, result} =
+        DmStreamHelpers.handle_stream_delta(:tool_use, "command_execution", socket())
+
       assert result.assigns.stream_tool == "Bash"
     end
 
     test "sets stream_tool to tool name for :tool_use with unknown tool" do
-      {:noreply, result} = DmStreamHelpers.handle_stream_delta(:tool_use, "my_custom_tool", socket())
+      {:noreply, result} =
+        DmStreamHelpers.handle_stream_delta(:tool_use, "my_custom_tool", socket())
+
       assert result.assigns.stream_tool == "my_custom_tool"
     end
 
@@ -124,19 +128,27 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmStreamHelpersTest do
 
   describe "handle_stream_tool_input/3" do
     test "sets stream_tool label for known tool name" do
-      {:noreply, result} = DmStreamHelpers.handle_stream_tool_input("command_execution", %{}, socket())
+      {:noreply, result} =
+        DmStreamHelpers.handle_stream_tool_input("command_execution", %{}, socket())
+
       assert result.assigns.stream_tool == "Bash"
     end
 
     test "appends command to label when command_execution has command key" do
       input = %{"command" => "ls -la"}
-      {:noreply, result} = DmStreamHelpers.handle_stream_tool_input("command_execution", input, socket())
+
+      {:noreply, result} =
+        DmStreamHelpers.handle_stream_tool_input("command_execution", input, socket())
+
       assert result.assigns.stream_tool == "Bash: ls -la"
     end
 
     test "falls back to base label when command_execution has empty command" do
       input = %{"command" => ""}
-      {:noreply, result} = DmStreamHelpers.handle_stream_tool_input("command_execution", input, socket())
+
+      {:noreply, result} =
+        DmStreamHelpers.handle_stream_tool_input("command_execution", input, socket())
+
       assert result.assigns.stream_tool == "Bash"
     end
 

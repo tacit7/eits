@@ -51,7 +51,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
       ]
 
       count = SessionImporter.import_messages(raw_messages, session.id)
-      assert total_count(count) ==2
+      assert total_count(count) == 2
 
       messages = Messages.list_messages_for_session(session.id)
       assert length(messages) == 2
@@ -81,7 +81,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
       ]
 
       count = SessionImporter.import_messages(raw_messages, session.id)
-      assert total_count(count) ==0
+      assert total_count(count) == 0
     end
 
     test "parses ISO8601 timestamps correctly", %{session: session} do
@@ -130,7 +130,7 @@ defmodule EyeInTheSky.Claude.SessionImporterTest do
       ]
 
       count = SessionImporter.import_messages(raw_messages, session.id)
-      assert total_count(count) ==1
+      assert total_count(count) == 1
 
       # Should still be just 1 message, not 2
       messages = Messages.list_messages_for_session(session.id)

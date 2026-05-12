@@ -111,7 +111,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                 placeholder="e.g., Code Reviewer, Bug Fixer..."
               />
             </.form_field>
-
+            
     <!-- Worktree / Branch -->
             <.form_field label="Worktree Branch" hint="Optional — isolates work + enables PR">
               <input

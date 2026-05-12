@@ -358,7 +358,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     with {:ok, session} <- resolve_session(uuid) do
       opts = %{}
       opts = if summary = params["summary"], do: Map.put(opts, :summary, summary), else: opts
-      opts = if final_status = params["final_status"], do: Map.put(opts, :final_status, final_status), else: opts
+
+      opts =
+        if final_status = params["final_status"],
+          do: Map.put(opts, :final_status, final_status),
+          else: opts
 
       case Sessions.end_session(session, opts) do
         {:ok, updated} ->

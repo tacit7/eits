@@ -126,8 +126,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
           <.icon
             name="hero-arrow-right-mini"
             class="size-3 group-hover:translate-x-0.5 transition-transform duration-100"
-          />
-          View all sessions
+          /> View all sessions
         </.link>
       </div>
     </div>
@@ -246,7 +245,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
           {@session.name || "unnamed"}
         </div>
         <div class="text-nano text-base-content/48 mt-0.5 flex items-center gap-1">
-          <span class="text-base-content/30">##{@session.id}</span>
+          <span class="text-base-content/30">#{@session.id}</span>
           <span>·</span>
           <span class="capitalize">{@session.status}</span>
           <%= if @session.last_activity_at do %>

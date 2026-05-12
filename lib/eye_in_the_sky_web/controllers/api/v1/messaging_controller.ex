@@ -67,7 +67,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     end
   end
 
-
   @doc """
   POST /api/v1/dm - Send a direct message to an agent session.
   Body:

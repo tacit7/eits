@@ -2,7 +2,6 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
   use ExUnit.Case, async: false
 
   alias EyeInTheSky.Claude.ChatManager
-  alias EyeInTheSky.Claude.ChatWorker
   alias EyeInTheSky.Claude.ChatRegistry
   alias EyeInTheSky.Claude.ChatSupervisor
 
@@ -114,6 +113,7 @@ defmodule EyeInTheSky.Claude.ChatManagerTest do
 
       # Worker should be gone
       :timer.sleep(50)
+
       assert Registry.lookup(ChatRegistry, {:channel, channel_id}) == [] or
                not Process.alive?(worker_pid)
 

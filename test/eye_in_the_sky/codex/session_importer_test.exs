@@ -51,7 +51,7 @@ defmodule EyeInTheSky.Codex.SessionImporterTest do
       ]
 
       count = SessionImporter.import_messages(messages, session.id)
-      assert total_count(count) ==2
+      assert total_count(count) == 2
 
       db_messages = Messages.list_messages_for_session(session.id)
       assert length(db_messages) == 2
@@ -78,7 +78,7 @@ defmodule EyeInTheSky.Codex.SessionImporterTest do
       ]
 
       count = SessionImporter.import_messages(messages, session.id)
-      assert total_count(count) ==0
+      assert total_count(count) == 0
     end
   end
 
@@ -118,7 +118,7 @@ defmodule EyeInTheSky.Codex.SessionImporterTest do
       # When watermark is nil, SessionImporter.sync should import all
       # We test this indirectly by importing all, then checking the count
       count = SessionImporter.import_messages(messages, session.id)
-      assert total_count(count) ==3
+      assert total_count(count) == 3
     end
 
     test "returns only messages after the watermark uuid", %{session: session} do
@@ -155,7 +155,7 @@ defmodule EyeInTheSky.Codex.SessionImporterTest do
 
       # Import first two messages
       count1 = SessionImporter.import_messages([msg1, msg2], session.id)
-      assert total_count(count1) ==2
+      assert total_count(count1) == 2
 
       # Verify watermark is set to uuid2
       assert Messages.get_last_source_uuid(session.id) == uuid2
@@ -166,7 +166,7 @@ defmodule EyeInTheSky.Codex.SessionImporterTest do
       count2 = SessionImporter.import_messages([msg3], session.id)
 
       # Only message 3 should be imported
-      assert total_count(count2) ==1
+      assert total_count(count2) == 1
 
       # Verify final state
       all_messages = Messages.list_messages_for_session(session.id)
@@ -237,7 +237,7 @@ defmodule EyeInTheSky.Codex.SessionImporterTest do
       count = SessionImporter.import_messages(messages, session3.id)
 
       # Both messages should be imported (because watermark uuid is not found)
-      assert total_count(count) ==2
+      assert total_count(count) == 2
 
       all_messages = Messages.list_messages_for_session(session3.id)
       assert length(all_messages) == 3

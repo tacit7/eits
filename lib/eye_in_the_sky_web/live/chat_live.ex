@@ -108,13 +108,19 @@ defmodule EyeInTheSkyWeb.ChatLive do
         agent_templates: socket.assigns[:agent_templates]
       })
 
-    # Mark the active channel as read when the user opens it. Zero out the
+    # Mark the active channel as read when the user opens it. Only fire
+    # when the channel actually changed to avoid redundant DB writes on
+    # same-channel param updates (e.g. thread navigation). Zero out the
     # active channel's unread count immediately so the badge clears without
-    # waiting for a full reload.
+    # waiting for the next PubSub broadcast.
+    int_channel_id = parse_int(channel_id, nil)
+    prev_channel_id = socket.assigns[:active_channel_id]
+    channel_changed? = int_channel_id != nil && to_string(prev_channel_id) != to_string(channel_id)
+
     unread_counts =
-      if connected?(socket) && channel_id && session_id do
+      if connected?(socket) && channel_changed? && session_id do
         Channels.mark_as_read(channel_id, session_id)
-        Map.put(data.unread_counts, parse_int(channel_id, channel_id), 0)
+        Map.put(data.unread_counts, int_channel_id, 0)
       else
         data.unread_counts
       end

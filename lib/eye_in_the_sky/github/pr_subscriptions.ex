@@ -1,8 +1,9 @@
 defmodule EyeInTheSky.Github.PrSubscriptions do
+  @moduledoc false
   import Ecto.Query
 
-  alias EyeInTheSky.Repo
   alias EyeInTheSky.Github.PrSubscription
+  alias EyeInTheSky.Repo
 
   def subscribe(session_uuid, pr_number, repository_full_name) do
     attrs = %{

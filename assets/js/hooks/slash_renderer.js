@@ -22,7 +22,7 @@ function rowClass() {
   return 'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm'
 }
 
-function rowHTML(item, query, activeFlags) {
+function rowHTML(item, query, activeFlags, triggerChar) {
   const badge = {
     skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">skill</span>',
     command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-secondary/10 text-secondary">cmd</span>',
@@ -31,7 +31,10 @@ function rowHTML(item, query, activeFlags) {
     prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning">prompt</span>',
   }[item.type] || ''
 
-  const prefix = item.type === 'agent' ? '@' : '/'
+  let prefix = '/'
+  if (item.type === 'agent') {
+    prefix = triggerChar === '#' ? '#' : '@'
+  }
   const nameHtml = highlightMatch(item.slug, query)
   const name = `<span class="font-medium text-base-content">${prefix}${nameHtml}</span>`
 
@@ -58,7 +61,9 @@ function rowHTML(item, query, activeFlags) {
 
 // Render items into container grouped by type. Returns ordered items array (DOM order).
 // onHover(idx) and onSelect(idx) are called for mouseenter/mousedown events.
-export function renderItems(container, items, activeIndex, query, activeFlags, onHover, onSelect) {
+// triggerChar — the character that opened the popup ('/', '@@', '@', '#'); used to
+// display the correct prefix on agent rows.
+export function renderItems(container, items, activeIndex, query, activeFlags, onHover, onSelect, triggerChar) {
   container.innerHTML = ''
 
   const groups = {}
@@ -90,7 +95,7 @@ export function renderItems(container, items, activeIndex, query, activeFlags, o
       row.type = 'button'
       row.dataset.slashIdx = idx
       row.className = rowClass()
-      row.innerHTML = rowHTML(item, query, activeFlags)
+      row.innerHTML = rowHTML(item, query, activeFlags, triggerChar)
       row.addEventListener('mouseenter', () => onHover(idx))
       row.addEventListener('mousedown', (e) => {
         e.preventDefault()

@@ -144,7 +144,18 @@ export const SlashCommandPopup = {
       return
     }
 
-    // 3. / slash commands (unchanged logic)
+    // 3. # agent autocomplete (alias for @@ — inserts #slug instead of @@slug)
+    const hashMatch = textToCursor.match(/(^|[\s(])#([^\s#]*)$/)
+    if (hashMatch) {
+      const query = hashMatch[2]
+      this.slashTriggerPos = cursor - query.length - 1
+      this.slashTriggerChar = '#'
+      this.fileMode = false
+      this.slashFilter(query, 'agent')
+      return
+    }
+
+    // 4. / slash commands (unchanged logic)
     let triggerPos = -1
     for (let i = cursor - 1; i >= 0; i--) {
       if (val[i] === '/') {
@@ -330,7 +341,8 @@ export const SlashCommandPopup = {
       (idx) => {
         this.slashIndex = idx
         this.slashSelect()
-      }
+      },
+      this.slashTriggerChar
     )
 
     this.popup.classList.remove('hidden')
@@ -348,7 +360,10 @@ export const SlashCommandPopup = {
   },
 
   slashBuildInsertion(item) {
-    if (item.type === 'agent') return { text: `@@${item.slug} `, selectRange: null }
+    if (item.type === 'agent') {
+      const prefix = this.slashTriggerChar === '#' ? '#' : '@@'
+      return { text: `${prefix}${item.slug} `, selectRange: null }
+    }
 
     const argType = item.arg_type
     if (!argType || argType === 'none') return { text: `/${item.slug} `, selectRange: null }

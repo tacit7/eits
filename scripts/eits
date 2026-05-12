@@ -3556,24 +3556,116 @@ EOF
 cmd_search() {
   if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat <<EOF
-usage: eits search <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
+usage: eits search <entity> <query> [options]
+       eits search <query> [--type sessions|tasks|notes|messages|commits] [options]
 
-Full-text search across sessions, tasks, and notes in one shot.
+Entity-scoped search (preferred form):
+  eits search messages <query>   Full-text search across session message bodies
+  eits search commits  <query>   ILIKE search across commit messages (returns session context)
+  eits search sessions <query>   Search session names/descriptions
+  eits search tasks    <query>   Search task titles
+  eits search notes    <query>   Search note content
 
-Options:
-  --type <csv>    Entity types to search, comma-separated (default: sessions,tasks,notes)
-  --limit <n>     Max results per entity type (default: 5)
-  --project <id>  Scope to a project
-  --json          Emit combined JSON: {"sessions":[...],"tasks":[...],"notes":[...]}
+Multi-type search (default: sessions,tasks,notes):
+  eits search <query> [--type <csv>] [--limit <n>] [--project <id>] [--json]
+
+Options (all forms):
+  --limit|-n <n>   Max results (default: 5 for multi, 20 for single-entity)
+  --project|-p     Scope to a project (sessions/tasks/notes only)
+  --session        Scope messages to a specific session UUID or ID
+  --include-archived  Include archived sessions (messages only)
+  --json|-j        Raw JSON output
 
 Examples:
-  eits search "auth"
-  eits search "migration" --type tasks,notes --limit 10
+  eits search messages "usage flyout"
+  eits search commits  "usage flyout"
+  eits search "auth" --type tasks,notes --limit 10
   eits search "deploy" --json
 EOF
     return 0
   fi
 
+  # ── Entity dispatch: eits search <entity> <query> [opts] ──────────────────
+  # If the first arg is a known entity type, delegate to its search directly.
+  local _first="${1:-}"
+  case "$_first" in
+    messages)
+      shift
+      local _query="${1:-}"; [[ -n "$_query" ]] || die "usage: eits search messages <query>"
+      shift
+      local _limit=20 _session="" _archived="" _json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit|-n|-l)        _limit="$2";   shift 2 ;;
+          --session|-s)         _session="$2"; shift 2 ;;
+          --include-archived)   _archived=1;   shift ;;
+          --json|-j)            _json=1;       shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local _qs; _qs="q=$(printf '%s' "$_query" | jq -Rr @uri)&limit=${_limit}"
+      [[ -n "$_session" ]]  && _qs="${_qs}&session_id=$(printf '%s' "$_session" | jq -Rr @uri)"
+      [[ -n "$_archived" ]] && _qs="${_qs}&include_archived=true"
+      local _resp; _resp=$(_curl "${BASE_URL}/messages/search?${_qs}") || return 1
+      if [[ $_json -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      else
+        local _count; _count=$(printf '%s\n' "$_resp" | jq -r '.count')
+        printf '%s\n' "$_resp" | jq -r \
+          '.messages[] | [
+            (.session_name // (.session_id | tostring)),
+            (.session_uuid // ""),
+            .role,
+            (.body_excerpt | gsub("\n";" ") | .[0:60]),
+            (.inserted_at | tostring | .[0:19])
+          ] | @tsv' \
+          | column -t -s $'\t' \
+          | { printf "(%s results)\n" "$_count"; cat; }
+      fi
+      return 0
+      ;;
+    commits)
+      shift
+      local _query="${1:-}"; [[ -n "$_query" ]] || die "usage: eits search commits <query>"
+      shift
+      local _limit=20 _json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit|-n|-l) _limit="$2"; shift 2 ;;
+          --json|-j)     _json=1;     shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local _qs; _qs="q=$(printf '%s' "$_query" | jq -Rr @uri)&limit=${_limit}"
+      local _resp; _resp=$(_curl "${BASE_URL}/commits?${_qs}") || return 1
+      if [[ $_json -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      else
+        local _count; _count=$(printf '%s\n' "$_resp" | jq -r '.count // 0')
+        printf '%s\n' "$_resp" | jq -r \
+          '.commits[] | [
+            (.session_name // (.session_uuid // (.session_id | tostring))),
+            (.session_uuid // ""),
+            (.commit_hash | .[0:8]),
+            (.commit_message // "" | gsub("\n";" ") | .[0:60]),
+            (.created_at // "" | .[0:19])
+          ] | @tsv' \
+          | column -t -s $'\t' \
+          | { printf "(%s results)\n" "$_count"; cat; }
+      fi
+      return 0
+      ;;
+    sessions|tasks|notes)
+      # Pass through to multi-type logic with --type forced to this entity
+      shift
+      local _query="${1:-}"; [[ -n "$_query" ]] || die "usage: eits search ${_first} <query>"
+      shift
+      # Rebuild args with --type injected, then fall through to multi-type block
+      set -- "$_query" --type "$_first" "$@"
+      ;;
+  esac
+
+  # ── Multi-type search ──────────────────────────────────────────────────────
   local query="" types="sessions,tasks,notes" limit=5 project="" json_mode=0
 
   # first non-flag arg is the query
@@ -3586,7 +3678,7 @@ EOF
       --type)
         [[ $# -lt 2 || "${2:0:1}" == "-" ]] && die "--type requires a value (sessions|tasks|notes)"
         types="$2"; shift 2 ;;
-      --limit|-l)
+      --limit|-l|-n)
         [[ $# -lt 2 || "${2:0:1}" == "-" ]] && die "--limit requires a numeric value"
         [[ "$2" =~ ^[0-9]+$ ]] || die "--limit must be a positive integer, got: $2"
         limit="$2"; shift 2 ;;

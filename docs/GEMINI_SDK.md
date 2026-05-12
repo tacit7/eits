@@ -133,7 +133,10 @@ When you add a new provider you must touch (this is what shipped for Gemini):
 - `DmMessageComponents.stream_provider_avatar/1`
 - `Rail.Flyout.canvas_provider_icon/1`
 - `priv/static/images/gemini.svg`
-- DM topbar Sync + Reload — both `MessageHandlers.sync_messages_from_session_file/1` AND `DmExportHelpers.handle_reload_from_session_file/2` now have a `"gemini"` branch (implemented in `4ff24598`). `sync_gemini_async/3` resolves the project path and delegates to `GeminiImporter.sync/3`. Reload drops all DB rows and re-imports from disk. `load_messages_on_mount/1` also syncs from the Gemini file on mount instead of returning an empty shape.
+- DM topbar Sync + Reload — both wired for Gemini (`4ff24598`, refined in `ace5897d`, `a5455b39`, `d94555c2`):
+  - **Reload** (`handle_reload_from_session_file/2`, `"gemini"` branch): skips the file reader (GeminiReader returns `{:error, :not_found}` because Gemini CLI uses a different UUID space); reloads messages from the database directly. DB is authoritative since BulkImporter continuously syncs.
+  - **Sync** (`sync_messages_from_session_file/1`, `"gemini"` branch): calls `sync_gemini_async/3` → `GeminiImporter.sync/3`, but only when the session DB count is > 0.
+  - **`load_messages_on_mount/1`** conditional sync: if DB has 0 rows (JSONL-only session), runs `GeminiImporter.sync` from file so history appears on first load; if DB has rows, skips to avoid duplicate inserts (live-stream UUID space differs from JSONL turn IDs).
 
 ## `mix gemini.backfill_metadata`
 
@@ -155,7 +158,10 @@ mix gemini.backfill_metadata --dry-run     # preview only
 - `d76fd7a5` — backfill task
 - `0c645ba6` — Pricing + cost in metadata
 - `c7457d37` — import path passes metadata_fn (no more silent wipe)
-- `4ff24598` — real Reload + Sync wired for Gemini; sync_gemini_async helper; load_messages_on_mount syncs from Gemini file
+- `4ff24598` — real Reload + Sync wired for Gemini; sync_gemini_async helper
+- `ace5897d` — disable auto-sync on mount to prevent duplicate rows (different UUID spaces)
+- `a5455b39` — conditional mount sync (sync if DB empty, skip if rows exist); stable per-turn source_uuid via SHA-256(session_id+timestamp)
+- `d94555c2` — Reload skips file reader (GeminiReader not_found); reloads from DB instead
 
 ## Dependencies
 

@@ -110,11 +110,37 @@ Rules are rows in `webhook_rules`. Each rule has:
 
 Invalid variables are rejected at rule-save time.
 
+## PR Subscriptions
+
+Agents can subscribe to a PR and receive a DM for every event that touches it (`pull_request.*`, `check_run.*`, `workflow_job.*`, `push`).
+
+**Commit:** `c8af2c6b`
+
+| Module | Location | Responsibility |
+|--------|----------|----------------|
+| `PrSubscriptions` | `github/pr_subscriptions.ex` | CRUD: subscribe/3, unsubscribe/3, subscribers_for/2 |
+| `PrSubscription` | `github/pr_subscription.ex` | Schema: session_uuid + pr_number + repository_full_name + active |
+| `PrSubscriptionController` | `controllers/api/v1/pr_subscription_controller.ex` | POST + DELETE `/api/v1/webhooks/pr_subscriptions` |
+
+Subscribe endpoint:
+```bash
+POST /api/v1/webhooks/pr_subscriptions
+{"pr_number": 42, "repository_full_name": "owner/repo", "session_uuid": "<uuid>"}
+# → 201 {id, pr_number, repository_full_name, active}
+```
+
+Unsubscribe: `DELETE /api/v1/webhooks/pr_subscriptions` with same body params.
+
+`WebhookDispatcher` fan-outs a DM to each active subscriber after processing each delivery. `EventContext` was extended to extract `pr_number` from `check_run` and `workflow_job` payloads (in addition to `pull_request`). Subscribe/unsubscribe is also available via the CLI: `eits webhooks subscribe` / `eits webhooks unsubscribe`.
+
+`subscribe/3` is idempotent: re-subscribing an inactive subscription re-activates it.
+
 ## Database Tables
 
 - `github_webhook_deliveries` — durable inbox, one row per delivery
 - `github_webhook_rules` — user-configured trigger rules
 - `github_webhook_rule_executions` — audit log, one row per rule fired
+- `github_pr_subscriptions` — per-session PR subscriptions (session_uuid, pr_number, repo, active)
 - `pull_requests` — extended with `github_pr_id`, `repository_full_name`, `title`, `state`, `draft`, `merged`, `author_login`, `last_synced_at`
 
 ## Configuration

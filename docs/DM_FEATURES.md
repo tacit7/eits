@@ -1323,20 +1323,20 @@ Previously, `load_messages_on_mount` had a race: both the mount Task sync and ev
 
 The skeleton defers all DB loads until after sync completes, eliminating the race entirely. For active sessions, the event-driven pipeline (`claude_complete → sync_and_reload`) handles imports; the mount Task only syncs when the session is already idle/finished.
 
-**Gemini sessions** (`4ff24598`): `load_messages_on_mount/1` now performs an incremental sync from the Gemini session file (via `sync_gemini_async/3` → `GeminiImporter.sync/3`) instead of returning the empty `:clean` shape. This means opening a DM page for a completed or idle Gemini session will import any turns that were missed while the LiveView was disconnected.
+**Gemini sessions** (`4ff24598`, `ace5897d`, `a5455b39`): `load_messages_on_mount/1` uses conditional sync. If the session has zero DB rows (JSONL-only session or cleared DB), `GeminiImporter.sync` runs from the JSONL file so history appears on first load. If the session already has DB rows, sync is skipped — the live-stream persistence path uses a different UUID space than JSONL turn IDs, so BulkImporter cannot dedup across them and would insert duplicates on every mount.
 
 ---
 
 ## Gemini Reload + Sync (DM Toolbar)
 
-**Commit:** `4ff24598`
+**Commits:** `4ff24598`, `d94555c2`
 
-The **Reload** and **Sync** toolbar buttons in the DM page now work for Gemini sessions:
+The **Reload** and **Sync** toolbar buttons in the DM page work for Gemini sessions:
 
-- **Reload** (`DmExportHelpers.handle_reload_from_session_file/2`, `"gemini"` branch): Drops all existing DB rows for the session and re-imports the full JSONL file from `~/.gemini/tmp/<proj>/chats/`. Mirrors the Claude/Codex Reload behavior.
-- **Sync** (`MessageHandlers.sync_messages_from_session_file/1`, `"gemini"` branch): Calls `sync_gemini_async/3` which resolves the project path via `SessionHelpers.resolve_project_path/2` and runs `GeminiImporter.sync/3` with the last persisted `source_uuid` as the cutoff watermark. Only new turns since the last sync are inserted.
+- **Reload** (`DmExportHelpers.handle_reload_from_session_file/2`, `"gemini"` branch): Reloads messages from the database directly. Does NOT read the JSONL file — `GeminiReader.read_messages` returns `{:error, :not_found}` in practice because the Gemini CLI uses a different session UUID space than EITS. The DB is authoritative since BulkImporter continuously syncs via the live-stream path.
+- **Sync** (`MessageHandlers.sync_messages_from_session_file/1`, `"gemini"` branch): Calls `sync_gemini_async/3` which resolves the project path via `SessionHelpers.resolve_project_path/2` and runs `GeminiImporter.sync/3` from the JSONL file. Only useful for JSONL-only sessions (DB empty) — when rows already exist, the UUID space mismatch prevents dedup.
 
-Helper function added to `message_handlers.ex`:
+`sync_gemini_async/3` in `message_handlers.ex`:
 
 ```elixir
 defp sync_gemini_async(session_id, session_uuid, session, agent) do

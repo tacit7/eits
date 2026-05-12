@@ -28,6 +28,24 @@ defmodule EyeInTheSky.Agents do
   end
 
   @doc """
+  Returns agents for autocomplete, preloading only `:project` so that
+  `populate_project_name/1` can set a meaningful slug. Capped at 200 rows,
+  sorted most-recent first, excluding archived agents.
+
+  Intentionally does NOT preload sessions — this is called on every DM page
+  mount and must stay lightweight.
+  """
+  def list_agents_for_autocomplete do
+    Agent
+    |> preload(:project)
+    |> where([a], is_nil(a.archived_at))
+    |> order_by([a], desc: a.created_at)
+    |> limit(200)
+    |> Repo.all()
+    |> Enum.map(&populate_project_name/1)
+  end
+
+  @doc """
   Returns agents with their sessions preloaded, capped at 200 rows.
   Sorted by creation date (most recent first).
 

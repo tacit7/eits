@@ -1050,7 +1050,7 @@
       <!-- Hint row: always-visible affordance hints -->
       <div class="flex items-center justify-between mt-2 px-0.5 select-none">
         <span class="text-[11px] text-base-content/30">
-          <span class="font-mono">@id</span> to mention · <span class="font-mono">/skill</span> for commands
+          <span class="font-mono">@</span> to mention · <span class="font-mono">/skill</span> for commands
         </span>
         <span class="text-[11px] text-base-content/25 font-mono">⏎ send · ⇧⏎ newline</span>
       </div>

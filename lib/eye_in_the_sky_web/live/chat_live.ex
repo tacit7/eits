@@ -97,14 +97,27 @@ defmodule EyeInTheSkyWeb.ChatLive do
   end
 
   defp load_channel_assigns(project_id, channel_id, channels, params, socket) do
+    session_id = get_session_id(socket)
+
     data =
       ChannelDataLoader.load(project_id, channel_id, %{
         channels: channels,
-        session_id: get_session_id(socket),
+        session_id: session_id,
         session_search: socket.assigns[:session_search] || "",
         thread_id: params["thread_id"],
         agent_templates: socket.assigns[:agent_templates]
       })
+
+    # Mark the active channel as read when the user opens it. Zero out the
+    # active channel's unread count immediately so the badge clears without
+    # waiting for a full reload.
+    unread_counts =
+      if connected?(socket) && channel_id && session_id do
+        Channels.mark_as_read(channel_id, session_id)
+        Map.put(data.unread_counts, parse_int(channel_id, channel_id), 0)
+      else
+        data.unread_counts
+      end
 
     serialized_channels = ChatPresenter.serialize_channels(channels)
 
@@ -123,7 +136,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:active_channel_id, channel_id)
       |> assign(:messages, data.messages)
       |> assign(:has_more_messages, length(data.messages) == 100)
-      |> assign(:unread_counts, data.unread_counts)
+      |> assign(:unread_counts, unread_counts)
       |> assign(:active_thread, data.active_thread)
       |> assign(:agent_status_counts, data.agent_status_counts)
       |> assign(:prompts, data.prompts)
@@ -140,7 +153,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     if connected?(socket) do
       Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
         id: "app-rail",
-        unread_counts: data.unread_counts
+        unread_counts: unread_counts
       )
     end
 

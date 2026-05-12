@@ -3566,7 +3566,7 @@ Entity-scoped search (preferred form):
   eits search tasks    <query>   Search task titles
   eits search notes    <query>   Search note content
 
-Multi-type search (default: sessions,tasks,notes):
+Multi-type search (default: all entity types):
   eits search <query> [--type <csv>] [--limit <n>] [--project <id>] [--json]
 
 Options (all forms):
@@ -3666,7 +3666,7 @@ EOF
   esac
 
   # ── Multi-type search ──────────────────────────────────────────────────────
-  local query="" types="sessions,tasks,notes" limit=5 project="" json_mode=0
+  local query="" types="sessions,tasks,notes,messages,commits" limit=5 project="" json_mode=0
 
   # first non-flag arg is the query
   if [[ -n "${1:-}" && "${1:0:1}" != "-" ]]; then
@@ -3694,14 +3694,16 @@ EOF
   [[ -z "$query" ]] && die "usage: eits search <query>"
 
   # validate --type tokens strictly — exact token match, no substring
-  local do_sessions=0 do_tasks=0 do_notes=0
+  local do_sessions=0 do_tasks=0 do_notes=0 do_messages=0 do_commits=0
   local _t; IFS=',' read -ra _type_tokens <<< "$types"
   for _t in "${_type_tokens[@]}"; do
     case "$_t" in
       sessions) do_sessions=1 ;;
       tasks)    do_tasks=1 ;;
       notes)    do_notes=1 ;;
-      *) die "unknown type: '$_t' (valid: sessions, tasks, notes)" ;;
+      messages) do_messages=1 ;;
+      commits)  do_commits=1 ;;
+      *) die "unknown type: '$_t' (valid: sessions, tasks, notes, messages, commits)" ;;
     esac
   done
 
@@ -3715,11 +3717,15 @@ EOF
   local f_sessions="${tmp_dir}/sessions.json"
   local f_tasks="${tmp_dir}/tasks.json"
   local f_notes="${tmp_dir}/notes.json"
+  local f_messages="${tmp_dir}/messages.json"
+  local f_commits="${tmp_dir}/commits.json"
 
   # write empty defaults so each file always exists
-  echo '{"sessions":[]}' > "$f_sessions"
-  echo '{"tasks":[]}'    > "$f_tasks"
-  echo '{"notes":[]}'    > "$f_notes"
+  echo '{"sessions":[]}'          > "$f_sessions"
+  echo '{"tasks":[]}'             > "$f_tasks"
+  echo '{"notes":[]}'             > "$f_notes"
+  echo '{"messages":[],"count":0}' > "$f_messages"
+  echo '{"commits":[],"count":0}'  > "$f_commits"
 
   # fan out in parallel — only requested types
   [[ $do_sessions -eq 1 ]] && \
@@ -3728,6 +3734,10 @@ EOF
     ( _curl "${BASE_URL}/tasks?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_tasks" 2>/dev/null ) &
   [[ $do_notes -eq 1 ]] && \
     ( _curl "${BASE_URL}/notes?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_notes" 2>/dev/null ) &
+  [[ $do_messages -eq 1 ]] && \
+    ( _curl "${BASE_URL}/messages/search?q=${q_enc}&limit=${limit}" > "$f_messages" 2>/dev/null ) &
+  [[ $do_commits -eq 1 ]] && \
+    ( _curl "${BASE_URL}/commits?q=${q_enc}&limit=${limit}" > "$f_commits" 2>/dev/null ) &
   wait
 
   if [[ $json_mode -eq 1 ]]; then
@@ -3735,16 +3745,22 @@ EOF
       --slurpfile s "$f_sessions" \
       --slurpfile t "$f_tasks" \
       --slurpfile n "$f_notes" \
+      --slurpfile m "$f_messages" \
+      --slurpfile c "$f_commits" \
       '{
         sessions: ($s[0].sessions // []),
         tasks:    ($t[0].tasks    // []),
-        notes:    ($n[0].notes    // [])
+        notes:    ($n[0].notes    // []),
+        messages: ($m[0].messages // []),
+        commits:  ($c[0].commits  // [])
       }'
   else
-    local s_count t_count n_count
+    local s_count t_count n_count m_count c_count
     s_count=$(jq '[.sessions[]?] | length' "$f_sessions" 2>/dev/null); s_count=${s_count:-0}
     t_count=$(jq '[.tasks[]?]    | length' "$f_tasks"    2>/dev/null); t_count=${t_count:-0}
     n_count=$(jq '[.notes[]?]    | length' "$f_notes"    2>/dev/null); n_count=${n_count:-0}
+    m_count=$(jq '[.messages[]?] | length' "$f_messages" 2>/dev/null); m_count=${m_count:-0}
+    c_count=$(jq '[.commits[]?]  | length' "$f_commits"  2>/dev/null); c_count=${c_count:-0}
 
     [[ $do_sessions -eq 1 && "$s_count" -gt 0 ]] && {
       printf '\n── Sessions (%s) ──────────────────────────────────────────────\n' "$s_count"
@@ -3758,8 +3774,27 @@ EOF
       printf '\n── Notes (%s) ─────────────────────────────────────────────────\n' "$n_count"
       _tbl_notes "$(cat "$f_notes")"
     }
+    [[ $do_messages -eq 1 && "$m_count" -gt 0 ]] && {
+      printf '\n── Messages (%s) ──────────────────────────────────────────────\n' "$m_count"
+      jq -r '.messages[] | [
+        (.session_name // (.session_id | tostring)),
+        (.session_uuid // ""),
+        .role,
+        (.body_excerpt | gsub("\n";" ") | .[0:55]),
+        (.inserted_at | tostring | .[0:19])
+      ] | @tsv' "$f_messages" | column -t -s $'\t'
+    }
+    [[ $do_commits -eq 1 && "$c_count" -gt 0 ]] && {
+      printf '\n── Commits (%s) ───────────────────────────────────────────────\n' "$c_count"
+      jq -r '.commits[] | [
+        (.session_name // (.session_uuid // (.session_id | tostring))),
+        (.commit_hash | .[0:8]),
+        (.commit_message // "" | gsub("\n";" ") | .[0:60]),
+        (.created_at // "" | .[0:19])
+      ] | @tsv' "$f_commits" | column -t -s $'\t'
+    }
 
-    local total=$(( s_count + t_count + n_count ))
+    local total=$(( s_count + t_count + n_count + m_count + c_count ))
     if [[ $total -eq 0 ]]; then
       printf '\nNo results for "%s"\n' "$query"
     else

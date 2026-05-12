@@ -128,11 +128,10 @@ defmodule EyeInTheSky.Codex.CLI do
         if full_auto, do: args ++ ["--full-auto"], else: args
       end
 
-    # Skip git repo check — allow running outside git repos
-    args = args ++ ["--skip-git-repo-check"]
-
     # Inject EITS env vars via shell_environment_policy.set so they're
-    # available to shell commands the agent runs (bypasses default filters)
+    # available to shell commands the agent runs (bypasses default filters).
+    # Must come before --skip-git-repo-check — Codex CLI stops parsing flags
+    # after that flag, causing exit code 2 if -c args follow it.
     env_args =
       [
         {"EITS_SESSION_UUID", opts[:eits_session_uuid]},
@@ -151,6 +150,10 @@ defmodule EyeInTheSky.Codex.CLI do
       end)
 
     args = args ++ env_args
+
+    # Skip git repo check — allow running outside git repos.
+    # Must come after -c env flags (see note above).
+    args = args ++ ["--skip-git-repo-check"]
 
     # Prompt goes last as positional argument
     if prompt = opts[:prompt] do

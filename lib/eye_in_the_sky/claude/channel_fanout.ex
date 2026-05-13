@@ -4,7 +4,7 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
 
   Two modes:
 
-  - `fanout_all/5` — routes to every channel member (excluding sender). Each
+  - `fanout_all/6` — routes to every channel member (excluding sender). Each
     member's routing mode is determined by ChannelProtocol: :direct if mentioned
     by ID, :broadcast if @all was used, :ambient otherwise. Used for messages
     posted by humans or agents via the REST API.
@@ -28,15 +28,25 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
   `content_blocks` — multimodal blocks to forward (pass `[]` for text-only messages).
   `message_id`     — DB id of the channel_message record that triggered this fanout.
                      Used to populate AgentWorker context metadata.
+  `sender_role`    — "user" or "agent"; shown in the MSG prompt so recipients know
+                     whether the message came from a human or an agent.
   """
   @spec fanout_all(
           channel_id :: term(),
           body :: String.t(),
           sender_session_id :: integer(),
           content_blocks :: list(),
-          message_id :: integer() | nil
+          message_id :: integer() | nil,
+          sender_role :: String.t()
         ) :: :ok
-  def fanout_all(channel_id, body, sender_session_id, content_blocks \\ [], message_id \\ nil) do
+  def fanout_all(
+        channel_id,
+        body,
+        sender_session_id,
+        content_blocks \\ [],
+        message_id \\ nil,
+        sender_role \\ "agent"
+      ) do
     {_mode, mentioned_ids_numeric, _mention_all} = ChannelProtocol.parse_routing(body, -1)
     # Resolve name-based @mentions (e.g. @claude-worker) to session IDs in addition to @{id}.
     mentioned_ids_by_name = Channels.resolve_mention_names(channel_id, body)
@@ -78,6 +88,7 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
               mode,
               channel_ctx,
               sender,
+              sender_role,
               channel_id,
               content_blocks,
               context
@@ -101,14 +112,22 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
 
   `sender_session_id` is skipped even if mentioned.
   `message_id`       — DB id of the channel_message record that triggered this fanout.
+  `sender_role`      — "user" or "agent"; forwarded to the MSG prompt.
   """
   @spec fanout_mentions_only(
           channel_id :: term(),
           body :: String.t(),
           sender_session_id :: integer(),
-          message_id :: integer() | nil
+          message_id :: integer() | nil,
+          sender_role :: String.t()
         ) :: :ok
-  def fanout_mentions_only(channel_id, body, sender_session_id, message_id \\ nil) do
+  def fanout_mentions_only(
+        channel_id,
+        body,
+        sender_session_id,
+        message_id \\ nil,
+        sender_role \\ "agent"
+      ) do
     {_mode, mentioned_ids_numeric, _mention_all} = ChannelProtocol.parse_routing(body, -1)
     mentioned_ids_by_name = Channels.resolve_mention_names(channel_id, body)
     mentioned_ids = Enum.uniq(mentioned_ids_numeric ++ mentioned_ids_by_name)
@@ -145,6 +164,7 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
                 :direct,
                 channel_ctx,
                 sender,
+                sender_role,
                 channel_id,
                 [],
                 context
@@ -171,6 +191,7 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
          mode,
          channel_ctx,
          sender,
+         sender_role,
          channel_id,
          content_blocks,
          context
@@ -188,6 +209,7 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
             mode: mode,
             channel: channel_ctx,
             sender: sender,
+            sender_role: sender_role,
             body: body
           })
 

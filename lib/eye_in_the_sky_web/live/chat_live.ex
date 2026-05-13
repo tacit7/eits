@@ -215,8 +215,19 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   # Sub-components
 
+  attr :channels, :list, required: true
+  attr :active_channel_id, :any, default: nil
+  attr :messages, :list, required: true
+  attr :has_more_messages, :boolean, default: false
+  attr :active_agents, :list, default: []
+  attr :channel_members, :list, default: []
+  attr :working_agents, :list, default: []
+  attr :slash_items, :list, default: []
+  attr :active_thread, :any, default: nil
   attr :message_search_query, :string, default: ""
   attr :message_search_results, :list, default: []
+  attr :uploads, :any, required: true
+  attr :socket, :any, required: true
   defp message_feed(assigns) do
     ~H"""
     <div class="flex-1 min-h-0 overflow-hidden flex flex-col">

@@ -82,8 +82,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
 
     case ChannelMessages.create_channel_message(attrs) do
       {:ok, msg} ->
-        notify_channel_members(channel_id, int_id, body)
-        ChannelFanout.fanout_all(channel_id, body, int_id)
+        notify_channel_members(channel_id, int_id, body, attrs.sender_role)
+        ChannelFanout.fanout_all(channel_id, body, int_id, [], nil, attrs.sender_role)
 
         if team_id = parse_int(params["broadcast_to_team_id"]) do
           broadcast_to_team(channel_id, int_id, team_id, body)
@@ -106,7 +106,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   #   - @all → skip all notifications (every member gets a broadcast MSG prompt)
   #   - @{session_id} mentions → skip those sessions (they get a direct MSG prompt)
   # Ambient-only members still receive the channel notification.
-  defp notify_channel_members(channel_id, sender_session_id, body) do
+  defp notify_channel_members(channel_id, sender_session_id, body, sender_role) do
     mention_all = Regex.match?(~r/@all\b/i, body)
 
     # If @all, ChannelFanout delivers broadcast MSG prompts to everyone — skip all DM notifications.
@@ -120,7 +120,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
         members =
           EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
 
-        sender_label = get_sender_name(sender_session_id)
+        sender_label = get_sender_label(sender_session_id, sender_role)
 
         for member <- members,
             not MapSet.member?(mentioned_ids, member.session_id) do
@@ -147,11 +147,14 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
     :ok
   end
 
-  defp get_sender_name(session_id) do
-    case Sessions.get_session(session_id) do
-      {:ok, session} -> session.name || "session:#{session_id}"
-      _ -> "session:#{session_id}"
-    end
+  defp get_sender_label(session_id, role) do
+    name =
+      case Sessions.get_session(session_id) do
+        {:ok, session} -> session.name || "session:#{session_id}"
+        _ -> "session:#{session_id}"
+      end
+
+    "#{name} (#{role})"
   end
 
   # Fan out DMs to all active team members when broadcast_to_team_id is supplied.
@@ -170,7 +173,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
 
   defp do_team_fanout(members, sender_session_id, team, channel_id, body) do
     if Enum.any?(members, &(&1.session_id == sender_session_id)) do
-      sender_label = get_sender_name(sender_session_id)
+      sender_label = get_sender_label(sender_session_id, "agent")
 
       dm_body =
         "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"

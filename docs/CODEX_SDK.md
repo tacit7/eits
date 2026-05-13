@@ -83,6 +83,8 @@ On subsequent messages to the same session:
 3. `start_codex_sdk/2` calls `Codex.SDK.resume(thread_id, prompt, opts)`
 4. CLI builds: `codex exec resume <thread_id> --json --full-auto ...`
 
+**Resume Command Syntax**: The correct scripted syntax is **`codex exec resume <thread_id>`** — `resume` is a *subcommand* that follows `exec`, not a `--resume` flag. This is the only resume pattern supported by the Codex CLI.
+
 Codex stores session history locally at `$CODEX_HOME/sessions` for up to 30 days.
 
 ## Incremental Sync Watermark

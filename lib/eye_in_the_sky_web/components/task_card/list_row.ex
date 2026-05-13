@@ -33,17 +33,28 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     assigns = assign(assigns, :dm_session, dm_session)
 
     ~H"""
+    <%!--
+      Row state legend:
+      default  → no bg, dim text
+      hover    → bg-base-200/40, brighter text, reveal checkbox+actions
+      focus-visible (keyboard) → focus-visible:ring-2 ring-primary/50
+      vim-nav-focused → [&.vim-nav-focused]:ring-2 ring-primary/50
+      selected/open   → data-drawer-open: left accent + bg-base-200/60 + ring-1 ring-primary/20
+      checked (bulk)  → outer wrapper bg-primary/8
+      done            → opacity-60, title line-through, dimmer metadata
+    --%>
     <div
       id={"task-row-#{@task.id}"}
       class={[
         "group/row relative",
-        @task.completed_at && "opacity-60 hover:opacity-80"
+        @task.completed_at && "opacity-60 hover:opacity-80",
+        @selected && @select_mode && "bg-primary/8 rounded-lg"
       ]}
     >
-      <%!-- Left accent bar — visible when drawer is open for this row --%>
+      <%!-- Left accent bar — visible when this row is open in the drawer --%>
       <div class="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary opacity-0 group-[[data-drawer-open]]/row:opacity-100 transition-opacity pointer-events-none" />
 
-      <%!-- Checkbox: absolute, outside row flow, hover-reveal --%>
+      <%!-- Checkbox — revealed on hover, selected, focus, and bulk mode --%>
       <div
         class={[
           "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2",
@@ -51,7 +62,9 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           if(@select_mode,
             do: "opacity-100 scale-100",
             else:
-              "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
+              "opacity-0 scale-75 transition duration-100 " <>
+                "group-hover/row:opacity-100 group-hover/row:scale-100 " <>
+                "group-[[data-drawer-open]]/row:opacity-100 group-[[data-drawer-open]]/row:scale-100"
           )
         ]}
         aria-hidden={to_string(!@select_mode)}
@@ -67,7 +80,14 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
 
       <%!-- Row body --%>
       <div
-        class="flex items-center gap-4 py-3 pr-2 pl-2 hover:bg-base-200/40 group-[[data-drawer-open]]/row:bg-base-200/60 rounded-lg cursor-pointer [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
+        class={[
+          "flex items-center gap-4 py-3 pr-2 pl-2 rounded-lg cursor-pointer",
+          "hover:bg-base-200/40",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+          "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50",
+          "group-[[data-drawer-open]]/row:bg-base-200/60",
+          "group-[[data-drawer-open]]/row:ring-1 group-[[data-drawer-open]]/row:ring-inset group-[[data-drawer-open]]/row:ring-primary/20"
+        ]}
         data-vim-list-item
         data-vim-item-type="task"
         data-vim-item-id={@task.id}
@@ -112,8 +132,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             {@task.title}
           </span>
 
-          <%!-- Metadata line --%>
-          <div class="flex items-center gap-1.5 flex-wrap mt-1 text-mini">
+          <%!-- Metadata line — extra dim when task is done --%>
+          <div class={["flex items-center gap-1.5 flex-wrap mt-1 text-mini", @task.completed_at && "opacity-70"]}>
             <%!-- State pill --%>
             <%= if is_struct(@task.state, EyeInTheSky.Tasks.WorkflowState) do %>
               <span class={[

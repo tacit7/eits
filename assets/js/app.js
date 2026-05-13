@@ -89,6 +89,7 @@ import {GlobalKeydown} from "./hooks/global_keydown"
 import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
 import {PreserveDetails} from "./hooks/preserve_details"
 import {VimNav} from "./hooks/vim_nav"
+import {TaskListSelection} from "./hooks/task_list_selection"
 import {showToast, showSessionFailureToast} from "./hooks/utils"
 import SortDropdown from "./hooks/sort_dropdown"
 import {getHooks} from "live_svelte"
@@ -164,6 +165,7 @@ Hooks.GlobalKeydown = GlobalKeydown
 Hooks.DmHistoryCleanup = DmHistoryCleanup
 Hooks.PreserveDetails = PreserveDetails
 Hooks.SortDropdown = SortDropdown
+Hooks.TaskListSelection = TaskListSelection
 Hooks.PtyHook = PtyHook
 Hooks.TerminalHook = TerminalHook
 Hooks.TerminalWindowHook = TerminalWindowHook

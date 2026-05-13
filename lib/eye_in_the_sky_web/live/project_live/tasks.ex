@@ -45,6 +45,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:show_archive_confirm, false)
       |> assign(:loaded_task_ids, [])
       |> assign(:loaded_tasks, [])
+      |> assign(:state_counts, %{})
       |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
 
     socket =
@@ -247,21 +248,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     show_all = Map.get(socket.assigns, :show_all, false)
     project_id = socket.assigns.project_id
 
-    if show_all do
-      TasksListHelpers.load_tasks(
-        socket,
-        fn query -> Tasks.search_tasks(query) end,
-        fn opts -> Tasks.list_tasks(opts) end,
-        fn opts -> Tasks.count_tasks(opts) end
-      )
-    else
-      TasksListHelpers.load_tasks(
-        socket,
-        fn query -> Tasks.search_tasks(query, project_id) end,
-        fn opts -> Tasks.list_tasks_for_project(project_id, opts) end,
-        fn opts -> Tasks.count_tasks_for_project(project_id, opts) end
-      )
-    end
+    socket =
+      if show_all do
+        TasksListHelpers.load_tasks(
+          socket,
+          fn query -> Tasks.search_tasks(query) end,
+          fn opts -> Tasks.list_tasks(opts) end,
+          fn opts -> Tasks.count_tasks(opts) end
+        )
+      else
+        TasksListHelpers.load_tasks(
+          socket,
+          fn query -> Tasks.search_tasks(query, project_id) end,
+          fn opts -> Tasks.list_tasks_for_project(project_id, opts) end,
+          fn opts -> Tasks.count_tasks_for_project(project_id, opts) end
+        )
+      end
+
+    state_counts =
+      if show_all, do: %{}, else: Tasks.count_tasks_for_project_by_state(project_id)
+
+    assign(socket, :state_counts, state_counts)
   end
 
   defp load_tasks_page(socket, page) do

@@ -244,6 +244,20 @@ defmodule EyeInTheSky.Tasks.Queries do
   end
 
   @doc """
+  Returns a map of `%{state_id => count}` for all non-archived tasks in a project.
+  Single GROUP BY query — use this instead of N calls to count_tasks_for_project.
+  """
+  def count_tasks_for_project_by_state(project_id) when is_integer(project_id) do
+    from(t in Task,
+      where: t.project_id == ^project_id and t.archived == false,
+      group_by: t.state_id,
+      select: {t.state_id, count(t.id)}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  @doc """
   Search tasks using PostgreSQL full-text search.
   """
   def search_tasks(query, project_id \\ nil, opts \\ []) when is_binary(query) do

@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     only: [relative_time: 1, overdue?: 1, due_today?: 1, format_due_date: 1]
 
   alias EyeInTheSky.Tasks.WorkflowState
+  alias Phoenix.LiveView.JS
 
   @state_todo WorkflowState.todo_id()
   @state_in_progress WorkflowState.in_progress_id()
@@ -32,10 +33,16 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     assigns = assign(assigns, :dm_session, dm_session)
 
     ~H"""
-    <div class={[
-      "group/row relative",
-      @task.completed_at && "opacity-60 hover:opacity-80"
-    ]}>
+    <div
+      id={"task-row-#{@task.id}"}
+      class={[
+        "group/row relative",
+        @task.completed_at && "opacity-60 hover:opacity-80"
+      ]}
+    >
+      <%!-- Left accent bar — visible when drawer is open for this row --%>
+      <div class="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary opacity-0 group-[[data-drawer-open]]/row:opacity-100 transition-opacity pointer-events-none" />
+
       <%!-- Checkbox: absolute, outside row flow, hover-reveal --%>
       <div
         class={[
@@ -60,13 +67,21 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
 
       <%!-- Row body --%>
       <div
-        class="flex items-center gap-4 py-3 pr-2 pl-2 hover:bg-base-200/40 rounded-lg cursor-pointer [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
+        class="flex items-center gap-4 py-3 pr-2 pl-2 hover:bg-base-200/40 group-[[data-drawer-open]]/row:bg-base-200/60 rounded-lg cursor-pointer [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
         data-vim-list-item
         data-vim-item-type="task"
         data-vim-item-id={@task.id}
         data-vim-item-title={@task.title}
         data-vim-item-url={"/projects/#{@task.project_id}/tasks?task=#{@task.uuid}"}
-        phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
+        phx-click={
+          if @select_mode do
+            "toggle_select_task"
+          else
+            JS.remove_attribute("data-drawer-open", to: "[data-drawer-open]")
+            |> JS.set_attribute({"data-drawer-open", ""}, to: "#task-row-#{@task.id}")
+            |> JS.push(@on_click || "")
+          end
+        }
         phx-keyup={if !@select_mode, do: @on_click}
         phx-key="Enter"
         phx-value-task_id={@task.uuid || to_string(@task.id)}
@@ -171,8 +186,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           </div>
         </div>
 
-        <%!-- Hover actions --%>
-        <div class="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+        <%!-- Hover actions — also revealed when row is selected (data-drawer-open) or focused via vim-nav --%>
+        <div class="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover/row:opacity-100 md:group-[[data-drawer-open]]/row:opacity-100 transition-opacity">
           <%= if @dm_session do %>
             <.link
               navigate={"/dm/#{@dm_session.uuid}"}

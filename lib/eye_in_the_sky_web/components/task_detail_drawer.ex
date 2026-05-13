@@ -8,6 +8,8 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
     only: [relative_time: 1, overdue?: 1, due_today?: 1, format_date_input: 1]
 
+  alias Phoenix.LiveView.JS
+
   attr :id, :string, required: true
   attr :show, :boolean, required: true
   attr :task, :map, default: nil
@@ -66,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
           </div>
           <button
             type="button"
-            phx-click={@toggle_event}
+            phx-click={clear_selection_and_toggle(@toggle_event)}
             class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5 transition-colors"
           >
             <.icon name="hero-x-mark" class="size-5" />
@@ -336,6 +338,14 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
     </.side_drawer>
     """
   end
+
+  # Builds a JS command that clears the selected-row indicator before toggling.
+  defp clear_selection_and_toggle(event) when is_binary(event) do
+    JS.remove_attribute("data-drawer-open", to: "[data-drawer-open]")
+    |> JS.push(event)
+  end
+
+  defp clear_selection_and_toggle(%JS{} = js), do: js
 
   defp format_tags(nil), do: ""
   defp format_tags([]), do: ""

@@ -90,6 +90,7 @@ import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
 import {PreserveDetails} from "./hooks/preserve_details"
 import {VimNav} from "./hooks/vim_nav"
 import {TaskListSelection} from "./hooks/task_list_selection"
+import {DrawerDirtyForm} from "./hooks/drawer_dirty_form"
 import {showToast, showSessionFailureToast} from "./hooks/utils"
 import SortDropdown from "./hooks/sort_dropdown"
 import {getHooks} from "live_svelte"
@@ -166,6 +167,7 @@ Hooks.DmHistoryCleanup = DmHistoryCleanup
 Hooks.PreserveDetails = PreserveDetails
 Hooks.SortDropdown = SortDropdown
 Hooks.TaskListSelection = TaskListSelection
+Hooks.DrawerDirtyForm = DrawerDirtyForm
 Hooks.PtyHook = PtyHook
 Hooks.TerminalHook = TerminalHook
 Hooks.TerminalWindowHook = TerminalWindowHook

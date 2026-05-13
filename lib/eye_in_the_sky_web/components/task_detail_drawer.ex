@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
         <%!-- Scrollable body --%>
         <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <%!-- Main edit form (no nested forms) --%>
-          <form id="task-edit-form" phx-submit={@update_event}>
+          <form id="task-edit-form" phx-submit={@update_event} phx-hook="DrawerDirtyForm">
             <%!-- Title --%>
             <input
               type="text"
@@ -254,11 +254,32 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
 
         <%!-- Footer actions (outside all forms) --%>
         <div class="px-6 py-4 border-t border-base-content/5 flex items-center gap-2 flex-shrink-0">
-          <button type="submit" form="task-edit-form" class="btn btn-sm btn-primary text-xs px-4">
-            Save
-          </button>
+          <div class="flex items-center gap-1.5">
+            <button
+              type="submit"
+              form="task-edit-form"
+              class="btn btn-sm btn-primary text-xs px-4 opacity-40 pointer-events-none"
+            >
+              Save
+            </button>
+            <span
+              id="task-dirty-indicator"
+              class="hidden text-micro text-warning/70 ml-0.5"
+            >
+              unsaved
+            </span>
+          </div>
           <%!-- Start Agent: disabled when an agent is already assigned or session exists --%>
           <% has_agent = not is_nil(@task.agent_id) || (is_list(@task.sessions) && @task.sessions != []) %>
+          <% agent_disabled_reason =
+            cond do
+              is_list(@task.sessions) && @task.sessions != [] ->
+                "Session #{session_label(List.first(@task.sessions))} already running"
+              not is_nil(@task.agent_id) ->
+                "Agent ##{@task.agent_id} already assigned"
+              true ->
+                "Start agent for this task"
+            end %>
           <button
             type="button"
             phx-click="start_agent_for_task"
@@ -271,11 +292,12 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                 else: "text-base-content/50 hover:text-base-content/80"
               )
             ]}
-            title={if has_agent, do: "Agent already assigned", else: "Start agent for this task"}
+            title={agent_disabled_reason}
           >
             <.icon name="hero-play" class="size-3.5" /> Start Agent
           </button>
           <div class="ml-auto flex items-center gap-1">
+            <%!-- Copy to project dropdown --%>
             <%= if not is_nil(@copy_event) && @projects != [] do %>
               <% other_projects = Enum.reject(@projects, &(&1.id == @current_project_id)) %>
               <%= if other_projects != [] do %>
@@ -309,25 +331,44 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                 </div>
               <% end %>
             <% end %>
-            <button
-              type="button"
-              phx-click="archive_task"
-              phx-value-task_id={@task.uuid || to_string(@task.id)}
-              class="btn btn-sm btn-ghost text-xs text-base-content/40 hover:text-warning hover:bg-warning/10"
-              title="Archive task"
-            >
-              <.icon name="hero-archive-box" class="size-3.5" />
-            </button>
-            <button
-              type="button"
-              phx-click={@delete_event}
-              phx-value-task_id={@task.uuid || to_string(@task.id)}
-              phx-confirm="Delete this task?"
-              data-drawer-delete="true"
-              class="btn btn-sm btn-ghost text-xs text-error/50 hover:text-error hover:bg-error/10"
-            >
-              <.icon name="hero-trash" class="size-3.5" />
-            </button>
+            <%!-- Overflow menu: archive + delete (demoted, destructive) --%>
+            <div class="dropdown dropdown-top dropdown-end">
+              <button
+                type="button"
+                tabindex="0"
+                class="btn btn-sm btn-ghost text-xs text-base-content/30 hover:text-base-content/60"
+                title="More actions"
+              >
+                <.icon name="hero-ellipsis-horizontal" class="size-4" />
+              </button>
+              <ul
+                tabindex="0"
+                class="dropdown-content menu p-1 shadow-lg bg-base-200 rounded-lg w-40 z-50"
+              >
+                <li>
+                  <button
+                    type="button"
+                    phx-click="archive_task"
+                    phx-value-task_id={@task.uuid || to_string(@task.id)}
+                    class="text-xs text-base-content/60 hover:text-warning gap-2"
+                  >
+                    <.icon name="hero-archive-box" class="size-3.5" /> Archive
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    phx-click={@delete_event}
+                    phx-value-task_id={@task.uuid || to_string(@task.id)}
+                    phx-confirm="Delete this task?"
+                    data-drawer-delete="true"
+                    class="text-xs text-error/60 hover:text-error gap-2"
+                  >
+                    <.icon name="hero-trash" class="size-3.5" /> Delete
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       <% else %>

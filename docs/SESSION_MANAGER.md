@@ -512,6 +512,41 @@ The addition of `worktree_path` and `branch_name` eliminates orchestrator guessi
 
 This fix ensures the startup hook can properly populate `EITS_AGENT_UUID` and `EITS_PROJECT_ID` in the Claude Code environment when resuming a session.
 
+### Session Resume Context Injection — Channel Mentions
+
+When a session resumes via `eits sessions resume <uuid>` or the session lifecycle hooks, the `eits-session-resume.sh` script injects recent channel activity for awareness. This allows resumed agents to pick up context on what happened while they were paused.
+
+**What gets injected:**
+- Messages from channels where the session is a member **AND** was directly @mentioned in the last hour
+- Up to 3 most recent messages per qualifying channel
+- Message sender, timestamp, and truncated body (200 chars max)
+- Pure ambient-observer channels (no direct mention) are skipped — avoids noise for agents that only passively listen
+
+**Example injected context:**
+```markdown
+## Recent Channel Activity (last 1h — you were @mentioned)
+
+### #tech-review (channel:42)
+- **alice** [14:23]: Design feedback on PR #156: we need to…
+- **bob** [14:15]: @3185 can you review the auth changes?
+- **charlie** [14:05]: Updated schema migration, ready for QA
+```
+
+**Implementation:** Shell function `_inject_channel_context()` in `priv/scripts/eits-session-resume.sh`:
+1. Queries the DB using `psql` directly against `EITS_PG_*` env vars
+2. Filters channels by session membership + @mention by session ID or UUID in the last hour
+3. Formats top 3 messages per channel chronologically
+4. Falls back gracefully if `psql` is unavailable or no qualifying channels exist
+5. Appends context to the system-reminder section output
+
+**Query behavior:**
+- Uses a CTE to find mentioned channels first (efficient for sparse @mentions)
+- Rows from other sessions only (excludes self-mentions)
+- Case-insensitive ILIKE match on session ID (numeric) or UUID (string format)
+- Runs only when session has a numeric ID (`SESSION_INT_ID` env var is set)
+
+This allows resumed agents to recover context automatically — no explicit "catch me up" request needed. Particularly useful for long-running orchestrators that pause and resume across task boundaries, or for agents that were idle while important discussions happened in team channels.
+
 **Environment Variable: EITS_SESSION_ID**
 Spawned Claude processes set `EITS_SESSION_ID` to the **integer EITS session record ID**, not the UUID. This is critical for child agent spawning:
 - `EITS_SESSION_ID` = integer (e.g., `3185`) — set by eits-session-startup.sh during agent startup; used for `--parent-session-id` 

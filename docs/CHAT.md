@@ -233,9 +233,13 @@ Channels.remove_member(channel_id, session_id)
 Channels.list_members(channel_id)
 Channels.is_member?(channel_id, session_id)
 Channels.mark_as_read(channel_id, session_id)
+  # Called on channel open in load_channel_assigns to immediately clear unread badge
+  # Guards against same-channel param updates (e.g. thread navigation) to avoid redundant DB writes
 Channels.count_unread_messages(channel_id, session_id)
 Channels.list_channels_for_session(session_id)
 ```
+
+**Unread Count Handling**: When a user opens a channel, `load_channel_assigns` calls `Channels.mark_as_read` and zeroes the channel's unread count in the map (via `Map.put(data.unread_counts, int_channel_id, 0)`). This clears the badge immediately without waiting for PubSub broadcast. The channel_changed? guard prevents redundant DB writes when the user navigates threads or other params on the same channel. `parse_int(channel_id, nil)` ensures non-numeric channel IDs don't insert dead string keys into the unread_counts map.
 
 ### ChannelOnboarding (`lib/eye_in_the_sky/channels/channel_onboarding.ex`)
 
@@ -347,7 +351,35 @@ ChannelFanout.fanout_mentions_only(channel_id, body, sender_session_id, message_
 - Called from `ChannelMessageController.create` for REST API posted messages
 - Called from `AgentWorkerEvents.maybe_fanout_mentions` for agent replies with @mentions
 
+**Channel Notification Deduplication**: `notify_channel_members` (called from `ChannelMessageController.create`) skips DM notifications for sessions that will receive direct/broadcast MSG prompts from `ChannelFanout.fanout_all`. Specifically:
+- **@all messages**: skip all notifications (every member gets a broadcast MSG prompt)
+- **@{session_id} mentions**: skip those specific sessions (they get a direct MSG prompt)
+- **Ambient-only members**: still receive the channel notification DM
+
+This prevents agents from receiving the same message twice in a single turn (once via direct MSG prompt, once via notification DM).
+
 **Performance**: Task.async_stream with timeout: 5s, on_timeout: :kill_task prevents hung agents from blocking delivery to other members. Connection pool capped at 10 concurrent checkouts.
+
+### Session Resume Context Injection
+
+When a session resumes, the `eits-session-resume.sh` script automatically injects recent channel context into the system-reminder. It queries the database for channels where the resuming session is a member and was directly @mentioned (by session ID or UUID) within the last hour.
+
+**Behavior**:
+- Skips pure ambient-observer channels (no direct @mention) to avoid noise
+- For each qualifying channel, injects the 3 most recent messages (chronologically ordered)
+- Falls back gracefully if psql is unavailable or no qualifying channels exist
+- Only runs when a numeric session ID is available
+
+**Format in system-reminder**:
+```
+## Recent Channel Activity (last 1h — you were @mentioned)
+
+### #channel_name (channel:123)
+- **sender_name** [HH:MM]: message body (truncated to 200 chars)
+- **sender_name** [HH:MM]: message body
+```
+
+**Implementation**: Pure shell function in `priv/scripts/eits-session-resume.sh` using psql directly against `EITS_PG_*` env vars. No Elixir/Phoenix dependencies.
 
 ### ChatWorker / ChatManager
 
@@ -614,6 +646,7 @@ Svelte component handling message display and input for `/chat`.
 - Message history navigation (up/down arrows, 50 message buffer)
 - Auto-scroll on new messages
 - Delete message button (hover reveal)
+- Composer hint text shows `@` to mention (not `@id` to mention)
 
 ### DmPage Component
 

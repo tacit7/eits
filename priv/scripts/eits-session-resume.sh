@@ -227,3 +227,69 @@ ORDER BY channel_id, rn DESC;
 }
 
 _inject_channel_context "${SESSION_INT_ID:-}" "${SESSION_ID:-}"
+
+# --- Notification Buffer Flush ---
+# Summarise pending channel notifications buffered during idle window.
+# These are MSG prompts queued by AgentWorker that haven't been delivered yet.
+# Showing the count + senders on resume lets the agent orient before AgentWorker
+# delivers the full prompts. TTL = 1 hour (same as channel context window).
+
+_inject_pending_notifications() {
+  local session_int="$1"
+
+  [ -z "$session_int" ] && return
+
+  local psql_bin
+  psql_bin=$(command -v psql 2>/dev/null) || psql_bin="/opt/homebrew/bin/psql"
+  [ -x "$psql_bin" ] || return
+
+  export PGPASSWORD="${EITS_PG_PASSWORD:-postgres}"
+  local pg_user="${EITS_PG_USER:-postgres}"
+  local pg_host="${EITS_PG_HOST:-localhost}"
+  local pg_db="${EITS_PG_DB:-eits_dev}"
+
+  # Pending channel notifications: messages queued for this session via AgentWorker
+  # (sender_role='user' = channel message routed to this agent) with status pending/sent,
+  # arrived in the last hour, carrying a channel context.
+  local sql
+  sql="
+SELECT
+  COALESCE(s.name, 'session:' || m.session_id::text) AS from_name,
+  c.name AS channel_name,
+  c.id   AS channel_id,
+  to_char(m.inserted_at AT TIME ZONE 'UTC', 'HH24:MI') AS ts,
+  LEFT(REPLACE(REPLACE(m.body, E'\n', ' '), E'\r', ''), 120) AS snippet
+FROM messages m
+JOIN channels c ON c.id = m.channel_id
+LEFT JOIN sessions s ON s.id = m.session_id
+WHERE m.session_id = ${session_int}
+  AND m.status IN ('pending', 'sent')
+  AND m.channel_id IS NOT NULL
+  AND m.inserted_at > NOW() - INTERVAL '1 hour'
+  AND m.sender_role = 'user'
+ORDER BY m.inserted_at ASC
+LIMIT 10;
+"
+
+  local rows
+  rows=$("$psql_bin" --no-psqlrc -U "$pg_user" -h "$pg_host" -d "$pg_db" \
+    -t -A -F $'\x1f' -c "$sql" 2>/dev/null || true)
+
+  [ -z "$rows" ] && return
+
+  local output=""
+  while IFS=$'\x1f' read -r from_name ch_name ch_id ts snippet; do
+    [ -z "$ch_id" ] && continue
+    output="${output}
+- **${from_name}** in #${ch_name} [${ts}]: ${snippet}"
+  done <<< "$rows"
+
+  if [ -n "$output" ]; then
+    echo ""
+    echo "## Pending Notifications (buffered while idle — AgentWorker will deliver full prompts)"
+    echo "$output"
+    _log "injected pending notifications: $(echo "$rows" | wc -l | tr -d ' ') messages"
+  fi
+}
+
+_inject_pending_notifications "${SESSION_INT_ID:-}"

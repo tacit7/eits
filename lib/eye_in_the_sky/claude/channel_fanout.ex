@@ -37,8 +37,12 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
           message_id :: integer() | nil
         ) :: :ok
   def fanout_all(channel_id, body, sender_session_id, content_blocks \\ [], message_id \\ nil) do
-    {_mode, mentioned_ids, _mention_all} = ChannelProtocol.parse_routing(body, -1)
-    Enum.each(mentioned_ids, &maybe_auto_add_member(channel_id, &1))
+    {_mode, mentioned_ids_numeric, _mention_all} = ChannelProtocol.parse_routing(body, -1)
+    # Resolve name-based @mentions (e.g. @claude-worker) to session IDs in addition to @{id}.
+    mentioned_ids_by_name = Channels.resolve_mention_names(channel_id, body)
+    all_mentioned_ids = Enum.uniq(mentioned_ids_numeric ++ mentioned_ids_by_name)
+
+    Enum.each(all_mentioned_ids, &maybe_auto_add_member(channel_id, &1))
 
     case Channels.get_channel(channel_id) do
       nil ->
@@ -59,8 +63,14 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
         |> Enum.reject(fn m -> ChannelProtocol.skip?(m.session_id, sender_session_id) end)
         |> Task.async_stream(
           fn member ->
+            # Derive mode: name-mentioned members are treated as :direct.
             {mode, _mentioned_ids, _mention_all} =
               ChannelProtocol.parse_routing(body, member.session_id)
+
+            mode =
+              if mode == :ambient and member.session_id in mentioned_ids_by_name,
+                do: :direct,
+                else: mode
 
             route_to_member(
               member.session_id,
@@ -99,7 +109,9 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
           message_id :: integer() | nil
         ) :: :ok
   def fanout_mentions_only(channel_id, body, sender_session_id, message_id \\ nil) do
-    {_mode, mentioned_ids, _mention_all} = ChannelProtocol.parse_routing(body, -1)
+    {_mode, mentioned_ids_numeric, _mention_all} = ChannelProtocol.parse_routing(body, -1)
+    mentioned_ids_by_name = Channels.resolve_mention_names(channel_id, body)
+    mentioned_ids = Enum.uniq(mentioned_ids_numeric ++ mentioned_ids_by_name)
 
     target_ids =
       mentioned_ids

@@ -17,6 +17,8 @@
   export let workingAgents = {}
   export let slashItems = []
   export let activeThread = null
+  export let messageSearchQuery = ''
+  export let messageSearchResults = []
   export let live
 
   let loadingOlder = false
@@ -54,10 +56,17 @@
   let showSearch = false
   let searchQuery = ''
   let searchInput
+  let searchDebounce = null
 
-  $: filteredMessages = searchQuery.trim()
-    ? messages.filter(m => (m.body || '').toLowerCase().includes(searchQuery.toLowerCase()))
-    : messages
+  // Use server-side FTS results when a query is active; fall back to full message list.
+  $: filteredMessages = searchQuery.trim() ? messageSearchResults : messages
+
+  function handleSearchInput() {
+    clearTimeout(searchDebounce)
+    searchDebounce = setTimeout(() => {
+      live.pushEvent('search_channel_messages', { query: searchQuery })
+    }, 250)
+  }
 
   $: processedMessages = (() => {
     const result = []
@@ -91,6 +100,7 @@
   function closeSearch() {
     showSearch = false
     searchQuery = ''
+    live.pushEvent('clear_message_search', {})
   }
 
   function handleDocKeydown(e) {
@@ -612,6 +622,7 @@
           <input
             bind:this={searchInput}
             bind:value={searchQuery}
+            on:input={handleSearchInput}
             type="text"
             placeholder="Search messages..."
             class="w-full input input-xs bg-base-200/50 border-base-content/8 pl-8 pr-4 text-base placeholder:text-base-content/25 focus:border-primary/30"

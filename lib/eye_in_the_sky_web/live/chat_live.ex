@@ -155,6 +155,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:sender_filter, nil)
       |> assign_new(:session_search, fn -> "" end)
       |> assign(:slash_items, SlashItems.build())
+      |> assign(:message_search_query, "")
+      |> assign(:message_search_results, [])
 
     if connected?(socket) do
       Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
@@ -194,6 +196,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
           working_agents={@working_agents}
           slash_items={@slash_items}
           active_thread={@active_thread}
+          message_search_query={@message_search_query}
+          message_search_results={@message_search_results}
           uploads={@uploads}
           socket={@socket}
         />
@@ -211,6 +215,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   # Sub-components
 
+  attr :message_search_query, :string, default: ""
+  attr :message_search_results, :list, default: []
   defp message_feed(assigns) do
     ~H"""
     <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -227,7 +233,9 @@ defmodule EyeInTheSkyWeb.ChatLive do
             channelMembers: @channel_members,
             workingAgents: @working_agents,
             slashItems: @slash_items,
-            activeThread: @active_thread
+            activeThread: @active_thread,
+            messageSearchQuery: @message_search_query,
+            messageSearchResults: @message_search_results
           }
         }
         socket={@socket}

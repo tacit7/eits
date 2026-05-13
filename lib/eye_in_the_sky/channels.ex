@@ -342,4 +342,41 @@ defmodule EyeInTheSky.Channels do
     )
     |> Repo.all()
   end
+
+  @doc """
+  Resolves name-based @mentions in a message body to session IDs.
+
+  Scans `body` for `@word` tokens that are NOT purely numeric (those are handled by
+  `ChannelProtocol.parse_routing/2`). For each non-numeric token, looks up active
+  channel members whose session name matches case-insensitively. Returns a deduplicated
+  list of matching session IDs.
+
+  Only resolves members already in the channel — unknown names are silently ignored.
+  """
+  @spec resolve_mention_names(term(), String.t()) :: [integer()]
+  def resolve_mention_names(channel_id, body) when is_binary(body) do
+    name_tokens =
+      Regex.scan(~r/@([A-Za-z][A-Za-z0-9_.-]*)/, body)
+      |> Enum.map(fn [_, token] -> String.downcase(token) end)
+      |> Enum.uniq()
+
+    if name_tokens == [] do
+      []
+    else
+      from(m in ChannelMember,
+        join: s in EyeInTheSky.Sessions.Session,
+        on: s.id == m.session_id,
+        where:
+          m.channel_id == ^channel_id and
+            not is_nil(m.session_id) and
+            fragment("LOWER(?)", s.name) in ^name_tokens,
+        select: m.session_id,
+        limit: 50
+      )
+      |> Repo.all()
+      |> Enum.uniq()
+    end
+  end
+
+  def resolve_mention_names(_channel_id, _body), do: []
 end

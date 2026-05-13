@@ -183,6 +183,31 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
     end
   end
 
+  def handle_event("search_channel_messages", %{"query" => query}, socket) do
+    channel_id = socket.assigns.active_channel_id
+
+    search_results =
+      if String.trim(query) == "" do
+        []
+      else
+        channel_id
+        |> Messages.search_messages_for_channel(query)
+        |> ChatPresenter.serialize_messages()
+      end
+
+    {:noreply,
+     socket
+     |> assign(:message_search_query, query)
+     |> assign(:message_search_results, search_results)}
+  end
+
+  def handle_event("clear_message_search", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:message_search_query, "")
+     |> assign(:message_search_results, [])}
+  end
+
   def handle_event("search_sessions", %{"session_search" => query}, socket) do
     sessions_by_project =
       ChannelHelpers.build_sessions_by_project(

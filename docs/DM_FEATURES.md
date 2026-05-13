@@ -180,6 +180,50 @@ mount/3 (single with chain)
 
 ---
 
+## Channel Marks as Read on Open
+
+**Commit:** `be35e9a4`
+
+When a user switches to a channel in the chat interface, the channel is automatically marked as read in the database.
+
+**Behavior:**
+- Calling `load_channel_assigns/5` when opening a channel triggers `Channels.mark_as_read/2`
+- Unread badge clears immediately without waiting for a PubSub update
+- Active channel's unread count is zeroed before being passed to socket assigns and Rail component updates
+- Ensures the UI badge reflects read status immediately on channel switch
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/live/chat_live.ex` — Calls `Channels.mark_as_read/2` in `load_channel_assigns/5` when `connected?/1` is true
+- Updates `unread_counts` map to zero out the active channel before sending to Rail sidebar via `send_update/2`
+- Guards against unconnected mounts (dead render) and missing channel/session IDs
+
+---
+
+## Suppress Channel Notification DM for @mentioned and @all Sessions
+
+**Commit:** `e1346ed9`
+
+Channel notification DMs are suppressed for sessions that receive direct or broadcast message prompts from `ChannelFanout`, preventing duplicate delivery in the same turn.
+
+**Behavior:**
+- **@all mentions:** All members receive a broadcast MSG prompt from `ChannelFanout.fanout_all/2` — skip all channel notification DMs
+- **@{session_id} mentions:** Those specific sessions receive a direct MSG prompt from `ChannelFanout.fanout_all/2` — skip their notification DMs
+- **Ambient-only members:** Still receive the channel notification DM (they get an ambient MSG prompt, not a direct/broadcast)
+- Regex scans message body for `@all\b` pattern and `@(\d+)` mentions to identify suppressed sessions
+
+**Problem Solved:**
+- Before: `notify_channel_members/3` DMed all members AND `ChannelFanout` sent MSG prompts to the same sessions
+- After: Duplicate delivery eliminated; agents no longer receive the same message twice in the same turn
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/channel_message_controller.ex` — `notify_channel_members/3` now:
+  - Detects `@all` pattern and skips all DM notifications if matched
+  - Scans for `@(\d+)` session IDs and builds a `MapSet` of mentioned IDs
+  - Filters notification recipients to exclude mentioned sessions
+  - Wrapped in `AsyncTask.start/1` so ambient notifications still process asynchronously
+
+---
+
 ## New Agent Drawer
 
 **Trigger:** "New Agent" button in sidebar or task list.
@@ -472,18 +516,27 @@ The DM composer supports inline autocomplete for file paths and agent names, ena
 - `assets/js/hooks/slash_command_popup.js` — Debounce + stale-reply guard (`fileRequestSeq`)
 - Tests: 20 Elixir tests in `file_autocomplete_test.exs`, 18 JS tests in `slash_command_popup_file.test.js`
 
-### @@ Agent Autocomplete
+### @@ Agent Autocomplete (and # Shortcut)
 
-**Trigger:** Type `@@` to autocomplete agent names from the current workspace.
+**Trigger:** Type `@@` or `#` to autocomplete agent names from the current workspace.
 
 **Behavior:**
 - Client-side autocomplete (no server call)
 - Filters agent list by typed prefix
-- Selects and inserts agent name into message
+- Selecting an agent inserts `@@slug` (with `@@` trigger) or `#slug` (with `#` trigger)
+- `@@` and `#` are equivalent shortcuts; use whichever is more natural in context
 - Remapped from original `@` trigger to avoid conflict with file autocomplete
 
+**Agent Slug Population:**
+- Uses `Agents.list_agents_for_autocomplete/0` to preload `:project` relationship
+- Calls `populate_project_name/1` to set meaningful slugs based on project context
+- Excludes archived agents, capped at 200 rows, sorted by most recent first
+- Ensures slugs are not nil (which would fall back to description or `agent-<id>`)
+
 **Implementation:**
-- Client-side filtering in `assets/js/hooks/slash_command_popup.js`
+- `assets/js/hooks/slash_command_popup.js` — Detects `#` regex, routes to `slashFilter('agent')`, passes `triggerChar` to renderer
+- `assets/js/hooks/slash_renderer.js` — Displays correct prefix (`#` or `@`) on agent rows based on trigger
+- `lib/eye_in_the_sky/agents.ex` — `list_agents_for_autocomplete/0` provides lightweight query with project preload
 - Works without server-side queries; uses agents already loaded on the page
 
 ---
@@ -499,7 +552,7 @@ The DM composer supports inline autocomplete for file paths and agent names, ena
 | `Cmd/Ctrl + T` | New task |
 | `ArrowLeft / ArrowRight` (on splitter) | Resize editor panel by 20px |
 | `@` | Trigger file autocomplete in composer |
-| `@@` | Trigger agent autocomplete in composer |
+| `@@` or `#` | Trigger agent autocomplete in composer |
 
 ---
 

@@ -167,6 +167,87 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
             </div>
           </form>
 
+          <%!-- Context: agent, sessions, source --%>
+          <% has_context =
+            not is_nil(@task.agent_id) ||
+              (is_list(@task.sessions) && @task.sessions != []) ||
+              not is_nil(@task.created_by_session_id) %>
+          <%= if has_context do %>
+            <div class="border-t border-base-content/5 pt-4 space-y-2">
+              <span class="text-mini font-medium text-base-content/40 uppercase tracking-wider block mb-3">
+                Context
+              </span>
+              <%!-- Agent row --%>
+              <%= if not is_nil(@task.agent) do %>
+                <% agent = @task.agent %>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-base-content/40 w-20 shrink-0">Agent</span>
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <.status_dot status={String.to_existing_atom(agent.status || "idle")} />
+                    <span class="font-mono text-base-content/60 truncate">
+                      {agent.persona_id || "agent-#{agent.id}"}
+                    </span>
+                    <span class="text-base-content/20 font-mono">#{agent.id}</span>
+                  </div>
+                  <.link
+                    navigate={"/dm/#{List.first(@task.sessions) && List.first(@task.sessions).uuid}"}
+                    class={[
+                      "ml-2 shrink-0 text-base-content/30 hover:text-primary transition-colors",
+                      if(is_nil(@task.sessions) || @task.sessions == [],
+                        do: "pointer-events-none opacity-40",
+                        else: ""
+                      )
+                    ]}
+                    title="Open session DM"
+                  >
+                    <.icon name="hero-chat-bubble-left-ellipsis" class="size-3.5" />
+                  </.link>
+                </div>
+              <% else %>
+                <%= if not is_nil(@task.agent_id) do %>
+                  <div class="flex items-center text-xs gap-1">
+                    <span class="text-base-content/40 w-20 shrink-0">Agent</span>
+                    <span class="font-mono text-base-content/40">#{@task.agent_id}</span>
+                  </div>
+                <% end %>
+              <% end %>
+              <%!-- Sessions --%>
+              <%= if is_list(@task.sessions) && @task.sessions != [] do %>
+                <%= for session <- @task.sessions do %>
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-base-content/40 w-20 shrink-0">Session</span>
+                    <.link
+                      navigate={"/dm/#{session.uuid}"}
+                      class="flex items-center gap-1 text-base-content/50 hover:text-primary transition-colors min-w-0"
+                    >
+                      <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
+                      <span class="font-mono truncate">{session_label(session)}</span>
+                    </.link>
+                    <.status_dot status={String.to_existing_atom(session.status || "idle")} />
+                  </div>
+                <% end %>
+              <% end %>
+              <%!-- Created by session --%>
+              <%= if not is_nil(@task.created_by_session_id) && (is_nil(@task.sessions) || @task.sessions == []) do %>
+                <div class="flex items-center text-xs gap-1">
+                  <span class="text-base-content/40 w-20 shrink-0">Created by</span>
+                  <span class="font-mono text-base-content/40">
+                    session #{@task.created_by_session_id}
+                  </span>
+                </div>
+              <% end %>
+              <%!-- Worktree --%>
+              <%= if not is_nil(@task.agent) && not is_nil(@task.agent.git_worktree_path) do %>
+                <div class="flex items-center text-xs gap-1">
+                  <span class="text-base-content/40 w-20 shrink-0">Worktree</span>
+                  <span class="font-mono text-base-content/40 truncate text-micro">
+                    {Path.basename(@task.agent.git_worktree_path)}
+                  </span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+
           <%!-- Checklist (rendered via slot — TaskChecklistComponent from parent LiveView) --%>
           {render_slot(@checklist)}
 

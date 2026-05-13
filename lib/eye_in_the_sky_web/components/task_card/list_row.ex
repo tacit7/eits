@@ -98,12 +98,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           if @select_mode do
             "toggle_select_task"
           else
-            JS.remove_attribute("data-drawer-open", to: "[data-drawer-open]")
-            |> JS.set_attribute({"data-drawer-open", ""}, to: "#task-row-#{@task.id}")
-            |> JS.push(@on_click || "")
+            open_row_js(@task.id, @on_click)
           end
         }
-        phx-keyup={if !@select_mode, do: @on_click}
+        phx-keyup={if !@select_mode, do: open_row_js(@task.id, @on_click)}
         phx-key="Enter"
         phx-value-task_id={@task.uuid || to_string(@task.id)}
         role="button"
@@ -256,4 +254,13 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
   defp priority_label(1), do: "Low"
   defp priority_label(_), do: ""
 
+  # Shared JS command for both click and keyup (Enter) row activation.
+  # Scoped to #project-tasks-list to avoid clearing data-drawer-open on other components.
+  # NOTE: id is the integer task.id (matches `id={"task-row-#{@task.id}"}` DOM id).
+  #       data-row-id uses uuid|string id — dual keying is intentional, do not unify.
+  defp open_row_js(task_id, on_click) do
+    JS.remove_attribute("data-drawer-open", to: "#project-tasks-list [data-drawer-open]")
+    |> JS.set_attribute({"data-drawer-open", ""}, to: "#task-row-#{task_id}")
+    |> JS.push(on_click || "")
+  end
 end

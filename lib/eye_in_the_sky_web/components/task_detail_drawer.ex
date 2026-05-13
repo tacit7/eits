@@ -183,7 +183,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                 <div class="flex items-center justify-between text-xs">
                   <span class="text-base-content/40 w-20 shrink-0">Agent</span>
                   <div class="flex items-center gap-1.5 min-w-0">
-                    <.status_dot status={String.to_existing_atom(agent.status || "idle")} />
+                    <.status_dot status={safe_status_atom(agent.status)} />
                     <span class="font-mono text-base-content/60 truncate">
                       {agent.persona_id || "agent-#{agent.id}"}
                     </span>
@@ -223,7 +223,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                       <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
                       <span class="font-mono truncate">{session_label(session)}</span>
                     </.link>
-                    <.status_dot status={String.to_existing_atom(session.status || "idle")} />
+                    <.status_dot status={safe_status_atom(session.status)} />
                   </div>
                 <% end %>
               <% end %>
@@ -280,34 +280,12 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
             </div>
           <% end %>
 
-          <%!-- Metadata --%>
-          <div class="flex items-center gap-3 text-mini text-base-content/25 pt-2">
-            <%= if not is_nil(@task.updated_at) && @task.updated_at != @task.created_at do %>
-              <span>Updated {relative_time(@task.updated_at)}</span>
-              <span class="text-base-content/10">&middot;</span>
-            <% end %>
-            <%!-- Agent link — navigates to the agent's active session DM --%>
-            <%= if is_list(@task.sessions) && @task.sessions != [] do %>
-              <% session = List.first(@task.sessions) %>
-              <.link
-                navigate={"/dm/#{session.uuid}"}
-                class="flex items-center gap-1 text-base-content/40 hover:text-primary transition-colors"
-                title="Open agent session"
-              >
-                <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
-                <span class="font-mono truncate max-w-[180px]">
-                  {session_label(session)}
-                </span>
-              </.link>
-            <% else %>
-              <%= if @task.agent_id do %>
-                <span class="flex items-center gap-1 text-base-content/25">
-                  <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
-                  <span class="font-mono">Agent #{@task.agent_id}</span>
-                </span>
-              <% end %>
-            <% end %>
-          </div>
+          <%!-- Metadata timestamps --%>
+          <%= if not is_nil(@task.updated_at) && @task.updated_at != @task.created_at do %>
+            <div class="text-mini text-base-content/25 pt-2">
+              Updated {relative_time(@task.updated_at)}
+            </div>
+          <% end %>
 
           <%!-- Add annotation --%>
           <div class="border-t border-base-content/5 pt-4">
@@ -462,8 +440,9 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   end
 
   # Builds a JS command that clears the selected-row indicator before toggling.
+  # Scoped to #project-tasks-list to avoid nuking data-drawer-open on unrelated components.
   defp clear_selection_and_toggle(event) when is_binary(event) do
-    JS.remove_attribute("data-drawer-open", to: "[data-drawer-open]")
+    JS.remove_attribute("data-drawer-open", to: "#project-tasks-list [data-drawer-open]")
     |> JS.push(event)
   end
 
@@ -486,4 +465,13 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   end
 
   defp session_label(_), do: "Agent"
+
+  # Safe conversion of status strings to atoms for status_dot.
+  # String.to_existing_atom/1 crashes on unknown strings — use a lookup instead.
+  @known_statuses ~w(idle working waiting completed failed)a
+  @status_map Map.new(@known_statuses, &{to_string(&1), &1})
+  defp safe_status_atom(status) when is_binary(status),
+    do: Map.get(@status_map, status, :idle)
+
+  defp safe_status_atom(_), do: :idle
 end

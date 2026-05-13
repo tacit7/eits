@@ -127,10 +127,6 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "quick_create_chat" } },
   { id: "create.prompt",  label: "New Prompt",  keys: ["n", "p"], group: "create",
     action: { kind: "navigate", path: "prompts/new", relative: true } },
-  { id: "create.kanban_task", label: "New Kanban Task", keys: ["n", "k"], group: "create",
-    action: { kind: "push_event", event: "toggle_new_task_drawer", payload: {}, target: "active_view" },
-    scope: "route_suffix:/kanban" },
-
   // global
   { id: "global.help",    label: "Keybinding Help",  keys: ["?"], group: "global",
     action: { kind: "client", name: "help" } },
@@ -321,10 +317,6 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "quick_create_chat" } },
   { id: "leader.create.prompt",      label: "New Prompt",      keys: ["Space", "n", "p"], group: "create",
     action: { kind: "navigate", path: "prompts/new", relative: true } },
-  { id: "leader.create.kanban_task", label: "New Kanban Task", keys: ["Space", "n", "k"], group: "create",
-    action: { kind: "push_event", event: "toggle_new_task_drawer", payload: {}, target: "active_view" },
-    scope: "route_suffix:/kanban" },
-
   // group jump (context: any list)
   { id: "list.group_prev", label: "Previous group", keys: ["{"], group: "context",
     action: { kind: "client", name: "list_group_prev" }, scope: "feature:vim-list" },

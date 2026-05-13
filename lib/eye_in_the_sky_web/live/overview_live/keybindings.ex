@@ -175,8 +175,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
         %{keys: ["Space", "n", "t"], desc: "New task"},
         %{keys: ["Space", "n", "n"], desc: "New note"},
         %{keys: ["Space", "n", "c"], desc: "New chat"},
-        %{keys: ["Space", "n", "p"], desc: "New prompt"},
-        %{keys: ["Space", "n", "k"], desc: "New kanban task (kanban page)"}
+        %{keys: ["Space", "n", "p"], desc: "New prompt"}
       ]
     }
   ]

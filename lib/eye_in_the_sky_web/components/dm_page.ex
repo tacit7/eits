@@ -475,7 +475,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       </div>
 
       <%!-- Tab content --%>
-      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto" id="dm-tab-content">
+      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col" id="dm-tab-content">
         <%= case @active_tab do %>
           <% "messages" -> %>
             <.messages_tab_content

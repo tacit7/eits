@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   def messages_tab(assigns) do
     ~H"""
-    <div class="flex h-full flex-col" id="dm-messages-tab">
+    <div class="flex flex-1 min-h-0 flex-col" id="dm-messages-tab">
       <div
         class="overflow-y-auto flex-1 min-h-0"
         id="messages-container"

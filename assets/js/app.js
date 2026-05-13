@@ -177,8 +177,24 @@ const liveSocket = new LiveSocket("/live", Socket, {
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
-window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
-window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+// Track navigation kind so we can reset main scroll on full navigations only.
+// phx:page-loading-stop doesn't carry detail; capture kind from start and apply on stop.
+let _pendingNavKind = null
+window.addEventListener("phx:page-loading-start", (e) => {
+  _pendingNavKind = e.detail?.kind ?? null
+  topbar.show(300)
+})
+window.addEventListener("phx:page-loading-stop", (_info) => {
+  topbar.hide()
+  // Reset main scroll on navigate (not patch/submit) so pages always start at the top.
+  // Without this, scrolling down the sessions list then clicking a session leaves
+  // #main-content scrolled, hiding the DM composer below the viewport.
+  if (_pendingNavKind === "navigate") {
+    const main = document.getElementById("main-content")
+    if (main) main.scrollTop = 0
+  }
+  _pendingNavKind = null
+})
 
 // Editor layout: source of truth on <html data-editor-mode>, owned by the
 // EditorLayout hook on #file-editor-pane. Window-level listeners handle

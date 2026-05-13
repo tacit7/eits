@@ -45,6 +45,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     --%>
     <div
       id={"task-row-#{@task.id}"}
+      data-row-id={@task.uuid || to_string(@task.id)}
       class={[
         "group/row relative",
         @task.completed_at && "opacity-60 hover:opacity-80",

@@ -168,6 +168,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: handle_toggle_select_all_tasks(socket)
 
   @impl true
+  def handle_event("select_range", params, socket),
+    do: handle_select_range_tasks(params, socket)
+
+  @impl true
   def handle_event("enter_select_mode_tasks", _params, socket),
     do: handle_enter_select_mode(socket)
 
@@ -343,22 +347,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           />
 
           <div
-            id="project-tasks-list"
-            phx-update="stream"
-            phx-hook="TaskListSelection"
-            data-vim-list
-            data-selected-task-id={@selected_task && @selected_task.id}
-            class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
+            id="project-tasks-shift-wrapper"
+            phx-hook="ShiftSelect"
+            data-list-id="project-tasks-list"
           >
-            <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
-              <TaskCard.task_card
-                task={task}
-                variant="list"
-                on_click="open_task_detail"
-                on_delete="delete_task"
-                select_mode={@tasks_select_mode}
-                selected={MapSet.member?(@selected_task_ids, task.uuid || to_string(task.id))}
-              />
+            <div
+              id="project-tasks-list"
+              phx-update="stream"
+              phx-hook="TaskListSelection"
+              data-vim-list
+              data-selected-task-id={@selected_task && @selected_task.id}
+              class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
+            >
+              <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
+                <TaskCard.task_card
+                  task={task}
+                  variant="list"
+                  on_click="open_task_detail"
+                  on_delete="delete_task"
+                  select_mode={@tasks_select_mode}
+                  selected={MapSet.member?(@selected_task_ids, task.uuid || to_string(task.id))}
+                />
+              </div>
             </div>
           </div>
 

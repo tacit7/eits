@@ -1,7 +1,7 @@
 /**
  * ShiftSelect
  *
- * Wraps the sessions list. Uses a single capture-phase listener to:
+ * Wraps a list of selectable rows. Uses a single capture-phase listener to:
  * - Track the anchor row on normal checkbox clicks.
  * - Fire `select_range` on shift+click and cancel the phx-click handler.
  *
@@ -10,13 +10,15 @@
  * the click. The capture handler runs before that stop fires.
  *
  * Usage:
- *   <div phx-hook="ShiftSelect" id="ps-list-shift-wrapper">
+ *   <div phx-hook="ShiftSelect" id="ps-list-shift-wrapper" data-list-id="ps-list">
  *     <div id="ps-list" phx-update="stream" ...>
  *       <div data-row-id="123" ...>
  *         ...  (square_checkbox renders data-checkbox-area="true" on the label)
  *       </div>
  *     </div>
  *   </div>
+ *
+ * data-list-id is optional; defaults to "ps-list" for backwards compatibility.
  */
 export const ShiftSelect = {
   mounted() {
@@ -44,8 +46,10 @@ export const ShiftSelect = {
         return
       }
 
-      // Scope to #ps-list to avoid picking up stray data-row-id elements
-      const list = this.el.querySelector("#ps-list")
+      // Scope to the list element to avoid picking up stray data-row-id elements.
+      // data-list-id overrides the default "#ps-list" for reuse across different pages.
+      const listId = this.el.dataset.listId || "ps-list"
+      const list = this.el.querySelector(`#${listId}`)
       if (!list) return
 
       const orderedIds = Array.from(
@@ -74,7 +78,8 @@ export const ShiftSelect = {
     // After a LiveView patch (filter change, PubSub update), reset the anchor
     // if the anchored row is no longer in the DOM.
     if (this._anchor) {
-      const list = this.el.querySelector("#ps-list")
+      const listId = this.el.dataset.listId || "ps-list"
+      const list = this.el.querySelector(`#${listId}`)
       if (list && !list.querySelector(`[data-row-id="${this._anchor}"]`)) {
         this._anchor = null
       }

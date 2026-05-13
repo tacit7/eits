@@ -27,6 +27,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TaskEventHandlers do
   defdelegate handle_toggle_select_all_tasks(socket), to: TasksHelpers
   defdelegate handle_enter_select_mode(socket), to: TasksHelpers
   defdelegate handle_exit_select_mode(socket), to: TasksHelpers
+  defdelegate handle_select_range_tasks(params, socket), to: TasksHelpers
   defdelegate handle_open_filter_sheet(params, socket), to: TasksHelpers
   defdelegate handle_close_filter_sheet(params, socket), to: TasksHelpers
   defdelegate handle_search(params, socket, reload_fn), to: TasksHelpers

@@ -1507,7 +1507,7 @@ Settings handlers were extracted into a dedicated `SettingsHandlers` module (com
 
 ## Desktop Top Bar
 
-**Commits:** `d6c5ae2e`, `ef000cd3`, `b58104ad`, `fa1f2f94`
+**Commits:** `d6c5ae2e`, `ef000cd3`, `b58104ad`, `fa1f2f94`, `37c837a9`
 
 A desktop-only top bar appears above the main content area on the DM page, providing breadcrumb navigation, search access, and tab controls.
 
@@ -1558,10 +1558,26 @@ An ellipsis button in the toolbar opens an inline dropdown with session-level ac
 - Previously, the page height was computed as `100dvh - 2rem`, which caused an 8px overflow into the parent container
 - With overflow-auto on main, this overflow made the main container scrollable, causing messages to be clipped and auto-scroll to land 8px short of the visual bottom
 
+**Scroll fixes (37c837a9):**
+
+*Navigation-aware scroll reset:*
+- When navigating between sessions (not patching/submitting), reset `#main-content` scrollTop to 0 so the DM composer is always visible when entering a session
+- Problem: Scrolling down the sessions list then clicking a session would leave `#main-content` scrolled, hiding the composer below the viewport
+- Solution: `phx:page-loading-start` event now captures the navigation `kind` (navigate/patch/submit); `phx:page-loading-stop` resets scroll only on navigate
+- Prevents accidental scroll state bleeding across different conversations
+
+*Flex height chain fixes:*
+- `dm-tab-content` div now has `flex flex-col` classes to ensure proper height distribution within the tab container
+- `dm-messages-tab` changed from `h-full` to `flex-1 min-h-0` to participate in flex height constraints instead of filling arbitrary height
+- The `min-h-0` override tells the flex container to collapse below its natural height, allowing sibling elements to constrain the viewport
+- Without these changes, the messages container would either overflow its parent or fail to fill available space
+
 **Files:**
+- `assets/js/app.js` — navigation kind tracking and scroll reset on `phx:page-loading-stop`
 - `lib/eye_in_the_sky_web/components/layouts.ex` — top_bar component with dm_toolbar private component
 - `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — top bar integration
-- `lib/eye_in_the_sky_web/components/dm_page.ex` — DM page height calculation
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — DM page height calculation and dm-tab-content flex layout
+- `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex` — messages tab flex height constraints
 
 ---
 

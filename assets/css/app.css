@@ -218,6 +218,7 @@ form:focus-visible {
 :root {
   --surface-rail:     var(--color-base-300);
   --surface-flyout:   var(--color-base-200);
+  --pty-bg:           var(--surface-flyout);
   --surface-canvas:   var(--color-base-100);
   --surface-card:     var(--color-base-100);
   --surface-tool:     var(--color-base-200);
@@ -234,7 +235,6 @@ form:focus-visible {
 /* Values sourced directly from the approved DM page mockup (eits-dm-mockup.html).
    Rail < Flyout < Canvas < Card/Composer — near-achromatic, no blue chroma. */
 [data-theme="tokyonight"] {
-  --pty-bg: #16161e;
   --surface-rail:            #131316;  /* nav icon rail — darkest */
   --surface-flyout:          #161619;  /* session switcher panel */
   --surface-canvas:          #1a1a22;  /* main content background */
@@ -281,7 +281,6 @@ form:focus-visible {
 /* --bg-200: hsl(30 3.3% 11.8%) deep bg / rail        */
 /* --brand-100: hsl(15 63.1% 59.6%) orange            */
 [data-theme="dark"] {
-  --pty-bg: #1e1e1e;
   /* ===== Surface stack — warm neutral, matches Claude.ai palette ===== */
   /* Rail is darker than canvas (recedes); card is lighter (elevated).  */
   --surface-rail:     hsl(30 3.3% 10%);         /* deeper than base-300: darkest layer */
@@ -363,7 +362,6 @@ form:focus-visible {
 /* Text: #1D1D19 primary, #66655D secondary, #B1ADA1 muted */
 /* Accent: #D97757 primary orange, #C15F3C brand rust */
 [data-theme="light"] {
-  --pty-bg: #ffffff;
   /* ===== Text contrast ===== */
   --text-primary:   oklch(var(--bc) / 0.92);
   --text-secondary: oklch(var(--bc) / 0.70);
@@ -407,8 +405,6 @@ form:focus-visible {
   background-color: transparent !important;
 }
 
-[data-theme="dracula"] { --pty-bg: #282a36; }
-[data-theme="autumn"]  { --pty-bg: #1c1208; }
 
 /* ===== DM Semantic Token Aliases =====
    Scoped to DM screen components. DaisyUI base tokens stay underneath.

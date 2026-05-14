@@ -13,7 +13,7 @@ Four workflow states by default:
 | In Review   | Amber   |
 | Done        | Green   |
 
-Columns are **drag-reorderable** using the grip handle next to the column name. Reordering changes display position only; state IDs (used by API/CLI) remain the same.
+Columns are **drag-reorderable** using the grip handle (bars icon) next to the column name. Reordering changes display position only; state IDs (used by API/CLI) remain the same.
 
 ## Creating Tasks
 
@@ -41,19 +41,45 @@ Click a card to open the **task detail drawer**.
 
 Right-side slide-over panel for full task editing:
 
-- **Title**: Inline editable text field
+- **Header**: Task title with tag pills (colored dots + labels)
 - **Status**: Dropdown (To Do, In Progress, In Review, Done)
 - **Priority**: Dropdown (None, Low, Medium, High)
-- **Due date**: Date picker with overdue/today indicators
+- **Due date**: Date picker with overdue/today indicators (parses date strings from HTML date input to DateTime)
 - **Tags**: Comma-separated text input
 - **Description**: Multi-line textarea
+- **Context section** (Phase 3): Shows associated agent, sessions, and worktree path if task is spawned from an agent session
 - **Checklist**: Add items, toggle completion, delete items. Progress bar shows completion percentage.
 - **Annotations**: Read existing notes, add new ones via textarea
-- **Footer actions**: Save, Start Agent, Copy to Project, Archive, Delete
+- **Footer actions**:
+  - **Save**: Persists all changes; button disabled until form is marked dirty
+  - **Start Agent**: Spawn a Claude agent for the task (tooltip shows blocking reason if session unavailable)
+  - **Copy to Project**: Duplicate task to another project
+  - **Archive / Delete**: Moved to ellipsis overflow dropdown (bottom right) to reduce visual prominence
+
+### Drawer Dirty State
+
+The form tracks whether any field has been modified:
+- **Save button disabled** until at least one field changes
+- **Unsaved indicator** appears when form is dirty
+- Uses `DrawerDirtyForm` hook (`assets/js/hooks/drawer_dirty_form.js`) to monitor all input changes
 
 ## Filtering
 
+### Status Pills
+
+Shows per-state task counts with colored dots:
+- Each status (To Do, In Progress, In Review, Done) displays as a pill with:
+  - Colored dot matching the state color
+  - State name
+  - Task count for that state
+- Click a pill to filter by that status (shows only tasks in that state)
+- Active filter highlighted with darker background
+- Toolbar reorder: search → status pills → view toggle → sort
+
+**Implementation**: `count_tasks_for_project_by_state/1` provides a single GROUP BY query (more efficient than N separate counts).
+
 ### Search
+
 Type 2 or more characters in the search bar to filter tasks by title/description (full-text search).
 
 **Search behavior:**
@@ -64,9 +90,11 @@ Type 2 or more characters in the search bar to filter tasks by title/description
 - Partial matches supported (substring and word matching)
 
 ### Priority Filters
+
 Click High/Med/Low chips to filter by priority. Click again to deselect.
 
 ### Tag Filters
+
 Click tag chips to filter. Multiple tags can be selected:
 - **AND mode** (default): Shows tasks that have ALL selected tags
 - **OR mode**: Shows tasks that have ANY selected tag
@@ -108,18 +136,45 @@ The task list view (`/projects/:id/tasks`) also supports bulk operations on sele
 
 1. Click the **Select** toggle to enter bulk mode
 2. Checkboxes appear on each row. Click rows to select/deselect.
-3. Action bar appears showing count of selected tasks:
+3. **Shift-Select support**: Click a row's checkbox, then Shift+click another checkbox to select the entire range (matches sessions page behavior)
+4. Action bar appears showing count of selected tasks:
    - **Move to**: Dropdown menu of workflow states (with color dots). Click a state to move all selected tasks to it. No confirmation needed as state changes are reversible.
    - **Archive**: Archives all selected tasks. Opens a styled confirmation modal before proceeding. Shows mixed-result messaging on completion (e.g., "Archived 3 tasks; 1 failed").
    - **Delete**: Deletes all selected tasks (with confirmation dialog)
 
-4. After any bulk operation, the selection is cleared and the list reloads.
+5. After any bulk operation, the selection is cleared and the list reloads.
 
 Success and error messages include counts:
 - "Moved 3 tasks to In Progress"
 - "Archived 2 tasks"
 - "Moved 5 tasks to Done; 1 failed"
 - "Archived 3 tasks; 1 could not be archived"
+
+## Row Selection & Persistent Drawer State
+
+### Task List Row States
+
+Rows display distinct visual states:
+- **Default**: Neutral background
+- **Hover**: Light background tint
+- **Focus-visible**: Keyboard focus via `focus-visible:` prefix; vim-nav focus via `vim-nav-focused` class
+- **Selected** (drawer open): Left accent bar + subtle background highlight
+- **Checked** (bulk mode): Outer wrapper gets `bg-primary/8` to distinguish from selected
+- **Done**: Metadata line at opacity-70 in addition to title strikethrough
+
+### Persistent Selection After Drawer Close
+
+When a task detail drawer is open, the corresponding row in the task list is marked with `data-drawer-open` attribute:
+- Left accent bar appears (colored primary dot)
+- Row background subtly highlights
+- Row actions (buttons) are revealed
+- When drawer closes, the attribute is cleared
+
+**Implementation**:
+- `TaskListSelection` hook (`assets/js/hooks/task_list_selection.js`) uses `MutationObserver` to detect LiveView stream patches
+- Hook restores `data-drawer-open` after patch if the selected task is still visible
+- Drawer close button clears `data-drawer-open` from all rows via JS
+- `data-selected-task-id` on list container drives the hook
 
 ## Drag and Drop
 
@@ -132,6 +187,8 @@ Drag columns by the grip handle (bars icon) next to the column name to reorder. 
 ## Spawning Agents
 
 From the task detail drawer, click **Start Agent** to spawn a Claude agent for the task. The agent receives the task title and description as its prompt. The resulting session is linked to the task.
+
+**Blocking reason tooltip**: If the session that owns the task is not available, the tooltip shows the specific reason (e.g., "Session [name]", "Agent [id]").
 
 ## Copying Tasks
 
@@ -245,20 +302,84 @@ The toolbar Select button now provides clearer visual feedback for entering and 
 
 **Commits**: `1225e125`, `0a4c5b60`
 
+## Task Date Handling
+
+### Due Date DateTime Parsing
+
+HTML date input sends `YYYY-MM-DD` string format. The task drawer now parses this string to a proper `DateTime` struct before passing to Ecto changesets.
+
+- `handle_update_task` in `TasksHelpers` parses the date string to `DateTime`
+- Task display helpers (`format_due_date`, `format_date_input`, `overdue?`, `due_today?`, `due_date_class`) now handle both string and `DateTime` struct inputs
+- Allows tasks loaded from DB (which return `DateTime` structs) to render correctly
+- Fixes bug where due_at updates failed due to type mismatch
+
+**Files**:
+- `lib/eye_in_the_sky_web/helpers/task_helpers.ex` — Display helper improvements
+- `lib/eye_in_the_sky_web/live/shared/tasks_helpers.ex` — Date parsing in `handle_update_task`
+
+**Commit**: `81ee48e8`
+
+## Task Drawer Header Tag Pills
+
+The task detail drawer header now displays all assigned tags as colored pills (dots + labels):
+- Tag color matches the task tag color scheme
+- Clicking a pill navigates to filter tasks by that tag
+- Improves visibility of task associations at a glance
+
+**File**: `lib/eye_in_the_sky_web/components/task_detail_drawer.ex`
+**Commit**: `dd83409c`
+
+## Task Detail Drawer Context Section
+
+Phase 3 improvement: The drawer now displays a context section showing:
+- **Agent**: The agent that spawned the task (if applicable)
+- **Sessions**: List of associated sessions
+- **Worktree**: Path to the worktree if spawned from an agent session
+
+Provides users with visibility into the source and lineage of task creation.
+
+**File**: `lib/eye_in_the_sky_web/components/task_detail_drawer.ex`
+**Commit**: `8b959c4d`
+
+## Review Issues Fixed
+
+- **safe_status_atom**: Status state names are now safely converted to atoms
+- **Scoped selectors**: CSS selectors now properly scoped to task rows to avoid unintended matches
+- **Keyup highlight**: Keyboard navigation (keyup events) now properly highlights and focuses task rows
+- **Duplicate session link**: Removed accidental duplicate session links in the task drawer
+
+**Files**:
+- `assets/js/hooks/vim_nav_commands.ts` — Simplified keyup handling
+- `lib/eye_in_the_sky_web/components/task_card/kanban_card.ex` — Scoped selectors
+- `lib/eye_in_the_sky_web/components/task_card/list_row.ex` — Fixed duplicate links
+- `lib/eye_in_the_sky_web/components/task_detail_drawer.ex` — Refactored structure
+- `lib/eye_in_the_sky_web/live/overview_live/keybindings.ex` — Simplified keybindings
+
+**Commit**: `11b0c2b8`
+
 ## File Locations
 
 | Component | Path |
 |-----------|------|
 | LiveView | `lib/eye_in_the_sky_web/live/project_live/kanban.ex` |
+| Tasks LiveView | `lib/eye_in_the_sky_web/live/project_live/tasks.ex` |
 | Filter Handlers | `lib/eye_in_the_sky_web/live/project_live/kanban/filter_handlers.ex` |
+| Task Event Handlers | `lib/eye_in_the_sky_web/live/shared/task_event_handlers.ex` |
+| Tasks Helpers | `lib/eye_in_the_sky_web/live/shared/tasks_helpers.ex` |
 | Kanban Toolbar | `lib/eye_in_the_sky_web/components/kanban_toolbar.ex` |
+| Top Bar Tasks | `lib/eye_in_the_sky_web/components/top_bar/tasks.ex` |
 | Kanban Card | `lib/eye_in_the_sky_web/components/task_card/kanban_card.ex` |
+| List Row | `lib/eye_in_the_sky_web/components/task_card/list_row.ex` |
 | Detail Drawer | `lib/eye_in_the_sky_web/components/task_detail_drawer.ex` |
 | New Task Drawer | `lib/eye_in_the_sky_web/components/new_task_drawer.ex` |
 | New Agent Drawer | `lib/eye_in_the_sky_web/components/new_agent_drawer.ex` |
 | Sidebar Projects | `lib/eye_in_the_sky_web/components/sidebar/projects_section.ex` |
+| Task Helpers | `lib/eye_in_the_sky_web/helpers/task_helpers.ex` |
 | View Helpers | `lib/eye_in_the_sky_web/helpers/view_helpers.ex` |
-| Tasks Context | `lib/eye_in_the_sky_web/tasks.ex` |
-| Task Schema | `lib/eye_in_the_sky_web/tasks/task.ex` |
-| ChecklistItem | `lib/eye_in_the_sky_web/tasks/checklist_item.ex` |
-| JS Hooks | `assets/js/app.js` (SortableKanban, SortableColumns) |
+| Tasks Context | `lib/eye_in_the_sky/tasks.ex` |
+| Tasks Queries | `lib/eye_in_the_sky/tasks/queries.ex` |
+| Task Schema | `lib/eye_in_the_sky/tasks/task.ex` |
+| ChecklistItem | `lib/eye_in_the_sky/tasks/checklist_item.ex` |
+| JS Hooks | `assets/js/app.js` (SortableKanban, SortableColumns, TaskListSelection) |
+| JS Hooks | `assets/js/hooks/drawer_dirty_form.js` |
+| JS Hooks | `assets/js/hooks/shift_select.js` |

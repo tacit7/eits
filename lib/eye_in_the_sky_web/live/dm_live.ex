@@ -32,6 +32,10 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @default_message_limit 50
   @message_page_size 20
+  # Grace period (ms) after Claude launches before PTY stdin writes are safe.
+  # Ink calls setRawMode(true) async; writes before that land while ICRNL is
+  # active and \r gets converted to \n (insert newline, not submit).
+  @pty_stdin_grace_ms 3_000
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
@@ -58,7 +62,11 @@ defmodule EyeInTheSkyWeb.DmLive do
         socket =
           if connected?(socket),
             do: subscribe_dm_pty(socket, session.uuid),
-            else: socket |> assign(:pty_pid, nil) |> assign(:pty_pending_launch, false)
+            else:
+              socket
+              |> assign(:pty_pid, nil)
+              |> assign(:pty_pending_launch, false)
+              |> assign(:pty_launched_at, nil)
 
         {:ok, socket}
 
@@ -112,7 +120,10 @@ defmodule EyeInTheSkyWeb.DmLive do
       if socket.assigns[:pty_pending_launch] && socket.assigns[:pty_pid] do
         PtyServer.write(socket.assigns.pty_pid, build_launch_command(socket.assigns))
         PtyServer.mark_launched(socket.assigns.pty_pid)
-        assign(socket, :pty_pending_launch, false)
+
+        socket
+        |> assign(:pty_pending_launch, false)
+        |> assign(:pty_launched_at, DateTime.utc_now())
       else
         socket
       end
@@ -612,12 +623,39 @@ defmodule EyeInTheSkyWeb.DmLive do
       header = "\r\n\e[1;36m[#{sender}]\e[0m\r\n"
       socket = push_event(socket, "pty_output", %{data: Base.encode64(header)})
       body = String.trim_trailing(msg.body)
-      PtyServer.write(socket.assigns.pty_pid, body)
-      PtyServer.write(socket.assigns.pty_pid, "\r\n")
+      pty_pid = socket.assigns.pty_pid
+
+      # Ink calls stdin.setRawMode(true) asynchronously during App mount.
+      # If the PTY write lands before raw mode is active, the line discipline's
+      # ICRNL flag converts \r → \n, which Ink sees as "insert newline" rather
+      # than "submit".  Give Claude 3 seconds to reach raw mode before writing
+      # stdin; after the grace window, write immediately.
+      elapsed_ms =
+        case socket.assigns[:pty_launched_at] do
+          nil -> @pty_stdin_grace_ms
+          launched_at -> DateTime.diff(DateTime.utc_now(), launched_at, :millisecond)
+        end
+
+      delay_ms = max(0, @pty_stdin_grace_ms - elapsed_ms)
+
+      if delay_ms > 0 do
+        Process.send_after(self(), {:deferred_pty_write, pty_pid, body}, delay_ms)
+      else
+        PtyServer.write(pty_pid, body)
+        PtyServer.write(pty_pid, "\r")
+      end
+
       {:noreply, socket}
     else
       {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}
     end
+  end
+
+  @impl true
+  def handle_info({:deferred_pty_write, pty_pid, body}, socket) do
+    PtyServer.write(pty_pid, body)
+    PtyServer.write(pty_pid, "\r")
+    {:noreply, socket}
   end
 
   # ---------------------------------------------------------------------------
@@ -785,6 +823,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     socket
     |> assign(:pty_pid, pty_pid)
     |> assign(:pty_pending_launch, pending)
+    |> assign(:pty_launched_at, nil)
   end
 
   # ---------------------------------------------------------------------------

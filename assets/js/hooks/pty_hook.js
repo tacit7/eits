@@ -140,7 +140,7 @@ function getXtermTheme() {
   const base = THEMES[daisyTheme] || THEMES.dark
   // Read --surface-canvas so the terminal background matches the sessions list page.
   const canvas = getComputedStyle(document.documentElement).getPropertyValue("--surface-canvas").trim()
-  return canvas ? { ...base, background: canvas, cursorAccent: canvas } : base
+  return canvas ? { ...base, background: canvas } : base
 }
 
 export const PtyHook = {

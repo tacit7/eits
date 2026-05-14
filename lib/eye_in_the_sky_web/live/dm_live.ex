@@ -799,17 +799,26 @@ defmodule EyeInTheSkyWeb.DmLive do
   # cd to the session's working directory (if set), then resume the claude session.
   defp build_launch_command(assigns) do
     session = assigns[:session]
+    agent = assigns[:agent]
     uuid = assigns[:session_uuid]
 
-    cd_part =
-      case session && session.git_worktree_path do
-        nil -> ""
-        "" -> ""
-        path -> "cd #{path} && "
-      end
+    # Resolve working path: session.git_worktree_path → agent.git_worktree_path → project.path
+    working_path =
+      nonempty(session && session.git_worktree_path) ||
+        nonempty(agent && agent.git_worktree_path) ||
+        nonempty(project_path(session))
+
+    cd_part = if working_path, do: "cd #{working_path} && ", else: ""
 
     "#{cd_part}claude --resume #{uuid}\n"
   end
+
+  defp nonempty(nil), do: nil
+  defp nonempty(""), do: nil
+  defp nonempty(val), do: val
+
+  defp project_path(%{project: %{path: path}}), do: path
+  defp project_path(_), do: nil
 
   defp subscribe_dm_pty(socket, session_uuid) do
     session_key = "dm-#{session_uuid}"

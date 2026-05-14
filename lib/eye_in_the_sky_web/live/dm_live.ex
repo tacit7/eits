@@ -107,11 +107,11 @@ defmodule EyeInTheSkyWeb.DmLive do
       PtyServer.resize(pid, cols, rows)
     end
 
-    # Fire claude on the first resize so it starts with correct dimensions,
-    # not the 220-col PTY default from spawn time.
+    # Fire the launch command on the first resize so claude starts with correct
+    # dimensions, not the 220-col PTY default from spawn time.
     socket =
       if socket.assigns[:pty_pending_launch] && socket.assigns[:pty_pid] do
-        PtyServer.write(socket.assigns.pty_pid, "claude\n")
+        PtyServer.write(socket.assigns.pty_pid, build_launch_command(socket.assigns))
         assign(socket, :pty_pending_launch, false)
       else
         socket
@@ -745,6 +745,22 @@ defmodule EyeInTheSkyWeb.DmLive do
   defp toggle_active_overlay(socket, overlay) do
     {:noreply,
      assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, overlay))}
+  end
+
+  # Build the shell command string to run on first terminal open.
+  # cd to the session's working directory (if set), then resume the claude session.
+  defp build_launch_command(assigns) do
+    session = assigns[:session]
+    uuid = assigns[:session_uuid]
+
+    cd_part =
+      case session && session.git_worktree_path do
+        nil -> ""
+        "" -> ""
+        path -> "cd #{path} && "
+      end
+
+    "#{cd_part}claude --resume #{uuid}\n"
   end
 
   defp subscribe_dm_pty(socket, session_uuid) do

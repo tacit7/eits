@@ -611,7 +611,9 @@ defmodule EyeInTheSkyWeb.DmLive do
       sender = if msg.from_session_id, do: "session:#{msg.from_session_id}", else: "DM"
       header = "\r\n\e[1;36m[#{sender}]\e[0m\r\n"
       socket = push_event(socket, "pty_output", %{data: Base.encode64(header)})
-      PtyServer.write(socket.assigns.pty_pid, msg.body <> "\r")
+      body = String.trim_trailing(msg.body)
+      PtyServer.write(socket.assigns.pty_pid, body)
+      PtyServer.write(socket.assigns.pty_pid, "\r\n")
       {:noreply, socket}
     else
       {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}

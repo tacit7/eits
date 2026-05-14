@@ -606,8 +606,15 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_info({:new_dm, msg}, socket) do
-    # Inbound DM from another session — append directly, no stream_content clear.
-    {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}
+    if socket.assigns[:pty_pid] do
+      # PTY mode — render the DM as terminal output so xterm.js displays it.
+      # Format: bold cyan sender label + reset + message body.
+      sender = if msg.from_session_id, do: "session:#{msg.from_session_id}", else: "DM"
+      text = "\r\n\e[1;36m[#{sender}]\e[0m #{msg.body}\r\n"
+      {:noreply, push_event(socket, "pty_output", %{data: Base.encode64(text)})}
+    else
+      {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}
+    end
   end
 
   # ---------------------------------------------------------------------------

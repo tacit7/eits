@@ -607,11 +607,12 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_info({:new_dm, msg}, socket) do
     if socket.assigns[:pty_pid] do
-      # PTY mode — render the DM as terminal output so xterm.js displays it.
-      # Format: bold cyan sender label + reset + message body.
+      # PTY mode — render the DM header in xterm.js and feed the body to Claude.
       sender = if msg.from_session_id, do: "session:#{msg.from_session_id}", else: "DM"
-      text = "\r\n\e[1;36m[#{sender}]\e[0m #{msg.body}\r\n"
-      {:noreply, push_event(socket, "pty_output", %{data: Base.encode64(text)})}
+      header = "\r\n\e[1;36m[#{sender}]\e[0m\r\n"
+      socket = push_event(socket, "pty_output", %{data: Base.encode64(header)})
+      PtyServer.write(socket.assigns.pty_pid, msg.body <> "\r")
+      {:noreply, socket}
     else
       {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}
     end

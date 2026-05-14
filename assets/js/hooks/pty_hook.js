@@ -90,7 +90,7 @@ const THEMES = {
     foreground:          "#787c99",
     cursor:              "#c0caf5",
     cursorAccent:        "#16161e",
-    selectionBackground: "#515c7e4d",
+    selectionBackground: "#7aa2f780",
     black:               "#363b54",
     brightBlack:         "#363b54",
     red:                 "#f7768e",

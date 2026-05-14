@@ -431,17 +431,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       </div>
 
 
-      <%= if @pty_pid && @active_tab in ["messages", nil] do %>
-        <%!-- PTY terminal — only on messages tab --%>
+      <%= if @pty_pid do %>
+        <%!-- PTY terminal — always in DOM so xterm.js keeps its state; hidden when off messages tab --%>
         <div
           id={"pty-dm-#{@session_uuid}"}
           phx-hook="PtyHook"
           phx-update="ignore"
           class="flex-1 min-h-0 p-2 overflow-hidden"
+          style={if @active_tab not in ["messages", nil], do: "display:none"}
         >
         </div>
-      <% else %>
-        <%!-- Tab content --%>
+      <% end %>
+      <%= if !@pty_pid || @active_tab not in ["messages", nil] do %>
+        <%!-- Tab content — shown when no PTY, or PTY active but on non-messages tab --%>
         <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col" id="dm-tab-content">
           <%= case @active_tab do %>
             <% "messages" -> %>

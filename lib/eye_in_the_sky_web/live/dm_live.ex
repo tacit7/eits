@@ -694,7 +694,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_info(:auto_launch_claude, socket) do
     if pid = socket.assigns[:pty_pid] do
-      PtyServer.write(pid, "claude --resume #{socket.assigns.session_uuid}\n")
+      PtyServer.write(pid, "claude\n")
     end
 
     {:noreply, socket}

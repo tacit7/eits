@@ -130,6 +130,10 @@ defmodule EyeInTheSky.Terminal.PtyServer do
       {"TERM", "xterm-256color"},
       # Signal truecolor support — chalk uses this to select level 3 (24-bit)
       {"COLORTERM", "truecolor"},
+      # Bypass chalk/supports-color isTTY gate. Without this, chalk level is 0
+      # even with COLORTERM set because erlexec stdout is not a real TTY from
+      # Node's perspective. FORCE_COLOR=3 skips the isTTY check entirely.
+      {"FORCE_COLOR", "3"},
       {"LANG", "en_US.UTF-8"},
       {"HOME", home},
       {"PATH", System.get_env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")},

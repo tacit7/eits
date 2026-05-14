@@ -65,7 +65,7 @@ defmodule EyeInTheSky.Terminal.PtyServer do
 
   @default_cols 220
   @default_rows 50
-  @shell_bin System.find_executable("bash") || "/bin/bash"
+  @shell_bin System.find_executable("zsh") || System.find_executable("bash") || "/bin/zsh"
 
   # 512 KB scroll buffer cap
   @max_buffer_bytes 512 * 1024
@@ -249,7 +249,7 @@ defmodule EyeInTheSky.Terminal.PtyServer do
 
   # --- Private ---
 
-  defp default_shell_cmd, do: [@shell_bin, "--norc", "--noprofile", "-i"]
+  defp default_shell_cmd, do: [@shell_bin, "-i"]
 
   # Broadcast a typed message to all subscribers, including tag when set.
   defp broadcast(subscribers, type, payload) do

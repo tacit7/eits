@@ -73,7 +73,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
     ~H"""
     <div
-      class="flex flex-col h-full px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative overflow-hidden"
+      class={[
+        "flex flex-col h-full relative overflow-hidden",
+        if(@pty_pid, do: "px-0 py-0", else: "px-0 sm:px-4 lg:px-8 py-0 sm:py-4")
+      ]}
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
@@ -481,7 +484,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           id={"pty-dm-#{@session_uuid}"}
           phx-hook="PtyHook"
           phx-update="ignore"
-          class="flex-1 min-h-0 p-2"
+          class="flex-1 min-h-0 p-2 overflow-hidden"
         >
         </div>
       <% else %>

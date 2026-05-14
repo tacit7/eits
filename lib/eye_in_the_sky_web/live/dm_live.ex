@@ -3,6 +3,8 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   alias EyeInTheSky.{Agents, Notes, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
+  alias EyeInTheSky.Terminal.PtyRegistry
   alias EyeInTheSkyWeb.Components.DmPage
 
   alias EyeInTheSkyWeb.DmLive.{
@@ -52,7 +54,14 @@ defmodule EyeInTheSkyWeb.DmLive do
     case Agents.get_agent(session.agent_id) do
       {:ok, agent} ->
         MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
-        {:ok, mount_session_assigns(socket, params, session, agent, connected?(socket))}
+        socket = mount_session_assigns(socket, params, session, agent, connected?(socket))
+
+        socket =
+          if connected?(socket),
+            do: subscribe_dm_pty(socket, session.uuid),
+            else: assign(socket, :pty_pid, nil)
+
+        {:ok, socket}
 
       {:error, :not_found} ->
         handle_mount_error(socket, "Agent not found for this session")
@@ -73,6 +82,32 @@ defmodule EyeInTheSkyWeb.DmLive do
       if connected, do: MountState.assign_connected_defaults(s, session), else: s
     end)
     |> MessageHandlers.load_messages_on_mount()
+  end
+
+  # ---------------------------------------------------------------------------
+  # Tab & UI toggles
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # PTY terminal events
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("pty_input", %{"data" => data}, socket) do
+    if pid = socket.assigns[:pty_pid] do
+      PtyServer.write(pid, data)
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("pty_resize", %{"cols" => cols, "rows" => rows}, socket) do
+    if pid = socket.assigns[:pty_pid] do
+      PtyServer.resize(pid, cols, rows)
+    end
+
+    {:noreply, socket}
   end
 
   # ---------------------------------------------------------------------------
@@ -651,10 +686,56 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, assign(socket, :codex_raw_lines, lines)}
   end
 
+  # ---------------------------------------------------------------------------
+  # PTY terminal — DM page
+  # ---------------------------------------------------------------------------
+
+  # Auto-launch claude --resume <session_uuid> into a freshly created PTY
+  @impl true
+  def handle_info(:auto_launch_claude, socket) do
+    if pid = socket.assigns[:pty_pid] do
+      PtyServer.write(pid, "claude --resume #{socket.assigns.session_uuid}\n")
+    end
+
+    {:noreply, socket}
+  end
+
+  # Scroll buffer replayed on (re-)subscribe
+  @impl true
+  def handle_info({:pty_scroll_buffer, buffer}, socket) when byte_size(buffer) > 0 do
+    {:noreply, push_event(socket, "pty_output", %{data: Base.encode64(buffer)})}
+  end
+
+  def handle_info({:pty_scroll_buffer, _empty}, socket), do: {:noreply, socket}
+
+  # Live PTY output
+  @impl true
+  def handle_info({:pty_output, data}, socket) do
+    {:noreply, push_event(socket, "pty_output", %{data: Base.encode64(data)})}
+  end
+
+  # PTY process exited
+  @impl true
+  def handle_info(:pty_exited, socket) do
+    {:noreply,
+     socket
+     |> assign(:pty_pid, nil)
+     |> push_event("pty_output", %{data: Base.encode64("\r\n[process exited]\r\n")})}
+  end
+
   @impl true
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
     {:noreply, socket}
+  end
+
+  @impl true
+  def terminate(_reason, socket) do
+    if pid = socket.assigns[:pty_pid] do
+      PtyServer.unsubscribe(pid)
+    end
+
+    :ok
   end
 
   # ---------------------------------------------------------------------------
@@ -664,6 +745,19 @@ defmodule EyeInTheSkyWeb.DmLive do
   defp toggle_active_overlay(socket, overlay) do
     {:noreply,
      assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, overlay))}
+  end
+
+  defp subscribe_dm_pty(socket, session_uuid) do
+    session_key = "dm-#{session_uuid}"
+    was_running = Registry.lookup(PtyRegistry, session_key) != []
+    {:ok, pty_pid} = PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
+    :ok = PtyServer.subscribe(pty_pid)
+
+    unless was_running do
+      Process.send_after(self(), :auto_launch_claude, 500)
+    end
+
+    assign(socket, :pty_pid, pty_pid)
   end
 
   # ---------------------------------------------------------------------------
@@ -678,6 +772,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         agent={@session}
         agent_record={@agent}
         session_uuid={@session_uuid}
+        pty_pid={assigns[:pty_pid]}
         active_tab={@active_tab}
         uploads={@uploads}
         streams={@streams}

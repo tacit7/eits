@@ -56,6 +56,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
   attr :overlay_data, :map, default: %{active_overlay: nil, active_timer: nil, reloading: false}
   attr :syncing, :boolean, default: false
+  attr :pty_pid, :any, default: nil
 
   defp normalize_message_data(message_data) do
     Map.merge(
@@ -474,84 +475,95 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         </div>
       </div>
 
-      <%!-- Tab content --%>
-      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col" id="dm-tab-content">
-        <%= case @active_tab do %>
-          <% "messages" -> %>
-            <.messages_tab_content
-              streams={@streams}
-              message_data={@message_data}
-              stream={@stream}
-              agent={@agent}
-              codex_raw_lines={@codex_raw_lines}
-              syncing={@syncing}
-            />
-          <% "tasks" -> %>
-            <TasksTab.tasks_tab tasks={@task_data.tasks} />
-          <% "commits" -> %>
-            <CommitsTab.commits_tab
-              commits={@commits}
-              diff_cache={@diff_cache}
-              commits_view={@commits_view}
-              diff_mode={@diff_mode}
-              cumulative_diff={@cumulative_diff}
-            />
-          <% "notes" -> %>
-            <NotesTab.notes_tab notes={@notes} />
-          <% "context" -> %>
-            <ContextTab.context_tab session_context={@session_context} />
-          <% "settings" -> %>
-            <SettingsTab.settings_tab
-              scope={@dm_settings_scope}
-              subtab={@dm_settings_subtab}
-              session={@agent}
-              agent={@agent_record}
-              session_state={@session_state}
-              notify_on_stop={@notify_on_stop}
-            />
-          <% _ -> %>
-            <.messages_tab_content
-              streams={@streams}
-              message_data={@message_data}
-              stream={@stream}
-              agent={@agent}
-              codex_raw_lines={@codex_raw_lines}
-              syncing={@syncing}
-            />
-        <% end %>
-      </div>
-
-      <%!-- Composer (pinned to bottom) --%>
-      <%= if @active_tab in ["messages", nil] do %>
+      <%= if @pty_pid do %>
+        <%!-- PTY terminal replaces tabs + composer --%>
         <div
-          id="dm-page-composer"
-          class="flex-shrink-0 max-w-[860px] mx-auto w-full px-5 pb-7 pt-3 safe-inset-bottom"
+          id={"pty-dm-#{@session_uuid}"}
+          phx-hook="PtyHook"
+          phx-update="ignore"
+          class="flex-1 min-h-0 p-2"
         >
-          <%= if @message_data.queued_prompts != [] do %>
-            <Composer.prompt_queue prompts={@message_data.queued_prompts} />
-          <% end %>
-          <Composer.message_form
-            uploads={@uploads}
-            selected_model={@session_state.model}
-            selected_effort={@session_state.effort}
-            active_overlay={@overlay_data.active_overlay}
-            processing={@session_state.processing}
-            slash_items={@slash_items}
-            thinking_enabled={@session_state.thinking_enabled}
-            max_budget_usd={@session_state.max_budget_usd}
-            provider={@agent.provider}
-            context_used={@session_state.context_used}
-            context_window={@session_state.context_window}
-            total_cost={Map.get(@session_state, :total_cost, 0.0)}
-            display_name={
-              if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) &&
-                   @agent_record.agent_definition,
-                 do: @agent_record.agent_definition.display_name
-            }
-            session_cli_opts={assigns[:session_cli_opts] || []}
-            session_uuid={@session_uuid}
-          />
         </div>
+      <% else %>
+        <%!-- Tab content --%>
+        <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col" id="dm-tab-content">
+          <%= case @active_tab do %>
+            <% "messages" -> %>
+              <.messages_tab_content
+                streams={@streams}
+                message_data={@message_data}
+                stream={@stream}
+                agent={@agent}
+                codex_raw_lines={@codex_raw_lines}
+                syncing={@syncing}
+              />
+            <% "tasks" -> %>
+              <TasksTab.tasks_tab tasks={@task_data.tasks} />
+            <% "commits" -> %>
+              <CommitsTab.commits_tab
+                commits={@commits}
+                diff_cache={@diff_cache}
+                commits_view={@commits_view}
+                diff_mode={@diff_mode}
+                cumulative_diff={@cumulative_diff}
+              />
+            <% "notes" -> %>
+              <NotesTab.notes_tab notes={@notes} />
+            <% "context" -> %>
+              <ContextTab.context_tab session_context={@session_context} />
+            <% "settings" -> %>
+              <SettingsTab.settings_tab
+                scope={@dm_settings_scope}
+                subtab={@dm_settings_subtab}
+                session={@agent}
+                agent={@agent_record}
+                session_state={@session_state}
+                notify_on_stop={@notify_on_stop}
+              />
+            <% _ -> %>
+              <.messages_tab_content
+                streams={@streams}
+                message_data={@message_data}
+                stream={@stream}
+                agent={@agent}
+                codex_raw_lines={@codex_raw_lines}
+                syncing={@syncing}
+              />
+          <% end %>
+        </div>
+
+        <%!-- Composer (pinned to bottom) --%>
+        <%= if @active_tab in ["messages", nil] do %>
+          <div
+            id="dm-page-composer"
+            class="flex-shrink-0 max-w-[860px] mx-auto w-full px-5 pb-7 pt-3 safe-inset-bottom"
+          >
+            <%= if @message_data.queued_prompts != [] do %>
+              <Composer.prompt_queue prompts={@message_data.queued_prompts} />
+            <% end %>
+            <Composer.message_form
+              uploads={@uploads}
+              selected_model={@session_state.model}
+              selected_effort={@session_state.effort}
+              active_overlay={@overlay_data.active_overlay}
+              processing={@session_state.processing}
+              slash_items={@slash_items}
+              thinking_enabled={@session_state.thinking_enabled}
+              max_budget_usd={@session_state.max_budget_usd}
+              provider={@agent.provider}
+              context_used={@session_state.context_used}
+              context_window={@session_state.context_window}
+              total_cost={Map.get(@session_state, :total_cost, 0.0)}
+              display_name={
+                if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) &&
+                     @agent_record.agent_definition,
+                   do: @agent_record.agent_definition.display_name
+              }
+              session_cli_opts={assigns[:session_cli_opts] || []}
+              session_uuid={@session_uuid}
+            />
+          </div>
+        <% end %>
       <% end %>
     </div>
     """

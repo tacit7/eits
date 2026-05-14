@@ -172,7 +172,10 @@ defmodule EyeInTheSky.Terminal.PtyServer do
           scroll_buffer_bytes: 0,
           idle_timeout_ms: idle_timeout_ms,
           idle_timer: nil,
-          has_launched: false
+          has_launched: false,
+          # 60fps output coalescing — buffers rapid Ink re-renders into one push
+          output_buffer: [],
+          flush_timer: nil
         }
 
         {:ok, arm_idle_timer(state)}
@@ -221,10 +224,29 @@ defmodule EyeInTheSky.Terminal.PtyServer do
 
   @impl true
   # Live PTY output from erlexec
+  # 60fps output coalescing — buffer rapid Ink re-renders into one push per frame.
+  # Ink can emit many partial escape-sequence bursts per render cycle; coalescing
+  # them into a single binary prevents xterm.js from parsing interleaved sequences
+  # and keeps the LiveView push rate capped at ~60fps regardless of Ink's cadence.
   def handle_info({:stdout, _os_pid, data}, state) do
     state = append_scroll_buffer(state, data)
-    broadcast(state.subscribers, :output, data)
+    state = %{state | output_buffer: [state.output_buffer | data]}
+
+    state =
+      if state.flush_timer do
+        state
+      else
+        timer = Process.send_after(self(), :flush_pty_output, 16)
+        %{state | flush_timer: timer}
+      end
+
     {:noreply, state}
+  end
+
+  def handle_info(:flush_pty_output, state) do
+    payload = IO.iodata_to_binary(state.output_buffer)
+    broadcast(state.subscribers, :output, payload)
+    {:noreply, %{state | output_buffer: [], flush_timer: nil}}
   end
 
   # erlexec: OS process exited with non-zero status

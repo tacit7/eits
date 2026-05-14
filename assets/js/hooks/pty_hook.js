@@ -1,6 +1,7 @@
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import { WebLinksAddon } from "@xterm/addon-web-links"
+import { WebglAddon } from "@xterm/addon-webgl"
 import "@xterm/xterm/css/xterm.css"
 
 export const PtyHook = {
@@ -38,6 +39,18 @@ export const PtyHook = {
     term.loadAddon(fitAddon)
     term.loadAddon(new WebLinksAddon())
     term.open(this.el)
+
+    // Load WebGL renderer for GPU-accelerated painting. Falls back to the
+    // default canvas renderer if WebGL2 is unavailable (e.g. headless browser,
+    // software renderer). Must be loaded after term.open().
+    try {
+      const webgl = new WebglAddon()
+      webgl.onContextLoss(() => webgl.dispose())
+      term.loadAddon(webgl)
+    } catch (_) {
+      // WebGL unavailable — xterm.js keeps the canvas renderer
+    }
+
     fitAddon.fit()
 
     // Send initial terminal size to server unconditionally.

@@ -75,8 +75,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
     <div
       class={[
         "flex flex-col h-full relative overflow-hidden",
-        if(@pty_pid, do: "px-0 py-0", else: "px-0 sm:px-4 lg:px-8 py-0 sm:py-4")
+        if(@pty_pid, do: "px-0 py-0", else: "px-0 sm:px-4 lg:px-8 py-0 sm:py-4"),
+        if(@pty_pid, do: "pty-content", else: nil)
       ]}
+      style={if @pty_pid, do: "background: var(--pty-bg, #1e1e1e)", else: nil}
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"

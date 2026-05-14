@@ -128,6 +128,8 @@ defmodule EyeInTheSky.Terminal.PtyServer do
 
     env = [
       {"TERM", "xterm-256color"},
+      # Signal truecolor support — chalk uses this to select level 3 (24-bit)
+      {"COLORTERM", "truecolor"},
       {"LANG", "en_US.UTF-8"},
       {"HOME", home},
       {"PATH", System.get_env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")},

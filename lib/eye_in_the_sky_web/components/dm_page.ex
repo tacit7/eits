@@ -481,7 +481,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       </div>
 
       <%!-- Desktop tab bar (md+). Mobile uses the hamburger ActionMenu instead. --%>
-      <%= if not @pty_pid do %>
+      <%= if is_nil(@pty_pid) do %>
         <div class="hidden md:flex items-center gap-0.5 px-4 sm:px-5 pb-2 flex-shrink-0" id="dm-desktop-tabs">
           <%= for {tab, icon, label} <- @tabs do %>
             <button

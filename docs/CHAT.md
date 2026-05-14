@@ -25,8 +25,8 @@ ChatLive.handle_event("send_channel_message")
     |-- 1. Persist images: UploadHelpers.consume_and_persist_agent_images(images)
     |-- 2. Save message to DB + create FileAttachment rows (wrapped in Repo.transaction)
     |-- 3. Broadcast to PubSub ("channel:<id>:messages") only after both commits
-    |-- 4. ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks)
-    |       (content_blocks: base64-encoded images for agent context)
+    |-- 4. ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks, nil, "user")
+    |       (content_blocks: base64-encoded images for agent context; sender_role: "user" for LiveView composer)
     |
     v
 ChannelFanout.fanout_all (parallelized via Task.async_stream, max_concurrency: 10)
@@ -69,7 +69,7 @@ POST /api/v1/channels/:id/messages
 ChannelMessageController.create
     |-- 1. Save message to DB
     |-- 2. Broadcast to PubSub ("channel:<id>:messages")
-    |-- 3. ChannelFanout.fanout_all(channel_id, body, sender_session_id)
+    |-- 3. ChannelFanout.fanout_all(channel_id, body, sender_session_id, [], nil, "user")
     |       [Routes to all channel members using same protocol as UI]
 ```
 
@@ -325,11 +325,12 @@ SlashItems.load_agents(channel_id)  # Returns agent items with most recent sessi
 Core fanout engine for routing messages to channel members. Uses `Task.async_stream` with `max_concurrency: 10` to parallelize DB inserts and agent message delivery.
 
 ```elixir
-ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks \\ [], message_id \\ nil)
+ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks \\ [], message_id \\ nil, sender_role \\ "user")
   # Route to all members (excluding sender)
   # Routing mode (:direct/:broadcast/:ambient) determined per-member via ChannelProtocol
   # Auto-adds mentioned sessions as members if not present
   # message_id: optional, passed to build_prompt context; used for dedup/threading
+  # sender_role: defaults to "user" for LiveView composer; set to "agent" for agent-sourced replies
   # Context metadata: %{"source" => "channel", "channel_id" => id, "channel_message_id" => message_id, "reply_mode" => "cli_required"}
   # Parallelized: all N sends fire concurrently, latency ≈ 1 insert time
 
@@ -347,9 +348,9 @@ ChannelFanout.fanout_mentions_only(channel_id, body, sender_session_id, message_
 - Passes string-keyed context metadata to AgentManager for logging/tracing
 
 **Integration points**:
-- Called from `ChatLive.handle_event("send_channel_message")` via `ChannelHelpers.route_to_members`
-- Called from `ChannelMessageController.create` for REST API posted messages
-- Called from `AgentWorkerEvents.maybe_fanout_mentions` for agent replies with @mentions
+- Called from `ChatLive.handle_event("send_channel_message")` via `ChannelHelpers.route_to_members` with `sender_role="user"`
+- Called from `ChannelMessageController.create` for REST API posted messages with `sender_role="user"`
+- Called from `AgentWorkerEvents.maybe_fanout_mentions` for agent replies with @mentions using `sender_role="agent"`
 
 **Channel Notification Deduplication**: `notify_channel_members` (called from `ChannelMessageController.create`) skips DM notifications for sessions that will receive direct/broadcast MSG prompts from `ChannelFanout.fanout_all`. Specifically:
 - **@all messages**: skip all notifications (every member gets a broadcast MSG prompt)

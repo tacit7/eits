@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.TerminalLive do
   @impl true
   def mount(_params, session, socket) do
     if connected?(socket) do
-      session_key = Map.get(session, "pty_session_key", generate_key())
+      session_key = derive_session_key(session)
 
       {:ok, pty_pid} =
         PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
@@ -126,5 +126,14 @@ defmodule EyeInTheSkyWeb.TerminalLive do
 
   # --- Private ---
 
-  defp generate_key, do: "terminal-#{System.unique_integer([:positive])}"
+  # Derive a stable PTY key for the browser session.
+  # Priority: explicit pty_session_key > user_id > _csrf_token (stable per tab).
+  defp derive_session_key(session) do
+    cond do
+      key = session["pty_session_key"] -> key
+      user_id = session["user_id"] -> "terminal-user-#{user_id}"
+      token = session["_csrf_token"] -> "terminal-csrf-#{token}"
+      true -> "terminal-#{System.unique_integer([:positive])}"
+    end
+  end
 end

@@ -760,7 +760,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         path -> "cd #{path} && "
       end
 
-    "#{cd_part}claude --resume #{uuid}\n"
+    "#{cd_part}claude --resume #{uuid}"
   end
 
   defp subscribe_dm_pty(socket, session_uuid) do

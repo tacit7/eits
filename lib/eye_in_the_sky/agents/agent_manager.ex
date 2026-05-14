@@ -15,6 +15,67 @@ defmodule EyeInTheSky.Agents.AgentManager do
   alias EyeInTheSky.Agents.InstructionBuilder
   alias EyeInTheSky.Agents.RuntimeContext
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
+
+  # Grace period (ms) after Claude starts before stdin writes are safe.
+  # Ink calls setRawMode(true) asynchronously; writes before that land while
+  # ICRNL is active and \r is converted to \n (insert newline, not submit).
+  @pty_stdin_grace_ms 4_000
+
+  @doc """
+  Creates an agent + session and starts Claude interactively in a PTY.
+
+  No AgentWorker is spawned; no `-p` flag is used. Claude runs in interactive
+  (`cli`) mode inside a PTY keyed by `"dm-\#{session.uuid}"`. The initial
+  instructions (if any) are written to PTY stdin after a startup grace period
+  to let Ink call `setRawMode(true)`.
+
+  ## Options
+  Same as `create_agent/1` except `:agent_type`, `:model`, `:effort_level`,
+  `:project_id`, `:project_path`, `:description`, `:instructions`.
+
+  Returns `{:ok, %{agent: agent, session: session}}` or `{:error, reason}`.
+  """
+  def create_pty_session(opts) do
+    with {:ok, %{agent: agent, session: session}} <- RecordBuilder.create_records(opts) do
+      session_key = "dm-#{session.uuid}"
+
+      {:ok, pty_pid} =
+        PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
+
+      # Build and write the interactive launch command (no -p).
+      working_path = opts[:project_path]
+      cd_part = if working_path && working_path != "", do: "cd #{working_path} && ", else: ""
+      launch_cmd = "#{cd_part}claude --session-id #{session.uuid}\n"
+
+      Logger.info(
+        "🖥️ create_pty_session: starting PTY for session.id=#{session.id}, key=#{session_key}"
+      )
+
+      PtyServer.write(pty_pid, launch_cmd)
+      PtyServer.mark_launched(pty_pid)
+
+      # Write initial instructions after grace period so Ink's setRawMode fires first.
+      instructions = opts[:instructions]
+
+      if is_binary(instructions) && instructions != "" do
+        body = String.trim_trailing(instructions)
+        grace = @pty_stdin_grace_ms
+
+        Task.start(fn ->
+          Process.sleep(grace)
+          PtyServer.write(pty_pid, body)
+          Process.sleep(80)
+          PtyServer.write(pty_pid, "\r")
+        end)
+      end
+
+      case Agents.update_agent(agent, %{status: "running"}) do
+        {:ok, updated_agent} -> {:ok, %{agent: updated_agent, session: session}}
+        {:error, _} -> {:ok, %{agent: agent, session: session}}
+      end
+    end
+  end
 
   @doc """
   Creates an agent + session and starts the AgentWorker with the initial message.

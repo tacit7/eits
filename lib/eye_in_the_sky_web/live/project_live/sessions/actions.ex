@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
       )
       |> Keyword.put(:project_id, project.id)
 
-    case AgentManager.create_agent(opts) do
+    case AgentManager.create_pty_session(opts) do
       {:ok, _result} ->
         socket =
           socket

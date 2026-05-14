@@ -430,56 +430,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
       </div>
 
-      <%!-- Tab bar — always visible on desktop, mobile uses ActionMenu hamburger --%>
-      <div class="hidden md:flex items-center gap-0.5 px-4 sm:px-5 pb-2 flex-shrink-0" id="dm-tabs">
-        <div class="flex items-center gap-0.5 min-w-max">
-          <%= for {tab, icon, label} <- @tabs do %>
-            <button
-              class={[
-                "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] font-medium transition-all duration-150",
-                @active_tab == tab && "bg-primary/10 text-primary",
-                @active_tab != tab &&
-                  "text-base-content/40 hover:text-base-content/65 hover:bg-base-content/5"
-              ]}
-              phx-click="change_tab"
-              phx-value-tab={tab}
-              id={"dm-tab-#{tab}"}
-            >
-              <.icon name={icon} class="size-3.5" />
-              {label}
-            </button>
-          <% end %>
-        </div>
-        <%= if @active_tab in ["messages", nil] do %>
-          <div class="ml-auto w-48">
-            <form phx-change="search_messages" phx-submit="search_messages" class="relative">
-              <.icon
-                name="hero-magnifying-glass"
-                class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-base-content/30 pointer-events-none"
-              />
-              <input
-                type="text"
-                name="query"
-                value={@message_data.message_search_query}
-                placeholder="Search messages..."
-                autocomplete="off"
-                phx-debounce="300"
-                class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-base-content/20 focus:border-base-content/20 placeholder:text-base-content/25 text-base-content/70 transition-colors"
-              />
-              <%= if @message_data.message_search_query != "" do %>
-                <button
-                  type="button"
-                  phx-click="search_messages"
-                  phx-value-query=""
-                  class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content/60 transition-colors"
-                >
-                  <.icon name="hero-x-mark" class="size-3.5" />
-                </button>
-              <% end %>
-            </form>
-          </div>
-        <% end %>
-      </div>
 
       <%= if @pty_pid && @active_tab in ["messages", nil] do %>
         <%!-- PTY terminal — only on messages tab --%>

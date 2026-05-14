@@ -138,9 +138,9 @@ const THEMES = {
 function getXtermTheme() {
   const daisyTheme = document.documentElement.getAttribute("data-theme") || "dark"
   const base = THEMES[daisyTheme] || THEMES.dark
-  // Read --surface-flyout so the terminal background matches the session list panel.
-  const flyout = getComputedStyle(document.documentElement).getPropertyValue("--surface-flyout").trim()
-  return flyout ? { ...base, background: flyout, cursorAccent: flyout } : base
+  // Read --surface-canvas so the terminal background matches the sessions list page.
+  const canvas = getComputedStyle(document.documentElement).getPropertyValue("--surface-canvas").trim()
+  return canvas ? { ...base, background: canvas, cursorAccent: canvas } : base
 }
 
 export const PtyHook = {

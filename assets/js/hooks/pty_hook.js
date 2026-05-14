@@ -40,12 +40,20 @@ export const PtyHook = {
     term.open(this.el)
     fitAddon.fit()
 
+    // Send initial terminal size to server unconditionally.
+    // term.onResize only fires when size CHANGES — if fitAddon.fit() computes
+    // the same dimensions as xterm.js's default (e.g. container still at 0 size
+    // during the first render), no resize event fires and the auto-launch command
+    // is never triggered. Pushing dimensions explicitly here guarantees the server
+    // knows the size and can fire the launch command on mount.
+    this.pushEvent("pty_resize", { cols: term.cols, rows: term.rows })
+
     // Send input to server
     term.onData(data => {
       this.pushEvent("pty_input", { data })
     })
 
-    // Notify server of resize
+    // Notify server of subsequent resize
     term.onResize(({ cols, rows }) => {
       this.pushEvent("pty_resize", { cols, rows })
     })

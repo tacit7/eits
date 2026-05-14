@@ -142,7 +142,7 @@ defmodule EyeInTheSky.Terminal.PtyServer do
       {"FORCE_COLOR", "3"},
       {"LANG", "en_US.UTF-8"},
       {"HOME", home},
-      {"PATH", System.get_env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")},
+      {"PATH", build_path()},
       {"SHELL", @shell_bin},
       {"USER", System.get_env("USER", "user")},
       {"LOGNAME", System.get_env("LOGNAME", System.get_env("USER", "user"))}
@@ -266,6 +266,28 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   # --- Private ---
 
   defp default_shell_cmd, do: [@shell_bin, "-i"]
+
+  # Build a PATH that includes directories the server process may be missing.
+  # The Phoenix server's PATH is often stripped of user-installed tools (Go, etc.)
+  # which causes .zshrc lines like `export PATH="$PATH:$(go env GOPATH)/bin"` to
+  # fail with "command not found: go" when the PTY shell sources the rc file.
+  @extra_paths [
+    "/usr/local/go/bin",
+    "/opt/homebrew/bin",
+    "/opt/homebrew/sbin"
+  ]
+
+  defp build_path do
+    base = System.get_env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+    existing = MapSet.new(String.split(base, ":"))
+
+    extras =
+      @extra_paths
+      |> Enum.filter(&(not MapSet.member?(existing, &1)))
+      |> Enum.join(":")
+
+    if extras == "", do: base, else: "#{base}:#{extras}"
+  end
 
   # Broadcast a typed message to all subscribers, including tag when set.
   defp broadcast(subscribers, type, payload) do

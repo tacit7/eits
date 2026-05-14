@@ -115,6 +115,9 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   @doc "Terminate the PTY and the GenServer."
   def stop(server), do: GenServer.stop(server, :normal)
 
+  @doc "Returns true if the PTY was started within the last 10 seconds."
+  def fresh?(server), do: GenServer.call(server, :fresh?)
+
   # --- Callbacks ---
 
   @impl true
@@ -165,7 +168,8 @@ defmodule EyeInTheSky.Terminal.PtyServer do
           scroll_buffer: [],
           scroll_buffer_bytes: 0,
           idle_timeout_ms: idle_timeout_ms,
-          idle_timer: nil
+          idle_timer: nil,
+          started_at: System.monotonic_time(:millisecond)
         }
 
         {:ok, arm_idle_timer(state)}
@@ -174,6 +178,12 @@ defmodule EyeInTheSky.Terminal.PtyServer do
         Logger.error("PtyServer: failed to spawn #{inspect(command)}: #{inspect(reason)}")
         {:stop, reason}
     end
+  end
+
+  @impl true
+  def handle_call(:fresh?, _from, state) do
+    age_ms = System.monotonic_time(:millisecond) - state.started_at
+    {:reply, age_ms < 10_000, state}
   end
 
   @impl true

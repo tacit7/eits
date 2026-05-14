@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSky.{Agents, Notes, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
-  alias EyeInTheSky.Terminal.PtyRegistry
   alias EyeInTheSkyWeb.Components.DmPage
 
   alias EyeInTheSkyWeb.DmLive.{
@@ -611,7 +610,9 @@ defmodule EyeInTheSkyWeb.DmLive do
       sender = if msg.from_session_id, do: "session:#{msg.from_session_id}", else: "DM"
       header = "\r\n\e[1;36m[#{sender}]\e[0m\r\n"
       socket = push_event(socket, "pty_output", %{data: Base.encode64(header)})
-      PtyServer.write(socket.assigns.pty_pid, msg.body <> "\r")
+      input = msg.body <> "\r"
+      Logger.debug("PTY DM inject: pid=#{inspect(socket.assigns.pty_pid)} data=#{inspect(input)}")
+      PtyServer.write(socket.assigns.pty_pid, input)
       {:noreply, socket}
     else
       {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}
@@ -768,20 +769,21 @@ defmodule EyeInTheSkyWeb.DmLive do
         path -> "cd #{path} && "
       end
 
-    "#{cd_part}claude --resume #{uuid}"
+    "#{cd_part}claude --resume #{uuid}\n"
   end
 
   defp subscribe_dm_pty(socket, session_uuid) do
     session_key = "dm-#{session_uuid}"
-    was_running = Registry.lookup(PtyRegistry, session_key) != []
     {:ok, pty_pid} = PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
     :ok = PtyServer.subscribe(pty_pid)
+    # Use fresh? to detect if PTY just spawned (within 10s). Only fire the
+    # auto-launch on brand-new PTYs so we don't blast the command into a
+    # running Claude session when the user navigates back.
+    pending = PtyServer.fresh?(pty_pid)
 
     socket
     |> assign(:pty_pid, pty_pid)
-    # pending_launch: true only for fresh PTYs — fires claude on first resize
-    # so the terminal dimensions are confirmed before claude starts drawing.
-    |> assign(:pty_pending_launch, !was_running)
+    |> assign(:pty_pending_launch, pending)
   end
 
   # ---------------------------------------------------------------------------

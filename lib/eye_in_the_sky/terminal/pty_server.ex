@@ -115,8 +115,11 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   @doc "Terminate the PTY and the GenServer."
   def stop(server), do: GenServer.stop(server, :normal)
 
-  @doc "Returns true if the PTY was started within the last 10 seconds."
-  def fresh?(server), do: GenServer.call(server, :fresh?)
+  @doc "Returns true if the launch command has never been sent into this PTY."
+  def should_launch?(server), do: GenServer.call(server, :should_launch?)
+
+  @doc "Mark that the launch command was sent. Prevents re-launch on reconnect."
+  def mark_launched(server), do: GenServer.cast(server, :mark_launched)
 
   # --- Callbacks ---
 
@@ -169,7 +172,7 @@ defmodule EyeInTheSky.Terminal.PtyServer do
           scroll_buffer_bytes: 0,
           idle_timeout_ms: idle_timeout_ms,
           idle_timer: nil,
-          started_at: System.monotonic_time(:millisecond)
+          has_launched: false
         }
 
         {:ok, arm_idle_timer(state)}
@@ -181,9 +184,8 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   end
 
   @impl true
-  def handle_call(:fresh?, _from, state) do
-    age_ms = System.monotonic_time(:millisecond) - state.started_at
-    {:reply, age_ms < 10_000, state}
+  def handle_call(:should_launch?, _from, state) do
+    {:reply, !state.has_launched, state}
   end
 
   @impl true
@@ -201,6 +203,10 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   @impl true
   def handle_cast({:unsubscribe, pid}, state) do
     {:noreply, remove_subscriber(state, pid)}
+  end
+
+  def handle_cast(:mark_launched, state) do
+    {:noreply, %{state | has_launched: true}}
   end
 
   def handle_cast({:write, data}, %{os_pid: os_pid} = state) do

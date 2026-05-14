@@ -111,6 +111,7 @@ defmodule EyeInTheSkyWeb.DmLive do
     socket =
       if socket.assigns[:pty_pending_launch] && socket.assigns[:pty_pid] do
         PtyServer.write(socket.assigns.pty_pid, build_launch_command(socket.assigns))
+        PtyServer.mark_launched(socket.assigns.pty_pid)
         assign(socket, :pty_pending_launch, false)
       else
         socket
@@ -776,10 +777,10 @@ defmodule EyeInTheSkyWeb.DmLive do
     session_key = "dm-#{session_uuid}"
     {:ok, pty_pid} = PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
     :ok = PtyServer.subscribe(pty_pid)
-    # Use fresh? to detect if PTY just spawned (within 10s). Only fire the
-    # auto-launch on brand-new PTYs so we don't blast the command into a
-    # running Claude session when the user navigates back.
-    pending = PtyServer.fresh?(pty_pid)
+    # Only launch if Claude has never been started in this PTY session.
+    # has_launched is set to true the moment we write the launch command,
+    # so navigating away and back does not re-launch into a running Claude.
+    pending = PtyServer.should_launch?(pty_pid)
 
     socket
     |> assign(:pty_pid, pty_pid)

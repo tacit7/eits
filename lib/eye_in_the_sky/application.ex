@@ -64,6 +64,8 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.OrchestratorTimers.Server,
           # IAM policy cache (ETS-backed, single-node)
           EyeInTheSky.IAM.PolicyCache,
+          # Registry for persistent PTY sessions (keyed by session_key string)
+          {Registry, keys: :unique, name: EyeInTheSky.Terminal.PtyRegistry},
           # DynamicSupervisor for per-session PTY processes
           EyeInTheSky.Terminal.PtySupervisor,
           # Session store with TTL-based expiration (prevents unbounded ETS growth)

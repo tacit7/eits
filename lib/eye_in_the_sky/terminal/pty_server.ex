@@ -2,19 +2,42 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   @moduledoc """
   GenServer that owns a single PTY session via erlexec.
 
-  Lifecycle:
-  - Started dynamically by PtySupervisor, one per terminal LiveView session.
-  - Output from the PTY is forwarded to `subscriber` (a LiveView pid) via
-    `{:pty_output, data}` messages.
-  - The process exits (and takes the OS child with it) when the LiveView
-    disconnects or `stop/1` is called.
+  ## Persistent lifecycle
 
-  ## subscriber_tag option
+  PtyServer is no longer tied to a single LiveView pid. It lives under
+  PtySupervisor and is keyed by a `session_key` string in PtyRegistry.
+  Multiple LiveViews (or the same one after navigation) can subscribe and
+  unsubscribe without killing the underlying OS process.
 
-  Pass `subscriber_tag: any_term` to tag output messages. When set, output is
-  delivered as `{:pty_output, tag, data}` instead of `{:pty_output, data}`.
-  This lets a parent LiveView hosting multiple terminals route output to the
-  correct component by matching on the tag.
+  The PTY shuts down only when:
+  - The OS process exits (shell/Claude exits).
+  - All subscribers have been gone for longer than `idle_timeout_ms` (default 30 min).
+  - `stop/1` is called explicitly.
+
+  ## Scroll buffer
+
+  Output is accumulated in a capped binary buffer (default 512 KB). On
+  subscribe, the caller immediately receives `{:pty_scroll_buffer, tag, binary}`
+  (or `{:pty_scroll_buffer, binary}` when tag is nil) so it can replay history
+  into xterm.js before live output begins.
+
+  ## Subscriber messages
+
+  Each subscriber pid receives:
+  - `{:pty_scroll_buffer, binary}` — history replayed on subscribe (no tag)
+  - `{:pty_scroll_buffer, tag, binary}` — same, with tag
+  - `{:pty_output, binary}` — live PTY output (no tag)
+  - `{:pty_output, tag, binary}` — live PTY output with tag
+  - `:pty_exited` — OS process has exited (no tag)
+  - `{:pty_exited, tag}` — OS process has exited with tag
+
+  ## Tagged subscribers
+
+  Pass a tag to `subscribe/3` to route output from multiple PTYs through a
+  single LiveView. The tag is included in all messages so the LiveView can
+  dispatch to the right component:
+
+      PtyServer.subscribe(pty_pid, self(), canvas_terminal_id)
 
   ## erlexec gotchas on macOS
 
@@ -44,34 +67,62 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   @default_rows 50
   @shell_bin System.find_executable("bash") || "/bin/bash"
 
+  # 512 KB scroll buffer cap
+  @max_buffer_bytes 512 * 1024
+  # 30 minutes idle before auto-shutdown when no subscribers
+  @default_idle_timeout_ms 30 * 60 * 1_000
+
   # --- Public API ---
 
+  @doc """
+  Start a PtyServer registered under `session_key` in PtyRegistry.
+
+  Options:
+  - `:session_key` (required) — unique string key for registry lookup
+  - `:cols` — initial terminal width (default #{@default_cols})
+  - `:rows` — initial terminal height (default #{@default_rows})
+  - `:command` — command list to spawn (default: bash interactive)
+  - `:idle_timeout_ms` — ms with no subscribers before stopping (default #{@default_idle_timeout_ms})
+  """
   def start_link(opts) do
-    subscriber = Keyword.fetch!(opts, :subscriber)
-    cols = Keyword.get(opts, :cols, @default_cols)
-    rows = Keyword.get(opts, :rows, @default_rows)
-    # Optional tag — when set, output is sent as {:pty_output, tag, data}
-    # instead of {:pty_output, data}. Lets a parent route output to the
-    # right component when hosting multiple terminals.
-    tag = Keyword.get(opts, :subscriber_tag, nil)
-    GenServer.start_link(__MODULE__, {subscriber, cols, rows, tag})
+    session_key = Keyword.fetch!(opts, :session_key)
+    name = {:via, Registry, {EyeInTheSky.Terminal.PtyRegistry, session_key}}
+    GenServer.start_link(__MODULE__, opts, name: name)
+  end
+
+  @doc """
+  Subscribe `pid` to receive PTY output. Immediately sends the scroll buffer.
+
+  Pass an optional `tag` to receive tagged messages (`{:pty_output, tag, data}`
+  instead of `{:pty_output, data}`). Useful when one LiveView manages multiple
+  PTY sessions and needs to route output to the right component.
+  """
+  def subscribe(server, pid \\ self(), tag \\ nil) do
+    GenServer.call(server, {:subscribe, pid, tag})
+  end
+
+  @doc "Unsubscribe `pid` from PTY output."
+  def unsubscribe(server, pid \\ self()) do
+    GenServer.cast(server, {:unsubscribe, pid})
   end
 
   @doc "Write data (keystrokes / paste) into the PTY."
-  def write(pid, data), do: GenServer.cast(pid, {:write, data})
+  def write(server, data), do: GenServer.cast(server, {:write, data})
 
   @doc "Resize the PTY window."
-  def resize(pid, cols, rows), do: GenServer.cast(pid, {:resize, cols, rows})
+  def resize(server, cols, rows), do: GenServer.cast(server, {:resize, cols, rows})
 
   @doc "Terminate the PTY and the GenServer."
-  def stop(pid), do: GenServer.stop(pid, :normal)
+  def stop(server), do: GenServer.stop(server, :normal)
 
   # --- Callbacks ---
 
   @impl true
-  def init({subscriber, cols, rows, tag}) do
-    # Monitor the LiveView so we clean up when it dies.
-    Process.monitor(subscriber)
+  def init(opts) do
+    cols = Keyword.get(opts, :cols, @default_cols)
+    rows = Keyword.get(opts, :rows, @default_rows)
+    idle_timeout_ms = Keyword.get(opts, :idle_timeout_ms, @default_idle_timeout_ms)
+    command = Keyword.get(opts, :command, default_shell_cmd())
 
     home = System.get_env("HOME", "/tmp")
 
@@ -85,17 +136,9 @@ defmodule EyeInTheSky.Terminal.PtyServer do
       {"LOGNAME", System.get_env("LOGNAME", System.get_env("USER", "user"))}
     ]
 
-    # List form → direct exec (no sh -c wrapping).
-    # --norc --noprofile: skip init files that might exit early.
-    # -i: force interactive mode so bash shows a prompt and reads stdin.
-    shell_cmd = [@shell_bin, "--norc", "--noprofile", "-i"]
-
-    opts = [
-      # CRITICAL: without this erlexec defaults stdin to /dev/null
+    exec_opts = [
       :stdin,
-      # deliver PTY output as {:stdout, os_pid, data}
       {:stdout, self()},
-      # merge stderr into stdout stream
       {:stderr, :stdout},
       :pty,
       :pty_echo,
@@ -103,19 +146,47 @@ defmodule EyeInTheSky.Terminal.PtyServer do
       :monitor
     ]
 
-    case :exec.run(shell_cmd, opts) do
+    case :exec.run(command, exec_opts) do
       {:ok, _erlang_pid, os_pid} ->
-        # Set initial window size — winsz is not a valid exec:run option
         :exec.winsz(os_pid, rows, cols)
-        {:ok, %{subscriber: subscriber, os_pid: os_pid, cols: cols, rows: rows, tag: tag}}
+
+        state = %{
+          os_pid: os_pid,
+          cols: cols,
+          rows: rows,
+          # %{pid => tag_or_nil}
+          subscribers: %{},
+          scroll_buffer: [],
+          scroll_buffer_bytes: 0,
+          idle_timeout_ms: idle_timeout_ms,
+          idle_timer: nil
+        }
+
+        {:ok, arm_idle_timer(state)}
 
       {:error, reason} ->
-        Logger.error("PtyServer: failed to spawn shell: #{inspect(reason)}")
+        Logger.error("PtyServer: failed to spawn #{inspect(command)}: #{inspect(reason)}")
         {:stop, reason}
     end
   end
 
   @impl true
+  def handle_call({:subscribe, pid, tag}, _from, state) do
+    Process.monitor(pid)
+    state = %{state | subscribers: Map.put(state.subscribers, pid, tag)}
+    state = cancel_idle_timer(state)
+
+    buffer = IO.iodata_to_binary(state.scroll_buffer)
+    send_to(pid, tag, :scroll_buffer, buffer)
+
+    {:reply, :ok, state}
+  end
+
+  @impl true
+  def handle_cast({:unsubscribe, pid}, state) do
+    {:noreply, remove_subscriber(state, pid)}
+  end
+
   def handle_cast({:write, data}, %{os_pid: os_pid} = state) do
     :exec.send(os_pid, data)
     {:noreply, state}
@@ -127,32 +198,38 @@ defmodule EyeInTheSky.Terminal.PtyServer do
   end
 
   @impl true
-  # PTY output from erlexec — route with tag when present
-  def handle_info({:stdout, _os_pid, data}, %{subscriber: sub, tag: nil} = state) do
-    send(sub, {:pty_output, data})
-    {:noreply, state}
-  end
-
-  def handle_info({:stdout, _os_pid, data}, %{subscriber: sub, tag: tag} = state) do
-    send(sub, {:pty_output, tag, data})
+  # Live PTY output from erlexec
+  def handle_info({:stdout, _os_pid, data}, state) do
+    state = append_scroll_buffer(state, data)
+    broadcast(state.subscribers, :output, data)
     {:noreply, state}
   end
 
   # erlexec: OS process exited with non-zero status
   def handle_info({:DOWN, _ref, :process, _pid, {:exit_status, _code}}, state) do
-    notify_exit(state)
+    broadcast(state.subscribers, :exited, nil)
     {:stop, :normal, state}
   end
 
-  # erlexec: OS process exited cleanly (exit code 0 → :normal via erlexec's ospid_loop)
+  # erlexec: OS process exited cleanly (exit code 0 → :normal)
   def handle_info({:DOWN, os_pid, :process, _lwp, :normal}, %{os_pid: os_pid} = state) do
-    notify_exit(state)
+    broadcast(state.subscribers, :exited, nil)
     {:stop, :normal, state}
   end
 
-  # LiveView died — clean up
-  def handle_info({:DOWN, _ref, :process, pid, _reason}, %{subscriber: pid} = state) do
-    {:stop, :normal, state}
+  # Subscriber process died — remove it
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
+    {:noreply, remove_subscriber(state, pid)}
+  end
+
+  # Idle timeout fired — no subscribers long enough, shut down
+  def handle_info(:idle_timeout, state) do
+    if map_size(state.subscribers) == 0 do
+      Logger.info("PtyServer: idle timeout with no subscribers, shutting down")
+      {:stop, :normal, state}
+    else
+      {:noreply, %{state | idle_timer: nil}}
+    end
   end
 
   def handle_info(_msg, state), do: {:noreply, state}
@@ -166,6 +243,60 @@ defmodule EyeInTheSky.Terminal.PtyServer do
 
   # --- Private ---
 
-  defp notify_exit(%{subscriber: sub, tag: nil}), do: send(sub, :pty_exited)
-  defp notify_exit(%{subscriber: sub, tag: tag}), do: send(sub, {:pty_exited, tag})
+  defp default_shell_cmd, do: [@shell_bin, "--norc", "--noprofile", "-i"]
+
+  # Broadcast a typed message to all subscribers, including tag when set.
+  defp broadcast(subscribers, type, payload) do
+    Enum.each(subscribers, fn {pid, tag} ->
+      send_to(pid, tag, type, payload)
+    end)
+  end
+
+  defp send_to(pid, nil, :scroll_buffer, data), do: send(pid, {:pty_scroll_buffer, data})
+  defp send_to(pid, tag, :scroll_buffer, data), do: send(pid, {:pty_scroll_buffer, tag, data})
+  defp send_to(pid, nil, :output, data), do: send(pid, {:pty_output, data})
+  defp send_to(pid, tag, :output, data), do: send(pid, {:pty_output, tag, data})
+  defp send_to(pid, nil, :exited, _), do: send(pid, :pty_exited)
+  defp send_to(pid, tag, :exited, _), do: send(pid, {:pty_exited, tag})
+
+  defp remove_subscriber(state, pid) do
+    updated = %{state | subscribers: Map.delete(state.subscribers, pid)}
+
+    if map_size(updated.subscribers) == 0 do
+      arm_idle_timer(updated)
+    else
+      updated
+    end
+  end
+
+  defp arm_idle_timer(%{idle_timeout_ms: ms} = state) do
+    timer = Process.send_after(self(), :idle_timeout, ms)
+    %{state | idle_timer: timer}
+  end
+
+  defp cancel_idle_timer(%{idle_timer: nil} = state), do: state
+
+  defp cancel_idle_timer(%{idle_timer: ref} = state) do
+    Process.cancel_timer(ref)
+    %{state | idle_timer: nil}
+  end
+
+  defp append_scroll_buffer(%{scroll_buffer_bytes: current} = state, data) do
+    data_size = byte_size(data)
+    new_bytes = current + data_size
+
+    if new_bytes <= @max_buffer_bytes do
+      %{state | scroll_buffer: [state.scroll_buffer | data], scroll_buffer_bytes: new_bytes}
+    else
+      trim_scroll_buffer(state, data)
+    end
+  end
+
+  defp trim_scroll_buffer(state, data) do
+    full = IO.iodata_to_binary([state.scroll_buffer | data])
+    full_size = byte_size(full)
+    keep = min(full_size, @max_buffer_bytes)
+    trimmed = binary_part(full, full_size - keep, keep)
+    %{state | scroll_buffer: [trimmed], scroll_buffer_bytes: byte_size(trimmed)}
+  end
 end

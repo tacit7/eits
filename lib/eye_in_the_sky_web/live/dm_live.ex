@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         socket =
           if connected?(socket),
             do: subscribe_dm_pty(socket, session.uuid),
-            else: assign(socket, :pty_pid, nil)
+            else: socket |> assign(:pty_pid, nil) |> assign(:pty_pending_launch, false)
 
         {:ok, socket}
 
@@ -106,6 +106,16 @@ defmodule EyeInTheSkyWeb.DmLive do
     if pid = socket.assigns[:pty_pid] do
       PtyServer.resize(pid, cols, rows)
     end
+
+    # Fire claude on the first resize so it starts with correct dimensions,
+    # not the 220-col PTY default from spawn time.
+    socket =
+      if socket.assigns[:pty_pending_launch] && socket.assigns[:pty_pid] do
+        PtyServer.write(socket.assigns.pty_pid, "claude\n")
+        assign(socket, :pty_pending_launch, false)
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
@@ -690,16 +700,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   # PTY terminal — DM page
   # ---------------------------------------------------------------------------
 
-  # Auto-launch claude --resume <session_uuid> into a freshly created PTY
-  @impl true
-  def handle_info(:auto_launch_claude, socket) do
-    if pid = socket.assigns[:pty_pid] do
-      PtyServer.write(pid, "claude\n")
-    end
-
-    {:noreply, socket}
-  end
-
   # Scroll buffer replayed on (re-)subscribe
   @impl true
   def handle_info({:pty_scroll_buffer, buffer}, socket) when byte_size(buffer) > 0 do
@@ -753,11 +753,11 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:ok, pty_pid} = PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
     :ok = PtyServer.subscribe(pty_pid)
 
-    unless was_running do
-      Process.send_after(self(), :auto_launch_claude, 500)
-    end
-
-    assign(socket, :pty_pid, pty_pid)
+    socket
+    |> assign(:pty_pid, pty_pid)
+    # pending_launch: true only for fresh PTYs — fires claude on first resize
+    # so the terminal dimensions are confirmed before claude starts drawing.
+    |> assign(:pty_pending_launch, !was_running)
   end
 
   # ---------------------------------------------------------------------------

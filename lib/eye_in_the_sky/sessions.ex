@@ -208,6 +208,34 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Return the agent definition slug (agent type) for a session identified by its UUID.
+
+  Used by the IAM hook controller to enrich the hook payload with the agent type
+  before policy evaluation. A single three-table join avoids loading the full session
+  struct when only the slug is needed.
+
+  Returns `{:ok, slug}` when found, `:error` when the session, agent, or agent
+  definition is missing.
+  """
+  @spec agent_type_for_session(String.t()) :: {:ok, String.t()} | :error
+  def agent_type_for_session(uuid) when is_binary(uuid) do
+    result =
+      from(s in Session,
+        join: a in assoc(s, :agent),
+        join: ad in assoc(a, :agent_definition),
+        where: s.uuid == ^uuid,
+        select: ad.slug,
+        limit: 1
+      )
+      |> Repo.one()
+
+    case result do
+      nil -> :error
+      slug -> {:ok, slug}
+    end
+  end
+
+  @doc """
   Resolves a session from an integer ID or UUID string.
   Returns {:ok, session} or {:error, :not_found}.
   """

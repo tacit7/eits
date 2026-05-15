@@ -90,6 +90,7 @@ defmodule EyeInTheSky.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:sobelow, "~> 0.13", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_slop, "~> 0.1", only: [:dev, :test], runtime: false},
       {:archdo,
        github: "BadBeta/archdo",
        ref: "1e651d57096122d8125490e78e963db4aa956266",

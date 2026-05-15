@@ -81,10 +81,18 @@ defmodule EyeInTheSky.IAM.Evaluator do
           list
 
         :error ->
-          if is_binary(ctx.agent_type) and ctx.agent_type not in ["", "*"] do
-            PolicyCache.for_agent_type(ctx.agent_type)
-          else
+          # When opts[:policies] is provided (test injection / explicit bypass),
+          # skip the document cache lookup too — callers in that mode don't own
+          # a DB connection and don't expect side effects.
+          # opts[:document_candidates] can still be provided independently.
+          if Keyword.has_key?(opts, :policies) do
             []
+          else
+            if is_binary(ctx.agent_type) and ctx.agent_type not in ["", "*"] do
+              PolicyCache.for_agent_type(ctx.agent_type)
+            else
+              []
+            end
           end
       end
 

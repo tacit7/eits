@@ -97,6 +97,7 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
             <th>Name</th>
             <th>Effect</th>
             <th>Priority</th>
+            <th>Source</th>
             <th>Matched?</th>
             <th>Reason</th>
           </tr>
@@ -117,6 +118,9 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
                 </span>
               </td>
               <td>{t.policy.priority}</td>
+              <td class="text-xs text-base-content/60">
+                {EyeInTheSky.IAM.EvaluationSource.label(Map.get(t, :source, :global))}
+              </td>
               <td>
                 <%= if t.matched? do %>
                   <span class="badge badge-sm badge-success">match</span>

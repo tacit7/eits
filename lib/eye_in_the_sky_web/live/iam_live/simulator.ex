@@ -75,6 +75,14 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
   end
 
   @impl true
+  def handle_params(%{"agent_type" => agent_type}, _uri, socket) when is_binary(agent_type) do
+    form = Map.put(socket.assigns.form, "agent_type", agent_type)
+    {:noreply, assign(socket, :form, form)}
+  end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("preset", %{"preset" => key}, socket) do
     case Map.fetch(@presets, key) do
       {:ok, overrides} ->
@@ -357,6 +365,27 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
       </div>
 
       <%= if @result do %>
+        <%= if @result.document_contributions != [] do %>
+          <section class="card bg-base-200">
+            <div class="card-body">
+              <h2 class="card-title text-lg flex items-center gap-2">
+                <.icon name="hero-document-text" class="size-5" /> Document contributions
+              </h2>
+              <div class="flex flex-wrap gap-2">
+                <%= for dc <- @result.document_contributions do %>
+                  <div class="badge badge-outline gap-1 py-3 px-3">
+                    <.link navigate={"/iam/documents/#{dc.document_id}"} class="link link-hover font-medium">
+                      {dc.document_name}
+                    </.link>
+                    <span class="text-base-content/50">→ {dc.agent_type}</span>
+                    <span class="badge badge-ghost badge-sm">{dc.effective_policy_count} matched</span>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </section>
+        <% end %>
+
         <section class="card bg-base-200">
           <div class="card-body">
             <h2 class="card-title text-lg flex items-center gap-2">

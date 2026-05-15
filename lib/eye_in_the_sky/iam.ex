@@ -164,13 +164,14 @@ defmodule EyeInTheSky.IAM do
       end
 
     instructions_snapshot =
-      Enum.map(decision.instructions, fn %{policy: p, message: msg, source: src} ->
+      Enum.map(decision.instructions, fn instr ->
+        p = instr.policy
         %{
           "policy_id" => p.id,
           "system_key" => p.system_key,
           "name" => p.name,
-          "message" => msg,
-          "source" => EyeInTheSky.IAM.EvaluationSource.label(src)
+          "message" => instr.message,
+          "source" => EyeInTheSky.IAM.EvaluationSource.label(Map.get(instr, :source))
         }
       end)
 
@@ -393,18 +394,26 @@ defmodule EyeInTheSky.IAM do
       Repo.transaction(fn ->
         Enum.reduce_while(document_ids, 0, fn doc_id, count ->
           attrs = %{agent_type: agent_type, document_id: doc_id}
+          changeset = AgentTypeDocument.changeset(%AgentTypeDocument{}, attrs)
 
-          case %AgentTypeDocument{} |> AgentTypeDocument.changeset(attrs) |> Repo.insert() do
-            {:ok, _} ->
+          # on_conflict: :nothing prevents Postgres from raising a unique violation,
+          # which would taint the transaction (ERROR 25P02 in_failed_sql_transaction)
+          # and make subsequent inserts fail. Already-attached rows are silently
+          # skipped; other constraint errors (e.g. bad FK) still propagate via
+          # {:error, changeset} from the changeset validation step.
+          case Repo.insert(changeset,
+                 on_conflict: :nothing,
+                 conflict_target: [:agent_type, :document_id]
+               ) do
+            {:ok, %AgentTypeDocument{id: nil}} ->
+              # on_conflict: :nothing — row already existed, no insert performed
+              {:cont, count}
+
+            {:ok, _atd} ->
               {:cont, count + 1}
 
             {:error, changeset} ->
-              if unique_violation?(changeset, :iam_agent_type_documents_unique) do
-                # Already attached — treat as no-op, continue
-                {:cont, count}
-              else
-                Repo.rollback({:changeset, changeset})
-              end
+              Repo.rollback({:changeset, changeset})
           end
         end)
       end)

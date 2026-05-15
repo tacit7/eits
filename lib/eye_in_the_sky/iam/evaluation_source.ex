@@ -24,7 +24,8 @@ defmodule EyeInTheSky.IAM.EvaluationSource do
       iex> EvaluationSource.label({:document, 1, "NoDeployments", "code-reviewer"})
       ~s(document "NoDeployments" → code-reviewer)
   """
-  @spec label(t()) :: String.t()
+  @spec label(t() | nil) :: String.t() | nil
+  def label(nil), do: nil
   def label(:global), do: "global"
   def label({:document, _id, name, agent_type}), do: ~s(document "#{name}" → #{agent_type})
 end

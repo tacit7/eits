@@ -131,6 +131,50 @@ defmodule EyeInTheSky.IAM do
     end
   end
 
+  @doc """
+  Force-reseed a built-in system policy to its seed definition.
+
+  Unlike `seed_builtin/1`, this overwrites all fields on an existing row —
+  including locked matcher fields — restoring the policy to its canonical
+  state. Any operator customizations to `enabled`, `priority`, `condition`, or
+  `message` are lost.
+
+  Useful after manual DB edits, schema mistakes, or when you want to pull in
+  updated seed defaults after a code change without shipping a migration.
+
+  Returns `{:ok, policy}` if the `system_key` is found in `Seeds.policies/0`,
+  `{:error, :not_in_seeds}` if the key is unknown, or
+  `{:error, changeset}` on a validation failure.
+  """
+  @spec reseed_builtin(String.t()) ::
+          {:ok, Policy.t()} | {:error, :not_in_seeds} | {:error, Ecto.Changeset.t()}
+  def reseed_builtin(system_key) when is_binary(system_key) do
+    editable = ~w(enabled priority condition message)
+
+    case Enum.find(EyeInTheSky.IAM.Seeds.policies(), &(&1[:system_key] == system_key)) do
+      nil ->
+        {:error, :not_in_seeds}
+
+      seed_attrs ->
+        attrs = Map.put(seed_attrs, :editable_fields, editable)
+
+        result =
+          case Repo.get_by(Policy, system_key: system_key) do
+            nil ->
+              %Policy{}
+              |> Policy.create_changeset(attrs)
+              |> Repo.insert()
+
+            %Policy{} = existing ->
+              existing
+              |> Policy.create_changeset(attrs)
+              |> Repo.update()
+          end
+
+        maybe_invalidate_cache(result)
+    end
+  end
+
   @doc "Bulk toggle the `enabled` flag on policies matching the given ids."
   @spec bulk_toggle_enabled([integer()], boolean()) :: {non_neg_integer(), nil | [term()]}
   def bulk_toggle_enabled(ids, enabled) when is_list(ids) and is_boolean(enabled) do

@@ -81,9 +81,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
   defp agent_types_string([]), do: "—"
 
   defp agent_types_string(agent_type_docs) do
-    agent_type_docs
-    |> Enum.map(& &1.agent_type)
-    |> Enum.join(", ")
+    Enum.map_join(agent_type_docs, ", ", & &1.agent_type)
   end
 
   defp policy_count(doc) do

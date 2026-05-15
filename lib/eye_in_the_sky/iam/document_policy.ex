@@ -10,7 +10,7 @@ defmodule EyeInTheSky.IAM.DocumentPolicy do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias EyeInTheSky.IAM.{PolicyDocument, Policy}
+  alias EyeInTheSky.IAM.{Policy, PolicyDocument}
 
   schema "iam_document_policies" do
     belongs_to :document, PolicyDocument

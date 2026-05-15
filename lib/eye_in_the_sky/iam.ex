@@ -12,11 +12,12 @@ defmodule EyeInTheSky.IAM do
 
   import Ecto.Query, warn: false
 
+  alias EyeInTheSky.IAM.AgentTypeDocument
+  alias EyeInTheSky.IAM.DocumentPolicy
+  alias EyeInTheSky.IAM.EvaluationSource
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.IAM.PolicyCache
   alias EyeInTheSky.IAM.PolicyDocument
-  alias EyeInTheSky.IAM.DocumentPolicy
-  alias EyeInTheSky.IAM.AgentTypeDocument
   alias EyeInTheSky.Repo
 
   @typedoc """
@@ -171,14 +172,14 @@ defmodule EyeInTheSky.IAM do
           "system_key" => p.system_key,
           "name" => p.name,
           "message" => instr.message,
-          "source" => EyeInTheSky.IAM.EvaluationSource.label(Map.get(instr, :source))
+          "source" => EvaluationSource.label(Map.get(instr, :source))
         }
       end)
 
     {winning_policy_id, winning_system_key, winning_name, winning_source} =
       case decision.winning_policy do
         nil -> {nil, nil, nil, nil}
-        p -> {p.id, p.system_key, p.name, EyeInTheSky.IAM.EvaluationSource.label(decision.winning_source)}
+        p -> {p.id, p.system_key, p.name, EvaluationSource.label(decision.winning_source)}
       end
 
     row = %{
@@ -272,33 +273,37 @@ defmodule EyeInTheSky.IAM do
           {:ok, DocumentPolicy.t()}
           | {:error, :document_not_found | :policy_not_found | :already_attached | Ecto.Changeset.t()}
   def add_policy_to_document(document_id, policy_id) do
-    with {:doc, %PolicyDocument{}} <- {:doc, Repo.get(PolicyDocument, document_id)},
-         {:policy, %Policy{}} <- {:policy, Repo.get(Policy, policy_id)} do
-      result =
-        Repo.transaction(fn ->
-          %DocumentPolicy{}
-          |> DocumentPolicy.changeset(%{document_id: document_id, policy_id: policy_id})
-          |> Repo.insert()
-        end)
-
-      case result do
-        {:ok, {:ok, dp}} ->
-          invalidate_cache()
-          {:ok, dp}
-
-        {:ok, {:error, changeset}} ->
-          if unique_violation?(changeset, :iam_document_policies_unique) do
-            {:error, :already_attached}
-          else
-            {:error, changeset}
-          end
-
-        {:error, reason} ->
-          {:error, reason}
-      end
+    with %PolicyDocument{} <- Repo.get(PolicyDocument, document_id) || :doc_not_found,
+         %Policy{} <- Repo.get(Policy, policy_id) || :policy_not_found do
+      do_insert_document_policy(document_id, policy_id)
     else
-      {:doc, nil} -> {:error, :document_not_found}
-      {:policy, nil} -> {:error, :policy_not_found}
+      :doc_not_found -> {:error, :document_not_found}
+      :policy_not_found -> {:error, :policy_not_found}
+    end
+  end
+
+  defp do_insert_document_policy(document_id, policy_id) do
+    result =
+      Repo.transaction(fn ->
+        %DocumentPolicy{}
+        |> DocumentPolicy.changeset(%{document_id: document_id, policy_id: policy_id})
+        |> Repo.insert()
+      end)
+
+    case result do
+      {:ok, {:ok, dp}} ->
+        invalidate_cache()
+        {:ok, dp}
+
+      {:ok, {:error, changeset}} ->
+        if unique_violation?(changeset, :iam_document_policies_unique) do
+          {:error, :already_attached}
+        else
+          {:error, changeset}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

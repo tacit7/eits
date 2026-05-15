@@ -11,7 +11,7 @@ defmodule EyeInTheSky.IAM.PolicyDocument do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias EyeInTheSky.IAM.{DocumentPolicy, AgentTypeDocument}
+  alias EyeInTheSky.IAM.{AgentTypeDocument, DocumentPolicy}
 
   schema "iam_policy_documents" do
     field :name, :string

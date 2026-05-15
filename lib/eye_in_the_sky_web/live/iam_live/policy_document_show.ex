@@ -211,12 +211,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
 
   defp attached_count(doc), do: length(doc.document_policies)
 
-  defp effective_count(doc) do
-    Enum.count(doc.document_policies, & &1.policy.enabled)
-  end
-
   defp conflict_detected?(doc) do
-    enabled_policies = doc.document_policies |> Enum.filter(& &1.policy.enabled)
+    enabled_policies = doc.document_policies
 
     allows = Enum.filter(enabled_policies, &(&1.policy.effect == "allow"))
     denies = Enum.filter(enabled_policies, &(&1.policy.effect == "deny"))
@@ -313,7 +309,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
               <h2 class="text-lg font-semibold flex items-center gap-2">
                 <.icon name="hero-shield-check" class="size-5" /> Policies in this document
                 <span class="badge badge-ghost text-xs font-mono">
-                  {attached_count(@document)} attached / {effective_count(@document)} effective
+                  {attached_count(@document)} policies
                 </span>
               </h2>
             </div>

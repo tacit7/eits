@@ -454,7 +454,11 @@ defmodule EyeInTheSky.IAM do
   end
 
   @doc """
-  Return all enabled policies contributed by documents attached to the given agent type.
+  Return all policies contributed by documents attached to the given agent type.
+
+  Document attachment is its own activation path — the policy-level `enabled`
+  flag gates the global pool only. A disabled policy explicitly added to a
+  document is still evaluated for agents attached to that document.
 
   Each result is a `document_policy_candidate` map:
 
@@ -469,7 +473,6 @@ defmodule EyeInTheSky.IAM do
       join: doc in assoc(atd, :document),
       join: dp in assoc(doc, :document_policies),
       join: p in assoc(dp, :policy),
-      where: p.enabled == true,
       select: %{
         policy: p,
         document: doc,

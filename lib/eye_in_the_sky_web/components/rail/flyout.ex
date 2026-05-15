@@ -325,6 +325,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :iam -> %>
               <Helpers.simple_link href="/iam/policies" label="Policies" icon="hero-shield-check" />
               <Helpers.simple_link
+                href="/iam/documents"
+                label="Documents"
+                icon="hero-document-text"
+              />
+              <Helpers.simple_link
                 href="/iam/agent-types"
                 label="Agent Types"
                 icon="hero-users"

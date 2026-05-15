@@ -197,7 +197,9 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
                 class="flex items-center justify-between gap-3 p-3 bg-base-100 rounded-lg border border-base-content/10"
               >
                 <div class="flex-1 min-w-0">
-                  <span class="font-medium">{doc.name}</span>
+                  <.link navigate={~p"/iam/documents/#{doc.id}"} class="font-medium link link-hover">
+                    {doc.name}
+                  </.link>
                   <%= if doc.description do %>
                     <p class="text-xs text-base-content/55 mt-0.5 truncate">{doc.description}</p>
                   <% end %>

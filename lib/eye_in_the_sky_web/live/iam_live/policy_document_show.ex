@@ -428,7 +428,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                     <%= for atd <- @document.agent_type_documents do %>
                       <tr id={"atd-#{atd.id}"}>
                         <td>
-                          <span class="font-mono text-sm">{atd.agent_type}</span>
+                          <.link
+                            navigate={~p"/iam/agent-types/show?agent_type=#{atd.agent_type}"}
+                            class="font-mono text-sm link link-hover"
+                          >{atd.agent_type}</.link>
                         </td>
                         <td class="text-right">
                           <button

@@ -14,7 +14,20 @@ defmodule EyeInTheSky.IAM do
 
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.IAM.PolicyCache
+  alias EyeInTheSky.IAM.PolicyDocument
+  alias EyeInTheSky.IAM.DocumentPolicy
+  alias EyeInTheSky.IAM.AgentTypeDocument
   alias EyeInTheSky.Repo
+
+  @typedoc """
+  A policy that contributes to evaluation via a document attachment.
+  Returned by `policies_for_agent_type/1` and cached by `PolicyCache.for_agent_type/1`.
+  """
+  @type document_policy_candidate :: %{
+          policy: Policy.t(),
+          document: PolicyDocument.t(),
+          attached_agent_type: String.t()
+        }
 
   # ── reads ───────────────────────────────────────────────────────────────────
 
@@ -189,6 +202,227 @@ defmodule EyeInTheSky.IAM do
     }
 
     Repo.insert_all("iam_decisions", [row])
+  end
+
+  # ── policy documents ─────────────────────────────────────────────────────────
+
+  @doc "List all policy documents ordered by name."
+  @spec list_policy_documents() :: [PolicyDocument.t()]
+  def list_policy_documents do
+    PolicyDocument
+    |> order_by([d], asc: d.name)
+    |> Repo.all()
+  end
+
+  @doc """
+  Fetch a policy document by id. Pass `preload: [...]` to eager-load associations.
+
+      get_policy_document(id, preload: [:document_policies, :agent_type_documents])
+  """
+  @spec get_policy_document(integer(), keyword()) ::
+          {:ok, PolicyDocument.t()} | {:error, :not_found}
+  def get_policy_document(id, opts \\ []) do
+    preloads = Keyword.get(opts, :preload, [])
+
+    case Repo.get(PolicyDocument, id) do
+      nil -> {:error, :not_found}
+      doc -> {:ok, Repo.preload(doc, preloads)}
+    end
+  end
+
+  @doc "Create a policy document."
+  @spec create_policy_document(map()) :: {:ok, PolicyDocument.t()} | {:error, Ecto.Changeset.t()}
+  def create_policy_document(attrs) do
+    %PolicyDocument{}
+    |> PolicyDocument.create_changeset(attrs)
+    |> Repo.insert()
+    |> maybe_invalidate_cache()
+  end
+
+  @doc "Update an existing policy document."
+  @spec update_policy_document(PolicyDocument.t(), map()) ::
+          {:ok, PolicyDocument.t()} | {:error, Ecto.Changeset.t()}
+  def update_policy_document(%PolicyDocument{} = doc, attrs) do
+    doc
+    |> PolicyDocument.update_changeset(attrs)
+    |> Repo.update()
+    |> maybe_invalidate_cache()
+  end
+
+  @doc "Delete a policy document. Cascades to document_policies and agent_type_documents."
+  @spec delete_policy_document(PolicyDocument.t()) ::
+          {:ok, PolicyDocument.t()} | {:error, Ecto.Changeset.t()}
+  def delete_policy_document(%PolicyDocument{} = doc) do
+    doc
+    |> Repo.delete()
+    |> maybe_invalidate_cache()
+  end
+
+  @doc """
+  Attach a policy to a document.
+
+  Returns `{:error, :document_not_found}` or `{:error, :policy_not_found}` if
+  either entity is missing. Returns `{:error, :already_attached}` if the pair
+  already exists (unique constraint). Invalidates the cache on success.
+  """
+  @spec add_policy_to_document(integer(), integer()) ::
+          {:ok, DocumentPolicy.t()}
+          | {:error, :document_not_found | :policy_not_found | :already_attached | Ecto.Changeset.t()}
+  def add_policy_to_document(document_id, policy_id) do
+    with {:doc, %PolicyDocument{}} <- {:doc, Repo.get(PolicyDocument, document_id)},
+         {:policy, %Policy{}} <- {:policy, Repo.get(Policy, policy_id)} do
+      result =
+        Repo.transaction(fn ->
+          %DocumentPolicy{}
+          |> DocumentPolicy.changeset(%{document_id: document_id, policy_id: policy_id})
+          |> Repo.insert()
+        end)
+
+      case result do
+        {:ok, {:ok, dp}} ->
+          invalidate_cache()
+          {:ok, dp}
+
+        {:ok, {:error, changeset}} ->
+          if unique_violation?(changeset, :iam_document_policies_unique) do
+            {:error, :already_attached}
+          else
+            {:error, changeset}
+          end
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    else
+      {:doc, nil} -> {:error, :document_not_found}
+      {:policy, nil} -> {:error, :policy_not_found}
+    end
+  end
+
+  @doc """
+  Remove a policy from a document. Returns `:ok` or `{:error, :not_found}`.
+  Invalidates the cache on success.
+  """
+  @spec remove_policy_from_document(integer(), integer()) :: :ok | {:error, :not_found}
+  def remove_policy_from_document(document_id, policy_id) do
+    case Repo.get_by(DocumentPolicy, document_id: document_id, policy_id: policy_id) do
+      nil ->
+        {:error, :not_found}
+
+      %DocumentPolicy{} = dp ->
+        Repo.delete!(dp)
+        invalidate_cache()
+        :ok
+    end
+  end
+
+  @doc """
+  Return all agent types that have at least one document attached, grouped as
+  `[{agent_type, [PolicyDocument.t()]}]` ordered by agent_type.
+  """
+  @spec list_agent_types_with_documents() :: [{String.t(), [PolicyDocument.t()]}]
+  def list_agent_types_with_documents do
+    rows =
+      AgentTypeDocument
+      |> order_by([a], asc: a.agent_type)
+      |> preload(:document)
+      |> Repo.all()
+
+    rows
+    |> Enum.group_by(& &1.agent_type, & &1.document)
+    |> Enum.sort_by(fn {agent_type, _} -> agent_type end)
+  end
+
+  @doc """
+  Attach a policy document to an agent type string.
+
+  Returns `{:error, :document_not_found}` if the document does not exist.
+  Returns `{:error, :already_attached}` if the pair already exists.
+  Invalidates the cache on success.
+  """
+  @spec attach_document_to_agent_type(String.t(), integer()) ::
+          {:ok, AgentTypeDocument.t()}
+          | {:error, :document_not_found | :already_attached | Ecto.Changeset.t()}
+  def attach_document_to_agent_type(agent_type, document_id) do
+    case Repo.get(PolicyDocument, document_id) do
+      nil ->
+        {:error, :document_not_found}
+
+      %PolicyDocument{} ->
+        result =
+          Repo.transaction(fn ->
+            %AgentTypeDocument{}
+            |> AgentTypeDocument.changeset(%{agent_type: agent_type, document_id: document_id})
+            |> Repo.insert()
+          end)
+
+        case result do
+          {:ok, {:ok, atd}} ->
+            invalidate_cache()
+            {:ok, atd}
+
+          {:ok, {:error, changeset}} ->
+            if unique_violation?(changeset, :iam_agent_type_documents_unique) do
+              {:error, :already_attached}
+            else
+              {:error, changeset}
+            end
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
+  @doc """
+  Detach a policy document from an agent type. Returns `:ok` or `{:error, :not_found}`.
+  Invalidates the cache on success.
+  """
+  @spec detach_document_from_agent_type(String.t(), integer()) :: :ok | {:error, :not_found}
+  def detach_document_from_agent_type(agent_type, document_id) do
+    case Repo.get_by(AgentTypeDocument, agent_type: agent_type, document_id: document_id) do
+      nil ->
+        {:error, :not_found}
+
+      %AgentTypeDocument{} = atd ->
+        Repo.delete!(atd)
+        invalidate_cache()
+        :ok
+    end
+  end
+
+  @doc """
+  Return all enabled policies contributed by documents attached to the given agent type.
+
+  Each result is a `document_policy_candidate` map:
+
+      %{policy: %Policy{}, document: %PolicyDocument{}, attached_agent_type: "code-reviewer"}
+
+  Always returns a list — never an error tuple. Unknown or unattached agent types return `[]`.
+  """
+  @spec policies_for_agent_type(String.t()) :: [document_policy_candidate()]
+  def policies_for_agent_type(agent_type) when is_binary(agent_type) do
+    from(atd in AgentTypeDocument,
+      where: atd.agent_type == ^agent_type,
+      join: doc in assoc(atd, :document),
+      join: dp in assoc(doc, :document_policies),
+      join: p in assoc(dp, :policy),
+      where: p.enabled == true,
+      select: %{
+        policy: p,
+        document: doc,
+        attached_agent_type: atd.agent_type
+      }
+    )
+    |> Repo.all()
+  end
+
+  # ── private helpers ──────────────────────────────────────────────────────────
+
+  defp unique_violation?(%Ecto.Changeset{errors: errors}, constraint_name) do
+    Enum.any?(errors, fn {_field, {_msg, opts}} ->
+      opts[:constraint] == :unique and opts[:constraint_name] == constraint_name
+    end)
   end
 
   # ── cache hook ──────────────────────────────────────────────────────────────

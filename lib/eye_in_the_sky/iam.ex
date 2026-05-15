@@ -164,19 +164,20 @@ defmodule EyeInTheSky.IAM do
       end
 
     instructions_snapshot =
-      Enum.map(decision.instructions, fn %{policy: p, message: msg} ->
+      Enum.map(decision.instructions, fn %{policy: p, message: msg, source: src} ->
         %{
           "policy_id" => p.id,
           "system_key" => p.system_key,
           "name" => p.name,
-          "message" => msg
+          "message" => msg,
+          "source" => EyeInTheSky.IAM.EvaluationSource.label(src)
         }
       end)
 
-    {winning_policy_id, winning_system_key, winning_name} =
+    {winning_policy_id, winning_system_key, winning_name, winning_source} =
       case decision.winning_policy do
-        nil -> {nil, nil, nil}
-        p -> {p.id, p.system_key, p.name}
+        nil -> {nil, nil, nil, nil}
+        p -> {p.id, p.system_key, p.name, EyeInTheSky.IAM.EvaluationSource.label(decision.winning_source)}
       end
 
     row = %{
@@ -193,6 +194,7 @@ defmodule EyeInTheSky.IAM do
       winning_policy_id: winning_policy_id,
       winning_policy_system_key: winning_system_key,
       winning_policy_name: winning_name,
+      winning_source: winning_source,
       reason: decision.reason,
       instructions_snapshot: instructions_snapshot,
       evaluated_count: decision.evaluated_count,
@@ -371,6 +373,52 @@ defmodule EyeInTheSky.IAM do
           {:error, reason} ->
             {:error, reason}
         end
+    end
+  end
+
+  @doc """
+  Attach multiple policy documents to an agent type in a single transaction.
+
+  Returns `{:ok, count}` where count is the number of rows inserted, or
+  `{:error, reason}` if the transaction fails. Already-attached documents are
+  treated as a no-op (ignored, not an error) so callers can call this
+  idempotently. Invalidates the cache only on full success.
+  """
+  @spec attach_documents_to_agent_type(String.t(), [integer()]) ::
+          {:ok, non_neg_integer()} | {:error, term()}
+  def attach_documents_to_agent_type(_agent_type, []), do: {:ok, 0}
+
+  def attach_documents_to_agent_type(agent_type, document_ids) do
+    result =
+      Repo.transaction(fn ->
+        Enum.reduce_while(document_ids, 0, fn doc_id, count ->
+          attrs = %{agent_type: agent_type, document_id: doc_id}
+
+          case %AgentTypeDocument{} |> AgentTypeDocument.changeset(attrs) |> Repo.insert() do
+            {:ok, _} ->
+              {:cont, count + 1}
+
+            {:error, changeset} ->
+              if unique_violation?(changeset, :iam_agent_type_documents_unique) do
+                # Already attached — treat as no-op, continue
+                {:cont, count}
+              else
+                Repo.rollback({:changeset, changeset})
+              end
+          end
+        end)
+      end)
+
+    case result do
+      {:ok, count} ->
+        invalidate_cache()
+        {:ok, count}
+
+      {:error, {:changeset, cs}} ->
+        {:error, cs}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

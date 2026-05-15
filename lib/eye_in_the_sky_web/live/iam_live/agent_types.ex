@@ -77,36 +77,20 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
         {:noreply, put_flash(socket, :error, "Select at least one document.")}
 
       true ->
-        results =
-          Enum.map(selected_docs, fn doc_id ->
-            IAM.attach_document_to_agent_type(agent_type, doc_id)
-          end)
-
-        errors =
-          Enum.filter(results, fn
-            {:ok, _} -> false
-            _ -> true
-          end)
-
         socket =
-          if errors == [] do
-            socket
-            |> put_flash(:info, "Document(s) attached to \"#{agent_type}\".")
-            |> assign(:show_add_form, false)
-            |> assign(:add_agent_type, "")
-            |> assign(:add_selected_docs, [])
-            |> assign_agent_types()
-          else
-            error_msg =
-              errors
-              |> Enum.map(fn
-                {:error, :document_not_found} -> "Document not found"
-                {:error, :already_attached} -> "Already attached"
-                {:error, _} -> "Attachment failed"
-              end)
-              |> Enum.join(", ")
+          case IAM.attach_documents_to_agent_type(agent_type, selected_docs) do
+            {:ok, _count} ->
+              socket
+              |> put_flash(:info, "Document(s) attached to \"#{agent_type}\".")
+              |> assign(:show_add_form, false)
+              |> assign(:add_agent_type, "")
+              |> assign(:add_selected_docs, [])
+              |> assign_agent_types()
 
-            put_flash(socket, :error, "Errors: #{error_msg}")
+            {:error, _reason} ->
+              socket
+              |> put_flash(:error, "Failed to attach document(s) to \"#{agent_type}\". No changes were made.")
+              |> assign_agent_types()
           end
 
         {:noreply, socket}

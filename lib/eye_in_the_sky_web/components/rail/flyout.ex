@@ -322,6 +322,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <AgentsSection.agents_content agents={@flyout_agents} myself={@myself} />
             <% :notifications -> %>
               <Helpers.simple_link href="/notifications" label="Notifications" icon="hero-bell" />
+            <% :iam -> %>
+              <Helpers.simple_link href="/iam/policies" label="Policies" icon="hero-shield-check" />
+              <Helpers.simple_link
+                href="/iam/agent-types"
+                label="Agent Types"
+                icon="hero-users"
+              />
+              <Helpers.simple_link href="/iam/simulator" label="Simulator" icon="hero-beaker" />
             <% :usage -> %>
               <UsageSection.usage_content usage={@flyout_usage} />
             <% :jobs -> %>

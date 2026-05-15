@@ -180,6 +180,10 @@ defmodule EyeInTheSkyWeb.Router do
       live "/iam/policies", IAMLive.Policies, :index
       live "/iam/policies/new", IAMLive.PolicyNew, :new
       live "/iam/policies/:id/edit", IAMLive.PolicyEdit, :edit
+      live "/iam/documents", IAMLive.PolicyDocuments, :index
+      live "/iam/documents/new", IAMLive.PolicyDocumentNew, :new
+      live "/iam/documents/:id", IAMLive.PolicyDocumentShow, :show
+      live "/iam/documents/:id/edit", IAMLive.PolicyDocumentEdit, :edit
       live "/bookmarks", BookmarkLive.Index, :index
     end
   end

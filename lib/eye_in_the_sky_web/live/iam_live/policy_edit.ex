@@ -106,6 +106,30 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
      |> assign(:scope, scope)}
   end
 
+  @impl true
+  def handle_event("reseed", _params, socket) do
+    policy = socket.assigns.policy
+
+    case IAM.reseed_builtin(policy.system_key) do
+      {:ok, updated} ->
+        changeset = Policy.update_changeset(updated, %{})
+
+        {:noreply,
+         socket
+         |> assign(:policy, updated)
+         |> assign(:form, to_form(changeset))
+         |> assign(:condition_text, encode_condition(updated.condition))
+         |> assign(:scope, infer_scope(updated))
+         |> put_flash(:info, "Policy reset to seed defaults.")}
+
+      {:error, :not_in_seeds} ->
+        {:noreply, put_flash(socket, :error, "No seed definition found for this policy.")}
+
+      {:error, _cs} ->
+        {:noreply, put_flash(socket, :error, "Failed to reseed policy.")}
+    end
+  end
+
   def handle_event("save", %{"policy" => raw_params} = event_params, socket) do
     condition_text = Map.get(event_params, "condition_text", socket.assigns.condition_text)
     scope = Map.get(event_params, "scope", socket.assigns.scope)
@@ -303,7 +327,19 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
           condition_disabled={locked?(assigns, :condition)}
         />
 
-        <div class="flex justify-end gap-2">
+        <div class="flex justify-between gap-2">
+          <%= if @system? do %>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm text-warning"
+              phx-click="reseed"
+              data-confirm="Reset this policy to its seed defaults? All customizations (enabled, priority, condition, message) will be overwritten."
+            >
+              <.icon name="hero-arrow-path" class="size-4" /> Reset to seed defaults
+            </button>
+          <% else %>
+            <div />
+          <% end %>
           <.form_actions submit_text="Save changes" cancel_navigate={~p"/iam/policies"} />
         </div>
       </.form>

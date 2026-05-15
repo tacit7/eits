@@ -51,6 +51,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
                |> assign(:condition_text, encode_condition(policy.condition))
                |> assign(:scope, infer_scope(policy))
                |> assign(:projects, Projects.list_projects())
+               |> assign(:matcher_source, load_matcher_source(policy.builtin_matcher))
                |> assign(:iam_hooks_status, HooksChecker.status())}
 
             {:error, :not_found} ->
@@ -75,6 +76,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
            |> assign(:condition_text, "{}")
            |> assign(:scope, "global")
            |> assign(:projects, [])
+           |> assign(:matcher_source, nil)
            |> assign(:iam_hooks_status, HooksChecker.status())}
         end
     end
@@ -159,6 +161,19 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
 
   defp locked?(%{system?: true, editable_fields: editable}, field) do
     not MapSet.member?(editable, to_string(field))
+  end
+
+  defp load_matcher_source(nil), do: nil
+
+  defp load_matcher_source(key) when is_binary(key) do
+    with {:ok, module} <- EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key),
+         source_path when is_list(source_path) <- module.__info__(:compile)[:source],
+         path = List.to_string(source_path),
+         {:ok, content} <- File.read(path) do
+      content
+    else
+      _ -> nil
+    end
   end
 
   # ── rendering ─────────────────────────────────────────────────────────────
@@ -292,6 +307,21 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
           <.form_actions submit_text="Save changes" cancel_navigate={~p"/iam/policies"} />
         </div>
       </.form>
+
+      <%= if @matcher_source do %>
+        <details class="collapse collapse-arrow bg-base-200">
+          <summary class="collapse-title font-semibold flex items-center gap-2 min-h-0 py-3 px-4">
+            <.icon name="hero-code-bracket" class="size-4 text-primary" />
+            Matcher source
+            <code class="font-mono text-xs text-base-content/60 ml-1">
+              {@policy.builtin_matcher}.ex
+            </code>
+          </summary>
+          <div class="collapse-content px-0 pb-0">
+            <pre class="overflow-x-auto text-xs font-mono leading-relaxed p-4 bg-base-300 rounded-b-box max-h-[32rem] overflow-y-auto"><code>{@matcher_source}</code></pre>
+          </div>
+        </details>
+      <% end %>
     </div>
     """
   end

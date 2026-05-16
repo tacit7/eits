@@ -204,6 +204,27 @@ Example:
 
 **Why idempotent seeding?** If a user disables or modifies a system policy, restarting the app will restore it. This ensures critical safety policies cannot be accidentally deleted.
 
+### Reseeding Built-in Policies
+
+The `IAM.reseed_builtin/1` function force-resets a built-in system policy to its seed definition. Unlike idempotent boot-time seeding, `reseed_builtin/1` overwrites **all fields** on an existing row — including locked matcher fields — restoring the policy to its canonical state.
+
+```elixir
+IAM.reseed_builtin("builtin.block_sudo")
+# {:ok, %Policy{...}}
+
+IAM.reseed_builtin("builtin.block_unknown")
+# {:error, :not_in_seeds}
+```
+
+**Use cases:**
+- Manual database edits that corrupted a policy definition
+- Schema mistakes requiring restoration without a migration
+- Pulling in updated seed defaults after a code change without shipping a migration
+
+**UI**: The policy edit page includes a "Reset to seed defaults" button (only visible for system policies). The button prompts for confirmation and overwrites `enabled`, `priority`, `condition`, and `message` fields. Returns errors if the `system_key` is unknown or validation fails.
+
+**Invalidates cache**: Successful reseed invalidates the policy cache, ensuring changes take effect immediately.
+
 ### Notable Matcher Details
 
 **`block_read_outside_cwd`** (fixed): Now filters out URL-like paths (e.g., `/api/v1/foo`) to prevent false positives when paths appear in tool arguments like `--message` or `--instructions`. Only candidates whose first filesystem segment exists trigger the match.
@@ -215,6 +236,42 @@ Example:
 **`require_commit_before_stop`**: Runs on Stop event (not PreToolUse). Runs `git status --porcelain` against the session's `project_path` and injects a warning into the transcript if uncommitted changes are found. Supports `"checkUntracked"` (default true) and `"ignorePaths"` conditions.
 
 **`prefer_package_manager`** (advisory): Warns when a Bash command uses a package manager that differs from the project's configured preference. Requires a `"packageManager"` condition key set to one of: `"npm"`, `"yarn"`, `"pnpm"`, or `"bun"`. Detects the manager from the first command token or runner prefixes (`npx`, `yarn`, `pnpm`, `bunx`). Only matches package manager operations (install/add/remove/uninstall/run/exec/ci sub-commands); bare invocations like `npm --version` do not trigger. Without the `"packageManager"` condition, the matcher is a no-op — the policy is opt-in.
+
+---
+
+## Policy Documents & Document Attachment
+
+Policy documents are named collections of policies that can be attached to agent types. Document attachment is a **separate activation path** from the global `enabled` flag:
+
+- A policy with `enabled: false` (disabled globally) will still be evaluated if it appears in a document attached to an agent type
+- A policy with `enabled: true` but not attached to any document will only be evaluated against the global policy pool
+- Document attachment ignores the policy-level `enabled` flag entirely
+
+### Multi-Attach: `attach_documents_to_agent_type/2`
+
+Bulk-attaches multiple policy documents to an agent type in a single **transactional** operation:
+
+```elixir
+IAM.attach_documents_to_agent_type("code-reviewer", [1, 2, 3])
+# {:ok, 2}  → inserted 2 new attachments (doc 3 was already attached)
+
+IAM.attach_documents_to_agent_type("code-reviewer", [])
+# {:ok, 0}  → no documents specified
+```
+
+**Idempotency**: Already-attached documents are silently skipped (no error). The function uses `on_conflict: :nothing` at the SQL level:
+
+```sql
+INSERT INTO iam_agent_type_documents (agent_type, document_id) 
+  VALUES (...) 
+  ON CONFLICT (agent_type, document_id) DO NOTHING
+```
+
+This prevents unique constraint violations from tainting the transaction (ERROR 25P02: `in_failed_sql_transaction`).
+
+**Transaction safety**: All documents are attached in a single `Repo.transaction`, so either all succeed or all roll back. Constraint validation errors still propagate. **Cache is invalidated only on full success** — partial attachment is not possible.
+
+**Returns**: `{:ok, count}` where count is the number of rows inserted (excluding already-attached documents), or `{:error, reason}` on transaction failure.
 
 ---
 
@@ -233,6 +290,36 @@ When Claude Code calls a tool:
    - Allow → let it through
    - Instruct → allow + advisory reason
 5. **Default (no match)** → allow (fail-open)
+
+### Instructions Snapshot & Source Audit
+
+When a decision is logged to `iam_decisions`, all matching advisory policies (instruct action) are captured in an `instructions_snapshot` JSON field:
+
+```json
+[
+  {
+    "policy_id": 5,
+    "system_key": "builtin.warn_git_amend",
+    "name": "Warn on git amend",
+    "message": "Consider using regular commits instead of amend",
+    "source": "global"
+  },
+  {
+    "policy_id": 12,
+    "name": "Warn on deployment changes",
+    "system_key": null,
+    "message": "This change affects the deployment pipeline",
+    "source": "document \"DeploymentSafety\" → code-reviewer"
+  }
+]
+```
+
+The `source` field in instructions and the `winning_source` field in the decision row both use `EvaluationSource.label/1`:
+- `"global"` if the policy came from the global pool
+- `"document \"Name\" → agent_type"` if attached to a policy document
+- `nil` (null in JSON) if missing from the instruction
+
+This tracing is crucial for operators debugging policy evaluation and understanding why a tool call was allowed, blocked, or warned.
 
 ---
 
@@ -422,6 +509,26 @@ ALTER TABLE iam_decisions
 ```
 
 **Reason**: The Bash tool resource_path is the full command string and overflows on moderately long commands (e.g., `git worktree add`, multi-flag compiles, agent spawn instructions). Widening to `text` eliminates truncation and removes the need for app-layer truncation logic. No data loss; existing varchar data migrates as-is.
+
+### `20260515033321_add_iam_document_index_and_winning_source`
+
+Adds a `document_id` index and `winning_source` field to the IAM decisions table:
+
+```sql
+CREATE INDEX iam_agent_type_documents_document_id 
+  ON iam_agent_type_documents(document_id);
+
+ALTER TABLE iam_decisions ADD COLUMN winning_source VARCHAR(255);
+```
+
+**Document ID index**: Covers document-only lookups and ON DELETE CASCADE cascading paths. The existing unique index on `(agent_type, document_id)` covers agent_type-first queries but not document_id-only scans. When a policy document is deleted, this index accelerates the cascade to remove all attachments.
+
+**Winning source field**: Stores the `EvaluationSource.label/1` string for the winning (matched) policy:
+- `"global"` if the winning policy came from the global pool
+- `"document \"Name\" → agent_type"` if attached to a policy document
+- `NULL` if the decision was a fallback (no policy matched)
+
+This audit field enables operators to trace where a matched policy originated without joining to the policy attachment tables.
 
 ---
 

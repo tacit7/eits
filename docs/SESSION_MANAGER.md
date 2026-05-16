@@ -485,6 +485,70 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 
 This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
 
+### Agent Type Resolution for IAM Policy Evaluation
+
+When Claude Code hooks evaluate session-scoped policies (e.g., document-attached policies that scope enforcement by agent type), the hook payload from the Claude CLI may not include an explicit `agent_type` field. To ensure policies fire correctly, the IAM controller enriches hook payloads with the agent type resolved from the session record.
+
+**Function:** `Sessions.agent_type_for_session/1`
+
+```elixir
+def agent_type_for_session(uuid) when is_binary(uuid) do
+  result =
+    from(s in Session,
+      join: a in assoc(s, :agent),
+      join: ad in assoc(a, :agent_definition),
+      where: s.uuid == ^uuid,
+      select: ad.slug,
+      limit: 1
+    )
+    |> Repo.one()
+
+  case result do
+    nil -> :error
+    slug -> {:ok, slug}
+  end
+end
+```
+
+**Purpose:** Resolves the agent definition slug (e.g., `"setup-guardian"`) for a session identified by its UUID via a three-table join (Session → Agent → AgentDefinition). Returns `{:ok, slug}` when found, `:error` when the session, agent, or agent definition is missing.
+
+**Usage in IAM Controller:** `POST /api/v1/iam/decide` enriches the hook payload before policy evaluation:
+
+```elixir
+def decide(conn, params) when is_map(params) do
+  start_us = System.monotonic_time(:microsecond)
+
+  params = enrich_agent_type(params)  # Enrich with agent type from session
+  ctx = Normalizer.from_hook_payload(params)
+  decision = Evaluator.decide(ctx)
+
+  # ... broadcast and return
+end
+
+defp enrich_agent_type(params) do
+  with nil <- Map.get(params, "agent_type"),
+       uuid when is_binary(uuid) <- Map.get(params, "session_id"),
+       {:ok, slug} <- Sessions.agent_type_for_session(uuid) do
+    Map.put(params, "agent_type", slug)
+  else
+    _ -> params
+  end
+end
+```
+
+**Behavior:**
+- Uses `put_new` semantics — if `agent_type` is already in the payload, it is not overwritten
+- Falls back gracefully: if the session, agent, or agent definition is missing, the payload remains unchanged (policy evaluation may skip document-attached policies that require agent type)
+- O(1) lookup: single three-table join with limit 1; no N+1 risk
+
+**Example flow:**
+1. Claude Code hook posts `{session_id: "uuid-...", tool: "Edit", ...}` (no agent_type)
+2. IAM controller calls `agent_type_for_session("uuid-...")`
+3. Resolves to `{:ok, "setup-guardian"}` by joining Session → Agent → AgentDefinition
+4. Enriches params: `Map.put(params, "agent_type", "setup-guardian")`
+5. Policy evaluator now has agent_type for document-scoped policies
+6. Policies that target agent type "setup-guardian" fire correctly
+
 ### Session Resume Response
 
 When a session is resumed via `POST /api/v1/sessions/:uuid/resume` or fetched via `GET /api/v1/sessions/:uuid`, the response includes the agent UUID, project ID, and worktree information needed to set up the Claude Code environment:

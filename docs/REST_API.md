@@ -2140,14 +2140,15 @@ This endpoint is **unauthenticated** — hook scripts run in the Claude CLI proc
 
 **Request body:**
 
-Raw Claude Code hook payload (JSON object). The endpoint normalizes the payload to extract:
+Raw Claude Code hook payload (JSON object). The endpoint enriches and normalizes the payload before policy evaluation:
+
 - `event` — Hook event type (`"PreToolUse"`, `"PostToolUse"`, `"UserPromptSubmit"`, `"Stop"`)
 - `session_uuid` — Session UUID (if available)
 - `tool` — Tool name being evaluated (for PreToolUse)
 - `resource_path` — File path or resource identifier
 - `project_id` — Project ID (from session or path resolution)
 - `project_path` — Project directory path
-- `agent_type` — Agent type from session
+- `agent_type` — Agent type. **Automatically enriched from the session record if not provided.** When missing, the endpoint resolves `agent_type` by joining `Session → Agent → AgentDefinition` to fetch the agent's slug. If explicitly provided in the request, takes precedence over the resolved value. This enrichment ensures document-based policies (which scope by agent type) fire correctly for Claude Code hooks that don't include agent type in their payload.
 
 **Response:** `200 OK` — Hook-protocol JSON
 

@@ -139,6 +139,32 @@ defmodule EyeInTheSky.Messages do
     |> broadcast_and_return()
   end
 
+  @spec send_to_session(String.t() | integer(), String.t(), Keyword.t()) ::
+          {:ok, Sessions.Session.t()} | {:error, any()}
+  def send_to_session(session_id, body, _opts \\ []) do
+    result =
+      Repo.transaction(fn ->
+        with {:ok, session} <- Sessions.resolve(session_id),
+             {:ok, _message} <-
+               send_message(%{
+                 session_id: session.id,
+                 sender_role: "user",
+                 recipient_role: "agent",
+                 provider: "claude",
+                 body: body
+               }) do
+          session
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+
+    case result do
+      {:ok, session} -> {:ok, session}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def record_incoming_reply(session_id, provider, body, opts \\ []) do
     id = Keyword.get(opts, :id) || Ecto.UUID.generate()
     source_uuid = Keyword.get(opts, :source_uuid) || Ecto.UUID.generate()

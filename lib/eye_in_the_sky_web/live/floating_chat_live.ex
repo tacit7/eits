@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.{Messages, Repo, Sessions}
+  alias EyeInTheSky.{Messages, Sessions}
 
   require Logger
 
@@ -88,9 +88,16 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_event("fab_send_message", %{"session_id" => session_id, "body" => body}, socket) do
-    case send_session_message(session_id, body) do
-      {:ok, session_id_int} ->
-        {:halt, switch_active_session(socket, session_id_int)}
+    case Messages.send_to_session(session_id, body) do
+      {:ok, session} ->
+        case AgentManager.continue_session(session.id, body, model: "sonnet") do
+          {:ok, _} ->
+            {:halt, switch_active_session(socket, session.id)}
+
+          {:error, reason} ->
+            Logger.warning("FAB continue_session failed: #{inspect(reason)}")
+            {:halt, switch_active_session(socket, session.id)}
+        end
 
       {:error, reason} ->
         {:halt, push_event(socket, "fab_chat_error", %{error: reason})}
@@ -132,9 +139,16 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
          %{"session_id" => session_id, "body" => body},
          socket
        ) do
-    case send_session_message(session_id, body) do
-      {:ok, _session_id_int} ->
-        {:halt, socket}
+    case Messages.send_to_session(session_id, body) do
+      {:ok, session} ->
+        case AgentManager.continue_session(session.id, body, model: "sonnet") do
+          {:ok, _} ->
+            {:halt, socket}
+
+          {:error, reason} ->
+            Logger.warning("ConfigGuide continue_session failed: #{inspect(reason)}")
+            {:halt, socket}
+        end
 
       {:error, reason} ->
         {:halt, push_event(socket, "config_guide_error", %{error: reason})}
@@ -323,38 +337,4 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     )
   end
 
-  defp send_session_message(session_id, body) do
-    result =
-      Repo.transaction(fn ->
-        with {:ok, session} <- Sessions.resolve(session_id),
-             {:ok, _message} <-
-               Messages.send_message(%{
-                 session_id: session.id,
-                 sender_role: "user",
-                 recipient_role: "agent",
-                 provider: "claude",
-                 body: body
-               }) do
-          session
-        else
-          {:error, reason} -> Repo.rollback(reason)
-        end
-      end)
-
-    case result do
-      {:ok, session} ->
-        case AgentManager.continue_session(session.id, body, model: "sonnet") do
-          {:ok, _} ->
-            {:ok, session.id}
-
-          {:error, reason} ->
-            Logger.warning("FAB continue_session failed after message saved: #{inspect(reason)}")
-            {:ok, session.id}
-        end
-
-      {:error, reason} ->
-        Logger.error("FAB send_session_message error: #{inspect(reason)}")
-        {:error, to_string(reason)}
-    end
-  end
 end

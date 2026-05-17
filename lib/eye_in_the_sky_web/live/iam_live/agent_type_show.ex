@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.IAMLive.IAMComponents
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
@@ -54,11 +55,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   def handle_event("select_attach_doc", %{"doc_id" => doc_id_str}, socket) do
-    doc_id =
-      case Integer.parse(doc_id_str) do
-        {id, ""} -> id
-        _ -> nil
-      end
+    doc_id = parse_int(doc_id_str)
 
     {:noreply, assign(socket, :attach_doc_id, doc_id)}
   end
@@ -95,8 +92,11 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
   def handle_event("detach_document", %{"doc_id" => doc_id_str}, socket) do
     agent_type = socket.assigns.agent_type
 
-    case Integer.parse(doc_id_str) do
-      {doc_id, ""} ->
+    case parse_int(doc_id_str) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid document ID.")}
+
+      doc_id ->
         case IAM.detach_document_from_agent_type(agent_type, doc_id) do
           :ok ->
             {:noreply,
@@ -107,9 +107,6 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
           {:error, :not_found} ->
             {:noreply, put_flash(socket, :error, "Attachment not found.")}
         end
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid document ID.")}
     end
   end
 

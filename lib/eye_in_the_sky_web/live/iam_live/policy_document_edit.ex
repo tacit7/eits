@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentEdit do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.IAMLive.IAMComponents
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
@@ -16,8 +17,14 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentEdit do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    case Integer.parse(id) do
-      {int_id, ""} ->
+    case parse_int(id) do
+      nil ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Invalid document ID.")
+         |> push_navigate(to: ~p"/iam/documents")}
+
+      int_id ->
         if connected?(socket) do
           case IAM.get_policy_document(int_id) do
             {:ok, %PolicyDocument{} = doc} ->
@@ -51,12 +58,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentEdit do
            |> assign(:form, to_form(changeset))
            |> assign(:iam_hooks_status, HooksChecker.status())}
         end
-
-      _ ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Invalid document ID.")
-         |> push_navigate(to: ~p"/iam/documents")}
     end
   end
 

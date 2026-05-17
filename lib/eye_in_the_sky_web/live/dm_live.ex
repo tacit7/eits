@@ -398,8 +398,11 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("delete_attachment", %{"id" => attachment_id}, socket) do
-    case Integer.parse(attachment_id) do
-      {id, _} ->
+    case parse_int(attachment_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid attachment ID")}
+
+      id ->
         case EyeInTheSky.FileAttachments.delete_attachment(id) do
           :ok ->
             {:noreply,
@@ -410,9 +413,6 @@ defmodule EyeInTheSkyWeb.DmLive do
             {:noreply,
              put_flash(socket, :error, "Failed to delete attachment: #{inspect(reason)}")}
         end
-
-      :error ->
-        {:noreply, put_flash(socket, :error, "Invalid attachment ID")}
     end
   end
 

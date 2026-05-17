@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.IAMLive.IAMComponents
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
@@ -17,8 +18,14 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    case Integer.parse(id) do
-      {int_id, ""} ->
+    case parse_int(id) do
+      nil ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Invalid document ID.")
+         |> push_navigate(to: ~p"/iam/documents")}
+
+      int_id ->
         if connected?(socket) do
           load_document(int_id, socket)
         else
@@ -33,12 +40,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
            |> assign(:new_agent_type, "")
            |> assign(:iam_hooks_status, HooksChecker.status())}
         end
-
-      _ ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Invalid document ID.")
-         |> push_navigate(to: ~p"/iam/documents")}
     end
   end
 
@@ -50,8 +51,11 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
   def handle_event("add_policy", %{"policy_id" => policy_id_str}, socket) do
     doc = socket.assigns.document
 
-    case Integer.parse(policy_id_str) do
-      {policy_id, ""} ->
+    case parse_int(policy_id_str) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a policy to add.")}
+
+      policy_id ->
         case IAM.add_policy_to_document(doc.id, policy_id) do
           {:ok, _} ->
             {:noreply,
@@ -71,9 +75,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
           {:error, _cs} ->
             {:noreply, put_flash(socket, :error, "Failed to add policy.")}
         end
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Select a policy to add.")}
     end
   end
 
@@ -81,8 +82,11 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
   def handle_event("remove_policy", %{"policy_id" => policy_id_str}, socket) do
     doc = socket.assigns.document
 
-    case Integer.parse(policy_id_str) do
-      {policy_id, ""} ->
+    case parse_int(policy_id_str) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid policy ID.")}
+
+      policy_id ->
         case IAM.remove_policy_from_document(doc.id, policy_id) do
           :ok ->
             {:noreply,
@@ -93,9 +97,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
           {:error, :not_found} ->
             {:noreply, put_flash(socket, :error, "Policy not found in document.")}
         end
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid policy ID.")}
     end
   end
 

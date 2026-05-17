@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.IAMLive.IAMComponents
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
@@ -39,8 +40,11 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
 
   @impl true
   def handle_event("delete", %{"id" => id}, socket) do
-    case Integer.parse(id) do
-      {int_id, ""} ->
+    case parse_int(id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid document ID.")}
+
+      int_id ->
         case IAM.get_policy_document(int_id, preload: [:agent_type_documents]) do
           {:error, :not_found} ->
             {:noreply, put_flash(socket, :error, "Document not found.")}
@@ -62,9 +66,6 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
                 {:noreply, put_flash(socket, :error, "Failed to delete document.")}
             end
         end
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid document ID.")}
     end
   end
 

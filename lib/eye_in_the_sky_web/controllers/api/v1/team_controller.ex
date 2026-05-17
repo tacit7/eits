@@ -330,24 +330,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
     cond do
       session_id_raw && session_id_raw != "" ->
-        resolve_session(session_id_raw)
+        Sessions.resolve(session_id_raw)
 
       agent_id_raw && agent_id_raw != "" ->
         resolve_agent_session(agent_id_raw)
 
       header_session && header_session != "" ->
-        resolve_session(header_session)
+        Sessions.resolve(header_session)
 
       true ->
         {:ok, :bearer_only}
-    end
-  end
-
-  defp resolve_session(raw) do
-    if int_id = parse_int(raw) do
-      Sessions.get_session(int_id)
-    else
-      Sessions.get_session_by_uuid(raw)
     end
   end
 
@@ -439,7 +431,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   defp do_broadcast(conn, team, from_raw, body) do
     members = Teams.list_members(team.id)
 
-    with {:ok, from_session} <- resolve_broadcast_sender(from_raw),
+    with {:ok, from_session} <- Sessions.resolve(from_raw),
          :ok <- check_sender_not_terminated(from_session),
          :ok <- check_is_team_member(members, from_session) do
       targets =
@@ -499,13 +491,5 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     if Enum.any?(members, &(&1.session_id == session.id)),
       do: :ok,
       else: {:error, :not_member}
-  end
-
-  defp resolve_broadcast_sender(raw) do
-    if int_id = parse_int(raw) do
-      Sessions.get_session(int_id)
-    else
-      Sessions.get_session_by_uuid(raw)
-    end
   end
 end

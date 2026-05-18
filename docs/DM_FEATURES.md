@@ -1211,6 +1211,39 @@ Duplicate DM messages on send have been eliminated. Previously, `AgentManager.se
 
 ---
 
+## Messages.send_to_session/2: Atomic Session Resolution & DM Send
+
+**Commit:** `6945108f`
+
+The `Messages.send_to_session/2` function atomically resolves a session by ID or UUID and sends a message to it within a database transaction. This extracts transaction logic from the LiveView layer into the Messages context, maintaining proper separation of concerns.
+
+**Function signature:**
+```elixir
+@spec send_to_session(String.t() | integer(), String.t(), Keyword.t()) ::
+  {:ok, Sessions.Session.t()} | {:error, any()}
+def send_to_session(session_id, body, _opts \\ [])
+```
+
+**Parameters:**
+- `session_id`: Session UUID (string) or numeric session ID (integer)
+- `body`: Message body text (string)
+- `opts`: Optional keyword list (reserved for future use)
+
+**Behavior:**
+1. Wraps the operation in `Repo.transaction/1`
+2. Resolves the session using `Sessions.resolve/1` (handles both UUID and integer ID formats)
+3. Sends a message with `sender_role="user"` and `recipient_role="agent"` via `send_message/1`
+4. Returns `{:ok, session}` on success, `{:error, reason}` on failure
+5. Automatic rollback on error via `Repo.rollback/1`
+
+**Use case:** Centralized API for sending DMs to sessions—eliminates transaction boilerplate in LiveView and command handlers. Callers no longer need to wrap session resolution and message creation in manual transactions.
+
+**Note:** The `AgentManager.continue_session` call remains in the LiveView layer (via `floating_chat_live`) to preserve orchestration layer separation. This function handles only the message persistence, not session state transitions.
+
+**Implementation file:** `lib/eye_in_the_sky/messages.ex`
+
+---
+
 ## DM Sidebar Tab Default
 
 **Commit:** `81f211e4`

@@ -453,7 +453,28 @@ def get_int(params, key) do
 end
 ```
 
-**✅ Correct — use Integer.parse/Float.parse:**
+**✅ Correct — use parse_int/1 in LiveViews:**
+
+In LiveViews and controllers, use the `parse_int/1` helper from `EyeInTheSkyWeb.ControllerHelpers` (preferred):
+
+```elixir
+import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
+def handle_event("delete", %{"id" => id}, socket) do
+  case parse_int(id) do
+    nil ->
+      {:noreply, put_flash(socket, :error, "Invalid ID")}
+
+    int_id ->
+      # ... handle int_id
+  end
+end
+```
+
+`parse_int/1` returns the integer on success and `nil` on failure (cleaner than `Integer.parse`'s `{n, remainder}` tuple). It also handles `nil`, already-integer values, and non-binary types gracefully.
+
+**For other contexts or floats,** use `Integer.parse/Float.parse` directly:
+
 ```elixir
 def get_int(params, key) do
   case Integer.parse(params[key] || "") do
@@ -474,7 +495,7 @@ end
 
 **Also applies to UUID/ID pre-validation:** Use `Ecto.UUID.cast/1` to validate UUID format before running a DB query, instead of catching `Ecto.Query.CastError` in a rescue clause.
 
-**Rule:** Never rescue `ArgumentError` for type coercion. Use `Integer.parse`, `Float.parse`, or `Ecto.UUID.cast` instead.
+**Rule:** Never rescue `ArgumentError` for type coercion. In LiveViews, prefer `parse_int/1`; elsewhere use `Integer.parse`, `Float.parse`, or `Ecto.UUID.cast`.
 
 ---
 

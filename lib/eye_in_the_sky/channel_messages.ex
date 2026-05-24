@@ -47,7 +47,7 @@ defmodule EyeInTheSky.ChannelMessages do
 
   @doc "Preloads associations needed for serialization."
   def preload_for_serialization(message) do
-    EyeInTheSky.Repo.preload(message, [:session, :reactions])
+    EyeInTheSky.Repo.preload(message, [:session, :reactions, :attachments])
   end
 
   @doc """

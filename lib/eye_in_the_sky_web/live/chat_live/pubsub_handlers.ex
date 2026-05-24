@@ -44,7 +44,6 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
       serialized =
         message
         |> ChannelMessages.preload_for_serialization()
-        |> EyeInTheSky.Repo.preload(:attachments)
         |> ChatPresenter.serialize_message()
 
       messages = socket.assigns.messages ++ [serialized]

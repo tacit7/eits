@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.RateLimitClient
   alias EyeInTheSky.{Notifications, Projects, Prompts, Tasks}
@@ -386,7 +387,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     do: FilterActions.handle_set_session_scope(params, socket)
 
   def handle_event("show_more_project_sessions", %{"project_id" => pid_str}, socket) do
-    pid = String.to_integer(pid_str)
+    pid = parse_int(pid_str)
+    if is_nil(pid), do: {:noreply, socket} else
     current = Map.get(socket.assigns.session_project_visible, pid, 5)
 
     {:noreply,
@@ -395,10 +397,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        :session_project_visible,
        Map.put(socket.assigns.session_project_visible, pid, current + 5)
      )}
+    end
   end
 
   def handle_event("toggle_project_sessions", %{"project_id" => pid_str}, socket) do
-    pid = String.to_integer(pid_str)
+    pid = parse_int(pid_str)
+    if is_nil(pid), do: {:noreply, socket} else
     collapsed = socket.assigns.session_project_collapsed
 
     updated =
@@ -407,6 +411,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         else: MapSet.put(collapsed, pid)
 
     {:noreply, assign(socket, :session_project_collapsed, updated)}
+    end
   end
 
   def handle_event("update_task_search", params, socket),
@@ -457,10 +462,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   def handle_event("open_task_detail", %{"task_id" => task_id_str}, socket) do
-    task_id = String.to_integer(task_id_str)
+    task_id = parse_int(task_id_str)
+    if is_nil(task_id), do: {:noreply, socket} else
     tasks = socket.assigns.flyout_tasks
     index = Enum.find_index(tasks, &(&1.id == task_id)) || 0
     {:noreply, assign(socket, :rail_modal, {:view_task, index, tasks})}
+    end
   end
 
   def handle_event("task_detail_nav", %{"dir" => dir}, socket) do
@@ -471,10 +478,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   def handle_event("open_note_detail", %{"note_id" => note_id_str}, socket) do
-    note_id = String.to_integer(note_id_str)
+    note_id = parse_int(note_id_str)
+    if is_nil(note_id), do: {:noreply, socket} else
     notes = socket.assigns.flyout_notes
     index = Enum.find_index(notes, &(&1.id == note_id)) || 0
     {:noreply, assign(socket, :rail_modal, {:view_note, index, notes})}
+    end
   end
 
   def handle_event("note_detail_nav", %{"dir" => dir}, socket) do

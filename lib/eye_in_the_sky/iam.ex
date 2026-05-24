@@ -262,6 +262,13 @@ defmodule EyeInTheSky.IAM do
     |> Repo.all()
   end
 
+  @doc "List all policy documents with associations preloaded (agent_type_documents and document_policies)."
+  @spec list_policy_documents_with_associations() :: [PolicyDocument.t()]
+  def list_policy_documents_with_associations do
+    list_policy_documents()
+    |> Repo.preload([:agent_type_documents, :document_policies])
+  end
+
   @doc """
   Fetch a policy document by id. Pass `preload: [...]` to eager-load associations.
 
@@ -328,26 +335,21 @@ defmodule EyeInTheSky.IAM do
 
   defp do_insert_document_policy(document_id, policy_id) do
     result =
-      Repo.transaction(fn ->
-        %DocumentPolicy{}
-        |> DocumentPolicy.changeset(%{document_id: document_id, policy_id: policy_id})
-        |> Repo.insert()
-      end)
+      %DocumentPolicy{}
+      |> DocumentPolicy.changeset(%{document_id: document_id, policy_id: policy_id})
+      |> Repo.insert()
 
     case result do
-      {:ok, {:ok, dp}} ->
+      {:ok, dp} ->
         invalidate_cache()
         {:ok, dp}
 
-      {:ok, {:error, changeset}} ->
+      {:error, changeset} ->
         if unique_violation?(changeset, :iam_document_policies_unique) do
           {:error, :already_attached}
         else
           {:error, changeset}
         end
-
-      {:error, reason} ->
-        {:error, reason}
     end
   end
 

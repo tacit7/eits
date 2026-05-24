@@ -72,10 +72,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
   # ── helpers ───────────────────────────────────────────────────────────────
 
   defp assign_documents(socket) do
-    docs =
-      IAM.list_policy_documents()
-      |> EyeInTheSky.Repo.preload([:agent_type_documents, :document_policies])
-
+    docs = IAM.list_policy_documents_with_associations()
     assign(socket, :documents, docs)
   end
 

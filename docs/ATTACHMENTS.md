@@ -111,6 +111,18 @@ delete_attachment(attachment :: FileAttachment.t() | id :: integer())
 - `DmMessageComponents.message_attachments/1` — Renders attachment list with delete buttons
 - Shows filename, size, and delete button on hover
 
+### Attachment Preloading
+
+Attachments are preloaded centrally via `ChannelMessages.preload_for_serialization/1`:
+
+```elixir
+def preload_for_serialization(message) do
+  EyeInTheSky.Repo.preload(message, [:session, :reactions, :attachments])
+end
+```
+
+This function is called in all message serialization paths (e.g., chat LiveView pubsub handlers) to ensure attachments are fetched along with other necessary associations. This centralization prevents redundant queries and keeps preload logic in one place.
+
 ## Future Improvements
 
 1. **Download Capability** — Add REST API endpoint to download files with proper content-type headers

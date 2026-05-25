@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-05-01
-Last updated: 2026-05-06 (Team authentication and project_id ownership checks)
+Last updated: 2026-05-24 (IAM context preload layer, transaction removal in document policy insertion)
 
 ## Authentication
 
@@ -753,6 +753,11 @@ IAM converts policy decisions into JSON responses per the Claude Code hook proto
   - `raw_payload`: Full hook payload for debugging
   - `inserted_at`: UTC timestamp
 - **Indexing**: FK indexes on `winning_policy_id` and `project_id` enable fast audit queries by policy or project. Partial indexes exclude NULL FK values for better selectivity.
+
+**Data access patterns**: Query and preload operations are encapsulated in the IAM context module to maintain clean separation between the database layer and presentation layer:
+
+- **Preload layer**: `IAM.list_policy_documents_with_associations/0` encapsulates `Repo.preload([:agent_type_documents, :document_policies])` to eagerly load policy document associations. This prevents N+1 queries when rendering policy documents in LiveView. Callers invoke the high-level function instead of calling `Repo.preload` directly in the presentation layer, maintaining the domain boundary.
+- **Transaction scope**: Atomic insert-only operations (e.g., attaching a policy document) omit unnecessary transaction wrappers. `do_insert_document_policy/2` directly calls `Repo.insert` instead of wrapping it in `Repo.transaction`, as there are no multi-step atomic operations requiring transaction semantics. Single inserts are already atomic at the database level; transaction overhead is avoided for simpler operations.
 
 ### Policy CRUD LiveView
 

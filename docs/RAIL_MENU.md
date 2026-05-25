@@ -608,3 +608,25 @@ Related components:
 16. **Skills flyout details preservation** — the skills section uses `phx-update="ignore"` on the details element wrapping each skill row. This preserves the `open` state across re-renders when the skills list is reloaded (e.g., when search/filter changes).
 
 17. **Notes expand-in-place pattern** — small notes (< 200 bytes) render as expandable `<details>` elements instead of navigating to the edit page. Large notes (≥ 200 bytes) provide an "Edit →" link within the expanded view that navigates to `/notes/:id/edit`. The expansion is in-place, preserving list scroll position.
+
+18. **Safe integer parsing in event handlers** — use `parse_int/1` from `EyeInTheSkyWeb.ControllerHelpers` instead of `String.to_integer/1` when converting event parameter strings to integers. `String.to_integer` raises an error on invalid input, while `parse_int` returns `nil`, allowing graceful error handling:
+
+    ```elixir
+    # Import at the top of the module
+    import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
+    # In handle_event
+    def handle_event("show_more_project_sessions", %{"project_id" => pid_str}, socket) do
+      case parse_int(pid_str) do
+        nil -> {:noreply, socket}  # Invalid integer; safely ignore
+        pid ->
+          current = Map.get(socket.assigns.session_project_visible, pid, 5)
+          {:noreply,
+           assign(socket, :session_project_visible,
+             Map.put(socket.assigns.session_project_visible, pid, current + 5)
+           )}
+      end
+    end
+    ```
+
+    Applied to all event handlers that receive integer IDs from the frontend: `show_more_project_sessions`, `toggle_project_sessions`, `open_task_detail`, `open_note_detail`, and others.

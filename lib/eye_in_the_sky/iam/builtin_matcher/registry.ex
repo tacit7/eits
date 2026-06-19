@@ -58,7 +58,8 @@ defmodule EyeInTheSky.IAM.BuiltinMatcher.Registry do
     "sanitize_bearer_tokens" => Builtin.SanitizeBearerTokens,
     "block_gh_pipeline" => Builtin.BlockGhPipeline,
     "prefer_package_manager" => Builtin.PreferPackageManager,
-    "require_commit_before_stop" => Builtin.RequireCommitBeforeStop
+    "require_commit_before_stop" => Builtin.RequireCommitBeforeStop,
+    "warn_db_cli" => Builtin.WarnDbCli
   }
 
   @doc "Return all known registry keys."

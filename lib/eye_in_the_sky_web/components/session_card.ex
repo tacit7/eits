@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     assigns =
       assigns
       |> assign(:status_label, status_label)
-      |> assign(:status_atom, String.to_existing_atom(display_status))
+      |> assign(:status_atom, display_status_to_atom(display_status))
 
     ~H"""
     <%!--
@@ -204,6 +204,25 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       nil -> nil
       %Ecto.Association.NotLoaded{} -> nil
       agent -> Map.get(agent, :description)
+    end
+  end
+
+  defp display_status_to_atom(status) do
+    case status do
+      "working" -> :working
+      "waiting" -> :waiting
+      "compacting" -> :compacting
+      "idle" -> :idle
+      "idle_stale" -> :idle_stale
+      "idle_dead" -> :idle_dead
+      "completed" -> :completed
+      "failed" -> :failed
+      "failed_billing" -> :failed_billing
+      "failed_auth" -> :failed_auth
+      "failed_rate_limit" -> :failed_rate_limit
+      "failed_timeout" -> :failed_timeout
+      "failed_retry_exhausted" -> :failed_retry_exhausted
+      _ -> :idle
     end
   end
 

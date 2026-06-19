@@ -1,41 +1,25 @@
-# IAM PreToolUse Hook — Install Guide
+# IAM Hook Integration
 
-The `iam-pretooluse.sh` script wires EITS IAM policy enforcement into every Claude Code
-session. On each tool call, Claude Code runs the script with the PreToolUse payload on
-stdin; the script forwards it to the EITS IAM decide endpoint and returns the policy
-decision (allow or deny) as a Claude hook response.
+Claude Code hook events (PreToolUse, PostToolUse, Stop) are forwarded to the EITS IAM
+endpoint via a direct `curl` command in `~/.claude/settings.json`. No wrapper script is needed.
 
-**Fail-open guarantee:** if EITS is unreachable, the script emits `{"continue": true}`
-and exits 0. A failed EITS call will never block a tool use.
+**Fail-open guarantee**: `|| true` at the end of the curl command ensures the hook always
+exits 0 even if EITS is unreachable. A down EITS server never blocks tool calls.
 
 ---
 
 ## Prerequisites
 
-- `curl` — HTTP client
-- `jq` — JSON processor
-
-Both must be on `$PATH` when Claude Code runs. Install via your system package manager
-if missing (`brew install curl jq` on macOS).
+- `curl` — must be on `$PATH` when Claude Code runs (`brew install curl` if missing)
+- EITS Phoenix server running at `http://127.0.0.1:5001`
 
 ---
 
-## Step 1 — Set EITS_URL
+## Wire the Hooks
 
-The script reads `$EITS_URL` to locate the API. Set it in your shell profile:
-
-```bash
-# ~/.zshrc or ~/.bashrc
-export EITS_URL=http://localhost:5001/api/v1
-```
-
-If `EITS_URL` is not set, the script defaults to `http://localhost:5001/api/v1`.
-
----
-
-## Step 2 — Wire into settings.json
-
-Add the script to the `PreToolUse` hooks array in `~/.claude/settings.json`:
+Add the following to `~/.claude/settings.json` under each relevant event. The same curl
+command works for all events — the IAM controller reads the `event` field from the payload
+to determine the hook type.
 
 ```json
 {
@@ -46,35 +30,29 @@ Add the script to the `PreToolUse` hooks array in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/eits/web/priv/scripts/iam-pretooluse.sh"
+            "command": "curl -sf --max-time 5 -X POST http://127.0.0.1:5001/api/v1/iam/hook -H 'Content-Type: application/json' -d @- || true"
           }
         ]
       }
-    ]
-  }
-}
-```
-
-Replace `/path/to/eits/web` with the absolute path to this repo. The empty `matcher`
-field matches all tools. To restrict enforcement to specific tools, set `matcher` to a
-regex (e.g., `"Bash|Edit|Write"`).
-
-**Example with multiple hooks** (IAM runs after the existing EITS workflow guard):
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
+    ],
+    "PostToolUse": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/eits/web/priv/scripts/eits-pre-tool-use.sh"
-          },
+            "command": "curl -sf --max-time 5 -X POST http://127.0.0.1:5001/api/v1/iam/hook -H 'Content-Type: application/json' -d @- || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
           {
             "type": "command",
-            "command": "/path/to/eits/web/priv/scripts/iam-pretooluse.sh"
+            "command": "curl -sf --max-time 5 -X POST http://127.0.0.1:5001/api/v1/iam/hook -H 'Content-Type: application/json' -d @- || true"
           }
         ]
       }
@@ -83,156 +61,143 @@ regex (e.g., `"Bash|Edit|Write"`).
 }
 ```
 
----
+Empty `matcher` (`""`) matches all tools. To restrict a hook entry to specific tools, set
+`matcher` to a regex: `"Bash|Edit|Write"`.
 
-## Step 3 — Verify
-
-Start a Claude Code session. Trigger any tool call. In the EITS web UI at
-`http://localhost:5001/iam/decisions`, you should see a new `iam_decisions` row with
-`permission: allow` (assuming no deny policies are active).
-
-To verify a deny: with the `block_rm_rf` built-in policy enabled, run a Bash tool call
-containing `rm -rf`. Claude Code should block the call with the policy's reason message.
+**PreToolUse is the only blocking event.** PostToolUse and Stop are advisory — missing them
+leaves no safety gap.
 
 ---
 
-## Environment variables
+## Port Override
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `EITS_URL` | `http://localhost:5001/api/v1` | API base URL for the EITS server |
+If your EITS server runs on a non-default port, change `5001` in the command accordingly.
+The Tauri desktop app reads the `PORT` env variable and rewrites this automatically on startup.
+
+---
+
+## Tauri Desktop — Automatic Installation
+
+The Tauri desktop app automatically installs IAM hooks on every launch via
+`install_iam_hooks(&port)` in `src-tauri/src/lib.rs`. It:
+
+1. Reads the current `~/.claude/settings.json`
+2. Checks each event type independently for an existing `"iam/hook"` reference
+3. Adds the hook entry only if none exists (idempotent — no duplicates)
+4. Writes the file back
+
+Port comes from the `PORT` env var (default `5050` in Tauri builds). This means hook
+installation is zero-touch for desktop users.
+
+---
+
+## Verify
+
+Start a Claude Code session and trigger any tool call. Check the EITS decision log:
+
+```
+http://localhost:5001/iam/decisions
+```
+
+You should see a new row with `permission: allow`. To verify a deny is working, enable the
+`builtin.block_rm_rf` policy and trigger a Bash call containing `rm -rf` — Claude Code should
+block it with the policy message.
+
+You can also query the database directly:
+
+```sql
+SELECT session_uuid, tool, resource_path, permission, winning_policy_name, inserted_at
+FROM iam_decisions
+ORDER BY inserted_at DESC
+LIMIT 10;
+```
 
 ---
 
 ## Troubleshooting
 
-**Hook not firing at all**
+**Hooks not firing at all**
 
-Check that the path in `settings.json` is absolute and the script is executable:
+Reload Claude Code after editing `settings.json`. Check that the JSON is valid — a parse
+error silently disables all hooks.
 
-```bash
-chmod +x /path/to/eits/web/priv/scripts/iam-pretooluse.sh
+**EITS unreachable — fail-open in effect**
+
+The `|| true` suffix means the hook exits 0 and Claude continues. Check that `mix phx.server`
+is running at `http://127.0.0.1:5001`.
+
+**Agent type not resolving**
+
+If document-based policies aren't firing for a specific agent type, the `session_id` in the
+hook payload must match a session that has an associated agent definition slug. Check:
+
+```sql
+SELECT s.uuid, ad.slug
+FROM sessions s
+JOIN agents a ON a.id = s.agent_id
+JOIN agent_definitions ad ON ad.id = a.agent_definition_id
+WHERE s.uuid = '<your-session-uuid>';
 ```
 
-Reload Claude Code after editing `settings.json`.
-
-**Endpoint unreachable — fail-open in effect**
-
-The script logs to stderr when it fails open:
-
-```
-[iam-pretooluse] fail-open: endpoint returned HTTP 000
-```
-
-To see these messages, start Claude Code from a terminal. If EITS is not running,
-start the Phoenix server:
-
-```bash
-cd /path/to/eits/web
-mix phx.server
-```
+If the join returns no rows, the session has no agent definition and `agent_type` will default
+to `"*"` — document candidates keyed to a specific slug won't be evaluated.
 
 **Decision log not updating**
 
-The endpoint writes to `iam_decisions` asynchronously via `Task.Supervisor`. If the
-table is empty after a confirmed allow, check Phoenix logs for audit write errors.
+The audit write is async (`Task.Supervisor`). If rows are missing, check Phoenix logs for
+errors from the `IAMDecisionLogger` task.
 
 **Tool calls blocked unexpectedly**
 
-Query recent deny decisions:
+Query recent denies scoped to your session:
 
 ```sql
-SELECT session_uuid, tool, resource_path, reason, winning_policy_name
+SELECT tool, resource_path, reason, winning_policy_name, winning_source
 FROM iam_decisions
-WHERE permission = 'deny'
+WHERE session_uuid = '<your-session-uuid>'
+  AND permission = 'deny'
 ORDER BY inserted_at DESC
 LIMIT 20;
 ```
 
-Or filter by your session UUID to see only your calls.
+Use the simulator at `/iam/simulator` to replay a context and see which policy matched.
 
 ---
 
-## Phase 4a: Policy Evaluation with Built-in Matchers
+## Response Wire Format
 
-Starting with Phase 4a, system policies can use `builtin_matcher` for specialized detection
-beyond regex conditions. When a policy has a builtin matcher set:
+The IAM hook endpoint returns JSON consumed directly by Claude Code.
 
-1. **Conditions are evaluated first** (AND logic)
-2. **If conditions match, builtin_matcher is dispatched**
-   - Dispatched via `safe_builtin_match/2` with rescue/catch protection
-   - Error in matcher → returns false (fail closed, does not match)
-   - Builtin matcher returns true/false
-3. **Both conditions AND builtin_matcher must match** for policy to apply
-
-### Builtin Matcher Keys
-
-System policies can set `builtin_matcher` to one of these registered keys:
-
+**PreToolUse — allow**:
 ```json
-[
-  "block_sudo",
-  "block_rm_rf",
-  "protect_env_vars",
-  "block_env_files",
-  "block_read_outside_cwd",
-  "block_push_master",
-  "block_curl_pipe_sh",
-  "block_work_on_main",
-  "warn_destructive_sql"
-]
+{"permissionDecision": "allow"}
 ```
 
-Each key corresponds to a specialized Elixir module that can:
-- Parse command arguments
-- Resolve file paths
-- Inspect git state
-- Analyze SQL statements
-- Access environment variables
-
-### Example Policy with Builtin Matcher
-
+**PreToolUse — deny**:
 ```json
 {
-  "name": "Block rm -rf",
-  "description": "Prevent destructive rm -rf commands",
-  "action": "deny",
-  "system_key": "builtin.block_rm_rf",
-  "builtin_matcher": "block_rm_rf",
-  "conditions": [
-    {
-      "kind": "tool_name_match",
-      "value": "Bash"
-    }
-  ]
+  "permissionDecision": "deny",
+  "permissionDecisionReason": "sudo is not permitted by policy 'Block sudo commands'"
 }
 ```
+Instruct-policy messages are concatenated into `permissionDecisionReason` alongside the deny reason.
 
-When Claude Code runs a Bash command:
-1. Condition `tool_name_match: "Bash"` is evaluated
-2. If matched, `builtin_matcher: "block_rm_rf"` is dispatched
-3. The BlockRmRf module parses the command and detects `rm -rf` patterns
-4. If detected, policy action `"deny"` blocks the call
+**PostToolUse — instruct match**:
+```json
+{"additionalContext": "Advisory: this command modifies the database schema…"}
+```
 
-### Important: Command/Content Regex
+**PostToolUse — no match**:
+```json
+{}
+```
 
-Only **system policies with registered builtin matchers** can use command/content parsing and 
-git-state inspection. User-authored policies in v1 cannot set `builtin_matcher` and are 
-restricted to declarative conditions (regex only).
+**Stop — no instructions**: exits 0 (Claude can stop).
+**Stop — instructions present**: exits 2 (blocks Claude from stopping, injects advisory context).
 
 ---
 
-## How the response adapter works
+## Related
 
-The EITS endpoint calls `EITS.IAM.HookResponse.to_json/2`, which maps the `Decision`
-struct to the Claude hook wire format:
-
-- **PreToolUse** — returns `permissionDecision: "allow" | "deny"` plus
-  `permissionDecisionReason` from the winning policy message. Advisory instructions
-  from `instruct` policies are concatenated into the reason.
-- **PostToolUse** — returns `additionalContext` with accumulated advisory output.
-- **Stop** — returns exit-code semantics; code 2 blocks Claude from stopping when
-  instructions are present.
-
-The hook script passes the raw PreToolUse payload through unchanged and forwards the
-adapter's JSON directly to stdout for Claude Code to consume.
+- [IAM_POLICY.md](IAM_POLICY.md) — Policy schema, builtin matchers, evaluator algorithm
+- [IAM_POLICY_DOCUMENTS.md](IAM_POLICY_DOCUMENTS.md) — Policy documents and agent type scoping

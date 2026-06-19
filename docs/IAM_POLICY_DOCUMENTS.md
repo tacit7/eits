@@ -1,5 +1,9 @@
 # IAM Policy Documents
 
+> **Status: Implemented.** This document reflects the current system state. It was originally
+> written as a design spec; most spec-phase language has been left intact because the reasoning
+> it captures is still useful. Treat "Decision X" sections as rationale, not open questions.
+
 Policy documents are named, reusable collections of policies that can be attached to agent types. When the evaluator processes a hook event, it unions document-contributed candidates with the global pool and runs the standard evaluation pass — with one explicit semantic override for agent-type scoping described below.
 
 ---

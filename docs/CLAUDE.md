@@ -28,7 +28,9 @@
 - [WORKSPACE_SCOPE.md](WORKSPACE_SCOPE.md) — Workspace scope contract: Scope struct, WorkspaceLive.Hooks, cross-workspace ownership validation, canonical queries
 - [VIM_NAV.md](VIM_NAV.md) — Vim navigation: all current keybindings, scope system, DOM markers
 - [VIM_NAV_LAZYVIM_PLAN.md](VIM_NAV_LAZYVIM_PLAN.md) — Planned LazyVim-inspired leader bindings (Space prefix, Phase A/B)
-- [IAM_POLICY_DOCUMENTS.md](IAM_POLICY_DOCUMENTS.md) — Policy documents: named policy collections attached to agent types, data model, evaluator change, UI spec
+- [IAM_POLICY.md](IAM_POLICY.md) — IAM policy schema, builtin matchers (36 registered), condition predicates, evaluator algorithm, policy documents, agent type enrichment
+- [IAM_HOOK_INSTALL.md](IAM_HOOK_INSTALL.md) — Wiring Claude Code hooks to the IAM endpoint (curl command, Tauri auto-install, troubleshooting)
+- [IAM_POLICY_DOCUMENTS.md](IAM_POLICY_DOCUMENTS.md) — Policy documents design rationale: agent-type scoping, source metadata, ETS cache strategy
 
 ## Claude API Key Blocking
 

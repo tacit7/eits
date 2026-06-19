@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     assigns =
       assigns
       |> assign(:status_label, status_label)
-      |> assign(:status_atom, String.to_atom(display_status))
+      |> assign(:status_atom, String.to_existing_atom(display_status))
 
     ~H"""
     <%!--

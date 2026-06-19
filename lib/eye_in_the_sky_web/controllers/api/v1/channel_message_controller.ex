@@ -125,21 +125,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
         for member <- members,
             not MapSet.member?(mentioned_ids, member.session_id) do
           dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
-
-          case DMDelivery.deliver_and_persist(
-                 member.session_id,
-                 sender_session_id,
-                 dm_body,
-                 %{channel_id: channel_id, channel_notification: true}
-               ) do
-            {:ok, _} ->
-              :ok
-
-            {:error, reason} ->
-              Logger.warning(
-                "channel notify failed for session #{member.session_id}: #{inspect(reason)}"
-              )
-          end
+          deliver_channel_notification(member.session_id, sender_session_id, dm_body, channel_id)
         end
       end)
     end
@@ -155,6 +141,19 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
       end
 
     "#{name} (#{role})"
+  end
+
+  defp deliver_channel_notification(session_id, sender_session_id, dm_body, channel_id) do
+    case DMDelivery.deliver_and_persist(session_id, sender_session_id, dm_body, %{
+           channel_id: channel_id,
+           channel_notification: true
+         }) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("channel notify failed for session #{session_id}: #{inspect(reason)}")
+    end
   end
 
   # Fan out DMs to all active team members when broadcast_to_team_id is supplied.

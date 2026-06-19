@@ -72,7 +72,9 @@ defmodule EyeInTheSky.Github.WebhookDispatcher do
     end
   end
 
-  defp notify_pr_subscribers(%EventContext{pr_number: pr_number, repository_full_name: repo} = ctx)
+  defp notify_pr_subscribers(
+         %EventContext{pr_number: pr_number, repository_full_name: repo} = ctx
+       )
        when is_integer(pr_number) and is_binary(repo) do
     subs = PrSubscriptions.subscribers_for(pr_number, repo)
 
@@ -96,7 +98,12 @@ defmodule EyeInTheSky.Github.WebhookDispatcher do
 
   defp notify_pr_subscribers(_ctx), do: :ok
 
-  defp format_pr_dm(%EventContext{event_type: event_type, pr_number: pr, head_branch: branch, sender_login: sender}) do
+  defp format_pr_dm(%EventContext{
+         event_type: event_type,
+         pr_number: pr,
+         head_branch: branch,
+         sender_login: sender
+       }) do
     branch_part = if branch, do: " on `#{branch}`", else: ""
     sender_part = if sender, do: " by #{sender}", else: ""
     "PR ##{pr} [#{event_type}]#{branch_part}#{sender_part}"

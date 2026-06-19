@@ -21,6 +21,7 @@ defmodule EyeInTheSky.Github.PrSubscriptions do
         if unique_conflict?(cs) do
           # Idempotent: activate if it was previously deactivated
           existing = get_by(session_uuid, pr_number, repository_full_name)
+
           if existing && !existing.active do
             existing |> Ecto.Changeset.change(active: true) |> Repo.update()
           else

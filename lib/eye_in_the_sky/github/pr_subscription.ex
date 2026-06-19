@@ -17,7 +17,7 @@ defmodule EyeInTheSky.Github.PrSubscription do
     |> validate_required([:session_uuid, :pr_number, :repository_full_name])
     |> validate_number(:pr_number, greater_than: 0)
     |> unique_constraint([:session_uuid, :pr_number, :repository_full_name],
-         name: :github_pr_subscriptions_session_pr_repo_unique
-       )
+      name: :github_pr_subscriptions_session_pr_repo_unique
+    )
   end
 end

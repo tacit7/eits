@@ -11,7 +11,9 @@ defmodule EyeInTheSky.Repo.Migrations.CreateGithubPrSubscriptions do
       timestamps(inserted_at: :created_at, updated_at: false, type: :utc_datetime_usec)
     end
 
-    create unique_index(:github_pr_subscriptions, [:session_uuid, :pr_number, :repository_full_name],
+    create unique_index(
+             :github_pr_subscriptions,
+             [:session_uuid, :pr_number, :repository_full_name],
              name: :github_pr_subscriptions_session_pr_repo_unique
            )
 

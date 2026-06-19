@@ -677,7 +677,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id="dm-live-root">
+    <div id="dm-live-root" class="flex flex-col flex-1 min-h-0">
       <DmPage.dm_page
         agent={@session}
         agent_record={@agent}

@@ -498,7 +498,11 @@ defmodule EyeInTheSkyWeb.DmLive do
       socket
       |> assign(:syncing, false)
       |> TabHelpers.force_reload_messages(socket.assigns.session_id)
-      |> push_event("new_message", %{})
+      # Use scroll_to_bottom (not new_message) so the hook always jumps to the
+      # bottom after initial page load, regardless of shouldAutoScroll. The
+      # shouldAutoScroll flag can be false when the browser's scroll restoration
+      # fires between mounted() and this sync completing.
+      |> push_event("scroll_to_bottom", %{})
 
     {:noreply, socket}
   end

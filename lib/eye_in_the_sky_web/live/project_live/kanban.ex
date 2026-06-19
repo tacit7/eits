@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
     TaskEventHandlers,
     TasksHelpers
   }
+
   alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, DatePickerHandlers, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers

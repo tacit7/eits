@@ -50,7 +50,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
   end
 
   @impl true
-  def handle_info({:recalculate_done, %{ingested: ingested, skipped: skipped, errors: errors}}, socket) do
+  def handle_info(
+        {:recalculate_done, %{ingested: ingested, skipped: skipped, errors: errors}},
+        socket
+      ) do
     socket =
       socket
       |> load_all_async(socket.assigns.date_range)

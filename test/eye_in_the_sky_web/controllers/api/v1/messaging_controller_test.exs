@@ -28,6 +28,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
 
   alias EyeInTheSky.Accounts.ApiKey
   alias EyeInTheSky.Channels
+  alias EyeInTheSky.Messages
 
   import EyeInTheSky.Factory
 
@@ -86,6 +87,46 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
 
       assert resp["success"] == true
       assert String.contains?(resp["message"], to_string(session.id))
+    end
+
+    test "auto-replies when the DM message is exactly test message", %{conn: conn} do
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManager
+      )
+
+      on_exit(fn ->
+        Application.put_env(
+          :eye_in_the_sky,
+          :agent_manager_module,
+          EyeInTheSky.Agents.MockAgentManager
+        )
+      end)
+
+      target_agent = create_agent()
+      sender_agent = create_agent()
+      target_session = create_session(target_agent)
+      sender_session = create_session(sender_agent)
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "from_session_id" => sender_session.uuid,
+          "to_session_id" => target_session.uuid,
+          "message" => "test message"
+        })
+
+      assert json_response(conn, 201)["success"] == true
+
+      [reply_dm] = Messages.list_inbound_dms(sender_session.id)
+
+      assert reply_dm.from_session_id == target_session.id
+      assert reply_dm.to_session_id == sender_session.id
+
+      assert String.contains?(
+               reply_dm.body,
+               "Codex received your message and is responding."
+             )
     end
 
     test "returns 400 when from_session_id is missing", %{conn: conn} do

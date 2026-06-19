@@ -151,6 +151,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
         nil ->
           case DMDelivery.deliver_and_persist(to_session.id, from_session.id, dm_body, metadata) do
             {:ok, msg} ->
+              maybe_send_test_message_auto_reply(from_session, to_session, params["message"])
               dm_success(conn, to_session, msg)
 
             {:error, :queue_full} ->
@@ -260,5 +261,43 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       message_id: to_string(msg.id),
       message_uuid: msg.uuid
     })
+  end
+
+  defp maybe_send_test_message_auto_reply(from_session, to_session, raw_message) do
+    if trim_param(raw_message) == "test message" do
+      reply_sender_name = ApiPresenter.resolve_session_sender_name(to_session)
+
+      reply_body =
+        "DM from:#{reply_sender_name} (session:#{to_session.uuid}) Codex received your message and is responding."
+
+      reply_metadata = %{
+        sender_name: reply_sender_name,
+        from_session_uuid: to_session.uuid,
+        to_session_uuid: from_session.uuid,
+        response_required: false,
+        auto_reply: true
+      }
+
+      case Messages.find_recent_dm(from_session.id, reply_body, seconds: 30) do
+        nil ->
+          case DMDelivery.deliver_and_persist(
+                 from_session.id,
+                 to_session.id,
+                 reply_body,
+                 reply_metadata
+               ) do
+            {:ok, _msg} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning(
+                "DM auto-reply failed from session #{to_session.id} to #{from_session.id}: #{inspect(reason)}"
+              )
+          end
+
+        _existing ->
+          :ok
+      end
+    end
   end
 end

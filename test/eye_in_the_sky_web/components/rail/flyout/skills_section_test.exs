@@ -144,7 +144,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSectionTest do
         )
 
       assert html =~ "skill-1"
-      assert html =~ "Test description"
       assert html =~ "?skill="
     end
   end

@@ -51,7 +51,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
 
   defp skill_row(assigns) do
     assigns =
-      assign(assigns, :skill_link, assigns.skills_route <> "?skill=" <> URI.encode_www_form(assigns.skill.id))
+      assign(
+        assigns,
+        :skill_link,
+        assigns.skills_route <> "?skill=" <> URI.encode_www_form(assigns.skill.id)
+      )
 
     ~H"""
     <.link
@@ -61,9 +65,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
       data-vim-flyout-item
     >
       <.icon
-        name={
-          if @skill.source in [:commands, :project_commands], do: "hero-slash", else: "hero-bolt"
-        }
+        name={if @skill.source in [:commands, :project_commands], do: "hero-slash", else: "hero-bolt"}
         class="size-3 flex-shrink-0 text-base-content/30"
       />
       <span class="truncate flex-1">{@skill.slug}</span>

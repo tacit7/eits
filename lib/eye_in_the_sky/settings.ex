@@ -52,7 +52,8 @@ defmodule EyeInTheSky.Settings do
     "palette_shortcut" => "auto",
     "use_anthropic_api_key" => "false",
     "rate_limit_per_session" => "false",
-    "agent_notifications" => "false"
+    "agent_notifications" => "false",
+    "dm_use_pty" => "false"
   }
 
   @doc """

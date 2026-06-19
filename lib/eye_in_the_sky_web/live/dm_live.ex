@@ -59,8 +59,10 @@ defmodule EyeInTheSkyWeb.DmLive do
         MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
         socket = mount_session_assigns(socket, params, session, agent, connected?(socket))
 
+        use_pty = EyeInTheSky.Settings.get_boolean("dm_use_pty")
+
         socket =
-          if connected?(socket),
+          if connected?(socket) && use_pty,
             do: subscribe_dm_pty(socket, session.uuid),
             else:
               socket

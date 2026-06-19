@@ -24,10 +24,17 @@ defmodule EyeInTheSky.IAM.Builtin.WarnDbCli do
 
   @db_cli_re ~r/\b(?:psql|sqlite3|mysql|mysqladmin|mysqlcheck|mariadb(?:-admin)?|cockroach|mongosh?|redis-(?:cli|server)|cqlsh|y(?:sql|cql)sh|influx|pgcli|mycli|litecli)\b/
 
+  # Matches single-quoted or double-quoted strings (non-greedy, no newline crossing).
+  # Used to strip quoted arguments before matching so we don't fire on strings like
+  # git commit -m "...psql..." or echo "use psql to query".
+  @quoted_re ~r/(?:'[^']*'|"[^"]*")/
+
   @impl true
   def matches?(%Policy{} = _p, %Context{tool: "Bash", resource_content: cmd})
       when is_binary(cmd) do
-    Regex.match?(@db_cli_re, cmd)
+    cmd
+    |> String.replace(@quoted_re, "")
+    |> then(&Regex.match?(@db_cli_re, &1))
   end
 
   def matches?(_, _), do: false

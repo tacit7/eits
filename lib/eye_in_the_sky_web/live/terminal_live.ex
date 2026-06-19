@@ -1,12 +1,24 @@
 defmodule EyeInTheSkyWeb.TerminalLive do
   @moduledoc """
-  Full-screen terminal LiveView backed by a PTY process.
+  Full-screen terminal LiveView backed by a persistent PTY process.
 
-  The xterm.js hook on the client handles rendering. Input/output flow:
-  - User types → JS hook pushes `pty_input` event → handle_event writes to PtyServer
-  - PtyServer receives output → sends `{:pty_output, data}` to this LiveView pid
-  - handle_info forwards data to client via `push_event("pty_output", %{data: ...})`
-  - Resize: JS hook pushes `pty_resize` on terminal resize → handle_event calls PtyServer.resize/3
+  The PTY session outlives this LiveView. Navigate away and come back — the
+  process is still running. The scroll buffer is replayed into xterm.js on
+  re-mount so the user sees history.
+
+  ## Session key
+
+  The PTY is keyed by `pty_session_key` from the LiveView session map.
+  Pass a stable key (e.g., a user or session UUID) to share the same PTY
+  across reconnects and navigation. Falls back to a per-mount unique key.
+
+  ## Input/output flow
+
+  - User types → JS hook pushes `pty_input` → handle_event writes to PtyServer
+  - PtyServer output → sends `{:pty_output, data}` to this LiveView pid
+  - handle_info forwards to client via `push_event("pty_output", %{data: base64})`
+  - Resize → JS hook pushes `pty_resize` → handle_event calls PtyServer.resize/3
+  - On subscribe → PtyServer sends `{:pty_scroll_buffer, binary}` → replayed as pty_output
   """
 
   use EyeInTheSkyWeb, :live_view
@@ -17,23 +29,30 @@ defmodule EyeInTheSkyWeb.TerminalLive do
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     if connected?(socket) do
+      session_key = derive_session_key(session)
+
       {:ok, pty_pid} =
-        PtySupervisor.start_pty(subscriber: self(), cols: 220, rows: 50)
+        PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
+
+      # subscribe/1 immediately sends {:pty_scroll_buffer, binary} with accumulated history
+      :ok = PtyServer.subscribe(pty_pid)
 
       {:ok,
        socket
        |> assign(:pty_pid, pty_pid)
+       |> assign(:session_key, session_key)
        |> assign(:page_title, "Terminal")}
     else
-      {:ok, assign(socket, pty_pid: nil, page_title: "Terminal")}
+      {:ok, assign(socket, pty_pid: nil, session_key: nil, page_title: "Terminal")}
     end
   end
 
   @impl true
   def terminate(_reason, %{assigns: %{pty_pid: pid}}) when is_pid(pid) do
-    PtyServer.stop(pid)
+    # Unsubscribe only — do NOT stop the PtyServer. The OS process keeps running.
+    PtyServer.unsubscribe(pid)
   end
 
   def terminate(_reason, _socket), do: :ok
@@ -59,11 +78,19 @@ defmodule EyeInTheSkyWeb.TerminalLive do
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   def handle_event(event, _params, socket) do
-    Logger.debug("TerminalLive: Unexpected handle_event: #{event}")
+    Logger.debug("TerminalLive: unexpected handle_event: #{event}")
     {:noreply, socket}
   end
 
   @impl true
+  # Scroll buffer replay on (re-)subscribe — write into xterm.js as if it were live output
+  def handle_info({:pty_scroll_buffer, buffer}, socket) when byte_size(buffer) > 0 do
+    {:noreply, push_event(socket, "pty_output", %{data: Base.encode64(buffer)})}
+  end
+
+  def handle_info({:pty_scroll_buffer, _empty}, socket), do: {:noreply, socket}
+
+  # Live output from PtyServer
   def handle_info({:pty_output, data}, socket) do
     {:noreply, push_event(socket, "pty_output", %{data: Base.encode64(data)})}
   end
@@ -95,5 +122,18 @@ defmodule EyeInTheSkyWeb.TerminalLive do
       </div>
     </div>
     """
+  end
+
+  # --- Private ---
+
+  # Derive a stable PTY key for the browser session.
+  # Priority: explicit pty_session_key > user_id > _csrf_token (stable per tab).
+  defp derive_session_key(session) do
+    cond do
+      key = session["pty_session_key"] -> key
+      user_id = session["user_id"] -> "terminal-user-#{user_id}"
+      token = session["_csrf_token"] -> "terminal-csrf-#{token}"
+      true -> "terminal-#{System.unique_integer([:positive])}"
+    end
   end
 end

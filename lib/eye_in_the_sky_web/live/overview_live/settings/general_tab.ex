@@ -197,6 +197,32 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
 
       <section>
         <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+          Terminal
+        </h2>
+        <div class="card bg-base-100 border border-base-300 shadow-sm">
+          <div class="card-body p-0 divide-y divide-base-300">
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Use PTY terminal in DM sessions</p>
+                <p class="text-xs text-base-content/50 mt-0.5">
+                  Replace the web chat interface with an embedded PTY terminal.
+                  Requires a page reload to take effect.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-primary"
+                checked={@settings["dm_use_pty"] == "true"}
+                phx-click="toggle_setting"
+                phx-value-key="dm_use_pty"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
           Keyboard
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">

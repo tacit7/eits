@@ -216,7 +216,9 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       case Canvases.create_terminal(canvas_id, attrs) do
         {:ok, ct} ->
           {:ok, pty_pid} =
-            PtySupervisor.start_pty(subscriber: self(), subscriber_tag: ct.id)
+            PtySupervisor.find_or_start_pty(session_key: "canvas-terminal-#{ct.id}")
+
+          PtyServer.subscribe(pty_pid, self(), ct.id)
 
           {:noreply,
            socket
@@ -310,6 +312,18 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   def handle_info({:remove_canvas_window, cs_id}, socket) do
     {:noreply, remove_canvas_session(socket, cs_id)}
   end
+
+  # Scroll buffer replay on (re-)subscribe — route same as live output
+  def handle_info({:pty_scroll_buffer, terminal_id, data}, socket) when byte_size(data) > 0 do
+    send_update(TerminalWindowComponent,
+      id: "terminal-window-#{terminal_id}",
+      pty_output: data
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:pty_scroll_buffer, _terminal_id, _empty}, socket), do: {:noreply, socket}
 
   # PTY output — tagged with terminal id
   def handle_info({:pty_output, terminal_id, data}, socket) do
@@ -711,7 +725,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
       pty_map =
         Map.new(terminals, fn ct ->
-          {:ok, pid} = PtySupervisor.start_pty(subscriber: self(), subscriber_tag: ct.id)
+          {:ok, pid} = PtySupervisor.find_or_start_pty(session_key: "canvas-terminal-#{ct.id}")
+          PtyServer.subscribe(pid, self(), ct.id)
           {ct.id, pid}
         end)
 

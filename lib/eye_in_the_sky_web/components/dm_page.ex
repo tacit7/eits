@@ -56,6 +56,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
   attr :overlay_data, :map, default: %{active_overlay: nil, active_timer: nil, reloading: false}
   attr :syncing, :boolean, default: false
+  attr :pty_pid, :any, default: nil
 
   defp normalize_message_data(message_data) do
     Map.merge(
@@ -72,7 +73,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
     ~H"""
     <div
-      class="flex flex-col h-full px-0 sm:px-4 lg:px-8 py-0 sm:py-4 relative overflow-hidden"
+      class={[
+        "flex flex-col h-full relative overflow-hidden",
+        if(@pty_pid, do: "px-0 py-0", else: "px-0 sm:px-4 lg:px-8 py-0 sm:py-4"),
+        if(@pty_pid, do: "pty-content", else: nil)
+      ]}
+      style={if @pty_pid, do: "background: var(--pty-bg, #1e1e1e)", else: nil}
       id="dm-page"
       phx-drop-target={@uploads.files.ref}
       phx-hook="DragUpload"
@@ -422,136 +428,100 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           </div>
         <% end %>
 
-        <%!-- Pill tabs --%>
-        <div class="px-5 pb-3 flex items-center gap-3" id="dm-tabs">
-          <div class="flex items-center gap-0.5 min-w-max">
-            <%= for {tab, icon, label} <- @tabs do %>
-              <button
-                class={[
-                  "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] font-medium transition-all duration-150",
-                  @active_tab == tab && "bg-primary/10 text-primary",
-                  @active_tab != tab &&
-                    "text-base-content/40 hover:text-base-content/65 hover:bg-base-content/5"
-                ]}
-                phx-click="change_tab"
-                phx-value-tab={tab}
-                id={"dm-tab-#{tab}"}
-              >
-                <.icon name={icon} class="size-3.5" />
-                {label}
-              </button>
-            <% end %>
-          </div>
-          <%= if @active_tab in ["messages", nil] do %>
-            <div class="ml-auto w-48">
-              <form phx-change="search_messages" phx-submit="search_messages" class="relative">
-                <.icon
-                  name="hero-magnifying-glass"
-                  class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-base-content/30 pointer-events-none"
-                />
-                <input
-                  type="text"
-                  name="query"
-                  value={@message_data.message_search_query}
-                  placeholder="Search messages..."
-                  autocomplete="off"
-                  phx-debounce="300"
-                  class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg bg-base-content/[0.05] border border-base-content/8 focus:outline-none focus:ring-1 focus:ring-base-content/20 focus:border-base-content/20 placeholder:text-base-content/25 text-base-content/70 transition-colors"
-                />
-                <%= if @message_data.message_search_query != "" do %>
-                  <button
-                    type="button"
-                    phx-click="search_messages"
-                    phx-value-query=""
-                    class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content/60 transition-colors"
-                  >
-                    <.icon name="hero-x-mark" class="size-3.5" />
-                  </button>
-                <% end %>
-              </form>
-            </div>
-          <% end %>
-        </div>
       </div>
 
-      <%!-- Tab content --%>
-      <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col" id="dm-tab-content">
-        <%= case @active_tab do %>
-          <% "messages" -> %>
-            <.messages_tab_content
-              streams={@streams}
-              message_data={@message_data}
-              stream={@stream}
-              agent={@agent}
-              codex_raw_lines={@codex_raw_lines}
-              syncing={@syncing}
-            />
-          <% "tasks" -> %>
-            <TasksTab.tasks_tab tasks={@task_data.tasks} />
-          <% "commits" -> %>
-            <CommitsTab.commits_tab
-              commits={@commits}
-              diff_cache={@diff_cache}
-              commits_view={@commits_view}
-              diff_mode={@diff_mode}
-              cumulative_diff={@cumulative_diff}
-            />
-          <% "notes" -> %>
-            <NotesTab.notes_tab notes={@notes} />
-          <% "context" -> %>
-            <ContextTab.context_tab session_context={@session_context} />
-          <% "settings" -> %>
-            <SettingsTab.settings_tab
-              scope={@dm_settings_scope}
-              subtab={@dm_settings_subtab}
-              session={@agent}
-              agent={@agent_record}
-              session_state={@session_state}
-              notify_on_stop={@notify_on_stop}
-            />
-          <% _ -> %>
-            <.messages_tab_content
-              streams={@streams}
-              message_data={@message_data}
-              stream={@stream}
-              agent={@agent}
-              codex_raw_lines={@codex_raw_lines}
-              syncing={@syncing}
-            />
-        <% end %>
-      </div>
 
-      <%!-- Composer (pinned to bottom) --%>
-      <%= if @active_tab in ["messages", nil] do %>
+      <%= if @pty_pid do %>
+        <%!-- PTY terminal — always in DOM so xterm.js keeps its state; hidden when off messages tab --%>
         <div
-          id="dm-page-composer"
-          class="flex-shrink-0 max-w-[860px] mx-auto w-full px-5 pb-7 pt-3 safe-inset-bottom"
+          id={"pty-dm-#{@session_uuid}"}
+          phx-hook="PtyHook"
+          phx-update="ignore"
+          class="flex-1 min-h-0 p-2 overflow-hidden"
+          style={if @active_tab not in ["messages", nil], do: "display:none"}
         >
-          <%= if @message_data.queued_prompts != [] do %>
-            <Composer.prompt_queue prompts={@message_data.queued_prompts} />
-          <% end %>
-          <Composer.message_form
-            uploads={@uploads}
-            selected_model={@session_state.model}
-            selected_effort={@session_state.effort}
-            active_overlay={@overlay_data.active_overlay}
-            processing={@session_state.processing}
-            slash_items={@slash_items}
-            thinking_enabled={@session_state.thinking_enabled}
-            max_budget_usd={@session_state.max_budget_usd}
-            provider={@agent.provider}
-            context_used={@session_state.context_used}
-            context_window={@session_state.context_window}
-            total_cost={Map.get(@session_state, :total_cost, 0.0)}
-            display_name={
-              if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) &&
-                   @agent_record.agent_definition,
-                 do: @agent_record.agent_definition.display_name
-            }
-            session_cli_opts={assigns[:session_cli_opts] || []}
-            session_uuid={@session_uuid}
-          />
         </div>
+      <% end %>
+      <%= if !@pty_pid || @active_tab not in ["messages", nil] do %>
+        <%!-- Tab content — shown when no PTY, or PTY active but on non-messages tab --%>
+        <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col" id="dm-tab-content">
+          <%= case @active_tab do %>
+            <% "messages" -> %>
+              <.messages_tab_content
+                streams={@streams}
+                message_data={@message_data}
+                stream={@stream}
+                agent={@agent}
+                codex_raw_lines={@codex_raw_lines}
+                syncing={@syncing}
+              />
+            <% "tasks" -> %>
+              <TasksTab.tasks_tab tasks={@task_data.tasks} />
+            <% "commits" -> %>
+              <CommitsTab.commits_tab
+                commits={@commits}
+                diff_cache={@diff_cache}
+                commits_view={@commits_view}
+                diff_mode={@diff_mode}
+                cumulative_diff={@cumulative_diff}
+              />
+            <% "notes" -> %>
+              <NotesTab.notes_tab notes={@notes} />
+            <% "context" -> %>
+              <ContextTab.context_tab session_context={@session_context} />
+            <% "settings" -> %>
+              <SettingsTab.settings_tab
+                scope={@dm_settings_scope}
+                subtab={@dm_settings_subtab}
+                session={@agent}
+                agent={@agent_record}
+                session_state={@session_state}
+                notify_on_stop={@notify_on_stop}
+              />
+            <% _ -> %>
+              <.messages_tab_content
+                streams={@streams}
+                message_data={@message_data}
+                stream={@stream}
+                agent={@agent}
+                codex_raw_lines={@codex_raw_lines}
+                syncing={@syncing}
+              />
+          <% end %>
+        </div>
+
+        <%!-- Composer (pinned to bottom) --%>
+        <%= if @active_tab in ["messages", nil] do %>
+          <div
+            id="dm-page-composer"
+            class="flex-shrink-0 max-w-[860px] mx-auto w-full px-5 pb-7 pt-3 safe-inset-bottom"
+          >
+            <%= if @message_data.queued_prompts != [] do %>
+              <Composer.prompt_queue prompts={@message_data.queued_prompts} />
+            <% end %>
+            <Composer.message_form
+              uploads={@uploads}
+              selected_model={@session_state.model}
+              selected_effort={@session_state.effort}
+              active_overlay={@overlay_data.active_overlay}
+              processing={@session_state.processing}
+              slash_items={@slash_items}
+              thinking_enabled={@session_state.thinking_enabled}
+              max_budget_usd={@session_state.max_budget_usd}
+              provider={@agent.provider}
+              context_used={@session_state.context_used}
+              context_window={@session_state.context_window}
+              total_cost={Map.get(@session_state, :total_cost, 0.0)}
+              display_name={
+                if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) &&
+                     @agent_record.agent_definition,
+                   do: @agent_record.agent_definition.display_name
+              }
+              session_cli_opts={assigns[:session_cli_opts] || []}
+              session_uuid={@session_uuid}
+            />
+          </div>
+        <% end %>
       <% end %>
     </div>
     """

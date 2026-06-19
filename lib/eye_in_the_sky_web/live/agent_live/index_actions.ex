@@ -305,7 +305,7 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
       "create_new_session: model=#{opts[:model]}, effort=#{inspect(opts[:effort_level])}, project_id=#{project.id}, project_path=#{project.path}"
     )
 
-    case AgentManager.create_agent(opts) do
+    case AgentManager.create_pty_session(opts) do
       {:ok, result} ->
         Logger.info(
           "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"

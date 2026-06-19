@@ -246,8 +246,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
         </div>
         <div class="text-nano text-base-content/48 mt-0.5 flex items-center gap-1">
           <span class="text-base-content/30">#{@session.id}</span>
-          <span>·</span>
-          <span class="capitalize">{@session.status}</span>
           <%= if @session.last_activity_at do %>
             <span>·</span>
             <span>{relative_time(@session.last_activity_at)}</span>

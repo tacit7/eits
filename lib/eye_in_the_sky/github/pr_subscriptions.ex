@@ -13,24 +13,13 @@ defmodule EyeInTheSky.Github.PrSubscriptions do
       active: true
     }
 
-    case %PrSubscription{} |> PrSubscription.changeset(attrs) |> Repo.insert() do
-      {:ok, sub} ->
-        {:ok, sub}
-
-      {:error, %Ecto.Changeset{errors: [_ | _]} = cs} ->
-        if unique_conflict?(cs) do
-          # Idempotent: activate if it was previously deactivated
-          existing = get_by(session_uuid, pr_number, repository_full_name)
-
-          if existing && !existing.active do
-            existing |> Ecto.Changeset.change(active: true) |> Repo.update()
-          else
-            {:ok, existing}
-          end
-        else
-          {:error, cs}
-        end
-    end
+    %PrSubscription{}
+    |> PrSubscription.changeset(attrs)
+    |> Repo.insert(
+      on_conflict: [set: [active: true]],
+      conflict_target: [:session_uuid, :pr_number, :repository_full_name],
+      returning: true
+    )
   end
 
   def unsubscribe(session_uuid, pr_number, repository_full_name) do
@@ -58,20 +47,4 @@ defmodule EyeInTheSky.Github.PrSubscriptions do
     )
   end
 
-  defp get_by(session_uuid, pr_number, repository_full_name) do
-    Repo.one(
-      from s in PrSubscription,
-        where:
-          s.session_uuid == ^session_uuid and
-            s.pr_number == ^pr_number and
-            s.repository_full_name == ^repository_full_name,
-        limit: 1
-    )
-  end
-
-  defp unique_conflict?(%Ecto.Changeset{errors: errors}) do
-    Enum.any?(errors, fn {_field, {_msg, opts}} ->
-      opts[:constraint] == :unique
-    end)
-  end
 end

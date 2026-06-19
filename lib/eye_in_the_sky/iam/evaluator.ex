@@ -35,11 +35,6 @@ defmodule EyeInTheSky.IAM.Evaluator do
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.IAM.PolicyCache
 
-  # PolicyCache.for_agent_type/1 is added by the document-cache parallel agent.
-  # Suppress the undefined-function warning so this branch compiles cleanly
-  # before the two feature branches are merged.
-  @compile {:no_warn_undefined, {EyeInTheSky.IAM.PolicyCache, :for_agent_type, 1}}
-
   @telemetry_decide [:eye_in_the_sky, :iam, :decide]
 
   @type evaluation_candidate :: %{policy: Policy.t(), source: EvaluationSource.t()}
@@ -235,7 +230,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
   defp ctx_event_name(:post_tool_use), do: "PostToolUse"
   defp ctx_event_name(:stop), do: "Stop"
   defp ctx_event_name(:user_prompt_submit), do: "UserPromptSubmit"
-  defp ctx_event_name(_), do: "PreToolUse"
+  defp ctx_event_name(_), do: nil
 
   # Document-sourced: the document attachment IS the agent-type scope.
   # Policy-level agent_type is bypassed entirely (per spec Decision 1).

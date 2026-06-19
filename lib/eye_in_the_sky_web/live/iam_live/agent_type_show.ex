@@ -38,7 +38,13 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
       socket
       |> assign(:agent_type, agent_type)
       |> assign(:page_title, "Agent Type: #{agent_type}")
-      |> load_data(agent_type)
+
+    socket =
+      if connected?(socket) do
+        load_data(socket, agent_type)
+      else
+        socket
+      end
 
     {:noreply, socket}
   end

@@ -364,9 +364,14 @@ defmodule EyeInTheSky.IAM do
         {:error, :not_found}
 
       %DocumentPolicy{} = dp ->
-        Repo.delete!(dp)
-        invalidate_cache()
-        :ok
+        case Repo.delete(dp) do
+          {:ok, _} ->
+            invalidate_cache()
+            :ok
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 
@@ -493,9 +498,14 @@ defmodule EyeInTheSky.IAM do
         {:error, :not_found}
 
       %AgentTypeDocument{} = atd ->
-        Repo.delete!(atd)
-        invalidate_cache()
-        :ok
+        case Repo.delete(atd) do
+          {:ok, _} ->
+            invalidate_cache()
+            :ok
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 

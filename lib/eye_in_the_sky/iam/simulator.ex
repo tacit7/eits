@@ -50,11 +50,6 @@ defmodule EyeInTheSky.IAM.Simulator do
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.IAM.PolicyCache
 
-  # PolicyCache.for_agent_type/1 is added by the document-cache parallel agent.
-  # Suppress the undefined-function warning so this branch compiles cleanly
-  # before the two feature branches are merged.
-  @compile {:no_warn_undefined, {EyeInTheSky.IAM.PolicyCache, :for_agent_type, 1}}
-
   @telemetry_simulate [:eye_in_the_sky, :iam, :simulate]
 
   @type miss_reason ::

@@ -82,15 +82,20 @@ defmodule EyeInTheSky.Github.WebhookDispatcher do
 
     Enum.each(subs, fn sub ->
       Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-        with {:ok, session_id} <- Sessions.get_session_id_by_uuid(sub.session_uuid) do
-          Messages.create_message(%{
-            session_id: session_id,
-            body: body,
-            sender_role: "system",
-            recipient_role: "user",
-            direction: "outbound",
-            status: "pending"
-          })
+        with {:ok, session_id} <- Sessions.get_session_id_by_uuid(sub.session_uuid),
+             {:ok, _msg} <-
+               Messages.create_message(%{
+                 session_id: session_id,
+                 body: body,
+                 sender_role: "system",
+                 recipient_role: "user",
+                 direction: "outbound",
+                 status: "pending"
+               }) do
+          :ok
+        else
+          {:error, reason} ->
+            Logger.error("PR subscriber DM failed for #{sub.session_uuid}: #{inspect(reason)}")
         end
       end)
     end)

@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.PrSubscriptionController do
   use EyeInTheSkyWeb, :controller
 
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
   alias EyeInTheSky.Github.PrSubscriptions
 
   def subscribe(conn, %{
@@ -10,19 +12,24 @@ defmodule EyeInTheSkyWeb.Api.V1.PrSubscriptionController do
       }) do
     pr_number = parse_int(pr_number)
 
-    case PrSubscriptions.subscribe(session_uuid, pr_number, repo) do
-      {:ok, sub} ->
-        conn
-        |> put_status(201)
-        |> json(%{
-          id: sub.id,
-          pr_number: sub.pr_number,
-          repository_full_name: sub.repository_full_name,
-          active: sub.active
-        })
+    if is_nil(pr_number) do
+      conn |> put_status(400) |> json(%{error: "pr_number must be an integer"})
+    else
 
-      {:error, changeset} ->
-        conn |> put_status(422) |> json(%{error: "invalid", details: format_errors(changeset)})
+      case PrSubscriptions.subscribe(session_uuid, pr_number, repo) do
+        {:ok, sub} ->
+          conn
+          |> put_status(201)
+          |> json(%{
+            id: sub.id,
+            pr_number: sub.pr_number,
+            repository_full_name: sub.repository_full_name,
+            active: sub.active
+          })
+
+        {:error, changeset} ->
+          conn |> put_status(422) |> json(%{error: "invalid", details: format_errors(changeset)})
+      end
     end
   end
 
@@ -37,9 +44,14 @@ defmodule EyeInTheSkyWeb.Api.V1.PrSubscriptionController do
         "repository_full_name" => repo,
         "session_uuid" => session_uuid
       }) do
-    pr_number = parse_int(pr_number)
-    PrSubscriptions.unsubscribe(session_uuid, pr_number, repo)
-    json(conn, %{ok: true})
+    case parse_int(pr_number) do
+      nil ->
+        conn |> put_status(400) |> json(%{error: "pr_number must be an integer"})
+
+      pr_int ->
+        PrSubscriptions.unsubscribe(session_uuid, pr_int, repo)
+        json(conn, %{ok: true})
+    end
   end
 
   def unsubscribe(conn, _params) do
@@ -47,9 +59,6 @@ defmodule EyeInTheSkyWeb.Api.V1.PrSubscriptionController do
     |> put_status(400)
     |> json(%{error: "pr_number, repository_full_name, and session_uuid are required"})
   end
-
-  defp parse_int(val) when is_integer(val), do: val
-  defp parse_int(val) when is_binary(val), do: String.to_integer(val)
 
   defp format_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->

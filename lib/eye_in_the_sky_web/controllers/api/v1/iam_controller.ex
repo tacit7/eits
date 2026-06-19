@@ -25,12 +25,29 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMController do
     duration_us = System.monotonic_time(:microsecond) - start_us
     hook_json = HookResponse.from_decision(decision, ctx.event)
 
-    IAM.record_audit(ctx, decision, params, duration_us)
+    IAM.record_audit(ctx, decision, sanitize_payload(params), duration_us)
 
     json(conn, hook_json)
   end
 
   # ── private ──────────────────────────────────────────────────────────────────
+
+  @max_content_bytes 4096
+
+  # Strip large resource_content before storing in iam_decisions.raw_payload to
+  # prevent file-read output (potentially MBs) from bloating the audit table.
+  defp sanitize_payload(params) do
+    case Map.get(params, "resource_content") do
+      nil ->
+        params
+
+      content when is_binary(content) and byte_size(content) > @max_content_bytes ->
+        Map.put(params, "resource_content", binary_part(content, 0, @max_content_bytes) <> "…[truncated]")
+
+      _ ->
+        params
+    end
+  end
 
   # Claude Code hook payloads don't include agent_type. Enrich it from the
   # session record so document-based policies (which scope by agent type) fire

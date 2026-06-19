@@ -213,7 +213,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
   defp attached_count(doc), do: length(doc.document_policies)
 
   defp conflict_detected?(doc) do
-    enabled_policies = doc.document_policies
+    enabled_policies = Enum.filter(doc.document_policies, & &1.policy.enabled)
 
     allows = Enum.filter(enabled_policies, &(&1.policy.effect == "allow"))
     denies = Enum.filter(enabled_policies, &(&1.policy.effect == "deny"))

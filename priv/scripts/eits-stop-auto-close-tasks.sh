@@ -18,15 +18,7 @@ session_id=$(echo "$input_json" | jq -r '.session_id // empty' 2>/dev/null) || e
 [ -z "$session_id" ] && exit 0
 
 # Find in-progress tasks (state 2) for this session
-task_ids=$(eits tasks list --session "$session_id" --state 2 2>/dev/null | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    for t in d.get('tasks', []):
-        print(t['id'])
-except Exception:
-    pass
-" 2>/dev/null) || exit 0
+task_ids=$(eits tasks list --session "$session_id" --state 2 2>/dev/null | jq -r '.tasks[]?.id // empty' 2>/dev/null) || exit 0
 
 [ -z "$task_ids" ] && exit 0
 

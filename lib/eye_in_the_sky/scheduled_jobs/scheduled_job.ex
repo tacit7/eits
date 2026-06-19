@@ -131,8 +131,13 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
   defp validate_schedule_value(changeset, _), do: changeset
 
   defp apply_job_type_config(cs, "mix_task", config), do: validate_mix_task_config(cs, config)
-  defp apply_job_type_config(cs, "spawn_agent", config), do: validate_spawn_agent_config(cs, config)
-  defp apply_job_type_config(cs, "daily_digest", config), do: validate_daily_digest_config(cs, config)
+
+  defp apply_job_type_config(cs, "spawn_agent", config),
+    do: validate_spawn_agent_config(cs, config)
+
+  defp apply_job_type_config(cs, "daily_digest", config),
+    do: validate_daily_digest_config(cs, config)
+
   defp apply_job_type_config(cs, _, _config), do: cs
 
   defp validate_mix_task_config(changeset, config) do

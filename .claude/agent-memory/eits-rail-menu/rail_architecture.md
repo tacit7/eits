@@ -7,14 +7,24 @@ type: project
 ## File Locations
 
 - `lib/eye_in_the_sky_web/components/rail.ex` — main LiveComponent, all state + event handlers
-- `lib/eye_in_the_sky_web/components/rail/flyout.ex` — HEEx rendering, all section content
+- `lib/eye_in_the_sky_web/components/rail/flyout.ex` — flyout shell + `section_header_link` component (extracted ~2026-04-30)
+- `lib/eye_in_the_sky_web/components/rail/flyout/` — **13 per-section sub-modules** (split ~2026-05-01):
+  - `agents_section.ex`, `canvas_section.ex`, `chat_section.ex`, `files_section.ex`
+  - `helpers.ex`, `jobs_section.ex`, `notes_section.ex`, `prompts_section.ex`
+  - `sessions_section.ex`, `skills_section.ex`, `tasks_section.ex`, `teams_section.ex`, `usage_section.ex`
 - `lib/eye_in_the_sky_web/components/rail/helpers.ex` — `project_initial/1` and minor utils
 - `lib/eye_in_the_sky_web/components/rail/project_switcher.ex` — project picker dropdown
 - `lib/eye_in_the_sky_web/components/rail/project_actions.ex` — project CRUD + select event handlers
-- `lib/eye_in_the_sky_web/components/rail/file_actions.ex` — file open/save/expand/collapse event handlers (extracted in PR #287)
-- `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — renders `<.live_component module={Rail} id="app-rail" sidebar_project={assigns[:sidebar_project]} ...>`
+- `lib/eye_in_the_sky_web/components/rail/file_actions.ex` — file open/save/expand/collapse event handlers
+- `lib/eye_in_the_sky_web/components/rail/file_panel.ex` — file panel component
+- `lib/eye_in_the_sky_web/components/rail/filter_actions.ex` — filter/search event handlers
+- `lib/eye_in_the_sky_web/components/rail/loader.ex` — lazy-loading functions extracted from rail.ex
+- `lib/eye_in_the_sky_web/components/rail/section_actions.ex` — section toggle/open event handlers
+- `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — renders `<.live_component module={Rail} id="app-rail" ...>`
 - `assets/js/hooks/rail_state.js` — RailState hook: localStorage persistence, mobile swipe, section restore
 - `docs/RAIL_MENU.md` — full architecture doc (canonical reference)
+
+**CRITICAL**: flyout.ex is now a thin shell. Section content lives in `flyout/<section>_section.ex`. When adding or editing flyout content for a section, edit the sub-module, not flyout.ex directly.
 
 ## Section Map (current)
 

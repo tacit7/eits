@@ -161,7 +161,9 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
                        ^sdk_ref,
                        %Message{
                          type: :result,
-                         metadata: %{usage: %{total_tokens: 100, input_tokens: 50, output_tokens: 50}}
+                         metadata: %{
+                           usage: %{total_tokens: 100, input_tokens: 50, output_tokens: 50}
+                         }
                        }
                      },
                      1000
@@ -355,7 +357,8 @@ defmodule EyeInTheSky.Gemini.StreamHandlerTest do
                       %Message{type: :text, content: "I will run a command"}},
                      1000
 
-      assert_receive {:claude_message, ^sdk_ref, %Message{type: :tool_use, content: %{name: "bash"}}},
+      assert_receive {:claude_message, ^sdk_ref,
+                      %Message{type: :tool_use, content: %{name: "bash"}}},
                      1000
 
       assert_receive {:claude_message, ^sdk_ref,

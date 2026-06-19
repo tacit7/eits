@@ -227,8 +227,11 @@ defmodule EyeInTheSky.ScheduledJobs do
   def bulk_update_enabled(job_ids, enabled, caller_project_id \\ nil) do
     Enum.reduce(job_ids, {0, 0}, fn job_id, {succeeded, failed} ->
       case get_job(job_id) do
-        {:ok, job} -> apply_enabled_if_authorized(job, enabled, caller_project_id, {succeeded, failed})
-        _ -> {succeeded, failed + 1}
+        {:ok, job} ->
+          apply_enabled_if_authorized(job, enabled, caller_project_id, {succeeded, failed})
+
+        _ ->
+          {succeeded, failed + 1}
       end
     end)
   end

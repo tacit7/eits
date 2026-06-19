@@ -77,3 +77,9 @@ config :eye_in_the_sky, :run_iam_seeds, false
 # Disable rate limiting in test — Hammer ETS table is global and persists across
 # tests, so repeated requests from 127.0.0.1 trip the default 60 req/min limit.
 config :eye_in_the_sky, :rate_limit_enabled, false
+
+# Point global claude home to a nonexistent directory so skills/agents helpers
+# don't pick up real ~/.claude/agents or ~/.claude/commands files during tests.
+# Without this, tests asserting empty state fail on dev machines that have
+# actual agent/skill files installed globally.
+config :eye_in_the_sky, :claude_home_dir, "/tmp/eits_test_claude_home_nonexistent"

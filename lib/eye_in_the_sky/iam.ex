@@ -18,6 +18,7 @@ defmodule EyeInTheSky.IAM do
   alias EyeInTheSky.IAM.Policy
   alias EyeInTheSky.IAM.PolicyCache
   alias EyeInTheSky.IAM.PolicyDocument
+  alias EyeInTheSky.IAM.Seeds
   alias EyeInTheSky.Repo
 
   @typedoc """
@@ -151,7 +152,7 @@ defmodule EyeInTheSky.IAM do
   def reseed_builtin(system_key) when is_binary(system_key) do
     editable = ~w(enabled priority condition message)
 
-    case Enum.find(EyeInTheSky.IAM.Seeds.policies(), &(&1[:system_key] == system_key)) do
+    case Enum.find(Seeds.policies(), &(&1[:system_key] == system_key)) do
       nil ->
         {:error, :not_in_seeds}
 

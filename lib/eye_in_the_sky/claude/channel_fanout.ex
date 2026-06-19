@@ -86,12 +86,9 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
               member.session_id,
               body,
               mode,
-              channel_ctx,
               sender,
               sender_role,
-              channel_id,
-              content_blocks,
-              context
+              %{ctx: channel_ctx, id: channel_id, content_blocks: content_blocks, context: context}
             )
           end,
           max_concurrency: 10,
@@ -162,12 +159,9 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
                 session_id,
                 body,
                 :direct,
-                channel_ctx,
                 sender,
                 sender_role,
-                channel_id,
-                [],
-                context
+                %{ctx: channel_ctx, id: channel_id, content_blocks: [], context: context}
               )
             end,
             max_concurrency: 10,
@@ -185,17 +179,10 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
   # Private
   # ---------------------------------------------------------------------------
 
-  defp route_to_member(
-         session_id,
-         body,
-         mode,
-         channel_ctx,
-         sender,
-         sender_role,
-         channel_id,
-         content_blocks,
-         context
-       ) do
+  defp route_to_member(session_id, body, mode, sender, sender_role, channel_opts) do
+    %{ctx: channel_ctx, id: channel_id, content_blocks: content_blocks, context: context} =
+      channel_opts
+
     case Messages.send_message(%{
            session_id: session_id,
            sender_role: "user",

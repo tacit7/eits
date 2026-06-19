@@ -38,7 +38,13 @@ defmodule EyeInTheSky.Channels.ChannelOnboarding do
       true ->
         recent = ChannelMessages.list_messages_for_channel(channel.id, limit: @snapshot_limit)
         message = build_message(channel, recent)
-        agent_manager = Application.get_env(:eye_in_the_sky, :agent_manager_module, EyeInTheSky.Agents.AgentManager)
+
+        agent_manager =
+          Application.get_env(
+            :eye_in_the_sky,
+            :agent_manager_module,
+            EyeInTheSky.Agents.AgentManager
+          )
 
         case agent_manager.send_message(member.session_id, message) do
           {:ok, _} ->

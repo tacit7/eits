@@ -52,8 +52,14 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
 
   defp project_path_for(socket) do
     case socket.assigns[:project] do
-      %{path: path} when is_binary(path) and path != "" -> path
-      _ -> File.cwd!()
+      %{path: path} when is_binary(path) and path != "" ->
+        path
+
+      _ ->
+        case File.cwd() do
+          {:ok, path} -> path
+          {:error, _} -> Path.expand("~")
+        end
     end
   end
 
@@ -108,8 +114,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
 
   defp display_name(agent), do: String.downcase(agent.name || agent.slug)
 
+  defp claude_home_dir do
+    Application.get_env(:eye_in_the_sky, :claude_home_dir, Path.expand("~/.claude"))
+  end
+
   defp do_load_agents(project_path) do
-    global = load_from_dir(Path.expand("~/.claude/agents"), :agents, "~/.claude/agents")
+    global = load_from_dir(Path.join(claude_home_dir(), "agents"), :agents, "~/.claude/agents")
 
     project =
       load_from_dir(Path.join(project_path, ".claude/agents"), :project_agents, ".claude/agents")

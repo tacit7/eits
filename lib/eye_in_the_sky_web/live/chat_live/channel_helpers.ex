@@ -20,10 +20,13 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
   Auto-joins mentioned sessions to the channel, then routes the message
   to every existing agent member (excluding the sender).
 
-  Delegates to ChannelFanout.fanout_all/4.
+  `sender_role` defaults to "user" — this path is always triggered by a
+  human session via the LiveView composer.
+
+  Delegates to ChannelFanout.fanout_all/6.
   """
-  def route_to_members(channel_id, body, sender_session_id, content_blocks) do
-    ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks)
+  def route_to_members(channel_id, body, sender_session_id, content_blocks, sender_role \\ "user") do
+    ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks, nil, sender_role)
   end
 
   def build_sessions_by_project(channel_members, all_projects, search) do

@@ -2,6 +2,8 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Crontab.CronExpression.Parser, as: CrontabParser
+
   @primary_key {:id, :id, autogenerate: true}
 
   schema "scheduled_jobs" do
@@ -76,6 +78,7 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
   end
 
   defp validate_job_config(changeset) do
+    schedule_type = get_field(changeset, :schedule_type)
     job_type = get_field(changeset, :job_type)
     config_raw = get_field(changeset, :config) || "{}"
 
@@ -85,13 +88,57 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduledJob do
         _ -> %{}
       end
 
-    case job_type do
-      "mix_task" -> validate_mix_task_config(changeset, config)
-      "spawn_agent" -> validate_spawn_agent_config(changeset, config)
-      "daily_digest" -> validate_daily_digest_config(changeset, config)
-      _ -> changeset
+    changeset
+    |> validate_schedule_value(schedule_type)
+    |> apply_job_type_config(job_type, config)
+  end
+
+  defp validate_schedule_value(changeset, "cron") do
+    case get_field(changeset, :schedule_value) do
+      nil ->
+        changeset
+
+      "" ->
+        add_error(changeset, :schedule_value, "is required")
+
+      cron_expr ->
+        case CrontabParser.parse(cron_expr) do
+          {:ok, _} -> changeset
+          {:error, _} -> add_error(changeset, :schedule_value, "is not a valid cron expression")
+        end
     end
   end
+
+  defp validate_schedule_value(changeset, "interval") do
+    case get_field(changeset, :schedule_value) do
+      nil ->
+        changeset
+
+      "" ->
+        add_error(changeset, :schedule_value, "is required")
+
+      value ->
+        case Integer.parse(value) do
+          {num, ""} when num > 0 ->
+            changeset
+
+          _ ->
+            add_error(changeset, :schedule_value, "must be a positive integer")
+        end
+    end
+  end
+
+  defp validate_schedule_value(changeset, _), do: changeset
+
+  defp apply_job_type_config(cs, "mix_task", config), do: validate_mix_task_config(cs, config)
+
+  defp apply_job_type_config(cs, "spawn_agent", config),
+    do: validate_spawn_agent_config(cs, config)
+
+  defp apply_job_type_config(cs, "daily_digest", config),
+    do: validate_daily_digest_config(cs, config)
+
+  defp apply_job_type_config(cs, _, _config), do: cs
 
   defp validate_mix_task_config(changeset, config) do
     if (config["task"] || "") |> String.trim() == "" do

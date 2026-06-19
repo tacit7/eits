@@ -181,7 +181,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                   class="size-3.5"
                 />
               </button>
-              <div class="dropdown dropdown-end">
+              <div class="dropdown dropdown-end" id={"note-actions-#{note.id}"} phx-update="ignore">
                 <button
                   tabindex="0"
                   role="button"

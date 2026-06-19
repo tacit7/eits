@@ -172,11 +172,11 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 - **Flyout header icon**: hero-bolt icon links to `/projects/:id/skills` (project-scoped only)
 - **Filter zone** (always visible):
   - **Search input**: filters skill name/description in real-time
-  - **Scope pills**: All / Global / Project (toggleable)
-    - **Global**: filters to `:agents` source (global skills)
+  - **Scope pills**: All / Project (toggleable; Global pill removed)
     - **Project**: filters to `:project_agents` source (project-specific skills)
     - **All**: shows both sources
-- **Skill list**: expandable rows show description/snippet on click via `<details>` element
+- **Skill list**: loads immediately when the section is toggled open (`maybe_load_skills` called from `handle_toggle_section`); expandable rows show description/snippet on click via `<details>` element
+- **Open link**: each skill row has an "Open" link that navigates to `/projects/:id/skills?skill=<slug>`, pre-selecting the skill via `handle_params`
 - **Skill icons**:
   - **Section header**: hero-bolt (for skills section)
   - **Command rows**: hero-slash (for slash commands)
@@ -608,3 +608,25 @@ Related components:
 16. **Skills flyout details preservation** — the skills section uses `phx-update="ignore"` on the details element wrapping each skill row. This preserves the `open` state across re-renders when the skills list is reloaded (e.g., when search/filter changes).
 
 17. **Notes expand-in-place pattern** — small notes (< 200 bytes) render as expandable `<details>` elements instead of navigating to the edit page. Large notes (≥ 200 bytes) provide an "Edit →" link within the expanded view that navigates to `/notes/:id/edit`. The expansion is in-place, preserving list scroll position.
+
+18. **Safe integer parsing in event handlers** — use `parse_int/1` from `EyeInTheSkyWeb.ControllerHelpers` instead of `String.to_integer/1` when converting event parameter strings to integers. `String.to_integer` raises an error on invalid input, while `parse_int` returns `nil`, allowing graceful error handling:
+
+    ```elixir
+    # Import at the top of the module
+    import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+
+    # In handle_event
+    def handle_event("show_more_project_sessions", %{"project_id" => pid_str}, socket) do
+      case parse_int(pid_str) do
+        nil -> {:noreply, socket}  # Invalid integer; safely ignore
+        pid ->
+          current = Map.get(socket.assigns.session_project_visible, pid, 5)
+          {:noreply,
+           assign(socket, :session_project_visible,
+             Map.put(socket.assigns.session_project_visible, pid, current + 5)
+           )}
+      end
+    end
+    ```
+
+    Applied to all event handlers that receive integer IDs from the frontend: `show_more_project_sessions`, `toggle_project_sessions`, `open_task_detail`, `open_note_detail`, and others.

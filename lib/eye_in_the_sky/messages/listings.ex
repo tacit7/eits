@@ -17,6 +17,32 @@ defmodule EyeInTheSky.Messages.Listings do
     |> Repo.all()
   end
 
+  @doc """
+  Full-text search scoped to a single channel using the messages_body_fts GIN index.
+
+  Returns at most 50 matching messages in chronological order.
+  Returns [] when query is blank or no FTS match exists.
+  No ILIKE fallback — a full table scan on messages is too expensive without a trigram index.
+  """
+  @spec search_messages_for_channel(String.t(), String.t()) :: [Message.t()]
+  def search_messages_for_channel(_channel_id, query) when query == "" or is_nil(query), do: []
+
+  def search_messages_for_channel(channel_id, query) when is_binary(query) do
+    Message
+    |> where([m], m.channel_id == ^channel_id)
+    |> where(
+      [m],
+      fragment(
+        "to_tsvector('english', COALESCE(?, '')) @@ plainto_tsquery('english', ?)",
+        m.body,
+        ^query
+      )
+    )
+    |> order_by([m], asc: m.inserted_at)
+    |> limit(50)
+    |> Repo.all()
+  end
+
   def list_recent_messages(session_id, limit \\ 50)
 
   def list_recent_messages(session_id, limit) do

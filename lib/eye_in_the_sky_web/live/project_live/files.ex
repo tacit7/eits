@@ -461,12 +461,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       <!-- File Tree Sidebar -->
       <div
         id="file-tree-sidebar"
-        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-64 md:max-h-none md:h-full"
+        class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-80 md:max-h-none md:h-full"
         phx-update="ignore"
       >
-        <div class="p-4">
+        <div class="p-3 md:p-4">
           <h2 class="text-sm font-semibold text-base-content/80 mb-2">Files</h2>
-          <ul class="menu menu-sm bg-base-200 rounded-lg">
+          <ul class="menu menu-sm bg-base-200 rounded-lg max-sm:[&_summary]:min-h-[44px] max-sm:[&_a]:min-h-[44px]">
             <.tree_item :for={item <- @file_tree} item={item} project_id={@project.id} />
           </ul>
         </div>

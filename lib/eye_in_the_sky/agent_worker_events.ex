@@ -248,8 +248,8 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     :ok
   end
 
-  defp save_result(session_id, provider, text, metadata, channel_id, source_uuid) do
-    db_metadata = %{
+  defp build_db_metadata(metadata) do
+    %{
       duration_ms: metadata[:duration_ms],
       total_cost_usd: metadata[:total_cost_usd],
       usage: metadata[:usage],
@@ -257,6 +257,10 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       num_turns: metadata[:num_turns],
       is_error: metadata[:is_error]
     }
+  end
+
+  defp save_result(session_id, provider, text, metadata, channel_id, source_uuid) do
+    db_metadata = build_db_metadata(metadata)
 
     opts = [metadata: db_metadata]
     opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
@@ -272,14 +276,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # Does NOT insert into channel_messages. Used when reply_mode is "cli_required"
   # so the agent's raw output is auditable without auto-mirroring into the channel.
   defp save_to_session_transcript_only(session_id, provider, text, metadata, context) do
-    db_metadata = %{
-      duration_ms: metadata[:duration_ms],
-      total_cost_usd: metadata[:total_cost_usd],
-      usage: metadata[:usage],
-      model_usage: metadata[:model_usage],
-      num_turns: metadata[:num_turns],
-      is_error: metadata[:is_error]
-    }
+    db_metadata = build_db_metadata(metadata)
 
     full_metadata =
       Map.merge(db_metadata, %{

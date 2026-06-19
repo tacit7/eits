@@ -37,7 +37,26 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, setup_channel(params, socket)}
+    {:noreply, maybe_setup_channel(params, socket)}
+  end
+
+  defp maybe_setup_channel(params, socket) do
+    project_id = get_project_id(params)
+    new_channel_id = params["channel_id"]
+    current_channel_id = socket.assigns[:active_channel_id]
+    current_project_id = socket.assigns[:project_id]
+
+    thread_only_change? =
+      current_channel_id != nil and
+        to_string(new_channel_id) == to_string(current_channel_id) and
+        current_project_id == project_id
+
+    if thread_only_change? do
+      thread_id = params["thread_id"]
+      assign(socket, :active_thread, ChannelDataLoader.load_thread(thread_id))
+    else
+      setup_channel(params, socket)
+    end
   end
 
   defp setup_channel(params, socket) do
@@ -78,13 +97,33 @@ defmodule EyeInTheSkyWeb.ChatLive do
   end
 
   defp load_channel_assigns(project_id, channel_id, channels, params, socket) do
+    session_id = get_session_id(socket)
+
     data =
       ChannelDataLoader.load(project_id, channel_id, %{
         channels: channels,
-        session_id: get_session_id(socket),
+        session_id: session_id,
         session_search: socket.assigns[:session_search] || "",
-        thread_id: params["thread_id"]
+        thread_id: params["thread_id"],
+        agent_templates: socket.assigns[:agent_templates]
       })
+
+    # Mark the active channel as read when the user opens it. Only fire
+    # when the channel actually changed to avoid redundant DB writes on
+    # same-channel param updates (e.g. thread navigation). Zero out the
+    # active channel's unread count immediately so the badge clears without
+    # waiting for the next PubSub broadcast.
+    int_channel_id = parse_int(channel_id, nil)
+    prev_channel_id = socket.assigns[:active_channel_id]
+    channel_changed? = int_channel_id != nil && to_string(prev_channel_id) != to_string(channel_id)
+
+    unread_counts =
+      if connected?(socket) && channel_changed? && session_id do
+        Channels.mark_as_read(channel_id, session_id)
+        Map.put(data.unread_counts, int_channel_id, 0)
+      else
+        data.unread_counts
+      end
 
     serialized_channels = ChatPresenter.serialize_channels(channels)
 
@@ -103,7 +142,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:active_channel_id, channel_id)
       |> assign(:messages, data.messages)
       |> assign(:has_more_messages, length(data.messages) == 100)
-      |> assign(:unread_counts, data.unread_counts)
+      |> assign(:unread_counts, unread_counts)
       |> assign(:active_thread, data.active_thread)
       |> assign(:agent_status_counts, data.agent_status_counts)
       |> assign(:prompts, data.prompts)
@@ -116,11 +155,13 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:sender_filter, nil)
       |> assign_new(:session_search, fn -> "" end)
       |> assign(:slash_items, SlashItems.build())
+      |> assign(:message_search_query, "")
+      |> assign(:message_search_results, [])
 
     if connected?(socket) do
       Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
         id: "app-rail",
-        unread_counts: data.unread_counts
+        unread_counts: unread_counts
       )
     end
 
@@ -155,6 +196,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
           working_agents={@working_agents}
           slash_items={@slash_items}
           active_thread={@active_thread}
+          message_search_query={@message_search_query}
+          message_search_results={@message_search_results}
           uploads={@uploads}
           socket={@socket}
         />
@@ -172,6 +215,19 @@ defmodule EyeInTheSkyWeb.ChatLive do
 
   # Sub-components
 
+  attr :channels, :list, required: true
+  attr :active_channel_id, :any, default: nil
+  attr :messages, :list, required: true
+  attr :has_more_messages, :boolean, default: false
+  attr :active_agents, :list, default: []
+  attr :channel_members, :list, default: []
+  attr :working_agents, :list, default: []
+  attr :slash_items, :list, default: []
+  attr :active_thread, :any, default: nil
+  attr :message_search_query, :string, default: ""
+  attr :message_search_results, :list, default: []
+  attr :uploads, :any, required: true
+  attr :socket, :any, required: true
   defp message_feed(assigns) do
     ~H"""
     <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -188,7 +244,9 @@ defmodule EyeInTheSkyWeb.ChatLive do
             channelMembers: @channel_members,
             workingAgents: @working_agents,
             slashItems: @slash_items,
-            activeThread: @active_thread
+            activeThread: @active_thread,
+            messageSearchQuery: @message_search_query,
+            messageSearchResults: @message_search_results
           }
         }
         socket={@socket}
@@ -268,7 +326,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
       current_project={nil}
       prompts={@prompts}
       agent_templates={@agent_templates}
-      file_uploads={@uploads}
     />
     """
   end

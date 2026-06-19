@@ -12,13 +12,15 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   GET /api/v1/prompts - List prompts. Supports ?query= for search, ?project_id= for scoping.
   """
   def index(conn, params) do
+    project_id = parse_int(params["project_id"])
+
     prompts =
       cond do
         params["query"] && params["query"] != "" ->
-          Prompts.search_prompts(params["query"], params["project_id"])
+          Prompts.search_prompts(params["query"], project_id)
 
-        params["project_id"] ->
-          Prompts.list_project_prompts(params["project_id"])
+        project_id ->
+          Prompts.list_project_prompts(project_id)
 
         true ->
           Prompts.list_global_prompts()
@@ -37,7 +39,7 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   def show(conn, %{"id" => id} = params) do
     include_text = params["include_text"] not in ["false", false]
 
-    case Prompts.get_prompt_by_ref(id, params["project_id"]) do
+    case Prompts.get_prompt_by_ref(id, parse_int(params["project_id"])) do
       {:error, :not_found} ->
         {:error, :not_found, "Prompt not found"}
 

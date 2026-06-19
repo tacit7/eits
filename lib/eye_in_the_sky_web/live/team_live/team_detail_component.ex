@@ -52,8 +52,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
       <%!-- Stats row --%>
       <div class="flex items-center gap-3 text-mini text-base-content/40">
         <span>
-          <span class="font-mono font-semibold text-base-content/70">{length(@members)}</span>
-          members
+          <span class="font-mono font-semibold text-base-content/70">{length(@members)}</span> members
         </span>
         <span class="text-base-content/20">·</span>
         <span>

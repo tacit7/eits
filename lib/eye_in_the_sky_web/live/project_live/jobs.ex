@@ -112,20 +112,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
   end
 
   # Blanket relay for all other events (save_job, cancel_form, etc.)
+  # Validate that we have a valid project context before relaying to child component.
   def handle_event(event, params, socket) do
-    send_update(JobsPage, id: "jobs-page", event_relay: {event, params})
-    {:noreply, socket}
+    if is_nil(socket.assigns[:project_id]) do
+      {:noreply, put_flash(socket, :error, "Access denied")}
+    else
+      send_update(JobsPage, id: "jobs-page", event_relay: {event, params})
+      {:noreply, socket}
+    end
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <%= if msg = @flash["error"] do %>
-      <div id="flash-error" role="alert" class="alert alert-error text-sm mx-4 mt-4">{msg}</div>
-    <% end %>
-    <%= if msg = @flash["info"] do %>
-      <div id="flash-info" role="alert" class="alert alert-info text-sm mx-4 mt-4">{msg}</div>
-    <% end %>
     <.live_component
       module={EyeInTheSkyWeb.Components.JobsPage}
       id="jobs-page"

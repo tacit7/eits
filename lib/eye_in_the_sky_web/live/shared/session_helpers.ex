@@ -50,7 +50,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.SessionHelpers do
       agent.git_worktree_path ->
         {:ok, agent.git_worktree_path}
 
-      agent.project && agent.project.path ->
+      # Guard against %Ecto.Association.NotLoaded{} — it's truthy but has no
+      # :path field. Pattern-match on a map with a binary :path key instead.
+      match?(%{path: p} when is_binary(p), agent.project) ->
         {:ok, agent.project.path}
 
       true ->

@@ -72,6 +72,7 @@ defmodule EyeInTheSky.Sessions.Queries do
   end
 
   defp apply_project_filter(query, nil), do: query
+
   defp apply_project_filter(query, project_id) do
     where(query, [s, a], s.project_id == ^project_id or a.project_id == ^project_id)
   end
@@ -87,6 +88,7 @@ defmodule EyeInTheSky.Sessions.Queries do
 
   defp apply_name_filter(query, nil), do: query
   defp apply_name_filter(query, ""), do: query
+
   defp apply_name_filter(query, name) do
     where(query, [s], ilike(s.name, ^"%#{name}%"))
   end

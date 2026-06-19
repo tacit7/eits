@@ -25,7 +25,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
     <details class={
       if @compact,
         do: "group my-px",
-        else: "group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
+        else:
+          "group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
     }>
       <summary class={
         if @compact,

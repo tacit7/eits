@@ -181,7 +181,10 @@ defmodule EyeInTheSky.Projects.FileTree do
 
       case File.read_link(full_path) do
         {:ok, target} ->
-          resolve_path_via_parent(resolve_link_target(target, real_parent), MapSet.put(seen, full_path))
+          resolve_path_via_parent(
+            resolve_link_target(target, real_parent),
+            MapSet.put(seen, full_path)
+          )
 
         {:error, :einval} ->
           {:ok, full_path}

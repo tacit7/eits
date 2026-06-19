@@ -81,7 +81,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     description = params["description"]
     state_id = parse_form_int(params["state_id"], 0)
     priority = parse_form_int(params["priority"], 0)
-    due_at = if params["due_at"] != "", do: params["due_at"], else: nil
+    due_at =
+      case params["due_at"] do
+        "" -> nil
+        nil -> nil
+        date_str ->
+          case DateTime.from_iso8601(date_str <> "T00:00:00Z") do
+            {:ok, dt, _} -> dt
+            _ -> nil
+          end
+      end
     tags_string = params["tags"] || ""
 
     tag_names = parse_tag_names(tags_string)
@@ -333,6 +342,55 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
      |> assign(:tasks_select_mode, false)
      |> assign(:selected_task_ids, MapSet.new())
      |> reinsert_all_tasks()}
+  end
+
+  def handle_select_range_tasks(
+        %{"anchor_id" => anchor_id, "target_id" => target_id, "ordered_ids" => raw_ordered_ids},
+        socket
+      ) do
+    # Filter client-provided IDs against loaded tasks to prevent scope leakage.
+    visible_ids = MapSet.new(socket.assigns.loaded_task_ids)
+
+    ordered_ids =
+      raw_ordered_ids
+      |> Enum.map(&to_string/1)
+      |> Enum.filter(&MapSet.member?(visible_ids, &1))
+
+    anchor = to_string(anchor_id)
+    target = to_string(target_id)
+
+    anchor_idx = Enum.find_index(ordered_ids, &(&1 == anchor))
+    target_idx = Enum.find_index(ordered_ids, &(&1 == target))
+
+    if is_nil(anchor_idx) or is_nil(target_idx) do
+      {:noreply, socket}
+    else
+      range_ids =
+        ordered_ids
+        |> Enum.slice(min(anchor_idx, target_idx)..max(anchor_idx, target_idx))
+        |> MapSet.new()
+
+      selected = MapSet.union(socket.assigns.selected_task_ids, range_ids)
+      prev_select_mode = socket.assigns.tasks_select_mode
+      new_select_mode = MapSet.size(selected) > 0
+      select_mode_changed? = prev_select_mode != new_select_mode
+
+      socket =
+        socket
+        |> assign(:selected_task_ids, selected)
+        |> assign(:tasks_select_mode, new_select_mode)
+
+      socket =
+        if select_mode_changed? do
+          reinsert_all_tasks(socket)
+        else
+          # Only re-insert the rows in the range
+          range_tasks = Enum.filter(socket.assigns.loaded_tasks, &MapSet.member?(range_ids, task_id(&1)))
+          Enum.reduce(range_tasks, socket, fn task, acc -> stream_insert(acc, :tasks, task) end)
+        end
+
+      {:noreply, socket}
+    end
   end
 
   def reinsert_all_tasks(socket) do

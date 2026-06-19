@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-4">
               <h2 class="card-title text-base mb-2">Claude Files</h2>
-              <%= if @project.path do %>
+              <%= if @project && @project.path do %>
                 <div class="mb-2 pb-2 border-b border-base-300">
                   <p class="text-xs text-base-content/60 mb-1">Project Path</p>
                   <p class="text-xs font-mono text-base-content/90 break-all">{@project.path}</p>

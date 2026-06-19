@@ -9,7 +9,7 @@ defmodule EyeInTheSky.Notes do
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
   alias EyeInTheSky.Sessions
-  alias EyeInTheSky.Tasks
+  alias EyeInTheSky.Tasks.Task, as: TaskSchema
 
   # Delegate to NoteQueries to avoid a circular dependency with EyeInTheSky.Tasks.
   defdelegate with_notes_count(tasks), to: NoteQueries
@@ -59,20 +59,47 @@ defmodule EyeInTheSky.Notes do
 
   @doc """
   Returns notes for a specific task.
-  Accepts either an integer task ID or a UUID string.
-  Returns [] if the task does not exist (preserves prior behavior).
-  Resolves the task via the Tasks context, then matches notes on both integer ID (as string) and UUID.
+  Accepts an integer task ID or a UUID string.
   Options: `:limit` (default 500), `:starred` (boolean, default false)
+
+  Notes may be stored with either the integer string or the UUID as parent_id (migration
+  artifact). Resolves both forms by querying the Task schema directly to avoid the circular
+  dependency that would arise from calling the Tasks context.
   """
   def list_notes_for_task(task_id, opts \\ []) do
-    case resolve_task_ids(task_id) do
+    starred_only = Keyword.get(opts, :starred, false)
+    limit_val = Keyword.get(opts, :limit, 500)
+
+    # Detect input shape to avoid CastError: integer, UUID string, or stringified integer.
+    task_ids =
+      cond do
+        is_integer(task_id) ->
+          from(t in TaskSchema, where: t.id == ^task_id, select: {t.id, t.uuid})
+          |> Repo.one()
+
+        is_binary(task_id) && uuid_format?(task_id) ->
+          from(t in TaskSchema, where: t.uuid == ^task_id, select: {t.id, t.uuid})
+          |> Repo.one()
+
+        is_binary(task_id) ->
+          case Integer.parse(task_id) do
+            {int_id, ""} ->
+              from(t in TaskSchema, where: t.id == ^int_id, select: {t.id, t.uuid})
+              |> Repo.one()
+
+            _ ->
+              nil
+          end
+
+        true ->
+          nil
+      end
+
+    case task_ids do
       nil ->
         []
 
       {int_id, uuid} ->
-        starred_only = Keyword.get(opts, :starred, false)
-        limit_val = Keyword.get(opts, :limit, 500)
-
         query =
           Note
           |> scope_by_parent("task", to_string(int_id), uuid)
@@ -80,7 +107,6 @@ defmodule EyeInTheSky.Notes do
           |> limit(^limit_val)
 
         query = if starred_only, do: where(query, [n], n.starred == true), else: query
-
         Repo.all(query)
     end
   end
@@ -299,6 +325,8 @@ defmodule EyeInTheSky.Notes do
     where(query, [n], n.parent_type == ^type and (n.parent_id == ^id_str or n.parent_id == ^uuid))
   end
 
+  defp uuid_format?(str), do: match?({:ok, _}, Ecto.UUID.cast(str))
+
   defp resolve_session(session_id) do
     Sessions.resolve(to_string(session_id))
   end
@@ -343,14 +371,5 @@ defmodule EyeInTheSky.Notes do
     |> order_by(^order)
     |> limit(^limit_val)
     |> Repo.all()
-  end
-
-  # Resolves a task identifier (integer ID or UUID string) via the Tasks context.
-  # Returns {integer_id, uuid_string} or nil if the task does not exist.
-  defp resolve_task_ids(task_id) do
-    case Tasks.get_task_ids(task_id) do
-      {:ok, ids} -> ids
-      {:error, :not_found} -> nil
-    end
   end
 end

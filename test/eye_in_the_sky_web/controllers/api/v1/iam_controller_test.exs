@@ -40,6 +40,11 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMControllerTest do
   end
 
   setup do
+    # Clear the ETS-backed PolicyCache before each test. When a previous test
+    # creates a policy in its sandbox and then rolls back, the policy ID stays
+    # in ETS. The next test's sandbox doesn't have that row, so any audit write
+    # with winning_policy_id referencing it fails the FK constraint.
+    PolicyCache.invalidate()
     {:ok, conn: api_conn()}
   end
 

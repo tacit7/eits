@@ -6,20 +6,21 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
 
   import Phoenix.LiveView
   import Phoenix.Component, only: [assign: 3]
-  import Ecto.Query
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.{Messages, Repo, Sessions}
-  alias EyeInTheSky.Sessions.Session
+  alias EyeInTheSky.{Messages, Sessions}
 
   require Logger
 
+  # Polling interval for bookmark status refresh.
+  # Timer is owned by the consuming LiveView process; cleanup happens at view termination.
   @refresh_interval_ms 30_000
 
   def on_mount(:default, _params, _session, socket) do
     if connected?(socket) do
       EyeInTheSky.Events.subscribe_notifications()
       EyeInTheSky.Events.subscribe_projects()
+      EyeInTheSky.Events.subscribe_channels()
     end
 
     socket =
@@ -87,9 +88,16 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   end
 
   defp handle_fab_event("fab_send_message", %{"session_id" => session_id, "body" => body}, socket) do
-    case send_session_message(session_id, body) do
-      {:ok, session_id_int} ->
-        {:halt, switch_active_session(socket, session_id_int)}
+    case Messages.send_to_session(session_id, body) do
+      {:ok, session} ->
+        case AgentManager.continue_session(session.id, body, model: "sonnet") do
+          {:ok, _} ->
+            {:halt, switch_active_session(socket, session.id)}
+
+          {:error, reason} ->
+            Logger.warning("FAB continue_session failed: #{inspect(reason)}")
+            {:halt, switch_active_session(socket, session.id)}
+        end
 
       {:error, reason} ->
         {:halt, push_event(socket, "fab_chat_error", %{error: reason})}
@@ -131,9 +139,16 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
          %{"session_id" => session_id, "body" => body},
          socket
        ) do
-    case send_session_message(session_id, body) do
-      {:ok, _session_id_int} ->
-        {:halt, socket}
+    case Messages.send_to_session(session_id, body) do
+      {:ok, session} ->
+        case AgentManager.continue_session(session.id, body, model: "sonnet") do
+          {:ok, _} ->
+            {:halt, socket}
+
+          {:error, reason} ->
+            Logger.warning("ConfigGuide continue_session failed: #{inspect(reason)}")
+            {:halt, socket}
+        end
 
       {:error, reason} ->
         {:halt, push_event(socket, "config_guide_error", %{error: reason})}
@@ -229,6 +244,16 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     {:halt, socket}
   end
 
+  defp handle_fab_info({event, _channel}, socket)
+       when event in [:channel_created, :channel_deleted] do
+    send_update(EyeInTheSkyWeb.Components.Rail,
+      id: "app-rail",
+      refresh_channels: true
+    )
+
+    {:halt, socket}
+  end
+
   defp handle_fab_info(_msg, socket) do
     {:cont, socket}
   end
@@ -265,6 +290,12 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     end
   end
 
+  # Schedules the next status poll, cancelling any outstanding timer first.
+  # NOTE: on_mount hooks have no destroy/terminate callback. This timer fires
+  # every @refresh_interval_ms until the consuming LiveView process exits — at
+  # which point the process dies and all pending timers are discarded automatically.
+  # Cancelling before each reschedule prevents accumulation when events arrive
+  # faster than the interval.
   defp schedule_fab_refresh(socket) do
     if socket.assigns[:fab_timer], do: Process.cancel_timer(socket.assigns.fab_timer)
     timer = Process.send_after(self(), :fab_refresh_statuses, @refresh_interval_ms)
@@ -287,38 +318,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     if ids == [] do
       %{}
     else
-      int_ids =
-        ids
-        |> Enum.flat_map(fn s ->
-          case Integer.parse(s) do
-            {n, ""} -> [n]
-            _ -> []
-          end
-        end)
-
-      uuid_ids =
-        ids
-        |> Enum.filter(fn s ->
-          case Ecto.UUID.cast(s) do
-            {:ok, _} -> true
-            _ -> false
-          end
-        end)
-
-      sessions =
-        case {int_ids, uuid_ids} do
-          {[], []} ->
-            []
-
-          {[], uuids} ->
-            Repo.all(from s in Session, where: s.uuid in ^uuids)
-
-          {ints, []} ->
-            Repo.all(from s in Session, where: s.id in ^ints)
-
-          {ints, uuids} ->
-            Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids)
-        end
+      sessions = Sessions.list_sessions_by_mixed_ids(ids)
 
       sessions
       |> Enum.reduce(%{}, fn s, acc ->
@@ -337,22 +337,4 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     )
   end
 
-  defp send_session_message(session_id, body) do
-    with {:ok, session} <- Sessions.resolve(session_id),
-         {:ok, _message} <-
-           Messages.send_message(%{
-             session_id: session.id,
-             sender_role: "user",
-             recipient_role: "agent",
-             provider: "claude",
-             body: body
-           }),
-         {:ok, _admission} <- AgentManager.continue_session(session.id, body, model: "sonnet") do
-      {:ok, session.id}
-    else
-      {:error, reason} ->
-        Logger.error("FAB send_session_message error: #{inspect(reason)}")
-        {:error, to_string(reason)}
-    end
-  end
 end

@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   alias EyeInTheSky.{Notes, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
+  alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
@@ -499,10 +500,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   end
 
   defp resolve_session_id(sid) do
-    case Helpers.resolve_session_int_id(sid) do
-      {:ok, id} -> id
-      _ -> nil
-    end
+    SessionResolver.resolve_int_or_nil(sid)
   end
 
   defp format_claim_owner_hint(task_id_str) do

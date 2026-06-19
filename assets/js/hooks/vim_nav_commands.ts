@@ -16,7 +16,7 @@ export type PushEventAction = {
 
 export type ClientAction = {
   kind: "client"
-  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "list_yank_title" | "list_rename" | "list_open_edit" | "list_toggle_done" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab" | "session_nav_next" | "session_nav_prev" | "hint_mode_enter" | "task_nav_next" | "task_nav_prev"
+  name: "help" | "history_back" | "history_forward" | "command_palette" | "quick_create_note" | "quick_create_task" | "quick_create_chat" | "list_next" | "list_prev" | "list_open" | "list_top" | "list_bottom" | "page_search" | "list_archive" | "list_delete" | "list_yank_uuid" | "list_yank_id" | "list_yank_title" | "list_rename" | "list_open_edit" | "list_toggle_done" | "focus_composer" | "focus_flyout" | "find_sessions" | "find_recent_sessions" | "find_tasks" | "find_notes" | "find_projects" | "list_group_prev" | "list_group_next" | "list_item_delete" | "list_item_archive" | "list_open_tab" | "session_nav_next" | "session_nav_prev" | "hint_mode_enter" | "task_nav_next" | "task_nav_prev" | "quick_dm_compose" | "quick_dm_pick"
 }
 
 export type CommandAction = NavigateAction | PushEventAction | ClientAction
@@ -130,7 +130,6 @@ export const COMMANDS: Command[] = [
   { id: "create.kanban_task", label: "New Kanban Task", keys: ["n", "k"], group: "create",
     action: { kind: "push_event", event: "toggle_new_task_drawer", payload: {}, target: "active_view" },
     scope: "route_suffix:/kanban" },
-
   // global
   { id: "global.help",    label: "Keybinding Help",  keys: ["?"], group: "global",
     action: { kind: "client", name: "help" } },
@@ -180,6 +179,8 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "focus_composer" }, scope: "route_suffix:/dm" },
 
   // session context actions (sessions page only)
+  { id: "session.quick_dm",  label: "Quick DM",         keys: ["m"],       group: "context",
+    action: { kind: "client", name: "quick_dm_compose" }, scope: "page:sessions" },
   { id: "session.archive",   label: "Archive session",  keys: ["A"],       group: "context",
     action: { kind: "client", name: "list_archive" },   scope: "page:sessions" },
   { id: "session.delete",    label: "Delete session",   keys: ["D"],       group: "context",
@@ -235,6 +236,10 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "task_nav_next" }, scope: "route_suffix:/tasks" },
   { id: "leader.task.prev",      label: "Prev task",       keys: ["Space", "t", "p"], group: "navigation",
     action: { kind: "client", name: "task_nav_prev" }, scope: "route_suffix:/tasks" },
+
+  // Space d — dm actions
+  { id: "leader.dm.quick", label: "Quick DM session", keys: ["Space", "d", "m"], group: "global",
+    action: { kind: "client", name: "quick_dm_pick" } },
 
   // Space x — exit / dismiss
   { id: "leader.exit", label: "Close all flyouts", keys: ["Space", "x", "x"], group: "global",
@@ -315,10 +320,6 @@ export const COMMANDS: Command[] = [
     action: { kind: "client", name: "quick_create_chat" } },
   { id: "leader.create.prompt",      label: "New Prompt",      keys: ["Space", "n", "p"], group: "create",
     action: { kind: "navigate", path: "prompts/new", relative: true } },
-  { id: "leader.create.kanban_task", label: "New Kanban Task", keys: ["Space", "n", "k"], group: "create",
-    action: { kind: "push_event", event: "toggle_new_task_drawer", payload: {}, target: "active_view" },
-    scope: "route_suffix:/kanban" },
-
   // group jump (context: any list)
   { id: "list.group_prev", label: "Previous group", keys: ["{"], group: "context",
     action: { kind: "client", name: "list_group_prev" }, scope: "feature:vim-list" },

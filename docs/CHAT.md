@@ -25,8 +25,8 @@ ChatLive.handle_event("send_channel_message")
     |-- 1. Persist images: UploadHelpers.consume_and_persist_agent_images(images)
     |-- 2. Save message to DB + create FileAttachment rows (wrapped in Repo.transaction)
     |-- 3. Broadcast to PubSub ("channel:<id>:messages") only after both commits
-    |-- 4. ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks)
-    |       (content_blocks: base64-encoded images for agent context)
+    |-- 4. ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks, nil, "user")
+    |       (content_blocks: base64-encoded images for agent context; sender_role: "user" for LiveView composer)
     |
     v
 ChannelFanout.fanout_all (parallelized via Task.async_stream, max_concurrency: 10)
@@ -69,7 +69,7 @@ POST /api/v1/channels/:id/messages
 ChannelMessageController.create
     |-- 1. Save message to DB
     |-- 2. Broadcast to PubSub ("channel:<id>:messages")
-    |-- 3. ChannelFanout.fanout_all(channel_id, body, sender_session_id)
+    |-- 3. ChannelFanout.fanout_all(channel_id, body, sender_session_id, [], nil, "user")
     |       [Routes to all channel members using same protocol as UI]
 ```
 
@@ -233,9 +233,13 @@ Channels.remove_member(channel_id, session_id)
 Channels.list_members(channel_id)
 Channels.is_member?(channel_id, session_id)
 Channels.mark_as_read(channel_id, session_id)
+  # Called on channel open in load_channel_assigns to immediately clear unread badge
+  # Guards against same-channel param updates (e.g. thread navigation) to avoid redundant DB writes
 Channels.count_unread_messages(channel_id, session_id)
 Channels.list_channels_for_session(session_id)
 ```
+
+**Unread Count Handling**: When a user opens a channel, `load_channel_assigns` calls `Channels.mark_as_read` and zeroes the channel's unread count in the map (via `Map.put(data.unread_counts, int_channel_id, 0)`). This clears the badge immediately without waiting for PubSub broadcast. The channel_changed? guard prevents redundant DB writes when the user navigates threads or other params on the same channel. `parse_int(channel_id, nil)` ensures non-numeric channel IDs don't insert dead string keys into the unread_counts map.
 
 ### ChannelOnboarding (`lib/eye_in_the_sky/channels/channel_onboarding.ex`)
 
@@ -321,11 +325,12 @@ SlashItems.load_agents(channel_id)  # Returns agent items with most recent sessi
 Core fanout engine for routing messages to channel members. Uses `Task.async_stream` with `max_concurrency: 10` to parallelize DB inserts and agent message delivery.
 
 ```elixir
-ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks \\ [], message_id \\ nil)
+ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks \\ [], message_id \\ nil, sender_role \\ "user")
   # Route to all members (excluding sender)
   # Routing mode (:direct/:broadcast/:ambient) determined per-member via ChannelProtocol
   # Auto-adds mentioned sessions as members if not present
   # message_id: optional, passed to build_prompt context; used for dedup/threading
+  # sender_role: defaults to "user" for LiveView composer; set to "agent" for agent-sourced replies
   # Context metadata: %{"source" => "channel", "channel_id" => id, "channel_message_id" => message_id, "reply_mode" => "cli_required"}
   # Parallelized: all N sends fire concurrently, latency ≈ 1 insert time
 
@@ -343,11 +348,39 @@ ChannelFanout.fanout_mentions_only(channel_id, body, sender_session_id, message_
 - Passes string-keyed context metadata to AgentManager for logging/tracing
 
 **Integration points**:
-- Called from `ChatLive.handle_event("send_channel_message")` via `ChannelHelpers.route_to_members`
-- Called from `ChannelMessageController.create` for REST API posted messages
-- Called from `AgentWorkerEvents.maybe_fanout_mentions` for agent replies with @mentions
+- Called from `ChatLive.handle_event("send_channel_message")` via `ChannelHelpers.route_to_members` with `sender_role="user"`
+- Called from `ChannelMessageController.create` for REST API posted messages with `sender_role="user"`
+- Called from `AgentWorkerEvents.maybe_fanout_mentions` for agent replies with @mentions using `sender_role="agent"`
+
+**Channel Notification Deduplication**: `notify_channel_members` (called from `ChannelMessageController.create`) skips DM notifications for sessions that will receive direct/broadcast MSG prompts from `ChannelFanout.fanout_all`. Specifically:
+- **@all messages**: skip all notifications (every member gets a broadcast MSG prompt)
+- **@{session_id} mentions**: skip those specific sessions (they get a direct MSG prompt)
+- **Ambient-only members**: still receive the channel notification DM
+
+This prevents agents from receiving the same message twice in a single turn (once via direct MSG prompt, once via notification DM).
 
 **Performance**: Task.async_stream with timeout: 5s, on_timeout: :kill_task prevents hung agents from blocking delivery to other members. Connection pool capped at 10 concurrent checkouts.
+
+### Session Resume Context Injection
+
+When a session resumes, the `eits-session-resume.sh` script automatically injects recent channel context into the system-reminder. It queries the database for channels where the resuming session is a member and was directly @mentioned (by session ID or UUID) within the last hour.
+
+**Behavior**:
+- Skips pure ambient-observer channels (no direct @mention) to avoid noise
+- For each qualifying channel, injects the 3 most recent messages (chronologically ordered)
+- Falls back gracefully if psql is unavailable or no qualifying channels exist
+- Only runs when a numeric session ID is available
+
+**Format in system-reminder**:
+```
+## Recent Channel Activity (last 1h — you were @mentioned)
+
+### #channel_name (channel:123)
+- **sender_name** [HH:MM]: message body (truncated to 200 chars)
+- **sender_name** [HH:MM]: message body
+```
+
+**Implementation**: Pure shell function in `priv/scripts/eits-session-resume.sh` using psql directly against `EITS_PG_*` env vars. No Elixir/Phoenix dependencies.
 
 ### ChatWorker / ChatManager
 
@@ -614,6 +647,7 @@ Svelte component handling message display and input for `/chat`.
 - Message history navigation (up/down arrows, 50 message buffer)
 - Auto-scroll on new messages
 - Delete message button (hover reveal)
+- Composer hint text shows `@` to mention (not `@id` to mention)
 
 ### DmPage Component
 

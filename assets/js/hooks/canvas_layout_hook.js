@@ -127,7 +127,8 @@ export const CanvasLayoutHook = {
       const positions = computePositions(windows, W, H)
       positions.forEach((pos, i) => applyPosition(windows[i], pos))
     })
-  }
+  },
+  destroyed() {}
 }
 
 const MIN_DIM = 120  // never write dimensions smaller than this

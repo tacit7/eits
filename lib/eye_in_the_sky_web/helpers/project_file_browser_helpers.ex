@@ -158,13 +158,17 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers do
 
   defp build_scan_entry(item, base_dir, full, relative, depth) do
     if File.dir?(full) do
-      children = if depth < @max_tree_depth, do: scan_directory(base_dir, full, depth + 1), else: []
+      children =
+        if depth < @max_tree_depth, do: scan_directory(base_dir, full, depth + 1), else: []
+
       %{name: item, path: full, relative: relative, is_dir: true, children: children}
     else
-      size = case File.stat(full) do
-        {:ok, %{size: s}} -> s
-        _ -> 0
-      end
+      size =
+        case File.stat(full) do
+          {:ok, %{size: s}} -> s
+          _ -> 0
+        end
+
       %{name: item, path: full, relative: relative, is_dir: false, size: size}
     end
   end

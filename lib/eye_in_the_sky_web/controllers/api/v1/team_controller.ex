@@ -11,16 +11,22 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams
   def index(conn, params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params) do
+    with {:ok, scope} <- get_project_scope(conn, params) do
       limit =
         case parse_int(params["limit"]) do
           n when is_integer(n) and n > 0 -> n
           _ -> nil
         end
 
-      # Use project_id filter if provided, otherwise use requester's project
+      # Use explicit project_id if provided, otherwise fall back to session's project (if any)
       project_id = params["project_id"] && parse_int(params["project_id"])
-      project_id = project_id || requester_session.project_id
+
+      project_id =
+        project_id ||
+          case scope do
+            :bearer_only -> nil
+            session -> session.project_id
+          end
 
       opts =
         []
@@ -43,9 +49,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams/:id
   def show(conn, %{"id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(id),
-         :ok <- validate_project_access(team, requester_session) do
+         :ok <- validate_project_access(team, scope) do
       members = Teams.list_members(team.id)
 
       json(conn, %{
@@ -62,8 +68,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -71,8 +79,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # POST /api/v1/teams
   def create(conn, params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
-         {:ok, project_id} <- resolve_create_project_id(params, requester_session) do
+    with {:ok, scope} <- get_project_scope(conn, params),
+         {:ok, project_id} <- resolve_create_project_id(params, scope) do
       attrs = %{
         name: params["name"],
         description: params["description"],
@@ -97,6 +105,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: cannot create team in this project"}
     end
@@ -112,9 +121,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     if map_size(attrs) == 0 do
       {:error, :bad_request, "at least one of name or description is required"}
     else
-      with {:ok, requester_session} <- get_authenticated_session(conn, params),
+      with {:ok, scope} <- get_project_scope(conn, params),
            {:ok, team} <- resolve_team(id),
-           :ok <- validate_project_access(team, requester_session) do
+           :ok <- validate_project_access(team, scope) do
         case Teams.update_team(team, attrs) do
           {:ok, updated} ->
             json(conn, %{
@@ -132,8 +141,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       else
         {:error, :not_found} ->
           {:error, :not_found, "Team not found"}
+
         {:error, :unauthorized} ->
           {:error, :unauthorized, "Unauthorized"}
+
         {:error, :forbidden} ->
           {:error, :forbidden, "Access denied: team does not belong to your project"}
       end
@@ -142,9 +153,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # DELETE /api/v1/teams/:id
   def delete(conn, %{"id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(id),
-         :ok <- validate_project_access(team, requester_session) do
+         :ok <- validate_project_access(team, scope) do
       case Teams.delete_team(team) do
         {:ok, _} ->
           json(conn, %{success: true, message: "Team archived", id: team.id})
@@ -155,8 +166,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -164,9 +177,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # GET /api/v1/teams/:team_id/members
   def list_members(conn, %{"team_id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(id),
-         :ok <- validate_project_access(team, requester_session) do
+         :ok <- validate_project_access(team, scope) do
       members = Teams.list_members(team.id)
 
       json(conn, %{
@@ -177,8 +190,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -186,16 +201,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # POST /api/v1/teams/:team_id/members
   def join(conn, %{"team_id" => id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(id),
-         :ok <- validate_project_access(team, requester_session) do
+         :ok <- validate_project_access(team, scope) do
       attrs = %{
         team_id: team.id,
         name: params["name"],
         role: params["role"] || "member",
         agent_id: resolve_id(params["agent_id"], &Agents.get_agent_by_uuid/1),
-        session_id:
-          resolve_id(params["session_id"], &Sessions.get_session_by_uuid/1)
+        session_id: resolve_id(params["session_id"], &Sessions.get_session_by_uuid/1)
       }
 
       case Teams.join_team(attrs) do
@@ -216,8 +230,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -225,16 +241,21 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # PATCH /api/v1/teams/:team_id/members/:member_id
   def update_member(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
-         :ok <- validate_project_access(team, requester_session),
-         {:ok, member} <- Teams.get_member(member_id) do
+         :ok <- validate_project_access(team, scope),
+         {:ok, member} <- resolve_member(member_id) do
       do_update_member(conn, member, params)
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
+      {:error, :member_not_found} ->
+        {:error, :not_found, "Member not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -242,16 +263,21 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # DELETE /api/v1/teams/:team_id/members/:member_id
   def leave(conn, %{"team_id" => team_id, "member_id" => member_id} = params) do
-    with {:ok, requester_session} <- get_authenticated_session(conn, params),
+    with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
-         :ok <- validate_project_access(team, requester_session),
-         {:ok, member} <- Teams.get_member(member_id) do
+         :ok <- validate_project_access(team, scope),
+         {:ok, member} <- resolve_member(member_id) do
       do_leave_team(conn, member)
     else
       {:error, :not_found} ->
         {:error, :not_found, "Team not found"}
+
+      {:error, :member_not_found} ->
+        {:error, :not_found, "Member not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
+
       {:error, :forbidden} ->
         {:error, :forbidden, "Access denied: team does not belong to your project"}
     end
@@ -270,15 +296,17 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         {:error, :bad_request, "from_session_id is required"}
 
       true ->
-        with {:ok, requester_session} <- get_authenticated_session(conn, params),
+        with {:ok, scope} <- get_project_scope(conn, params),
              {:ok, team} <- resolve_team(id),
-             :ok <- validate_project_access(team, requester_session) do
+             :ok <- validate_project_access(team, scope) do
           do_broadcast(conn, team, from_raw, String.trim(body))
         else
           {:error, :not_found} ->
             {:error, :not_found, "Team not found"}
+
           {:error, :unauthorized} ->
             {:error, :unauthorized, "Unauthorized"}
+
           {:error, :forbidden} ->
             {:error, :forbidden, "Access denied: team does not belong to your project"}
         end
@@ -287,31 +315,27 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # ── helpers ──────────────────────────────────────────────────────────────────
 
-  defp get_authenticated_session(conn, params) do
+  # Returns {:ok, session} when a session/agent identifier is provided, or
+  # {:ok, :bearer_only} when the caller authenticated only with a Bearer API key.
+  # The caller is already authenticated by the plug pipeline; this is purely about
+  # resolving optional project-scope context for ownership checks.
+  defp get_project_scope(conn, params) do
     session_id_raw = params["session_id"]
     agent_id_raw = params["agent_id"]
     header_session = conn |> Plug.Conn.get_req_header("x-eits-session") |> List.first()
 
     cond do
       session_id_raw && session_id_raw != "" ->
-        resolve_session(session_id_raw)
+        Sessions.resolve(session_id_raw)
 
       agent_id_raw && agent_id_raw != "" ->
         resolve_agent_session(agent_id_raw)
 
       header_session && header_session != "" ->
-        resolve_session(header_session)
+        Sessions.resolve(header_session)
 
       true ->
-        {:error, :unauthorized}
-    end
-  end
-
-  defp resolve_session(raw) do
-    if int_id = parse_int(raw) do
-      Sessions.get_session(int_id)
-    else
-      Sessions.get_session_by_uuid(raw)
+        {:ok, :bearer_only}
     end
   end
 
@@ -336,23 +360,39 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-  defp validate_project_access(team, requester_session) do
-    if team.project_id == requester_session.project_id do
-      :ok
-    else
-      {:error, :forbidden}
+  # Bearer-only callers have no project context — skip ownership check.
+  defp validate_project_access(_team, :bearer_only), do: :ok
+  # Unscoped team (no project) is accessible by any authenticated session.
+  defp validate_project_access(%{project_id: nil}, _session), do: :ok
+  # Session with no project cannot claim ownership of a scoped team.
+  defp validate_project_access(_team, %{project_id: nil}), do: {:error, :forbidden}
+  # Same project — allowed.
+  defp validate_project_access(%{project_id: p}, %{project_id: p}), do: :ok
+  # Different projects — denied.
+  defp validate_project_access(_, _), do: {:error, :forbidden}
+
+  # Bearer-only: use explicit project_id param (may be nil — fine for unrestricted teams)
+  defp resolve_create_project_id(params, :bearer_only) do
+    {:ok, params["project_id"] && parse_int(params["project_id"])}
+  end
+
+  # Session with no project: cannot bind a new team to an explicit project_id either.
+  defp resolve_create_project_id(params, %{project_id: nil}) do
+    case parse_int(params["project_id"]) do
+      nil -> {:ok, nil}
+      _project_id -> {:error, :forbidden}
     end
   end
 
-  defp resolve_create_project_id(params, requester_session) do
+  defp resolve_create_project_id(params, session) do
     case parse_int(params["project_id"]) do
       nil ->
-        # No project_id provided, use requester's project
-        {:ok, requester_session.project_id}
+        # No project_id provided — inherit from session
+        {:ok, session.project_id}
 
       project_id ->
-        # Project_id provided, validate it matches requester
-        if project_id == requester_session.project_id do
+        # Explicit project_id must match the session's project
+        if project_id == session.project_id do
           {:ok, project_id}
         else
           {:error, :forbidden}
@@ -362,6 +402,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   defp resolve_team(id) do
     if int_id = parse_int(id), do: Teams.get_team(int_id), else: Teams.get_team_by_name(id)
+  end
+
+  defp resolve_member(id) do
+    case Teams.get_member(id) do
+      {:ok, member} -> {:ok, member}
+      {:error, :not_found} -> {:error, :member_not_found}
+    end
   end
 
   defp do_update_member(conn, member, params) do
@@ -387,7 +434,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
   defp do_broadcast(conn, team, from_raw, body) do
     members = Teams.list_members(team.id)
 
-    with {:ok, from_session} <- resolve_broadcast_sender(from_raw),
+    with {:ok, from_session} <- Sessions.resolve(from_raw),
          :ok <- check_sender_not_terminated(from_session),
          :ok <- check_is_team_member(members, from_session) do
       targets =
@@ -430,8 +477,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         {:error, :not_found, "Sender session not found"}
 
       {:error, :sender_terminated} ->
-        {:error, :unprocessable_entity,
-         "Sender session is terminated and cannot broadcast"}
+        {:error, :unprocessable_entity, "Sender session is terminated and cannot broadcast"}
 
       {:error, :not_member} ->
         {:error, :forbidden, "Sender is not a member of this team"}
@@ -448,13 +494,5 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     if Enum.any?(members, &(&1.session_id == session.id)),
       do: :ok,
       else: {:error, :not_member}
-  end
-
-  defp resolve_broadcast_sender(raw) do
-    if int_id = parse_int(raw) do
-      Sessions.get_session(int_id)
-    else
-      Sessions.get_session_by_uuid(raw)
-    end
   end
 end

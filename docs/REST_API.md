@@ -90,6 +90,7 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 | `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`, `"zombie_swept"`, `"billing_error"`, `"authentication_error"`, `"rate_limit_error"`, `"watchdog_timeout"`, `"retry_exhausted"`. Auto-cleared when transitioning away from waiting. Error values are normally set by the AgentWorker on systemic failure, not by API clients — they drive the red failure-tier badges in the session UI |
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
 | `read_only` | boolean | no | Session intent: `true` for read-only (review mode), `false` for work mode |
+| `worktree_path` | string | no | Absolute path to the git worktree for this session. Stored as `git_worktree_path` in DB. Set by agents after `git worktree add` |
 
 **Response:** `200 OK`
 
@@ -219,6 +220,47 @@ curl -X POST localhost:5001/api/v1/sessions/42/waiting \
   -H 'Content-Type: application/json'
 
 curl -X POST localhost:5001/api/v1/sessions/abc-123/waiting \
+  -H 'Content-Type: application/json'
+```
+
+---
+
+### POST /api/v1/sessions/:uuid/end
+
+End a session with optional final status. Implements the i-end-session MCP tool.
+
+Accepts integer session ID or UUID string. Sets `status` to the provided `final_status` (default: `"completed"`) and `ended_at=now` if the status is a terminal state.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session UUID or integer ID |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `final_status` | string | no | Final session status (default: `"completed"`). One of: `completed`, `failed`, `compacted` |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Session ended",
+  "status": "completed"
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/sessions/abc-123/end \
+  -H 'Content-Type: application/json' \
+  -d '{"final_status":"completed"}'
+
+curl -X POST localhost:5001/api/v1/sessions/42/end \
   -H 'Content-Type: application/json'
 ```
 
@@ -710,7 +752,7 @@ Track one or more git commits. Looks up the Agent by UUID to get the integer `se
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `agent_id` | string | yes | Agent/session UUID |
+| `agent_id` | string | yes | Agent UUID |
 | `commit_hashes` | string[] | yes | List of commit hashes |
 | `commit_messages` | string[] | no | Parallel list of commit messages |
 
@@ -882,34 +924,73 @@ curl 'localhost:5001/api/v1/notes?session_id=42&q=authentication'
 
 ---
 
-### POST /session-context
+### GET /api/v1/sessions/:uuid/context
 
-Save or update session context (markdown). Upserts based on session_id. Looks up the Agent by UUID to resolve integer IDs.
+Fetch session context (markdown). Accepts session UUID or integer session ID.
 
-**Request body:**
+**URL params:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `agent_id` | string | yes | Agent/session UUID |
-| `context` | string | yes | Markdown context content |
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session UUID or integer ID |
 
-**Response:** `201 Created`
+**Response:** `200 OK`
 
 ```json
 {
-  "id": 5,
-  "agent_id": 7,
-  "session_id": 42,
-  "context": "# Session Context\n\nWorking on..."
+  "success": true,
+  "context": "# Session Context\n\nKey findings...",
+  "metadata": {},
+  "updated_at": "2026-03-15T10:30:00Z"
 }
 ```
 
 **Example:**
 
 ```bash
-curl -X POST localhost:5001/api/v1/session-context \
+curl localhost:5001/api/v1/sessions/abc-123/context
+curl localhost:5001/api/v1/sessions/42/context
+```
+
+---
+
+### PATCH /api/v1/sessions/:uuid/context
+
+Save or update session context (markdown). Upserts based on session_id. Accepts session UUID or integer session ID.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `uuid` | string or integer | Session UUID or integer ID |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `context` | string | yes | Markdown context content |
+| `metadata` | object | no | Structured JSON metadata |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "context": "# Session Context\n\nKey findings...",
+  "metadata": {}
+}
+```
+
+**Example:**
+
+```bash
+curl -X PATCH localhost:5001/api/v1/sessions/abc-123/context \
   -H 'Content-Type: application/json' \
-  -d '{"agent_id":"abc-123","context":"# Context\n\nKey findings..."}'
+  -d '{"context":"# Context\n\nKey findings..."}'
+
+curl -X PATCH localhost:5001/api/v1/sessions/42/context \
+  -H 'Content-Type: application/json' \
+  -d '{"context":"# Context\n\nKey findings..."}'
 ```
 
 ---
@@ -2059,14 +2140,15 @@ This endpoint is **unauthenticated** — hook scripts run in the Claude CLI proc
 
 **Request body:**
 
-Raw Claude Code hook payload (JSON object). The endpoint normalizes the payload to extract:
+Raw Claude Code hook payload (JSON object). The endpoint enriches and normalizes the payload before policy evaluation:
+
 - `event` — Hook event type (`"PreToolUse"`, `"PostToolUse"`, `"UserPromptSubmit"`, `"Stop"`)
 - `session_uuid` — Session UUID (if available)
 - `tool` — Tool name being evaluated (for PreToolUse)
 - `resource_path` — File path or resource identifier
 - `project_id` — Project ID (from session or path resolution)
 - `project_path` — Project directory path
-- `agent_type` — Agent type from session
+- `agent_type` — Agent type. **Automatically enriched from the session record if not provided.** When missing, the endpoint resolves `agent_type` by joining `Session → Agent → AgentDefinition` to fetch the agent's slug. If explicitly provided in the request, takes precedence over the resolved value. This enrichment ensures document-based policies (which scope by agent type) fire correctly for Claude Code hooks that don't include agent type in their payload.
 
 **Response:** `200 OK` — Hook-protocol JSON
 

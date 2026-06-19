@@ -53,12 +53,33 @@ defmodule EyeInTheSky.IAM.PolicyCache do
     end
   end
 
-  @doc "Clear the cache so the next read re-loads from DB."
+  @doc """
+  Return enabled policies contributed by documents attached to the given agent type.
+  Warms the per-agent-type entry on miss.
+
+  Always returns a list — never an error tuple. Unknown agent types return `[]`.
+  """
+  @spec for_agent_type(String.t()) :: [EyeInTheSky.IAM.document_policy_candidate()]
+  def for_agent_type(agent_type) do
+    key = {:agent_type_candidates, agent_type}
+
+    case :ets.lookup(@table, key) do
+      [{^key, candidates}] ->
+        candidates
+
+      [] ->
+        candidates = EyeInTheSky.IAM.policies_for_agent_type(agent_type)
+        :ets.insert(@table, {key, candidates})
+        candidates
+    end
+  end
+
+  @doc "Clear all cached data (global policies and per-agent-type candidates) so the next read re-loads from DB."
   @spec invalidate() :: :ok
   def invalidate do
     case :ets.whereis(@table) do
       :undefined -> :ok
-      _tid -> :ets.delete(@table, :enabled_policies)
+      _tid -> :ets.delete_all_objects(@table)
     end
 
     :ok

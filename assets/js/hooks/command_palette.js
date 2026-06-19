@@ -1,5 +1,14 @@
-import { fuzzyPositions, scoreCmd, escapeHtml, highlightLabel } from "./palette_utils.js"
-import { getCommands } from "./palette_commands/index.js"
+import {
+  fuzzyPositions,
+  scoreCmd,
+  escapeHtml,
+  highlightLabel,
+  loadRecentCommands,
+  saveRecentCommand,
+  detectMacOS,
+  matchesModifier,
+} from "../command_palette.js"
+import { getCommands } from "../commands.js"
 
 export const CommandPalette = {
   mounted() {
@@ -10,9 +19,7 @@ export const CommandPalette = {
     this.activeIndex = 0
     this.visibleItems = []
 
-    this._isMac = navigator.userAgentData
-      ? navigator.userAgentData.platform === "macOS"
-      : navigator.platform.toUpperCase().includes("MAC")
+    this._isMac = detectMacOS()
 
     // Read shortcut from root layout div (data-palette-shortcut) on each keydown
     // so live-navigation setting changes are picked up without remounting.
@@ -21,11 +28,7 @@ export const CommandPalette = {
     this._matchesModifier = (e) => {
       const el = document.querySelector("[data-palette-shortcut]")
       const shortcut = el ? (el.dataset.paletteShortcut || "auto") : "auto"
-      if (shortcut === "cmd")  return e.metaKey
-      if (shortcut === "ctrl") return e.ctrlKey
-      if (shortcut === "alt")  return e.altKey
-      // auto: on Mac accept both Cmd+K and Ctrl+K so either key works
-      return this._isMac ? (e.metaKey || e.ctrlKey) : e.ctrlKey
+      return matchesModifier(e, shortcut, this._isMac)
     }
 
     this.handleEvent("palette:sessions-result", ({ sessions }) => {
@@ -334,17 +337,11 @@ export const CommandPalette = {
   },
 
   loadRecent() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem("command_palette_recent") || "[]")
-      return Array.isArray(parsed) ? parsed : []
-    } catch (_) { return [] }
+    return loadRecentCommands()
   },
 
   saveRecent(cmd) {
-    if (cmd.type !== "navigate") return
-    const existing = this.loadRecent().filter(e => e.href !== cmd.href)
-    const next = [{ id: cmd.id, label: cmd.label, href: cmd.href, at: Date.now() }, ...existing].slice(0, 8)
-    localStorage.setItem("command_palette_recent", JSON.stringify(next))
+    return saveRecentCommand(cmd)
   },
 
 }

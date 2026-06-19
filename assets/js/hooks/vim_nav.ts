@@ -136,6 +136,10 @@ export const VimNav = {
   hintBuffer: "" as string,
   hintLabels: [] as Array<{ label: string; index: number }>,
   hintOverlayEl: null as HTMLElement | null,
+  quickDmOverlayEl: null as HTMLElement | null,
+  _quickDmTargetUuid: "" as string,
+  _quickDmTargetName: "" as string,
+  _quickDmComposeHandler: null as ((e: Event) => void) | null,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -177,6 +181,18 @@ export const VimNav = {
       const item = items.find(el => el.dataset.vimItemId === task_id)
       if (item) item.dataset.vimItemDone = done ? "true" : "false"
     })
+    this.handleEvent("vim:quick-dm-result", ({ ok, error }: { ok: boolean; error?: string }) => {
+      this._hideQuickDm()
+      if (!ok && error) console.warn("[vim-nav] quick DM failed:", error)
+    })
+    this._quickDmComposeHandler = (e: Event) => {
+      const { uuid, name } = (e as CustomEvent).detail ?? {}
+      if (!uuid) return
+      this._quickDmTargetUuid = uuid
+      this._quickDmTargetName = name || "Session"
+      this._showQuickDmCompose()
+    }
+    document.addEventListener("vim:quick-dm-compose", this._quickDmComposeHandler)
   },
 
   destroyed() {
@@ -184,17 +200,20 @@ export const VimNav = {
     if (this._onFocusin) document.removeEventListener("focusin", this._onFocusin)
     if (this._onFocusout) document.removeEventListener("focusout", this._onFocusout)
     if (this._onPageLoad) window.removeEventListener("phx:page-loading-stop", this._onPageLoad)
+    if (this._quickDmComposeHandler) document.removeEventListener("vim:quick-dm-compose", this._quickDmComposeHandler)
     if (this.sequenceTimer) clearTimeout(this.sequenceTimer)
     if (this.countTimer) clearTimeout(this.countTimer)
     this.hideHelp()
     this.hideWhichKey()
     this.clearListFocus()
+    this._hideQuickDm()
     this.statusbarEl?.remove()
     this.statusbarEl = null
     this._onKeydown = null
     this._onFocusin = null
     this._onFocusout = null
     this._onPageLoad = null
+    this._quickDmComposeHandler = null
   },
 
   isEnabled(): boolean {
@@ -210,6 +229,13 @@ export const VimNav = {
     if (!this.isEnabled()) return
     if (event.defaultPrevented) return
     if (event.isComposing) return
+
+    // Quick DM compose overlay: intercept Esc before insert-mode handling closes the textarea
+    if (this.quickDmOverlayEl && event.key === "Escape") {
+      event.preventDefault()
+      this._hideQuickDm()
+      return
+    }
 
     // Phase 1: insert mode — only Esc exits
     if (this.mode === "insert") {
@@ -660,6 +686,23 @@ export const VimNav = {
         this.pushEvent("vim:task-nav", { direction, task_uuid, current_path: window.location.pathname })
         return
       }
+      if (action.name === "quick_dm_compose") {
+        const item = this.currentListItems()[this.listFocusIndex]
+        if (!item) return
+        const uuid = item.dataset.sessionUuid
+        const name = item.dataset.vimItemTitle || "Session"
+        if (!uuid) return
+        this._quickDmTargetUuid = uuid
+        this._quickDmTargetName = name
+        this._showQuickDmCompose()
+        return
+      }
+      if (action.name === "quick_dm_pick") {
+        document.getElementById("command-palette")?.dispatchEvent(
+          new CustomEvent("palette:open-command", { detail: { commandId: "message-session" } })
+        )
+        return
+      }
       if (action.name === "list_group_prev" || action.name === "list_group_next") {
         const items = this.currentListItems()
         if (items.length === 0) return
@@ -857,6 +900,57 @@ export const VimNav = {
       sessionStorage.setItem(key, JSON.stringify(updated))
     } catch { /* ignore quota/parse errors */ }
   },
+
+  // ── Quick DM compose overlay ────────────────────────────────────────────────
+
+  _quickDmOverlayBase(): HTMLElement {
+    if (this.quickDmOverlayEl) {
+      this.quickDmOverlayEl.remove()
+      this.quickDmOverlayEl = null
+    }
+    const overlay = document.createElement("div")
+    overlay.id = "vim-nav-quick-dm"
+    overlay.setAttribute("aria-label", "Quick DM")
+    overlay.style.cssText = [
+      "position:fixed", "inset:0", "z-index:10000",
+      "display:flex", "align-items:center", "justify-content:center",
+      "background:rgba(0,0,0,0.6)",
+    ].join(";")
+    this.quickDmOverlayEl = overlay
+    document.body.appendChild(overlay)
+    return overlay
+  },
+
+  _showQuickDmCompose(): void {
+    const overlay = this._quickDmOverlayBase()
+    overlay.innerHTML = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:16px 20px;width:420px;max-width:90vw;font-family:monospace;color:var(--color-base-content)"><div style="font-size:13px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">DM: ${escapeHtml(this._quickDmTargetName)}</div><textarea id="vim-qdm-input" placeholder="Type your message…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--color-base-300);border-radius:4px;font-family:monospace;font-size:12px;background:var(--color-base-200);color:var(--color-base-content);resize:none;min-height:72px" rows="3"></textarea><div style="margin-top:8px;font-size:9px;opacity:0.4">Enter to send &nbsp;|&nbsp; Esc cancel</div></div>`
+
+    const textarea = overlay.querySelector<HTMLTextAreaElement>("#vim-qdm-input")
+    if (textarea) {
+      textarea.focus()
+      textarea.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault()
+          const body = textarea.value.trim()
+          if (body) this._submitQuickDm(body)
+        }
+      })
+    }
+  },
+
+  _submitQuickDm(body: string): void {
+    this.pushEvent("vim:quick-dm", { session_uuid: this._quickDmTargetUuid, body })
+    // Overlay hidden on vim:quick-dm-result from backend
+  },
+
+  _hideQuickDm(): void {
+    this.quickDmOverlayEl?.remove()
+    this.quickDmOverlayEl = null
+    this._quickDmTargetUuid = ""
+    this._quickDmTargetName = ""
+  },
+
+  // ── End Quick DM ────────────────────────────────────────────────────────────
 
   showHelp(prefix?: string[]) {
     if (this.helpOverlayEl) { this.hideHelp(); return }

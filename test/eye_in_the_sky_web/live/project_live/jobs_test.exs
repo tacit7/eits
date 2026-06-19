@@ -143,11 +143,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       assert updated.enabled == false
     end
 
-    test "run now button triggers job", %{conn: conn, project: project, job: job} do
+    test "run now button triggers job", %{conn: conn, project: project} do
+      # spawn_agent jobs show a confirmation modal — use mix_task which runs immediately
+      {:ok, runnable_job} =
+        ScheduledJobs.create_job(
+          job_attrs(project.id, %{
+            "job_type" => "mix_task",
+            "config" => ~s({"task": "my_task"})
+          })
+        )
+
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
 
       view
-      |> element("button[aria-label='Run job now'][phx-value-id='#{job.id}']")
+      |> element("button[aria-label='Run job now'][phx-value-id='#{runnable_job.id}']")
       |> render_click()
 
       assert has_element?(view, "#flash-info", "Job triggered")

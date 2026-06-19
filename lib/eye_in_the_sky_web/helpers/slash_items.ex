@@ -245,7 +245,7 @@ defmodule EyeInTheSkyWeb.Helpers.SlashItems do
 
   @doc false
   def load_agents do
-    agents = Agents.list_agents()
+    agents = Agents.list_agents_for_autocomplete()
     agent_ids = Enum.map(agents, & &1.id)
 
     # Query most recent session_id per agent for @mention autocomplete.

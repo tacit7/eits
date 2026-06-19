@@ -122,6 +122,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     |> Helpers.maybe_put(:name, params["name"])
     |> Helpers.maybe_put(:description, params["description"])
     |> Helpers.maybe_put(:project_id, parse_int(params["project_id"], nil))
+    |> Helpers.maybe_put(:git_worktree_path, params["worktree_path"])
     |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
     |> then(fn a ->
       if params["clear_entrypoint"] in [true, "true"], do: Map.put(a, :entrypoint, nil), else: a
@@ -355,18 +356,17 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   """
   def end_session(conn, %{"uuid" => uuid} = params) do
     with {:ok, session} <- resolve_session(uuid) do
-      status = params["final_status"] || "completed"
+      opts = %{}
+      opts = if summary = params["summary"], do: Map.put(opts, :summary, summary), else: opts
 
-      attrs =
-        if status in Sessions.terminated_statuses() do
-          %{status: status, ended_at: DateTime.utc_now()}
-        else
-          %{status: status}
-        end
+      opts =
+        if final_status = params["final_status"],
+          do: Map.put(opts, :final_status, final_status),
+          else: opts
 
-      case Sessions.update_session(session, attrs) do
+      case Sessions.end_session(session, opts) do
         {:ok, updated} ->
-          handle_terminal_status(updated, status)
+          handle_terminal_status(updated, updated.status)
           json(conn, %{success: true, message: "Session ended", status: updated.status})
 
         {:error, _cs} ->

@@ -114,19 +114,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
-  defp apply_canvas_rename(socket, id, updated) do
-    canvases = Enum.map(socket.assigns.canvases, fn c -> if c.id == id, do: updated, else: c end)
-
-    socket =
-      if socket.assigns.active_canvas_id == id do
-        assign(socket, :page_title, updated.name <> " — Canvas")
-      else
-        socket
-      end
-
-    socket |> assign(:canvases, canvases) |> assign(:renaming_canvas_id, nil)
-  end
-
   def handle_event("rename_canvas", _params, socket) do
     {:noreply, assign(socket, :renaming_canvas_id, nil)}
   end
@@ -229,7 +216,9 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       case Canvases.create_terminal(canvas_id, attrs) do
         {:ok, ct} ->
           {:ok, pty_pid} =
-            PtySupervisor.start_pty(subscriber: self(), subscriber_tag: ct.id)
+            PtySupervisor.find_or_start_pty(session_key: "canvas-terminal-#{ct.id}")
+
+          PtyServer.subscribe(pty_pid, self(), ct.id)
 
           {:noreply,
            socket
@@ -281,6 +270,19 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
+  defp apply_canvas_rename(socket, id, updated) do
+    canvases = Enum.map(socket.assigns.canvases, fn c -> if c.id == id, do: updated, else: c end)
+
+    socket =
+      if socket.assigns.active_canvas_id == id do
+        assign(socket, :page_title, updated.name <> " — Canvas")
+      else
+        socket
+      end
+
+    socket |> assign(:canvases, canvases) |> assign(:renaming_canvas_id, nil)
+  end
+
   @impl true
   def handle_info({:new_message, message}, socket) do
     {:noreply, refresh_window(socket, message.session_id)}
@@ -311,6 +313,18 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     {:noreply, remove_canvas_session(socket, cs_id)}
   end
 
+  # Scroll buffer replay on (re-)subscribe — route same as live output
+  def handle_info({:pty_scroll_buffer, terminal_id, data}, socket) when byte_size(data) > 0 do
+    send_update(TerminalWindowComponent,
+      id: "terminal-window-#{terminal_id}",
+      pty_output: data
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:pty_scroll_buffer, _terminal_id, _empty}, socket), do: {:noreply, socket}
+
   # PTY output — tagged with terminal id
   def handle_info({:pty_output, terminal_id, data}, socket) do
     send_update(TerminalWindowComponent,
@@ -337,24 +351,33 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   def handle_info({:canvas_session_added, _payload}, socket) do
-    new_sessions = Canvases.list_canvas_sessions(socket.assigns.active_canvas_id || -1)
-    existing_ids = Enum.map(socket.assigns.canvas_sessions, & &1.id)
+    case socket.assigns.active_canvas_id do
+      nil ->
+        {:noreply, socket}
 
-    added =
-      Enum.reject(new_sessions, &(&1.id in existing_ids))
-      |> apply_default_positions(length(socket.assigns.canvas_sessions))
+      canvas_id ->
+        new_sessions = Canvases.list_canvas_sessions(canvas_id)
+        existing_ids = Enum.map(socket.assigns.canvas_sessions, & &1.id)
 
-    new_session_ids = Enum.map(added, & &1.session_id)
-    subscribe_all(new_session_ids)
+        added =
+          Enum.reject(new_sessions, &(&1.id in existing_ids))
+          |> apply_default_positions(length(socket.assigns.canvas_sessions))
 
-    {:noreply,
-     socket
-     |> assign(:canvas_sessions, socket.assigns.canvas_sessions ++ added)
-     |> assign(
-       :subscribed_session_ids,
-       socket.assigns.subscribed_session_ids ++ new_session_ids
-     )
-     |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())}
+        new_session_ids = Enum.map(added, & &1.session_id)
+        subscribe_all(new_session_ids)
+
+        new_count = length(socket.assigns.canvas_sessions) + length(added)
+        updated_counts = Map.put(socket.assigns.canvas_session_counts, canvas_id, new_count)
+
+        {:noreply,
+         socket
+         |> assign(:canvas_sessions, socket.assigns.canvas_sessions ++ added)
+         |> assign(
+           :subscribed_session_ids,
+           socket.assigns.subscribed_session_ids ++ new_session_ids
+         )
+         |> assign(:canvas_session_counts, updated_counts)}
+    end
   end
 
   def handle_info(_, socket), do: {:noreply, socket}
@@ -702,7 +725,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
       pty_map =
         Map.new(terminals, fn ct ->
-          {:ok, pid} = PtySupervisor.start_pty(subscriber: self(), subscriber_tag: ct.id)
+          {:ok, pid} = PtySupervisor.find_or_start_pty(session_key: "canvas-terminal-#{ct.id}")
+          PtyServer.subscribe(pid, self(), ct.id)
           {ct.id, pid}
         end)
 

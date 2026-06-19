@@ -1,33 +1,57 @@
 import { TOUCH_DEVICE, createSwipeDetector } from './touch_gesture'
 
-const STORAGE_KEY_SECTION = 'rail_section'
-const STORAGE_KEY_PROJECT = 'rail_project_id'
+const STORAGE_KEY = 'rail_state'
+const CURRENT_VERSION = 1
+
+// --- Migration from legacy separate keys (one-time, removes old entries) ---
+function migrateOldKeys() {
+  const section = localStorage.getItem('rail_section')
+  const projectId = localStorage.getItem('rail_project_id')
+  if (!section && !projectId) return
+
+  const current = readState()
+  if (section && !current.section) current.section = section
+  if (projectId && !current.project_id) current.project_id = projectId
+  writeState(current)
+  localStorage.removeItem('rail_section')
+  localStorage.removeItem('rail_project_id')
+}
+
+function readState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    const state = raw ? JSON.parse(raw) : {}
+    if (!state.version) {
+      return { version: CURRENT_VERSION, ...state }
+    }
+    return state
+  } catch {
+    return { version: CURRENT_VERSION }
+  }
+}
+
+function writeState(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // storage quota exceeded — silently skip
+  }
+}
 
 export const RailState = {
   mounted() {
-    // Restore last section from localStorage (no-op if rail_section is never written)
-    const savedSection = localStorage.getItem(STORAGE_KEY_SECTION)
-    if (savedSection) {
-      this.pushEventTo(this.el, 'restore_section', { section: savedSection })
-    }
+    migrateOldKeys()
 
-    // Restore last selected project across LiveView navigations.
-    // The rail LiveComponent remounts on cross-LV navigation, losing sidebar_project.
-    // We persist the project_id here and push it back on every mount so the server
-    // can restore it if no project is provided by the parent LiveView.
-    const savedProjectId = localStorage.getItem(STORAGE_KEY_PROJECT)
-    if (savedProjectId) {
-      this.pushEventTo(this.el, 'restore_project', { project_id: savedProjectId })
-    }
+    // Send the full blob to the server once on mount.
+    // The server applies each field defensively.
+    const state = readState()
+    this.pushEventTo(this.el, 'restore_rail_state', state)
 
-    // Listen for save_project events pushed from the server when a project is selected.
-    // project_id is a string (or null to clear).
-    this.handleEvent('save_project', ({ project_id }) => {
-      if (project_id) {
-        localStorage.setItem(STORAGE_KEY_PROJECT, String(project_id))
-      } else {
-        localStorage.removeItem(STORAGE_KEY_PROJECT)
-      }
+    // Server pushes partial patches; hook merges them into the blob.
+    this.handleEvent('save_rail_state', (patch) => {
+      const current = readState()
+      const next = { version: CURRENT_VERSION, ...current, ...patch }
+      writeState(next)
     })
 
     // Listen for mobile open event dispatched from app header

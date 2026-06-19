@@ -197,8 +197,11 @@ defmodule EyeInTheSky.Prompts do
 
   @doc """
   Search prompts using PostgreSQL full-text search.
+
+  Options:
+  - `:limit` - max results (default: no limit, uses PgSearch default of 50)
   """
-  def search_prompts(query, project_id \\ nil) when is_binary(query) do
+  def search_prompts(query, project_id \\ nil, opts \\ []) when is_binary(query) do
     extra_where =
       if project_id do
         dynamic([p], (p.project_id == ^project_id or is_nil(p.project_id)) and p.active == true)
@@ -206,12 +209,22 @@ defmodule EyeInTheSky.Prompts do
         dynamic([p], p.active == true)
       end
 
-    PgSearch.search_for(query,
-      table: "subagent_prompts",
-      schema: Prompt,
-      search_columns: ["name", "description", "prompt_text"],
-      extra_where: extra_where,
-      order_by: [desc: :updated_at]
-    )
+    search_opts =
+      [
+        table: "subagent_prompts",
+        schema: Prompt,
+        search_columns: ["name", "description", "prompt_text"],
+        extra_where: extra_where,
+        order_by: [desc: :updated_at]
+      ]
+
+    search_opts =
+      if Keyword.get(opts, :limit) do
+        Keyword.put(search_opts, :limit, Keyword.get(opts, :limit))
+      else
+        search_opts
+      end
+
+    PgSearch.search_for(query, search_opts)
   end
 end

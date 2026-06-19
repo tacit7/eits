@@ -32,6 +32,11 @@ defmodule EyeInTheSky.Events do
   All callers use the single-struct form:
   - `{:agent_working, %Session{}}` — agent transitioned to working state
   - `{:agent_stopped, %Session{}}` — agent transitioned to idle/stopped state
+
+  ## Payload shape for `tasks` topic
+
+  - `{:tasks_changed, %{task_id: id, task: %Task{}}}` — specific task created/updated/deleted
+  - `{:tasks_changed, %{}}` — generic task change (no entity info)
   """
 
   @pubsub EyeInTheSky.PubSub
@@ -92,6 +97,24 @@ defmodule EyeInTheSky.Events do
   @doc "A project record was updated. Broadcasts to projects topic."
   def project_updated(project), do: broadcast("projects", {:project_updated, project})
 
+  @doc "Subscribe to channel list changes (created, deleted/archived)."
+  def subscribe_channels, do: sub("channels")
+
+  @doc "A channel was created. Broadcasts to channels topic."
+  def channel_created(channel), do: broadcast("channels", {:channel_created, channel})
+
+  @doc "A channel was deleted/archived. Broadcasts to channels topic."
+  def channel_deleted(channel), do: broadcast("channels", {:channel_deleted, channel})
+
+  @doc "Subscribe to bookmark changes (created, deleted)."
+  def subscribe_bookmarks, do: sub("bookmarks")
+
+  @doc "A bookmark was created. Broadcasts to bookmarks topic."
+  def bookmark_created(bookmark), do: broadcast("bookmarks", {:bookmark_created, bookmark})
+
+  @doc "A bookmark was deleted. Broadcasts to bookmarks topic."
+  def bookmark_deleted(bookmark), do: broadcast("bookmarks", {:bookmark_deleted, bookmark})
+
   @doc "Subscribe to settings changes."
   def subscribe_settings, do: sub("settings")
 
@@ -147,6 +170,7 @@ defmodule EyeInTheSky.Events do
 
     if task.project_id do
       broadcast("tasks:#{task.project_id}", :tasks_changed)
+      broadcast("tasks:#{task.project_id}", {:task_updated, task})
     end
   end
 
@@ -344,6 +368,20 @@ defmodule EyeInTheSky.Events do
   def editor_push(editor_id, op, payload) do
     broadcast("editor:#{editor_id}", {:editor_push, op, payload})
   end
+
+  @doc "Subscribe to GitHub webhook delivery notifications."
+  def subscribe_github_webhook, do: sub("github:webhook_received")
+
+  @doc "Broadcast a delivery ID to wake the WebhookDispatcher."
+  def github_webhook_received(delivery_id),
+    do: broadcast("github:webhook_received", {:github_webhook_received, delivery_id})
+
+  @doc "Subscribe to pull request update events."
+  def subscribe_pull_requests, do: sub("pull_requests:updated")
+
+  @doc "Broadcast that a pull request record was updated."
+  def pull_request_updated(pr),
+    do: broadcast("pull_requests:updated", {:pull_request_updated, pr})
 
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)

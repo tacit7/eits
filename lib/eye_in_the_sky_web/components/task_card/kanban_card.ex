@@ -322,8 +322,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             }
           >
             <span class="relative inline-flex">
-              <.icon
-                name="hero-user-circle"
+              <.custom_icon
+                name="lucide-robot"
                 class={"size-3.5 #{cond do
                   is_working -> "text-primary"
                   is_waiting -> "text-warning"

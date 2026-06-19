@@ -51,6 +51,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
                |> assign(:condition_text, encode_condition(policy.condition))
                |> assign(:scope, infer_scope(policy))
                |> assign(:projects, Projects.list_projects())
+               |> assign(:matcher_source, load_matcher_source(policy.builtin_matcher))
                |> assign(:iam_hooks_status, HooksChecker.status())}
 
             {:error, :not_found} ->
@@ -75,6 +76,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
            |> assign(:condition_text, "{}")
            |> assign(:scope, "global")
            |> assign(:projects, [])
+           |> assign(:matcher_source, nil)
            |> assign(:iam_hooks_status, HooksChecker.status())}
         end
     end
@@ -102,6 +104,30 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
      |> assign(:form, to_form(changeset))
      |> assign(:condition_text, condition_text)
      |> assign(:scope, scope)}
+  end
+
+  @impl true
+  def handle_event("reseed", _params, socket) do
+    policy = socket.assigns.policy
+
+    case IAM.reseed_builtin(policy.system_key) do
+      {:ok, updated} ->
+        changeset = Policy.update_changeset(updated, %{})
+
+        {:noreply,
+         socket
+         |> assign(:policy, updated)
+         |> assign(:form, to_form(changeset))
+         |> assign(:condition_text, encode_condition(updated.condition))
+         |> assign(:scope, infer_scope(updated))
+         |> put_flash(:info, "Policy reset to seed defaults.")}
+
+      {:error, :not_in_seeds} ->
+        {:noreply, put_flash(socket, :error, "No seed definition found for this policy.")}
+
+      {:error, _cs} ->
+        {:noreply, put_flash(socket, :error, "Failed to reseed policy.")}
+    end
   end
 
   def handle_event("save", %{"policy" => raw_params} = event_params, socket) do
@@ -159,6 +185,19 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
 
   defp locked?(%{system?: true, editable_fields: editable}, field) do
     not MapSet.member?(editable, to_string(field))
+  end
+
+  defp load_matcher_source(nil), do: nil
+
+  defp load_matcher_source(key) when is_binary(key) do
+    with {:ok, module} <- EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key),
+         source_path when is_list(source_path) <- module.__info__(:compile)[:source],
+         path = List.to_string(source_path),
+         {:ok, content} <- File.read(path) do
+      content
+    else
+      _ -> nil
+    end
   end
 
   # ── rendering ─────────────────────────────────────────────────────────────
@@ -288,10 +327,37 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
           condition_disabled={locked?(assigns, :condition)}
         />
 
-        <div class="flex justify-end gap-2">
+        <div class="flex justify-between gap-2">
+          <%= if @system? do %>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm text-warning"
+              phx-click="reseed"
+              data-confirm="Reset this policy to its seed defaults? All customizations (enabled, priority, condition, message) will be overwritten."
+            >
+              <.icon name="hero-arrow-path" class="size-4" /> Reset to seed defaults
+            </button>
+          <% else %>
+            <div />
+          <% end %>
           <.form_actions submit_text="Save changes" cancel_navigate={~p"/iam/policies"} />
         </div>
       </.form>
+
+      <%= if @matcher_source do %>
+        <details class="collapse collapse-arrow bg-base-200">
+          <summary class="collapse-title font-semibold flex items-center gap-2 min-h-0 py-3 px-4">
+            <.icon name="hero-code-bracket" class="size-4 text-primary" />
+            Matcher source
+            <code class="font-mono text-xs text-base-content/60 ml-1">
+              {@policy.builtin_matcher}.ex
+            </code>
+          </summary>
+          <div class="collapse-content px-0 pb-0">
+            <pre class="overflow-x-auto text-xs font-mono leading-relaxed p-4 bg-base-300 rounded-b-box max-h-[32rem] overflow-y-auto"><code>{@matcher_source}</code></pre>
+          </div>
+        </details>
+      <% end %>
     </div>
     """
   end

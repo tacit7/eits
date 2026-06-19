@@ -145,6 +145,11 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
             member: ApiPresenter.present_channel_member(member)
           })
 
+        {:error, :duplicate} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{success: false, error: "Already a member of this channel"})
+
         {:error, %Ecto.Changeset{} = cs} ->
           {:error, cs}
       end

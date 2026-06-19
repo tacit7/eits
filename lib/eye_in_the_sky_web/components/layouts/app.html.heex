@@ -95,6 +95,7 @@
             search_query={assigns[:search_query]}
             filter_state_id={assigns[:filter_state_id]}
             workflow_states={assigns[:workflow_states] || []}
+            state_counts={assigns[:state_counts] || %{}}
             sort_by={assigns[:sort_by]}
             sidebar_project={assigns[:sidebar_project]}
           />
@@ -115,7 +116,11 @@
             session_uuid={assigns[:session_uuid]}
             show_iterm={true}
             notify_on_stop={assigns[:notify_on_stop] || false}
-            session_active={(assigns[:agent] || %{}) |> Map.get(:status) |> then(&(&1 in ~w(working compacting)))}
+            session_active={
+              (assigns[:agent] || %{})
+              |> Map.get(:status)
+              |> then(&(&1 in ~w(working compacting)))
+            }
           />
         <% :notes -> %>
           <EyeInTheSkyWeb.TopBar.Notes.toolbar

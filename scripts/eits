@@ -98,6 +98,40 @@ _post()   { _curl -X POST  -H "Content-Type: application/json" -d "$2" "$BASE_UR
 _patch()  { _curl -X PATCH -H "Content-Type: application/json" -d "$2" "$BASE_URL$1" | jq .; }
 _delete() { _curl -X DELETE "$BASE_URL$1" | jq .; }
 
+# _dm_post <endpoint> <payload> — POST with file-based lock to prevent parallel DM drops
+# Serializes DM calls to avoid connection pool conflicts when called concurrently.
+# Uses atomic mkdir for portable lock acquisition (works on macOS, Linux, etc.)
+_dm_post() {
+  local _dm_lock_dir="/tmp/eits_dm_${EITS_SESSION_UUID:-${EITS_SESSION_ID:-default}}.lock"
+  local _post_exit=0
+  local _wait_count=0
+  local _max_wait=60  # max 60 attempts * 0.5s = 30s timeout
+
+  # Acquire lock using atomic mkdir (portable across Unix systems)
+  while ! mkdir "$_dm_lock_dir" 2>/dev/null; do
+    _wait_count=$((_wait_count + 1))
+    if [[ $_wait_count -gt $_max_wait ]]; then
+      echo "error: DM lock acquire timeout (possible deadlock) — try again" >&2
+      return 1
+    fi
+    sleep 0.5
+  done
+
+  # Lock is held; execute the POST under lock
+  local _result
+  _result=$(_post "$1" "$2")
+  _post_exit=$?
+
+  # Release lock (cleanup the lock directory)
+  rmdir "$_dm_lock_dir" 2>/dev/null || true
+
+  # Return POST result/error
+  if [[ $_post_exit -ne 0 ]]; then
+    return "$_post_exit"
+  fi
+  printf '%s\n' "$_result"
+}
+
 die()  { echo "error: $*" >&2; exit 1; }
 need() { [[ -n "${!1:-}" ]] || die "$1 is required"; }
 
@@ -420,15 +454,16 @@ cmd_sessions() {
 usage: eits sessions update <uuid|self> [options]
 
 Options:
-  --status <s>       Session status (see below)
-  --reason <text>    Human-readable reason for status change
-  --intent <text>    Intent annotation for this session
-  --name <text>      Rename the session
-  --description <d>  Set session description
-  --project-id <n>   Reassign to project
-  --entrypoint <e>   Set entrypoint string
-  --clear-entrypoint Remove entrypoint value
-  --ended-at <ISO>   Set ended_at timestamp (ISO8601)
+  --status <s>           Session status (see below)
+  --reason <text>        Human-readable reason for status change
+  --intent <text>        Intent annotation for this session
+  --name <text>          Rename the session
+  --description <d>      Set session description
+  --project-id <n>       Reassign to project
+  --entrypoint <e>       Set entrypoint string
+  --clear-entrypoint     Remove entrypoint value
+  --ended-at <ISO>       Set ended_at timestamp (ISO8601)
+  --worktree-path <path> Set the git worktree path for this session
 
 Valid --status values:
   working    Claude is actively processing (set by UserPromptSubmit hook)
@@ -443,22 +478,23 @@ SESSIONS_UPDATE_HELP
       fi
       local uuid="${1:-}"; need uuid; shift
       [[ "$uuid" == "self" ]] && { uuid="${EITS_SESSION_UUID:-}"; [[ -n "$uuid" ]] || die "EITS_SESSION_UUID is not set"; }
-      local status="" reason="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at="" project_id=""
+      local status="" reason="" intent="" entrypoint="" name="" description="" clear_entrypoint="" ended_at="" project_id="" worktree_path=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --status)      status="$2";      shift 2 ;;
-          --reason)      reason="$2";      shift 2 ;;
-          --intent)      intent="$2";      shift 2 ;;
-          --entrypoint)  entrypoint="$2";  shift 2 ;;
-          --name)        name="$2";        shift 2 ;;
-          --description) description="$2"; shift 2 ;;
-          --project-id)  project_id="$2";  shift 2 ;;
+          --status)         status="$2";        shift 2 ;;
+          --reason)         reason="$2";        shift 2 ;;
+          --intent)         intent="$2";        shift 2 ;;
+          --entrypoint)     entrypoint="$2";    shift 2 ;;
+          --name)           name="$2";          shift 2 ;;
+          --description)    description="$2";   shift 2 ;;
+          --project-id)     project_id="$2";    shift 2 ;;
           --clear-entrypoint) clear_entrypoint="true"; shift ;;
-          --ended-at)    ended_at="$2";    shift 2 ;;
+          --ended-at)       ended_at="$2";      shift 2 ;;
+          --worktree-path)  worktree_path="$2"; shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
-      _patch "/sessions/$uuid" "$(json status "$status" status_reason "$reason" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at" project_id "$project_id")"
+      _patch "/sessions/$uuid" "$(json status "$status" status_reason "$reason" intent "$intent" entrypoint "$entrypoint" name "$name" description "$description" clear_entrypoint "$clear_entrypoint" ended_at "$ended_at" project_id "$project_id" worktree_path "$worktree_path")"
       ;;
     set-intent)
       # eits sessions set-intent <review|work> [<uuid>]
@@ -774,24 +810,33 @@ TASKS_HELP
       _get "/tasks/$id"
       ;;
     create)
-      # eits tasks create --title <t> [--description <d>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>] [--team <id>] [--due-at <ISO8601>]
+      # eits tasks create --title <t> [--description <d> | --description-file <path>] [--project <id>] [--priority <p>] [--session <uuid>] [--agent <uuid>] [--tags <id1,id2,...>] [--team <id>] [--due-at <ISO8601>]
       # Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID (falls back to $EITS_SESSION_ID)
-      local title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id="" due_at=""
+      local title="" description="" description_file="" project_id="${EITS_PROJECT_ID:-}" priority="" session_id="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}" agent_id="${EITS_AGENT_UUID:-}" tags="" team_id="" due_at=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --title|-t)       title="$2";       shift 2 ;;
-          --description|-d) description="$2"; shift 2 ;;
-          --project|-p)     project_id="$2";  shift 2 ;;
-          --priority)       priority="$2";    shift 2 ;;
-          --session|-s)     session_id="$2";  shift 2 ;;
-          --agent|-a)       agent_id="$2";    shift 2 ;;
-          --tags)           tags="$2";        shift 2 ;;
-          --team)           team_id="$2";     shift 2 ;;
-          --due-at)         due_at="$2";      shift 2 ;;
+          --title|-t)            title="$2";       shift 2 ;;
+          --description|-d)      description="$2"; shift 2 ;;
+          --description-file)    description_file="$2"; shift 2 ;;
+          --project|-p)          project_id="$2";  shift 2 ;;
+          --priority)            priority="$2";    shift 2 ;;
+          --session|-s)          session_id="$2";  shift 2 ;;
+          --agent|-a)            agent_id="$2";    shift 2 ;;
+          --tags)                tags="$2";        shift 2 ;;
+          --team)                team_id="$2";     shift 2 ;;
+          --due-at)              due_at="$2";      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
       need title
+      # Mutual exclusion: --description and --description-file cannot both be set
+      [[ -n "$description" && -n "$description_file" ]] && die "--description and --description-file are mutually exclusive"
+      # Read description from file if provided
+      if [[ -n "$description_file" ]]; then
+        [[ -f "$description_file" ]] || die "--description-file: file not found: $description_file"
+        [[ -r "$description_file" ]] || die "--description-file: file not readable: $description_file"
+        description="$(cat "$description_file")"
+      fi
       local body
       body="$(json title "$title" description "$description" project_id "$project_id" priority "$priority" session_id "$session_id" agent_id "$agent_id" team_id "$team_id" due_at "$due_at")"
       if [[ -n "$tags" ]]; then
@@ -802,12 +847,13 @@ TASKS_HELP
       _post "/tasks" "$body"
       ;;
     update)
-      # eits tasks update <id> [--state <id|name>] [--priority <p>] [--description <d>] [--title <t>] [--due-at <ISO8601>]
+      # eits tasks update <id> [--state <id|name>] [--priority <p>] [--description <d> | --description-file <path>] [--title <t>] [--due-at <ISO8601>]
       # State IDs:   1=To Do, 2=In Progress, 3=Done, 4=In Review
       # State names: todo, start|in-progress|progress, done, review|in-review
       # Prefer: eits tasks complete <id> --message "..." (sets Done + annotates in one shot)
       local id="${1:-}"; need id; shift
       local updates="{}"
+      local description_file=""
       # Normalize a --state value: numeric → state_id, name → server alias string
       _resolve_state() {
         local v="$1"
@@ -838,14 +884,26 @@ TASKS_HELP
       }
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --state|-s|--state-name) _resolve_state "$2"; shift 2 ;;
-          --priority)    updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
-          --description|-d) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
-          --title|-t)    updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
-          --due-at)      updates=$(echo "$updates" | jq --arg v "$2" '. + {due_at: $v}');      shift 2 ;;
+          --state|-s|--state-name)  _resolve_state "$2"; shift 2 ;;
+          --priority)               updates=$(echo "$updates" | jq --arg v "$2" '. + {priority: $v}');    shift 2 ;;
+          --description|-d)         updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+          --description-file)       description_file="$2"; shift 2 ;;
+          --title|-t)               updates=$(echo "$updates" | jq --arg v "$2" '. + {title: $v}');       shift 2 ;;
+          --due-at)                 updates=$(echo "$updates" | jq --arg v "$2" '. + {due_at: $v}');      shift 2 ;;
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Mutual exclusion: --description and --description-file cannot both be set
+      if echo "$updates" | jq -e '.description' >/dev/null 2>&1; then
+        [[ -z "$description_file" ]] || die "--description and --description-file are mutually exclusive"
+      fi
+      # Read description from file if provided
+      if [[ -n "$description_file" ]]; then
+        [[ -f "$description_file" ]] || die "--description-file: file not found: $description_file"
+        [[ -r "$description_file" ]] || die "--description-file: file not readable: $description_file"
+        local desc; desc="$(cat "$description_file")"
+        updates=$(echo "$updates" | jq --arg v "$desc" '. + {description: $v}')
+      fi
       _patch "/tasks/$id" "${updates}"
       ;;
     done)
@@ -1018,23 +1076,24 @@ TASKS_HELP
       fi
       ;;
     begin|quick)
-      # eits tasks begin [--id <task_id>] [--title <t>] [--description <d>] [--project <id>] [--priority <p>] [--tag <id>] [--quiet|-q]
+      # eits tasks begin [--id <task_id>] [--title <t>] [--description <d> | --description-file <path>] [--project <id>] [--priority <p>] [--tag <id>] [--quiet|-q]
       # With --id: claims an existing task (links session + sets In Progress). No new task created.
       # Without --id: creates a new task then claims it.
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
         cat <<'HELP'
 usage: eits tasks begin [--id <task_id>] --title <title> [options]
 
-  --id <task_id>     Claim a pre-existing task instead of creating a new one.
-                     Links the current session and sets state to In Progress atomically.
-                     When --id is given, --title and --description are ignored.
+  --id <task_id>           Claim a pre-existing task instead of creating a new one.
+                           Links the current session and sets state to In Progress atomically.
+                           When --id is given, --title and --description are ignored.
 
-  --title <text>     Task title (required when --id is not given)
-  --description <t>  Task description
-  --project <id>     Project ID (default: $EITS_PROJECT_ID)
-  --priority <p>     Priority
-  --tag <id>         Tag ID to apply after creation (repeatable: --tag 1 --tag 2)
-  --quiet|-q         Print only the task ID
+  --title <text>           Task title (required when --id is not given)
+  --description <t>        Task description (inline)
+  --description-file <p>   Read task description from file (mutually exclusive with --description)
+  --project <id>           Project ID (default: $EITS_PROJECT_ID)
+  --priority <p>           Priority
+  --tag <id>               Tag ID to apply after creation (repeatable: --tag 1 --tag 2)
+  --quiet|-q               Print only the task ID
 
 NOTES:
   Orchestrators that pre-create tasks and pass Task ID: <n> in agent instructions
@@ -1042,20 +1101,29 @@ NOTES:
   This atomically claims the task without creating a duplicate.
 HELP
         return 0; }
-      local task_id_flag="" title="" description="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
+      local task_id_flag="" title="" description="" description_file="" project_id="${EITS_PROJECT_ID:-}" priority="" quiet=0
       local -a tag_ids=()
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --id)             task_id_flag="$2"; shift 2 ;;
-          --title|-t)       title="$2";        shift 2 ;;
-          --description|-d) description="$2";  shift 2 ;;
-          --project|-p)     project_id="$2";   shift 2 ;;
-          --priority)       priority="$2";     shift 2 ;;
-          --tag)            tag_ids+=("$2");   shift 2 ;;
-          --quiet|-q)       quiet=1;           shift ;;
+          --id)                  task_id_flag="$2"; shift 2 ;;
+          --title|-t)            title="$2";        shift 2 ;;
+          --description|-d)      description="$2";  shift 2 ;;
+          --description-file)    description_file="$2"; shift 2 ;;
+          --project|-p)          project_id="$2";   shift 2 ;;
+          --priority)            priority="$2";     shift 2 ;;
+          --tag)                 tag_ids+=("$2");   shift 2 ;;
+          --quiet|-q)            quiet=1;           shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Mutual exclusion: --description and --description-file cannot both be set
+      [[ -n "$description" && -n "$description_file" ]] && die "--description and --description-file are mutually exclusive"
+      # Read description from file if provided
+      if [[ -n "$description_file" ]]; then
+        [[ -f "$description_file" ]] || die "--description-file: file not found: $description_file"
+        [[ -r "$description_file" ]] || die "--description-file: file not readable: $description_file"
+        description="$(cat "$description_file")"
+      fi
       local _sess="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
 
       # --id path: claim existing task, skip create
@@ -1631,6 +1699,7 @@ USAGE
         [[ -f "$instructions_file" ]] || die "--instructions-file: file not found: $instructions_file"
         [[ -r "$instructions_file" ]] || die "--instructions-file: file not readable: $instructions_file"
         instructions="$(cat "$instructions_file")"
+        [[ -n "$instructions" ]] || die "--instructions-file produced empty content: $instructions_file"
       fi
       need instructions
 
@@ -1679,7 +1748,7 @@ USAGE
         if command -v envsubst &>/dev/null; then
           instructions=$(printf '%s\n' "$instructions" | envsubst)
         elif command -v perl &>/dev/null; then
-          instructions=$(printf '%s' "$instructions" | perl -pe 's/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/my $k=$1//$2; defined $ENV{$k} ? $ENV{$k} : ""/ge')
+          instructions=$(printf '%s' "$instructions" | perl -pe 's!\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)!my $k=$1//$2; defined $ENV{$k} ? $ENV{$k} : ""!ge')
         else
           die "--interpolate-env requires envsubst (gettext) or perl"
         fi
@@ -2055,8 +2124,38 @@ cmd_tags() {
 
 cmd_commits() {
   local sub="${1:-}"; shift || true
-  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create>"; return 0; }
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && { echo "usage: eits commits <list|create|search>"; return 0; }
   case "$sub" in
+    search)
+      # eits commits search <query> [--limit|-n <n>] [--json|-j]
+      local query="${1:-}"; shift || true
+      [[ -z "$query" ]] && die "usage: eits commits search <query> [--limit <n>] [--json]"
+      local limit=20 json_mode=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit|-n|-l) limit="$2"; shift 2 ;;
+          --json|-j)     json_mode=1; shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local qs; qs="q=$(printf '%s' "$query" | jq -Rr @uri)&limit=${limit}"
+      local _resp; _resp=$(_curl "${BASE_URL}/commits?${qs}") || return 1
+      if [[ $json_mode -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      else
+        local count; count=$(printf '%s\n' "$_resp" | jq -r '.count // 0')
+        printf "(%s results)\n" "$count"
+        printf '%s\n' "$_resp" | jq -r \
+          '.commits[] | [
+            (.session_name // (.session_uuid // (.session_id | tostring))),
+            (.session_uuid // ""),
+            (.commit_hash | .[0:8]),
+            (.commit_message // "" | gsub("\n";" ") | .[0:60]),
+            (.created_at // "" | .[0:19])
+          ] | @tsv' \
+          | column -t -s $'\t'
+      fi
+      ;;
     list)
       # eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] [--limit <n>]
       # Agent-centric default: when EITS_SESSION_UUID/EITS_SESSION_ID is set, shows only
@@ -2174,7 +2273,7 @@ cmd_commits() {
       fi
       ;;
     *)
-      echo "usage: eits commits <list|create>"
+      echo "usage: eits commits <list|create|search>"
       ;;
   esac
 }
@@ -2437,7 +2536,7 @@ EOF
     payload=$(jq -n --arg f "$from" --arg t "$to" --arg m "$message" --argjson r "$response_required" \
       '{from_session_id: $f, to_session_id: $t, message: $m, response_required: $r}')
   fi
-  local _dm_resp; _dm_resp=$(_post "/dm" "$payload") || return 1
+  local _dm_resp; _dm_resp=$(_dm_post "/dm" "$payload") || return 1
   # Resolve recipient name — use $to (already known) rather than parsing response
   local _to_name; _to_name=$(_curl "$BASE_URL/sessions/$to" 2>/dev/null \
     | jq -r '.session.name // .name // empty' 2>/dev/null)
@@ -3043,7 +3142,7 @@ Orchestrators should check member_status, not session_status.
 
 --wait:         Block until all members have member_status done or spawn_failed.
                 Polls every 5 seconds and prints a summary line each tick.
-                Exits with 0 when all done, 1 if any spawn_failed.
+                Exits with 0 when all done, 1 if any spawn_failed, 2 if any hung agents.
 --watch [<n>]:  Continuously refresh status every N seconds (default: 5).
                 Clears the screen each tick. Press Ctrl+C to stop.
 --json:         Output raw JSON instead of formatted text (useful for scripting).
@@ -3102,7 +3201,8 @@ HELP
               (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
               (.session_uuid // "—") as $uuid_str |
               (.session_id | tostring) as $sid_str |
-              "  \(.name) (\(.role)) — member:\($member_str) session:\($session_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
+              (if .git_worktree_path then (.git_worktree_path | rtrimstr("/") | split("/") | .[-1]) else "—" end) as $branch_str |
+              "  \(.name) (\(.role)) — member:\($member_str) session:\($session_str) branch:\($branch_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
             )
           else empty end)
         '
@@ -3161,17 +3261,40 @@ HELP
                 (.member_status // .status // "unknown") as $member_str |
                 (.session_uuid // "—") as $uuid_str |
                 (.session_id | tostring) as $sid_str |
+                (if .git_worktree_path then (.git_worktree_path | rtrimstr("/") | split("/") | .[-1]) else "—" end) as $branch_str |
                 (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
-                "  \(.name) (\(.role)) — \($member_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
+                "  \(.name) (\(.role)) — \($member_str) branch:\($branch_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
               )
             '
             [[ "$spawn_failed_count" -gt 0 ]] && return 1 || return 0
+          fi
+          # Check pending members for hung workers before sleeping.
+          # A hung agent is alive but has had no activity for >10 minutes.
+          # Exit 2 immediately rather than polling forever.
+          local hung_agents=()
+          while IFS= read -r member; do
+            local member_status session_uuid member_name
+            member_status=$(echo "$member" | jq -r '.member_status // .status')
+            session_uuid=$(echo "$member" | jq -r '.session_uuid // empty')
+            member_name=$(echo "$member" | jq -r '.name // "unknown"')
+            if [[ "$member_status" != "done" && "$member_status" != "spawn_failed" && -n "$session_uuid" ]]; then
+              local worker_resp worker_hung
+              worker_resp=$(_curl "$BASE_URL/sessions/$session_uuid/worker" 2>/dev/null || echo '{}')
+              worker_hung=$(echo "$worker_resp" | jq -r '.hung // false')
+              if [[ "$worker_hung" == "true" ]]; then
+                hung_agents+=("$member_name")
+              fi
+            fi
+          done < <(echo "$resp" | jq -c '.members // [] | .[]')
+          if [[ "${#hung_agents[@]}" -gt 0 ]]; then
+            printf 'teams status --wait: hung agents detected: %s\n' "$(IFS=', '; echo "${hung_agents[*]}")" >&2
+            return 2
           fi
           sleep 5
         done
       else
         _teams_status_summary
-        printf '\nTip: use --wait to block until all members are done (polls every 5s, exits 0/1).\n' >&2
+        printf '\nTip: use --wait to block until all members are done (polls every 5s, exits 0/1/2).\n' >&2
       fi
       ;;
     update-member)
@@ -3433,25 +3556,117 @@ EOF
 cmd_search() {
   if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat <<EOF
-usage: eits search <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
+usage: eits search <entity> <query> [options]
+       eits search <query> [--type sessions|tasks|notes|messages|commits] [options]
 
-Full-text search across sessions, tasks, and notes in one shot.
+Entity-scoped search (preferred form):
+  eits search messages <query>   Full-text search across session message bodies
+  eits search commits  <query>   ILIKE search across commit messages (returns session context)
+  eits search sessions <query>   Search session names/descriptions
+  eits search tasks    <query>   Search task titles
+  eits search notes    <query>   Search note content
 
-Options:
-  --type <csv>    Entity types to search, comma-separated (default: sessions,tasks,notes)
-  --limit <n>     Max results per entity type (default: 5)
-  --project <id>  Scope to a project
-  --json          Emit combined JSON: {"sessions":[...],"tasks":[...],"notes":[...]}
+Multi-type search (default: all entity types):
+  eits search <query> [--type <csv>] [--limit <n>] [--project <id>] [--json]
+
+Options (all forms):
+  --limit|-n <n>   Max results (default: 5 for multi, 20 for single-entity)
+  --project|-p     Scope to a project (sessions/tasks/notes only)
+  --session        Scope messages to a specific session UUID or ID
+  --include-archived  Include archived sessions (messages only)
+  --json|-j        Raw JSON output
 
 Examples:
-  eits search "auth"
-  eits search "migration" --type tasks,notes --limit 10
+  eits search messages "usage flyout"
+  eits search commits  "usage flyout"
+  eits search "auth" --type tasks,notes --limit 10
   eits search "deploy" --json
 EOF
     return 0
   fi
 
-  local query="" types="sessions,tasks,notes" limit=5 project="" json_mode=0
+  # ── Entity dispatch: eits search <entity> <query> [opts] ──────────────────
+  # If the first arg is a known entity type, delegate to its search directly.
+  local _first="${1:-}"
+  case "$_first" in
+    messages)
+      shift
+      local _query="${1:-}"; [[ -n "$_query" ]] || die "usage: eits search messages <query>"
+      shift
+      local _limit=20 _session="" _archived="" _json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit|-n|-l)        _limit="$2";   shift 2 ;;
+          --session|-s)         _session="$2"; shift 2 ;;
+          --include-archived)   _archived=1;   shift ;;
+          --json|-j)            _json=1;       shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local _qs; _qs="q=$(printf '%s' "$_query" | jq -Rr @uri)&limit=${_limit}"
+      [[ -n "$_session" ]]  && _qs="${_qs}&session_id=$(printf '%s' "$_session" | jq -Rr @uri)"
+      [[ -n "$_archived" ]] && _qs="${_qs}&include_archived=true"
+      local _resp; _resp=$(_curl "${BASE_URL}/messages/search?${_qs}") || return 1
+      if [[ $_json -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      else
+        local _count; _count=$(printf '%s\n' "$_resp" | jq -r '.count')
+        printf '%s\n' "$_resp" | jq -r \
+          '.messages[] | [
+            (.session_name // (.session_id | tostring)),
+            (.session_uuid // ""),
+            .role,
+            (.body_excerpt | gsub("\n";" ") | .[0:60]),
+            (.inserted_at | tostring | .[0:19])
+          ] | @tsv' \
+          | column -t -s $'\t' \
+          | { printf "(%s results)\n" "$_count"; cat; }
+      fi
+      return 0
+      ;;
+    commits)
+      shift
+      local _query="${1:-}"; [[ -n "$_query" ]] || die "usage: eits search commits <query>"
+      shift
+      local _limit=20 _json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit|-n|-l) _limit="$2"; shift 2 ;;
+          --json|-j)     _json=1;     shift ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      local _qs; _qs="q=$(printf '%s' "$_query" | jq -Rr @uri)&limit=${_limit}"
+      local _resp; _resp=$(_curl "${BASE_URL}/commits?${_qs}") || return 1
+      if [[ $_json -eq 1 ]]; then
+        printf '%s\n' "$_resp" | jq .
+      else
+        local _count; _count=$(printf '%s\n' "$_resp" | jq -r '.count // 0')
+        printf '%s\n' "$_resp" | jq -r \
+          '.commits[] | [
+            (.session_name // (.session_uuid // (.session_id | tostring))),
+            (.session_uuid // ""),
+            (.commit_hash | .[0:8]),
+            (.commit_message // "" | gsub("\n";" ") | .[0:60]),
+            (.created_at // "" | .[0:19])
+          ] | @tsv' \
+          | column -t -s $'\t' \
+          | { printf "(%s results)\n" "$_count"; cat; }
+      fi
+      return 0
+      ;;
+    sessions|tasks|notes)
+      # Pass through to multi-type logic with --type forced to this entity
+      shift
+      local _query="${1:-}"; [[ -n "$_query" ]] || die "usage: eits search ${_first} <query>"
+      shift
+      # Rebuild args with --type injected, then fall through to multi-type block
+      set -- "$_query" --type "$_first" "$@"
+      ;;
+  esac
+
+  # ── Multi-type search ──────────────────────────────────────────────────────
+  local query="" types="sessions,tasks,notes,messages,commits" limit=5 project="" json_mode=0
 
   # first non-flag arg is the query
   if [[ -n "${1:-}" && "${1:0:1}" != "-" ]]; then
@@ -3463,7 +3678,7 @@ EOF
       --type)
         [[ $# -lt 2 || "${2:0:1}" == "-" ]] && die "--type requires a value (sessions|tasks|notes)"
         types="$2"; shift 2 ;;
-      --limit|-l)
+      --limit|-l|-n)
         [[ $# -lt 2 || "${2:0:1}" == "-" ]] && die "--limit requires a numeric value"
         [[ "$2" =~ ^[0-9]+$ ]] || die "--limit must be a positive integer, got: $2"
         limit="$2"; shift 2 ;;
@@ -3479,14 +3694,16 @@ EOF
   [[ -z "$query" ]] && die "usage: eits search <query>"
 
   # validate --type tokens strictly — exact token match, no substring
-  local do_sessions=0 do_tasks=0 do_notes=0
+  local do_sessions=0 do_tasks=0 do_notes=0 do_messages=0 do_commits=0
   local _t; IFS=',' read -ra _type_tokens <<< "$types"
   for _t in "${_type_tokens[@]}"; do
     case "$_t" in
       sessions) do_sessions=1 ;;
       tasks)    do_tasks=1 ;;
       notes)    do_notes=1 ;;
-      *) die "unknown type: '$_t' (valid: sessions, tasks, notes)" ;;
+      messages) do_messages=1 ;;
+      commits)  do_commits=1 ;;
+      *) die "unknown type: '$_t' (valid: sessions, tasks, notes, messages, commits)" ;;
     esac
   done
 
@@ -3500,11 +3717,15 @@ EOF
   local f_sessions="${tmp_dir}/sessions.json"
   local f_tasks="${tmp_dir}/tasks.json"
   local f_notes="${tmp_dir}/notes.json"
+  local f_messages="${tmp_dir}/messages.json"
+  local f_commits="${tmp_dir}/commits.json"
 
   # write empty defaults so each file always exists
-  echo '{"sessions":[]}' > "$f_sessions"
-  echo '{"tasks":[]}'    > "$f_tasks"
-  echo '{"notes":[]}'    > "$f_notes"
+  echo '{"sessions":[]}'          > "$f_sessions"
+  echo '{"tasks":[]}'             > "$f_tasks"
+  echo '{"notes":[]}'             > "$f_notes"
+  echo '{"messages":[],"count":0}' > "$f_messages"
+  echo '{"commits":[],"count":0}'  > "$f_commits"
 
   # fan out in parallel — only requested types
   [[ $do_sessions -eq 1 ]] && \
@@ -3513,6 +3734,10 @@ EOF
     ( _curl "${BASE_URL}/tasks?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_tasks" 2>/dev/null ) &
   [[ $do_notes -eq 1 ]] && \
     ( _curl "${BASE_URL}/notes?q=${q_enc}&limit=${limit}${proj_qs}" > "$f_notes" 2>/dev/null ) &
+  [[ $do_messages -eq 1 ]] && \
+    ( _curl "${BASE_URL}/messages/search?q=${q_enc}&limit=${limit}" > "$f_messages" 2>/dev/null ) &
+  [[ $do_commits -eq 1 ]] && \
+    ( _curl "${BASE_URL}/commits?q=${q_enc}&limit=${limit}" > "$f_commits" 2>/dev/null ) &
   wait
 
   if [[ $json_mode -eq 1 ]]; then
@@ -3520,16 +3745,22 @@ EOF
       --slurpfile s "$f_sessions" \
       --slurpfile t "$f_tasks" \
       --slurpfile n "$f_notes" \
+      --slurpfile m "$f_messages" \
+      --slurpfile c "$f_commits" \
       '{
         sessions: ($s[0].sessions // []),
         tasks:    ($t[0].tasks    // []),
-        notes:    ($n[0].notes    // [])
+        notes:    ($n[0].notes    // []),
+        messages: ($m[0].messages // []),
+        commits:  ($c[0].commits  // [])
       }'
   else
-    local s_count t_count n_count
+    local s_count t_count n_count m_count c_count
     s_count=$(jq '[.sessions[]?] | length' "$f_sessions" 2>/dev/null); s_count=${s_count:-0}
     t_count=$(jq '[.tasks[]?]    | length' "$f_tasks"    2>/dev/null); t_count=${t_count:-0}
     n_count=$(jq '[.notes[]?]    | length' "$f_notes"    2>/dev/null); n_count=${n_count:-0}
+    m_count=$(jq '[.messages[]?] | length' "$f_messages" 2>/dev/null); m_count=${m_count:-0}
+    c_count=$(jq '[.commits[]?]  | length' "$f_commits"  2>/dev/null); c_count=${c_count:-0}
 
     [[ $do_sessions -eq 1 && "$s_count" -gt 0 ]] && {
       printf '\n── Sessions (%s) ──────────────────────────────────────────────\n' "$s_count"
@@ -3543,8 +3774,27 @@ EOF
       printf '\n── Notes (%s) ─────────────────────────────────────────────────\n' "$n_count"
       _tbl_notes "$(cat "$f_notes")"
     }
+    [[ $do_messages -eq 1 && "$m_count" -gt 0 ]] && {
+      printf '\n── Messages (%s) ──────────────────────────────────────────────\n' "$m_count"
+      jq -r '.messages[] | [
+        (.session_name // (.session_id | tostring)),
+        (.session_uuid // ""),
+        .role,
+        (.body_excerpt | gsub("\n";" ") | .[0:55]),
+        (.inserted_at | tostring | .[0:19])
+      ] | @tsv' "$f_messages" | column -t -s $'\t'
+    }
+    [[ $do_commits -eq 1 && "$c_count" -gt 0 ]] && {
+      printf '\n── Commits (%s) ───────────────────────────────────────────────\n' "$c_count"
+      jq -r '.commits[] | [
+        (.session_name // (.session_uuid // (.session_id | tostring))),
+        (.commit_hash | .[0:8]),
+        (.commit_message // "" | gsub("\n";" ") | .[0:60]),
+        (.created_at // "" | .[0:19])
+      ] | @tsv' "$f_commits" | column -t -s $'\t'
+    }
 
-    local total=$(( s_count + t_count + n_count ))
+    local total=$(( s_count + t_count + n_count + m_count + c_count ))
     if [[ $total -eq 0 ]]; then
       printf '\nNo results for "%s"\n' "$query"
     else
@@ -3608,13 +3858,14 @@ SEARCH_HELP
         local count; count=$(printf '%s\n' "$_resp" | jq -r '.count')
         printf '%s\n' "$_resp" | jq -r \
           '.messages[] | [
-            (.session_name // .session_uuid // (.session_id | tostring)),
+            (.session_name // (.session_id | tostring)),
+            (.session_uuid // ""),
             .role,
-            (.body_excerpt | gsub("\n";" ") | .[0:80]),
+            (.body_excerpt | gsub("\n";" ") | .[0:60]),
             (.inserted_at | tostring | .[0:19])
           ] | @tsv' \
           | column -t -s $'\t' \
-          | { printf "%-4s  %s\n" "($count results)" ""; cat; }
+          | { printf "(%s results)\n" "$count"; cat; }
       fi
       ;;
     *)
@@ -3764,6 +4015,48 @@ cmd_me() {
   printf '\n'
 }
 
+# ── whoami ────────────────────────────────────────────────────────────────────
+
+cmd_whoami() {
+  local session_uuid="${EITS_SESSION_UUID:-}"
+  local session_id_int="${EITS_SESSION_ID:-}"
+
+  # Resolve session identifier
+  local _session_id="$session_uuid"
+  [[ -n "$_session_id" ]] || _session_id="$session_id_int"
+  [[ -n "$_session_id" ]] || die "whoami: EITS_SESSION_UUID or EITS_SESSION_ID must be set"
+
+  # Get session data
+  local _sess_resp
+  _sess_resp=$(_curl "$BASE_URL/sessions/$_session_id") || return 1
+
+  local _resolved_session_uuid _resolved_session_id _agent_uuid _project_id
+  _resolved_session_uuid=$(echo "$_sess_resp" | jq -r '.uuid // empty')
+  _resolved_session_id=$(echo "$_sess_resp" | jq -r '.session_id // .id // empty')
+  _agent_uuid=$(echo "$_sess_resp" | jq -r '.agent_id // empty')
+  _project_id=$(echo "$_sess_resp" | jq -r '.project_id // empty')
+
+  [[ -n "$_agent_uuid" ]] || die "whoami: agent_id not found in session response"
+  [[ -n "$_resolved_session_id" ]] || die "whoami: session_id not found in session response"
+
+  # Get agent data to resolve agent integer ID
+  local _agent_resp
+  _agent_resp=$(_curl "$BASE_URL/agents/$_agent_uuid") || return 1
+
+  local _agent_id
+  _agent_id=$(echo "$_agent_resp" | jq -r '.id // empty')
+  [[ -n "$_agent_id" ]] || die "whoami: agent id not found in agent response"
+
+  # Return JSON with all identity info
+  jq -n \
+    --arg session_uuid "$_resolved_session_uuid" \
+    --arg session_id "$_resolved_session_id" \
+    --arg agent_uuid "$_agent_uuid" \
+    --arg agent_id "$_agent_id" \
+    --arg project_id "$_project_id" \
+    '{session_uuid: $session_uuid, session_id: ($session_id | tonumber), agent_uuid: $agent_uuid, agent_id: ($agent_id | tonumber), project_id: ($project_id | tonumber)}'
+}
+
 # ── standup ───────────────────────────────────────────────────────────────────
 
 cmd_standup() {
@@ -3886,6 +4179,130 @@ ${report}"
   esac
 }
 
+# ── webhooks ──────────────────────────────────────────────────────────────────
+
+cmd_webhooks() {
+  local sub="${1:-}"; shift || true
+  [[ "$sub" == "--help" || "$sub" == "-h" ]] && {
+    cat <<'WEBHOOKS_HELP'
+usage: eits webhooks <subcommand> [options]
+
+Subcommands:
+  subscribe    --pr <n> [--repo <owner/repo>]
+                 Subscribe the current session to all GitHub webhook events for a PR.
+                 DMs are sent to this session when any event touches that PR.
+
+                 --pr <n>            PR number (required)
+                 --repo <owner/repo> GitHub repo (default: EITS_REPO env var or git remote)
+
+  unsubscribe  --pr <n> [--repo <owner/repo>]
+                 Remove the webhook subscription for a PR.
+
+                 --pr <n>            PR number (required)
+                 --repo <owner/repo> GitHub repo (default: EITS_REPO env var or git remote)
+
+Env vars:
+  EITS_SESSION_UUID  used as subscriber identity (required)
+  EITS_REPO          default repo (owner/repo) if --repo is not specified
+WEBHOOKS_HELP
+    return 0; }
+
+  # Resolve session UUID
+  local _session_uuid="${EITS_SESSION_UUID:-}"
+  [[ -n "$_session_uuid" ]] || die "EITS_SESSION_UUID is not set — cannot determine subscriber identity"
+
+  # Helper: infer repo from EITS_REPO or git remote
+  _infer_repo() {
+    if [[ -n "${EITS_REPO:-}" ]]; then
+      echo "$EITS_REPO"
+      return 0
+    fi
+    local _remote
+    _remote=$(git remote get-url origin 2>/dev/null || true)
+    local _inferred
+    _inferred=$(echo "$_remote" | sed -E 's|.*github\.com[:/]([^/]+/[^/.]+)(\.git)?$|\1|')
+    if [[ -n "$_inferred" && "$_inferred" != "$_remote" ]]; then
+      echo "$_inferred"
+    fi
+  }
+
+  case "$sub" in
+    subscribe)
+      local pr="" repo=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --pr)   pr="$2";   shift 2 ;;
+          --repo) repo="$2"; shift 2 ;;
+          --help|-h)
+            echo "usage: eits webhooks subscribe --pr <n> [--repo <owner/repo>]"
+            return 0 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$pr" ]] || die "--pr is required"
+      if [[ -z "$repo" ]]; then
+        repo=$(_infer_repo)
+        [[ -n "$repo" ]] || die "--repo is required (could not infer from EITS_REPO or git remote)"
+      fi
+
+      local _payload
+      _payload=$(jq -n \
+        --argjson pr_number "$pr" \
+        --arg repository_full_name "$repo" \
+        --arg session_uuid "$_session_uuid" \
+        '{pr_number: $pr_number, repository_full_name: $repository_full_name, session_uuid: $session_uuid}')
+
+      local _result
+      _result=$(_curl -X POST -H "Content-Type: application/json" -d "$_payload" \
+        "$BASE_URL/webhooks/pr_subscriptions") || exit $?
+
+      local _status
+      _status=$(echo "$_result" | jq -r '.id // empty' 2>/dev/null)
+
+      # 409 already-subscribed is treated as success (idempotent)
+      echo "$_result" | jq .
+      echo "subscribed to PR #${pr} in ${repo}" >&2
+      ;;
+
+    unsubscribe)
+      local pr="" repo=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --pr)   pr="$2";   shift 2 ;;
+          --repo) repo="$2"; shift 2 ;;
+          --help|-h)
+            echo "usage: eits webhooks unsubscribe --pr <n> [--repo <owner/repo>]"
+            return 0 ;;
+          *) die "unknown flag: $1" ;;
+        esac
+      done
+      [[ -n "$pr" ]] || die "--pr is required"
+      if [[ -z "$repo" ]]; then
+        repo=$(_infer_repo)
+        [[ -n "$repo" ]] || die "--repo is required (could not infer from EITS_REPO or git remote)"
+      fi
+
+      local _payload
+      _payload=$(jq -n \
+        --argjson pr_number "$pr" \
+        --arg repository_full_name "$repo" \
+        --arg session_uuid "$_session_uuid" \
+        '{pr_number: $pr_number, repository_full_name: $repository_full_name, session_uuid: $session_uuid}')
+
+      _post "/webhooks/pr_subscriptions/unsubscribe" "$_payload"
+      echo "unsubscribed from PR #${pr} in ${repo}" >&2
+      ;;
+
+    ""|--help|-h)
+      echo "usage: eits webhooks <subscribe|unsubscribe> [options]"
+      echo "Run 'eits webhooks --help' for details."
+      ;;
+    *)
+      die "unknown subcommand: $sub (expected: subscribe, unsubscribe)"
+      ;;
+  esac
+}
+
 # ── help ──────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -3928,7 +4345,9 @@ Commands:
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
+  webhooks      subscribe|unsubscribe --pr <n> [--repo <owner/repo>]   subscribe session to PR webhook events (DMs on match)
   me            Print current session/agent/project context and verify server-side
+  whoami        JSON output: {session_uuid, session_id, agent_uuid, agent_id, project_id} — for scripting
 
 Env vars (injected by EITS hooks):
   EITS_SESSION_UUID  current session UUID (default --session / --from / --mine)
@@ -3969,7 +4388,9 @@ case "$cmd" in
   messages)      cmd_messages      "$@" ;;
   codex)         cmd_codex         "$@" ;;
   standup)       cmd_standup      "$@" ;;
-  me|whoami)     cmd_me ;;
+  webhooks)      cmd_webhooks     "$@" ;;
+  me)            cmd_me ;;
+  whoami)        cmd_whoami ;;
   help|--help|-h) usage ;;
   "") usage; exit 0 ;;
   *) die "unknown command: $cmd" ;;

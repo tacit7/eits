@@ -36,6 +36,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :session_sort, :atom, default: :last_activity
   attr :session_name_filter, :string, default: ""
   attr :session_show, :atom, default: :twenty
+  attr :session_scope, :atom, default: :current
+  attr :session_project_visible, :map, default: %{}
+  attr :session_project_collapsed, :any, default: nil
+  attr :projects, :list, default: []
   attr :notification_count, :integer, default: 0
   attr :flyout_agents, :list, default: []
   attr :agent_search, :string, default: ""
@@ -56,6 +60,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_file_error, :string, default: nil
   attr :flyout_usage, :any, default: nil
   attr :rail_modal, :any, default: nil
+  attr :show_new_channel_form, :boolean, default: false
   attr :myself, :any, required: true
 
   def flyout(assigns) do
@@ -192,12 +197,20 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               />
             <% end %>
           <% end %>
+          <%= if @active_section == :chat do %>
+            <.header_action_btn
+              phx-click="toggle_new_channel_form"
+              phx-target={@myself}
+              title="New channel"
+            />
+          <% end %>
         </div>
 
         <%!-- ── Filter zone (section-specific, always visible) ── --%>
         <%= if @active_section == :sessions do %>
           <SessionsSection.sessions_filters
             session_name_filter={@session_name_filter}
+            session_scope={@session_scope}
             myself={@myself}
           />
         <% end %>
@@ -255,7 +268,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <SessionsSection.sessions_content
                 sessions={@flyout_sessions}
                 session_name_filter={@session_name_filter}
+                session_scope={@session_scope}
+                projects={@projects}
+                session_project_visible={@session_project_visible}
+                session_project_collapsed={@session_project_collapsed}
                 sidebar_project={@sidebar_project}
+                myself={@myself}
               />
             <% :tasks -> %>
               <TasksSection.tasks_content
@@ -284,9 +302,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 notes={@flyout_notes}
                 note_search={@note_search}
                 note_parent_type={@note_parent_type}
+                myself={@myself}
               />
             <% :skills -> %>
-              <SkillsSection.skills_content skills={@flyout_skills} />
+              <SkillsSection.skills_content
+                skills={@flyout_skills}
+                skills_route={Helpers.skills_route(@sidebar_project)}
+              />
             <% :teams -> %>
               <TeamsSection.teams_content
                 teams={@flyout_teams}
@@ -300,6 +322,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <AgentsSection.agents_content agents={@flyout_agents} myself={@myself} />
             <% :notifications -> %>
               <Helpers.simple_link href="/notifications" label="Notifications" icon="hero-bell" />
+            <% :iam -> %>
+              <Helpers.simple_link href="/iam/policies" label="Policies" icon="hero-shield-check" />
+              <Helpers.simple_link
+                href="/iam/documents"
+                label="Documents"
+                icon="hero-document-text"
+              />
+              <Helpers.simple_link
+                href="/iam/agent-types"
+                label="Agent Types"
+                icon="hero-users"
+              />
+              <Helpers.simple_link href="/iam/simulator" label="Simulator" icon="hero-beaker" />
             <% :usage -> %>
               <UsageSection.usage_content usage={@flyout_usage} />
             <% :jobs -> %>
@@ -319,10 +354,34 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         </div>
       </div>
 
+      <%!-- ── Channel modal ── --%>
+      <.new_channel_modal
+        :if={@show_new_channel_form}
+        myself={@myself}
+      />
+
       <%!-- ── Rail modal (new task / new prompt) ── --%>
       <.rail_modal
         :if={@rail_modal in [:new_task, :new_prompt]}
         modal={@rail_modal}
+        myself={@myself}
+      />
+
+      <%!-- ── Task detail modal ── --%>
+      <.task_detail_modal
+        :if={match?({:view_task, _, _}, @rail_modal)}
+        task={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
+        index={elem(@rail_modal, 1)}
+        total={length(elem(@rail_modal, 2))}
+        myself={@myself}
+      />
+
+      <%!-- ── Note detail modal ── --%>
+      <.note_detail_modal
+        :if={match?({:view_note, _, _}, @rail_modal)}
+        note={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
+        index={elem(@rail_modal, 1)}
+        total={length(elem(@rail_modal, 2))}
         myself={@myself}
       />
     </div>
@@ -386,6 +445,244 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <button
               type="button"
               phx-click="close_rail_modal"
+              phx-target={@myself}
+              class="px-3 py-1 text-xs text-base-content/55 hover:text-base-content/80 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="px-3 py-1 text-xs bg-primary text-primary-content rounded hover:opacity-90 transition-opacity font-medium"
+            >
+              Create
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    """
+  end
+
+  attr :task, :map, required: true
+  attr :index, :integer, required: true
+  attr :total, :integer, required: true
+  attr :myself, :any, required: true
+
+  defp task_detail_modal(assigns) do
+    task_link =
+      if assigns.task && assigns.task.project_id do
+        "/projects/#{assigns.task.project_id}/tasks?task_id=#{assigns.task.id}"
+      else
+        "/projects"
+      end
+
+    assigns = assign(assigns, :task_link, task_link)
+
+    ~H"""
+    <div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
+      <%!-- Header --%>
+      <div class="flex items-start justify-between gap-2 flex-shrink-0">
+        <span class="text-sm font-semibold text-base-content/85 leading-snug">{@task.title}</span>
+        <button
+          type="button"
+          phx-click="close_rail_modal"
+          phx-target={@myself}
+          class="size-5 flex-shrink-0 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+        >
+          <.icon name="hero-x-mark-mini" class="size-3.5" />
+        </button>
+      </div>
+
+      <%!-- State badge --%>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class={[
+          "w-1.5 h-1.5 rounded-full flex-shrink-0",
+          TasksSection.task_state_dot(@task.state_id)
+        ]} />
+        <span class="text-xs text-base-content/55">{task_state_label(@task.state_id)}</span>
+      </div>
+
+      <%!-- Description --%>
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <%= if @task.description && @task.description != "" do %>
+          <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">
+            {@task.description}
+          </p>
+        <% else %>
+          <p class="text-xs text-base-content/30 italic">No description.</p>
+        <% end %>
+      </div>
+
+      <%!-- Footer: prev/next + counter + open link --%>
+      <div class="flex items-center justify-between pt-1 border-t border-base-content/8 flex-shrink-0">
+        <%!-- Prev / counter / Next --%>
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            phx-click="task_detail_nav"
+            phx-value-dir="prev"
+            phx-target={@myself}
+            disabled={@total <= 1}
+            class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+          >
+            <.icon name="hero-chevron-left-mini" class="size-3.5" />
+          </button>
+          <span class="text-nano text-base-content/35 tabular-nums">
+            {@index + 1}/{@total}
+          </span>
+          <button
+            type="button"
+            phx-click="task_detail_nav"
+            phx-value-dir="next"
+            phx-target={@myself}
+            disabled={@total <= 1}
+            class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+          >
+            <.icon name="hero-chevron-right-mini" class="size-3.5" />
+          </button>
+        </div>
+
+        <%!-- Open link --%>
+        <.link
+          navigate={@task_link}
+          class="px-3 py-1 text-xs bg-primary text-primary-content rounded hover:opacity-90 transition-opacity font-medium"
+        >
+          Open task →
+        </.link>
+      </div>
+    </div>
+    """
+  end
+
+  defp task_state_label(1), do: "To Do"
+  defp task_state_label(2), do: "In Progress"
+  defp task_state_label(3), do: "Done"
+  defp task_state_label(4), do: "In Review"
+  defp task_state_label(_), do: "Unknown"
+
+  attr :note, :map, required: true
+  attr :index, :integer, required: true
+  attr :total, :integer, required: true
+  attr :myself, :any, required: true
+
+  defp note_detail_modal(assigns) do
+    edit_link = "/notes/#{assigns.note.id}/edit"
+    assigns = assign(assigns, :edit_link, edit_link)
+
+    ~H"""
+    <div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
+      <%!-- Header --%>
+      <div class="flex items-start justify-between gap-2 flex-shrink-0">
+        <div class="min-w-0 flex-1">
+          <span class="text-sm font-semibold text-base-content/85 leading-snug block truncate">
+            {note_label(@note)}
+          </span>
+          <span class="text-micro text-base-content/30 uppercase tracking-wide">
+            {@note.parent_type}
+          </span>
+        </div>
+        <button
+          type="button"
+          phx-click="close_rail_modal"
+          phx-target={@myself}
+          class="size-5 flex-shrink-0 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+        >
+          <.icon name="hero-x-mark-mini" class="size-3.5" />
+        </button>
+      </div>
+
+      <%!-- Body --%>
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <%= if @note.body && @note.body != "" do %>
+          <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">
+            {@note.body}
+          </p>
+        <% else %>
+          <p class="text-xs text-base-content/30 italic">No content.</p>
+        <% end %>
+      </div>
+
+      <%!-- Footer: prev/next + counter + edit link --%>
+      <div class="flex items-center justify-between pt-1 border-t border-base-content/8 flex-shrink-0">
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            phx-click="note_detail_nav"
+            phx-value-dir="prev"
+            phx-target={@myself}
+            disabled={@total <= 1}
+            class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+          >
+            <.icon name="hero-chevron-left-mini" class="size-3.5" />
+          </button>
+          <span class="text-nano text-base-content/35 tabular-nums">
+            {@index + 1}/{@total}
+          </span>
+          <button
+            type="button"
+            phx-click="note_detail_nav"
+            phx-value-dir="next"
+            phx-target={@myself}
+            disabled={@total <= 1}
+            class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+          >
+            <.icon name="hero-chevron-right-mini" class="size-3.5" />
+          </button>
+        </div>
+
+        <.link
+          navigate={@edit_link}
+          class="px-3 py-1 text-xs bg-primary text-primary-content rounded hover:opacity-90 transition-opacity font-medium"
+        >
+          Edit note →
+        </.link>
+      </div>
+    </div>
+    """
+  end
+
+  defp note_label(note) do
+    label = note.title || String.slice(note.body || "", 0, 60)
+    if label == "", do: "(empty)", else: label
+  end
+
+  attr :myself, :any, required: true
+
+  defp new_channel_modal(assigns) do
+    ~H"""
+    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+      <div class="bg-base-100 border border-base-content/10 rounded-lg shadow-xl w-72 p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-semibold text-base-content/80">New Channel</span>
+          <button
+            type="button"
+            phx-click="toggle_new_channel_form"
+            phx-target={@myself}
+            class="size-5 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+          >
+            <.icon name="hero-x-mark-mini" class="size-3.5" />
+          </button>
+        </div>
+
+        <form phx-submit="create_channel" phx-target={@myself} class="flex flex-col gap-2">
+          <div>
+            <input
+              type="text"
+              name="channel_name"
+              placeholder="Channel name"
+              autofocus
+              required
+              class="w-full px-2.5 py-1.5 text-sm bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+            />
+            <div class="text-xs text-base-content/40 mt-1">
+              Use lowercase letters, numbers, and hyphens
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              phx-click="toggle_new_channel_form"
               phx-target={@myself}
               class="px-3 py-1 text-xs text-base-content/55 hover:text-base-content/80 transition-colors"
             >

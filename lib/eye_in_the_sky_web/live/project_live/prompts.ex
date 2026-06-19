@@ -64,13 +64,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
           Prompts.list_prompts()
         end
       else
-        project_id_str =
-          socket.assigns.project_id && Integer.to_string(socket.assigns.project_id)
+        project_id = socket.assigns.project_id
 
         if String.trim(query) != "" do
-          Prompts.search_prompts(query, project_id_str)
+          Prompts.search_prompts(query, project_id)
         else
-          Prompts.list_project_prompts(project_id_str)
+          Prompts.list_prompts(project_id: project_id)
         end
       end
 

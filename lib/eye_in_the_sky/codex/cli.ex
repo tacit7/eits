@@ -95,10 +95,11 @@ defmodule EyeInTheSky.Codex.CLI do
   def build_args(caller_opts) do
     opts = Keyword.filter(caller_opts, fn {_k, v} -> v != nil end)
 
+    # Resume uses a sub-subcommand: codex exec resume <thread_id> [flags] [prompt]
+    # New session uses: codex exec [flags] [prompt]
+    # NOT codex exec --resume <id> — that flag does not exist in the Codex CLI.
     resume_id = opts[:resume]
 
-    # Resume uses a subcommand: codex exec resume <thread_id> [flags] [prompt]
-    # New session uses: codex exec [flags] [prompt]
     base_args =
       if resume_id do
         ["exec", "resume", to_string(resume_id)]
@@ -126,11 +127,10 @@ defmodule EyeInTheSky.Codex.CLI do
         if full_auto, do: args ++ ["--full-auto"], else: args
       end
 
-    # Skip git repo check — allow running outside git repos
-    args = args ++ ["--skip-git-repo-check"]
-
     # Inject EITS env vars via shell_environment_policy.set so they're
-    # available to shell commands the agent runs (bypasses default filters)
+    # available to shell commands the agent runs (bypasses default filters).
+    # Must come before --skip-git-repo-check — Codex CLI stops parsing flags
+    # after that flag, causing exit code 2 if -c args follow it.
     env_args =
       [
         {"EITS_SESSION_UUID", opts[:eits_session_uuid]},
@@ -149,6 +149,10 @@ defmodule EyeInTheSky.Codex.CLI do
       end)
 
     args = args ++ env_args
+
+    # Skip git repo check — allow running outside git repos.
+    # Must come after -c env flags (see note above).
+    args = args ++ ["--skip-git-repo-check"]
 
     # Prompt goes last as positional argument
     if prompt = opts[:prompt] do

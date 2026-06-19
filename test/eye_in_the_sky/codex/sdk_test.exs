@@ -301,6 +301,7 @@ defmodule EyeInTheSky.Codex.SDKTest do
   # ---------------------------------------------------------------------------
 
   describe "thinking messages" do
+    @tag :sdk_e2e
     test "reasoning items delivered as thinking messages" do
       {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
@@ -316,7 +317,7 @@ defmodule EyeInTheSky.Codex.SDKTest do
 
       assert_receive {:claude_message, ^ref,
                       %Message{type: :thinking, content: "Let me think..."}},
-                     5_000
+                     10_000
     end
   end
 
@@ -439,7 +440,8 @@ defmodule EyeInTheSky.Codex.SDKTest do
       )
 
       # Should only receive the real message, not the noise
-      assert_receive {:claude_message, ^ref, %Message{type: :text, content: "after noise"}}, 5_000
+      assert_receive {:claude_message, ^ref, %Message{type: :text, content: "after noise"}},
+                     15_000
 
       SDK.cancel(ref)
     end

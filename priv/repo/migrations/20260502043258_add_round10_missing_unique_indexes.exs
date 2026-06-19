@@ -33,20 +33,7 @@ defmodule EyeInTheSky.Repo.Migrations.AddRound10MissingUniqueIndexes do
     # plain (non-unique) index; upsert_session_context/1 needs it UNIQUE for
     # on_conflict: conflict_target to succeed.
     # Drop the non-unique index first if it exists so we can replace it.
-    execute("""
-    DO $$
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM pg_indexes
-        WHERE tablename = 'session_context'
-          AND indexname = 'session_context_session_id_index'
-          AND indexdef NOT LIKE '%UNIQUE%'
-      ) THEN
-        DROP INDEX CONCURRENTLY session_context_session_id_index;
-      END IF;
-    END
-    $$;
-    """)
+    execute("DROP INDEX CONCURRENTLY IF EXISTS session_context_session_id_index")
 
     create_if_not_exists(
       unique_index(:session_context, [:session_id],

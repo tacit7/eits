@@ -6,19 +6,18 @@ end
 defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.Accounts.ApiKey
   alias EyeInTheSky.Teams
 
   import EyeInTheSky.Factory
 
-  defp api_conn do
-    token = "test_api_key_#{System.unique_integer([:positive])}"
-    {:ok, _} = ApiKey.create(token, "test")
-    Phoenix.ConnTest.build_conn() |> Plug.Conn.put_req_header("authorization", "Bearer #{token}")
-  end
-
   setup do
-    {:ok, conn: api_conn()}
+    session = new_session()
+
+    conn =
+      Phoenix.ConnTest.build_conn()
+      |> Plug.Conn.put_req_header("x-eits-session", session.uuid)
+
+    {:ok, conn: conn, session: session}
   end
 
   defp create_team(overrides \\ %{}) do
@@ -169,6 +168,36 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       resp = json_response(conn, 422)
 
       assert resp["error"] == "Validation failed"
+    end
+  end
+
+  # ── Project scope enforcement ─────────────────────────────────────────────
+
+  describe "project scope enforcement" do
+    test "session with nil project_id cannot access a project-scoped team", %{conn: conn} do
+      # Team is scoped to a real project; requester session has no project.
+      project = project_fixture()
+      team = create_team(%{project_id: project.id})
+      session = new_session()
+
+      conn = get(conn, ~p"/api/v1/teams/#{team.id}?session_id=#{session.id}")
+      assert json_response(conn, 403)["error"] =~ "Access denied"
+    end
+
+    test "session with nil project_id cannot create a team bound to an explicit project", %{
+      conn: conn
+    } do
+      project = project_fixture()
+      session = new_session()
+      name = "scope-test-#{uniq()}"
+
+      conn =
+        post(conn, ~p"/api/v1/teams?session_id=#{session.id}", %{
+          "name" => name,
+          "project_id" => "#{project.id}"
+        })
+
+      assert json_response(conn, 403)["error"] =~ "Access denied"
     end
   end
 

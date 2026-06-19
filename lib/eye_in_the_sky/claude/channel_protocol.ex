@@ -42,16 +42,18 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
 
   Accepts a single map:
     %{
-      mode:    :direct | :broadcast | :ambient,
-      channel: %{id: integer, name: string},
-      sender:  string,
-      body:    string
+      mode:        :direct | :broadcast | :ambient,
+      channel:     %{id: integer, name: string},
+      sender:      string,
+      sender_role: string,   # "user" | "agent" (optional, defaults to "agent")
+      body:        string
     }
 
   Output format:
     MSG from Channel #<name> (<id>)
     Mode: <mode>
-    From: <sender>
+    From: <sender> (<role>)
+    Sender Type: <role>
 
     <body>
 
@@ -71,6 +73,7 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
           mode: routing_mode(),
           channel: %{id: integer(), name: String.t()},
           sender: String.t(),
+          sender_role: String.t(),
           body: String.t()
         }) :: String.t()
   def build_prompt(%{
@@ -78,7 +81,8 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
         channel: %{id: channel_id, name: channel_name},
         sender: sender,
         body: body
-      }) do
+      } = params) do
+    sender_role = Map.get(params, :sender_role, "agent")
     mode_str = Atom.to_string(mode)
 
     instruction =
@@ -97,7 +101,8 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
     base = """
     MSG from Channel ##{channel_name} (#{channel_id})
     Mode: #{mode_str}
-    From: #{sender}
+    From: #{format_sender_line(sender, sender_role)}
+    Sender Type: #{sender_role}
 
     #{body}
 
@@ -116,6 +121,12 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
 
     (base <> instruction) |> String.trim_trailing()
   end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers
+  # ---------------------------------------------------------------------------
+
+  defp format_sender_line(sender, role), do: "#{sender} (#{role})"
 
   @doc """
   Returns true if this member should be skipped (i.e., they are the sender).

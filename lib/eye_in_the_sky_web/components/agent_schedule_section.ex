@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
   @moduledoc """
-  LiveComponent for the Schedule Agents tab.
+  LiveComponent for the Recurring Agents tab.
 
   Owns all agent-schedule state (prompts, prompt_job_map, scheduling_prompt,
   scheduling_job, orphaned_jobs, projects) and handles the schedule event

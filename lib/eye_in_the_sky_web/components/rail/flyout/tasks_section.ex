@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
 
   def tasks_content(assigns) do
     ~H"""
-    <.task_row :for={t <- @tasks} task={t} />
+    <.task_row :for={t <- @tasks} task={t} myself={@myself} />
 
     <%= if @tasks == [] do %>
       <% filtering = @task_search != "" or not is_nil(@state_filter) %>
@@ -83,21 +83,20 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
   end
 
   attr :task, :map, required: true
+  attr :myself, :any, required: true
 
   def task_row(assigns) do
     ~H"""
-    <.link
-      navigate={
-        if @task.project_id,
-          do: "/projects/#{@task.project_id}/tasks?task_id=#{@task.id}",
-          else: "/projects"
-      }
+    <button
+      phx-click="open_task_detail"
+      phx-value-task_id={@task.id}
+      phx-target={@myself}
       data-vim-flyout-item
-      class="flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+      class="w-full flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
     >
       <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0 mt-px", task_state_dot(@task.state_id)]} />
       <span class="truncate">{@task.title}</span>
-    </.link>
+    </button>
     """
   end
 
@@ -116,14 +115,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
     """
   end
 
-  def nav_links(%{section: :tasks} = assigns) do
-    ~H"""
-    <Helpers.simple_link
-      href={"/projects/#{@project.id}/kanban"}
-      label={"#{@project.name} Board"}
-      icon="hero-squares-2x2"
-    />
-    """
+  def nav_links(%{section: :tasks}) do
+    nil
   end
 
   def nav_links(%{section: :prompts} = assigns) do

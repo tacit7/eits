@@ -7,6 +7,8 @@ defmodule EyeInTheSky.Claude.StreamAssembler do
   where events are PubSub-ready messages the caller broadcasts.
   """
 
+  @behaviour EyeInTheSky.Claude.StreamAssemblerBehavior
+
   alias EyeInTheSky.Claude.Message
 
   @type event ::

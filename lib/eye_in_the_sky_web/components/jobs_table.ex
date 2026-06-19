@@ -34,41 +34,110 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   attr :last_failed_runs, :map, required: true
   attr :show_origin, :boolean, default: false
   attr :target, :any, default: nil
+  attr :scope, :string, default: nil, doc: "Context scope: 'project', 'global', or 'overview'"
+  attr :project_name, :string, default: nil, doc: "Project name for project-scoped views"
+
+  attr :bulk_selected_jobs, :any,
+    default: nil,
+    doc: "MapSet of selected job IDs for bulk operations"
+
+  attr :last_n_runs_map, :map, default: %{}, doc: "Map of job_id to list of recent run structs"
 
   def jobs_table(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :selected_count,
+        if assigns.bulk_selected_jobs do
+          MapSet.size(assigns.bulk_selected_jobs)
+        else
+          0
+        end
+      )
+
     ~H"""
     <%= if @jobs != [] do %>
+      <%!-- Bulk Action Bar --%>
+      <%= if @selected_count > 0 do %>
+        <div class="mb-4 flex flex-wrap items-center gap-3 bg-base-100 border border-base-300 rounded-lg p-3 sm:p-4">
+          <span class="text-sm font-medium">{@selected_count} selected</span>
+          <div class="flex flex-wrap gap-2 ml-auto">
+            <button
+              class="btn btn-sm btn-outline"
+              phx-click="bulk_enable"
+              phx-value-scope={@scope}
+              phx-target={@target}
+              title="Enable selected jobs"
+            >
+              <.icon name="hero-check" class="size-3.5" /> Enable
+            </button>
+            <button
+              class="btn btn-sm btn-outline"
+              phx-click="bulk_disable"
+              phx-value-scope={@scope}
+              phx-target={@target}
+              title="Disable selected jobs"
+            >
+              <.icon name="hero-x-mark" class="size-3.5" /> Disable
+            </button>
+            <button
+              class="btn btn-sm btn-ghost"
+              phx-click="clear_bulk_selection"
+              phx-target={@target}
+              title="Clear selection"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      <% end %>
+
       <div class="md:hidden space-y-3">
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
-          <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)}"}>
-            <button
-              class="w-full text-left"
-              phx-click="expand_job"
-              phx-value-id={job.id}
-              phx-target={@target}
-            >
-              <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <div class="flex items-center gap-1.5">
-                    <h3 class="font-medium text-sm truncate">{job.name}</h3>
-                    <%= if job_state == :running do %>
-                      <span class="badge badge-warning badge-xs animate-pulse shrink-0">running</span>
+          <% is_selected = @bulk_selected_jobs && MapSet.member?(@bulk_selected_jobs, job.id) %>
+          <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)} #{if is_selected, do: "ring-2 ring-primary"}"}>
+            <div class="flex items-start gap-3">
+              <input
+                type="checkbox"
+                class="checkbox checkbox-sm mt-1"
+                checked={is_selected}
+                phx-click="toggle_job_select"
+                phx-value-id={job.id}
+                phx-target={@target}
+              />
+              <button
+                class="w-full text-left"
+                phx-click="expand_job"
+                phx-value-id={job.id}
+                phx-target={@target}
+              >
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <h3 class="font-medium text-sm truncate">{job.name}</h3>
+                      <%= if job_state == :running do %>
+                        <span class="badge badge-warning badge-xs animate-pulse shrink-0">
+                          running
+                        </span>
+                      <% end %>
+                    </div>
+                    <%= if job.description do %>
+                      <p class="text-mini text-base-content/60 mt-0.5 truncate">{job.description}</p>
                     <% end %>
+                    <p class="text-mini font-mono text-base-content/50 mt-1 truncate">
+                      {format_schedule(job)}
+                      <span class="text-base-content/30 not-italic ml-1">
+                        {job.timezone || "UTC"}
+                      </span>
+                    </p>
                   </div>
-                  <%= if job.description do %>
-                    <p class="text-mini text-base-content/60 mt-0.5 truncate">{job.description}</p>
-                  <% end %>
-                  <p class="text-mini font-mono text-base-content/50 mt-1 truncate">
-                    {format_schedule(job)}
-                    <span class="text-base-content/30 not-italic ml-1">{job.timezone || "UTC"}</span>
-                  </p>
+                  <span class="badge badge-xs badge-ghost">
+                    {type_label(job.job_type)}
+                  </span>
                 </div>
-                <span class="badge badge-xs badge-ghost">
-                  {type_label(job.job_type)}
-                </span>
-              </div>
-            </button>
+              </button>
+            </div>
 
             <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
             <%= if mobile_failed_run do %>
@@ -185,6 +254,19 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
         <table class="table table-sm">
           <thead>
             <tr>
+              <th style="width: 32px;">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm"
+                  checked={
+                    @bulk_selected_jobs && MapSet.size(@bulk_selected_jobs) > 0 &&
+                      Enum.all?(@jobs, &MapSet.member?(@bulk_selected_jobs, &1.id))
+                  }
+                  phx-click="select_all_jobs"
+                  phx-value-scope={@scope}
+                  phx-target={@target}
+                />
+              </th>
               <th>Name</th>
               <%= if @show_origin do %>
                 <th>Origin</th>
@@ -195,13 +277,25 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <th>Last Run</th>
               <th>Next Run</th>
               <th>Runs</th>
+              <th>Trend</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <%= for job <- @jobs do %>
               <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
-              <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"}"}>
+              <% is_selected = @bulk_selected_jobs && MapSet.member?(@bulk_selected_jobs, job.id) %>
+              <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"} #{if is_selected, do: "bg-primary/10"}"}>
+                <td style="width: 32px;">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    checked={is_selected}
+                    phx-click="toggle_job_select"
+                    phx-value-id={job.id}
+                    phx-target={@target}
+                  />
+                </td>
                 <td
                   class={"cursor-pointer #{row_border_class(row_state)}"}
                   phx-click="expand_job"
@@ -276,6 +370,24 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   {format_relative_time(job.next_run_at)}
                 </td>
                 <td class="text-xs">{job.run_count || 0}</td>
+                <td class="text-xs">
+                  <div class="flex items-center gap-0.5 flex-wrap">
+                    <%= for run <- (Map.get(@last_n_runs_map, job.id) || []) |> Enum.reverse() do %>
+                      <% run_color =
+                        case run.status do
+                          "completed" -> "bg-success"
+                          "failed" -> "bg-error"
+                          "running" -> "bg-warning"
+                          _ -> "bg-base-300"
+                        end %>
+                      <span
+                        class={"inline-block w-2 h-2 rounded-full #{run_color}"}
+                        title={run.status}
+                      >
+                      </span>
+                    <% end %>
+                  </div>
+                </td>
                 <td>
                   <div class="flex items-center gap-1">
                     <button
@@ -316,7 +428,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               </tr>
               <%= if @expanded_job_id == job.id do %>
                 <tr>
-                  <td colspan={if @show_origin, do: "9", else: "8"} class="bg-base-200 p-4">
+                  <td colspan={if @show_origin, do: "10", else: "9"} class="bg-base-200 p-4">
                     <div class="text-sm font-medium mb-2">Recent Runs</div>
                     <%= if @runs != [] do %>
                       <table class="table table-xs">
@@ -354,9 +466,39 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
         </table>
       </div>
     <% else %>
-      <div class="text-center py-8 rounded-lg border border-base-300">
-        <.icon name="hero-calendar" class="size-6 text-base-content/30 mx-auto mb-2" />
-        <p class="text-sm text-base-content/50">No scheduled jobs</p>
+      <div class="text-center py-12 rounded-lg border border-base-300 bg-base-50 flex flex-col items-center">
+        <.icon name="hero-clock" class="size-12 text-base-content/20 mb-4" />
+        <h3 class="text-lg font-semibold text-base-content mb-2">No scheduled jobs yet</h3>
+        <p class="text-sm text-base-content/60 max-w-md mb-4">
+          Scheduled jobs run Claude agents automatically on a cron schedule.
+          <%= if @scope == "project" do %>
+            This project has no jobs yet.
+          <% else %>
+            Use them for recurring tasks like daily reports, monitoring, or automated reviews.
+          <% end %>
+        </p>
+        <p class="text-xs text-base-content/50 max-w-md mb-6">
+          <%= case @scope do %>
+            <% "project" -> %>
+              These jobs will run only for <strong>{@project_name}</strong>.
+            <% "global" -> %>
+              Global jobs run across all projects.
+            <% _ -> %>
+              You can create project-scoped or global jobs.
+          <% end %>
+        </p>
+        <%= if @target do %>
+          <div class="flex flex-col gap-2 sm:flex-row items-center justify-center">
+            <button
+              class="btn btn-primary btn-sm min-h-[44px]"
+              phx-click="new_job"
+              phx-value-scope={@scope || ""}
+              phx-target={@target}
+            >
+              <.icon name="hero-plus" class="size-4" /> Create Job
+            </button>
+          </div>
+        <% end %>
       </div>
     <% end %>
     """

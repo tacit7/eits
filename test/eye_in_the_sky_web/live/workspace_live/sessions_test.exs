@@ -8,6 +8,13 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.SessionsTest do
   alias EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions
 
   setup %{user: user} do
+    # These tests exercise the authenticated LiveView path. Override disable_auth
+    # so AuthHook reads from session (not DISABLE_AUTH env var) even in dev envs
+    # where DISABLE_AUTH=true is set for the dev server.
+    prev_disable_auth = Application.get_env(:eye_in_the_sky, :disable_auth)
+    Application.put_env(:eye_in_the_sky, :disable_auth, false)
+    on_exit(fn -> Application.put_env(:eye_in_the_sky, :disable_auth, prev_disable_auth) end)
+
     workspace = Workspaces.default_workspace_for_user!(user)
 
     n = Factory.uniq()

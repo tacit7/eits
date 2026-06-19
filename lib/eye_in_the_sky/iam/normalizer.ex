@@ -111,6 +111,12 @@ defmodule EyeInTheSky.IAM.Normalizer do
 
   defp coerce_event_key(k) when is_atom(k), do: k
 
+  # CamelCase strings from Claude hooks (e.g. "PostToolUse", "PreToolUse", "Stop")
+  defp coerce_event_key("PostToolUse"), do: :post_tool_use
+  defp coerce_event_key("PreToolUse"), do: :pre_tool_use
+  defp coerce_event_key("Stop"), do: :stop
+  defp coerce_event_key("UserPromptSubmit"), do: :user_prompt_submit
+
   defp coerce_event_key(k) when is_binary(k) do
     String.to_existing_atom(k)
   rescue

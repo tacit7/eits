@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
           <% column_tasks = Map.get(@tasks_by_state, state.id, []) %>
           <% task_count = length(column_tasks) %>
           <div
-            class="flex-shrink-0 w-[84vw] max-w-80 md:w-72 flex flex-col h-full snap-start"
+            class="flex-shrink-0 w-[84vw] max-w-80 md:w-72 flex flex-col h-full snap-start min-h-0"
             data-column-id={state.id}
           >
             <%!-- Column header --%>
@@ -161,7 +161,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                 <button
                   phx-click="show_quick_add"
                   phx-value-state_id={state.id}
-                  class="mt-1 w-full flex items-center gap-1.5 px-2 py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-mini text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors"
+                  class="mt-1 w-full flex items-center justify-center sm:justify-start gap-1.5 px-2 py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-mini text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors min-h-[44px]"
                 >
                   <.icon name="hero-plus-mini" class="size-4 sm:w-3.5 sm:h-3.5" />
                   <span>Add task</span>

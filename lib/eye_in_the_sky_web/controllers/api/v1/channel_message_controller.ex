@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   alias EyeInTheSky.{AsyncTask, ChannelMessages, Sessions, Teams}
   alias EyeInTheSky.Claude.ChannelFanout
   alias EyeInTheSky.Messaging.DMDelivery
-  alias EyeInTheSky.Utils.ToolHelpers
+  alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
@@ -20,9 +20,9 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   def create(conn, %{"channel_id" => channel_id} = params) do
     with :ok <- validate_required(params["session_id"], "session_id"),
          :ok <- validate_required(params["body"], "body") do
-      case ToolHelpers.resolve_session_int_id(params["session_id"]) do
+      case SessionResolver.resolve_int(params["session_id"]) do
         {:ok, int_id} -> do_create(conn, channel_id, int_id, params)
-        {:error, reason} -> {:error, :not_found, reason}
+        {:error, :not_found} -> {:error, :not_found, "Session not found"}
       end
     end
   end
@@ -82,8 +82,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
 
     case ChannelMessages.create_channel_message(attrs) do
       {:ok, msg} ->
-        notify_channel_members(channel_id, int_id, body)
-        ChannelFanout.fanout_all(channel_id, body, int_id)
+        notify_channel_members(channel_id, int_id, body, attrs.sender_role)
+        ChannelFanout.fanout_all(channel_id, body, int_id, [], nil, attrs.sender_role)
 
         if team_id = parse_int(params["broadcast_to_team_id"]) do
           broadcast_to_team(channel_id, int_id, team_id, body)
@@ -99,40 +99,60 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   end
 
   # Fan out DMs to channel members with notifications="all", excluding the sender.
-  defp notify_channel_members(channel_id, sender_session_id, body) do
-    AsyncTask.start(fn ->
-      members =
-        EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
+  #
+  # Skips sessions that will receive a direct/broadcast MSG prompt from
+  # ChannelFanout.fanout_all — sending both is redundant and confusing for agents.
+  # Specifically:
+  #   - @all → skip all notifications (every member gets a broadcast MSG prompt)
+  #   - @{session_id} mentions → skip those sessions (they get a direct MSG prompt)
+  # Ambient-only members still receive the channel notification.
+  defp notify_channel_members(channel_id, sender_session_id, body, sender_role) do
+    mention_all = Regex.match?(~r/@all\b/i, body)
 
-      sender_label = get_sender_name(sender_session_id)
+    # If @all, ChannelFanout delivers broadcast MSG prompts to everyone — skip all DM notifications.
+    unless mention_all do
+      mentioned_ids =
+        Regex.scan(~r/@(\d+)/, body)
+        |> Enum.map(fn [_, id_str] -> String.to_integer(id_str) end)
+        |> MapSet.new()
 
-      for member <- members do
-        dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
+      AsyncTask.start(fn ->
+        members =
+          EyeInTheSky.Channels.list_members_for_notification(channel_id, sender_session_id)
 
-        case DMDelivery.deliver_and_persist(
-               member.session_id,
-               sender_session_id,
-               dm_body,
-               %{channel_id: channel_id, channel_notification: true}
-             ) do
-          {:ok, _} ->
-            :ok
+        sender_label = get_sender_label(sender_session_id, sender_role)
 
-          {:error, reason} ->
-            Logger.warning(
-              "channel notify failed for session #{member.session_id}: #{inspect(reason)}"
-            )
+        for member <- members,
+            not MapSet.member?(mentioned_ids, member.session_id) do
+          dm_body = "Channel notification [channel:#{channel_id}] from #{sender_label}: #{body}"
+          deliver_channel_notification(member.session_id, sender_session_id, dm_body, channel_id)
         end
-      end
-    end)
+      end)
+    end
 
     :ok
   end
 
-  defp get_sender_name(session_id) do
-    case Sessions.get_session(session_id) do
-      {:ok, session} -> session.name || "session:#{session_id}"
-      _ -> "session:#{session_id}"
+  defp get_sender_label(session_id, role) do
+    name =
+      case Sessions.get_session(session_id) do
+        {:ok, session} -> session.name || "session:#{session_id}"
+        _ -> "session:#{session_id}"
+      end
+
+    "#{name} (#{role})"
+  end
+
+  defp deliver_channel_notification(session_id, sender_session_id, dm_body, channel_id) do
+    case DMDelivery.deliver_and_persist(session_id, sender_session_id, dm_body, %{
+           channel_id: channel_id,
+           channel_notification: true
+         }) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("channel notify failed for session #{session_id}: #{inspect(reason)}")
     end
   end
 
@@ -152,7 +172,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
 
   defp do_team_fanout(members, sender_session_id, team, channel_id, body) do
     if Enum.any?(members, &(&1.session_id == sender_session_id)) do
-      sender_label = get_sender_name(sender_session_id)
+      sender_label = get_sender_label(sender_session_id, "agent")
 
       dm_body =
         "Broadcast from #{sender_label} [team:#{team.name}] [channel:#{channel_id}] #{body}"

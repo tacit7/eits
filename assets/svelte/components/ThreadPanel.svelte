@@ -23,6 +23,7 @@
   function senderLabel(message) {
     if (!message) return ''
     if (message.sender_role === 'user') return 'You'
+    if (message.sender_role === 'system') return 'System'
     return message.session_name || `@${message.session_id}` || message.provider || 'Agent'
   }
 

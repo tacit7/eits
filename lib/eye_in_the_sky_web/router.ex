@@ -146,6 +146,7 @@ defmodule EyeInTheSkyWeb.Router do
       live "/keybindings", OverviewLive.Keybindings, :index
       live "/skills", OverviewLive.Skills, :index
       live "/agents", OverviewLive.Agents, :index
+      live "/prompts", OverviewLive.Prompts, :index
       live "/config", OverviewLive.Config, :index
       live "/notifications", OverviewLive.Notifications, :index
       live "/settings", OverviewLive.Settings, :index
@@ -179,6 +180,13 @@ defmodule EyeInTheSkyWeb.Router do
       live "/iam/policies", IAMLive.Policies, :index
       live "/iam/policies/new", IAMLive.PolicyNew, :new
       live "/iam/policies/:id/edit", IAMLive.PolicyEdit, :edit
+      live "/iam/documents", IAMLive.PolicyDocuments, :index
+      live "/iam/documents/new", IAMLive.PolicyDocumentNew, :new
+      live "/iam/documents/:id", IAMLive.PolicyDocumentShow, :show
+      live "/iam/documents/:id/edit", IAMLive.PolicyDocumentEdit, :edit
+      live "/iam/agent-types", IAMLive.AgentTypes, :index
+      live "/iam/agent-types/show", IAMLive.AgentTypeShow, :show
+      live "/bookmarks", BookmarkLive.Index, :index
     end
   end
 
@@ -190,10 +198,13 @@ defmodule EyeInTheSkyWeb.Router do
   end
 
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
-    pipe_through :api
+    pipe_through :accepts_json
 
-    # Health check
     get "/health", HealthController, :index
+  end
+
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through :api
 
     # Sessions
     get "/sessions", SessionController, :index
@@ -210,6 +221,7 @@ defmodule EyeInTheSkyWeb.Router do
     post "/sessions/:uuid/tool-events", SessionController, :tool_event
     get "/sessions/:uuid/context", SessionController, :get_context
     patch "/sessions/:uuid/context", SessionController, :update_context
+    get "/sessions/:uuid/messages", SessionMessageController, :index
     get "/sessions/:uuid/tasks", TaskController, :list_for_session
 
     # Timers
@@ -302,12 +314,39 @@ defmodule EyeInTheSkyWeb.Router do
     post "/teams/:team_id/broadcast", TeamController, :broadcast
   end
 
+  # GitHub PR subscriptions — agents subscribe to PR events
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through :api
+
+    post "/webhooks/pr_subscriptions", PrSubscriptionController, :subscribe
+    post "/webhooks/pr_subscriptions/unsubscribe", PrSubscriptionController, :unsubscribe
+  end
+
+  # Bookmarks — in EyeInTheSkyWeb namespace (not Api.V1)
+  scope "/api/v1", EyeInTheSkyWeb do
+    pipe_through :api
+
+    get "/bookmarks", BookmarkController, :index
+    post "/bookmarks", BookmarkController, :create
+    get "/bookmarks/check", BookmarkController, :check
+    get "/bookmarks/:id", BookmarkController, :show
+    patch "/bookmarks/:id", BookmarkController, :update
+    delete "/bookmarks/:id", BookmarkController, :delete
+  end
+
   # IAM hook endpoint — unauthenticated (hooks run in Claude CLI process with no user session)
   scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
     pipe_through [:accepts_json]
 
     post "/iam/decide", IAMController, :decide
     post "/iam/hook", IAMController, :decide
+  end
+
+  # GitHub webhook endpoint — unauthenticated; auth via HMAC per-controller
+  scope "/api/v1", EyeInTheSkyWeb.Api.V1 do
+    pipe_through [:accepts_json]
+
+    post "/webhooks/github", GithubWebhookController, :receive
   end
 
   # Unauthenticated settings reads (read-only, no sensitive data)

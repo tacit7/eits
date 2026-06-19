@@ -64,8 +64,12 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.OrchestratorTimers.Server,
           # IAM policy cache (ETS-backed, single-node)
           EyeInTheSky.IAM.PolicyCache,
+          # Registry for persistent PTY sessions (keyed by session_key string)
+          {Registry, keys: :unique, name: EyeInTheSky.Terminal.PtyRegistry},
           # DynamicSupervisor for per-session PTY processes
           EyeInTheSky.Terminal.PtySupervisor,
+          # Session store with TTL-based expiration (prevents unbounded ETS growth)
+          EyeInTheSky.SessionStore,
           # In-process cache for Anthropic rate-limit API responses (5-min TTL)
           EyeInTheSky.Claude.RateLimitClient
         ]
@@ -93,7 +97,9 @@ defmodule EyeInTheSky.Application do
           # React to session lifecycle events and update team member state
           EyeInTheSky.Teams.Subscriber,
           # Poll for external task changes from spawned agents
-          EyeInTheSky.Tasks.Poller
+          EyeInTheSky.Tasks.Poller,
+          # Process incoming GitHub webhook deliveries
+          EyeInTheSky.Github.WebhookDispatcher
         ]
       else
         []

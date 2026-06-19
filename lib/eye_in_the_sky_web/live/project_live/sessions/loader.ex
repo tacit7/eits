@@ -238,7 +238,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
   defp maybe_attach_project_name(session, socket) do
     if socket.assigns.scope == :all do
       names_by_id =
-        Projects.list_projects()
+        socket.assigns.projects
         |> Map.new(&{&1.id, &1.name})
 
       Map.put(session, :project_name, Map.get(names_by_id, session.project_id))

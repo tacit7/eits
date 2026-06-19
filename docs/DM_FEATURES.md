@@ -180,6 +180,50 @@ mount/3 (single with chain)
 
 ---
 
+## Channel Marks as Read on Open
+
+**Commit:** `be35e9a4`
+
+When a user switches to a channel in the chat interface, the channel is automatically marked as read in the database.
+
+**Behavior:**
+- Calling `load_channel_assigns/5` when opening a channel triggers `Channels.mark_as_read/2`
+- Unread badge clears immediately without waiting for a PubSub update
+- Active channel's unread count is zeroed before being passed to socket assigns and Rail component updates
+- Ensures the UI badge reflects read status immediately on channel switch
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/live/chat_live.ex` — Calls `Channels.mark_as_read/2` in `load_channel_assigns/5` when `connected?/1` is true
+- Updates `unread_counts` map to zero out the active channel before sending to Rail sidebar via `send_update/2`
+- Guards against unconnected mounts (dead render) and missing channel/session IDs
+
+---
+
+## Suppress Channel Notification DM for @mentioned and @all Sessions
+
+**Commit:** `e1346ed9`
+
+Channel notification DMs are suppressed for sessions that receive direct or broadcast message prompts from `ChannelFanout`, preventing duplicate delivery in the same turn.
+
+**Behavior:**
+- **@all mentions:** All members receive a broadcast MSG prompt from `ChannelFanout.fanout_all/2` — skip all channel notification DMs
+- **@{session_id} mentions:** Those specific sessions receive a direct MSG prompt from `ChannelFanout.fanout_all/2` — skip their notification DMs
+- **Ambient-only members:** Still receive the channel notification DM (they get an ambient MSG prompt, not a direct/broadcast)
+- Regex scans message body for `@all\b` pattern and `@(\d+)` mentions to identify suppressed sessions
+
+**Problem Solved:**
+- Before: `notify_channel_members/3` DMed all members AND `ChannelFanout` sent MSG prompts to the same sessions
+- After: Duplicate delivery eliminated; agents no longer receive the same message twice in the same turn
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/channel_message_controller.ex` — `notify_channel_members/3` now:
+  - Detects `@all` pattern and skips all DM notifications if matched
+  - Scans for `@(\d+)` session IDs and builds a `MapSet` of mentioned IDs
+  - Filters notification recipients to exclude mentioned sessions
+  - Wrapped in `AsyncTask.start/1` so ambient notifications still process asynchronously
+
+---
+
 ## New Agent Drawer
 
 **Trigger:** "New Agent" button in sidebar or task list.
@@ -472,18 +516,27 @@ The DM composer supports inline autocomplete for file paths and agent names, ena
 - `assets/js/hooks/slash_command_popup.js` — Debounce + stale-reply guard (`fileRequestSeq`)
 - Tests: 20 Elixir tests in `file_autocomplete_test.exs`, 18 JS tests in `slash_command_popup_file.test.js`
 
-### @@ Agent Autocomplete
+### @@ Agent Autocomplete (and # Shortcut)
 
-**Trigger:** Type `@@` to autocomplete agent names from the current workspace.
+**Trigger:** Type `@@` or `#` to autocomplete agent names from the current workspace.
 
 **Behavior:**
 - Client-side autocomplete (no server call)
 - Filters agent list by typed prefix
-- Selects and inserts agent name into message
+- Selecting an agent inserts `@@slug` (with `@@` trigger) or `#slug` (with `#` trigger)
+- `@@` and `#` are equivalent shortcuts; use whichever is more natural in context
 - Remapped from original `@` trigger to avoid conflict with file autocomplete
 
+**Agent Slug Population:**
+- Uses `Agents.list_agents_for_autocomplete/0` to preload `:project` relationship
+- Calls `populate_project_name/1` to set meaningful slugs based on project context
+- Excludes archived agents, capped at 200 rows, sorted by most recent first
+- Ensures slugs are not nil (which would fall back to description or `agent-<id>`)
+
 **Implementation:**
-- Client-side filtering in `assets/js/hooks/slash_command_popup.js`
+- `assets/js/hooks/slash_command_popup.js` — Detects `#` regex, routes to `slashFilter('agent')`, passes `triggerChar` to renderer
+- `assets/js/hooks/slash_renderer.js` — Displays correct prefix (`#` or `@`) on agent rows based on trigger
+- `lib/eye_in_the_sky/agents.ex` — `list_agents_for_autocomplete/0` provides lightweight query with project preload
 - Works without server-side queries; uses agents already loaded on the page
 
 ---
@@ -499,7 +552,7 @@ The DM composer supports inline autocomplete for file paths and agent names, ena
 | `Cmd/Ctrl + T` | New task |
 | `ArrowLeft / ArrowRight` (on splitter) | Resize editor panel by 20px |
 | `@` | Trigger file autocomplete in composer |
-| `@@` | Trigger agent autocomplete in composer |
+| `@@` or `#` | Trigger agent autocomplete in composer |
 
 ---
 
@@ -1158,6 +1211,39 @@ Duplicate DM messages on send have been eliminated. Previously, `AgentManager.se
 
 ---
 
+## Messages.send_to_session/2: Atomic Session Resolution & DM Send
+
+**Commit:** `6945108f`
+
+The `Messages.send_to_session/2` function atomically resolves a session by ID or UUID and sends a message to it within a database transaction. This extracts transaction logic from the LiveView layer into the Messages context, maintaining proper separation of concerns.
+
+**Function signature:**
+```elixir
+@spec send_to_session(String.t() | integer(), String.t(), Keyword.t()) ::
+  {:ok, Sessions.Session.t()} | {:error, any()}
+def send_to_session(session_id, body, _opts \\ [])
+```
+
+**Parameters:**
+- `session_id`: Session UUID (string) or numeric session ID (integer)
+- `body`: Message body text (string)
+- `opts`: Optional keyword list (reserved for future use)
+
+**Behavior:**
+1. Wraps the operation in `Repo.transaction/1`
+2. Resolves the session using `Sessions.resolve/1` (handles both UUID and integer ID formats)
+3. Sends a message with `sender_role="user"` and `recipient_role="agent"` via `send_message/1`
+4. Returns `{:ok, session}` on success, `{:error, reason}` on failure
+5. Automatic rollback on error via `Repo.rollback/1`
+
+**Use case:** Centralized API for sending DMs to sessions—eliminates transaction boilerplate in LiveView and command handlers. Callers no longer need to wrap session resolution and message creation in manual transactions.
+
+**Note:** The `AgentManager.continue_session` call remains in the LiveView layer (via `floating_chat_live`) to preserve orchestration layer separation. This function handles only the message persistence, not session state transitions.
+
+**Implementation file:** `lib/eye_in_the_sky/messages.ex`
+
+---
+
 ## DM Sidebar Tab Default
 
 **Commit:** `81f211e4`
@@ -1259,6 +1345,96 @@ The `AutoScroll` hook preserves the auto-scroll behavior when the DM message lis
 
 **Files:**
 - `assets/js/hooks/auto_scroll.js` — `beforeUpdate`, `updated`, scroll listener, MutationObserver logic
+
+---
+
+## DM Page Loading Skeleton on Mount
+
+**Commit:** `95d0d1d6`
+
+The DM page now displays a YouTube-style shimmer skeleton while the session file sync completes, instead of messages appearing incrementally. This prevents the "one by one" loading effect caused by a stream reset mid-render.
+
+**Mount flow:**
+
+1. **Initial render** (dead and connected both start here):
+   - `assign_ui_flags/2` sets `syncing: true`
+   - MessagesTab checks `@syncing` and renders skeleton instead of messages
+   - `:grouped_messages` stream is initialized empty (critical for later stream_insert/stream reset calls)
+
+2. **Connected render continues:**
+   - A 5-second `Process.send_after` schedules a `:sync_timeout` failsafe
+   - Async `Task.start` begins session file sync (calls `SessionImporter.sync`)
+   - Task sends `{:sync_done, result}` message on completion (regardless of sync outcome)
+
+3. **Sync task completes:**
+   - `handle_info({:sync_done, _result}, socket)` dismisses skeleton (`syncing: false`)
+   - `TabHelpers.force_reload_messages/2` loads all messages from DB in one pass
+   - `push_event("new_message", %{})` triggers AutoScroll hook to re-anchor
+   - Skeleton fades away; messages appear all at once
+
+4. **Timeout failsafe:**
+   - If Task takes > 5 seconds, `:sync_timeout` fires
+   - `handle_info(:sync_timeout, %{assigns: %{syncing: true}}, socket)` dismisses skeleton and loads from DB
+   - Prevents UI lock on large sessions or slow disk I/O
+   - No-op if sync already completed before timeout fires
+
+**Sync result states:**
+
+The Task sends `{:sync_done, result}` with:
+- `:clean` — No new messages imported from session file (0 inserted, 0 updated)
+- `:dirty` — New messages imported (N inserted and/or updated); new messages appear with existing ones
+- Error also sends `:clean` — treat import failure as no-op; messages load from DB unchanged
+
+Both states trigger `force_reload_messages`, so messages always load from DB after sync completes, ensuring atomic all-at-once rendering.
+
+**Skeleton UI:**
+
+Renders 4 shimmer rows while `syncing: true`:
+- **Avatar circle** — 28px rounded-full with base-content/10 opacity
+- **Skeleton text lines** — 4 lines with varying widths (1/4, 11/12, 4/5 of container)
+- **Pill tags** — 2 pseudo-pills below text lines with reduced opacity (base-content/6)
+- **Animation** — `animate-pulse` class for continuous fade effect
+- **Accessibility** — `aria-hidden="true"` prevents screen reader announcement
+
+**Implementation files:**
+
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — mount, `handle_info({:sync_done, _})`, `handle_info(:sync_timeout, ...)`
+- `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — `assign_ui_flags/2` sets `syncing: true`
+- `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex` — `load_messages_on_mount/1` orchestrates Task + timeout
+- `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex` — `message_skeleton/1` component + guard on `@syncing`
+
+**Why this approach:**
+
+Previously, `load_messages_on_mount` had a race: both the mount Task sync and event-driven handlers (e.g., `handle_claude_complete`) could call `SessionImporter.sync` concurrently for active sessions. Both paths would read the same cursor before either committed, causing duplicate message inserts with distinct `source_uuid` values.
+
+The skeleton defers all DB loads until after sync completes, eliminating the race entirely. For active sessions, the event-driven pipeline (`claude_complete → sync_and_reload`) handles imports; the mount Task only syncs when the session is already idle/finished.
+
+**Gemini sessions** (`4ff24598`, `ace5897d`, `a5455b39`): `load_messages_on_mount/1` uses conditional sync. If the session has zero DB rows (JSONL-only session or cleared DB), `GeminiImporter.sync` runs from the JSONL file so history appears on first load. If the session already has DB rows, sync is skipped — the live-stream persistence path uses a different UUID space than JSONL turn IDs, so BulkImporter cannot dedup across them and would insert duplicates on every mount.
+
+---
+
+## Gemini Reload + Sync (DM Toolbar)
+
+**Commits:** `4ff24598`, `d94555c2`
+
+The **Reload** and **Sync** toolbar buttons in the DM page work for Gemini sessions:
+
+- **Reload** (`DmExportHelpers.handle_reload_from_session_file/2`, `"gemini"` branch): Reloads messages from the database directly. Does NOT read the JSONL file — `GeminiReader.read_messages` returns `{:error, :not_found}` in practice because the Gemini CLI uses a different session UUID space than EITS. The DB is authoritative since BulkImporter continuously syncs via the live-stream path.
+- **Sync** (`MessageHandlers.sync_messages_from_session_file/1`, `"gemini"` branch): Calls `sync_gemini_async/3` which resolves the project path via `SessionHelpers.resolve_project_path/2` and runs `GeminiImporter.sync/3` from the JSONL file. Only useful for JSONL-only sessions (DB empty) — when rows already exist, the UUID space mismatch prevents dedup.
+
+`sync_gemini_async/3` in `message_handlers.ex`:
+
+```elixir
+defp sync_gemini_async(session_id, session_uuid, session, agent) do
+  project_path =
+    case SessionHelpers.resolve_project_path(session, agent) do
+      {:ok, path} -> path
+      _ -> nil
+    end
+
+  GeminiImporter.sync(session_uuid, project_path, session_id)
+end
+```
 
 ---
 
@@ -1364,7 +1540,7 @@ Settings handlers were extracted into a dedicated `SettingsHandlers` module (com
 
 ## Desktop Top Bar
 
-**Commits:** `d6c5ae2e`, `ef000cd3`, `b58104ad`, `fa1f2f94`
+**Commits:** `d6c5ae2e`, `ef000cd3`, `b58104ad`, `fa1f2f94`, `37c837a9`
 
 A desktop-only top bar appears above the main content area on the DM page, providing breadcrumb navigation, search access, and tab controls.
 
@@ -1415,10 +1591,26 @@ An ellipsis button in the toolbar opens an inline dropdown with session-level ac
 - Previously, the page height was computed as `100dvh - 2rem`, which caused an 8px overflow into the parent container
 - With overflow-auto on main, this overflow made the main container scrollable, causing messages to be clipped and auto-scroll to land 8px short of the visual bottom
 
+**Scroll fixes (37c837a9):**
+
+*Navigation-aware scroll reset:*
+- When navigating between sessions (not patching/submitting), reset `#main-content` scrollTop to 0 so the DM composer is always visible when entering a session
+- Problem: Scrolling down the sessions list then clicking a session would leave `#main-content` scrolled, hiding the composer below the viewport
+- Solution: `phx:page-loading-start` event now captures the navigation `kind` (navigate/patch/submit); `phx:page-loading-stop` resets scroll only on navigate
+- Prevents accidental scroll state bleeding across different conversations
+
+*Flex height chain fixes:*
+- `dm-tab-content` div now has `flex flex-col` classes to ensure proper height distribution within the tab container
+- `dm-messages-tab` changed from `h-full` to `flex-1 min-h-0` to participate in flex height constraints instead of filling arbitrary height
+- The `min-h-0` override tells the flex container to collapse below its natural height, allowing sibling elements to constrain the viewport
+- Without these changes, the messages container would either overflow its parent or fail to fill available space
+
 **Files:**
+- `assets/js/app.js` — navigation kind tracking and scroll reset on `phx:page-loading-stop`
 - `lib/eye_in_the_sky_web/components/layouts.ex` — top_bar component with dm_toolbar private component
 - `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — top bar integration
-- `lib/eye_in_the_sky_web/components/dm_page.ex` — DM page height calculation
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — DM page height calculation and dm-tab-content flex layout
+- `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex` — messages tab flex height constraints
 
 ---
 

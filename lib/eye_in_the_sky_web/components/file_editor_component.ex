@@ -38,5 +38,4 @@ defmodule EyeInTheSkyWeb.Components.FileEditorComponent do
     <% end %>
     """
   end
-
 end

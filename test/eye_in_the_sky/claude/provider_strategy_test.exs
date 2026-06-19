@@ -174,7 +174,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
 
   describe "Claude.metadata handling" do
     test "message with no metadata remains unchanged" do
-      message = "Hello world"
+      _message = "Hello world"
     end
 
     test "message with only auto-populated metadata is not modified" do

@@ -486,6 +486,7 @@ defmodule EyeInTheSky.Tasks do
   defdelegate list_tasks_for_tag(tag_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks_for_project(project_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
+  defdelegate count_tasks_for_project_by_state(project_id), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_scope(scope, opts \\ []), to: EyeInTheSky.Tasks.Queries
 
   # Delegates to Tasks.Associations sub-module

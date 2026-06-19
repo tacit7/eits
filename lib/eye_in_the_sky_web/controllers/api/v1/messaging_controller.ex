@@ -6,9 +6,9 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Messages, Sessions}
+  alias EyeInTheSky.{Messages, Sessions}
   alias EyeInTheSky.Messaging.DMDelivery
-  alias EyeInTheSky.Utils.ToolHelpers
+  alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
@@ -26,8 +26,8 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     if is_nil(session_raw) or session_raw == "" do
       {:error, :bad_request, "session is required"}
     else
-      with {:ok, session} <- Sessions.resolve(session_raw),
-           {:ok, from_id} <- resolve_optional_session_id(from_raw),
+      with {:ok, session} <- SessionResolver.resolve(session_raw),
+           {:ok, from_id} <- SessionResolver.resolve_optional_int(from_raw),
            {:ok, since_dt} <- parse_since(params["since"]) do
         opts = [from_session_id: from_id, since: since_dt]
         messages = Messages.list_inbound_dms(session.id, limit, opts)
@@ -64,16 +64,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     case DateTime.from_iso8601(raw) do
       {:ok, dt, _offset} -> {:ok, dt}
       {:error, _} -> {:error, :bad_request, "since must be a valid ISO8601 timestamp"}
-    end
-  end
-
-  defp resolve_optional_session_id(nil), do: {:ok, nil}
-  defp resolve_optional_session_id(""), do: {:ok, nil}
-
-  defp resolve_optional_session_id(raw) do
-    case Sessions.resolve(raw) do
-      {:ok, session} -> {:ok, session.id}
-      {:error, :not_found} -> {:error, :not_found, "from session not found: #{raw}"}
     end
   end
 
@@ -121,24 +111,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
   # :from also falls back to agent UUID lookup (legacy sender_id).
   defp resolve_session_target(%{raw: raw, kind: :from}) do
-    if int_id = ToolHelpers.parse_int(raw) do
-      Sessions.get_session(int_id)
-    else
-      with {:error, :not_found} <- Sessions.get_session_by_uuid(raw),
-           {:ok, agent} <- Agents.get_agent_by_uuid(raw),
-           [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
-        {:ok, session}
-      else
-        {:ok, session} -> {:ok, session}
-        _ -> {:error, :not_found}
-      end
-    end
+    SessionResolver.resolve_with_agent_fallback(raw)
   end
 
   defp resolve_session_target(%{raw: raw, kind: :to}) do
-    if int_id = ToolHelpers.parse_int(raw),
-      do: Sessions.get_session(int_id),
-      else: Sessions.get_session_by_uuid(raw)
+    SessionResolver.resolve(raw)
   end
 
   # waiting = sdk-cli session ended and queued for resume; DM will be delivered on next wakeup
@@ -174,6 +151,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
         nil ->
           case DMDelivery.deliver_and_persist(to_session.id, from_session.id, dm_body, metadata) do
             {:ok, msg} ->
+              maybe_send_test_message_auto_reply(from_session, to_session, params["message"])
               dm_success(conn, to_session, msg)
 
             {:error, :queue_full} ->
@@ -283,5 +261,43 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       message_id: to_string(msg.id),
       message_uuid: msg.uuid
     })
+  end
+
+  defp maybe_send_test_message_auto_reply(from_session, to_session, raw_message) do
+    if trim_param(raw_message) == "test message" do
+      reply_sender_name = ApiPresenter.resolve_session_sender_name(to_session)
+
+      reply_body =
+        "DM from:#{reply_sender_name} (session:#{to_session.uuid}) Codex received your message and is responding."
+
+      reply_metadata = %{
+        sender_name: reply_sender_name,
+        from_session_uuid: to_session.uuid,
+        to_session_uuid: from_session.uuid,
+        response_required: false,
+        auto_reply: true
+      }
+
+      case Messages.find_recent_dm(from_session.id, reply_body, seconds: 30) do
+        nil ->
+          case DMDelivery.deliver_and_persist(
+                 from_session.id,
+                 to_session.id,
+                 reply_body,
+                 reply_metadata
+               ) do
+            {:ok, _msg} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning(
+                "DM auto-reply failed from session #{to_session.id} to #{from_session.id}: #{inspect(reason)}"
+              )
+          end
+
+        _existing ->
+          :ok
+      end
+    end
   end
 end

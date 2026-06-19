@@ -45,31 +45,42 @@
         {/if}
 
         <!-- Message row -->
-        <div class="group py-2 px-1 rounded-lg hover:bg-base-content/[0.02] transition-colors">
-          <div class="flex items-start gap-2">
-            {#if message.sender_role === 'user'}
-              <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
-                <div class="w-1 h-1 rounded-full bg-success"></div>
+        {#if message.sender_role === 'system'}
+          <!-- System message: centered annotation with dividers -->
+          <div class="flex items-center gap-3 my-2">
+            <div class="flex-1 h-px bg-base-content/[0.04]"></div>
+            <span class="text-[10px] text-base-content/25 select-none whitespace-nowrap">
+              {message.body.substring(0, 50)}
+            </span>
+            <div class="flex-1 h-px bg-base-content/[0.04]"></div>
+          </div>
+        {:else}
+          <div class="group py-2 px-1 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+            <div class="flex items-start gap-2">
+              {#if message.sender_role === 'user'}
+                <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
+                  <div class="w-1 h-1 rounded-full bg-success"></div>
+                </div>
+              {:else}
+                <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-primary/20 flex items-center justify-center">
+                  <div class="w-1 h-1 rounded-full bg-primary/60"></div>
+                </div>
+              {/if}
+              <div class="min-w-0 flex-1">
+                <div class="flex items-baseline gap-1.5 mb-0.5">
+                  <span class="text-[11px] font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'}">
+                    {message.sender_role === 'user' ? 'You' : message.sender_role === 'agent' ? 'Agent' : message.sender_role}
+                  </span>
+                  {#if message.provider}
+                    <span class="badge badge-xs badge-ghost">{message.provider}</span>
+                  {/if}
+                  <time class="text-[10px] text-base-content/30 ml-auto">{formatTime(message.inserted_at)}</time>
+                </div>
+                <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
               </div>
-            {:else}
-              <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-primary/20 flex items-center justify-center">
-                <div class="w-1 h-1 rounded-full bg-primary/60"></div>
-              </div>
-            {/if}
-            <div class="min-w-0 flex-1">
-              <div class="flex items-baseline gap-1.5 mb-0.5">
-                <span class="text-[11px] font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'}">
-                  {message.sender_role === 'user' ? 'You' : message.sender_role === 'agent' ? 'Agent' : message.sender_role}
-                </span>
-                {#if message.provider}
-                  <span class="badge badge-xs badge-ghost">{message.provider}</span>
-                {/if}
-                <time class="text-[10px] text-base-content/30 ml-auto">{formatTime(message.inserted_at)}</time>
-              </div>
-              <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
             </div>
           </div>
-        </div>
+        {/if}
       {/each}
     {:else}
       <!-- Empty state -->

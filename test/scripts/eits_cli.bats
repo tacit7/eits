@@ -716,9 +716,20 @@ teardown_teams() {
   [[ "$output" =~ "API URL:" ]]
 }
 
-@test "whoami: is an alias for me" {
-  run env EITS_SESSION_UUID="test-uuid" "$EITS" whoami 2>&1; true
-  [[ "$output" =~ "Session UUID:" ]]
+@test "whoami: returns JSON with session and agent identity" {
+  run "$EITS" whoami
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.session_uuid' >/dev/null
+  echo "$output" | jq -e '.session_id' >/dev/null
+  echo "$output" | jq -e '.agent_uuid' >/dev/null
+  echo "$output" | jq -e '.agent_id' >/dev/null
+  echo "$output" | jq -e '.project_id' >/dev/null
+}
+
+@test "whoami: fails when EITS_SESSION_UUID and EITS_SESSION_ID are not set" {
+  run env -u EITS_SESSION_UUID -u EITS_SESSION_ID "$EITS" whoami 2>&1
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "EITS_SESSION_UUID" || "$output" =~ "EITS_SESSION_ID" ]]
 }
 
 @test "me: shows (not set) when env vars missing" {

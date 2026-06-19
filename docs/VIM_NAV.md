@@ -156,6 +156,7 @@ Active when a flyout panel is open (`feature:vim-flyout` scope).
 
 | Keys | Action |
 |---|---|
+| `m` | Quick DM focused session (opens compose overlay, sends message + continues session) |
 | `A` | Archive focused session (refocuses next/previous item) |
 | `D` | Delete focused session (refocuses next/previous item) |
 | `y u` | Copy session UUID to clipboard |
@@ -259,6 +260,12 @@ When a focused session is archived or deleted, vim-nav automatically refocuses t
 | `Space b p` | Previous session *(projects page)* |
 | `Space b a` | Archive session *(sessions page)* |
 | `Space b D` | Delete session *(sessions page)* |
+
+### DM — `Space d`
+
+| Keys | Action |
+|---|---|
+| `Space d m` | Quick DM — pick session then compose message (global, works from any page) |
 
 ### Exit — `Space x`
 

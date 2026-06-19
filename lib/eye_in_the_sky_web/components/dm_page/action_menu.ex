@@ -74,7 +74,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               @session_active && "opacity-40 cursor-not-allowed"
             ]}
             disabled={@session_active}
-            title={if @session_active, do: "Available after the session stops", else: "Re-read transcript and import missed messages"}
+            title={
+              if @session_active,
+                do: "Available after the session stops",
+                else: "Re-read transcript and import missed messages"
+            }
           >
             <.icon name="hero-arrow-path" class="size-3.5" /> Sync messages
           </button>
@@ -108,7 +112,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
         <%= if @show_push_setup do %>
           <li>
             <button
-              id="dm-push-setup-btn"
+              id={if @wrapper_id, do: "#{@wrapper_id}-push-setup-btn", else: "dm-push-setup-btn"}
               phx-hook="PushSetup"
               phx-update="ignore"
               data-push-state="disabled"

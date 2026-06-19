@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [push_event: 3]
 
   alias EyeInTheSkyWeb.Components.Rail.Loader
 
@@ -16,16 +17,26 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
         socket.assigns.session_show
       )
 
-    {:noreply, socket |> assign(:session_sort, sort) |> assign(:flyout_sessions, sessions)}
+    socket =
+      socket
+      |> assign(:session_sort, sort)
+      |> assign(:flyout_sessions, sessions)
+      |> push_event("save_rail_state", %{session_sort: to_string(sort)})
+
+    {:noreply, socket}
   end
 
   def handle_update_session_name_filter(%{"value" => value}, socket) do
+    scope = socket.assigns[:session_scope] || :current
+    project = if scope == :all, do: nil, else: socket.assigns.sidebar_project
+    show = if scope == :all, do: :all_active, else: socket.assigns.session_show
+
     sessions =
       Loader.load_flyout_sessions(
-        socket.assigns.sidebar_project,
+        project,
         socket.assigns.session_sort,
         value,
-        socket.assigns.session_show
+        show
       )
 
     {:noreply,
@@ -43,7 +54,37 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
         show
       )
 
-    {:noreply, socket |> assign(:session_show, show) |> assign(:flyout_sessions, sessions)}
+    socket =
+      socket
+      |> assign(:session_show, show)
+      |> assign(:flyout_sessions, sessions)
+      |> push_event("save_rail_state", %{session_show: to_string(show)})
+
+    {:noreply, socket}
+  end
+
+  def handle_set_session_scope(%{"scope" => scope_str}, socket) do
+    scope = if scope_str == "all", do: :all, else: :current
+
+    project = if scope == :all, do: nil, else: socket.assigns.sidebar_project
+
+    sessions =
+      Loader.load_flyout_sessions(
+        project,
+        socket.assigns.session_sort,
+        socket.assigns.session_name_filter,
+        if(scope == :all, do: :all_active, else: socket.assigns.session_show)
+      )
+
+    socket =
+      socket
+      |> assign(:session_scope, scope)
+      |> assign(:session_project_visible, %{})
+      |> assign(:session_project_collapsed, MapSet.new())
+      |> assign(:flyout_sessions, sessions)
+      |> push_event("save_rail_state", %{session_scope: to_string(scope)})
+
+    {:noreply, socket}
   end
 
   def handle_update_task_search(%{"value" => value}, socket) do
@@ -67,7 +108,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
         state_id
       )
 
-    {:noreply, socket |> assign(:task_state_filter, state_id) |> assign(:flyout_tasks, tasks)}
+    socket =
+      socket
+      |> assign(:task_state_filter, state_id)
+      |> assign(:flyout_tasks, tasks)
+      |> push_event("save_rail_state", %{task_state_filter: state_id})
+
+    {:noreply, socket}
   end
 
   def handle_update_note_search(%{"value" => value}, socket) do
@@ -157,7 +204,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilterActions do
         status
       )
 
-    {:noreply, socket |> assign(:team_status, status) |> assign(:flyout_teams, teams)}
+    socket =
+      socket
+      |> assign(:team_status, status)
+      |> assign(:flyout_teams, teams)
+      |> push_event("save_rail_state", %{team_status: status})
+
+    {:noreply, socket}
   end
 
   def handle_update_prompt_search(%{"value" => value}, socket) do

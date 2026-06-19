@@ -7,8 +7,10 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
   `https://api.anthropic.com/api/oauth/usage`.
 
   Results are cached in-process:
-    - Success  → 5-minute TTL
-    - Error    → 2-minute backoff
+    - Success        → 5-minute TTL
+    - Error / 429    → 2-minute backoff; last successful result is preserved
+                       and returned as `{:ok, stale_data}` so the flyout
+                       keeps showing data rather than switching to an error state.
   """
 
   use Agent
@@ -45,7 +47,8 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
         {:ok, result}
 
       %{ok?: false, fetched_at: t} when now - t < @error_ttl_ms ->
-        {:error, :cached_error}
+        # Serve stale data during backoff window if we have it; otherwise error.
+        serve_stale_or_error(:cached_error)
 
       _ ->
         refresh_cache(now)
@@ -55,7 +58,8 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
   @doc "Bypass the cache and immediately re-fetch from the Anthropic API."
   @spec force_refresh() :: {:ok, map()} | {:error, atom()}
   def force_refresh do
-    Agent.update(__MODULE__, fn _ -> %{} end)
+    # Do NOT clear last_result so stale data survives a forced refresh that 429s.
+    Agent.update(__MODULE__, fn state -> Map.drop(state, [:ok?, :fetched_at, :reason]) end)
     refresh_cache(System.monotonic_time(:millisecond))
   end
 
@@ -64,12 +68,25 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
   defp refresh_cache(now) do
     case load() do
       {:ok, data} ->
-        Agent.update(__MODULE__, fn _ -> %{ok?: true, result: data, fetched_at: now} end)
+        Agent.update(__MODULE__, fn _ ->
+          %{ok?: true, result: data, fetched_at: now, last_result: data}
+        end)
+
         {:ok, data}
 
       {:error, reason} ->
-        Agent.update(__MODULE__, fn _ -> %{ok?: false, fetched_at: now, reason: reason} end)
-        {:error, reason}
+        Agent.update(__MODULE__, fn state ->
+          Map.merge(state, %{ok?: false, fetched_at: now, reason: reason})
+        end)
+
+        serve_stale_or_error(reason)
+    end
+  end
+
+  defp serve_stale_or_error(reason) do
+    case Agent.get(__MODULE__, &Map.get(&1, :last_result)) do
+      nil -> {:error, reason}
+      stale -> {:ok, stale}
     end
   end
 
@@ -121,7 +138,10 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
     now_ms = System.system_time(:millisecond)
 
     if expires_at_ms <= now_ms do
-      Logger.warning("RateLimitClient: Claude OAuth token expired; re-authenticate via Claude CLI")
+      Logger.warning(
+        "RateLimitClient: Claude OAuth token expired; re-authenticate via Claude CLI"
+      )
+
       {:error, :token_expired}
     else
       {:ok, token}
@@ -139,12 +159,15 @@ defmodule EyeInTheSky.Claude.RateLimitClient do
       {"anthropic-beta", "oauth-2025-04-20"}
     ]
 
-    case Req.get(url, headers: headers, receive_timeout: 10_000) do
+    case Req.get(url, headers: headers, receive_timeout: 10_000, retry: false) do
       {:ok, %Req.Response{status: 200, body: body}} when is_map(body) ->
         {:ok, body}
 
       {:ok, %Req.Response{status: 401}} ->
         {:error, :unauthorized}
+
+      {:ok, %Req.Response{status: 429}} ->
+        {:error, :rate_limited}
 
       {:ok, %Req.Response{status: status}} ->
         {:error, {:http_error, status}}

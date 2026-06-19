@@ -7,14 +7,24 @@ type: project
 ## File Locations
 
 - `lib/eye_in_the_sky_web/components/rail.ex` — main LiveComponent, all state + event handlers
-- `lib/eye_in_the_sky_web/components/rail/flyout.ex` — HEEx rendering, all section content
+- `lib/eye_in_the_sky_web/components/rail/flyout.ex` — flyout shell + `section_header_link` component (extracted ~2026-04-30)
+- `lib/eye_in_the_sky_web/components/rail/flyout/` — **13 per-section sub-modules** (split ~2026-05-01):
+  - `agents_section.ex`, `canvas_section.ex`, `chat_section.ex`, `files_section.ex`
+  - `helpers.ex`, `jobs_section.ex`, `notes_section.ex`, `prompts_section.ex`
+  - `sessions_section.ex`, `skills_section.ex`, `tasks_section.ex`, `teams_section.ex`, `usage_section.ex`
 - `lib/eye_in_the_sky_web/components/rail/helpers.ex` — `project_initial/1` and minor utils
 - `lib/eye_in_the_sky_web/components/rail/project_switcher.ex` — project picker dropdown
 - `lib/eye_in_the_sky_web/components/rail/project_actions.ex` — project CRUD + select event handlers
-- `lib/eye_in_the_sky_web/components/rail/file_actions.ex` — file open/save/expand/collapse event handlers (extracted in PR #287)
-- `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — renders `<.live_component module={Rail} id="app-rail" sidebar_project={assigns[:sidebar_project]} ...>`
+- `lib/eye_in_the_sky_web/components/rail/file_actions.ex` — file open/save/expand/collapse event handlers
+- `lib/eye_in_the_sky_web/components/rail/file_panel.ex` — file panel component
+- `lib/eye_in_the_sky_web/components/rail/filter_actions.ex` — filter/search event handlers
+- `lib/eye_in_the_sky_web/components/rail/loader.ex` — lazy-loading functions extracted from rail.ex
+- `lib/eye_in_the_sky_web/components/rail/section_actions.ex` — section toggle/open event handlers
+- `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — renders `<.live_component module={Rail} id="app-rail" ...>`
 - `assets/js/hooks/rail_state.js` — RailState hook: localStorage persistence, mobile swipe, section restore
 - `docs/RAIL_MENU.md` — full architecture doc (canonical reference)
+
+**CRITICAL**: flyout.ex is now a thin shell. Section content lives in `flyout/<section>_section.ex`. When adding or editing flyout content for a section, edit the sub-module, not flyout.ex directly.
 
 ## Section Map (current)
 
@@ -151,6 +161,38 @@ Merged in PR #273. Sections with both a global and project-scoped page show two 
 **Unimplemented project routes** (list icon always toasts): `:skills` → task #5225, agents (maps to :sessions) → task #5226.
 
 **Icon library note**: Globe uses Lucide inline SVG by explicit user preference — do NOT replace with `hero-globe-alt`. Lucide not installed as a package; inline the SVG directly in HEEx.
+
+## Flyout Detail Cards (tasks + notes)
+
+Non-blocking detail cards float to the right of the flyout. Clicking a row opens the card; clicking another row swaps it in-place — flyout list stays interactive.
+
+**Positioning** (both task and note cards):
+- `fixed left-[296px] top-[48px]` — rail (52px) + flyout (236px) + 8px gap; 40px top nav + 8px clearance
+- `w-[420px] h-[480px]` — fixed size, content area scrollable
+- `z-[100]` — above flyout but no backdrop
+
+**Layout structure**:
+```heex
+<div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] ... flex flex-col gap-3">
+  <%!-- Header: flex-shrink-0 --%>
+  <%!-- State badge (task) or type label (note): flex-shrink-0 --%>
+  <%!-- Content: flex-1 min-h-0 overflow-y-auto --%>
+  <%!-- Footer (prev/next + CTA): flex-shrink-0, border-t --%>
+</div>
+```
+
+**State shape**: `rail_modal: nil | {:view_task, index, tasks} | {:view_note, index, notes}`
+
+**Event handlers in `rail.ex`**:
+- `open_task_detail` — finds task by id in `flyout_tasks`, sets `rail_modal: {:view_task, index, tasks}`
+- `task_detail_nav` — wraps index with `rem(index + delta, count)`
+- `open_note_detail` / `note_detail_nav` — same pattern for notes
+- `close_rail_modal` — sets `rail_modal: nil`
+
+**"Open task" deep link**: `/projects/:project_id/tasks?task_id=:id`
+`ProjectLive.Tasks.handle_params/3` has a clause for `task_id` that loads the task and opens the task detail drawer directly. Added `alias EyeInTheSky.{Notes, Tasks}` to that module.
+
+**Call sites** in `flyout.ex` use `match?({:view_task, _, _}, @rail_modal)` guard with `elem/2` to extract fields.
 
 ## Known Gotchas
 

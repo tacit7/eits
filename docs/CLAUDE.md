@@ -21,12 +21,16 @@
 - [CHAT.md](CHAT.md) — Chat system: channels, routing, @mentions, cross-project membership
 - [CHAT_UI_DESIGN.md](CHAT_UI_DESIGN.md) — Chat UI design spec: message rendering rules, hierarchy, metadata, actions, composer, known issues
 - [EVENTS.md](EVENTS.md) — PubSub Events: all topics, payload shapes, subscribe helpers
+- [GITHUB_WEBHOOKS.md](GITHUB_WEBHOOKS.md) — GitHub webhook integration: delivery inbox, dispatcher, built-in handlers, rules engine, smee local dev
 - [ORCHESTRATOR_TIMERS.md](ORCHESTRATOR_TIMERS.md) — OrchestratorTimers: session-scoped auto-nudge timers, PubSub events, UI integration
 - [MOBILE.md](MOBILE.md) — Mobile layout standards: touch targets, sticky offsets, viewport, overflow
 - [RAIL_MENU.md](RAIL_MENU.md) — Rail menu: section map, sticky sections, lazy loaders, project context, known project-persistence bug
 - [WORKSPACE_SCOPE.md](WORKSPACE_SCOPE.md) — Workspace scope contract: Scope struct, WorkspaceLive.Hooks, cross-workspace ownership validation, canonical queries
 - [VIM_NAV.md](VIM_NAV.md) — Vim navigation: all current keybindings, scope system, DOM markers
 - [VIM_NAV_LAZYVIM_PLAN.md](VIM_NAV_LAZYVIM_PLAN.md) — Planned LazyVim-inspired leader bindings (Space prefix, Phase A/B)
+- [IAM_POLICY.md](IAM_POLICY.md) — IAM policy schema, builtin matchers (36 registered), condition predicates, evaluator algorithm, policy documents, agent type enrichment
+- [IAM_HOOK_INSTALL.md](IAM_HOOK_INSTALL.md) — Wiring Claude Code hooks to the IAM endpoint (curl command, Tauri auto-install, troubleshooting)
+- [IAM_POLICY_DOCUMENTS.md](IAM_POLICY_DOCUMENTS.md) — Policy documents design rationale: agent-type scoping, source metadata, ETS cache strategy
 
 ## Claude API Key Blocking
 

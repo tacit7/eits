@@ -75,9 +75,11 @@ defmodule EyeInTheSky.Codex.CLITest do
   # ---------------------------------------------------------------------------
 
   describe "build_args/1 resume" do
-    test "resume adds resume subcommand with thread_id" do
+    test "resume uses subcommand syntax: exec resume <thread_id>" do
       args = CLI.build_args(prompt: "continue", resume: "thread-abc-123")
-      assert Enum.take(args, 3) == ["exec", "resume", "thread-abc-123"]
+      assert Enum.at(args, 0) == "exec"
+      assert Enum.at(args, 1) == "resume"
+      assert Enum.at(args, 2) == "thread-abc-123"
     end
 
     test "no resume omits resume subcommand" do
@@ -109,18 +111,16 @@ defmodule EyeInTheSky.Codex.CLITest do
       assert List.last(args) == "test prompt"
     end
 
-    test "flags appear between exec and prompt" do
+    test "flags appear between exec resume <id> and prompt" do
       args = CLI.build_args(prompt: "test", model: "gpt-5.3-codex", resume: "tid")
-      first = List.first(args)
-      last = List.last(args)
-      assert first == "exec"
-      assert last == "test"
+      assert Enum.at(args, 0) == "exec"
+      assert Enum.at(args, 1) == "resume"
+      assert Enum.at(args, 2) == "tid"
+      assert List.last(args) == "test"
 
-      middle = args |> Enum.drop(1) |> Enum.drop(-1)
-      assert Enum.take(args, 3) == ["exec", "resume", "tid"]
+      middle = args |> Enum.drop(3) |> Enum.drop(-1)
       assert "--json" in middle
       assert "-m" in middle
-      assert "resume" in middle
     end
   end
 

@@ -33,8 +33,14 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
 
   defp project_path_for(socket) do
     case socket.assigns[:project] do
-      %{path: path} when is_binary(path) and path != "" -> path
-      _ -> File.cwd!()
+      %{path: path} when is_binary(path) and path != "" ->
+        path
+
+      _ ->
+        case File.cwd() do
+          {:ok, path} -> path
+          {:error, _} -> Path.expand("~")
+        end
     end
   end
 
@@ -93,7 +99,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
 
     Enum.filter(skills, fn skill ->
       String.contains?(String.downcase(skill.slug), q) ||
-        String.contains?(String.downcase(skill.description), q)
+        String.contains?(String.downcase(skill.description || ""), q)
     end)
   end
 
@@ -103,12 +109,20 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
   defp sort_skills(skills, "recent"), do: Enum.sort_by(skills, & &1.mtime, :desc)
   defp sort_skills(skills, _), do: Enum.sort_by(skills, & &1.slug)
 
+  defp claude_home_dir do
+    Application.get_env(:eye_in_the_sky, :claude_home_dir, Path.expand("~/.claude"))
+  end
+
   defp do_load_skills(project_path) do
     global_commands =
-      load_from_dir(Path.expand("~/.claude/commands"), :commands, "~/.claude/commands")
+      load_from_dir(Path.join(claude_home_dir(), "commands"), :commands, "~/.claude/commands")
 
     global_skills =
-      load_from_skills_dir(Path.expand("~/.claude/skills"), :skills, "~/.claude/skills")
+      load_from_skills_dir(
+        Path.join(claude_home_dir(), "skills"),
+        :skills,
+        "~/.claude/skills"
+      )
 
     project_commands =
       load_from_dir(

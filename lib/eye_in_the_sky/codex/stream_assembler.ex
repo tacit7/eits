@@ -19,6 +19,8 @@ defmodule EyeInTheSky.Codex.StreamAssembler do
   which provider it's listening to.
   """
 
+  @behaviour EyeInTheSky.Claude.StreamAssemblerBehavior
+
   alias EyeInTheSky.Claude.Message
 
   @type event ::

@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Tasks
+  alias EyeInTheSky.{Notes, Tasks}
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.Components.TasksBulkActions
@@ -11,11 +11,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Helpers.PubSubHelpers
-  import EyeInTheSkyWeb.Live.Shared.TasksHelpers
+  import EyeInTheSkyWeb.Live.Shared.TaskEventHandlers
 
   @impl true
-  def mount(%{"id" => _} = params, _session, socket) do
-    if connected?(socket), do: subscribe_tasks()
+  def mount(%{"id" => id} = params, _session, socket) do
+    project_id = ControllerHelpers.parse_int(id)
+    if connected?(socket), do: subscribe_project_tasks(project_id)
 
     socket =
       socket
@@ -44,6 +45,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:show_archive_confirm, false)
       |> assign(:loaded_task_ids, [])
       |> assign(:loaded_tasks, [])
+      |> assign(:state_counts, %{})
       |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
 
     socket =
@@ -62,6 +64,29 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       socket
       |> assign(:show_all, true)
       |> then(fn s -> if connected?(s), do: load_tasks(s), else: s end)
+
+    {:noreply, socket}
+  end
+
+  def handle_params(%{"task_id" => task_id} = params, _uri, socket) do
+    socket =
+      socket
+      |> assign(:show_all, Map.get(params, "show_all") == "true")
+      |> then(fn s -> if connected?(s), do: load_tasks(s), else: s end)
+
+    socket =
+      if connected?(socket) do
+        task = Tasks.get_task_by_uuid_or_id!(task_id)
+        notes = Notes.list_notes_for_task(task.id)
+
+        socket
+        |> assign(:selected_task, task)
+        |> assign(:task_notes, notes)
+        |> assign(:task_detail_focus, nil)
+        |> assign(:show_task_detail_drawer, true)
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
@@ -143,6 +168,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: handle_toggle_select_all_tasks(socket)
 
   @impl true
+  def handle_event("select_range", params, socket),
+    do: handle_select_range_tasks(params, socket)
+
+  @impl true
   def handle_event("enter_select_mode_tasks", _params, socket),
     do: handle_enter_select_mode(socket)
 
@@ -198,12 +227,24 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: handle_create_new_task(params, socket, &load_tasks/1)
 
   @impl true
+  def handle_event("add_task_annotation", params, socket),
+    do: handle_add_task_annotation(params, socket)
+
+  @impl true
   def handle_event("set_notify_on_stop", params, socket),
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
-  def handle_info(:tasks_changed, socket),
-    do: handle_tasks_changed(socket, &load_tasks/1)
+  def handle_info({:task_updated, task}, socket) do
+    loaded_ids = socket.assigns.loaded_task_ids
+    task_key = task.uuid || to_string(task.id)
+
+    if task_key in loaded_ids do
+      {:noreply, stream_insert(socket, :tasks, task)}
+    else
+      {:noreply, load_tasks(socket)}
+    end
+  end
 
   def handle_info(_, socket), do: {:noreply, socket}
 
@@ -211,21 +252,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     show_all = Map.get(socket.assigns, :show_all, false)
     project_id = socket.assigns.project_id
 
-    if show_all do
-      TasksListHelpers.load_tasks(
-        socket,
-        fn query -> Tasks.search_tasks(query) end,
-        fn opts -> Tasks.list_tasks(opts) end,
-        fn opts -> Tasks.count_tasks(opts) end
-      )
-    else
-      TasksListHelpers.load_tasks(
-        socket,
-        fn query -> Tasks.search_tasks(query, project_id) end,
-        fn opts -> Tasks.list_tasks_for_project(project_id, opts) end,
-        fn opts -> Tasks.count_tasks_for_project(project_id, opts) end
-      )
-    end
+    socket =
+      if show_all do
+        TasksListHelpers.load_tasks(
+          socket,
+          fn query -> Tasks.search_tasks(query) end,
+          fn opts -> Tasks.list_tasks(opts) end,
+          fn opts -> Tasks.count_tasks(opts) end
+        )
+      else
+        TasksListHelpers.load_tasks(
+          socket,
+          fn query -> Tasks.search_tasks(query, project_id) end,
+          fn opts -> Tasks.list_tasks_for_project(project_id, opts) end,
+          fn opts -> Tasks.count_tasks_for_project(project_id, opts) end
+        )
+      end
+
+    state_counts =
+      if show_all, do: %{}, else: Tasks.count_tasks_for_project_by_state(project_id)
+
+    assign(socket, :state_counts, state_counts)
   end
 
   defp load_tasks_page(socket, page) do
@@ -300,20 +347,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           />
 
           <div
-            id="project-tasks-list"
-            phx-update="stream"
-            data-vim-list
-            class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
+            id="project-tasks-shift-wrapper"
+            phx-hook="ShiftSelect"
+            data-list-id="project-tasks-list"
           >
-            <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
-              <TaskCard.task_card
-                task={task}
-                variant="list"
-                on_click="open_task_detail"
-                on_delete="delete_task"
-                select_mode={@tasks_select_mode}
-                selected={MapSet.member?(@selected_task_ids, task.uuid || to_string(task.id))}
-              />
+            <div
+              id="project-tasks-list"
+              phx-update="stream"
+              phx-hook="TaskListSelection"
+              data-vim-list
+              data-selected-task-id={@selected_task && @selected_task.id}
+              class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
+            >
+              <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
+                <TaskCard.task_card
+                  task={task}
+                  variant="list"
+                  on_click="open_task_detail"
+                  on_delete="delete_task"
+                  select_mode={@tasks_select_mode}
+                  selected={MapSet.member?(@selected_task_ids, task.uuid || to_string(task.id))}
+                />
+              </div>
             </div>
           </div>
 

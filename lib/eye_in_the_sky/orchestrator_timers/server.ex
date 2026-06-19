@@ -125,7 +125,15 @@ defmodule EyeInTheSky.OrchestratorTimers.Server do
 
     agent_manager = Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
 
-    case agent_manager.send_message(session_id, record.message, []) do
+    result =
+      try do
+        agent_manager.send_message(session_id, record.message, [])
+      rescue
+        e ->
+          {:error, e}
+      end
+
+    case result do
       {:ok, _} ->
         Logger.debug("[OrchestratorTimers] delivery succeeded session=#{session_id}")
 

@@ -7,9 +7,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
   import EyeInTheSkyWeb.CoreComponents
 
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
-    only: [relative_time: 1]
+    only: [relative_time: 1, overdue?: 1, due_today?: 1, format_due_date: 1]
 
   alias EyeInTheSky.Tasks.WorkflowState
+  alias Phoenix.LiveView.JS
 
   @state_todo WorkflowState.todo_id()
   @state_in_progress WorkflowState.in_progress_id()
@@ -32,11 +33,29 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     assigns = assign(assigns, :dm_session, dm_session)
 
     ~H"""
-    <div class={[
-      "group/row relative",
-      @task.completed_at && "opacity-60 hover:opacity-80"
-    ]}>
-      <%!-- Checkbox: absolute, outside row flow, hover-reveal --%>
+    <%!--
+      Row state legend:
+      default  → no bg, dim text
+      hover    → bg-base-200/40, brighter text, reveal checkbox+actions
+      focus-visible (keyboard) → focus-visible:ring-2 ring-primary/50
+      vim-nav-focused → [&.vim-nav-focused]:ring-2 ring-primary/50
+      selected/open   → data-drawer-open: left accent + bg-base-200/60 + ring-1 ring-primary/20
+      checked (bulk)  → outer wrapper bg-primary/8
+      done            → opacity-60, title line-through, dimmer metadata
+    --%>
+    <div
+      id={"task-row-#{@task.id}"}
+      data-row-id={@task.uuid || to_string(@task.id)}
+      class={[
+        "group/row relative",
+        @task.completed_at && "opacity-60 hover:opacity-80",
+        @selected && @select_mode && "bg-primary/8 rounded-lg"
+      ]}
+    >
+      <%!-- Left accent bar — visible when this row is open in the drawer --%>
+      <div class="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary opacity-0 group-[[data-drawer-open]]/row:opacity-100 transition-opacity pointer-events-none" />
+
+      <%!-- Checkbox — revealed on hover, selected, focus, and bulk mode --%>
       <div
         class={[
           "p-1 absolute z-10 top-1/2 -translate-y-1/2 -translate-x-1/2",
@@ -44,7 +63,9 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           if(@select_mode,
             do: "opacity-100 scale-100",
             else:
-              "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
+              "opacity-0 scale-75 transition duration-100 " <>
+                "group-hover/row:opacity-100 group-hover/row:scale-100 " <>
+                "group-[[data-drawer-open]]/row:opacity-100 group-[[data-drawer-open]]/row:scale-100"
           )
         ]}
         aria-hidden={to_string(!@select_mode)}
@@ -60,14 +81,27 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
 
       <%!-- Row body --%>
       <div
-        class="flex items-center gap-4 py-3 pr-2 pl-2 hover:bg-base-200/40 rounded-lg cursor-pointer [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
+        class={[
+          "flex items-center gap-4 py-3 pr-2 pl-2 rounded-lg cursor-pointer",
+          "hover:bg-base-200/40",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+          "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50",
+          "group-[[data-drawer-open]]/row:bg-base-200/60",
+          "group-[[data-drawer-open]]/row:ring-1 group-[[data-drawer-open]]/row:ring-inset group-[[data-drawer-open]]/row:ring-primary/20"
+        ]}
         data-vim-list-item
         data-vim-item-type="task"
         data-vim-item-id={@task.id}
         data-vim-item-title={@task.title}
         data-vim-item-url={"/projects/#{@task.project_id}/tasks?task=#{@task.uuid}"}
-        phx-click={if @select_mode, do: "toggle_select_task", else: @on_click}
-        phx-keyup={if !@select_mode, do: @on_click}
+        phx-click={
+          if @select_mode do
+            "toggle_select_task"
+          else
+            open_row_js(@task.id, @on_click)
+          end
+        }
+        phx-keyup={if !@select_mode, do: open_row_js(@task.id, @on_click)}
         phx-key="Enter"
         phx-value-task_id={@task.uuid || to_string(@task.id)}
         role="button"
@@ -97,10 +131,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             {@task.title}
           </span>
 
-          <%!-- Metadata line --%>
-          <div class="flex items-center gap-1.5 flex-wrap mt-1 text-mini">
+          <%!-- Metadata line — extra dim when task is done --%>
+          <div class={["flex items-center gap-1.5 flex-wrap mt-1 text-mini", @task.completed_at && "opacity-70"]}>
             <%!-- State pill --%>
-            <%= if @task.state do %>
+            <%= if is_struct(@task.state, EyeInTheSky.Tasks.WorkflowState) do %>
               <span class={[
                 "px-1.5 py-px rounded-full font-medium text-micro",
                 state_pill_class(@task.state_id)
@@ -119,12 +153,39 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
               </span>
             <% end %>
 
-            <%!-- Agent name (replaces UUID — much more useful scan anchor) --%>
-            <%= if @task.agent do %>
+            <%!-- Agent ID --%>
+            <%= if @task.agent_id do %>
               <span class="text-base-content/15">&middot;</span>
-              <span class="text-base-content/40 truncate max-w-[160px]">
-                {@task.agent.description}
+              <span class="flex items-center gap-0.5 text-base-content/40">
+                <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
+                <span class="font-mono">#{@task.agent_id}</span>
               </span>
+            <% end %>
+
+            <%!-- Due date --%>
+            <%= if @task.due_at do %>
+              <span class="text-base-content/15">&middot;</span>
+              <span class={[
+                "flex items-center gap-0.5 text-micro font-medium",
+                cond do
+                  overdue?(@task.due_at) -> "text-error"
+                  due_today?(@task.due_at) -> "text-warning"
+                  true -> "text-base-content/35"
+                end
+              ]}>
+                <.icon name="hero-calendar-mini" class="size-3" />
+                {format_due_date(@task.due_at)}
+              </span>
+            <% end %>
+
+            <%!-- Tags --%>
+            <%= if is_list(@task.tags) && @task.tags != [] do %>
+              <%= for tag <- Enum.take(@task.tags, 3) do %>
+                <span class="text-base-content/15">&middot;</span>
+                <span class="px-1 py-px rounded text-micro bg-base-content/8 text-base-content/40">
+                  {tag.name}
+                </span>
+              <% end %>
             <% end %>
 
             <%!-- Notes count --%>
@@ -144,8 +205,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           </div>
         </div>
 
-        <%!-- Hover actions --%>
-        <div class="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity">
+        <%!-- Hover actions — also revealed when row is selected (data-drawer-open) or focused via vim-nav --%>
+        <div class="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover/row:opacity-100 md:group-[[data-drawer-open]]/row:opacity-100 transition-opacity">
           <%= if @dm_session do %>
             <.link
               navigate={"/dm/#{@dm_session.uuid}"}
@@ -192,4 +253,14 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
   defp priority_label(2), do: "Med"
   defp priority_label(1), do: "Low"
   defp priority_label(_), do: ""
+
+  # Shared JS command for both click and keyup (Enter) row activation.
+  # Scoped to #project-tasks-list to avoid clearing data-drawer-open on other components.
+  # NOTE: id is the integer task.id (matches `id={"task-row-#{@task.id}"}` DOM id).
+  #       data-row-id uses uuid|string id — dual keying is intentional, do not unify.
+  defp open_row_js(task_id, on_click) do
+    JS.remove_attribute("data-drawer-open", to: "#project-tasks-list [data-drawer-open]")
+    |> JS.set_attribute({"data-drawer-open", ""}, to: "#task-row-#{task_id}")
+    |> JS.push(on_click || "")
+  end
 end

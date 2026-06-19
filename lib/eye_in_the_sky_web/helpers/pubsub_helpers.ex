@@ -14,7 +14,8 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
 
   | Payload          | Broadcaster                | Subscribers                         |
   |------------------|----------------------------|-------------------------------------|
-  | `:tasks_changed` | `EyeInTheSky.Tasks`     | `DMLive` (via `subscribe_tasks/0`)  |
+  | `{:tasks_changed, %{task_id: id, task: %Task{}}}` | `EyeInTheSky.Events.task_updated/1`     | `DMLive` (via `subscribe_tasks/0`)  |
+  | `{:tasks_changed, %{}}` | `EyeInTheSky.Events.tasks_changed/0`     | `DMLive` (via `subscribe_tasks/0`)  |
 
   ### `"tasks:<project_id>"`
 
@@ -142,6 +143,9 @@ defmodule EyeInTheSkyWeb.Helpers.PubSubHelpers do
 
   @doc "Subscribe to task change events."
   def subscribe_tasks, do: Events.subscribe_tasks()
+
+  @doc "Subscribe to task change events scoped to a specific project."
+  def subscribe_project_tasks(project_id), do: Events.subscribe_project_tasks(project_id)
 
   @doc "Subscribe to session-specific events for the given session id."
   def subscribe_session(session_id), do: Events.subscribe_session(session_id)

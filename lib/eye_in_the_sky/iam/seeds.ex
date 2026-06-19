@@ -400,6 +400,17 @@ defmodule EyeInTheSky.IAM.Seeds do
       enabled: false,
       message:
         "Session ending with uncommitted changes. Run `git status` to review, then commit or stash before closing."
+    },
+    %{
+      system_key: "warn_db_cli",
+      name: "Warn on direct database CLI usage",
+      effect: "instruct",
+      action: "Bash",
+      builtin_matcher: "warn_db_cli",
+      priority: 60,
+      enabled: false,
+      message:
+        "Direct database CLI access detected (psql, sqlite3, mysql, etc.). Prefer application-layer queries unless you have an explicit reason to connect directly."
     }
   ]
 

@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.BookmarkLive.Index do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Bookmarks
+  alias EyeInTheSky.{Bookmarks, Events}
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
@@ -15,7 +15,13 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
       |> assign(:sidebar_project, nil)
       |> assign(:bookmarks, [])
 
-    socket = if connected?(socket), do: load_bookmarks(socket), else: socket
+    socket =
+      if connected?(socket) do
+        Events.subscribe_bookmarks()
+        load_bookmarks(socket)
+      else
+        socket
+      end
 
     {:ok, socket}
   end
@@ -50,13 +56,23 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
 
   @impl true
   def handle_event("delete", %{"id" => id}, socket) do
-    bookmark = Bookmarks.get_bookmark!(id)
-    {:ok, _} = Bookmarks.delete_bookmark(bookmark)
+    case Bookmarks.get_bookmark(id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Bookmark not found.")}
 
-    socket = load_bookmarks(socket)
-
-    {:noreply, socket}
+      bookmark ->
+        {:ok, _} = Bookmarks.delete_bookmark(bookmark)
+        {:noreply, load_bookmarks(socket)}
+    end
   end
+
+  @impl true
+  def handle_info({event, _bookmark}, socket)
+      when event in [:bookmark_created, :bookmark_deleted] do
+    {:noreply, load_bookmarks(socket)}
+  end
+
+  def handle_info(_, socket), do: {:noreply, socket}
 
   defp load_bookmarks(socket) do
     bookmarks =
@@ -129,7 +145,10 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
         <% else %>
           <div class="space-y-2">
             <%= for bookmark <- @bookmarks do %>
-              <div class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow">
+              <div
+                id={"bookmark-#{bookmark.id}"}
+                class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"
+              >
                 <div class="card-body p-4">
                   <div class="flex items-start justify-between gap-4">
                     <!-- Bookmark Icon -->

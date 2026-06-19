@@ -2,14 +2,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.{Notes, Projects, Tasks}
-  alias EyeInTheSkyWeb.Live.Shared.{BulkHelpers, KanbanFilters, NotificationHelpers, TasksHelpers}
+
+  alias EyeInTheSkyWeb.Live.Shared.{
+    AgentPubSubHandlers,
+    BulkHelpers,
+    KanbanFilters,
+    NotificationHelpers,
+    TaskEventHandlers,
+    TasksHelpers
+  }
+
   alias EyeInTheSkyWeb.ProjectLive.Kanban.{BoardActions, DatePickerHandlers, FilterHandlers}
 
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentHelpers, only: [handle_start_agent_for_task: 2]
-  import EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   import EyeInTheSkyWeb.Components.KanbanFilterDrawer, only: [kanban_filter_drawer: 1]
   import EyeInTheSkyWeb.Components.KanbanBulkBar, only: [kanban_bulk_bar: 1]
+  import EyeInTheSkyWeb.Components.KanbanToolbar, only: [kanban_toolbar: 1]
   import EyeInTheSkyWeb.Components.KanbanBoard, only: [kanban_board: 1]
 
   @impl true
@@ -73,23 +82,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("update_task", params, socket),
-    do: TasksHelpers.handle_update_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_update_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("delete_task", params, socket),
-    do: TasksHelpers.handle_delete_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_delete_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("create_new_task", params, socket),
-    do: TasksHelpers.handle_create_new_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_create_new_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("quick_add_task", params, socket),
-    do: TasksHelpers.handle_quick_add_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_quick_add_task(params, socket, &KanbanFilters.load_tasks/1)
 
   @impl true
   def handle_event("archive_task", params, socket),
-    do: TasksHelpers.handle_archive_task(params, socket, &KanbanFilters.load_tasks/1)
+    do: TaskEventHandlers.handle_archive_task(params, socket, &KanbanFilters.load_tasks/1)
 
   # ---------------------------------------------------------------------------
   # Events: date picker (delegated to DatePickerHandlers)
@@ -125,11 +134,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_event("add_task_annotation", params, socket),
-    do: TasksHelpers.handle_add_task_annotation(params, socket)
+    do: TaskEventHandlers.handle_add_task_annotation(params, socket)
 
   @impl true
   def handle_event("copy_task_to_project", params, socket),
-    do: TasksHelpers.handle_copy_task_to_project(params, socket)
+    do: TaskEventHandlers.handle_copy_task_to_project(params, socket)
 
   # ---------------------------------------------------------------------------
   # Events: agent spawning
@@ -236,7 +245,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_info(:tasks_changed, socket) do
+  def handle_info({:task_updated, _task}, socket) do
     socket =
       socket
       |> KanbanFilters.load_tasks()
@@ -256,30 +265,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
 
   @impl true
   def handle_info({:agent_working, msg}, socket) do
-    handle_agent_working(socket, msg, fn socket, session_id ->
-      socket
-      |> update(:working_session_ids, &MapSet.put(&1, session_id))
-      |> update(:waiting_session_ids, &MapSet.delete(&1, session_id))
-    end)
+    AgentPubSubHandlers.handle_agent_working_mapsets(socket, msg)
   end
 
   @impl true
   def handle_info({:agent_stopped, %{status: "waiting", id: session_id}}, socket) do
-    socket =
-      socket
-      |> update(:working_session_ids, &MapSet.delete(&1, session_id))
-      |> update(:waiting_session_ids, &MapSet.put(&1, session_id))
-
-    {:noreply, socket}
+    AgentPubSubHandlers.handle_agent_stopped_waiting_mapsets(socket, %{
+      status: "waiting",
+      id: session_id
+    })
   end
 
   @impl true
   def handle_info({:agent_stopped, msg}, socket) do
-    handle_agent_stopped(socket, msg, fn socket, session_id ->
-      socket
-      |> update(:working_session_ids, &MapSet.delete(&1, session_id))
-      |> update(:waiting_session_ids, &MapSet.delete(&1, session_id))
-    end)
+    AgentPubSubHandlers.handle_agent_stopped_mapsets(socket, msg)
   end
 
   @impl true
@@ -291,6 +290,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   @impl true
   def handle_info({:agent_deleted, _}, socket), do: {:noreply, socket}
 
+  @impl true
   def handle_info({:checklist_updated, task}, socket) do
     {:noreply, socket |> assign(:selected_task, task) |> KanbanFilters.load_tasks()}
   end
@@ -314,6 +314,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
         bulk_mode={@bulk_mode}
         selected_tasks={@selected_tasks}
         workflow_states={@workflow_states}
+      />
+
+      <.kanban_toolbar
+        project_id={@project_id}
+        search_query={@search_query}
+        show_completed={@show_completed}
+        bulk_mode={@bulk_mode}
+        active_filter_count={@active_filter_count}
       />
 
       <.kanban_board

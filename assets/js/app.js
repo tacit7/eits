@@ -89,6 +89,8 @@ import {GlobalKeydown} from "./hooks/global_keydown"
 import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
 import {PreserveDetails} from "./hooks/preserve_details"
 import {VimNav} from "./hooks/vim_nav"
+import {TaskListSelection} from "./hooks/task_list_selection"
+import {DrawerDirtyForm} from "./hooks/drawer_dirty_form"
 import {showToast, showSessionFailureToast} from "./hooks/utils"
 import SortDropdown from "./hooks/sort_dropdown"
 import {getHooks} from "live_svelte"
@@ -164,6 +166,8 @@ Hooks.GlobalKeydown = GlobalKeydown
 Hooks.DmHistoryCleanup = DmHistoryCleanup
 Hooks.PreserveDetails = PreserveDetails
 Hooks.SortDropdown = SortDropdown
+Hooks.TaskListSelection = TaskListSelection
+Hooks.DrawerDirtyForm = DrawerDirtyForm
 Hooks.PtyHook = PtyHook
 Hooks.TerminalHook = TerminalHook
 Hooks.TerminalWindowHook = TerminalWindowHook
@@ -177,8 +181,24 @@ const liveSocket = new LiveSocket("/live", Socket, {
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
-window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
-window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+// Track navigation kind so we can reset main scroll on full navigations only.
+// phx:page-loading-stop doesn't carry detail; capture kind from start and apply on stop.
+let _pendingNavKind = null
+window.addEventListener("phx:page-loading-start", (e) => {
+  _pendingNavKind = e.detail?.kind ?? null
+  topbar.show(300)
+})
+window.addEventListener("phx:page-loading-stop", (_info) => {
+  topbar.hide()
+  // Reset main scroll on navigate (not patch/submit) so pages always start at the top.
+  // Without this, scrolling down the sessions list then clicking a session leaves
+  // #main-content scrolled, hiding the DM composer below the viewport.
+  if (_pendingNavKind === "navigate") {
+    const main = document.getElementById("main-content")
+    if (main) main.scrollTop = 0
+  }
+  _pendingNavKind = null
+})
 
 // Editor layout: source of truth on <html data-editor-mode>, owned by the
 // EditorLayout hook on #file-editor-pane. Window-level listeners handle

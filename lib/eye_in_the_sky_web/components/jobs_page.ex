@@ -93,6 +93,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       |> assign_new(:running_ids, fn -> MapSet.new(ScheduledJobs.list_running_job_ids()) end)
       |> assign_new(:last_run_map, fn -> ScheduledJobs.last_run_status_map() end)
       |> assign_new(:active_tab, fn -> :all_jobs end)
+      |> assign_new(:confirm_run_modal_job, fn -> nil end)
+      |> assign_new(:bulk_selected_jobs, fn -> MapSet.new() end)
 
     socket =
       if is_nil(prev_project_id) or assigns.project_id != prev_project_id do
@@ -147,6 +149,9 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   defp dispatch_event("change_schedule_type", params, socket),
     do: handle_change_schedule_type(params, socket)
 
+  defp dispatch_event("validate_cron", params, socket),
+    do: handle_validate_cron(params, socket)
+
   defp dispatch_event("save_job", params, socket) do
     handle_save_job(params, socket, &load_jobs/1, scoping_project_id: socket.assigns.project_id)
   end
@@ -161,19 +166,13 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     with {:ok, int_id} <- parse_job_id(id),
          {:ok, job} <- ScheduledJobs.get_job(int_id),
          :ok <- check_job_access(job, socket.assigns.project_id) do
-      case ScheduledJobs.run_now(int_id, socket.assigns.project_id) do
-        {:ok, _} ->
-          # Bubble flash to parent LiveView — component socket flash is not rendered
-          send(self(), {:jobs_page_flash, :info, "Job triggered"})
-          {:noreply, socket}
+      # Show confirmation modal for agent jobs, run immediately for others
+      case job.job_type do
+        "spawn_agent" ->
+          {:noreply, assign(socket, :confirm_run_modal_job, job)}
 
-        {:error, :unauthorized} ->
-          send(self(), {:jobs_page_flash, :error, "Access denied"})
-          {:noreply, socket}
-
-        {:error, reason} ->
-          send(self(), {:jobs_page_flash, :error, "Failed to trigger job: #{inspect(reason)}"})
-          {:noreply, socket}
+        _ ->
+          do_run_job(job, socket)
       end
     else
       :error ->
@@ -188,6 +187,30 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         send(self(), {:jobs_page_flash, :error, "Access denied"})
         {:noreply, socket}
     end
+  end
+
+  defp dispatch_event("confirm_run_job", params, socket) do
+    with {:ok, int_id} <- parse_job_id(params["id"]),
+         {:ok, job} <- ScheduledJobs.get_job(int_id),
+         :ok <- check_job_access(job, socket.assigns.project_id) do
+      {:noreply, assign(socket, :confirm_run_modal_job, nil) |> then(&do_run_job(job, &1))}
+    else
+      :error ->
+        send(self(), {:jobs_page_flash, :error, "Invalid job ID"})
+        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+
+      {:error, :not_found} ->
+        send(self(), {:jobs_page_flash, :error, "Job not found"})
+        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+
+      {:error, :access_denied} ->
+        send(self(), {:jobs_page_flash, :error, "Access denied"})
+        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+    end
+  end
+
+  defp dispatch_event("cancel_run_job", _params, socket) do
+    {:noreply, assign(socket, :confirm_run_modal_job, nil)}
   end
 
   defp dispatch_event("delete_job", params, socket),
@@ -231,7 +254,107 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     end
   end
 
+  defp dispatch_event("toggle_job_select", %{"id" => id}, socket) do
+    {:ok, int_id} = parse_job_id(id)
+    selected = socket.assigns.bulk_selected_jobs
+
+    updated =
+      if MapSet.member?(selected, int_id),
+        do: MapSet.delete(selected, int_id),
+        else: MapSet.put(selected, int_id)
+
+    {:noreply, assign(socket, :bulk_selected_jobs, updated)}
+  rescue
+    _ -> {:noreply, socket}
+  end
+
+  defp dispatch_event("select_all_jobs", %{"scope" => scope}, socket) do
+    jobs =
+      case scope do
+        "project" -> socket.assigns[:project_jobs] || []
+        "global" -> socket.assigns[:global_jobs] || []
+        "overview" -> socket.assigns[:jobs] || []
+        _ -> []
+      end
+
+    job_ids = Enum.map(jobs, & &1.id)
+    selected = socket.assigns.bulk_selected_jobs
+
+    all_selected =
+      Enum.all?(job_ids, &MapSet.member?(selected, &1))
+
+    updated =
+      if all_selected,
+        do: Enum.reduce(job_ids, selected, &MapSet.delete(&2, &1)),
+        else: Enum.reduce(job_ids, selected, &MapSet.put(&2, &1))
+
+    {:noreply, assign(socket, :bulk_selected_jobs, updated)}
+  end
+
+  defp dispatch_event("bulk_enable", %{"scope" => _scope}, socket) do
+    selected = socket.assigns.bulk_selected_jobs
+
+    if MapSet.size(selected) == 0 do
+      {:noreply, socket}
+    else
+      job_ids = MapSet.to_list(selected)
+
+      {updated_count, _} =
+        ScheduledJobs.bulk_update_enabled(job_ids, true, socket.assigns.project_id)
+
+      {:noreply,
+       socket
+       |> assign(:bulk_selected_jobs, MapSet.new())
+       |> load_jobs()
+       |> then(
+         &put_flash(&1, :info, "Enabled #{updated_count} job#{if updated_count != 1, do: "s"}")
+       )}
+    end
+  end
+
+  defp dispatch_event("bulk_disable", %{"scope" => _scope}, socket) do
+    selected = socket.assigns.bulk_selected_jobs
+
+    if MapSet.size(selected) == 0 do
+      {:noreply, socket}
+    else
+      job_ids = MapSet.to_list(selected)
+
+      {updated_count, _} =
+        ScheduledJobs.bulk_update_enabled(job_ids, false, socket.assigns.project_id)
+
+      {:noreply,
+       socket
+       |> assign(:bulk_selected_jobs, MapSet.new())
+       |> load_jobs()
+       |> then(
+         &put_flash(&1, :info, "Disabled #{updated_count} job#{if updated_count != 1, do: "s"}")
+       )}
+    end
+  end
+
+  defp dispatch_event("clear_bulk_selection", _params, socket) do
+    {:noreply, assign(socket, :bulk_selected_jobs, MapSet.new())}
+  end
+
   defp dispatch_event(_event, _params, socket), do: {:noreply, socket}
+
+  defp do_run_job(job, socket) do
+    case ScheduledJobs.run_now(job.id, socket.assigns.project_id) do
+      {:ok, _} ->
+        # Bubble flash to parent LiveView — component socket flash is not rendered
+        send(self(), {:jobs_page_flash, :info, "Job triggered"})
+        {:noreply, socket}
+
+      {:error, :unauthorized} ->
+        send(self(), {:jobs_page_flash, :error, "Access denied"})
+        {:noreply, socket}
+
+      {:error, reason} ->
+        send(self(), {:jobs_page_flash, :error, "Failed to trigger job: #{inspect(reason)}"})
+        {:noreply, socket}
+    end
+  end
 
   # ---------------------------------------------------------------------------
   # Private helpers
@@ -330,7 +453,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           phx-value-tab="agent_schedules"
           phx-target={@myself}
         >
-          Schedule Agents
+          Recurring Agents
         </button>
       </div>
 
@@ -431,6 +554,9 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               running_ids={@running_ids}
               last_run_map={@last_run_map}
               last_failed_runs={@last_failed_runs}
+              scope="project"
+              project_name={@project.name}
+              bulk_selected_jobs={@bulk_selected_jobs}
               target={@myself}
             />
           </div>
@@ -460,6 +586,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               running_ids={@running_ids}
               last_run_map={@last_run_map}
               last_failed_runs={@last_failed_runs}
+              scope="global"
+              bulk_selected_jobs={@bulk_selected_jobs}
               target={@myself}
             />
           </div>
@@ -472,10 +600,82 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
             running_ids={@running_ids}
             last_run_map={@last_run_map}
             last_failed_runs={@last_failed_runs}
+            last_n_runs_map={@last_n_runs_map}
+            scope="overview"
             show_origin={true}
+            bulk_selected_jobs={@bulk_selected_jobs}
             target={@myself}
           />
         <% end %>
+      <% end %>
+
+      <%!-- Run Now Confirmation Modal for agent jobs --%>
+      <%= if @confirm_run_modal_job do %>
+        <div class="modal modal-open">
+          <div class="modal-box max-w-sm">
+            <h3 class="font-bold text-lg mb-4">Confirm Run Job</h3>
+
+            <div class="space-y-3 mb-6">
+              <div>
+                <p class="text-xs font-medium text-base-content/70">Job Name</p>
+                <p class="text-sm font-mono">{@confirm_run_modal_job.name}</p>
+              </div>
+
+              <%= if @confirm_run_modal_job.description do %>
+                <div>
+                  <p class="text-xs font-medium text-base-content/70">Description</p>
+                  <p class="text-sm text-base-content/80">{@confirm_run_modal_job.description}</p>
+                </div>
+              <% end %>
+
+              <div>
+                <p class="text-xs font-medium text-base-content/70">Type</p>
+                <p class="text-sm">
+                  <span class="badge badge-xs badge-ghost">
+                    <%= case @confirm_run_modal_job.job_type do %>
+                      <% "spawn_agent" -> %>
+                        Agent
+                      <% "mix_task" -> %>
+                        Mix
+                      <% "daily_digest" -> %>
+                        Daily Digest
+                      <% "workable_task" -> %>
+                        Workable Task
+                      <% _ -> %>
+                        {String.upcase(@confirm_run_modal_job.job_type)}
+                    <% end %>
+                  </span>
+                </p>
+              </div>
+
+              <div class="rounded-lg bg-warning/10 border border-warning/30 p-3">
+                <p class="text-xs font-medium text-warning flex items-center gap-1.5">
+                  <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
+                  This will spawn a Claude agent
+                </p>
+              </div>
+            </div>
+
+            <div class="modal-action gap-2">
+              <button
+                class="btn btn-ghost"
+                phx-click="cancel_run_job"
+                phx-target={@myself}
+              >
+                Cancel
+              </button>
+              <button
+                class="btn btn-primary"
+                phx-click="confirm_run_job"
+                phx-value-id={@confirm_run_modal_job.id}
+                phx-target={@myself}
+              >
+                Run Job
+              </button>
+            </div>
+          </div>
+          <div class="modal-backdrop" phx-click="cancel_run_job" phx-target={@myself}></div>
+        </div>
       <% end %>
 
       <%!-- Agent Schedule Section — manages schedule state + form internally.

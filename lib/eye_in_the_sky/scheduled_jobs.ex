@@ -18,6 +18,7 @@ defmodule EyeInTheSky.ScheduledJobs do
   defdelegate last_run_status_map(), to: JobRunTracker
   defdelegate list_runs_for_job(job_id, opts \\ []), to: JobRunTracker
   defdelegate last_run_per_job(job_ids), to: JobRunTracker
+  defdelegate last_n_runs_for_jobs(job_ids, limit \\ 10), to: JobRunTracker
   defdelegate record_run_start(job), to: JobRunTracker
   defdelegate record_run_complete(run, status, opts \\ []), to: JobRunTracker
 
@@ -111,19 +112,20 @@ defmodule EyeInTheSky.ScheduledJobs do
   end
 
   defp create_job_insert(attrs) do
-    changeset = ScheduledJob.changeset(%ScheduledJob{}, attrs)
+    next =
+      JobScheduler.compute_next_run_at(
+        attrs["schedule_type"],
+        attrs["schedule_value"],
+        nil,
+        attrs["timezone"] || "Etc/UTC"
+      )
+
+    attrs_with_next = Map.put(attrs, "next_run_at", next)
+    changeset = ScheduledJob.changeset(%ScheduledJob{}, attrs_with_next)
 
     case Repo.insert(changeset) do
       {:ok, job} ->
-        next =
-          JobScheduler.compute_next_run_at(
-            job.schedule_type,
-            job.schedule_value,
-            nil,
-            job.timezone || "Etc/UTC"
-          )
-
-        update_job_fields(job, %{next_run_at: next})
+        {:ok, job}
 
       {:error, %Ecto.Changeset{} = cs} ->
         if Keyword.has_key?(cs.errors, :prompt_id),
@@ -143,28 +145,33 @@ defmodule EyeInTheSky.ScheduledJobs do
         |> Map.put("updated_at", now)
         |> maybe_encode_config()
 
+      # Compute next_run_at if the schedule changed and next_run_at wasn't explicitly set
+      attrs =
+        if !Map.has_key?(attrs, "next_run_at") &&
+             (Map.has_key?(attrs, "schedule_type") || Map.has_key?(attrs, "schedule_value")) do
+          schedule_type = attrs["schedule_type"] || job.schedule_type
+          schedule_value = attrs["schedule_value"] || job.schedule_value
+          timezone = attrs["timezone"] || job.timezone || "Etc/UTC"
+
+          next =
+            JobScheduler.compute_next_run_at(
+              schedule_type,
+              schedule_value,
+              nil,
+              timezone
+            )
+
+          Map.put(attrs, "next_run_at", next)
+        else
+          attrs
+        end
+
       case job |> ScheduledJob.changeset(attrs) |> Repo.update() do
-        {:ok, updated} -> maybe_recompute_next_run(updated, attrs)
+        {:ok, updated} -> {:ok, updated}
         error -> error
       end
     else
       {:error, :unauthorized}
-    end
-  end
-
-  defp maybe_recompute_next_run(updated, attrs) do
-    if Map.has_key?(attrs, "next_run_at") do
-      {:ok, updated}
-    else
-      next =
-        JobScheduler.compute_next_run_at(
-          updated.schedule_type,
-          updated.schedule_value,
-          nil,
-          updated.timezone || "Etc/UTC"
-        )
-
-      update_job_fields(updated, %{next_run_at: next})
     end
   end
 
@@ -214,6 +221,29 @@ defmodule EyeInTheSky.ScheduledJobs do
       update_job_fields(job, %{enabled: new_enabled, updated_at: DateTime.utc_now()})
     else
       {:error, :unauthorized}
+    end
+  end
+
+  def bulk_update_enabled(job_ids, enabled, caller_project_id \\ nil) do
+    Enum.reduce(job_ids, {0, 0}, fn job_id, {succeeded, failed} ->
+      case get_job(job_id) do
+        {:ok, job} ->
+          apply_enabled_if_authorized(job, enabled, caller_project_id, {succeeded, failed})
+
+        _ ->
+          {succeeded, failed + 1}
+      end
+    end)
+  end
+
+  defp apply_enabled_if_authorized(job, enabled, caller_project_id, {succeeded, failed}) do
+    if authorized?(job, caller_project_id) do
+      case update_job_fields(job, %{enabled: enabled, updated_at: DateTime.utc_now()}) do
+        {:ok, _} -> {succeeded + 1, failed}
+        _ -> {succeeded, failed + 1}
+      end
+    else
+      {succeeded, failed + 1}
     end
   end
 

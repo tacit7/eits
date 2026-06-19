@@ -30,6 +30,23 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
     {:noreply, assign(socket, :form_schedule_type, st)}
   end
 
+  def handle_validate_cron(%{"job" => %{"schedule_value" => cron_value}}, socket) do
+    # Validate the cron expression in real-time
+    job = socket.assigns.editing_job || %ScheduledJobs.ScheduledJob{}
+    form_data = %{"schedule_value" => cron_value, "schedule_type" => "cron"}
+
+    changeset =
+      job
+      |> ScheduledJobs.change_job(form_data)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :form, to_form(changeset))}
+  end
+
+  def handle_validate_cron(_params, socket) do
+    {:noreply, socket}
+  end
+
   def handle_toggle_claude_drawer(_params, socket) do
     {:noreply, assign(socket, :show_claude_drawer, !socket.assigns.show_claude_drawer)}
   end
@@ -125,6 +142,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
     |> ScheduledJobs.last_run_per_job()
     |> Enum.filter(fn {_id, run} -> run.status == "failed" end)
     |> Map.new()
+  end
+
+  # Returns %{job_id => [%JobRun{}, ...]} for the last 10 runs of each job.
+  def load_last_n_runs(jobs, limit \\ 10) do
+    ids = Enum.map(jobs, & &1.id)
+    ScheduledJobs.last_n_runs_for_jobs(ids, limit)
   end
 
   # ---------------------------------------------------------------------------

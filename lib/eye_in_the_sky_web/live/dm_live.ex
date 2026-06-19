@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   alias EyeInTheSky.{Agents, Notes, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
   alias EyeInTheSkyWeb.Components.DmPage
 
   alias EyeInTheSkyWeb.DmLive.{
@@ -20,7 +21,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSkyWeb.DmLive.TimerHandlers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
-  import EyeInTheSkyWeb.Live.Shared.TasksHelpers
+  import EyeInTheSkyWeb.Live.Shared.TaskEventHandlers
   import EyeInTheSkyWeb.Live.Shared.DmExportHelpers
   import EyeInTheSkyWeb.Live.Shared.DmModelHelpers
   import EyeInTheSkyWeb.Live.Shared.DmSessionHelpers
@@ -31,26 +32,53 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @default_message_limit 50
   @message_page_size 20
+  # Grace period (ms) after Claude launches before PTY stdin writes are safe.
+  # Ink calls setRawMode(true) async; writes before that land while ICRNL is
+  # active and \r gets converted to \n (insert newline, not submit).
+  @pty_stdin_grace_ms 3_000
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
-    session_result = Sessions.resolve(session_id_param)
+    mount_with_session(socket, session_id_param, params)
+  end
 
-    case session_result do
-      {:ok, session} ->
-        case Agents.get_agent(session.agent_id) do
-          {:ok, agent} ->
-            MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
-            {:ok, mount_session_assigns(socket, params, session, agent, connected?(socket))}
+  # ---------------------------------------------------------------------------
+  # Mount helpers — decomposed from mount/3
+  # ---------------------------------------------------------------------------
 
-          {:error, :not_found} ->
-            {:ok,
-             socket |> put_flash(:error, "Agent not found for this session") |> redirect(to: "/")}
-        end
+  defp mount_with_session(socket, session_id_param, params) do
+    case Sessions.resolve(session_id_param) do
+      {:ok, session} -> mount_with_agent(socket, params, session)
+      {:error, :not_found} -> handle_mount_error(socket, "Session not found")
+    end
+  end
+
+  defp mount_with_agent(socket, params, session) do
+    case Agents.get_agent(session.agent_id) do
+      {:ok, agent} ->
+        MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
+        socket = mount_session_assigns(socket, params, session, agent, connected?(socket))
+
+        use_pty = EyeInTheSky.Settings.get_boolean("dm_use_pty")
+
+        socket =
+          if connected?(socket) && use_pty,
+            do: subscribe_dm_pty(socket, session.uuid),
+            else:
+              socket
+              |> assign(:pty_pid, nil)
+              |> assign(:pty_pending_launch, false)
+              |> assign(:pty_launched_at, nil)
+
+        {:ok, socket}
 
       {:error, :not_found} ->
-        {:ok, socket |> put_flash(:error, "Session not found") |> redirect(to: "/")}
+        handle_mount_error(socket, "Agent not found for this session")
     end
+  end
+
+  defp handle_mount_error(socket, error_message) do
+    {:ok, socket |> put_flash(:error, error_message) |> redirect(to: "/")}
   end
 
   defp mount_session_assigns(socket, params, session, agent, connected) do
@@ -59,8 +87,50 @@ defmodule EyeInTheSkyWeb.DmLive do
     |> MountState.assign_sidebar_context(params)
     |> MountState.assign_session_state(session, agent)
     |> MountState.assign_essential_defaults(session)
-    |> then(fn s -> if connected, do: MountState.assign_connected_defaults(s, session), else: s end)
+    |> then(fn s ->
+      if connected, do: MountState.assign_connected_defaults(s, session), else: s
+    end)
     |> MessageHandlers.load_messages_on_mount()
+  end
+
+  # ---------------------------------------------------------------------------
+  # Tab & UI toggles
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # PTY terminal events
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_event("pty_input", %{"data" => data}, socket) do
+    if pid = socket.assigns[:pty_pid] do
+      PtyServer.write(pid, data)
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("pty_resize", %{"cols" => cols, "rows" => rows}, socket) do
+    if pid = socket.assigns[:pty_pid] do
+      PtyServer.resize(pid, cols, rows)
+    end
+
+    # Fire the launch command on the first resize so claude starts with correct
+    # dimensions, not the 220-col PTY default from spawn time.
+    socket =
+      if socket.assigns[:pty_pending_launch] && socket.assigns[:pty_pid] do
+        PtyServer.write(socket.assigns.pty_pid, build_launch_command(socket.assigns))
+        PtyServer.mark_launched(socket.assigns.pty_pid)
+
+        socket
+        |> assign(:pty_pending_launch, false)
+        |> assign(:pty_launched_at, DateTime.utc_now())
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   # ---------------------------------------------------------------------------
@@ -119,9 +189,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("toggle_context_meter", _params, socket),
     do: toggle_active_overlay(socket, :context_meter)
-
-  @impl true
-  def handle_event("toggle_new_session_drawer", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("toggle_new_task_drawer", _params, socket),
@@ -208,14 +275,14 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_event("delete_task", %{"task_id" => _} = params, socket) do
-    socket = assign(socket, :active_overlay, nil)
-    handle_delete_task(params, socket, &TabHelpers.reload_tasks/1)
+    cleanup_fn = fn s -> assign(s, :active_overlay, nil) end
+    handle_delete_task(params, socket, &TabHelpers.reload_tasks/1, cleanup_fn)
   end
 
   @impl true
   def handle_event("archive_task", %{"task_id" => _} = params, socket) do
-    socket = assign(socket, :active_overlay, nil)
-    handle_archive_task(params, socket, &TabHelpers.reload_tasks/1)
+    cleanup_fn = fn s -> assign(s, :active_overlay, nil) end
+    handle_archive_task(params, socket, &TabHelpers.reload_tasks/1, cleanup_fn)
   end
 
   @impl true
@@ -395,6 +462,26 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("delete_attachment", %{"id" => attachment_id}, socket) do
+    case parse_int(attachment_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid attachment ID")}
+
+      id ->
+        case EyeInTheSky.FileAttachments.delete_attachment(id) do
+          :ok ->
+            {:noreply,
+             put_flash(socket, :info, "Attachment deleted successfully")
+             |> push_event("refresh_messages", %{})}
+
+          {:error, reason} ->
+            {:noreply,
+             put_flash(socket, :error, "Failed to delete attachment: #{inspect(reason)}")}
+        end
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # File autocomplete
   # ---------------------------------------------------------------------------
@@ -413,6 +500,29 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def handle_event("load_diff", %{"hash" => hash}, socket),
     do: ExternalActions.handle_load_diff(hash, socket)
+
+  @impl true
+  def handle_event("load_cumulative_diff", _params, socket),
+    do: ExternalActions.handle_load_cumulative_diff(socket)
+
+  @impl true
+  def handle_event("set_diff_mode", %{"mode" => mode}, socket)
+      when mode in ["unified", "side_by_side"] do
+    {:noreply, assign(socket, :diff_mode, String.to_existing_atom(mode))}
+  end
+
+  @impl true
+  def handle_event("set_commits_view", %{"view" => view}, socket)
+      when view in ["list", "cumulative"] do
+    socket = assign(socket, :commits_view, String.to_existing_atom(view))
+
+    socket =
+      if view == "cumulative" and socket.assigns.cumulative_diff == nil,
+        do: elem(ExternalActions.handle_load_cumulative_diff(socket), 1),
+        else: socket
+
+    {:noreply, socket}
+  end
 
   @impl true
   def handle_event("open_iterm", _params, socket),
@@ -454,7 +564,11 @@ defmodule EyeInTheSkyWeb.DmLive do
       socket
       |> assign(:syncing, false)
       |> TabHelpers.force_reload_messages(socket.assigns.session_id)
-      |> push_event("new_message", %{})
+      # Use scroll_to_bottom (not new_message) so the hook always jumps to the
+      # bottom after initial page load, regardless of shouldAutoScroll. The
+      # shouldAutoScroll flag can be false when the browser's scroll restoration
+      # fires between mounted() and this sync completing.
+      |> push_event("scroll_to_bottom", %{})
 
     {:noreply, socket}
   end
@@ -517,8 +631,45 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def handle_info({:new_dm, msg}, socket) do
-    # Inbound DM from another session — append directly, no stream_content clear.
-    {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}
+    if socket.assigns[:pty_pid] do
+      # PTY mode — render the DM header in xterm.js and feed the body to Claude.
+      sender = if msg.from_session_id, do: "session:#{msg.from_session_id}", else: "DM"
+      header = "\r\n\e[1;36m[#{sender}]\e[0m\r\n"
+      socket = push_event(socket, "pty_output", %{data: Base.encode64(header)})
+      body = String.trim_trailing(msg.body)
+      pty_pid = socket.assigns.pty_pid
+
+      # Ink calls stdin.setRawMode(true) asynchronously during App mount.
+      # If the PTY write lands before raw mode is active, the line discipline's
+      # ICRNL flag converts \r → \n, which Ink sees as "insert newline" rather
+      # than "submit".  Give Claude 3 seconds to reach raw mode before writing
+      # stdin; after the grace window, write immediately.
+      elapsed_ms =
+        case socket.assigns[:pty_launched_at] do
+          nil -> @pty_stdin_grace_ms
+          launched_at -> DateTime.diff(DateTime.utc_now(), launched_at, :millisecond)
+        end
+
+      delay_ms = max(0, @pty_stdin_grace_ms - elapsed_ms)
+
+      if delay_ms > 0 do
+        Process.send_after(self(), {:deferred_pty_write, pty_pid, body}, delay_ms)
+      else
+        PtyServer.write(pty_pid, body)
+        PtyServer.write(pty_pid, "\r")
+      end
+
+      {:noreply, socket}
+    else
+      {:noreply, MessageHandlers.append_message_from_pubsub(socket, msg)}
+    end
+  end
+
+  @impl true
+  def handle_info({:deferred_pty_write, pty_pid, body}, socket) do
+    PtyServer.write(pty_pid, body)
+    PtyServer.write(pty_pid, "\r")
+    {:noreply, socket}
   end
 
   # ---------------------------------------------------------------------------
@@ -545,6 +696,11 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_info({:agent_updated, updated_session}, socket),
     do: AgentLifecycle.handle_agent_updated(updated_session, socket)
 
+  @impl true
+  def handle_info({:tasks_changed, _entity}, socket),
+    do: AgentLifecycle.handle_tasks_changed(socket)
+
+  # Fallback for bare :tasks_changed (backward compat)
   @impl true
   def handle_info(:tasks_changed, socket),
     do: AgentLifecycle.handle_tasks_changed(socket)
@@ -602,10 +758,46 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, assign(socket, :codex_raw_lines, lines)}
   end
 
+  # ---------------------------------------------------------------------------
+  # PTY terminal — DM page
+  # ---------------------------------------------------------------------------
+
+  # Scroll buffer replayed on (re-)subscribe
+  @impl true
+  def handle_info({:pty_scroll_buffer, buffer}, socket) when byte_size(buffer) > 0 do
+    {:noreply, push_event(socket, "pty_output", %{data: Base.encode64(buffer)})}
+  end
+
+  def handle_info({:pty_scroll_buffer, _empty}, socket), do: {:noreply, socket}
+
+  # Live PTY output
+  @impl true
+  def handle_info({:pty_output, data}, socket) do
+    {:noreply, push_event(socket, "pty_output", %{data: Base.encode64(data)})}
+  end
+
+  # PTY process exited
+  @impl true
+  def handle_info(:pty_exited, socket) do
+    {:noreply,
+     socket
+     |> assign(:pty_pid, nil)
+     |> push_event("pty_output", %{data: Base.encode64("\r\n[process exited]\r\n")})}
+  end
+
   @impl true
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
     {:noreply, socket}
+  end
+
+  @impl true
+  def terminate(_reason, socket) do
+    if pid = socket.assigns[:pty_pid] do
+      PtyServer.unsubscribe(pid)
+    end
+
+    :ok
   end
 
   # ---------------------------------------------------------------------------
@@ -617,6 +809,46 @@ defmodule EyeInTheSkyWeb.DmLive do
      assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, overlay))}
   end
 
+  # Build the shell command string to run on first terminal open.
+  # cd to the session's working directory (if set), then resume the claude session.
+  defp build_launch_command(assigns) do
+    session = assigns[:session]
+    agent = assigns[:agent]
+    uuid = assigns[:session_uuid]
+
+    # Resolve working path: session.git_worktree_path → agent.git_worktree_path → project.path
+    working_path =
+      nonempty(session && session.git_worktree_path) ||
+        nonempty(agent && agent.git_worktree_path) ||
+        nonempty(project_path(session))
+
+    cd_part = if working_path, do: "cd #{working_path} && ", else: ""
+
+    "#{cd_part}claude --resume #{uuid}\n"
+  end
+
+  defp nonempty(nil), do: nil
+  defp nonempty(""), do: nil
+  defp nonempty(val), do: val
+
+  defp project_path(%{project: %{path: path}}), do: path
+  defp project_path(_), do: nil
+
+  defp subscribe_dm_pty(socket, session_uuid) do
+    session_key = "dm-#{session_uuid}"
+    {:ok, pty_pid} = PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
+    :ok = PtyServer.subscribe(pty_pid)
+    # Only launch if Claude has never been started in this PTY session.
+    # has_launched is set to true the moment we write the launch command,
+    # so navigating away and back does not re-launch into a running Claude.
+    pending = PtyServer.should_launch?(pty_pid)
+
+    socket
+    |> assign(:pty_pid, pty_pid)
+    |> assign(:pty_pending_launch, pending)
+    |> assign(:pty_launched_at, nil)
+  end
+
   # ---------------------------------------------------------------------------
   # Render
   # ---------------------------------------------------------------------------
@@ -624,11 +856,12 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id="dm-live-root">
+    <div id="dm-live-root" class="flex flex-col flex-1 min-h-0">
       <DmPage.dm_page
         agent={@session}
         agent_record={@agent}
         session_uuid={@session_uuid}
+        pty_pid={assigns[:pty_pid]}
         active_tab={@active_tab}
         uploads={@uploads}
         streams={@streams}
@@ -671,6 +904,9 @@ defmodule EyeInTheSkyWeb.DmLive do
         }
         commits={@commits}
         diff_cache={@diff_cache}
+        commits_view={@commits_view}
+        diff_mode={@diff_mode}
+        cumulative_diff={@cumulative_diff}
         notes={@notes}
         codex_raw_lines={@codex_raw_lines}
         slash_items={@slash_items}
@@ -702,5 +938,4 @@ defmodule EyeInTheSkyWeb.DmLive do
     </div>
     """
   end
-
 end

@@ -90,6 +90,12 @@ config :wax_,
 # above is always included; add extras via WEBAUTHN_EXTRA_ORIGINS env var.
 config :eye_in_the_sky, :webauthn_extra_origins, []
 
+# PubSub message broadcast strategy: disabled NotifyListener and rely on direct context
+# broadcasts from Messages.send_message, Messages.record_incoming_reply, and ChannelMessages.
+# This consolidates to a single broadcast path and prevents duplicate events.
+# Override in tests.exs to enable if needed.
+config :eye_in_the_sky, EyeInTheSky.Messages.NotifyListener, enabled: false
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

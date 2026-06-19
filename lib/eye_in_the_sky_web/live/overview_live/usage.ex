@@ -39,15 +39,21 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
 
   @impl true
   def handle_event("recalculate", _params, socket) do
-    send(self(), :do_recalculate)
+    lv = self()
+
+    Task.start(fn ->
+      result = TokenIngestion.ingest_all(force: true)
+      send(lv, {:recalculate_done, result})
+    end)
+
     {:noreply, assign(socket, :recalculating, true)}
   end
 
   @impl true
-  def handle_info(:do_recalculate, socket) do
-    %{ingested: ingested, skipped: skipped, errors: errors} =
-      TokenIngestion.ingest_all(force: true)
-
+  def handle_info(
+        {:recalculate_done, %{ingested: ingested, skipped: skipped, errors: errors}},
+        socket
+      ) do
     socket =
       socket
       |> load_all_async(socket.assigns.date_range)

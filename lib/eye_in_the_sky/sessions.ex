@@ -63,6 +63,62 @@ defmodule EyeInTheSky.Sessions do
   end
 
   @doc """
+  Returns sessions matching mixed ID types (integers or UUIDs).
+
+  Splits ids into integer and UUID lists, then queries by both.
+  Returns [] for an empty list or when no sessions are found.
+  """
+  def list_sessions_by_mixed_ids([]), do: []
+
+  def list_sessions_by_mixed_ids(ids) when is_list(ids) do
+    int_ids =
+      ids
+      |> Enum.flat_map(fn
+        id when is_integer(id) ->
+          [id]
+
+        s when is_binary(s) ->
+          case Integer.parse(s) do
+            {n, ""} -> [n]
+            _ -> []
+          end
+
+        _ ->
+          []
+      end)
+
+    uuid_ids =
+      ids
+      |> Enum.filter(fn
+        id when is_integer(id) ->
+          false
+
+        s when is_binary(s) ->
+          case Ecto.UUID.cast(s) do
+            {:ok, _} -> true
+            _ -> false
+          end
+
+        _ ->
+          false
+      end)
+
+    case {int_ids, uuid_ids} do
+      {[], []} ->
+        []
+
+      {[], uuids} ->
+        Repo.all(from s in Session, where: s.uuid in ^uuids, limit: 100)
+
+      {ints, []} ->
+        Repo.all(from s in Session, where: s.id in ^ints, limit: 100)
+
+      {ints, uuids} ->
+        Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids, limit: 100)
+    end
+  end
+
+  @doc """
   Returns a map of %{agent_id => most_recent_session_id} for a list of agent IDs.
   Used for @mention autocomplete — resolves the latest session per agent in one query.
   """
@@ -149,6 +205,34 @@ defmodule EyeInTheSky.Sessions do
     |> where([s], s.id == ^id)
     |> preload(agent: :agent_definition)
     |> Repo.one()
+  end
+
+  @doc """
+  Return the agent definition slug (agent type) for a session identified by its UUID.
+
+  Used by the IAM hook controller to enrich the hook payload with the agent type
+  before policy evaluation. A single three-table join avoids loading the full session
+  struct when only the slug is needed.
+
+  Returns `{:ok, slug}` when found, `:error` when the session, agent, or agent
+  definition is missing.
+  """
+  @spec agent_type_for_session(String.t()) :: {:ok, String.t()} | :error
+  def agent_type_for_session(uuid) when is_binary(uuid) do
+    result =
+      from(s in Session,
+        join: a in assoc(s, :agent),
+        join: ad in assoc(a, :agent_definition),
+        where: s.uuid == ^uuid,
+        select: ad.slug,
+        limit: 1
+      )
+      |> Repo.one()
+
+    case result do
+      nil -> :error
+      slug -> {:ok, slug}
+    end
   end
 
   @doc """
@@ -277,7 +361,8 @@ defmodule EyeInTheSky.Sessions do
   def end_session(%Session{} = session, opts \\ %{}) do
     attrs = %{ended_at: DateTime.utc_now()}
     attrs = if s = opts[:summary], do: Map.put(attrs, :description, s), else: attrs
-    attrs = if s = opts[:final_status], do: Map.put(attrs, :status, s), else: attrs
+    final_status = opts[:final_status] || "completed"
+    attrs = Map.put(attrs, :status, final_status)
 
     with {:ok, updated} <- update_session(session, attrs) do
       Events.agent_stopped(updated)
@@ -631,7 +716,7 @@ defmodule EyeInTheSky.Sessions do
   end
 
   def list_sessions_for_scope(%EyeInTheSky.Scope{type: :workspace, workspace_id: wid}, opts) do
-    limit_val = Keyword.get(opts, :limit)
+    limit_val = Keyword.get(opts, :limit, 500)
     offset_val = Keyword.get(opts, :offset)
     active_only = Keyword.get(opts, :active_only, false)
 

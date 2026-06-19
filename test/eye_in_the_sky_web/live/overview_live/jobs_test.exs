@@ -41,10 +41,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.JobsTest do
       assert has_element?(view, "span.font-medium", "Global Shell Job")
     end
 
-    test "renders tab bar with All Jobs and Schedule Agents tabs", %{conn: conn} do
+    test "renders tab bar with All Jobs and Recurring Agents tabs", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/jobs")
       assert has_element?(view, "button[phx-value-tab='all_jobs']", "All Jobs")
-      assert has_element?(view, "button[phx-value-tab='agent_schedules']", "Schedule Agents")
+      assert has_element?(view, "button[phx-value-tab='agent_schedules']", "Recurring Agents")
     end
 
     test "renders New Job button", %{conn: conn} do

@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
           {:error, _} ->
             # Project was deleted or inaccessible — clear the stale localStorage entry.
-            {:noreply, push_event(socket, "save_project", %{project_id: nil})}
+            {:noreply, push_event(socket, "save_rail_state", %{project_id: nil})}
         end
     end
   end
@@ -286,7 +286,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
       end
 
     project_id = new_project && new_project.id
-    socket4 = push_event(socket3, "save_project", %{project_id: project_id})
+    socket4 = push_event(socket3, "save_rail_state", %{project_id: project_id})
 
     socket5 =
       socket4

@@ -72,8 +72,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection do
           global
         </span>
       </div>
-      <span :if={@prompt.description && @prompt.description != ""}
-            class="truncate text-base-content/40 ml-[18px]">
+      <span
+        :if={@prompt.description && @prompt.description != ""}
+        class="truncate text-base-content/40 ml-[18px]"
+      >
         {@prompt.description}
       </span>
     </.link>

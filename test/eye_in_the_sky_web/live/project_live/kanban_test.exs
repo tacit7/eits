@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       project = create_project()
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
-      view |> element("button", "New Task") |> render_click()
+      view |> element("button.btn-primary[phx-click='toggle_new_task_drawer']") |> render_click()
 
       html = render(view)
       assert html =~ "state_id"
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       project = create_project()
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
-      view |> element("button", "New Task") |> render_click()
+      view |> element("button.btn-primary[phx-click='toggle_new_task_drawer']") |> render_click()
 
       view
       |> form("form[phx-submit='create_new_task']", %{

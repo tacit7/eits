@@ -71,6 +71,37 @@ defmodule EyeInTheSky.Utils.ToolHelpers do
   def maybe_put(map, _key, nil), do: map
   def maybe_put(map, key, value), do: Map.put(map, key, value)
 
+  def resolve_agent_int_id(nil), do: {:error, "agent_id is required"}
+
+  def resolve_agent_int_id(id) when is_integer(id) do
+    case Agents.get_agent(id) do
+      {:ok, agent} -> {:ok, agent.id}
+      {:error, :not_found} -> {:error, "Agent not found: #{id}"}
+    end
+  end
+
+  def resolve_agent_int_id(raw) when is_binary(raw) do
+    case parse_int(raw) do
+      nil ->
+        case Ecto.UUID.cast(raw) do
+          {:ok, _} ->
+            case Agents.get_agent_by_uuid(raw) do
+              {:ok, agent} -> {:ok, agent.id}
+              {:error, :not_found} -> {:error, "Agent not found: #{raw}"}
+            end
+
+          :error ->
+            {:error, "Agent not found: #{raw}"}
+        end
+
+      int_id ->
+        case Agents.get_agent(int_id) do
+          {:ok, agent} -> {:ok, agent.id}
+          {:error, :not_found} -> {:error, "Agent not found: #{raw}"}
+        end
+    end
+  end
+
   def resolve_agent_uuid(nil), do: nil
 
   def resolve_agent_uuid(agent_int_id) do

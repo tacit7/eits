@@ -7,9 +7,7 @@ defmodule EyeInTheSky.Projects.Project do
     field :name, :string
     field :slug, :string
     field :path, :string
-    field :remote_url, :string
     field :git_remote, :string
-    field :repo_url, :string
     field :branch, :string
     field :active, :boolean, default: true
     field :bookmarked, :boolean, default: false
@@ -32,9 +30,7 @@ defmodule EyeInTheSky.Projects.Project do
       :name,
       :slug,
       :path,
-      :remote_url,
       :git_remote,
-      :repo_url,
       :branch,
       :active,
       :bookmarked,

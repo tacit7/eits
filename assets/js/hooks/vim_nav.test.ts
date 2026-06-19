@@ -2885,3 +2885,201 @@ describe("x toggle task done (list_toggle_done)", () => {
     h.destroyed()
   })
 })
+
+// ── Quick DM ─────────────────────────────────────────────────────────────────
+
+describe("quick DM commands (m on sessions page, Space d m global)", () => {
+  it("session.quick_dm command exists with correct definition", () => {
+    const cmd = COMMANDS.find(c => c.id === "session.quick_dm")!
+    expect(cmd).toBeDefined()
+    expect(cmd.label).toBe("Quick DM")
+    expect(cmd.keys).toEqual(["m"])
+    expect(cmd.scope).toBe("page:sessions")
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("quick_dm_compose")
+  })
+
+  it("leader.dm.quick command exists with correct definition", () => {
+    const cmd = COMMANDS.find(c => c.id === "leader.dm.quick")!
+    expect(cmd).toBeDefined()
+    expect(cmd.label).toBe("Quick DM session")
+    expect(cmd.keys).toEqual(["Space", "d", "m"])
+    expect(cmd.action.kind).toBe("client")
+    if (cmd.action.kind === "client") expect(cmd.action.name).toBe("quick_dm_pick")
+  })
+
+  it("quick_dm_compose opens compose overlay for focused session item", () => {
+    const li = document.createElement("div")
+    li.dataset.vimListItem = ""
+    li.dataset.sessionUuid = "abc-123"
+    li.dataset.vimItemTitle = "Test Session"
+    document.body.appendChild(li)
+
+    const list = document.createElement("div")
+    list.dataset.vimList = ""
+    list.appendChild(li)
+    document.body.appendChild(list)
+
+    const h = makeHook()
+    h.listFocusIndex = 0
+
+    const cmd = COMMANDS.find(c => c.id === "session.quick_dm")!
+    h.executeCommand(cmd)
+
+    expect(h.quickDmOverlayEl).not.toBeNull()
+    expect(h._quickDmTargetUuid).toBe("abc-123")
+    expect(h._quickDmTargetName).toBe("Test Session")
+    expect(document.getElementById("vim-nav-quick-dm")).not.toBeNull()
+
+    h._hideQuickDm()
+    li.remove()
+    list.remove()
+  })
+
+  it("quick_dm_compose does nothing when no list item is focused", () => {
+    const h = makeHook()
+    h.listFocusIndex = -1
+    const cmd = COMMANDS.find(c => c.id === "session.quick_dm")!
+    h.executeCommand(cmd)
+    expect(h.quickDmOverlayEl).toBeNull()
+  })
+
+  it("quick_dm_compose does nothing when focused item has no session UUID", () => {
+    const li = document.createElement("div")
+    li.dataset.vimListItem = ""
+    // no data-session-uuid
+    const list = document.createElement("div")
+    list.dataset.vimList = ""
+    list.appendChild(li)
+    document.body.appendChild(list)
+
+    const h = makeHook()
+    h.listFocusIndex = 0
+    const cmd = COMMANDS.find(c => c.id === "session.quick_dm")!
+    h.executeCommand(cmd)
+    expect(h.quickDmOverlayEl).toBeNull()
+
+    li.remove()
+    list.remove()
+  })
+
+  it("quick_dm_pick opens message-session palette command via palette:open-command", () => {
+    const paletteEl = document.createElement("dialog")
+    paletteEl.id = "command-palette"
+    document.body.appendChild(paletteEl)
+
+    const dispatched: CustomEvent[] = []
+    paletteEl.addEventListener("palette:open-command", (e) => dispatched.push(e as CustomEvent))
+
+    const h = makeHook()
+    const cmd = COMMANDS.find(c => c.id === "leader.dm.quick")!
+    h.executeCommand(cmd)
+
+    expect(dispatched).toHaveLength(1)
+    expect(dispatched[0].detail.commandId).toBe("message-session")
+    // does NOT open the custom overlay
+    expect(h.quickDmOverlayEl).toBeNull()
+
+    paletteEl.remove()
+  })
+
+  it("vim:quick-dm-compose event opens compose overlay with session info", () => {
+    const h = makeHook()
+    h.mounted()
+
+    document.dispatchEvent(new CustomEvent("vim:quick-dm-compose", {
+      detail: { uuid: "u-compose-1", name: "My Session" }
+    }))
+
+    expect(h.quickDmOverlayEl).not.toBeNull()
+    expect(h._quickDmTargetUuid).toBe("u-compose-1")
+    expect(h._quickDmTargetName).toBe("My Session")
+    expect(document.getElementById("vim-nav-quick-dm")).not.toBeNull()
+    expect(h.quickDmOverlayEl!.textContent).toContain("My Session")
+
+    h._hideQuickDm()
+    h.destroyed()
+  })
+
+  it("vim:quick-dm-compose event falls back name to 'Session' when missing", () => {
+    const h = makeHook()
+    h.mounted()
+
+    document.dispatchEvent(new CustomEvent("vim:quick-dm-compose", {
+      detail: { uuid: "u-compose-2" }
+    }))
+
+    expect(h._quickDmTargetName).toBe("Session")
+    h._hideQuickDm()
+    h.destroyed()
+  })
+
+  it("vim:quick-dm-compose event does nothing when uuid is missing", () => {
+    const h = makeHook()
+    h.mounted()
+
+    document.dispatchEvent(new CustomEvent("vim:quick-dm-compose", {
+      detail: { name: "No UUID" }
+    }))
+
+    expect(h.quickDmOverlayEl).toBeNull()
+    h.destroyed()
+  })
+
+  it("destroyed() removes vim:quick-dm-compose listener", () => {
+    const h = makeHook()
+    h.mounted()
+    h.destroyed()
+
+    // After destroy, the event should not open the overlay
+    document.dispatchEvent(new CustomEvent("vim:quick-dm-compose", {
+      detail: { uuid: "should-not-open", name: "Ghost" }
+    }))
+
+    expect(h.quickDmOverlayEl).toBeNull()
+  })
+
+  it("_submitQuickDm pushes vim:quick-dm with uuid and body", () => {
+    const h = makeHook()
+    h._quickDmTargetUuid = "uuid-123"
+    h._submitQuickDm("hello agent")
+    expect(h.pushEvent).toHaveBeenCalledWith("vim:quick-dm", { session_uuid: "uuid-123", body: "hello agent" })
+  })
+
+  it("vim:quick-dm-result ok:true closes overlay", () => {
+    const h = makeHook()
+    h.mounted()
+    h._quickDmOverlayBase()
+    expect(h.quickDmOverlayEl).not.toBeNull()
+
+    const [_evt, callback] = (h.handleEvent as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([evt]: [string]) => evt === "vim:quick-dm-result"
+    )!
+    callback({ ok: true })
+    expect(h.quickDmOverlayEl).toBeNull()
+    h.destroyed()
+  })
+
+  it("_hideQuickDm clears all quick DM state", () => {
+    const h = makeHook()
+    h._quickDmTargetUuid = "u-1"
+    h._quickDmTargetName = "Alpha"
+    h._quickDmOverlayBase()
+
+    h._hideQuickDm()
+    expect(h.quickDmOverlayEl).toBeNull()
+    expect(h._quickDmTargetUuid).toBe("")
+    expect(h._quickDmTargetName).toBe("")
+  })
+
+  it("handleKey intercepts Esc when compose overlay is open", () => {
+    const h = makeHook()
+    h._quickDmOverlayBase()
+    expect(h.quickDmOverlayEl).not.toBeNull()
+
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+    h.handleKey(event)
+
+    expect(h.quickDmOverlayEl).toBeNull()
+  })
+})

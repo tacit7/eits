@@ -6,11 +6,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.{Notifications, Projects, Prompts, Tasks}
   alias EyeInTheSky.Claude.RateLimitClient
+  alias EyeInTheSky.{Notifications, Projects, Prompts, Tasks}
+  alias EyeInTheSky.Projects.FileTree
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Components.NewSessionModal
+
   alias EyeInTheSkyWeb.Components.Rail.{
     FileActions,
     FilterActions,
@@ -72,6 +75,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_sort: :last_activity,
         session_name_filter: "",
         session_show: :twenty,
+        session_scope: :current,
+        session_project_visible: %{},
+        session_project_collapsed: MapSet.new(),
         rail_modal: nil,
         flyout_agents: [],
         agent_search: "",
@@ -94,6 +100,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         file_tabs: [],
         active_tab_path: nil,
         show_new_session_form: false,
+        show_new_channel_form: false,
         prefill_agent_slug: nil,
         prefill_agent_name: nil
       )
@@ -126,6 +133,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def update(%{refresh_projects: true}, socket) do
     {:ok, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+  end
+
+  def update(%{refresh_channels: true}, socket) do
+    {:ok,
+     assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
   end
 
   # Targeted update from NavHook when a session is created/updated/stopped.
@@ -198,18 +210,23 @@ defmodule EyeInTheSkyWeb.Components.Rail do
      |> start_async(:load_usage, fn -> RateLimitClient.force_refresh() end)}
   end
 
-  def handle_event("restore_section", %{"section" => section_str}, socket),
-    do: {:noreply, assign(socket, :active_section, Loader.parse_section(section_str))}
+  # Unified restore from localStorage blob. Fires once on mount after the hook reads
+  # the rail_state key. Each helper is defensive — bad or missing keys are ignored.
+  # Order matters: project must be restored before file_expanded (needs sidebar_project.path).
+  def handle_event("restore_rail_state", params, socket) do
+    socket =
+      socket
+      |> maybe_restore_project(params)
+      |> maybe_restore_section(params)
+      |> maybe_restore_session_sort(params)
+      |> maybe_restore_session_scope(params)
+      |> maybe_restore_session_show(params)
+      |> maybe_restore_task_state_filter(params)
+      |> maybe_restore_team_status(params)
+      |> maybe_restore_file_expanded(params)
 
-  # Restore the last selected project from localStorage after a cross-LiveView navigation.
-  # Only applies when the parent has not already provided a project (sidebar_project is nil).
-  # Project-scoped pages set sidebar_project in update/2 before the hook fires, so we
-  # skip the restore in that case to avoid overriding the route-derived context.
-  def handle_event("restore_project", %{"project_id" => id_str}, socket)
-      when is_nil(socket.assigns.sidebar_project),
-    do: ProjectActions.handle_restore_project(id_str, socket)
-
-  def handle_event("restore_project", _params, socket), do: {:noreply, socket}
+    {:noreply, socket}
+  end
 
   def handle_event("toggle_proj_picker", _params, socket),
     do: {:noreply, assign(socket, :proj_picker_open, !socket.assigns.proj_picker_open)}
@@ -341,6 +358,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("toggle_new_session_drawer", _params, socket),
     do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
 
+  def handle_event("toggle_new_channel_form", _params, socket),
+    do: {:noreply, assign(socket, :show_new_channel_form, !socket.assigns.show_new_channel_form)}
+
   def handle_event("open_new_session_with_agent", %{"slug" => slug, "name" => name}, socket) do
     {:noreply,
      socket
@@ -362,6 +382,71 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     end
   end
 
+  def handle_event("create_channel", params, socket) do
+    name = String.trim(params["channel_name"] || "")
+
+    cond do
+      name == "" ->
+        {:noreply, put_flash(socket, :error, "Channel name is required")}
+
+      String.length(name) > 80 ->
+        {:noreply, put_flash(socket, :error, "Channel name must be 80 characters or fewer")}
+
+      true ->
+        project_id = socket.assigns.sidebar_project && socket.assigns.sidebar_project.id
+
+        case EyeInTheSky.Channels.create_channel(%{
+               name: name,
+               channel_type: "public",
+               project_id: project_id
+             }) do
+          {:ok, channel} ->
+            EyeInTheSky.Events.channel_created(channel)
+
+            socket =
+              socket
+              |> assign(:show_new_channel_form, false)
+              |> assign(
+                :flyout_channels,
+                Loader.load_flyout_channels(socket.assigns.sidebar_project)
+              )
+
+            {:noreply, put_flash(socket, :info, "Channel ##{channel.name} created")}
+
+          {:error, %Ecto.Changeset{errors: [name: {msg, _}]}} ->
+            {:noreply, put_flash(socket, :error, "Channel name #{msg}")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to create channel")}
+        end
+    end
+  end
+
+  def handle_event("delete_channel", %{"channel_id" => channel_id}, socket) do
+    case EyeInTheSky.Channels.get_channel(channel_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Channel not found")}
+
+      channel ->
+        case EyeInTheSky.Channels.update_channel(channel, %{archived_at: DateTime.utc_now()}) do
+          {:ok, updated} ->
+            EyeInTheSky.Events.channel_deleted(updated)
+
+            socket =
+              assign(
+                socket,
+                :flyout_channels,
+                Loader.load_flyout_channels(socket.assigns.sidebar_project)
+              )
+
+            {:noreply, put_flash(socket, :info, "Channel ##{channel.name} deleted")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete ##{channel.name}")}
+        end
+    end
+  end
+
   def handle_event("set_session_sort", params, socket),
     do: FilterActions.handle_set_session_sort(params, socket)
 
@@ -370,6 +455,39 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("set_session_show", params, socket),
     do: FilterActions.handle_set_session_show(params, socket)
+
+  def handle_event("set_session_scope", params, socket),
+    do: FilterActions.handle_set_session_scope(params, socket)
+
+  def handle_event("show_more_project_sessions", %{"project_id" => pid_str}, socket) do
+    case parse_int(pid_str) do
+      nil -> {:noreply, socket}
+      pid ->
+        current = Map.get(socket.assigns.session_project_visible, pid, 5)
+
+        {:noreply,
+         assign(
+           socket,
+           :session_project_visible,
+           Map.put(socket.assigns.session_project_visible, pid, current + 5)
+         )}
+    end
+  end
+
+  def handle_event("toggle_project_sessions", %{"project_id" => pid_str}, socket) do
+    case parse_int(pid_str) do
+      nil -> {:noreply, socket}
+      pid ->
+        collapsed = socket.assigns.session_project_collapsed
+
+        updated =
+          if MapSet.member?(collapsed, pid),
+            do: MapSet.delete(collapsed, pid),
+            else: MapSet.put(collapsed, pid)
+
+        {:noreply, assign(socket, :session_project_collapsed, updated)}
+    end
+  end
 
   def handle_event("update_task_search", params, socket),
     do: FilterActions.handle_update_task_search(params, socket)
@@ -418,6 +536,40 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     {:noreply, assign(socket, :rail_modal, modal)}
   end
 
+  def handle_event("open_task_detail", %{"task_id" => task_id_str}, socket) do
+    case parse_int(task_id_str) do
+      nil -> {:noreply, socket}
+      task_id ->
+        tasks = socket.assigns.flyout_tasks
+        index = Enum.find_index(tasks, &(&1.id == task_id)) || 0
+        {:noreply, assign(socket, :rail_modal, {:view_task, index, tasks})}
+    end
+  end
+
+  def handle_event("task_detail_nav", %{"dir" => dir}, socket) do
+    {:view_task, index, tasks} = socket.assigns.rail_modal
+    count = length(tasks)
+    new_index = rem(index + if(dir == "next", do: 1, else: count - 1), count)
+    {:noreply, assign(socket, :rail_modal, {:view_task, new_index, tasks})}
+  end
+
+  def handle_event("open_note_detail", %{"note_id" => note_id_str}, socket) do
+    case parse_int(note_id_str) do
+      nil -> {:noreply, socket}
+      note_id ->
+        notes = socket.assigns.flyout_notes
+        index = Enum.find_index(notes, &(&1.id == note_id)) || 0
+        {:noreply, assign(socket, :rail_modal, {:view_note, index, notes})}
+    end
+  end
+
+  def handle_event("note_detail_nav", %{"dir" => dir}, socket) do
+    {:view_note, index, notes} = socket.assigns.rail_modal
+    count = length(notes)
+    new_index = rem(index + if(dir == "next", do: 1, else: count - 1), count)
+    {:noreply, assign(socket, :rail_modal, {:view_note, new_index, notes})}
+  end
+
   def handle_event("close_rail_modal", _params, socket),
     do: {:noreply, assign(socket, :rail_modal, nil)}
 
@@ -449,7 +601,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           socket =
             case modal_type do
               :new_task ->
-                assign(socket, :flyout_tasks,
+                assign(
+                  socket,
+                  :flyout_tasks,
                   Loader.load_flyout_tasks(
                     socket.assigns.sidebar_project,
                     socket.assigns.task_search,
@@ -546,6 +700,105 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp maybe_start_usage_async(socket, _section), do: socket
 
+  # --- localStorage restore helpers ---
+  # Each guards against missing/bad data. A bad value is silently skipped so a
+  # corrupted localStorage entry never crashes the LiveComponent.
+
+  defp maybe_restore_project(socket, %{"project_id" => id}) when not is_nil(id) do
+    # Only restore when the parent LiveView hasn't already set a project.
+    # update/2 runs before the hook fires, so a route-scoped project wins.
+    if is_nil(socket.assigns.sidebar_project) do
+      ProjectActions.handle_restore_project(to_string(id), socket)
+      |> then(fn {:noreply, s} -> s end)
+    else
+      socket
+    end
+  end
+
+  defp maybe_restore_project(socket, _), do: socket
+
+  defp maybe_restore_section(socket, %{"section" => section}) when is_binary(section) do
+    assign(socket, :active_section, Loader.parse_section(section))
+  end
+
+  defp maybe_restore_section(socket, _), do: socket
+
+  defp maybe_restore_session_sort(socket, %{"session_sort" => sort}) when is_binary(sort) do
+    assign(socket, :session_sort, Loader.parse_session_sort(sort))
+  end
+
+  defp maybe_restore_session_sort(socket, _), do: socket
+
+  defp maybe_restore_session_scope(socket, %{"session_scope" => scope})
+       when scope in ["current", "all"] do
+    assign(socket, :session_scope, String.to_existing_atom(scope))
+  end
+
+  defp maybe_restore_session_scope(socket, _), do: socket
+
+  defp maybe_restore_session_show(socket, %{"session_show" => show}) when is_binary(show) do
+    assign(socket, :session_show, Loader.parse_session_show(show))
+  end
+
+  defp maybe_restore_session_show(socket, _), do: socket
+
+  defp maybe_restore_task_state_filter(socket, %{"task_state_filter" => id})
+       when id in [1, 2, 3, 4] do
+    assign(socket, :task_state_filter, id)
+  end
+
+  # Defensive: JSON may sometimes arrive as a string if the value was stored
+  # before integer encoding was guaranteed (e.g. migrated from an older blob).
+  defp maybe_restore_task_state_filter(socket, %{"task_state_filter" => id})
+       when is_binary(id) do
+    case Integer.parse(id) do
+      {parsed, ""} when parsed in [1, 2, 3, 4] ->
+        assign(socket, :task_state_filter, parsed)
+
+      _ ->
+        socket
+    end
+  end
+
+  defp maybe_restore_task_state_filter(socket, _), do: socket
+
+  defp maybe_restore_team_status(socket, %{"team_status" => status})
+       when status in ["active", "archived"] do
+    assign(socket, :team_status, status)
+  end
+
+  defp maybe_restore_team_status(socket, _), do: socket
+
+  defp maybe_restore_file_expanded(socket, %{"file_expanded" => paths}) when is_list(paths) do
+    # Cap at 100 paths to avoid excessive filesystem reads on mount.
+    valid_paths = paths |> Enum.filter(&is_binary/1) |> Enum.take(100)
+
+    # Re-fetch children for restored paths if a project with a disk path is set.
+    # Without this, the expanded state would render folders as open but with no children.
+    case socket.assigns.sidebar_project do
+      %{path: root} when not is_nil(root) ->
+        children =
+          Enum.reduce(valid_paths, %{}, fn path, acc ->
+            case FileTree.children(root, path) do
+              {:ok, nodes} -> Map.put(acc, path, nodes)
+              {:error, _} -> acc
+            end
+          end)
+
+        # Only keep paths that successfully loaded children.
+        valid_expanded = MapSet.new(Map.keys(children))
+
+        socket
+        |> assign(:flyout_file_expanded, valid_expanded)
+        |> assign(:flyout_file_children, children)
+
+      _ ->
+        assign(socket, :flyout_file_expanded, MapSet.new(valid_paths))
+    end
+  end
+
+  defp maybe_restore_file_expanded(socket, _), do: socket
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -579,34 +832,137 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         </button>
 
         <div class="mb-3" />
-        <.rail_item section={:files} active_section={@active_section} flyout_open={@flyout_open} icon="hero-folder" label="Files" myself={@myself} />
-        <.rail_item section={:sessions} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-bot-message-square" label="Sessions" myself={@myself} />
-        <.rail_item section={:tasks} active_section={@active_section} flyout_open={@flyout_open} icon="hero-check-circle" label="Tasks" myself={@myself} />
-        <.rail_item section={:notes} active_section={@active_section} flyout_open={@flyout_open} icon="hero-pencil-square" label="Notes" myself={@myself} />
-        <.rail_item section={:agents} active_section={@active_section} flyout_open={@flyout_open} icon="lucide-robot" label="Agents" myself={@myself} />
-        <.rail_item section={:skills} active_section={@active_section} flyout_open={@flyout_open} icon="hero-bolt" label="Skills" myself={@myself} />
-        <.rail_item section={:prompts} active_section={@active_section} flyout_open={@flyout_open} icon="hero-document-text" label="Prompts" myself={@myself} />
-        <.rail_item section={:teams} active_section={@active_section} flyout_open={@flyout_open} icon="hero-users" label="Teams" myself={@myself} />
-        <.rail_item section={:jobs} active_section={@active_section} flyout_open={@flyout_open} icon="hero-clock" label="Jobs" myself={@myself} />
-        <.rail_item section={:canvas} active_section={@active_section} flyout_open={@flyout_open} icon="hero-squares-2x2" label="Canvas" myself={@myself} />
-        <.rail_item section={:chat} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chat-bubble-left-ellipsis" label="Chat" myself={@myself} />
-        <.rail_item section={:usage} active_section={@active_section} flyout_open={@flyout_open} icon="hero-chart-bar" label="Usage" myself={@myself} />
+        <.rail_item
+          section={:files}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-folder"
+          label="Files"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:sessions}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="lucide-bot-message-square"
+          label="Sessions"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:tasks}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-check-circle"
+          label="Tasks"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:notes}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-pencil-square"
+          label="Notes"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:agents}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="lucide-robot"
+          label="Agents"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:skills}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-bolt"
+          label="Skills"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:prompts}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-document-text"
+          label="Prompts"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:teams}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-users"
+          label="Teams"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:jobs}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-clock"
+          label="Jobs"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:canvas}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-squares-2x2"
+          label="Canvas"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:chat}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-chat-bubble-left-ellipsis"
+          label="Chat"
+          myself={@myself}
+        />
+        <.rail_item
+          section={:usage}
+          active_section={@active_section}
+          flyout_open={@flyout_open}
+          icon="hero-chart-bar"
+          label="Usage"
+          myself={@myself}
+        />
 
         <div class="flex-1" />
         <div class="mb-3" />
 
-        <.link navigate="/notifications" class={["relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors", "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"]} aria-label="Notifications">
+        <.link
+          navigate="/notifications"
+          class={[
+            "relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+            "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"
+          ]}
+          aria-label="Notifications"
+        >
           <.icon name="hero-bell-mini" class="size-4" />
-          <span :if={@notification_count > 0} class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5">
+          <span
+            :if={@notification_count > 0}
+            class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5"
+          >
             {@notification_count}
           </span>
         </.link>
 
-        <.link navigate="/settings" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Settings">
+        <.link
+          navigate="/settings"
+          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+          aria-label="Settings"
+        >
           <.icon name="hero-cog-6-tooth-mini" class="size-4" />
         </.link>
 
-        <.link href="/auth/logout" method="delete" class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors" aria-label="Sign out">
+        <.link
+          href="/auth/logout"
+          method="delete"
+          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+          aria-label="Sign out"
+        >
           <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
         </.link>
       </nav>
@@ -641,6 +997,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         session_sort={@session_sort}
         session_name_filter={@session_name_filter}
         session_show={@session_show}
+        session_scope={@session_scope}
+        session_project_visible={@session_project_visible}
+        session_project_collapsed={@session_project_collapsed}
+        projects={@projects}
         notification_count={@notification_count}
         flyout_agents={@flyout_agents}
         agent_search={@agent_search}
@@ -661,10 +1021,16 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_error={@flyout_file_error}
         flyout_usage={@flyout_usage}
         rail_modal={@rail_modal}
+        show_new_channel_form={@show_new_channel_form}
         myself={@myself}
       />
 
-      <.file_panel file_tabs={@file_tabs} active_tab_path={@active_tab_path} myself={@myself} socket={@socket} />
+      <.file_panel
+        file_tabs={@file_tabs}
+        active_tab_path={@active_tab_path}
+        myself={@myself}
+        socket={@socket}
+      />
       <%!-- Splitter handle for split-view mode. Visibility driven by data-editor-mode on <html>. --%>
       <%!-- role=separator makes this a keyboard-focusable resize handle per ARIA spec.
            aria-valuenow/min/max are kept in sync by the EditorLayout hook. --%>
@@ -677,7 +1043,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         aria-valuemin="320"
         aria-valuemax="9999"
         tabindex="0"
-      ></div>
+      >
+      </div>
 
       <.live_component
         module={NewSessionModal}

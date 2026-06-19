@@ -5,7 +5,7 @@ defmodule EyeInTheSky.Bookmarks do
 
   import Ecto.Query, warn: false
   alias EyeInTheSky.Bookmarks.Bookmark
-  alias EyeInTheSky.Repo
+  alias EyeInTheSky.{Events, Repo}
 
   @doc """
   Returns the list of bookmarks with optional filters.
@@ -40,13 +40,19 @@ defmodule EyeInTheSky.Bookmarks do
   """
   def get_bookmark!(id), do: Repo.get!(Bookmark, id)
 
+  def get_bookmark(id), do: Repo.get(Bookmark, id)
+
   @doc """
   Creates a bookmark.
   """
   def create_bookmark(attrs \\ %{}) do
-    %Bookmark{}
-    |> Bookmark.changeset(attrs)
-    |> Repo.insert()
+    result =
+      %Bookmark{}
+      |> Bookmark.changeset(attrs)
+      |> Repo.insert()
+
+    if match?({:ok, _}, result), do: Events.bookmark_created(elem(result, 1))
+    result
   end
 
   @doc """
@@ -62,7 +68,9 @@ defmodule EyeInTheSky.Bookmarks do
   Deletes a bookmark.
   """
   def delete_bookmark(%Bookmark{} = bookmark) do
-    Repo.delete(bookmark)
+    result = Repo.delete(bookmark)
+    if match?({:ok, _}, result), do: Events.bookmark_deleted(bookmark)
+    result
   end
 
   @doc """

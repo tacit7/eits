@@ -383,6 +383,51 @@ Pre-tool-use hooks (e.g., `eits-task-gate.sh`) can check the session's read_only
 
 ---
 
+## Session Auto-Registration (Startup Hook)
+
+The startup hook (`priv/scripts/eits-session-startup.sh`) now automatically registers new sessions when they are not pre-registered (e.g., not spawned by the orchestrator). This eliminates the need for manual `eits-init` invocation in normal operation.
+
+**Auto-Registration Flow:**
+
+1. **Check pre-registration**: Startup hook calls `eits sessions get $EITS_SESSION_UUID` to see if session was pre-created (spawned agent or spawn endpoint).
+2. **Auto-register if missing**: When `sessions get` returns nothing, the hook calls:
+   ```bash
+   eits sessions create \
+     --session-id "$SESSION_ID" \
+     --project "$(basename "$LOOKUP_DIR")" \
+     --project-path "$LOOKUP_DIR" \
+     --model "${MODEL:-}" \
+     --entrypoint "${ENTRYPOINT:-}"
+   ```
+3. **Extract agent UUID**: On success, extracts `EXISTING_AGENT_UUID` and `SESSION_INT_ID` from the create response and exports them.
+4. **Fallback on failure**: If create fails (server down), hook logs a message and proceeds — `EITS_AGENT_UUID` remains unset, and `eits-init` skill is available as a fallback.
+
+**Coverage:**
+- All new interactive `cli` sessions (normal user-initiated Claude Code)
+- All new headless `sdk-cli` sessions (spawned agents, resumed agents)
+- Spawned agents pre-registered by the orchestrator skip this path (already have `EXISTING_AGENT_UUID` set)
+
+**Fallback Skill (`eits-init`):**
+
+The `eits-init` skill is now a fallback for auto-registration failures (server down at session start). The skill description and behavior have been updated:
+
+**Before:** "MUST be called at the start of every session..."
+**After:** "Fallback session registration for EITS. Only needed when auto-registration in the startup hook failed (EITS server was down at session start). Check $EITS_AGENT_UUID first — if set, exit immediately."
+
+When auto-registration fails, the startup hook output includes:
+```
+[EITS] startup: auto-register failed — EITS server may be down
+**IMPORTANT**: Auto-registration failed (EITS server may be down). Invoke `skill: "eits-init"` before responding to the user.
+```
+
+When auto-registration succeeds, the output includes:
+```
+[EITS] startup: auto-registered session_int=$SESSION_INT_ID agent_uuid=$EXISTING_AGENT_UUID
+Session registered. EITS_AGENT_UUID is set — /eits-init is not needed.
+```
+
+---
+
 ## Session Usage Caching
 
 Session token and cost totals are cached on the `sessions` table for O(1) lookup when displaying per-session usage metrics.
@@ -440,6 +485,70 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 
 This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
 
+### Agent Type Resolution for IAM Policy Evaluation
+
+When Claude Code hooks evaluate session-scoped policies (e.g., document-attached policies that scope enforcement by agent type), the hook payload from the Claude CLI may not include an explicit `agent_type` field. To ensure policies fire correctly, the IAM controller enriches hook payloads with the agent type resolved from the session record.
+
+**Function:** `Sessions.agent_type_for_session/1`
+
+```elixir
+def agent_type_for_session(uuid) when is_binary(uuid) do
+  result =
+    from(s in Session,
+      join: a in assoc(s, :agent),
+      join: ad in assoc(a, :agent_definition),
+      where: s.uuid == ^uuid,
+      select: ad.slug,
+      limit: 1
+    )
+    |> Repo.one()
+
+  case result do
+    nil -> :error
+    slug -> {:ok, slug}
+  end
+end
+```
+
+**Purpose:** Resolves the agent definition slug (e.g., `"setup-guardian"`) for a session identified by its UUID via a three-table join (Session → Agent → AgentDefinition). Returns `{:ok, slug}` when found, `:error` when the session, agent, or agent definition is missing.
+
+**Usage in IAM Controller:** `POST /api/v1/iam/decide` enriches the hook payload before policy evaluation:
+
+```elixir
+def decide(conn, params) when is_map(params) do
+  start_us = System.monotonic_time(:microsecond)
+
+  params = enrich_agent_type(params)  # Enrich with agent type from session
+  ctx = Normalizer.from_hook_payload(params)
+  decision = Evaluator.decide(ctx)
+
+  # ... broadcast and return
+end
+
+defp enrich_agent_type(params) do
+  with nil <- Map.get(params, "agent_type"),
+       uuid when is_binary(uuid) <- Map.get(params, "session_id"),
+       {:ok, slug} <- Sessions.agent_type_for_session(uuid) do
+    Map.put(params, "agent_type", slug)
+  else
+    _ -> params
+  end
+end
+```
+
+**Behavior:**
+- Uses `put_new` semantics — if `agent_type` is already in the payload, it is not overwritten
+- Falls back gracefully: if the session, agent, or agent definition is missing, the payload remains unchanged (policy evaluation may skip document-attached policies that require agent type)
+- O(1) lookup: single three-table join with limit 1; no N+1 risk
+
+**Example flow:**
+1. Claude Code hook posts `{session_id: "uuid-...", tool: "Edit", ...}` (no agent_type)
+2. IAM controller calls `agent_type_for_session("uuid-...")`
+3. Resolves to `{:ok, "setup-guardian"}` by joining Session → Agent → AgentDefinition
+4. Enriches params: `Map.put(params, "agent_type", "setup-guardian")`
+5. Policy evaluator now has agent_type for document-scoped policies
+6. Policies that target agent type "setup-guardian" fire correctly
+
 ### Session Resume Response
 
 When a session is resumed via `POST /api/v1/sessions/:uuid/resume` or fetched via `GET /api/v1/sessions/:uuid`, the response includes the agent UUID, project ID, and worktree information needed to set up the Claude Code environment:
@@ -466,6 +575,41 @@ When a session is resumed via `POST /api/v1/sessions/:uuid/resume` or fetched vi
 The addition of `worktree_path` and `branch_name` eliminates orchestrator guessing on branch names before merge — the API now surfaces the exact branch the session is working on.
 
 This fix ensures the startup hook can properly populate `EITS_AGENT_UUID` and `EITS_PROJECT_ID` in the Claude Code environment when resuming a session.
+
+### Session Resume Context Injection — Channel Mentions
+
+When a session resumes via `eits sessions resume <uuid>` or the session lifecycle hooks, the `eits-session-resume.sh` script injects recent channel activity for awareness. This allows resumed agents to pick up context on what happened while they were paused.
+
+**What gets injected:**
+- Messages from channels where the session is a member **AND** was directly @mentioned in the last hour
+- Up to 3 most recent messages per qualifying channel
+- Message sender, timestamp, and truncated body (200 chars max)
+- Pure ambient-observer channels (no direct mention) are skipped — avoids noise for agents that only passively listen
+
+**Example injected context:**
+```markdown
+## Recent Channel Activity (last 1h — you were @mentioned)
+
+### #tech-review (channel:42)
+- **alice** [14:23]: Design feedback on PR #156: we need to…
+- **bob** [14:15]: @3185 can you review the auth changes?
+- **charlie** [14:05]: Updated schema migration, ready for QA
+```
+
+**Implementation:** Shell function `_inject_channel_context()` in `priv/scripts/eits-session-resume.sh`:
+1. Queries the DB using `psql` directly against `EITS_PG_*` env vars
+2. Filters channels by session membership + @mention by session ID or UUID in the last hour
+3. Formats top 3 messages per channel chronologically
+4. Falls back gracefully if `psql` is unavailable or no qualifying channels exist
+5. Appends context to the system-reminder section output
+
+**Query behavior:**
+- Uses a CTE to find mentioned channels first (efficient for sparse @mentions)
+- Rows from other sessions only (excludes self-mentions)
+- Case-insensitive ILIKE match on session ID (numeric) or UUID (string format)
+- Runs only when session has a numeric ID (`SESSION_INT_ID` env var is set)
+
+This allows resumed agents to recover context automatically — no explicit "catch me up" request needed. Particularly useful for long-running orchestrators that pause and resume across task boundaries, or for agents that were idle while important discussions happened in team channels.
 
 **Environment Variable: EITS_SESSION_ID**
 Spawned Claude processes set `EITS_SESSION_ID` to the **integer EITS session record ID**, not the UUID. This is critical for child agent spawning:

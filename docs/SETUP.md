@@ -536,3 +536,27 @@ Open that URL on the device you want to register (e.g., iPhone). The passkey wil
 - No `.tool-versions` or `.nvmrc` — use Node 22 LTS
 - Oban background jobs require the DB to be up before server starts
 - `mix precommit` runs compile + deps.unlock + format + test in one shot; run before committing
+
+---
+
+## GitHub Webhooks (Dev)
+
+To receive GitHub webhook events locally, use [smee-client](https://github.com/probot/smee-client) as a tunnel:
+
+1. Go to https://smee.io and create a new channel. Copy the URL.
+2. Configure your GitHub repo webhook to point at the smee.io URL.
+   - **Payload URL:** your smee.io channel URL
+   - **Content type:** `application/json`
+   - **Secret:** must match `GITHUB_WEBHOOK_SECRET` in your `.env`
+   - **Events:** select "Send me everything" or choose individual events
+3. Run smee alongside the Phoenix server:
+
+```bash
+npx smee-client \
+  --url https://smee.io/<your-channel> \
+  --target http://localhost:5001/api/v1/webhooks/github
+```
+
+4. Set `GITHUB_WEBHOOK_SECRET` in `.env` to match the GitHub webhook secret.
+
+In production, point the GitHub webhook directly at `https://your-domain/api/v1/webhooks/github`.

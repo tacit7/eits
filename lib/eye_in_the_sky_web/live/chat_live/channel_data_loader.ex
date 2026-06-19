@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelDataLoader do
       |> then(&Prompts.list_prompts(project_id: &1))
       |> ChatPresenter.serialize_prompts()
 
-    agent_templates = Agents.list_agent_templates()
+    agent_templates = Map.get(opts, :agent_templates) || Agents.list_agent_templates()
 
     channel_members = ChannelHelpers.load_channel_members(channel_id)
     all_projects = Projects.list_projects()

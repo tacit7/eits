@@ -8,12 +8,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('./palette_commands/index.js', () => ({
+vi.mock('../commands.js', () => ({
   getCommands: vi.fn(() => []),
 }))
 
 import { CommandPalette } from './command_palette.js'
-import { getCommands } from './palette_commands/index.js'
+import { getCommands } from '../commands.js'
 
 // jsdom does not implement scrollIntoView
 beforeEach(() => {

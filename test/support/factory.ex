@@ -77,4 +77,19 @@ defmodule EyeInTheSky.Factory do
     agent = create_agent()
     create_session(agent)
   end
+
+  def bookmark_fixture(attrs \\ %{}) do
+    defaults = %{
+      bookmark_type: "note",
+      bookmark_id: "note-#{uniq()}",
+      title: "Test bookmark #{uniq()}"
+    }
+
+    {:ok, bookmark} =
+      defaults
+      |> Map.merge(Map.new(attrs))
+      |> EyeInTheSky.Bookmarks.create_bookmark()
+
+    bookmark
+  end
 end

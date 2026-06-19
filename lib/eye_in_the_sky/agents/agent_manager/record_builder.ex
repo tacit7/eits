@@ -15,12 +15,12 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
   def create_records(opts) do
     agent_uuid = Ecto.UUID.generate()
     provider = resolve_provider(opts)
-    session_uuid = resolve_session_uuid(provider, opts)
+    provider_conversation_id = resolve_provider_conversation_id(provider, opts)
     description = resolve_description(opts)
     project_id = resolve_project_id(opts)
 
     Logger.info(
-      "📝 create_agent: agent_uuid=#{agent_uuid}, session_uuid=#{inspect(session_uuid)}, model=#{opts[:model]}, project_id=#{project_id}"
+      "📝 create_agent: agent_uuid=#{agent_uuid}, provider_conversation_id=#{inspect(provider_conversation_id)}, model=#{opts[:model]}, project_id=#{project_id}"
     )
 
     definition_info = resolve_agent_definition(opts[:agent], project_id, opts[:project_path])
@@ -29,7 +29,7 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
       insert_agent_and_session(%{
         agent_uuid: agent_uuid,
         provider: provider,
-        session_uuid: session_uuid,
+        provider_conversation_id: provider_conversation_id,
         description: description,
         project_id: project_id,
         worktree_path: worktree_path,
@@ -47,14 +47,14 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
     end
   end
 
-  defp resolve_session_uuid(provider, opts) do
+  defp resolve_provider_conversation_id(provider, opts) do
     # For codex and gemini sessions, leave uuid null — the provider's native session_id
     # arrives via InitEvent / thread.started and gets synced later via
     # maybe_sync_provider_conversation_id.
     # For claude sessions, pre-generate so the worker can reference it immediately.
     if provider in ["codex", "gemini"],
       do: nil,
-      else: opts[:session_uuid] || Ecto.UUID.generate()
+      else: opts[:provider_conversation_id] || Ecto.UUID.generate()
   end
 
   defp resolve_description(opts) do
@@ -100,7 +100,7 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
   defp insert_agent_and_session(%{
          agent_uuid: agent_uuid,
          provider: provider,
-         session_uuid: session_uuid,
+         provider_conversation_id: provider_conversation_id,
          description: description,
          project_id: project_id,
          worktree_path: worktree_path,
@@ -124,7 +124,7 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
     agent_changeset = Agent.changeset(%Agent{}, agent_attrs)
 
     session_opts = %{
-      uuid: session_uuid,
+      uuid: provider_conversation_id,
       name: description,
       description: "agent-id #{agent_uuid}",
       model: opts[:model],
@@ -149,7 +149,7 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
         EyeInTheSky.Events.agent_created(agent)
 
         Logger.info(
-          "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, session_uuid=#{session.uuid}"
+          "✅ create_agent: DB records created - agent.id=#{agent.id}, session.id=#{session.id}, provider_conversation_id=#{session.uuid}"
         )
 
         {:ok, %{agent: agent, session: session}}

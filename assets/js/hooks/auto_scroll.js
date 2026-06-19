@@ -4,6 +4,16 @@ export const AutoScroll = {
     this._intentLoadMore = false
     this._mounted = false
     this._updating = false
+
+    // Prevent the browser from restoring a previous scroll position after
+    // LiveView navigation. Without this, history.back() / push_navigate
+    // can restore a stale scrollTop to the messages container, which then
+    // tricks beforeUpdate() into setting shouldAutoScroll=false right before
+    // the sync-done messages load — leaving the view stuck at the top.
+    if (typeof history !== "undefined" && "scrollRestoration" in history) {
+      this._prevScrollRestoration = history.scrollRestoration
+      history.scrollRestoration = "manual"
+    }
     // WeakSet of children already observed by ResizeObserver. Using WeakSet
     // means removed DOM nodes are GC'd without manual cleanup. We only add
     // children we haven't seen — no more disconnect/reconnect on every patch,
@@ -74,6 +84,15 @@ export const AutoScroll = {
     this.handleEvent("new_message", () => {
       if (this.shouldAutoScroll) this.scrollToBottom()
     })
+
+    // Fired by the server after mount-sync completes (sync_done). Unlike
+    // "new_message", this bypasses shouldAutoScroll — we always want to land
+    // at the bottom after initial page load, regardless of whether the browser
+    // tried to restore a previous scroll position.
+    this.handleEvent("scroll_to_bottom", () => {
+      this.shouldAutoScroll = true
+      this.scrollToBottom()
+    })
   },
 
   beforeUpdate() {
@@ -117,6 +136,11 @@ export const AutoScroll = {
   },
 
   destroyed() {
+    // Restore browser scroll restoration to its original value so other pages
+    // (non-DM LiveViews) are not affected by the manual override.
+    if (typeof history !== "undefined" && this._prevScrollRestoration !== undefined) {
+      history.scrollRestoration = this._prevScrollRestoration
+    }
     this.el.removeEventListener("scroll", this._onScroll)
     this.el.removeEventListener("load-more-intent", this._onLoadMoreIntent)
     if (this._mutationObserver) {

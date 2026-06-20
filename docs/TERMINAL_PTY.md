@@ -1,11 +1,12 @@
 # Terminal PTY System
 
-Full-stack embedded terminal built on erlexec + xterm.js. Two surfaces exist:
+Full-stack embedded terminal built on erlexec + xterm.js. Three surfaces exist:
 
 - **`/terminal`** — standalone single-terminal LiveView page (`TerminalLive`)
 - **Canvas** — draggable/resizable terminal windows on the canvas page, multiple per canvas (`TerminalWindowComponent`)
+- **DM Sessions** — optional PTY-backed terminal mode in DM conversations, toggled via `dm_use_pty` setting (`DmLive`)
 
-Both surfaces share `PtyServer` and `PtySupervisor`. The wiring layer differs.
+All surfaces share `PtyServer` and `PtySupervisor`. The wiring layer differs.
 
 ---
 
@@ -64,8 +65,10 @@ erlexec → bash (OS process)
 | `lib/eye_in_the_sky/terminal/pty_supervisor.ex` | DynamicSupervisor for PtyServer instances |
 | `lib/eye_in_the_sky_web/live/terminal_live.ex` | Standalone LiveView (`/terminal`) |
 | `lib/eye_in_the_sky_web/live/canvas_live.ex` | Canvas LiveView; manages terminal lifecycle, PTY map |
+| `lib/eye_in_the_sky_web/live/dm_live.ex` | DM LiveView; optional PTY mode via `dm_use_pty` setting |
 | `lib/eye_in_the_sky_web/components/terminal_window_component.ex` | LiveComponent for canvas terminal windows |
 | `lib/eye_in_the_sky/canvases/canvas_terminal.ex` | Ecto schema for persisted terminal layout |
+| `lib/eye_in_the_sky/settings.ex` | Settings schema; defines `dm_use_pty` default |
 | `priv/repo/migrations/…add_canvas_terminals.exs` | Migration: canvas_terminals table |
 | `assets/js/hooks/pty_hook.js` | xterm.js hook for standalone terminal (pushEvent to LiveView) |
 | `assets/js/hooks/terminal_hook.js` | xterm.js hook for canvas windows (pushEventTo LiveComponent) |
@@ -326,6 +329,59 @@ this.handleEvent(`pty_output_${terminalId}`, ({ data }) => {
 #### `TerminalWindowHook` — `assets/js/hooks/terminal_window_hook.js`
 
 Drag + resize + z-index chrome. Mirrors `ChatWindowHook` but pushes `"terminal_moved"` / `"terminal_resized"` events (distinct names from chat windows). Restores JS-tracked position/size in `updated()` after LiveView patches the style attribute.
+
+---
+
+## DM PTY Mode — `DmLive`
+
+DM sessions can optionally use a PTY terminal instead of the text-message interface. This is controlled via the `dm_use_pty` setting (default: `false`).
+
+### Settings Integration
+
+The `dm_use_pty` toggle is stored in the settings schema:
+
+```elixir
+# lib/eye_in_the_sky/settings.ex
+@defaults %{
+  ...
+  "agent_notifications" => "false",
+  "dm_use_pty" => "false"   # Terminal section in UI
+}
+```
+
+### UI
+
+A new "Terminal" section in `/settings` → General tab exposes the toggle:
+
+```
+Terminal
+├─ Use PTY terminal in DM sessions (checkbox)
+└─ Note: "Requires a page reload to take effect"
+```
+
+### DmLive Integration
+
+`DmLive` checks the setting at mount time and conditionally subscribes to PTY output:
+
+```elixir
+use_pty = EyeInTheSky.Settings.get_boolean("dm_use_pty")
+
+socket =
+  if connected?(socket) && use_pty,
+    do: subscribe_dm_pty(socket, session.uuid),
+    else: socket
+```
+
+When `use_pty` is `true` and the socket is connected, the DM page subscribes to PTY messages for the session. When `false`, the page displays the standard text message interface.
+
+**Page reload requirement:** Changing this setting does not hot-reload the DM page — the user must manually refresh to switch modes. This is because mount-time subscription setup happens once at page load.
+
+### Mode Contrast
+
+| Mode | Interface | Behavior |
+|------|-----------|----------|
+| Text (default) | Web chat UI | Messages display in a list, send button, composer |
+| PTY (`dm_use_pty=true`) | xterm.js terminal | Raw terminal output/input, persistent bash session if available |
 
 ---
 

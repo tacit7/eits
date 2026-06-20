@@ -14,7 +14,7 @@ The Gemini integration follows a similar architecture to Codex, leveraging a ded
 
 ## Module map
 
-- `lib/eye_in_the_sky/claude/provider_strategy/gemini.ex` — implements the `ProviderStrategy` behaviour (`start/2`, `resume/2`, `cancel/1`, `format_content/1`). `build_opts/3` assembles a `%GeminiCliSdk.Options{}`. **No `system_prompt` field is set** (see §3 below).
+- `lib/eye_in_the_sky/claude/provider_strategy/gemini.ex` — implements the `ProviderStrategy` behaviour (`start/2`, `resume/2`, `cancel/1`, `format_content/1`). `build_opts/3` assembles a `%GeminiCliSdk.Options{}`, setting `system_prompt` via `maybe_system_prompt_path/2` (writes EITS init prompt to `$TMPDIR/eits-gemini/system-<session_id>.md` and passes the path). System prompt injection is gated on `eits_workflow` context (see §3 below).
 - `lib/eye_in_the_sky/gemini/stream_handler.ex` — supervised `Task` that consumes GeminiCliSdk's lazy stream and translates events into the `{:claude_message, ref, %Message{}}` and `{:claude_complete, ref, session_id}` tuples that `AgentWorker` expects.
 - `lib/eye_in_the_sky/gemini/stream_handler.ex` (nested `Registry`) — ETS-backed sdk_ref → pid map, auto-cleans on `:DOWN`.
 - `lib/eye_in_the_sky/gemini/session_reader.ex` — locates + parses session files under `~/.gemini/tmp/<dir>/chats/`.
@@ -29,9 +29,18 @@ The Gemini integration follows a similar architecture to Codex, leveraging a ded
 
 ## The GEMINI_SYSTEM_MD Landmine
 
-The `gemini_cli_sdk` exposes `Options.system_prompt :: String.t()` and maps it to the `GEMINI_SYSTEM_MD` env var. **Gemini CLI interprets that env var as a path to a markdown file, not inline content.** Passing prompt text verbatim makes the CLI try to open() the text and crash with `Error: missing system prompt file '<the entire prompt>'`. We removed `system_prompt` from `build_opts/3` entirely. EITS context still reaches the agent via env vars (`EITS_SESSION_UUID`, `EITS_SESSION_ID`, `EITS_AGENT_UUID`, `EITS_PROJECT_ID`).
+The `gemini_cli_sdk` exposes `Options.system_prompt :: String.t()` and maps it to the `GEMINI_SYSTEM_MD` env var. **Gemini CLI interprets that env var as a path to a markdown file, not inline content.** Passing prompt text verbatim makes the CLI try to open() the text and crash with `Error: missing system prompt file '<the entire prompt>'`.
 
-If a system prompt is ever needed: write to a temp file (e.g. `$TMPDIR/eits-gemini/system-<session_id>.md`) and pass that path. Note this **replaces** Gemini's default system prompt — no `--append` equivalent exists.
+### Fix: Write to File + Gate on eits_workflow
+
+To resolve this, the EITS init prompt is written to `$TMPDIR/eits-gemini/system-<session_id>.md` and the path is passed via `system_prompt`. The same temp file is overwritten on each call so the directory doesn't grow unbounded.
+
+**Important:** Unlike Claude's `--append-system-prompt`, `GEMINI_SYSTEM_MD` **replaces** Gemini's default system prompt entirely. To preserve Gemini's built-in prompt when EITS context is not needed, system prompt injection is gated on the `eits_workflow` context flag:
+
+- `eits_workflow != "0"`: Write and inject the EITS init prompt via the file path.
+- `eits_workflow == "0"`: Return `nil` so the SDK omits the env var entirely and Gemini boots with its default system prompt.
+
+This gate matches Claude's existing `eits_workflow` guard. EITS context still reaches the agent via env vars (`EITS_SESSION_UUID`, `EITS_SESSION_ID`, `EITS_AGENT_UUID`, `EITS_PROJECT_ID`) regardless.
 
 ## MessageEvent: Delta vs Final (Doubled-Text Bug)
 
@@ -162,6 +171,7 @@ mix gemini.backfill_metadata --dry-run     # preview only
 - `ace5897d` — disable auto-sync on mount to prevent duplicate rows (different UUID spaces)
 - `a5455b39` — conditional mount sync (sync if DB empty, skip if rows exist); stable per-turn source_uuid via SHA-256(session_id+timestamp)
 - `d94555c2` — Reload skips file reader (GeminiReader not_found); reloads from DB instead
+- `af6cbee9` — write system prompt to file and gate on eits_workflow (fixes `GEMINI_SYSTEM_MD` path interpretation)
 
 ## Dependencies
 
@@ -236,8 +246,8 @@ Gemini sessions also utilize an initial prompt to inform the agent about availab
 
 ## Known Issues and Gotchas
 
-- **`GEMINI_SYSTEM_MD` as path**: As noted in "The GEMINI_SYSTEM_MD Landmine," `gemini_cli_sdk` interprets `GEMINI_SYSTEM_MD` as a file path, not inline content. Direct system prompts must be written to a temporary file.
+- **`GEMINI_SYSTEM_MD` as path**: As noted in "The GEMINI_SYSTEM_MD Landmine," `gemini_cli_sdk` interprets `GEMINI_SYSTEM_MD` as a file path, not inline content. The EITS init prompt is written to a temporary file (`$TMPDIR/eits-gemini/system-<session_id>.md`) and the path is passed. System prompt injection is gated on `eits_workflow != "0"` to preserve Gemini's default prompt when not needed.
 - **Delta vs Final MessageEvent**: The `StreamHandler` must correctly differentiate and handle `delta: true` and `delta: false`/nil `MessageEvent`s to avoid duplicated text in the UI.
 - **Cost not from SDK**: Gemini SDK does not provide cost information directly; it must be calculated using `EyeInTheSky.Gemini.Pricing`.
 - **Atom-key trap**: Ensure metadata keys are atoms at the boundary for correct persistence and retrieval.
-- **Skill content path**: Verify that skill content for Gemini sessions is correctly loaded from `~/.gemini/skills/` or via the Gemini CLI's normal skill-discovery mechanism, especially given the `GEMINI_SYSTEM_MD` limitation.
+- **Skill content path**: Verify that skill content for Gemini sessions is correctly loaded from `~/.gemini/skills/` or via the Gemini CLI's normal skill-discovery mechanism.

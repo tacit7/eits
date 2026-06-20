@@ -51,7 +51,12 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions do
       )
       |> Keyword.put(:project_id, project.id)
 
-    case AgentManager.create_pty_session(opts) do
+    create_fn =
+      if EyeInTheSky.Settings.get_boolean("dm_use_pty"),
+        do: &AgentManager.create_pty_session/1,
+        else: &AgentManager.create_agent/1
+
+    case create_fn.(opts) do
       {:ok, %{session: session}} ->
         session = Sessions.preload_project(session)
 

@@ -1413,6 +1413,138 @@ The skeleton defers all DB loads until after sync completes, eliminating the rac
 
 ---
 
+## Auto-Scroll Fix: Browser Scroll Restoration
+
+**Commits:** `6e388fd1`, `cd52540c`
+
+The AutoScroll hook now prevents browser scroll restoration from interfering with navigation-based scroll behavior.
+
+**Problem:** When navigating between DM sessions, the browser's `history.scrollRestoration` can fire between the initial `mounted()` and the `sync_done` event. This stale scroll position tricks `beforeUpdate()` into calculating `shouldAutoScroll=false`, leaving the message view stuck at the top when new messages load.
+
+**Solution (6e388fd1):**
+
+1. **Set `history.scrollRestoration = 'manual'` in `AutoScroll.mounted()`**
+   - Prevents the browser from restoring previous scroll positions during navigation
+   - Saved as `_prevScrollRestoration` for restoration on cleanup
+   - Restored to original value in `destroyed()` so other pages are unaffected
+
+2. **Push `scroll_to_bottom` from sync_done instead of `new_message`**
+   - New event handler in AutoScroll hook bypasses `shouldAutoScroll` flag
+   - Unconditionally resets `shouldAutoScroll=true` and scrolls to bottom
+   - Fired from `DmLive` after `sync_done` completes, ensuring landing at latest message on every mount
+
+**Implementation:**
+
+```javascript
+// AutoScroll.mounted()
+if (typeof history !== "undefined" && "scrollRestoration" in history) {
+  this._prevScrollRestoration = history.scrollRestoration
+  history.scrollRestoration = "manual"
+}
+
+// AutoScroll event handler
+this.handleEvent("scroll_to_bottom", () => {
+  this.shouldAutoScroll = true
+  this.scrollToBottom()
+})
+
+// AutoScroll.destroyed()
+if (typeof history !== "undefined" && this._prevScrollRestoration !== undefined) {
+  history.scrollRestoration = this._prevScrollRestoration
+}
+```
+
+**Files:**
+- `assets/js/hooks/auto_scroll.js` — scroll restoration management and scroll_to_bottom handler
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — sync_done handler pushes scroll_to_bottom instead of new_message
+
+---
+
+## DM Height Chain Fix: Flex Layout Correction
+
+**Commit:** `81e05028`
+
+The `dm-live-root` element was missing flex layout classes, causing the entire DM page to scroll incorrectly.
+
+**Problem:** Without height classes on `dm-live-root`, the `<main>` element remained the scroll container for the entire page. The AutoScroll hook on `messages-container` was targeting a container that wasn't actually the viewport scroll container. Messages would land in the wrong scroll position, and the composer would not stay pinned at the bottom.
+
+**Solution:** Add `flex flex-col flex-1 min-h-0` to `dm-live-root` to restore the proper height chain:
+
+```
+<main>                          (flex-1 overflow-auto flex-col)
+  <div id="dm-live-root">       (flex flex-col flex-1 min-h-0) ← ADD THESE
+    <DmPage />
+      <dm-tab-content>          (flex-1 min-h-0)
+        <dm-messages-tab>       (flex-1 min-h-0 flex-col)
+          <messages-container>  (flex-1 min-h-0 overflow-y-auto) ← scroll here
+```
+
+**Effect:**
+- `dm-live-root` now fills the available space in `<main>`
+- Height propagates down the flex chain to `messages-container`
+- `messages-container` becomes the true scroll container (not `<main>`)
+- AutoScroll hook fires against the correct scrollable element
+- Composer stays pinned at bottom; messages-container is the only scrollable area
+
+**Files:**
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — render() template with updated dm-live-root classes
+
+---
+
+## DM Interface Mode: PTY vs Web Chat Toggle
+
+**Commit:** `52b81e02`
+
+A new `dm_use_pty` settings toggle allows switching the DM interface between web chat and PTY-backed terminal modes.
+
+**Setting:** `dm_use_pty` (boolean, default: `false`)
+
+**Location:** Settings → General tab → Terminal section
+
+**Behavior:**
+
+- **`false` (default):** Web chat interface with message bubbles, markdown rendering, and rich formatting
+- **`true`:** PTY-backed terminal interface embedded in the DM session, providing shell interaction
+
+**UI Control:**
+
+In `lib/eye_in_the_sky_web/live/overview_live/settings/general_tab.ex`, a new "Terminal" section appears with:
+- Label: "Use PTY terminal in DM sessions"
+- Description: "Replace the web chat interface with an embedded PTY terminal. Requires a page reload to take effect."
+- Toggle control: DaisyUI checkbox (toggle-sm toggle-primary)
+- Event handler: `toggle_setting` with key `"dm_use_pty"`
+
+**Effect on DM Mount:**
+
+When DmLive mounts, it checks the setting:
+
+```elixir
+use_pty = EyeInTheSky.Settings.get_boolean("dm_use_pty")
+
+if connected?(socket) && use_pty do
+  subscribe_dm_pty(socket, session.uuid)
+else
+  socket
+end
+```
+
+- If `true` and connected: subscribes to PTY events, wiring the terminal interface
+- If `false` or on dead render: uses standard web chat, skipping PTY subscription
+
+**Page Reload Requirement:**
+
+The setting requires a page reload to take effect because:
+- PTY subscriptions are set up at mount time, not dynamically
+- Changing the toggle mid-session doesn't swap the interface until page refresh
+- UI note in settings clearly states this requirement
+
+**Files:**
+- `lib/eye_in_the_sky/settings.ex` — new setting `"dm_use_pty" => "false"` in defaults
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — conditional PTY subscription on mount
+- `lib/eye_in_the_sky_web/live/overview_live/settings/general_tab.ex` — settings UI for toggle
+
+---
+
 ## Gemini Reload + Sync (DM Toolbar)
 
 **Commits:** `4ff24598`, `d94555c2`

@@ -317,6 +317,40 @@ This dual approach ensures:
 - `failed` → Red left border
 - `waiting` → Yellow left border (awaiting action/resume)
 
+### Display Status to Atom Conversion
+
+The display status string returned by `StatusHelpers.derive_display_status/2` must be converted to an Elixir atom for use in UI component styling and logic. Prior implementations used `String.to_existing_atom/1`, which crashes at runtime when the status string (e.g., `"failed_retry_exhausted"`) has never been registered as an atom in the running codebase — type specs alone do not register atoms.
+
+**Fix (commit c3ff50bc):** The `SessionCard` component now uses an exhaustive private function `display_status_to_atom/1` that maps all known display status strings to atom literals:
+
+```elixir
+defp display_status_to_atom(status) do
+  case status do
+    "working" -> :working
+    "waiting" -> :waiting
+    "compacting" -> :compacting
+    "idle" -> :idle
+    "idle_stale" -> :idle_stale
+    "idle_dead" -> :idle_dead
+    "completed" -> :completed
+    "failed" -> :failed
+    "failed_billing" -> :failed_billing
+    "failed_auth" -> :failed_auth
+    "failed_rate_limit" -> :failed_rate_limit
+    "failed_timeout" -> :failed_timeout
+    "failed_retry_exhausted" -> :failed_retry_exhausted
+    _ -> :idle
+  end
+end
+```
+
+**Key behaviors:**
+- All known statuses (including failed tier variants like `failed_billing`, `failed_auth`, `failed_retry_exhausted`) are explicitly mapped
+- Unknown statuses fall back to `:idle` for graceful degradation
+- The function is private to `SessionCard` and intentionally exhaustive to catch missing mappings at compile time (via pattern matching warnings in CI)
+
+This prevents `ArgumentError` crashes when UI renders sessions with newly-added error statuses that haven't been manually tested.
+
 **Auto-completion behavior:**
 - Status is **not** auto-set on CLI exit (Stop hook sets `idle`, not `completed`)
 - Completed status must be set **explicitly** via i-end-session skill or `POST /sessions/:id/complete`

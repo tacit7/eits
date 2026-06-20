@@ -44,7 +44,9 @@ defmodule EyeInTheSky.Agents.AgentManager do
         PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
 
       # Build and write the interactive launch command (no -p).
-      working_path = opts[:project_path]
+      # Use the resolved worktree path from the agent record (set by RecordBuilder
+      # after creating the git worktree), falling back to the raw project path.
+      working_path = agent.git_worktree_path || opts[:project_path]
       cd_part = if working_path && working_path != "", do: "cd #{working_path} && ", else: ""
       launch_cmd = "#{cd_part}claude --session-id #{session.uuid}\n"
 

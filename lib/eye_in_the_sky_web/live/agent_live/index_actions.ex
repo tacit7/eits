@@ -305,10 +305,15 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
       "create_new_session: model=#{opts[:model]}, effort=#{inspect(opts[:effort_level])}, project_id=#{project.id}, project_path=#{project.path}"
     )
 
-    case AgentManager.create_pty_session(opts) do
+    create_fn =
+      if EyeInTheSky.Settings.get_boolean("dm_use_pty"),
+        do: &AgentManager.create_pty_session/1,
+        else: &AgentManager.create_agent/1
+
+    case create_fn.(opts) do
       {:ok, result} ->
         Logger.info(
-          "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.agent.id}, session_uuid=#{result.agent.uuid}"
+          "create_new_session: agent created - agent_id=#{result.agent.id}, session_id=#{result.session.id}, session_uuid=#{result.session.uuid}"
         )
 
         if Keyword.get(action_opts, :navigate, true) do

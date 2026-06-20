@@ -102,47 +102,49 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 </div>
               </div>
 
-              <%!-- Live streaming bubble — flows naturally in the scroll container.
-                   No absolute positioning, no pb-32 toggle: bubble growth is a
-                   single reflow event (the div itself growing), not two
-                   (bubble + padding toggle). --%>
-              <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
-                <div id="live-stream-bubble">
-                  <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5">
-                    <div class="flex items-center gap-2 mb-2">
-                      <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                        <.provider_avatar session={@session} class="size-3 animate-pulse" />
-                      </div>
-                      <span class="text-[11px] font-semibold text-primary/80 animate-pulse">
-                        {stream_provider_label(@session)}
-                      </span>
-                    </div>
-                    <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5">
-                      <%= if @stream.thinking do %>
-                        <div class="text-xs text-base-content/30 italic font-mono line-clamp-3">
-                          {String.slice(@stream.thinking, -200, 200)}
-                        </div>
-                      <% end %>
-                      <%= if @stream.tool do %>
-                        <div class="text-xs text-base-content/40 font-mono">
-                          Using {@stream.tool}...
-                        </div>
-                      <% end %>
-                      <%= if @stream.content not in [nil, ""] do %>
-                        <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">
-                          {String.trim_leading(@stream.content)}
-                        </div>
-                      <% end %>
-                    </div>
-                  </div>
-                </div>
-              <% end %>
-
-              <%!-- Scroll anchor --%>
-              <div id="messages-scroll-anchor" style="height: 1px; overflow-anchor: auto;"></div>
             </div>
           <% end %>
         <% end %>
+
+        <%!-- Live streaming bubble — outside @syncing/@empty guards so it shows
+             even during initial page load (skeleton visible) or on sessions with
+             no prior messages. Positioned inside messages-container so it scrolls
+             with the message list and the scroll anchor stays below it. --%>
+        <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
+          <div id="live-stream-bubble" class="max-w-[860px] w-full mx-auto px-5 pb-3">
+            <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <.provider_avatar session={@session} class="size-3 animate-pulse" />
+                </div>
+                <span class="text-[11px] font-semibold text-primary/80 animate-pulse">
+                  {stream_provider_label(@session)}
+                </span>
+              </div>
+              <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5">
+                <%= if @stream.thinking do %>
+                  <div class="text-xs text-base-content/30 italic font-mono line-clamp-3">
+                    {String.slice(@stream.thinking, -200, 200)}
+                  </div>
+                <% end %>
+                <%= if @stream.tool do %>
+                  <div class="text-xs text-base-content/40 font-mono">
+                    Using {@stream.tool}...
+                  </div>
+                <% end %>
+                <%= if @stream.content not in [nil, ""] do %>
+                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">
+                    {String.trim_leading(@stream.content)}
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%!-- Scroll anchor — always at the bottom of messages-container so
+             CSS overflow-anchor keeps the view pinned when new content arrives. --%>
+        <div id="messages-scroll-anchor" style="height: 1px; overflow-anchor: auto;"></div>
       </div>
 
       <%!-- Codex raw JSONL stream panel --%>

@@ -816,7 +816,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         class="md:hidden fixed inset-0 z-40 bg-black/40"
       />
 
-      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-base-100 z-20">
+      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center pb-2 pt-10 gap-1 border-r border-base-content/8 bg-base-100 z-20">
         <button
           phx-click="toggle_proj_picker"
           phx-target={@myself}

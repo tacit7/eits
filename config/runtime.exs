@@ -3,9 +3,21 @@ import Dotenvy
 
 # Load env files with local overrides:
 # .env.local > .env, and explicit shell env overrides both.
-dot_env_files = Enum.filter([".env", ".env.local"], &File.exists?/1)
+# Check both the user config dir (used by the Tauri desktop bundle) and
+# the CWD (used in dev/server deployments). User config dir takes precedence.
+config_dir = Path.expand("~/.config/eits")
+dot_env_files =
+  Enum.filter(
+    [Path.join(config_dir, ".env"), ".env", ".env.local"],
+    &File.exists?/1
+  )
+
 runtime_env = source!(dot_env_files ++ [System.get_env()])
 get_env = fn key -> runtime_env[key] end
+
+# Tauri desktop branch: DISABLE_AUTH defaults to "1" — this app is local-only,
+# never network-reachable. Overridden by the .env file if present.
+disable_auth = get_env.("DISABLE_AUTH") || "1"
 
 # Push selected keys from the Dotenvy runtime env into the actual OS process
 # env so code paths that read via `System.get_env/1` see them. Without this,
@@ -49,7 +61,7 @@ if vapid_private = get_env.("VAPID_PRIVATE_KEY") do
     public_key: get_env.("VAPID_PUBLIC_KEY"),
     private_key: vapid_private
 else
-  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
+  if config_env() == :prod && disable_auth not in ~w(true 1) do
     raise "VAPID_PRIVATE_KEY environment variable is required in production"
   end
 end
@@ -65,7 +77,7 @@ end
 # NOTE: Tauri POC — prod guard removed so the bundled desktop app can bypass
 # auth. DO NOT set DISABLE_AUTH=true in any deployment where the app is
 # network-reachable.
-config :eye_in_the_sky, :disable_auth, get_env.("DISABLE_AUTH") in ~w(true 1)
+config :eye_in_the_sky, :disable_auth, disable_auth in ~w(true 1)
 
 # WebAuthn — extra allowed origins (comma-separated).
 webauthn_extra_raw =
@@ -88,7 +100,7 @@ end
 if webauthn_origin = get_env.("WEBAUTHN_ORIGIN") do
   config :wax_, origin: webauthn_origin
 else
-  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
+  if config_env() == :prod && disable_auth not in ~w(true 1) do
     raise """
     environment variable WEBAUTHN_ORIGIN is missing.
     Set it to your app's origin, e.g.: https://eits.dev
@@ -101,7 +113,7 @@ end
 if webauthn_rp_id = get_env.("WEBAUTHN_RP_ID") do
   config :wax_, rp_id: webauthn_rp_id
 else
-  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
+  if config_env() == :prod && disable_auth not in ~w(true 1) do
     raise """
     environment variable WEBAUTHN_RP_ID is missing.
     Set it to your app's RP ID (the registrable domain), e.g.: eits.dev
@@ -201,7 +213,7 @@ if config_env() == :prod do
   # Tauri desktop (DISABLE_AUTH=true): WKWebView may omit the Origin header on
   # WebSocket upgrades. Disable origin checking so LiveView socket connects.
   check_origin =
-    if get_env.("DISABLE_AUTH") in ~w(true 1), do: false, else: allowed_origins
+    if disable_auth in ~w(true 1), do: false, else: allowed_origins
 
   config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],

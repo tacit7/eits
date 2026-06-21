@@ -44,17 +44,24 @@ export function sessionCommands(hook) {
         return new Promise((resolve) => {
           hook._paletteRecentSessionsResolve = resolve
           hook.pushEvent("palette:recent-sessions", {})
-        }).then(sessions => sessions.map(s => ({
-          id: "session-" + s.uuid,
-          label: s.name || s.description || (s.uuid || "").slice(0, 8),
-          icon: "hero-chat-bubble-left-right",
-          group: "Recent",
-          hint: s.status,
-          keywords: [],
-          shortcut: null,
-          type: "navigate",
-          href: "/dm/" + s.uuid,
-          when: null
+        }).then(sessions => sessions.map(s => {
+          const projectLabel = s.project_name
+            ? (s.project_path
+                ? `${s.project_name} · ${s.project_path.split("/").pop()}`
+                : s.project_name)
+            : s.status
+          return {
+            id: "session-" + s.uuid,
+            label: s.name || s.description || (s.uuid || "").slice(0, 8),
+            icon: "hero-chat-bubble-left-right",
+            group: "Recent",
+            hint: projectLabel,
+            keywords: [],
+            shortcut: null,
+            type: "navigate",
+            href: "/dm/" + s.uuid,
+            when: null
+          }
         })))
       },
       when: null

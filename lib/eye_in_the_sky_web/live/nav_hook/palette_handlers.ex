@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
   import Phoenix.LiveView, only: [push_event: 3]
 
-  alias EyeInTheSky.{Agents, Messages, Notes, Projects, Sessions, Tasks}
+  alias EyeInTheSky.{Agents, Messages, Notes, Projects, Repo, Sessions, Tasks}
   alias EyeInTheSky.Agents.AgentManager
 
   # ---------------------------------------------------------------------------
@@ -40,10 +40,19 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   def handle_palette_event("palette:recent-sessions", _params, socket) do
     sessions =
       Sessions.list_sessions_filtered(status_filter: "all", sort_by: :last_activity, limit: 15)
+      |> Repo.preload(:project)
 
     results =
       Enum.map(sessions, fn s ->
-        %{id: s.id, uuid: s.uuid, name: s.name, description: s.description, status: s.status}
+        %{
+          id: s.id,
+          uuid: s.uuid,
+          name: s.name,
+          description: s.description,
+          status: s.status,
+          project_name: s.project && s.project.name,
+          project_path: s.project && s.project.path
+        }
       end)
 
     {:halt, push_event(socket, "palette:recent-sessions-result", %{sessions: results})}

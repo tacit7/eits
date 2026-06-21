@@ -27,7 +27,7 @@ disable_auth = get_env.("DISABLE_AUTH") || "1"
 #
 # We intentionally scope the push to explicitly-listed keys rather than dumping
 # every .env entry into the OS env.
-for key <- ~w[ANTHROPIC_API_KEY EITS_API_KEY] do
+for key <- ~w[ANTHROPIC_API_KEY EITS_API_KEY DATABASE_URL DATABASE_SSL_VERIFY] do
   case runtime_env[key] do
     val when is_binary(val) and val != "" -> System.put_env(key, val)
     _ -> :ok

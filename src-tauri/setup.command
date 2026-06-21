@@ -77,6 +77,20 @@ EOF
   ok "Created $ENV_FILE"
 fi
 
+# Ensure DATABASE_URL uses the current OS user.
+# Homebrew Postgres on macOS never creates a "postgres" superuser — the default
+# role is the installing user's login name. Older .env files may have been
+# written with a hardcoded "postgres" user that doesn't exist.
+CURRENT_DB_USER="$(whoami)"
+if ! grep -q "^DATABASE_URL=ecto://${CURRENT_DB_USER}@" "$ENV_FILE"; then
+  OLD_URL="$(grep "^DATABASE_URL=" "$ENV_FILE" | head -1 || true)"
+  if [[ -n "$OLD_URL" ]]; then
+    log "Updating DATABASE_URL to use current user ($CURRENT_DB_USER)..."
+    sed -i '' "s|^DATABASE_URL=ecto://[^@]*@|DATABASE_URL=ecto://${CURRENT_DB_USER}@|" "$ENV_FILE"
+    ok "Fixed DATABASE_URL in $ENV_FILE"
+  fi
+fi
+
 # Ensure SECRET_KEY_BASE is present (may be missing from an older .env)
 if ! grep -q "^SECRET_KEY_BASE=" "$ENV_FILE"; then
   log "Generating SECRET_KEY_BASE..."

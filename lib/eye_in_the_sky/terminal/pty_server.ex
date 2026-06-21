@@ -145,7 +145,10 @@ defmodule EyeInTheSky.Terminal.PtyServer do
       {"PATH", build_path()},
       {"SHELL", @shell_bin},
       {"USER", System.get_env("USER", "user")},
-      {"LOGNAME", System.get_env("LOGNAME", System.get_env("USER", "user"))}
+      {"LOGNAME", System.get_env("LOGNAME", System.get_env("USER", "user"))},
+      # Hint dark background to vim without requiring OSC 11 query support.
+      # Format: "foreground;background" — ANSI color indices (15=white, 0=black).
+      {"COLORFGBG", "15;0"}
     ]
 
     exec_opts = [

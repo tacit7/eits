@@ -3,12 +3,10 @@ defmodule EyeInTheSkyWeb.Endpoint do
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
-  # PHX_INSECURE_COOKIES=1 at compile time bakes `secure: false` into the
-  # session cookie. Needed for the Tauri bundle which loads http://localhost:5050
-  # in a WebView — WebKit discards `secure` cookies over plain HTTP, causing a
-  # LiveView mount loop as the session never persists across requests.
-  @secure_cookies System.get_env("PHX_INSECURE_COOKIES") != "1" and
-                    Application.compile_env(:eye_in_the_sky, :env) != :dev
+  # Reads from config/prod.exs (set via PHX_INSECURE_COOKIES=1 at compile time)
+  # or defaults to false in dev. WKWebView drops Secure cookies over http://localhost,
+  # causing a LiveView mount loop in the Tauri bundle when this is true.
+  @secure_cookies Application.compile_env(:eye_in_the_sky, :secure_cookies, false)
 
   @session_options [
     store: :cookie,

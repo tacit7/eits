@@ -15,11 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Configure git credentials for GitHub deps
-        run: |
-          git config --global credential.helper store
-          printf 'https://x-access-token:%s@github.com\n' '${{ secrets.GITHUB_TOKEN }}' >> ~/.git-credentials
-
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
         with:
@@ -63,7 +58,13 @@ jobs:
           restore-keys: ${{ runner.os }}-npm-
 
       - name: Install Mix deps
-        run: MIX_ENV=prod mix deps.get --only prod
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          git config --global --unset-all credential.helper || true
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          MIX_ENV=prod mix deps.get --only prod
 
       - name: Install npm deps
         run: npm ci

@@ -1,9 +1,9 @@
 import Config
 
-# PHX_INSECURE_COOKIES=1 disables the Secure flag on the session cookie.
-# Required for the Tauri bundle: WKWebView drops Secure cookies over http://localhost,
-# causing a LiveView mount loop. Set this at compile time (beforeBuildCommand).
-config :eye_in_the_sky, :secure_cookies, System.get_env("PHX_INSECURE_COOKIES") != "1"
+# Tauri bundle always serves over http://localhost — WKWebView drops Secure cookies
+# over plain HTTP, causing a LiveView reload loop. This branch is Tauri-only so
+# secure: false is unconditional here.
+config :eye_in_the_sky, :secure_cookies, false
 
 # Note we also include the path to a cache manifest
 # containing the digested version of static files. This

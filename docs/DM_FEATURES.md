@@ -178,6 +178,17 @@ mount/3 (single with chain)
 - Stream shows provider avatar (Claude or Codex) with thinking/tool indicators
 - Live-stream bubble with status indicator
 
+**Streaming bubble placement fix (commit 0cc7fc3f):**
+
+The streaming bubble in `messages_tab.ex` was previously nested inside both the `@syncing` and `@empty` conditional branches, making it invisible in two valid streaming states:
+
+- **`syncing=true`** — page is loading (skeleton visible); an agent can already be streaming a response
+- **`empty=true`** — session has no prior messages; first agent response starts streaming immediately
+
+The bubble and scroll anchor were moved to be inside `messages-container` but **outside** the `@syncing`/`@empty` tree. Live stream content is now always visible regardless of page load state or message history.
+
+**File:** `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex`
+
 ---
 
 ## Channel Marks as Read on Open
@@ -1538,10 +1549,47 @@ The setting requires a page reload to take effect because:
 - Changing the toggle mid-session doesn't swap the interface until page refresh
 - UI note in settings clearly states this requirement
 
+**Session creation branching on dm_use_pty (commit 7250ab9a):**
+
+Previously, all three session creation callers unconditionally called `AgentManager.create_pty_session/1`, even when `dm_use_pty=false`. Because the DM page only subscribes to PTY output when `dm_use_pty=true` (default: false), newly created sessions would appear blank in web chat mode.
+
+All three callers now branch on the setting at creation time:
+
+```elixir
+create_fn =
+  if EyeInTheSky.Settings.get_boolean("dm_use_pty"),
+    do: &AgentManager.create_pty_session/1,
+    else: &AgentManager.create_agent/1
+```
+
+- `dm_use_pty=true` → `create_pty_session/1` (PTY-backed terminal interface)
+- `dm_use_pty=false` → `create_agent/1` (SDK/messages mode, default)
+
+**Callers updated:**
+- `lib/eye_in_the_sky_web/live/agent_live/index_actions.ex`
+- `lib/eye_in_the_sky_web/live/project_live/sessions/actions.ex`
+- `lib/eye_in_the_sky_web/live/workspace_live/sessions/actions.ex`
+
+**create_pty_session working directory fix (commit 7250ab9a):**
+
+`AgentManager.create_pty_session/1` was using `opts[:project_path]` (the base project directory) as the working directory for the Claude launch command. This ignored the git worktree path resolved by `RecordBuilder` when a worktree had been created for the agent.
+
+The function now uses `agent.git_worktree_path` with `opts[:project_path]` as fallback, matching the already-correct logic in `DmLive.build_launch_command`:
+
+```elixir
+working_path = agent.git_worktree_path || opts[:project_path]
+```
+
+**File:** `lib/eye_in_the_sky/agents/agent_manager.ex`
+
 **Files:**
 - `lib/eye_in_the_sky/settings.ex` — new setting `"dm_use_pty" => "false"` in defaults
 - `lib/eye_in_the_sky_web/live/dm_live.ex` — conditional PTY subscription on mount
 - `lib/eye_in_the_sky_web/live/overview_live/settings/general_tab.ex` — settings UI for toggle
+- `lib/eye_in_the_sky/agents/agent_manager.ex` — worktree path fix and create_fn branch (commit 7250ab9a)
+- `lib/eye_in_the_sky_web/live/agent_live/index_actions.ex` — branch on dm_use_pty (commit 7250ab9a)
+- `lib/eye_in_the_sky_web/live/project_live/sessions/actions.ex` — branch on dm_use_pty (commit 7250ab9a)
+- `lib/eye_in_the_sky_web/live/workspace_live/sessions/actions.ex` — branch on dm_use_pty (commit 7250ab9a)
 
 ---
 

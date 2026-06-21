@@ -997,6 +997,48 @@ eits agents spawn --agent setup-guardian --member-name alice --team-name builder
 
 ---
 
+## PTY Session Creation
+
+Two behaviors govern how sessions are created and launched from the web UI.
+
+### dm_use_pty Branching
+
+Session creation callers — `AgentLive.IndexActions`, `ProjectLive.Sessions.Actions`, and `WorkspaceLive.Sessions.Actions` — branch on the `dm_use_pty` setting when creating a new session:
+
+```elixir
+create_fn =
+  if EyeInTheSky.Settings.get_boolean("dm_use_pty"),
+    do: &AgentManager.create_pty_session/1,
+    else: &AgentManager.create_agent/1
+
+case create_fn.(opts) do
+  ...
+end
+```
+
+| `dm_use_pty` | Function called | Mode |
+|---|---|---|
+| `true` | `AgentManager.create_pty_session/1` | PTY (interactive terminal, xterm.js) |
+| `false` (default) | `AgentManager.create_agent/1` | SDK/messages mode |
+
+**Why:** The DM page only subscribes to PTY output when `dm_use_pty=true`. Before this fix, all three callers unconditionally called `create_pty_session` regardless of the setting, leaving the DM page blank for any session created with `dm_use_pty=false`.
+
+### Worktree Path in Launch Command
+
+`AgentManager.create_pty_session/1` now uses `agent.git_worktree_path` as the working directory in the Claude CLI launch command, falling back to `opts[:project_path]`:
+
+```elixir
+# Use the resolved worktree path from the agent record (set by RecordBuilder
+# after creating the git worktree), falling back to the raw project path.
+working_path = agent.git_worktree_path || opts[:project_path]
+cd_part = if working_path && working_path != "", do: "cd #{working_path} && ", else: ""
+launch_cmd = "#{cd_part}claude --session-id #{session.uuid}\n"
+```
+
+**Why:** Previously `create_pty_session` used `opts[:project_path]` (the base project directory) as the working directory, ignoring the git worktree path resolved by `RecordBuilder`. This caused the PTY session to launch Claude in the wrong directory when a session had a worktree. The DM page's `build_launch_command` already used the correct worktree path — this fix brings `create_pty_session` into alignment with that logic.
+
+---
+
 ## Worktree Management
 
 Agent workers use git worktrees to isolate CLI processes and prevent conflicts on concurrent spawns.

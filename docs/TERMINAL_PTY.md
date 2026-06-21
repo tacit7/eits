@@ -63,9 +63,13 @@ erlexec → bash (OS process)
 |------|------|
 | `lib/eye_in_the_sky/terminal/pty_server.ex` | GenServer owning one PTY; `subscriber_tag` for multi-terminal routing |
 | `lib/eye_in_the_sky/terminal/pty_supervisor.ex` | DynamicSupervisor for PtyServer instances |
+| `lib/eye_in_the_sky/agents/agent_manager.ex` | `create_pty_session/1` and `create_agent/1`; session creation entry point |
 | `lib/eye_in_the_sky_web/live/terminal_live.ex` | Standalone LiveView (`/terminal`) |
 | `lib/eye_in_the_sky_web/live/canvas_live.ex` | Canvas LiveView; manages terminal lifecycle, PTY map |
 | `lib/eye_in_the_sky_web/live/dm_live.ex` | DM LiveView; optional PTY mode via `dm_use_pty` setting |
+| `lib/eye_in_the_sky_web/live/agent_live/index_actions.ex` | Session creation actions; branches on `dm_use_pty` |
+| `lib/eye_in_the_sky_web/live/project_live/sessions/actions.ex` | Session creation actions; branches on `dm_use_pty` |
+| `lib/eye_in_the_sky_web/live/workspace_live/sessions/actions.ex` | Session creation actions; branches on `dm_use_pty` |
 | `lib/eye_in_the_sky_web/components/terminal_window_component.ex` | LiveComponent for canvas terminal windows |
 | `lib/eye_in_the_sky/canvases/canvas_terminal.ex` | Ecto schema for persisted terminal layout |
 | `lib/eye_in_the_sky/settings.ex` | Settings schema; defines `dm_use_pty` default |
@@ -375,6 +379,33 @@ socket =
 When `use_pty` is `true` and the socket is connected, the DM page subscribes to PTY messages for the session. When `false`, the page displays the standard text message interface.
 
 **Page reload requirement:** Changing this setting does not hot-reload the DM page — the user must manually refresh to switch modes. This is because mount-time subscription setup happens once at page load.
+
+### Session Creation
+
+Three session creation call sites — `AgentLive.IndexActions`, `ProjectLive.Sessions.Actions`, and `WorkspaceLive.Sessions.Actions` — all branch on `dm_use_pty` when spawning a new session:
+
+```elixir
+create_fn =
+  if EyeInTheSky.Settings.get_boolean("dm_use_pty"),
+    do: &AgentManager.create_pty_session/1,
+    else: &AgentManager.create_agent/1
+
+case create_fn.(opts) do
+  ...
+end
+```
+
+When `dm_use_pty=false` (the default), `create_agent/1` is used (SDK/messages mode). When `true`, `create_pty_session/1` is used. Previously all three callers unconditionally called `create_pty_session/1`, which meant the DM page was always blank for newly created sessions because `DmLive` only subscribes to PTY output when `dm_use_pty=true`.
+
+**`create_pty_session` working directory fix (`AgentManager`):** The launch command issued to the PTY now uses `agent.git_worktree_path` as the working directory, falling back to `opts[:project_path]` when `git_worktree_path` is nil:
+
+```elixir
+working_path = agent.git_worktree_path || opts[:project_path]
+cd_part = if working_path && working_path != "", do: "cd #{working_path} && ", else: ""
+launch_cmd = "#{cd_part}claude --session-id #{session.uuid}\n"
+```
+
+Previously `opts[:project_path]` was always used, which is the base project directory. This ignored any agent-specific git worktree path resolved by `RecordBuilder` after creating the worktree. The non-PTY path (`create_agent/1`, SDK/messages mode) was not affected by this bug.
 
 ### Mode Contrast
 

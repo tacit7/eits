@@ -3,7 +3,8 @@ import Dotenvy
 
 # Load env files with local overrides:
 # .env.local > .env, and explicit shell env overrides both.
-runtime_env = source([".env", ".env.local", System.get_env()])
+dot_env_files = Enum.filter([".env", ".env.local"], &File.exists?/1)
+runtime_env = source!(dot_env_files ++ [System.get_env()])
 get_env = fn key -> runtime_env[key] end
 
 # Push selected keys from the Dotenvy runtime env into the actual OS process

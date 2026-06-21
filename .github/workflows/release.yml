@@ -15,11 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Configure git for GitHub deps
+      - name: Configure git credentials for GitHub deps
         run: |
-          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "git://github.com/"
-          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global credential.helper store
+          printf 'https://x-access-token:%s@github.com\n' '${{ secrets.GITHUB_TOKEN }}' >> ~/.git-credentials
 
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
@@ -28,7 +27,7 @@ jobs:
           elixir-version: '1.19'
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
 
@@ -38,7 +37,7 @@ jobs:
           targets: aarch64-apple-darwin
 
       - name: Cache Rust
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/bin/
@@ -50,14 +49,14 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Cache Mix deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: deps
           key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-
 
       - name: Cache npm
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: assets/node_modules
           key: ${{ runner.os }}-npm-${{ hashFiles('assets/package-lock.json') }}

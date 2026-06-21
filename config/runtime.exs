@@ -158,14 +158,11 @@ if config_env() == :prod do
   maybe_ipv6 = if get_env.("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   ssl_opts =
-    case System.get_env("DATABASE_SSL_VERIFY") do
+    case get_env.("DATABASE_SSL_VERIFY") do
       "none" ->
         [verify: :verify_none]
 
-      "false" ->
-        false
-
-      _ ->
+      "true" ->
         [
           verify: :verify_peer,
           cacerts: :public_key.cacerts_get(),
@@ -173,6 +170,11 @@ if config_env() == :prod do
             match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
           ]
         ]
+
+      _ ->
+        # Default to no SSL — local/desktop connections don't need it.
+        # Set DATABASE_SSL_VERIFY=true to enable peer verification (e.g. Supabase).
+        false
     end
 
   config :eye_in_the_sky, EyeInTheSky.Repo,

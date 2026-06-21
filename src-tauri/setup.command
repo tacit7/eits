@@ -65,15 +65,27 @@ if [[ -f "$ENV_FILE" ]]; then
 else
   log "Writing default .env..."
   DB_USER="$(whoami)"
+  SECRET_KEY_BASE="$(openssl rand -hex 64)"
   cat > "$ENV_FILE" <<EOF
 DATABASE_URL=ecto://${DB_USER}@localhost/eits_dev
 DATABASE_SSL_VERIFY=false
 PHX_SERVER=true
 PHX_DISABLE_FORCE_SSL=1
 DISABLE_AUTH=1
+SECRET_KEY_BASE=${SECRET_KEY_BASE}
 EOF
   ok "Created $ENV_FILE"
 fi
+
+# Ensure SECRET_KEY_BASE is present (may be missing from an older .env)
+if ! grep -q "^SECRET_KEY_BASE=" "$ENV_FILE"; then
+  log "Generating SECRET_KEY_BASE..."
+  echo "SECRET_KEY_BASE=$(openssl rand -hex 64)" >> "$ENV_FILE"
+  ok "Added SECRET_KEY_BASE to $ENV_FILE"
+fi
+
+# Read the persisted key so migrations use the same value
+SECRET_KEY_BASE="$(grep "^SECRET_KEY_BASE=" "$ENV_FILE" | cut -d= -f2-)"
 
 # Symlink .env into the release directory so the app finds it at startup
 if [[ ! -L "$REL/.env" ]]; then
@@ -87,6 +99,8 @@ if [[ -x "$REL/bin/eye_in_the_sky" ]]; then
     DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" \
     DATABASE_SSL_VERIFY=false \
     PHX_SERVER=false \
+    DISABLE_AUTH=1 \
+    SECRET_KEY_BASE="${SECRET_KEY_BASE}" \
     "$REL/bin/eye_in_the_sky" eval "EyeInTheSky.Release.migrate()" 2>&1 | tail -5
   ok "Migrations complete"
 else

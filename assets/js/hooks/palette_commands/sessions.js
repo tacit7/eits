@@ -62,7 +62,7 @@ export function sessionCommands(hook) {
             href: "/dm/" + s.uuid,
             when: null
           }
-        })))
+        }))
       },
       when: null
     },

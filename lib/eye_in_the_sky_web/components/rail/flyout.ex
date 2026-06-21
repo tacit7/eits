@@ -83,7 +83,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     >
       <div class={["flex flex-col h-full", if(!@open, do: "invisible")]}>
         <%!-- ── Header row: [icon] [Page Name]  [+ button] ── --%>
-        <div class="px-2.5 py-2.5 border-b border-base-content/8 flex-shrink-0 flex items-center gap-1">
+        <div class="px-2.5 pb-2.5 pt-10 border-b border-base-content/8 flex-shrink-0 flex items-center gap-1">
           <%!-- Icon + label --%>
           <%= cond do %>
             <% @active_section == :agents -> %>

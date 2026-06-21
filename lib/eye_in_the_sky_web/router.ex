@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Router do
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
         "font-src 'self' data: https://fonts.gstatic.com; " <>
         "img-src 'self' data: blob: #{origin} #{ip_origin}; " <>
-        "connect-src 'self' #{ws_origin} #{ip_ws_origin}; " <>
+        "connect-src 'self' #{ws_origin} #{ip_ws_origin} ipc://localhost; " <>
         "frame-ancestors 'none'; " <>
         "object-src 'none'"
     end
@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.Router do
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
         "font-src 'self' data: https://fonts.gstatic.com; " <>
         "img-src 'self' data: blob:; " <>
-        "connect-src 'self'; " <>
+        "connect-src 'self' ipc://localhost; " <>
         "frame-ancestors 'none'; " <>
         "object-src 'none'"
     end

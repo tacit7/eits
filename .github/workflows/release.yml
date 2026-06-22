@@ -76,6 +76,86 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Eye in the Sky ${{ github.ref_name }}'
-          releaseBody: 'See the assets below to download and install.'
+          releaseBody: |
+            ## Install
+
+            **Option A — Installer (recommended):** Download `Eye_in_the_Sky_*.pkg`, double-click, follow the wizard.
+            The installer copies the app to `/Applications` and creates `~/.config/eits/.env` automatically.
+            Then open Terminal and run:
+            ```
+            open "/Applications/Eye in the Sky.app/Contents/Resources/setup.command"
+            ```
+            to install PostgreSQL and set up the database.
+
+            **Option B — DMG:** Download the `.dmg`, drag the app to `/Applications`, then run `setup.command` as above.
           releaseDraft: true
           prerelease: false
+
+      - name: Build .pkg installer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          APP_PATH=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name "*.app" | head -1)
+
+          if [[ -z "$APP_PATH" ]]; then
+            echo "ERROR: No .app found — skipping .pkg build"
+            exit 1
+          fi
+          echo "Packaging: $APP_PATH  (version $VERSION)"
+
+          # Postinstall script: creates ~/.config/eits/.env with correct defaults.
+          # Runs as root during installation, so we resolve the real logged-in user.
+          # Homebrew/Postgres setup still requires setup.command (can't run brew as root).
+          mkdir -p pkg-scripts
+          cat > pkg-scripts/postinstall << 'POSTINSTALL'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          REAL_USER=$(stat -f '%Su' /dev/console 2>/dev/null || echo "${SUDO_USER:-$USER}")
+          REAL_HOME=$(eval echo "~$REAL_USER" 2>/dev/null || echo "/Users/$REAL_USER")
+          ENV_DIR="$REAL_HOME/.config/eits"
+          ENV_FILE="$ENV_DIR/.env"
+
+          mkdir -p "$ENV_DIR"
+          chown "$REAL_USER" "$ENV_DIR" 2>/dev/null || true
+
+          if [[ ! -f "$ENV_FILE" ]]; then
+            SECRET=$(openssl rand -hex 64)
+            printf 'DATABASE_URL=ecto://%s@localhost/eits_dev\n' "$REAL_USER" >  "$ENV_FILE"
+            printf 'DATABASE_SSL_VERIFY=false\n'                               >> "$ENV_FILE"
+            printf 'PHX_SERVER=true\n'                                         >> "$ENV_FILE"
+            printf 'PHX_DISABLE_FORCE_SSL=1\n'                                 >> "$ENV_FILE"
+            printf 'DISABLE_AUTH=1\n'                                          >> "$ENV_FILE"
+            printf 'SECRET_KEY_BASE=%s\n' "$SECRET"                            >> "$ENV_FILE"
+            chown "$REAL_USER" "$ENV_FILE"
+          fi
+
+          # Fix wrong postgres user in an existing .env
+          if grep -q "^DATABASE_URL=ecto://postgres@" "$ENV_FILE" 2>/dev/null; then
+            sed -i '' "s|^DATABASE_URL=ecto://postgres@|DATABASE_URL=ecto://${REAL_USER}@|" "$ENV_FILE"
+          fi
+
+          exit 0
+          POSTINSTALL
+          chmod +x pkg-scripts/postinstall
+
+          COMPONENT_PKG="Eye_in_the_Sky_component.pkg"
+          FINAL_PKG="Eye_in_the_Sky_${VERSION}.pkg"
+
+          pkgbuild \
+            --component "$APP_PATH" \
+            --install-location "/Applications" \
+            --scripts pkg-scripts \
+            --identifier "com.eits.EyeInTheSky" \
+            --version "$VERSION" \
+            "$COMPONENT_PKG"
+
+          productbuild \
+            --package "$COMPONENT_PKG" \
+            "$FINAL_PKG"
+
+          echo "Built $FINAL_PKG ($(du -sh "$FINAL_PKG" | cut -f1))"
+          gh release upload "${{ github.ref_name }}" "$FINAL_PKG" --clobber

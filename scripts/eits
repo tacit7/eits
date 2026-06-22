@@ -3468,6 +3468,61 @@ cmd_worktree() {
 
 _pending_log() { printf '%s/.eits/pending-annotations.log' "$HOME"; }
 
+# ── hooks ─────────────────────────────────────────────────────────────────────
+cmd_hooks() {
+  local subcmd="${1:-install}"; shift || true
+
+  # Resolve the install-hooks.sh script relative to this eits binary.
+  local self_dir
+  self_dir="$(cd "$(dirname "$0")" && pwd)"
+  local installer=""
+  # Look for install-hooks.sh alongside eits (dev) or under a sibling priv/scripts/ (installed)
+  for candidate in \
+    "$self_dir/../priv/scripts/install-hooks.sh" \
+    "$self_dir/../../priv/scripts/install-hooks.sh" \
+    "$HOME/Applications/Eye in the Sky.app/Contents/Resources/priv/scripts/install-hooks.sh" \
+    "/Applications/Eye in the Sky.app/Contents/Resources/priv/scripts/install-hooks.sh"; do
+    if [[ -f "$candidate" ]]; then
+      installer="$(cd "$(dirname "$candidate")" && pwd)/$(basename "$candidate")"
+      break
+    fi
+  done
+
+  if [[ -z "$installer" ]]; then
+    die "install-hooks.sh not found. Re-run from inside the EITS project or install the desktop app."
+  fi
+
+  local scripts_dir
+  scripts_dir="$(dirname "$installer")"
+
+  # Resolve the eits CLI path to pass to the installer
+  local eits_cli
+  eits_cli="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
+  case "$subcmd" in
+    install)
+      bash "$installer" --scripts-dir "$scripts_dir" --eits-cli "$eits_cli" "$@"
+      ;;
+    uninstall)
+      bash "$installer" --scripts-dir "$scripts_dir" --uninstall "$@"
+      ;;
+    --help|-h)
+      cat <<EOF
+usage: eits hooks <install|uninstall>
+
+  install     Copy hook scripts to ~/.config/eits/hooks/, install the eits CLI
+              to ~/.local/bin/eits, and merge hooks into ~/.claude/settings.json.
+
+  uninstall   Remove EITS-managed hook entries from ~/.claude/settings.json.
+              Does not delete scripts or the eits CLI binary.
+EOF
+      ;;
+    *)
+      die "unknown hooks subcommand: $subcmd (try: install, uninstall)"
+      ;;
+  esac
+}
+
 cmd_queue() {
   local subcmd="${1:-}"; shift || true
   [[ "${subcmd:-}" == "--help" || "${subcmd:-}" == "-h" ]] && {
@@ -4342,6 +4397,7 @@ Commands:
                 status <id> [--wait]   ← blocks until all members done/failed; exits 0 all done, 1 any failed
   timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
+  hooks         install|uninstall   (install EITS Claude Code hooks into ~/.claude/settings.json)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
@@ -4383,6 +4439,7 @@ case "$cmd" in
   teams)         cmd_teams         "$@" ;;
   timer)         cmd_timer         "$@" ;;
   worktree)      cmd_worktree      "$@" ;;
+  hooks)         cmd_hooks         "$@" ;;
   queue)         cmd_queue         "$@" ;;
   search)        cmd_search        "$@" ;;
   messages)      cmd_messages      "$@" ;;

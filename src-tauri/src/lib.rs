@@ -743,16 +743,11 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         // is running on the same machine, both processes try to register the same
         // node name and the release refuses to start.
         command.env("RELEASE_DISTRIBUTION", "none");
-
-        if std::env::var("DATABASE_URL").is_err() {
-            command.env("DATABASE_URL", "postgres://postgres:postgres@localhost/eits_dev?sslmode=disable");
-        }
-        if std::env::var("SECRET_KEY_BASE").is_err() {
-            command.env(
-                "SECRET_KEY_BASE",
-                "bnsVqob9r8+zpVEcTxUEWHIamQVlRwx2xBgVP56XZAWIUJDTGAiG/WxzD7twxmPN7c2aaaaf50e1f72b3653c8f33bc1b3239e318214ceed08588536f5e62526b9dc405154507082f8caa48786531104ba0a8b66a9ffd7b3148e36649db0c28a1e3e",
-            );
-        }
+        // DATABASE_URL and SECRET_KEY_BASE are intentionally NOT set here.
+        // They are read from ~/.config/eits/.env by runtime.exs at startup.
+        // setup.command creates that file with the correct OS-user credentials.
+        // Injecting them here would override the .env file values (System.get_env()
+        // is the last/highest-priority source in runtime.exs's source!() call).
 
         command
     }

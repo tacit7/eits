@@ -121,6 +121,30 @@ else
   log "Skipping migrations — app not found at $REL/bin/eye_in_the_sky"
 fi
 
+# ── 6. Claude Code hooks ──────────────────────────────────────────────────────
+HOOKS_INSTALLER="$APP/Contents/Resources/priv/scripts/install-hooks.sh"
+EITS_CLI_BUNDLED="$APP/Contents/Resources/scripts/eits"
+
+echo ""
+if [[ -f "$HOOKS_INSTALLER" ]]; then
+  echo "EITS can install Claude Code hooks that track your agent sessions."
+  echo "This writes entries to ~/.claude/settings.json and installs the eits CLI"
+  echo "to ~/.local/bin/eits."
+  echo ""
+  read -p "Install Claude Code hooks? (y/N) " -n 1 -r REPLY
+  echo ""
+  if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+    bash "$HOOKS_INSTALLER" \
+      --scripts-dir "$(dirname "$HOOKS_INSTALLER")" \
+      --eits-cli "$EITS_CLI_BUNDLED"
+    ok "Hooks installed"
+  else
+    log "Skipped. Run later with: eits hooks install"
+  fi
+else
+  log "Hook installer not bundled — skipping (run: eits hooks install)"
+fi
+
 echo ""
 echo "Setup complete. Open Eye in the Sky from your Applications folder."
 echo ""

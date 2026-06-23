@@ -673,6 +673,28 @@ eits worktree remove <branch> [--project-path <path>]
 
 ---
 
+## hooks
+
+```bash
+eits hooks install     # Install EITS Claude Code hooks into ~/.claude/settings.json
+eits hooks uninstall   # Remove EITS-managed hooks from ~/.claude/settings.json
+```
+
+**`eits hooks install`** performs a complete hook setup:
+1. Copies core hook scripts to `~/.config/eits/hooks/` (eits-lib.sh, eits-session-startup.sh, eits-session-resume.sh, etc.)
+2. Installs the eits CLI binary to `~/.local/bin/eits` and makes it executable
+3. Patches shell profiles (`~/.zprofile`, `~/.bash_profile`) to add `~/.local/bin` to `PATH` if not already present
+4. Merges EITS hook entries into `~/.claude/settings.json` without overwriting unrelated entries
+5. Provides feedback on what was installed
+
+**`eits hooks uninstall`** removes EITS-managed hooks:
+1. Removes EITS hook entries from `~/.claude/settings.json`
+2. Does NOT delete script files or the eits CLI binary — only removes the hook registrations
+
+**Why use this**: Claude Code hooks are the primary mechanism for automatic session tracking, context injection, and task lifecycle management. This command automates the setup that would otherwise require manual script copying and JSON editing.
+
+---
+
 ## Hooks & Server Availability
 
 EITS hooks (stored in `priv/scripts/` and `.claude/hooks/`) use a shared TCP probe guard (`eits-lib.sh`) to verify the server is available before making API calls. If the server is down, the hook silently exits (exit 0) instead of hanging or erroring.

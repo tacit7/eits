@@ -145,7 +145,8 @@ env = [
   {"PATH", System.get_env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")},
   {"SHELL", @shell_bin},
   {"USER", System.get_env("USER", "user")},
-  {"LOGNAME", System.get_env("LOGNAME", System.get_env("USER", "user"))}
+  {"LOGNAME", System.get_env("LOGNAME", System.get_env("USER", "user"))},
+  {"COLORFGBG", "15;0"}
 ]
 
 opts = [
@@ -160,6 +161,12 @@ opts = [
 ```
 
 **Every option is load-bearing.** See the gotchas section.
+
+#### Environment Variables
+
+**`COLORFGBG`** — Hint to vim about background color when OSC 11 is unavailable. Format is `"foreground;background"` with ANSI color indices (15=white, 0=black). Without it, vim may guess wrong and colorscheme appearance may be inverted or washed out.
+
+Other variables (`TERM`, `LANG`, etc.) are standard and follow conventional PTY setup.
 
 ### Shell command
 
@@ -508,6 +515,36 @@ erlexec allocates PTYs with the `ECHO` termios flag **off** by default. Input re
 | Event target | `pushEvent` → LiveView | `pushEventTo(this.el)` → LiveComponent |
 | Output event | `"pty_output"` (shared) | `"pty_output_<ct.id>"` (scoped per terminal) |
 | Multiple instances | No (one per page) | Yes (many per canvas) |
+
+---
+
+## Theme Handling and xterm.js Configuration
+
+### Theme Updates and escape sequence injection
+
+**Previous behavior (broken):** When the DaisyUI theme changed, a `MutationObserver` on the document root would:
+1. Update xterm.js theme options with new colors
+2. Write `\x1b[H\x1b[2J` (cursor-home + erase-display) to force a redraw
+
+The escape sequence injection was intended to align xterm.js's buffer redraw with Ink/Claude Code TUI re-renders, but it had a critical side effect: when vim was open in the PTY, these escape sequences landed in vim's input stream and corrupted its internal cursor tracking and redraw state.
+
+**Current behavior (fixed):** The `MutationObserver` now updates only the xterm.js theme options and does NOT write escape sequences. xterm.js automatically re-renders the buffer with new colors when its `options.theme` is updated. This is safe for vim and other TUI applications that expect a clean input stream.
+
+**Code location:** `assets/js/hooks/pty_hook.js`, `PtyHook.mount()`, `this._themeObserver`.
+
+### Background color detection for vim
+
+vim detects terminal background color using two methods:
+1. Query OSC 11 (Operating System Command 11: "what is your background color?")
+2. Check the `COLORFGBG` environment variable
+
+When OSC 11 is unavailable or unsupported, vim falls back to `COLORFGBG`. Without it, vim may guess wrong and colorscheme appearance breaks (inversion, washed-out colors).
+
+**Current setup:** `PtyServer` sets `COLORFGBG=15;0` in the bash process environment:
+- `15` = ANSI white (foreground)
+- `0` = ANSI black (background)
+
+This correctly hints dark background mode to vim. See `lib/eye_in_the_sky/terminal/pty_server.ex`, `build_env/0`.
 
 ---
 

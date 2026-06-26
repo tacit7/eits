@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 2, assign: 3]
-  import Phoenix.LiveView, only: [start_async: 3, push_navigate: 2, push_event: 3, put_flash: 3]
+  import Phoenix.LiveView, only: [push_navigate: 2, push_event: 3, put_flash: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Agents.AgentManager
@@ -107,20 +107,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  # macOS-specific: uses osascript for folder picker. Intentionally not generalized.
-  # Clicking "New project" triggers this. If the picker is cancelled or fails,
-  # handle_pick_folder/2 falls through to the inline path input fallback.
-  # NOTE: Creating a project does NOT auto-select it. Check the old Sidebar behavior —
-  # if it auto-selected, add |> assign(:sidebar_project, project) to handle_pick_folder/2.
+  # Pushes a phx:pick_folder event to the client.
+  # In Tauri: JS invokes the native folder picker (Rust pick_folder command) and
+  # pushes folder_picked back. In the browser: JS immediately pushes folder_picked
+  # with an empty payload to show the inline text-input fallback.
   def handle_show_new_project(socket) do
-    {:noreply,
-     start_async(socket, :pick_folder, fn ->
-       System.cmd(
-         "osascript",
-         ["-e", ~s[POSIX path of (choose folder with prompt "Select project folder:")]],
-         stderr_to_stdout: true
-       )
-     end)}
+    {:noreply, push_event(socket, "pick_folder", %{})}
   end
 
   def handle_cancel_new_project(socket),
@@ -172,18 +164,20 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  def handle_pick_folder({path, 0}, socket) do
+  # Handles the folder_picked event pushed back from the JS pick_folder listener.
+  # path present → create project directly.
+  # path absent or empty → show inline text-input fallback.
+  def handle_folder_picked(%{"path" => path}, socket) when is_binary(path) and path != "" do
     path = String.trim(path)
     name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
 
     case Projects.create_project(%{name: name, path: path}) do
       {:ok, _} -> {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
-      {:error, _} -> {:noreply, socket}
+      {:error, _} -> {:noreply, assign(socket, :new_project_path, "")}
     end
   end
 
-  # Cancelled or failed: show inline path input fallback
-  def handle_pick_folder(_result, socket),
+  def handle_folder_picked(_params, socket),
     do: {:noreply, assign(socket, :new_project_path, "")}
 
   # Only called when sidebar_project is nil (guarded in rail.ex handle_event clause).

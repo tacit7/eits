@@ -98,10 +98,27 @@ defmodule EyeInTheSky.Projects do
   defp inject_workspace_id_if_missing(%{workspace_id: id} = attrs) when not is_nil(id), do: attrs
 
   defp inject_workspace_id_if_missing(attrs) do
-    case Repo.one(from w in EyeInTheSky.Workspaces.Workspace, order_by: [asc: :id], limit: 1) do
-      nil -> attrs
-      workspace -> Map.put(attrs, :workspace_id, workspace.id)
-    end
+    workspace =
+      case Repo.one(from w in EyeInTheSky.Workspaces.Workspace, order_by: [asc: :id], limit: 1) do
+        nil ->
+          # No workspace yet — happens on fresh desktop installs where DISABLE_AUTH=1
+          # means no user ever logged in and triggered workspace creation. Seed one now.
+          {:ok, user} = EyeInTheSky.Accounts.get_or_create_user("desktop")
+          case EyeInTheSky.Workspaces.default_workspace_for_user(user) do
+            nil ->
+              case EyeInTheSky.Workspaces.create_default_workspace_for_user(user) do
+                {:ok, ws} -> ws
+                {:error, _} -> nil
+              end
+            ws ->
+              ws
+          end
+
+        ws ->
+          ws
+      end
+
+    if workspace, do: Map.put(attrs, :workspace_id, workspace.id), else: attrs
   end
 
   @doc """

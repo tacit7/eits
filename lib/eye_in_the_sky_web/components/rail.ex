@@ -255,6 +255,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("create_project", params, socket),
     do: ProjectActions.handle_create_project(params, socket)
 
+  def handle_event("folder_picked", params, socket),
+    do: ProjectActions.handle_folder_picked(params, socket)
+
   def handle_event("new_session", params, socket),
     do: ProjectActions.handle_new_session(params, socket)
 
@@ -579,12 +582,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_async(:load_usage, {:exit, reason}, socket) do
     {:noreply, assign(socket, :flyout_usage, {:error, reason})}
   end
-
-  def handle_async(:pick_folder, {:ok, result}, socket),
-    do: ProjectActions.handle_pick_folder(result, socket)
-
-  def handle_async(:pick_folder, _result, socket),
-    do: ProjectActions.handle_pick_folder(:cancelled, socket)
 
   defp maybe_reload_on_project_change(socket, same_project, same_project), do: socket
 

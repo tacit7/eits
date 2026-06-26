@@ -178,9 +178,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
       Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
     else
       if get_in(job_context, ["reply_mode"]) == "cli_required" do
-        save_to_session_transcript_only(session_id, provider, text, metadata, job_context)
+        save_result(session_id, provider, text, metadata, visibility: :session_only, context: job_context)
       else
-        save_result(session_id, provider, text, metadata, channel_id, source_uuid)
+        save_result(session_id, provider, text, metadata, channel_id: channel_id, source_uuid: source_uuid)
         maybe_fanout_mentions(channel_id, text, session_id)
       end
     end
@@ -259,39 +259,40 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     }
   end
 
-  defp save_result(session_id, provider, text, metadata, channel_id, source_uuid) do
+  # Unified save. opts:
+  #   :channel_id   — if set, also mirrors into channel_messages
+  #   :source_uuid  — originating session/agent UUID
+  #   :visibility   — :session_only adds audit metadata; nil means normal save
+  #   :context      — job_context map required when visibility is :session_only
+  defp save_result(session_id, provider, text, metadata, opts) do
     db_metadata = build_db_metadata(metadata)
 
-    opts = [metadata: db_metadata]
-    opts = if channel_id, do: Keyword.put(opts, :channel_id, channel_id), else: opts
-    opts = if source_uuid, do: Keyword.put(opts, :source_uuid, source_uuid), else: opts
+    {reply_opts, log_ok} =
+      if opts[:visibility] == :session_only do
+        context = opts[:context] || %{}
 
-    case Messages.record_incoming_reply(session_id, provider, text, opts) do
-      {:ok, _message} -> :ok
+        full_metadata =
+          Map.merge(db_metadata, %{
+            "visibility" => "session_only",
+            "source" => "channel_prompt",
+            "channel_id" => context["channel_id"],
+            "channel_message_id" => context["channel_message_id"]
+          })
+
+        {[metadata: full_metadata],
+         fn -> Logger.info("[#{session_id}] Saved channel-prompt reply to session transcript only") end}
+      else
+        channel_id = opts[:channel_id]
+        source_uuid = opts[:source_uuid]
+        base = [metadata: db_metadata]
+        base = if channel_id, do: Keyword.put(base, :channel_id, channel_id), else: base
+        base = if source_uuid, do: Keyword.put(base, :source_uuid, source_uuid), else: base
+        {base, fn -> :ok end}
+      end
+
+    case Messages.record_incoming_reply(session_id, provider, text, reply_opts) do
+      {:ok, _message} -> log_ok.()
       {:error, reason} -> Logger.warning("[#{session_id}] DB save failed: #{inspect(reason)}")
-    end
-  end
-
-  # Saves to the messages table (session transcript) with visibility metadata.
-  # Does NOT insert into channel_messages. Used when reply_mode is "cli_required"
-  # so the agent's raw output is auditable without auto-mirroring into the channel.
-  defp save_to_session_transcript_only(session_id, provider, text, metadata, context) do
-    db_metadata = build_db_metadata(metadata)
-
-    full_metadata =
-      Map.merge(db_metadata, %{
-        "visibility" => "session_only",
-        "source" => "channel_prompt",
-        "channel_id" => context["channel_id"],
-        "channel_message_id" => context["channel_message_id"]
-      })
-
-    case Messages.record_incoming_reply(session_id, provider, text, metadata: full_metadata) do
-      {:ok, _message} ->
-        Logger.info("[#{session_id}] Saved channel-prompt reply to session transcript only")
-
-      {:error, reason} ->
-        Logger.warning("[#{session_id}] Transcript-only save failed: #{inspect(reason)}")
     end
   end
 

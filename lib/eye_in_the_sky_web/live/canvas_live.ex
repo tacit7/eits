@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Terminal.PtyServer
   alias EyeInTheSky.Terminal.PtySupervisor
+  alias EyeInTheSkyWeb.CanvasLive.TerminalHandlers
   alias EyeInTheSkyWeb.Components.ChatWindowComponent
   alias EyeInTheSkyWeb.Components.TerminalWindowComponent
 
@@ -198,48 +199,14 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
-  def handle_event("add_terminal", _params, socket) do
-    canvas_id = socket.assigns.active_canvas_id
+  def handle_event("add_terminal", _params, socket),
+    do: TerminalHandlers.handle_add_terminal(socket)
 
-    if is_nil(canvas_id) do
-      {:noreply, socket}
-    else
-      offset = length(socket.assigns.canvas_sessions) + length(socket.assigns.canvas_terminals)
+  def handle_event("terminal_moved", %{"id" => id_str, "x" => x, "y" => y}, socket),
+    do: TerminalHandlers.handle_terminal_moved(id_str, x, y, socket)
 
-      attrs = %{
-        pos_x: 24 + offset * 32,
-        pos_y: 24 + offset * 32,
-        width: 620,
-        height: 400
-      }
-
-      case Canvases.create_terminal(canvas_id, attrs) do
-        {:ok, ct} ->
-          {:ok, pty_pid} =
-            PtySupervisor.find_or_start_pty(session_key: "canvas-terminal-#{ct.id}")
-
-          PtyServer.subscribe(pty_pid, self(), ct.id)
-
-          {:noreply,
-           socket
-           |> assign(:canvas_terminals, socket.assigns.canvas_terminals ++ [ct])
-           |> assign(:terminal_pty_map, Map.put(socket.assigns.terminal_pty_map, ct.id, pty_pid))}
-
-        {:error, _} ->
-          {:noreply, socket}
-      end
-    end
-  end
-
-  def handle_event("terminal_moved", %{"id" => id_str, "x" => x, "y" => y}, socket) do
-    if id = parse_int(id_str), do: Canvases.update_terminal_layout(id, %{pos_x: x, pos_y: y})
-    {:noreply, socket}
-  end
-
-  def handle_event("terminal_resized", %{"id" => id_str, "w" => w, "h" => h}, socket) do
-    if id = parse_int(id_str), do: Canvases.update_terminal_layout(id, %{width: w, height: h})
-    {:noreply, socket}
-  end
+  def handle_event("terminal_resized", %{"id" => id_str, "w" => w, "h" => h}, socket),
+    do: TerminalHandlers.handle_terminal_resized(id_str, w, h, socket)
 
   def handle_event(event, _params, socket) do
     Logger.warning("CanvasLive: unhandled event #{inspect(event)}")
@@ -314,41 +281,22 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   # Scroll buffer replay on (re-)subscribe — route same as live output
-  def handle_info({:pty_scroll_buffer, terminal_id, data}, socket) when byte_size(data) > 0 do
-    send_update(TerminalWindowComponent,
-      id: "terminal-window-#{terminal_id}",
-      pty_output: data
-    )
-
-    {:noreply, socket}
-  end
+  def handle_info({:pty_scroll_buffer, terminal_id, data}, socket) when byte_size(data) > 0,
+    do: TerminalHandlers.handle_pty_scroll_buffer(terminal_id, data, socket)
 
   def handle_info({:pty_scroll_buffer, _terminal_id, _empty}, socket), do: {:noreply, socket}
 
   # PTY output — tagged with terminal id
-  def handle_info({:pty_output, terminal_id, data}, socket) do
-    send_update(TerminalWindowComponent,
-      id: "terminal-window-#{terminal_id}",
-      pty_output: data
-    )
-
-    {:noreply, socket}
-  end
+  def handle_info({:pty_output, terminal_id, data}, socket),
+    do: TerminalHandlers.handle_pty_output(terminal_id, data, socket)
 
   # PTY exited — remove terminal window and clean up
-  def handle_info({:pty_exited, terminal_id}, socket) do
-    {:noreply, remove_terminal(socket, terminal_id)}
-  end
+  def handle_info({:pty_exited, terminal_id}, socket),
+    do: TerminalHandlers.handle_pty_exited(terminal_id, socket)
 
   # Component requested close
-  def handle_info({:remove_terminal_window, terminal_id}, socket) do
-    if pid = socket.assigns.terminal_pty_map[terminal_id] do
-      PtyServer.stop(pid)
-    end
-
-    Canvases.delete_terminal(terminal_id)
-    {:noreply, remove_terminal(socket, terminal_id)}
-  end
+  def handle_info({:remove_terminal_window, terminal_id}, socket),
+    do: TerminalHandlers.handle_remove_terminal_window(terminal_id, socket)
 
   def handle_info({:canvas_session_added, _payload}, socket) do
     case socket.assigns.active_canvas_id do
@@ -694,15 +642,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     |> assign(:session_search, "")
     |> assign(:canvas_terminals, [])
     |> assign(:terminal_pty_map, %{})
-  end
-
-  defp remove_terminal(socket, terminal_id) do
-    socket
-    |> assign(
-      :canvas_terminals,
-      Enum.reject(socket.assigns.canvas_terminals, &(&1.id == terminal_id))
-    )
-    |> assign(:terminal_pty_map, Map.delete(socket.assigns.terminal_pty_map, terminal_id))
   end
 
   defp activate_canvas(socket, canvas_id) do

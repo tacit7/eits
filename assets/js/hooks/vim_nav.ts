@@ -1,5 +1,7 @@
 // assets/js/hooks/vim_nav.ts
 import { COMMANDS, PREFIXES, type Command } from "./vim_nav_commands"
+import { createStatusbar, updateStatusbar, type Mode } from "./vim_nav_statusbar"
+import { _generateHintLabels } from "./vim_nav_hints"
 
 const EDITABLE_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"])
 
@@ -51,8 +53,6 @@ export function matchesKnownBindingOrPrefix(buffer: string[], key: string): bool
 // Re-export Command type for use in Task 3 hook implementation
 export type { Command }
 
-type Mode = "normal" | "insert"
-
 // LiveView injects `el` and `pushEvent` at mount — Phoenix ships no official TS types,
 // so we define the interface here for type safety.
 interface LiveViewHook {
@@ -62,51 +62,6 @@ interface LiveViewHook {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
-}
-
-function createStatusbar(): HTMLElement {
-  const el = document.createElement("div")
-  el.id = "vim-nav-statusbar"
-  el.setAttribute("aria-hidden", "true")
-  el.style.cssText = [
-    "position:fixed",
-    "bottom:12px",
-    "right:16px",
-    "z-index:9999",
-    "font-family:monospace",
-    "font-size:11px",
-    "padding:2px 6px",
-    "border-radius:3px",
-    "pointer-events:none",
-    "background:transparent",
-  ].join(";")
-  return el
-}
-
-function updateStatusbar(el: HTMLElement, mode: Mode, count = 0): void {
-  if (mode === "normal") {
-    el.textContent = count > 0 ? `[ NORMAL ] ${count}` : "[ NORMAL ]"
-    el.style.color = "var(--color-base-content)"
-    el.style.opacity = "0.55"
-  } else {
-    el.textContent = "[ INSERT ]"
-    el.style.color = "var(--color-info, var(--color-primary))"
-    el.style.opacity = "0.9"
-  }
-}
-
-function _generateHintLabels(count: number): string[] {
-  const alpha = "abcdefghijklmnopqrstuvwxyz"
-  const labels: string[] = []
-  for (let i = 0; labels.length < count && i < alpha.length; i++) {
-    labels.push(alpha[i])
-  }
-  for (let i = 0; labels.length < count && i < alpha.length; i++) {
-    for (let j = 0; labels.length < count && j < alpha.length; j++) {
-      labels.push(alpha[i] + alpha[j])
-    }
-  }
-  return labels
 }
 
 export const VimNav = {

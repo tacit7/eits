@@ -267,7 +267,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   defp save_result(session_id, provider, text, metadata, opts) do
     db_metadata = build_db_metadata(metadata)
 
-    {reply_opts, log_ok} =
+    {reply_opts, log_ok, log_err} =
       if opts[:visibility] == :session_only do
         context = opts[:context] || %{}
 
@@ -280,19 +280,20 @@ defmodule EyeInTheSky.AgentWorkerEvents do
           })
 
         {[metadata: full_metadata],
-         fn -> Logger.info("[#{session_id}] Saved channel-prompt reply to session transcript only") end}
+         fn -> Logger.info("[#{session_id}] Saved channel-prompt reply to session transcript only") end,
+         fn r -> Logger.warning("[#{session_id}] Transcript-only save failed: #{inspect(r)}") end}
       else
         channel_id = opts[:channel_id]
         source_uuid = opts[:source_uuid]
         base = [metadata: db_metadata]
         base = if channel_id, do: Keyword.put(base, :channel_id, channel_id), else: base
         base = if source_uuid, do: Keyword.put(base, :source_uuid, source_uuid), else: base
-        {base, fn -> :ok end}
+        {base, fn -> :ok end, fn r -> Logger.warning("[#{session_id}] DB save failed: #{inspect(r)}") end}
       end
 
     case Messages.record_incoming_reply(session_id, provider, text, reply_opts) do
       {:ok, _message} -> log_ok.()
-      {:error, reason} -> Logger.warning("[#{session_id}] DB save failed: #{inspect(reason)}")
+      {:error, reason} -> log_err.(reason)
     end
   end
 

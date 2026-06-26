@@ -1,7 +1,7 @@
 // assets/js/hooks/vim_nav.ts
 import { COMMANDS, PREFIXES, type Command } from "./vim_nav_commands"
 import { createStatusbar, updateStatusbar, type Mode } from "./vim_nav_statusbar"
-import { _generateHintLabels } from "./vim_nav_hints"
+import { _generateHintLabels, createHintOverlay, filterHintBadges } from "./vim_nav_hints"
 
 const EDITABLE_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"])
 
@@ -760,36 +760,9 @@ export const VimNav = {
     this.hintBuffer = ""
     this.hintMode = true
 
-    const overlay = document.createElement("div")
-    overlay.id = "vim-nav-hints"
-    overlay.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999"
-    this.hintOverlayEl = overlay
+    this.hintOverlayEl = createHintOverlay(items, labels)
+    document.body.appendChild(this.hintOverlayEl)
 
-    items.forEach((item, i) => {
-      const rect = item.getBoundingClientRect()
-      const badge = document.createElement("span")
-      badge.dataset.hintLabel = labels[i]
-      badge.textContent = labels[i]
-      badge.style.cssText = [
-        "position:fixed",
-        `top:${rect.top + 4}px`,
-        `left:${rect.left + 4}px`,
-        "background:var(--color-warning,#f59e0b)",
-        "color:var(--color-warning-content,#000)",
-        "font-family:monospace",
-        "font-size:11px",
-        "font-weight:700",
-        "line-height:1",
-        "padding:1px 4px",
-        "border-radius:3px",
-        "pointer-events:none",
-        "z-index:9999",
-        "letter-spacing:0.05em",
-      ].join(";")
-      overlay.appendChild(badge)
-    })
-
-    document.body.appendChild(overlay)
     if (this.statusbarEl) {
       this.statusbarEl.textContent = "[ HINT ]"
       this.statusbarEl.style.color = "var(--color-warning, #f59e0b)"
@@ -810,34 +783,14 @@ export const VimNav = {
 
   _updateHintFilter(): void {
     if (!this.hintOverlayEl) return
-    const prefix = this.hintBuffer
-
-    // Find all matching labels
-    const matches = this.hintLabels.filter(h => h.label.startsWith(prefix))
+    const matches = filterHintBadges(this.hintOverlayEl, this.hintBuffer, this.hintLabels)
 
     if (matches.length === 0) {
       this.exitHintMode()
       return
     }
 
-    // Update badge visibility
-    this.hintOverlayEl.querySelectorAll<HTMLElement>("[data-hint-label]").forEach(badge => {
-      const label = badge.dataset.hintLabel!
-      if (label.startsWith(prefix)) {
-        badge.style.opacity = "1"
-        // Bold the typed prefix, normal for remaining chars
-        const typed = label.slice(0, prefix.length)
-        const rest = label.slice(prefix.length)
-        badge.innerHTML = typed
-          ? `<span style="opacity:0.5">${typed}</span>${rest}`
-          : label
-      } else {
-        badge.style.opacity = "0.15"
-      }
-    })
-
-    // Exact match — focus and exit
-    if (matches.length === 1 && matches[0].label === prefix) {
+    if (matches.length === 1 && matches[0].label === this.hintBuffer) {
       this.focusListItem(matches[0].index)
       this.exitHintMode()
     }

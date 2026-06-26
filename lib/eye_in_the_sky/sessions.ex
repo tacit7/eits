@@ -575,43 +575,10 @@ defmodule EyeInTheSky.Sessions do
   """
   def terminated_statuses, do: ~w(completed failed)
 
-  @doc """
-  Broadcasts session_updated event (no DB change).
-  """
-  def broadcast_session_updated(session), do: Events.session_updated(session)
-
-  @doc """
-  Broadcasts session_completed and session_updated events (no DB change).
-  """
-  def broadcast_session_completed(session),
-    do: broadcast_with_session_updated(session, &Events.session_completed/1)
-
-  @doc """
-  Broadcasts agent_stopped and session_updated events (no DB change).
-  """
-  def broadcast_session_waiting(session),
-    do: broadcast_with_session_updated(session, &Events.agent_stopped/1)
-
-  defp broadcast_with_session_updated(session, event_fn) do
-    event_fn.(session)
-    Events.session_updated(session)
-  end
-
-  @doc """
-  Broadcasts appropriate side-effect events based on status change (no DB change).
-  Fires agent_stopped or agent_working depending on status, then session_updated.
-  """
-  def broadcast_status_side_effects(session, status) do
-    if status do
-      if status in ["completed", "failed", "waiting", "idle"] do
-        Events.agent_stopped(session)
-      else
-        Events.agent_working(session)
-      end
-    end
-
-    Events.session_updated(session)
-  end
+  defdelegate broadcast_session_updated(session), to: EyeInTheSky.Sessions.BroadcastEvents
+  defdelegate broadcast_session_completed(session), to: EyeInTheSky.Sessions.BroadcastEvents
+  defdelegate broadcast_session_waiting(session), to: EyeInTheSky.Sessions.BroadcastEvents
+  defdelegate broadcast_status_side_effects(session, status), to: EyeInTheSky.Sessions.BroadcastEvents
 
   @doc """
   Extracts and validates model information from a nested model object.
@@ -635,69 +602,7 @@ defmodule EyeInTheSky.Sessions do
 
   defdelegate ensure_web_ui_session(), to: EyeInTheSky.Sessions.WebUiBootstrap
 
-  @doc """
-  Registers a new session from a SessionStart hook.
-
-  Takes the raw hook params map and an already-resolved project_id.
-  Finds or creates the agent, parses model info, then creates the session.
-  Fires `EyeInTheSky.Events.session_started/1` on success.
-
-  Returns `{:ok, %{session: session, agent: agent}}` or `{:error, changeset}`.
-  """
-  @spec register_from_hook(map(), integer() | nil) ::
-          {:ok, %{session: Session.t(), agent: struct()}}
-          | {:error, :agent | :session, Ecto.Changeset.t()}
-  def register_from_hook(params, project_id) do
-    session_uuid = params["session_id"]
-
-    agent_attrs = %{
-      uuid: params["agent_id"] || session_uuid,
-      description: params["agent_description"] || params["description"],
-      project_id: project_id,
-      project_name: params["project_name"],
-      git_worktree_path: params["worktree_path"],
-      source: "hook"
-    }
-
-    case EyeInTheSky.Agents.find_or_create_agent(agent_attrs) do
-      {:ok, agent} ->
-        {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
-
-        session_attrs = %{
-          uuid: session_uuid,
-          agent_id: agent.id,
-          name: params["name"],
-          description: params["description"],
-          status: "working",
-          started_at: DateTime.utc_now(),
-          provider: params["provider"] || "claude",
-          model: params["model"],
-          model_provider: model_provider,
-          model_name: model_name,
-          project_id: project_id,
-          git_worktree_path: params["worktree_path"],
-          entrypoint: params["entrypoint"],
-          read_only: params["read_only"] == true or params["read_only"] == "true"
-        }
-
-        result =
-          if model_name,
-            do: create_session_with_model(session_attrs),
-            else: create_session(session_attrs)
-
-        case result do
-          {:ok, session} ->
-            EyeInTheSky.Events.session_started(session)
-            {:ok, %{session: session, agent: agent}}
-
-          {:error, changeset} ->
-            {:error, :session, changeset}
-        end
-
-      {:error, changeset} ->
-        {:error, :agent, changeset}
-    end
-  end
+  defdelegate register_from_hook(params, project_id), to: EyeInTheSky.Sessions.HookRegistrar
 
   defdelegate record_tool_event(session, type, params),
     to: EyeInTheSky.Sessions.ToolEventRecorder

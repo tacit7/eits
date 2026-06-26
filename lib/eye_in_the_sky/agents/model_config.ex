@@ -61,7 +61,7 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   Claude defaults remain in the caller (SpawnValidator) to preserve backward-compat
   API behavior — spawning a Claude agent with no model still resolves to "haiku".
   """
-  def default_model("codex"), do: "gpt-5.5"
+  def default_model("codex"), do: "gpt-5.3-codex"
   def default_model("gemini"), do: "gemini-2.5-flash"
 
   @doc """

@@ -38,14 +38,11 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def codex_models do
     [
+      {"gpt-5.3-codex", "GPT-5.3 Codex (Default)"},
       {"gpt-5.5", "GPT-5.5"},
-      {"gpt-5.4", "GPT-5.4"},
-      {"gpt-5.4-mini", "GPT-5.4 Mini"},
-      {"gpt-5.3-codex", "GPT-5.3 Codex"},
-      {"gpt-5.2-codex", "GPT-5.2 Codex"},
       {"gpt-5.2", "GPT-5.2"},
-      {"gpt-5.1-codex-max", "GPT-5.1 Codex Max"},
-      {"gpt-5.1-codex-mini", "GPT-5.1 Codex Mini"}
+      {"gpt-5.4", "GPT-5.4"},
+      {"gpt-5.4-mini", "GPT-5.4 Mini"}
     ]
   end
 
@@ -54,15 +51,14 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def codex_models_with_meta do
     [
-      {"gpt-5.5", "GPT-5.5", "Newest frontier · complex coding, computer use (default)",
+      {"gpt-5.3-codex", "GPT-5.3 Codex", "Coding-optimized model (default)", "text-warning"},
+      {"gpt-5.5", "GPT-5.5", "Frontier model for complex coding, research, and real-world work",
        "text-warning"},
-      {"gpt-5.4", "GPT-5.4", "Flagship frontier for professional work", "text-warning"},
-      {"gpt-5.4-mini", "GPT-5.4 Mini", "Fast and cheap for subagents", "text-info"},
-      {"gpt-5.3-codex", "GPT-5.3 Codex", "Industry-leading coding model", "text-info"},
-      {"gpt-5.2-codex", "GPT-5.2 Codex", "Frontier Codex-optimized", "text-info"},
-      {"gpt-5.2", "GPT-5.2", "Long-running agents", "text-info"},
-      {"gpt-5.1-codex-max", "GPT-5.1 Codex Max", "Deep reasoning, large context", "text-success"},
-      {"gpt-5.1-codex-mini", "GPT-5.1 Codex Mini", "Cheaper and faster", "text-success"}
+      {"gpt-5.2", "GPT-5.2", "Optimized for professional work and long-running agents",
+       "text-info"},
+      {"gpt-5.4", "GPT-5.4", "Strong model for everyday coding", "text-info"},
+      {"gpt-5.4-mini", "GPT-5.4 Mini", "Small, fast, and cost-efficient for simpler tasks",
+       "text-success"}
     ]
   end
 
@@ -121,7 +117,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   @doc """
   Returns the default model slug for a provider.
   """
-  def default_model_for("codex"), do: "gpt-5.5"
+  def default_model_for("codex"), do: "gpt-5.3-codex"
   def default_model_for("gemini"), do: "gemini-2.5-flash"
   def default_model_for(_), do: "claude-opus-4-8"
 

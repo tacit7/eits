@@ -9,6 +9,7 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   """
   def claude_models do
     [
+      "claude-opus-4-8",
       "claude-opus-4-7",
       "claude-opus-4-6",
       "claude-opus-4-5-20251101",

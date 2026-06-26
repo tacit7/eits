@@ -174,7 +174,12 @@ defmodule EyeInTheSky.Sessions do
   Gets a single session by UUID, returning {:ok, session} or {:error, :not_found}.
   """
   @spec get_session_by_uuid(String.t()) :: {:ok, Session.t()} | {:error, :not_found}
-  def get_session_by_uuid(uuid), do: get_by_uuid(uuid)
+  def get_session_by_uuid(uuid) when is_binary(uuid) do
+    case Ecto.UUID.cast(uuid) do
+      {:ok, _} -> get_by_uuid(uuid)
+      :error -> {:error, :not_found}
+    end
+  end
 
   @doc "Returns {:ok, id} if a session with the given UUID exists, else :error."
   @spec get_session_id_by_uuid(String.t()) :: {:ok, integer()} | :error

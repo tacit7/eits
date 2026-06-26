@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   attr :uploads, :map, required: true
-  attr :selected_model, :string, default: "claude-opus-4-8"
+  attr :selected_model, :string, default: "claude-opus-4-7"
   attr :selected_effort, :string, default: "medium"
   attr :active_overlay, :any, default: nil
   attr :processing, :boolean, default: false

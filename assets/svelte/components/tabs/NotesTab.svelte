@@ -3,6 +3,7 @@
   import { formatDateTime, shortId } from '../../utils/datetime.js'
   import { formatUUID, copyToClipboard } from '../../utils/clipboard.js'
   import { getHljs } from '../../../js/hljs_instance.js'
+  import DOMPurify from 'dompurify'
 
   // Heroicons
   import ClockSvg from 'heroicons/24/outline/clock.svg'
@@ -15,6 +16,13 @@
   // (core-only build, 6 languages). renderReady triggers re-render when ready.
   let markedParse = null
   let renderReady = false
+
+  const DOMPURIFY_CONFIG = {
+    ALLOWED_TAGS: ['p', 'strong', 'em', 'b', 'i', 'code', 'pre', 'ul', 'ol', 'li',
+                   'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'a',
+                   'span', 'hr', 'del', 's'],
+    ALLOWED_ATTR: ['class', 'href', 'target', 'rel']
+  }
 
   onMount(async () => {
     const [{ marked }, hljs] = await Promise.all([
@@ -47,7 +55,8 @@
   function renderMarkdown(content, _ready) {
     if (!markedParse) return content || ''
     try {
-      return markedParse(content)
+      const html = markedParse(content)
+      return DOMPurify.sanitize(html, DOMPURIFY_CONFIG)
     } catch (e) {
       console.error('Markdown parse error:', e)
       return content || ''

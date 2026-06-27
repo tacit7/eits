@@ -11,251 +11,52 @@ defmodule EyeInTheSky.Sessions do
 
   require Logger
 
-  alias EyeInTheSky.Events
   alias EyeInTheSky.Repo
-  alias EyeInTheSky.Scopes.Archivable
   alias EyeInTheSky.Sessions.Loader
   alias EyeInTheSky.Sessions.ModelInfo
+  alias EyeInTheSky.Sessions.Query
   alias EyeInTheSky.Sessions.Queries
   alias EyeInTheSky.Sessions.Session
+  alias EyeInTheSky.Sessions.StatusTransitions
   alias EyeInTheSky.Settings.JsonSettings
-  alias EyeInTheSky.Tasks.WorkflowState
-  alias EyeInTheSky.Utils.ToolHelpers
 
-  @doc """
-  Returns the list of sessions, excluding archived by default.
-  Pass `include_archived: true` to include archived sessions.
-  Pass `limit: n` to cap results (default: 1_000).
-  """
-  @spec list_sessions(keyword()) :: [Session.t()]
-  def list_sessions(opts \\ []) do
-    limit = Keyword.get(opts, :limit, 1_000)
-
-    Session
-    |> Archivable.include_archived(opts)
-    |> limit(^limit)
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns the list of sessions for a specific agent, excluding archived by default.
-  Pass `include_archived: true` to include archived sessions.
-  Pass `limit: n` to cap results (default: 200).
-  """
-  def list_sessions_for_agent(agent_id, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 200)
-
-    Session
-    |> where([s], s.agent_id == ^agent_id)
-    |> order_by([s], desc: s.started_at)
-    |> limit(^limit)
-    |> Archivable.include_archived(opts)
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns sessions with IDs in the given list. Returns [] for an empty list.
-  """
-  def list_sessions_by_ids([]), do: []
-
-  def list_sessions_by_ids(ids) do
-    Repo.all(from s in Session, where: s.id in ^ids)
-  end
-
-  @doc """
-  Returns sessions matching mixed ID types (integers or UUIDs).
-
-  Splits ids into integer and UUID lists, then queries by both.
-  Returns [] for an empty list or when no sessions are found.
-  """
-  def list_sessions_by_mixed_ids([]), do: []
-
-  def list_sessions_by_mixed_ids(ids) when is_list(ids) do
-    int_ids =
-      ids
-      |> Enum.flat_map(fn
-        id when is_integer(id) ->
-          [id]
-
-        s when is_binary(s) ->
-          case Integer.parse(s) do
-            {n, ""} -> [n]
-            _ -> []
-          end
-
-        _ ->
-          []
-      end)
-
-    uuid_ids =
-      ids
-      |> Enum.filter(fn
-        id when is_integer(id) ->
-          false
-
-        s when is_binary(s) ->
-          case Ecto.UUID.cast(s) do
-            {:ok, _} -> true
-            _ -> false
-          end
-
-        _ ->
-          false
-      end)
-
-    case {int_ids, uuid_ids} do
-      {[], []} ->
-        []
-
-      {[], uuids} ->
-        Repo.all(from s in Session, where: s.uuid in ^uuids, limit: 100)
-
-      {ints, []} ->
-        Repo.all(from s in Session, where: s.id in ^ints, limit: 100)
-
-      {ints, uuids} ->
-        Repo.all(from s in Session, where: s.id in ^ints or s.uuid in ^uuids, limit: 100)
-    end
-  end
-
-  @doc """
-  Returns a map of %{agent_id => most_recent_session_id} for a list of agent IDs.
-  Used for @mention autocomplete — resolves the latest session per agent in one query.
-  """
-  def latest_session_id_by_agents([]), do: %{}
-
-  def latest_session_id_by_agents(agent_ids) when is_list(agent_ids) do
-    from(s in Session,
-      where: s.agent_id in ^agent_ids,
-      group_by: s.agent_id,
-      select: {s.agent_id, max(s.id)}
-    )
-    |> Repo.all()
-    |> Map.new()
-  end
-
-  @doc """
-  Returns idle or waiting sessions that have not been archived and whose
-  last activity (or started_at as fallback) is older than the given cutoff.
-  Used by the scheduler to auto-archive dead idle sessions.
-  """
-  def list_idle_sessions_older_than(cutoff) do
-    # Two OR branches so PG can use the sessions(:last_activity_at) and
-    # sessions(:started_at) indexes added in 20260501053649. A single
-    # coalesce(last_activity_at, started_at) expression prevents index use.
-    from(s in Session,
-      where: s.status in ["idle", "waiting"],
-      where: is_nil(s.archived_at),
-      where: not is_nil(s.started_at),
-      where:
-        (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
-          (is_nil(s.last_activity_at) and s.started_at < ^cutoff)
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets a single session.
-
-  Raises `Ecto.NoResultsError` if the Session does not exist.
-  """
-  @spec get_session!(integer()) :: Session.t()
-  def get_session!(id), do: get!(id)
-
-  @doc """
-  Gets a single session by UUID.
-
-  Raises `Ecto.NoResultsError` if the Session does not exist.
-  """
-  @spec get_session_by_uuid!(String.t()) :: Session.t()
-  def get_session_by_uuid!(uuid), do: get_by_uuid!(uuid)
-
-  @doc """
-  Gets a single session by UUID, returning {:ok, session} or {:error, :not_found}.
-  """
-  @spec get_session_by_uuid(String.t()) :: {:ok, Session.t()} | {:error, :not_found}
-  def get_session_by_uuid(uuid) when is_binary(uuid) do
-    case Ecto.UUID.cast(uuid) do
-      {:ok, _} -> get_by_uuid(uuid)
-      :error -> {:error, :not_found}
-    end
-  end
-
-  @doc "Returns {:ok, id} if a session with the given UUID exists, else :error."
-  @spec get_session_id_by_uuid(String.t()) :: {:ok, integer()} | :error
-  def get_session_id_by_uuid(uuid) when is_binary(uuid) do
-    case Ecto.UUID.dump(uuid) do
-      {:ok, bin} ->
-        case Repo.query("SELECT id FROM sessions WHERE uuid = $1 LIMIT 1", [bin]) do
-          {:ok, %{rows: [[id]]}} -> {:ok, id}
-          {:ok, %{rows: []}} -> :error
-          _ -> :error
-        end
-
-      _ ->
-        :error
-    end
-  end
-
-  @doc """
-  Gets a single session, returning {:ok, session} or {:error, :not_found}.
-  """
-  @spec get_session(integer()) :: {:ok, Session.t()} | {:error, :not_found}
-  def get_session(id), do: get(id)
-
-  @doc "Fetch a single session with agent and agent_definition preloaded."
-  @spec get_session_with_agent(integer()) :: Session.t() | nil
-  def get_session_with_agent(id) do
-    Session
-    |> where([s], s.id == ^id)
-    |> preload(agent: :agent_definition)
-    |> Repo.one()
-  end
-
-  @doc """
-  Return the agent definition slug (agent type) for a session identified by its UUID.
-
-  Used by the IAM hook controller to enrich the hook payload with the agent type
-  before policy evaluation. A single three-table join avoids loading the full session
-  struct when only the slug is needed.
-
-  Returns `{:ok, slug}` when found, `:error` when the session, agent, or agent
-  definition is missing.
-  """
-  @spec agent_type_for_session(String.t()) :: {:ok, String.t()} | :error
-  def agent_type_for_session(uuid) when is_binary(uuid) do
-    result =
-      from(s in Session,
-        join: a in assoc(s, :agent),
-        join: ad in assoc(a, :agent_definition),
-        where: s.uuid == ^uuid,
-        select: ad.slug,
-        limit: 1
-      )
-      |> Repo.one()
-
-    case result do
-      nil -> :error
-      slug -> {:ok, slug}
-    end
-  end
-
-  @doc """
-  Resolves a session from an integer ID or UUID string.
-  Returns {:ok, session} or {:error, :not_found}.
-  """
-  @spec resolve(integer() | String.t()) :: {:ok, Session.t()} | {:error, :not_found}
-  def resolve(id) when is_integer(id), do: get_session(id)
-
-  def resolve(ref) when is_binary(ref) do
-    if id = ToolHelpers.parse_int(ref), do: get_session(id), else: get_session_by_uuid(ref)
-  end
+  # --- Query Delegates ---
+  defdelegate list_sessions(opts \\ []), to: Query
+  defdelegate list_sessions_for_agent(agent_id, opts \\ []), to: Query
+  defdelegate list_sessions_by_ids(ids), to: Query
+  defdelegate list_sessions_by_mixed_ids(ids), to: Query
+  defdelegate latest_session_id_by_agents(agent_ids), to: Query
+  defdelegate list_idle_sessions_older_than(cutoff), to: Query
+  defdelegate get_session!(id), to: Query
+  defdelegate get_session_by_uuid!(uuid), to: Query
+  defdelegate get_session_by_uuid(uuid), to: Query
+  defdelegate get_session_id_by_uuid(uuid), to: Query
+  defdelegate get_session(id), to: Query
+  defdelegate get_session_with_agent(id), to: Query
+  defdelegate agent_type_for_session(uuid), to: Query
+  defdelegate resolve(ref), to: Query
+  defdelegate list_active_sessions(opts \\ []), to: Query
+  defdelegate list_active_sessions_for_project(project_id, opts \\ []), to: Query
+  defdelegate list_sessions_with_agent(opts \\ []), to: Query
+  defdelegate list_project_sessions_with_agent(project_id, opts \\ []), to: Query
+  defdelegate count_and_ids_for_project(project_id), to: Query
+  defdelegate list_sessions_for_scope(scope, opts \\ []), to: Query
+  defdelegate preload_project(session), to: Query
 
   @doc """
   Creates a session.
   """
   @spec create_session(map()) :: {:ok, Session.t()} | {:error, Ecto.Changeset.t()}
   def create_session(attrs \\ %{}), do: create(attrs)
+
+  # --- Status Transition Delegates ---
+  defdelegate set_session_idle(session), to: StatusTransitions
+  defdelegate end_session(session, opts \\ %{}), to: StatusTransitions
+  defdelegate archive_session(session), to: StatusTransitions
+  defdelegate unarchive_session(session), to: StatusTransitions
+  defdelegate delete_session(session), to: StatusTransitions
+  defdelegate batch_delete_sessions(ids), to: StatusTransitions
+  defdelegate batch_archive_sessions_for_project(ids, project_id), to: StatusTransitions
 
   @doc """
   Creates a session with model tracking information.
@@ -348,81 +149,6 @@ defmodule EyeInTheSky.Sessions do
     |> Repo.update()
   end
 
-  @doc """
-  Sets a session to idle status and fires agent_stopped event.
-  Used by cancel/stop handlers in the web layer.
-  """
-  def set_session_idle(%Session{} = session) do
-    with {:ok, updated} <- update_session(session, %{status: "idle"}) do
-      Events.agent_stopped(updated)
-      {:ok, updated}
-    end
-  end
-
-  @doc """
-  Ends a session by setting ended_at timestamp.
-  Broadcasts agent_stopped and session_updated events.
-  """
-  def end_session(%Session{} = session, opts \\ %{}) do
-    attrs = %{ended_at: DateTime.utc_now()}
-    attrs = if s = opts[:summary], do: Map.put(attrs, :description, s), else: attrs
-    final_status = opts[:final_status] || "completed"
-    attrs = Map.put(attrs, :status, final_status)
-
-    with {:ok, updated} <- update_session(session, attrs) do
-      Events.agent_stopped(updated)
-      Events.session_updated(updated)
-      {:ok, updated}
-    end
-  end
-
-  @doc """
-  Archives a session (soft delete).
-  Broadcasts session_updated event.
-  """
-  def archive_session(%Session{} = session), do: set_archived(session, DateTime.utc_now())
-
-  @doc """
-  Unarchives a session.
-  Broadcasts session_updated event.
-  """
-  def unarchive_session(%Session{} = session), do: set_archived(session, nil)
-
-  defp set_archived(%Session{} = session, value) do
-    with {:ok, updated} <- update_session(session, %{archived_at: value}) do
-      Events.session_updated(updated)
-      {:ok, updated}
-    end
-  end
-
-  @doc """
-  Deletes a session (hard delete).
-  """
-  def delete_session(%Session{} = session), do: delete(session)
-
-  @doc """
-  Deletes multiple sessions by their integer IDs in a single query.
-  Returns `{deleted_count, nil}`.
-  """
-  def batch_delete_sessions(ids) when is_list(ids) do
-    Repo.delete_all(from s in Session, where: s.id in ^ids)
-  end
-
-  @doc """
-  Batch-archives sessions by integer IDs in a single query.
-  Only archives sessions belonging to the given project_id (ownership check).
-  Returns `{archived_count, nil}`.
-  """
-  def batch_archive_sessions_for_project(ids, project_id) when is_list(ids) and ids != [] do
-    Repo.update_all(
-      from(s in Session,
-        where: s.id in ^ids and s.project_id == ^project_id
-      ),
-      set: [archived_at: DateTime.utc_now()]
-    )
-  end
-
-  def batch_archive_sessions_for_project([], _project_id), do: {0, nil}
 
   @doc """
   Atomically increments the cached token and cost totals on a session row.
@@ -450,123 +176,6 @@ defmodule EyeInTheSky.Sessions do
     Session.changeset(session, attrs)
   end
 
-  @doc """
-  Lists active sessions (not ended and not archived), excluding archived by default.
-  Pass `include_archived: true` to include archived sessions.
-  Pass `limit: n` to cap results (default: 500).
-  """
-  def list_active_sessions(opts \\ []) do
-    limit = Keyword.get(opts, :limit, 500)
-
-    Session
-    |> where([s], is_nil(s.ended_at))
-    |> order_by([s], desc: s.started_at)
-    |> limit(^limit)
-    |> Archivable.include_archived(opts)
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists active sessions for a specific project, with :agent preloaded.
-  Excludes ended and archived sessions.
-  Pass `limit: n` to cap results (default: 500).
-  """
-  def list_active_sessions_for_project(project_id, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 500)
-
-    Session
-    |> where([s], s.project_id == ^project_id and is_nil(s.ended_at))
-    |> order_by([s], desc: s.started_at)
-    |> limit(^limit)
-    |> Archivable.include_archived([])
-    |> preload(:agent)
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists all sessions with agent preloaded for the overview page.
-  Returns sessions ordered by most recent first, excluding archived by default.
-  Pass `include_archived: true` to include archived sessions.
-  Pass `limit: n` to cap results (default: 500).
-  """
-  def list_sessions_with_agent(opts \\ []) do
-    limit = Keyword.get(opts, :limit, 500)
-
-    Session
-    |> with_agent_preload()
-    |> order_by([s], desc: s.started_at)
-    |> limit(^limit)
-    |> Archivable.include_archived(opts)
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists sessions for a single project with agents preloaded.
-  Returns sessions ordered by most recent first, excluding archived by default.
-  Options:
-  - `include_archived: true` — include archived sessions
-  - `active_only: true` — only sessions where ended_at IS NULL
-  - `limit: n` — cap result count at the DB level
-  """
-  def list_project_sessions_with_agent(project_id, opts \\ []) do
-    limit_val = Keyword.get(opts, :limit, 500)
-    offset_val = Keyword.get(opts, :offset)
-    active_only = Keyword.get(opts, :active_only, false)
-
-    query =
-      project_sessions_base_query(project_id)
-      |> with_agent_preload()
-      |> order_by([s], desc: s.started_at)
-      |> Archivable.include_archived(opts)
-
-    query = if active_only, do: where(query, [s], is_nil(s.ended_at)), else: query
-    query = if offset_val, do: offset(query, ^offset_val), else: query
-    query = if limit_val, do: limit(query, ^limit_val), else: query
-
-    sessions = Repo.all(query)
-    attach_current_task_titles(sessions)
-  end
-
-  @doc """
-  Returns `{count, [id]}` for all sessions belonging to a project (including archived).
-  Lightweight — no preloads, no task title joins.
-  Returns up to 10000 IDs to avoid unbounded memory usage.
-  """
-  def count_and_ids_for_project(project_id) do
-    base_query = project_sessions_base_query(project_id)
-
-    # Get true count via COUNT(*)
-    count_query = base_query |> select([s], count(s.id))
-    count = Repo.one(count_query)
-
-    # Get IDs (limited to 10000 to avoid OOM)
-    ids_query = base_query |> select([s], s.id) |> limit(10000)
-    ids = Repo.all(ids_query)
-
-    {count, ids}
-  end
-
-  defp attach_current_task_titles([]), do: []
-
-  defp attach_current_task_titles(sessions) do
-    session_ids = Enum.map(sessions, & &1.id)
-
-    tasks_by_session =
-      from(t in EyeInTheSky.Tasks.Task,
-        join: ts in "task_sessions",
-        on: ts.task_id == t.id,
-        where:
-          ts.session_id in ^session_ids and t.state_id == ^WorkflowState.in_progress_id() and
-            t.archived == false,
-        select: {ts.session_id, t.title}
-      )
-      |> Repo.all()
-      |> Map.new()
-
-    Enum.map(sessions, fn s ->
-      %{s | current_task_title: Map.get(tasks_by_session, s.id)}
-    end)
-  end
 
   defdelegate list_sessions_filtered(opts \\ []), to: Queries
   defdelegate list_session_overview_rows(opts \\ []), to: Queries
@@ -581,10 +190,11 @@ defmodule EyeInTheSky.Sessions do
   """
   def terminated_statuses, do: ~w(completed failed)
 
-  defdelegate broadcast_session_updated(session), to: EyeInTheSky.Sessions.BroadcastEvents
-  defdelegate broadcast_session_completed(session), to: EyeInTheSky.Sessions.BroadcastEvents
-  defdelegate broadcast_session_waiting(session), to: EyeInTheSky.Sessions.BroadcastEvents
-  defdelegate broadcast_status_side_effects(session, status), to: EyeInTheSky.Sessions.BroadcastEvents
+  # --- Event Delegates ---
+  defdelegate broadcast_session_updated(session), to: EyeInTheSky.Sessions.Events
+  defdelegate broadcast_session_completed(session), to: EyeInTheSky.Sessions.Events
+  defdelegate broadcast_session_waiting(session), to: EyeInTheSky.Sessions.Events
+  defdelegate broadcast_status_side_effects(session, status), to: EyeInTheSky.Sessions.Events
 
   @doc """
   Extracts and validates model information from a nested model object.
@@ -592,11 +202,6 @@ defmodule EyeInTheSky.Sessions do
   Delegates to ModelInfo.extract_model_info/1.
   """
   defdelegate extract_model_info(model_data), to: ModelInfo
-
-  # Preload helpers
-  defp with_agent_preload(query) do
-    preload(query, agent: :agent_definition)
-  end
 
   @doc """
   Gets model information for a session as a formatted string.
@@ -613,51 +218,4 @@ defmodule EyeInTheSky.Sessions do
   defdelegate record_tool_event(session, type, params),
     to: EyeInTheSky.Sessions.ToolEventRecorder
 
-  # --- Scope-aware queries ---
-
-  @doc """
-  Lists sessions for a given `EyeInTheSky.Scope`.
-
-  - Project scope: returns sessions for that project, ordered by started_at desc.
-  - Workspace scope: returns sessions across all projects in the workspace,
-    preloads :project so callers can show the project label.
-
-  Accepts the same opts as `list_project_sessions_with_agent/2`:
-  `include_archived`, `active_only`, `limit`.
-  """
-  def list_sessions_for_scope(scope, opts \\ [])
-
-  def list_sessions_for_scope(%EyeInTheSky.Scope{type: :project, project_id: pid}, opts) do
-    list_project_sessions_with_agent(pid, opts)
-  end
-
-  def list_sessions_for_scope(%EyeInTheSky.Scope{type: :workspace, workspace_id: wid}, opts) do
-    limit_val = Keyword.get(opts, :limit, 500)
-    offset_val = Keyword.get(opts, :offset)
-    active_only = Keyword.get(opts, :active_only, false)
-
-    query =
-      from s in Session,
-        join: p in EyeInTheSky.Projects.Project,
-        on: s.project_id == p.id and p.workspace_id == ^wid,
-        order_by: [desc: s.started_at],
-        preload: [project: p]
-
-    query = Archivable.include_archived(query, opts)
-    query = if active_only, do: where(query, [s], is_nil(s.ended_at)), else: query
-    query = if offset_val, do: offset(query, ^offset_val), else: query
-    query = if limit_val, do: limit(query, ^limit_val), else: query
-
-    query
-    |> with_agent_preload()
-    |> Repo.all()
-    |> attach_current_task_titles()
-  end
-
-  @doc "Preloads the :project association on a session struct."
-  def preload_project(%Session{} = session), do: Repo.preload(session, :project)
-
-  defp project_sessions_base_query(project_id) do
-    from(s in Session, where: s.project_id == ^project_id)
-  end
 end

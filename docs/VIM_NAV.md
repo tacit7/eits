@@ -15,6 +15,20 @@ In-app overlay: press `?` anywhere, or visit `/keybindings`.
 
 ---
 
+## Architecture
+
+The vim navigation system is modularized into four TypeScript files under `assets/js/hooks/`:
+
+- **`vim_nav.ts`** — Main orchestrator. Handles lifecycle (mount, destroy), mode transitions (normal ↔ insert), key buffering, command dispatch, and list/flyout navigation. Imports and delegates to specialized modules.
+
+- **`vim_nav_commands.ts`** — Command registry. Defines `COMMANDS` (keybinding to action mappings) and `PREFIXES` (multi-key sequences). The source of truth for all keybindings exported to the help overlay.
+
+- **`vim_nav_statusbar.ts`** — Statusbar rendering. Exports `Mode` type, `createStatusbar()` (builds the fixed statusbar element), and `updateStatusbar()` (updates display text and styling). Shows current mode and numeric count prefix.
+
+- **`vim_nav_hints.ts`** — Hint mode system. Exports `_generateHintLabels()` (generates alphabetic labels for list items), `createHintOverlay()` (builds the hint badge overlay DOM), and `filterHintBadges()` (filters badges on keystroke and updates visibility).
+
+---
+
 ## Global (always active)
 
 | Keys | Action |

@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSkyWeb.Components.DmPage
 
   alias EyeInTheSkyWeb.DmLive.{
+    Actions,
     AgentLifecycle,
     ExternalActions,
     MessageHandlers,
@@ -102,35 +103,9 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def handle_event("pty_input", %{"data" => data}, socket) do
-    if pid = socket.assigns[:pty_pid] do
-      PtyServer.write(pid, data)
-    end
+  def handle_event("pty_input", params, socket), do: Actions.handle_pty_input(socket, params)
 
-    {:noreply, socket}
-  end
-
-  def handle_event("pty_resize", %{"cols" => cols, "rows" => rows}, socket) do
-    if pid = socket.assigns[:pty_pid] do
-      PtyServer.resize(pid, cols, rows)
-    end
-
-    # Fire the launch command on the first resize so claude starts with correct
-    # dimensions, not the 220-col PTY default from spawn time.
-    socket =
-      if socket.assigns[:pty_pending_launch] && socket.assigns[:pty_pid] do
-        PtyServer.write(socket.assigns.pty_pid, build_launch_command(socket.assigns))
-        PtyServer.mark_launched(socket.assigns.pty_pid)
-
-        socket
-        |> assign(:pty_pending_launch, false)
-        |> assign(:pty_launched_at, DateTime.utc_now())
-      else
-        socket
-      end
-
-    {:noreply, socket}
-  end
+  def handle_event("pty_resize", params, socket), do: Actions.handle_pty_resize(socket, params)
 
   # ---------------------------------------------------------------------------
   # Tab & UI toggles
@@ -718,30 +693,6 @@ defmodule EyeInTheSkyWeb.DmLive do
      assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, overlay))}
   end
 
-  # Build the shell command string to run on first terminal open.
-  # cd to the session's working directory (if set), then resume the claude session.
-  defp build_launch_command(assigns) do
-    session = assigns[:session]
-    agent = assigns[:agent]
-    uuid = assigns[:session_uuid]
-
-    # Resolve working path: session.git_worktree_path → agent.git_worktree_path → project.path
-    working_path =
-      nonempty(session && session.git_worktree_path) ||
-        nonempty(agent && agent.git_worktree_path) ||
-        nonempty(project_path(session))
-
-    cd_part = if working_path, do: "cd #{working_path} && ", else: ""
-
-    "#{cd_part}claude --resume #{uuid}\n"
-  end
-
-  defp nonempty(nil), do: nil
-  defp nonempty(""), do: nil
-  defp nonempty(val), do: val
-
-  defp project_path(%{project: %{path: path}}), do: path
-  defp project_path(_), do: nil
 
   defp subscribe_dm_pty(socket, session_uuid) do
     session_key = "dm-#{session_uuid}"

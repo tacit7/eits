@@ -6,12 +6,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
-  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  import Phoenix.LiveView, only: [start_async: 3, connected?: 1]
 
   alias EyeInTheSky.Claude.RateLimitClient
-  alias EyeInTheSky.{Notifications, Projects, Prompts, Tasks}
-  alias EyeInTheSky.Projects.FileTree
-  alias EyeInTheSkyWeb.AgentLive.IndexActions
+  alias EyeInTheSky.{Notifications, Projects}
   alias EyeInTheSkyWeb.Components.NewSessionModal
 
   alias EyeInTheSkyWeb.Components.Rail.{
@@ -19,6 +17,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     FilterActions,
     Loader,
     ProjectActions,
+    RailSessionActions,
+    RailStateActions,
     SectionActions
   }
 
@@ -203,39 +203,20 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("close_flyout", _params, socket),
     do: SectionActions.handle_close_flyout(socket)
 
-  def handle_event("refresh_usage", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:flyout_usage, nil)
-     |> start_async(:load_usage, fn -> RateLimitClient.force_refresh() end)}
-  end
+  def handle_event("refresh_usage", params, socket),
+    do: RailStateActions.handle_refresh_usage(params, socket)
 
-  # Unified restore from localStorage blob. Fires once on mount after the hook reads
-  # the rail_state key. Each helper is defensive — bad or missing keys are ignored.
-  # Order matters: project must be restored before file_expanded (needs sidebar_project.path).
-  def handle_event("restore_rail_state", params, socket) do
-    socket =
-      socket
-      |> maybe_restore_project(params)
-      |> maybe_restore_section(params)
-      |> maybe_restore_session_sort(params)
-      |> maybe_restore_session_scope(params)
-      |> maybe_restore_session_show(params)
-      |> maybe_restore_task_state_filter(params)
-      |> maybe_restore_team_status(params)
-      |> maybe_restore_file_expanded(params)
+  def handle_event("restore_rail_state", params, socket),
+    do: RailStateActions.handle_restore_rail_state(params, socket)
 
-    {:noreply, socket}
-  end
+  def handle_event("toggle_proj_picker", params, socket),
+    do: RailStateActions.handle_toggle_proj_picker(params, socket)
 
-  def handle_event("toggle_proj_picker", _params, socket),
-    do: {:noreply, assign(socket, :proj_picker_open, !socket.assigns.proj_picker_open)}
+  def handle_event("close_proj_picker", params, socket),
+    do: RailStateActions.handle_close_proj_picker(params, socket)
 
-  def handle_event("close_proj_picker", _params, socket),
-    do: {:noreply, assign(socket, :proj_picker_open, false)}
-
-  def handle_event("open_mobile", _params, socket),
-    do: {:noreply, assign(socket, mobile_open: true, flyout_open: true)}
+  def handle_event("open_mobile", params, socket),
+    do: RailStateActions.handle_open_mobile(params, socket)
 
   def handle_event("select_project", params, socket),
     do: ProjectActions.handle_select_project_with_reload(params, socket)
@@ -279,103 +260,29 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("set_bookmark", params, socket),
     do: ProjectActions.handle_set_bookmark(params, socket)
 
-  def handle_event("new_note", _params, socket),
-    do: {:noreply, push_navigate(socket, to: "/notes/new")}
+  def handle_event("new_note", params, socket),
+    do: RailStateActions.handle_new_note(params, socket)
 
-  def handle_event("not_implemented", _params, socket),
-    do: {:noreply, put_flash(socket, :info, "Not implemented yet")}
+  def handle_event("not_implemented", params, socket),
+    do: RailStateActions.handle_not_implemented(params, socket)
 
-  def handle_event("toggle_new_session_drawer", _params, socket),
-    do: {:noreply, assign(socket, :show_new_session_form, !socket.assigns.show_new_session_form)}
+  def handle_event("toggle_new_session_drawer", params, socket),
+    do: RailSessionActions.handle_toggle_new_session_drawer(params, socket)
 
-  def handle_event("toggle_new_channel_form", _params, socket),
-    do: {:noreply, assign(socket, :show_new_channel_form, !socket.assigns.show_new_channel_form)}
+  def handle_event("toggle_new_channel_form", params, socket),
+    do: RailSessionActions.handle_toggle_new_channel_form(params, socket)
 
-  def handle_event("open_new_session_with_agent", %{"slug" => slug, "name" => name}, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_new_session_form, true)
-     |> assign(:prefill_agent_slug, slug)
-     |> assign(:prefill_agent_name, name)}
-  end
+  def handle_event("open_new_session_with_agent", params, socket),
+    do: RailSessionActions.handle_open_new_session_with_agent(params, socket)
 
-  def handle_event("create_new_session", params, socket) do
-    socket =
-      socket
-      |> assign(:show_new_session_form, false)
-      |> assign(:prefill_agent_slug, nil)
-      |> assign(:prefill_agent_name, nil)
+  def handle_event("create_new_session", params, socket),
+    do: RailSessionActions.handle_create_new_session(params, socket)
 
-    case params["submit_action"] do
-      "chat" -> IndexActions.handle_create_new_session(params, socket)
-      _ -> IndexActions.handle_launch_new_session(params, socket)
-    end
-  end
+  def handle_event("create_channel", params, socket),
+    do: RailSessionActions.handle_create_channel(params, socket)
 
-  def handle_event("create_channel", params, socket) do
-    name = String.trim(params["channel_name"] || "")
-
-    cond do
-      name == "" ->
-        {:noreply, put_flash(socket, :error, "Channel name is required")}
-
-      String.length(name) > 80 ->
-        {:noreply, put_flash(socket, :error, "Channel name must be 80 characters or fewer")}
-
-      true ->
-        project_id = socket.assigns.sidebar_project && socket.assigns.sidebar_project.id
-
-        case EyeInTheSky.Channels.create_channel(%{
-               name: name,
-               channel_type: "public",
-               project_id: project_id
-             }) do
-          {:ok, channel} ->
-            EyeInTheSky.Events.channel_created(channel)
-
-            socket =
-              socket
-              |> assign(:show_new_channel_form, false)
-              |> assign(
-                :flyout_channels,
-                Loader.load_flyout_channels(socket.assigns.sidebar_project)
-              )
-
-            {:noreply, put_flash(socket, :info, "Channel ##{channel.name} created")}
-
-          {:error, %Ecto.Changeset{errors: [name: {msg, _}]}} ->
-            {:noreply, put_flash(socket, :error, "Channel name #{msg}")}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to create channel")}
-        end
-    end
-  end
-
-  def handle_event("delete_channel", %{"channel_id" => channel_id}, socket) do
-    case EyeInTheSky.Channels.get_channel(channel_id) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Channel not found")}
-
-      channel ->
-        case EyeInTheSky.Channels.update_channel(channel, %{archived_at: DateTime.utc_now()}) do
-          {:ok, updated} ->
-            EyeInTheSky.Events.channel_deleted(updated)
-
-            socket =
-              assign(
-                socket,
-                :flyout_channels,
-                Loader.load_flyout_channels(socket.assigns.sidebar_project)
-              )
-
-            {:noreply, put_flash(socket, :info, "Channel ##{channel.name} deleted")}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to delete ##{channel.name}")}
-        end
-    end
-  end
+  def handle_event("delete_channel", params, socket),
+    do: RailSessionActions.handle_delete_channel(params, socket)
 
   def handle_event("set_session_sort", params, socket),
     do: FilterActions.handle_set_session_sort(params, socket)
@@ -389,35 +296,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("set_session_scope", params, socket),
     do: FilterActions.handle_set_session_scope(params, socket)
 
-  def handle_event("show_more_project_sessions", %{"project_id" => pid_str}, socket) do
-    case parse_int(pid_str) do
-      nil -> {:noreply, socket}
-      pid ->
-        current = Map.get(socket.assigns.session_project_visible, pid, 5)
+  def handle_event("show_more_project_sessions", params, socket),
+    do: RailStateActions.handle_show_more_project_sessions(params, socket)
 
-        {:noreply,
-         assign(
-           socket,
-           :session_project_visible,
-           Map.put(socket.assigns.session_project_visible, pid, current + 5)
-         )}
-    end
-  end
-
-  def handle_event("toggle_project_sessions", %{"project_id" => pid_str}, socket) do
-    case parse_int(pid_str) do
-      nil -> {:noreply, socket}
-      pid ->
-        collapsed = socket.assigns.session_project_collapsed
-
-        updated =
-          if MapSet.member?(collapsed, pid),
-            do: MapSet.delete(collapsed, pid),
-            else: MapSet.put(collapsed, pid)
-
-        {:noreply, assign(socket, :session_project_collapsed, updated)}
-    end
-  end
+  def handle_event("toggle_project_sessions", params, socket),
+    do: RailStateActions.handle_toggle_project_sessions(params, socket)
 
   def handle_event("update_task_search", params, socket),
     do: FilterActions.handle_update_task_search(params, socket)
@@ -455,103 +338,26 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("set_prompt_scope", params, socket),
     do: FilterActions.handle_set_prompt_scope(params, socket)
 
-  def handle_event("open_rail_modal", %{"type" => type}, socket) do
-    modal =
-      case type do
-        "new_task" -> :new_task
-        "new_prompt" -> :new_prompt
-        _ -> nil
-      end
+  def handle_event("open_rail_modal", params, socket),
+    do: RailStateActions.handle_open_rail_modal(params, socket)
 
-    {:noreply, assign(socket, :rail_modal, modal)}
-  end
+  def handle_event("open_task_detail", params, socket),
+    do: RailStateActions.handle_open_task_detail(params, socket)
 
-  def handle_event("open_task_detail", %{"task_id" => task_id_str}, socket) do
-    case parse_int(task_id_str) do
-      nil -> {:noreply, socket}
-      task_id ->
-        tasks = socket.assigns.flyout_tasks
-        index = Enum.find_index(tasks, &(&1.id == task_id)) || 0
-        {:noreply, assign(socket, :rail_modal, {:view_task, index, tasks})}
-    end
-  end
+  def handle_event("task_detail_nav", params, socket),
+    do: RailStateActions.handle_task_detail_nav(params, socket)
 
-  def handle_event("task_detail_nav", %{"dir" => dir}, socket) do
-    {:view_task, index, tasks} = socket.assigns.rail_modal
-    count = length(tasks)
-    new_index = rem(index + if(dir == "next", do: 1, else: count - 1), count)
-    {:noreply, assign(socket, :rail_modal, {:view_task, new_index, tasks})}
-  end
+  def handle_event("open_note_detail", params, socket),
+    do: RailStateActions.handle_open_note_detail(params, socket)
 
-  def handle_event("open_note_detail", %{"note_id" => note_id_str}, socket) do
-    case parse_int(note_id_str) do
-      nil -> {:noreply, socket}
-      note_id ->
-        notes = socket.assigns.flyout_notes
-        index = Enum.find_index(notes, &(&1.id == note_id)) || 0
-        {:noreply, assign(socket, :rail_modal, {:view_note, index, notes})}
-    end
-  end
+  def handle_event("note_detail_nav", params, socket),
+    do: RailStateActions.handle_note_detail_nav(params, socket)
 
-  def handle_event("note_detail_nav", %{"dir" => dir}, socket) do
-    {:view_note, index, notes} = socket.assigns.rail_modal
-    count = length(notes)
-    new_index = rem(index + if(dir == "next", do: 1, else: count - 1), count)
-    {:noreply, assign(socket, :rail_modal, {:view_note, new_index, notes})}
-  end
+  def handle_event("close_rail_modal", params, socket),
+    do: RailStateActions.handle_close_rail_modal(params, socket)
 
-  def handle_event("close_rail_modal", _params, socket),
-    do: {:noreply, assign(socket, :rail_modal, nil)}
-
-  def handle_event("submit_rail_modal", params, socket) do
-    title = String.trim(params["title"] || "")
-    body = String.trim(params["body"] || "")
-    modal_type = socket.assigns.rail_modal
-    project_id = socket.assigns.sidebar_project && socket.assigns.sidebar_project.id
-
-    if title == "" do
-      {:noreply, put_flash(socket, :error, "Title is required")}
-    else
-      result =
-        case modal_type do
-          :new_task ->
-            Tasks.create_task(%{title: title, body: body, state_id: 1, project_id: project_id})
-
-          :new_prompt ->
-            Prompts.create_prompt(%{title: title, body: body, project_id: project_id})
-
-          _ ->
-            {:error, :unknown}
-        end
-
-      case result do
-        {:ok, _} ->
-          socket = assign(socket, :rail_modal, nil)
-
-          socket =
-            case modal_type do
-              :new_task ->
-                assign(
-                  socket,
-                  :flyout_tasks,
-                  Loader.load_flyout_tasks(
-                    socket.assigns.sidebar_project,
-                    socket.assigns.task_search,
-                    socket.assigns.task_state_filter
-                  )
-                )
-
-              _ ->
-                socket
-            end
-
-          {:noreply, socket}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to create")}
-      end
-    end
-  end
+  def handle_event("submit_rail_modal", params, socket),
+    do: RailStateActions.handle_submit_rail_modal(params, socket)
 
   def handle_event("file_open", params, socket),
     do: FileActions.handle_file_open(params, socket)
@@ -629,104 +435,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp maybe_start_usage_async(socket, _section), do: socket
 
-  # --- localStorage restore helpers ---
-  # Each guards against missing/bad data. A bad value is silently skipped so a
-  # corrupted localStorage entry never crashes the LiveComponent.
-
-  defp maybe_restore_project(socket, %{"project_id" => id}) when not is_nil(id) do
-    # Only restore when the parent LiveView hasn't already set a project.
-    # update/2 runs before the hook fires, so a route-scoped project wins.
-    if is_nil(socket.assigns.sidebar_project) do
-      ProjectActions.handle_restore_project(to_string(id), socket)
-      |> then(fn {:noreply, s} -> s end)
-    else
-      socket
-    end
-  end
-
-  defp maybe_restore_project(socket, _), do: socket
-
-  defp maybe_restore_section(socket, %{"section" => section}) when is_binary(section) do
-    assign(socket, :active_section, Loader.parse_section(section))
-  end
-
-  defp maybe_restore_section(socket, _), do: socket
-
-  defp maybe_restore_session_sort(socket, %{"session_sort" => sort}) when is_binary(sort) do
-    assign(socket, :session_sort, Loader.parse_session_sort(sort))
-  end
-
-  defp maybe_restore_session_sort(socket, _), do: socket
-
-  defp maybe_restore_session_scope(socket, %{"session_scope" => scope})
-       when scope in ["current", "all"] do
-    assign(socket, :session_scope, String.to_existing_atom(scope))
-  end
-
-  defp maybe_restore_session_scope(socket, _), do: socket
-
-  defp maybe_restore_session_show(socket, %{"session_show" => show}) when is_binary(show) do
-    assign(socket, :session_show, Loader.parse_session_show(show))
-  end
-
-  defp maybe_restore_session_show(socket, _), do: socket
-
-  defp maybe_restore_task_state_filter(socket, %{"task_state_filter" => id})
-       when id in [1, 2, 3, 4] do
-    assign(socket, :task_state_filter, id)
-  end
-
-  # Defensive: JSON may sometimes arrive as a string if the value was stored
-  # before integer encoding was guaranteed (e.g. migrated from an older blob).
-  defp maybe_restore_task_state_filter(socket, %{"task_state_filter" => id})
-       when is_binary(id) do
-    case Integer.parse(id) do
-      {parsed, ""} when parsed in [1, 2, 3, 4] ->
-        assign(socket, :task_state_filter, parsed)
-
-      _ ->
-        socket
-    end
-  end
-
-  defp maybe_restore_task_state_filter(socket, _), do: socket
-
-  defp maybe_restore_team_status(socket, %{"team_status" => status})
-       when status in ["active", "archived"] do
-    assign(socket, :team_status, status)
-  end
-
-  defp maybe_restore_team_status(socket, _), do: socket
-
-  defp maybe_restore_file_expanded(socket, %{"file_expanded" => paths}) when is_list(paths) do
-    # Cap at 100 paths to avoid excessive filesystem reads on mount.
-    valid_paths = paths |> Enum.filter(&is_binary/1) |> Enum.take(100)
-
-    # Re-fetch children for restored paths if a project with a disk path is set.
-    # Without this, the expanded state would render folders as open but with no children.
-    case socket.assigns.sidebar_project do
-      %{path: root} when not is_nil(root) ->
-        children =
-          Enum.reduce(valid_paths, %{}, fn path, acc ->
-            case FileTree.children(root, path) do
-              {:ok, nodes} -> Map.put(acc, path, nodes)
-              {:error, _} -> acc
-            end
-          end)
-
-        # Only keep paths that successfully loaded children.
-        valid_expanded = MapSet.new(Map.keys(children))
-
-        socket
-        |> assign(:flyout_file_expanded, valid_expanded)
-        |> assign(:flyout_file_children, children)
-
-      _ ->
-        assign(socket, :flyout_file_expanded, MapSet.new(valid_paths))
-    end
-  end
-
-  defp maybe_restore_file_expanded(socket, _), do: socket
 
   @impl true
   def render(assigns) do

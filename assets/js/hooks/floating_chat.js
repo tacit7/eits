@@ -58,7 +58,8 @@ export const FloatingChat = {
     })
 
     // Event delegation — survives server-side re-renders
-    this.el.addEventListener('click', (e) => this._handleClick(e))
+    this._boundClick = (e) => this._handleClick(e)
+    this.el.addEventListener('click', this._boundClick)
 
     this._applyRadialOffsets()
   },
@@ -73,6 +74,7 @@ export const FloatingChat = {
 
   destroyed() {
     window.removeEventListener('bookmarks-updated', this._onBookmarksUpdated)
+    if (this._boundClick) this.el.removeEventListener('click', this._boundClick)
   },
 
   // --- bookmark sync ---

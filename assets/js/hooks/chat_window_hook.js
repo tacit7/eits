@@ -135,8 +135,8 @@ export const ChatWindowHook = {
 
     const onMouseUp = () => {
       this._dragging = false
-      document.removeEventListener("mousemove", onMouseMove)
-      document.removeEventListener("mouseup", onMouseUp)
+      document.removeEventListener("mousemove", this._boundDragMove)
+      document.removeEventListener("mouseup", this._boundDragUp)
       if (snapPreview) snapPreview.style.display = "none"
 
       const snap = activeSnap
@@ -174,7 +174,10 @@ export const ChatWindowHook = {
       }, 50)
     }
 
-    handle.addEventListener("mousedown", (e) => {
+    // Store bound handlers so destroyed() can remove them
+    this._boundDragMove = onMouseMove
+    this._boundDragUp = onMouseUp
+    this._boundDragStart = (e) => {
       // Let buttons inside the handle handle their own clicks (minimize, maximize, close).
       if (e.target.closest('button')) return
       e.preventDefault()
@@ -193,9 +196,11 @@ export const ChatWindowHook = {
 
       this._raiseToFront()
 
-      document.addEventListener("mousemove", onMouseMove)
-      document.addEventListener("mouseup", onMouseUp)
-    })
+      document.addEventListener("mousemove", this._boundDragMove)
+      document.addEventListener("mouseup", this._boundDragUp)
+    }
+
+    handle.addEventListener("mousedown", this._boundDragStart)
   },
 
   _initResize() {
@@ -599,6 +604,15 @@ export const ChatWindowHook = {
     if (this._chatResizeObserver) this._chatResizeObserver.disconnect()
     document.removeEventListener("mousedown", this._onBlurWindows)
     window.removeEventListener("canvas:focus-session", this._onFocusSession)
+
+    // Clean up drag listeners if drag is in progress
+    if (this._boundDragStart) {
+      const handle = this.el.querySelector("[data-drag-handle]")
+      if (handle) handle.removeEventListener("mousedown", this._boundDragStart)
+    }
+    if (this._boundDragMove) document.removeEventListener("mousemove", this._boundDragMove)
+    if (this._boundDragUp) document.removeEventListener("mouseup", this._boundDragUp)
+
     this._userScrolled = true  // stop any pending force-scroll timeouts
   }
 }

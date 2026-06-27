@@ -16,10 +16,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   alias EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection
   alias EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection
 
-  import EyeInTheSkyWeb.Components.Rail.Modals.RailModal, only: [rail_modal: 1]
-  import EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail, only: [task_detail_modal: 1]
-  import EyeInTheSkyWeb.Components.Rail.Modals.NoteDetail, only: [note_detail_modal: 1]
-  import EyeInTheSkyWeb.Components.Rail.Modals.NewChannel, only: [new_channel_modal: 1]
+  # Note: Modals (rail_modal, task_detail_modal, note_detail_modal, new_channel_modal)
+  # are now rendered in Rail.render/1, not here. Flyout focuses on navigation only.
 
   attr :open, :boolean, required: true
   # On mobile (<md), the flyout is hidden even when open unless mobile_open is also true.
@@ -64,8 +62,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_file_children, :map, default: %{}
   attr :flyout_file_error, :string, default: nil
   attr :flyout_usage, :any, default: nil
-  attr :rail_modal, :any, default: nil
-  attr :show_new_channel_form, :boolean, default: false
   attr :myself, :any, required: true
 
   def flyout(assigns) do
@@ -359,36 +355,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
         </div>
       </div>
 
-      <%!-- ── Channel modal ── --%>
-      <.new_channel_modal
-        :if={@show_new_channel_form}
-        myself={@myself}
-      />
-
-      <%!-- ── Rail modal (new task / new prompt) ── --%>
-      <.rail_modal
-        :if={@rail_modal in [:new_task, :new_prompt]}
-        modal={@rail_modal}
-        myself={@myself}
-      />
-
-      <%!-- ── Task detail modal ── --%>
-      <.task_detail_modal
-        :if={match?({:view_task, _, _}, @rail_modal)}
-        task={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
-        index={elem(@rail_modal, 1)}
-        total={length(elem(@rail_modal, 2))}
-        myself={@myself}
-      />
-
-      <%!-- ── Note detail modal ── --%>
-      <.note_detail_modal
-        :if={match?({:view_note, _, _}, @rail_modal)}
-        note={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
-        index={elem(@rail_modal, 1)}
-        total={length(elem(@rail_modal, 2))}
-        myself={@myself}
-      />
     </div>
     """
   end

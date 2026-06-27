@@ -6,6 +6,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
+
+  # Modals previously embedded inside flyout.ex — now rendered at rail top level
+  # so the flyout component stays focused on navigation concerns only.
+  import EyeInTheSkyWeb.Components.Rail.Modals.RailModal, only: [rail_modal: 1]
+  import EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail, only: [task_detail_modal: 1]
+  import EyeInTheSkyWeb.Components.Rail.Modals.NoteDetail, only: [note_detail_modal: 1]
+  import EyeInTheSkyWeb.Components.Rail.Modals.NewChannel, only: [new_channel_modal: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.RateLimitClient
@@ -951,8 +958,37 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_children={@flyout_file_children}
         flyout_file_error={@flyout_file_error}
         flyout_usage={@flyout_usage}
-        rail_modal={@rail_modal}
-        show_new_channel_form={@show_new_channel_form}
+        myself={@myself}
+      />
+
+      <%!-- ── Channel modal ── --%>
+      <.new_channel_modal
+        :if={@show_new_channel_form}
+        myself={@myself}
+      />
+
+      <%!-- ── Rail modal (new task / new prompt) ── --%>
+      <.rail_modal
+        :if={@rail_modal in [:new_task, :new_prompt]}
+        modal={@rail_modal}
+        myself={@myself}
+      />
+
+      <%!-- ── Task detail modal ── --%>
+      <.task_detail_modal
+        :if={match?({:view_task, _, _}, @rail_modal)}
+        task={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
+        index={elem(@rail_modal, 1)}
+        total={length(elem(@rail_modal, 2))}
+        myself={@myself}
+      />
+
+      <%!-- ── Note detail modal ── --%>
+      <.note_detail_modal
+        :if={match?({:view_note, _, _}, @rail_modal)}
+        note={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
+        index={elem(@rail_modal, 1)}
+        total={length(elem(@rail_modal, 2))}
         myself={@myself}
       />
 

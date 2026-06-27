@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {canvases, counts} =
+    {canvases, _counts} =
       if connected?(socket) do
         Events.subscribe_agent_working()
         {Canvases.list_canvases(), Canvases.count_sessions_per_canvas()}
@@ -33,7 +33,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      |> assign(:subscribed_session_ids, [])
      |> assign(:creating_canvas, false)
      |> assign(:renaming_canvas_id, nil)
-     |> assign(:canvas_session_counts, counts)
      |> assign(:show_session_picker, false)
      |> assign(:session_search, "")
      |> assign(:filtered_sessions, [])
@@ -87,7 +86,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
          socket
          |> assign(:canvases, socket.assigns.canvases ++ [canvas])
          |> assign(:creating_canvas, false)
-         |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
          |> push_patch(to: ~p"/canvases/#{canvas.id}")}
 
       {:error, _} ->
@@ -314,17 +312,13 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         new_session_ids = Enum.map(added, & &1.session_id)
         subscribe_all(new_session_ids)
 
-        new_count = length(socket.assigns.canvas_sessions) + length(added)
-        updated_counts = Map.put(socket.assigns.canvas_session_counts, canvas_id, new_count)
-
         {:noreply,
          socket
          |> assign(:canvas_sessions, socket.assigns.canvas_sessions ++ added)
          |> assign(
            :subscribed_session_ids,
            socket.assigns.subscribed_session_ids ++ new_session_ids
-         )
-         |> assign(:canvas_session_counts, updated_counts)}
+         )}
     end
   end
 
@@ -601,7 +595,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         :subscribed_session_ids,
         Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
       )
-      |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
     else
       socket
     end
@@ -636,7 +629,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     |> assign(:active_canvas_id, canvas_id)
     |> assign(:canvas_sessions, [])
     |> assign(:subscribed_session_ids, [])
-    |> assign(:canvas_session_counts, %{})
     |> assign(:show_session_picker, false)
     |> assign(:filtered_sessions, [])
     |> assign(:session_search, "")
@@ -673,7 +665,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       |> assign(:page_title, canvas_name <> " — Canvas")
       |> assign(:canvas_sessions, sessions)
       |> assign(:subscribed_session_ids, session_ids)
-      |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
       |> assign(:canvas_terminals, terminals)
       |> assign(:terminal_pty_map, pty_map)
     else

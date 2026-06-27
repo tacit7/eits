@@ -454,6 +454,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     """
   end
 
+  attr :file_tree, :list, required: true
+  attr :project, :any, required: true
+  attr :error, :string
+  attr :file_content, :string
+  attr :file_type, :string
+  attr :file_path, :string
+
   defp file_tree_view(assigns) do
     ~H"""
     <!-- Tree View -->
@@ -488,6 +495,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     </div>
     """
   end
+
+  attr :files, :list, required: true
+  attr :file_content, :string
+  attr :file_type, :string
+  attr :file_path, :string
+  attr :project, :any, required: true
+  attr :error, :string
 
   defp file_list_view(assigns) do
     ~H"""

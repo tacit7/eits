@@ -267,34 +267,35 @@ defmodule EyeInTheSky.Tasks do
     now = DateTime.utc_now()
 
     result =
-      Repo.transaction(fn ->
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:validate_task, fn repo, _changes ->
         locked_state =
           from(t in "tasks", where: t.id == ^task.id, select: t.state_id, lock: "FOR UPDATE")
-          |> Repo.one()
+          |> repo.one()
 
-        if is_nil(locked_state), do: Repo.rollback(:task_not_found)
-        # Reject In Progress tasks as a duplicate claim attempt
-        if locked_state == in_progress_id, do: Repo.rollback(:already_claimed)
-        # Reject Done/In Review — claiming them would silently regress their state
-        if locked_state != todo_id, do: Repo.rollback(:task_not_claimable)
-
-        Repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
-        Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
-
-        changeset = Task.changeset(task, %{state_id: in_progress_id, updated_at: now})
-
-        case Repo.update(changeset) do
-          {:ok, updated} -> updated
-          {:error, cs} -> Repo.rollback(cs)
+        cond do
+          is_nil(locked_state) -> {:error, :task_not_found}
+          locked_state == in_progress_id -> {:error, :already_claimed}
+          locked_state != todo_id -> {:error, :task_not_claimable}
+          true -> {:ok, locked_state}
         end
       end)
+      |> Ecto.Multi.run(:delete_old_sessions, fn repo, _changes ->
+        {count, _} = repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
+        {:ok, count}
+      end)
+      |> Ecto.Multi.run(:add_new_session, fn repo, _changes ->
+        repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+      end)
+      |> Ecto.Multi.update(:update_task, Task.changeset(task, %{state_id: in_progress_id, updated_at: now}))
+      |> Repo.transaction()
 
     case result do
-      {:ok, updated} ->
+      {:ok, %{update_task: updated}} ->
         EyeInTheSky.Events.task_updated(updated)
         {:ok, Repo.preload(updated, @full_task_preloads, force: true)}
 
-      {:error, reason} ->
+      {:error, _key, reason, _changes} ->
         {:error, reason}
     end
   end
@@ -357,23 +358,21 @@ defmodule EyeInTheSky.Tasks do
   """
   def delete_task_with_associations(%Task{} = task) do
     result =
-      Repo.transaction(fn ->
-        Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task.id))
-        Repo.delete_all(from(t in "task_sessions", where: t.task_id == ^task.id))
-        Repo.delete_all(from(t in "commit_tasks", where: t.task_id == ^task.id))
-
-        case Repo.delete(task) do
-          {:ok, t} -> t
-          {:error, reason} -> Repo.rollback(reason)
-        end
-      end)
+      Ecto.Multi.new()
+      |> Ecto.Multi.delete_all(:delete_task_tags, from(t in "task_tags", where: t.task_id == ^task.id))
+      |> Ecto.Multi.delete_all(:delete_task_sessions, from(t in "task_sessions", where: t.task_id == ^task.id))
+      |> Ecto.Multi.delete_all(:delete_commit_tasks, from(t in "commit_tasks", where: t.task_id == ^task.id))
+      |> Ecto.Multi.delete(:delete_task, task)
+      |> Repo.transaction()
 
     case result do
-      {:ok, deleted} -> EyeInTheSky.Events.task_updated(deleted)
-      _ -> :ok
-    end
+      {:ok, %{delete_task: deleted}} ->
+        EyeInTheSky.Events.task_updated(deleted)
+        {:ok, deleted}
 
-    result
+      {:error, _key, reason, _changes} ->
+        {:error, reason}
+    end
   end
 
   @doc """
@@ -436,22 +435,29 @@ defmodule EyeInTheSky.Tasks do
       )
 
     result =
-      Repo.transaction(fn ->
-        task_ids = Repo.all(task_ids_query)
-
-        Repo.delete_all(from(tt in "task_tags", where: tt.task_id in ^task_ids))
-        Repo.delete_all(from(ts in "task_sessions", where: ts.task_id in ^task_ids))
-        Repo.delete_all(from(ct in "commit_tasks", where: ct.task_id in ^task_ids))
-
-        {deleted, _} =
-          Repo.delete_all(from(t in Task, where: t.id in ^task_ids))
-
-        deleted
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:get_task_ids, fn repo, _changes ->
+        task_ids = repo.all(task_ids_query)
+        {:ok, task_ids}
       end)
+      |> Ecto.Multi.run(:delete_task_tags, fn repo, %{get_task_ids: task_ids} ->
+        repo.delete_all(from(tt in "task_tags", where: tt.task_id in ^task_ids))
+      end)
+      |> Ecto.Multi.run(:delete_task_sessions, fn repo, %{get_task_ids: task_ids} ->
+        repo.delete_all(from(ts in "task_sessions", where: ts.task_id in ^task_ids))
+      end)
+      |> Ecto.Multi.run(:delete_commit_tasks, fn repo, %{get_task_ids: task_ids} ->
+        repo.delete_all(from(ct in "commit_tasks", where: ct.task_id in ^task_ids))
+      end)
+      |> Ecto.Multi.run(:delete_tasks, fn repo, %{get_task_ids: task_ids} ->
+        {deleted, _} = repo.delete_all(from(t in Task, where: t.id in ^task_ids))
+        {:ok, deleted}
+      end)
+      |> Repo.transaction()
 
     case result do
-      {:ok, count} -> {count, nil}
-      {:error, _} -> {0, nil}
+      {:ok, %{delete_tasks: count}} -> {count, nil}
+      {:error, _key, _reason, _changes} -> {0, nil}
     end
   end
 

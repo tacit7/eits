@@ -530,14 +530,20 @@ defmodule EyeInTheSky.Sessions do
   @doc """
   Returns `{count, [id]}` for all sessions belonging to a project (including archived).
   Lightweight — no preloads, no task title joins.
+  Returns up to 10000 IDs to avoid unbounded memory usage.
   """
   def count_and_ids_for_project(project_id) do
-    rows =
-      project_sessions_base_query(project_id)
-      |> select([s], s.id)
-      |> Repo.all()
+    base_query = project_sessions_base_query(project_id)
 
-    {length(rows), rows}
+    # Get true count via COUNT(*)
+    count_query = base_query |> select([s], count(s.id))
+    count = Repo.one(count_query)
+
+    # Get IDs (limited to 10000 to avoid OOM)
+    ids_query = base_query |> select([s], s.id) |> limit(10000)
+    ids = Repo.all(ids_query)
+
+    {count, ids}
   end
 
   defp attach_current_task_titles([]), do: []

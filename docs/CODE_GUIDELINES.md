@@ -1129,6 +1129,36 @@ end
 
 **Result:** Monolithic 967-line `Rail.ex` → 466 lines + 621 lines distributed across sub-modules.
 
+### Rail Modals Sub-Module Extraction
+
+**Pattern (commit b32b58c0):** Flyout modal components were extracted from `Rail.Flyout` into dedicated sub-modules under `Rail.Modals`, keeping modal logic separate from panel layout.
+
+**Extracted modal modules:**
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `Rail.Modals.RailModal` | `lib/eye_in_the_sky_web_web/components/rail/modals/rail_modal.ex` | Shared modal container (backdrop, close button, sizing) |
+| `Rail.Modals.TaskDetail` | `lib/eye_in_the_sky_web_web/components/rail/modals/task_detail.ex` | Task detail modal: form, validation, submission |
+| `Rail.Modals.NoteDetail` | `lib/eye_in_the_sky_web_web/components/rail/modals/note_detail.ex` | Note detail modal: title/body input, star toggle |
+| `Rail.Modals.NewChannel` | `lib/eye_in_the_sky_web_web/components/rail/modals/new_channel.ex` | Channel creation modal: name input, submit |
+
+**Main Rail.Flyout now imports these components:**
+
+```elixir
+import EyeInTheSkyWeb.Components.Rail.Modals.RailModal, only: [rail_modal: 1]
+import EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail, only: [task_detail_modal: 1]
+import EyeInTheSkyWeb.Components.Rail.Modals.NoteDetail, only: [note_detail_modal: 1]
+import EyeInTheSkyWeb.Components.Rail.Modals.NewChannel, only: [new_channel_modal: 1]
+```
+
+**Why this pattern:**
+- **Modal isolation:** Modal logic (forms, state, submission) is separate from layout
+- **Reusability:** Modals can be rendered from multiple contexts without duplication
+- **Testability:** Each modal is independently testable as a component
+- **Maintainability:** Changes to modal styling don't affect the rail panel logic
+
+**Result:** Monolithic `Rail.Flyout` reduced by ~300 lines; modal logic now discoverable in dedicated sub-modules.
+
 ---
 
 ### DM Message Component Consolidation
@@ -2872,6 +2902,111 @@ end
 - Multiple concerns are tangled (filtering, sorting, rendering, actions)
 
 **Rule:** Extract to sub-modules to keep contexts under 200-300 lines and each module focused on one job. Sub-modules are named `Parent.SubModule` and live in `lib/parent/sub_module.ex`. Components extracted to UI live as `.ex` files in the `components/` directory with matching hierarchy (e.g., `Rail.FilePanel` → `components/rail/file_panel.ex`).
+
+---
+
+## Desktop App Project Creation (Tauri)
+
+**Pattern (commit fcf54a6d):** The desktop app's folder picker was refactored to use Tauri-native `push_event` instead of `osascript` dialogs, and project creation now handles missing users/workspaces by lazy-creating defaults.
+
+### Folder Picker: osascript → Tauri push_event
+
+**Before (osascript blocking dialog):**
+```elixir
+# lib/eye_in_the_sky_web_web/components/rail.ex
+def handle_async(:pick_folder, _async_result, socket) do
+  case System.cmd("osascript", ["-e", "..."]) do
+    {path, 0} -> 
+      {:noreply, assign(socket, :selected_folder, path)}
+    _ -> 
+      {:noreply, socket}
+  end
+end
+```
+
+**Problem:** osascript dialogs appear behind the Tauri window on macOS, making the folder picker invisible to users.
+
+**After (Tauri-native bridge):**
+```elixir
+# lib/eye_in_the_sky_web_web/components/rail.ex
+def handle_event("folder_picked", %{"path" => path}, socket) do
+  {:noreply, assign(socket, :selected_folder, path)}
+end
+```
+
+The JavaScript side (already wired in Tauri) calls:
+```javascript
+this.pushEvent("folder_picked", { path: selectedPath })
+```
+
+**Why this works:**
+- Tauri's native file picker respects window z-ordering
+- No subprocess calls or osascript dependencies
+- Push events flow through the LiveView socket, maintaining session context
+- The same pattern works across platforms (macOS, Linux, Windows)
+
+**When to use:**
+- Any OS file/folder selection in the desktop app should use Tauri's native API
+- Avoid `System.cmd` for dialogs; it's subprocess-heavy and loses focus context
+
+---
+
+### Lazy Workspace Creation on Fresh Desktop Installs
+
+**Pattern (commit fcf54a6d):** When a desktop app with `DISABLE_AUTH=1` creates a project, there's no logged-in user to trigger workspace creation. `inject_workspace_id_if_missing/1` now creates defaults atomically.
+
+**Before (silent failure):**
+```elixir
+# lib/eye_in_the_sky/projects.ex
+defp inject_workspace_id_if_missing(attrs) do
+  case Repo.one(from w in Workspace, order_by: [asc: :id], limit: 1) do
+    nil -> attrs  # ❌ Project creation fails validation: no workspace_id
+    workspace -> Map.put(attrs, :workspace_id, workspace.id)
+  end
+end
+```
+
+On fresh desktop installs where `DISABLE_AUTH=1`, no user ever logs in, so no workspace is seeded. Project creation silently fails.
+
+**After (lazy-create with user fallback):**
+```elixir
+defp inject_workspace_id_if_missing(attrs) do
+  workspace =
+    case Repo.one(from w in Workspace, order_by: [asc: :id], limit: 1) do
+      nil ->
+        # No workspace yet — typical on fresh desktop installs (DISABLE_AUTH=1)
+        # Seed a default user + workspace now
+        {:ok, user} = EyeInTheSky.Accounts.get_or_create_user("desktop")
+        case EyeInTheSky.Workspaces.default_workspace_for_user(user) do
+          nil ->
+            case EyeInTheSky.Workspaces.create_default_workspace_for_user(user) do
+              {:ok, ws} -> ws
+              {:error, _} -> nil
+            end
+          ws ->
+            ws
+        end
+
+      ws ->
+        ws
+    end
+
+  if workspace, do: Map.put(attrs, :workspace_id, workspace.id), else: attrs
+end
+```
+
+**Why this pattern:**
+- **Handles fresh installs:** Desktop app can create projects without waiting for a login workflow
+- **Atomic:** If workspace creation fails, gracefully fall back to nil (project creation fails with validation error, not a crash)
+- **Idempotent:** Multiple calls to `get_or_create_user("desktop")` safely return the same user
+- **Context-owned:** All workspace/user logic is in the context layer, not scattered across controllers
+
+**When to apply:**
+- Any feature that requires a workspace to exist but may run before user login (especially in desktop/embedded contexts)
+- Use `get_or_create_*` patterns to collapse concurrent seeding races
+- Always chain with a fallback query (`default_workspace_for_user`) in case creation fails
+
+**Rule:** Desktop apps with `DISABLE_AUTH` must lazy-create required schemas (user, workspace) at the first real operation point, not at server startup. Keep the logic in context modules with clear fallback handling.
 
 ---
 

@@ -123,7 +123,7 @@ defmodule EyeInTheSky.Prompts do
   Creates a prompt. Auto-generates UUID and timestamps if not provided.
   """
   def create_prompt(attrs \\ %{}) do
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     %Prompt{}
     |> Prompt.changeset(attrs)
@@ -137,7 +137,7 @@ defmodule EyeInTheSky.Prompts do
   Updates a prompt.
   """
   def update_prompt(%Prompt{} = prompt, attrs) do
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     prompt
     |> Prompt.changeset(attrs)

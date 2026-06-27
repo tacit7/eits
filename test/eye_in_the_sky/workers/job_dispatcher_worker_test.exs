@@ -1,5 +1,5 @@
 defmodule EyeInTheSky.Workers.JobDispatcherWorkerTest do
-  use EyeInTheSky.DataCase, async: true
+  use EyeInTheSky.DataCase, async: false
   use Oban.Testing, repo: EyeInTheSky.Repo
 
   alias EyeInTheSky.ScheduledJobs

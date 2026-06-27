@@ -71,7 +71,7 @@ defmodule EyeInTheSky.ScheduledJobs.JobScheduler do
   end
 
   def mark_job_executed(job) do
-    now = NaiveDateTime.utc_now()
+    now = DateTime.utc_now()
 
     next =
       compute_next_run_at(job.schedule_type, job.schedule_value, now, job.timezone || "Etc/UTC")

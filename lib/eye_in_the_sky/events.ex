@@ -376,6 +376,10 @@ defmodule EyeInTheSky.Events do
   def github_webhook_received(delivery_id),
     do: broadcast("github:webhook_received", {:github_webhook_received, delivery_id})
 
+  @doc "Broadcast a GitHub webhook rule fired event to a custom topic."
+  def webhook_rule_fired(topic, message),
+    do: broadcast(topic, {:webhook_rule_fired, message})
+
   @doc "Subscribe to pull request update events."
   def subscribe_pull_requests, do: sub("pull_requests:updated")
 

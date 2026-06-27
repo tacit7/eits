@@ -3,6 +3,7 @@ defmodule EyeInTheSky.Github.RuleActions do
   require Logger
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Github.Template
   alias EyeInTheSky.Messages
   alias EyeInTheSky.Tasks
@@ -19,7 +20,7 @@ defmodule EyeInTheSky.Github.RuleActions do
   defp execute("broadcast_only", config, _ctx) do
     topic = config["topic"] || "github:webhook"
     message = config["message"] || ""
-    Phoenix.PubSub.broadcast(EyeInTheSky.PubSub, topic, {:webhook_rule_fired, message})
+    Events.webhook_rule_fired(topic, message)
     :ok
   end
 

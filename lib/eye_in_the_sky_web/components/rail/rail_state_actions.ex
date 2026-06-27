@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
   alias EyeInTheSky.Claude.RateLimitClient
   alias EyeInTheSky.{Prompts, Tasks}
   alias EyeInTheSky.Projects.FileTree
-  alias EyeInTheSkyWeb.Components.Rail.Loader
+  alias EyeInTheSkyWeb.Components.Rail.{Loader, ProjectActions}
 
   def handle_refresh_usage(params, socket) do
     _ = params
@@ -196,7 +196,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
     # Only restore when the parent LiveView hasn't already set a project.
     # update/2 runs before the hook fires, so a route-scoped project wins.
     if is_nil(socket.assigns.sidebar_project) do
-      alias EyeInTheSkyWeb.Components.Rail.ProjectActions
       ProjectActions.handle_restore_project(to_string(id), socket)
       |> then(fn {:noreply, s} -> s end)
     else

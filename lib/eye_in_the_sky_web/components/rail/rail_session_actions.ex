@@ -4,6 +4,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
 
+  alias EyeInTheSky.{Channels, Events}
+  alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Components.Rail.Loader
 
   def handle_toggle_new_session_drawer(params, socket) do
@@ -32,13 +34,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
       |> assign(:prefill_agent_name, nil)
 
     case params["submit_action"] do
-      "chat" ->
-        alias EyeInTheSkyWeb.AgentLive.IndexActions
-        IndexActions.handle_create_new_session(params, socket)
-
-      _ ->
-        alias EyeInTheSkyWeb.AgentLive.IndexActions
-        IndexActions.handle_launch_new_session(params, socket)
+      "chat" -> IndexActions.handle_create_new_session(params, socket)
+      _ -> IndexActions.handle_launch_new_session(params, socket)
     end
   end
 
@@ -55,13 +52,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
       true ->
         project_id = socket.assigns.sidebar_project && socket.assigns.sidebar_project.id
 
-        case EyeInTheSky.Channels.create_channel(%{
+        case Channels.create_channel(%{
                name: name,
                channel_type: "public",
                project_id: project_id
              }) do
           {:ok, channel} ->
-            EyeInTheSky.Events.channel_created(channel)
+            Events.channel_created(channel)
 
             socket =
               socket
@@ -83,14 +80,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
   end
 
   def handle_delete_channel(%{"channel_id" => channel_id}, socket) do
-    case EyeInTheSky.Channels.get_channel(channel_id) do
+    case Channels.get_channel(channel_id) do
       nil ->
         {:noreply, put_flash(socket, :error, "Channel not found")}
 
       channel ->
-        case EyeInTheSky.Channels.update_channel(channel, %{archived_at: DateTime.utc_now()}) do
+        case Channels.update_channel(channel, %{archived_at: DateTime.utc_now()}) do
           {:ok, updated} ->
-            EyeInTheSky.Events.channel_deleted(updated)
+            Events.channel_deleted(updated)
 
             socket =
               assign(

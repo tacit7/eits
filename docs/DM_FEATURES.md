@@ -959,6 +959,30 @@ A markdown format toolbar (Aa button) in the DM composer enables inline text for
 - `lib/eye_in_the_sky_web/components/dm_page/composer.ex` — HEEx format bar
 - `assets/js/hooks/dm_composer.js` — selection wrapping logic
 
+### Prompt Queue Accordion (commit cb354c03)
+
+**Display:** Queue rows in the prompt queue section collapse/expand based on message length.
+
+**Behavior:**
+- **Short messages (≤80 characters):** Render flat without accordion, showing the full message inline
+- **Long messages (>80 characters):** Render as a collapsible `<details>` element with:
+  - **Summary:** Shows first 80 characters truncated with "…" ellipsis
+  - **Rotating chevron icon:** `hero-chevron-right` rotates 90° when expanded (group-open/pq:rotate-90)
+  - **Expanded body:** Shows full message with whitespace preserved (`whitespace-pre-wrap`)
+
+**Styling:**
+- Summary text styled with `text-xs text-base-content/50 truncate`
+- Expanded text uses `text-xs text-base-content/60 whitespace-pre-wrap break-words leading-relaxed`
+- Chevron transitions smoothly via `transition-transform` and `group-open/pq:rotate-90`
+- Named group `group/pq` used to scope the chevron rotation to the parent details element
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/components/dm_page/composer/prompt_queue.ex` — accordion logic with conditional `<details>` rendering
+- Decision made with `<% long? = String.length(msg) > 80 %>` to branch at render time
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/dm_page/composer/prompt_queue.ex`
+
 ### Composer Autocomplete and History
 
 See **Composer Autocomplete: @ File and @@ Agent** (above) for file and agent name completion.
@@ -1715,6 +1739,14 @@ Settings handlers were extracted into a dedicated `SettingsHandlers` module (com
 - Preserves ongoing live-stream display across message reloads
 
 **Result:** DmLive reduced from 746 to 631 lines; improved code organization and reusability.
+
+**L4: Redundant @impl true removal (ac2ff402)**
+- Removed ~60 redundant `@impl true` annotations from `handle_event/3`, `handle_info/2` callbacks throughout DmLive
+- These annotations were unnecessary since the module includes `use Phoenix.LiveView`, which establishes the default `@impl true` behavior for all callback functions
+- Cleaning up the boilerplate reduces visual noise and improves readability without changing behavior
+- Only removed where the default truly applies; any exceptional callback still retains explicit `@impl` if needed
+
+**Code reduction:** Removing annotations across ~400 lines of callback definitions
 
 ---
 

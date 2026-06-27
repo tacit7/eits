@@ -164,6 +164,27 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
   def handle_delete_agent(_event, _params, socket), do: {:cont, socket}
 
   # ---------------------------------------------------------------------------
+  # palette:resume-agent
+  # ---------------------------------------------------------------------------
+
+  def handle_resume_agent("palette:resume-agent", params, socket) do
+    agent_uuid = String.trim(params["agent_uuid"] || "")
+    new_instructions = String.trim(params["instructions"] || "")
+
+    if agent_uuid == "" do
+      {:halt,
+       push_event(socket, "palette:resume-agent-result", %{
+         ok: false,
+         error: "Agent UUID is required"
+       })}
+    else
+      {:halt, push_event(socket, "palette:resume-agent-result", do_resume_agent(agent_uuid, new_instructions))}
+    end
+  end
+
+  def handle_resume_agent(_event, _params, socket), do: {:cont, socket}
+
+  # ---------------------------------------------------------------------------
   # Private — get/delete helpers
   # ---------------------------------------------------------------------------
 
@@ -258,5 +279,40 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
       end
 
     {:halt, push_event(socket, "palette:create-agent-result", result)}
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private — resume agent helper
+  # ---------------------------------------------------------------------------
+
+  defp do_resume_agent(agent_uuid, new_instructions) do
+    case Agents.get_agent_by_uuid(agent_uuid) do
+      {:ok, agent} ->
+        # Create a new session for the existing agent
+        session_attrs = %{agent_id: agent.id}
+
+        case Sessions.create_session(session_attrs) do
+          {:ok, session} ->
+            # Use new instructions if provided, otherwise use empty (no instructions)
+            instructions = if new_instructions != "", do: new_instructions, else: ""
+
+            # Send initial message to start the session
+            opts = [instructions: instructions, model: "haiku"]
+
+            case AgentManager.send_message(session.id, instructions, opts) do
+              {:ok, _admission} ->
+                %{ok: true, session_uuid: session.uuid}
+
+              {:error, _reason} ->
+                %{ok: false, error: "Failed to start session"}
+            end
+
+          {:error, _reason} ->
+            %{ok: false, error: "Failed to create session"}
+        end
+
+      {:error, :not_found} ->
+        %{ok: false, error: "Agent not found"}
+    end
   end
 end

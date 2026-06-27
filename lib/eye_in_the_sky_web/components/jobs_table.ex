@@ -136,7 +136,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             </div>
 
             <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
-            <.failed_run_banner failed_run={mobile_failed_run} target={@target} job_id={job.id} />
+            <.failed_run_banner failed_run={mobile_failed_run} target={@target} job_id={job.id} mobile={true} />
 
             <div class="mt-3 flex items-center justify-between">
               <span class="text-xs text-base-content/60">Enabled</span>
@@ -389,7 +389,9 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
     """
   end
 
-  # Private component: running badge indicator
+  attr :job_state, :atom, required: true
+  attr :mobile, :boolean, default: false
+
   defp running_badge(assigns) do
     ~H"""
     <%= if @job_state == :running do %>
@@ -400,19 +402,23 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
     """
   end
 
-  # Private component: failed run banner with retry button
+  attr :failed_run, :any, required: true
+  attr :job_id, :any, required: true
+  attr :target, :any, required: true
+  attr :mobile, :boolean, default: false
+
   defp failed_run_banner(assigns) do
     ~H"""
     <%= if @failed_run do %>
-      <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+      <div class={["flex items-center gap-1.5 flex-wrap", if(@mobile, do: "mt-2", else: "mt-1.5")]}>
         <span class="badge badge-xs badge-error">failed</span>
-        <span class="text-xs text-error/70 truncate flex-1">
+        <span class={["text-xs text-error/70", if(@mobile, do: "truncate flex-1", else: "")]}>
           {format_relative_time(@failed_run.started_at)}{if @failed_run.result,
             do: ": #{String.slice(@failed_run.result, 0, 60)}",
             else: ""}
         </span>
         <button
-          class="btn btn-ghost btn-sm min-h-[44px] text-error shrink-0"
+          class={["btn btn-ghost btn-sm min-h-[44px] text-error", if(@mobile, do: "shrink-0", else: "")]}
           phx-click="run_now"
           phx-value-id={@job_id}
           phx-target={@target}
@@ -425,7 +431,10 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
     """
   end
 
-  # Private component: job action buttons (edit, delete, run)
+  attr :job, :any, required: true
+  attr :target, :any, required: true
+  attr :mobile, :boolean, default: false
+
   defp job_actions(assigns) do
     ~H"""
     <%= if @mobile do %>

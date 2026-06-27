@@ -15,10 +15,11 @@ export const BookmarkAgent = {
     this.updateBookmarkUI();
 
     // Handle click
-    this.el.addEventListener('click', (e) => {
+    this._boundClick = (e) => {
       e.stopPropagation();
       this.toggleBookmark();
-    });
+    };
+    this.el.addEventListener('click', this._boundClick);
   },
 
   updated() {
@@ -27,6 +28,10 @@ export const BookmarkAgent = {
     this.agentName = this.el.dataset.agentName;
     this.agentStatus = this.el.dataset.agentStatus;
     this.updateBookmarkUI();
+  },
+
+  destroyed() {
+    if (this._boundClick) this.el.removeEventListener('click', this._boundClick);
   },
 
   toggleBookmark() {

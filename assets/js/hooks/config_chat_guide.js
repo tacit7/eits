@@ -11,7 +11,8 @@ export const ConfigChatGuide = {
     this._openTimer = null
     this._modal = null
 
-    this.el.addEventListener('click', () => this._handleClick())
+    this._boundClick = () => this._handleClick()
+    this.el.addEventListener('click', this._boundClick)
 
     this.handleEvent('config_guide_agent_started', ({ session_uuid }) => {
       this._isOpening = false
@@ -61,6 +62,7 @@ export const ConfigChatGuide = {
     clearTimeout(this._openTimer)
     this._modal?.destroy()
     this._modal = null
+    if (this._boundClick) this.el.removeEventListener('click', this._boundClick)
   },
 
   _handleClick() {

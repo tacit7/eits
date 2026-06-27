@@ -39,21 +39,32 @@ function createQuickHook(eventPrefix, opts) {
         }
       })
 
-      this.el.querySelector(formSelector)?.addEventListener("submit", (e) => {
+      this._boundSubmit = (e) => {
         e.preventDefault()
         this._submit()
-      })
+      }
+      this.el.querySelector(formSelector)?.addEventListener("submit", this._boundSubmit)
 
-      this.el.querySelectorAll(cancelSelector).forEach(btn =>
-        btn.addEventListener("click", () => {
+      this._cancelHandlers = []
+      this.el.querySelectorAll(cancelSelector).forEach(btn => {
+        const handler = () => {
           this.el.close()
           if (cancelResets) this._reset()
-        })
-      )
+        }
+        this._cancelHandlers.push({ btn, handler })
+        btn.addEventListener("click", handler)
+      })
     },
 
     destroyed() {
       window.removeEventListener(eventPrefix, this._openHandler)
+      const form = this.el.querySelector(formSelector)
+      if (form && this._boundSubmit) form.removeEventListener("submit", this._boundSubmit)
+      if (this._cancelHandlers) {
+        this._cancelHandlers.forEach(({ btn, handler }) => {
+          btn.removeEventListener("click", handler)
+        })
+      }
     },
 
     _submit() { submit.call(this) },
@@ -146,21 +157,32 @@ export const QuickGetAgent = {
       }
     })
 
-    this.el.querySelector("[data-qga-form]")?.addEventListener("submit", (e) => {
+    this._boundSubmit = (e) => {
       e.preventDefault()
       this._submit()
-    })
+    }
+    this.el.querySelector("[data-qga-form]")?.addEventListener("submit", this._boundSubmit)
 
-    this.el.querySelectorAll("[data-qga-cancel]").forEach(btn =>
-      btn.addEventListener("click", () => {
+    this._cancelHandlers = []
+    this.el.querySelectorAll("[data-qga-cancel]").forEach(btn => {
+      const handler = () => {
         this.el.close()
         this._reset()
-      })
-    )
+      }
+      this._cancelHandlers.push({ btn, handler })
+      btn.addEventListener("click", handler)
+    })
   },
 
   destroyed() {
     window.removeEventListener("palette:get-agent", this._openHandler)
+    const form = this.el.querySelector("[data-qga-form]")
+    if (form && this._boundSubmit) form.removeEventListener("submit", this._boundSubmit)
+    if (this._cancelHandlers) {
+      this._cancelHandlers.forEach(({ btn, handler }) => {
+        btn.removeEventListener("click", handler)
+      })
+    }
   },
 
   _submit() {

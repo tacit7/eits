@@ -40,8 +40,8 @@ export const TerminalWindowHook = {
     }
 
     const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove)
-      document.removeEventListener("mouseup", onMouseUp)
+      document.removeEventListener("mousemove", this._boundDragMove)
+      document.removeEventListener("mouseup", this._boundDragUp)
 
       clearTimeout(dragPersistTimer)
       dragPersistTimer = setTimeout(() => {
@@ -52,7 +52,10 @@ export const TerminalWindowHook = {
       }, 50)
     }
 
-    handle.addEventListener("mousedown", (e) => {
+    // Store bound handlers so destroyed() can remove them
+    this._boundDragMove = onMouseMove
+    this._boundDragUp = onMouseUp
+    this._boundDragStart = (e) => {
       if (e.target.closest("button")) return
       e.preventDefault()
       startX    = e.clientX
@@ -62,9 +65,11 @@ export const TerminalWindowHook = {
       this._dragLeft = startLeft
       this._dragTop  = startTop
       this._raiseToFront()
-      document.addEventListener("mousemove", onMouseMove)
-      document.addEventListener("mouseup", onMouseUp)
-    })
+      document.addEventListener("mousemove", this._boundDragMove)
+      document.addEventListener("mouseup", this._boundDragUp)
+    }
+
+    handle.addEventListener("mousedown", this._boundDragStart)
   },
 
   _initResize() {
@@ -120,5 +125,13 @@ export const TerminalWindowHook = {
     this._destroyed = true
     clearTimeout(this._resizePersistTimer)
     if (this._windowResizeObserver) this._windowResizeObserver.disconnect()
+
+    // Clean up drag listeners if drag is in progress
+    if (this._boundDragStart) {
+      const handle = this.el.querySelector("[data-drag-handle]")
+      if (handle) handle.removeEventListener("mousedown", this._boundDragStart)
+    }
+    if (this._boundDragMove) document.removeEventListener("mousemove", this._boundDragMove)
+    if (this._boundDragUp) document.removeEventListener("mouseup", this._boundDragUp)
   }
 }

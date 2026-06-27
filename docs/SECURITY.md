@@ -464,9 +464,19 @@ CSP is enforced via per-request nonce to allow inline scripts while maintaining 
 - Production CSP uses `script-src 'self' 'nonce-<value>'` (no `unsafe-inline`)
 - Development CSP uses `script-src 'self' 'unsafe-inline'` for convenience
 
+**CSP Plug** (`lib/eye_in_the_sky_web/plugs/content_security_policy.ex`):
+- CSP header generation has been extracted into a dedicated plug `EyeInTheSkyWeb.Plugs.ContentSecurityPolicy`
+- The router now pipes the `:browser` pipeline through this plug instead of inline CSP functions
+- The plug reads the nonce from `conn.assigns.csp_nonce` (set by the `CspNonce` plug) and applies environment-specific policies:
+  - **Dev**: Uses `'unsafe-inline'` for script-src and allows Vite dev server (host + WebSocket origins)
+  - **Prod**: Uses nonce-based script-src (no `unsafe-inline`) with hardened defaults
+
+**CSP Exceptions**:
+- Custom icon SVG elements in `root.html.heex` use inline SVG because Heroicons lacks equivalents (robot, kanban, bot icons). These are documented in `lib/eye_in_the_sky_web/components/core_components.ex` with a removal note once Heroicons adds the missing icons.
+
 **CSP Header (Production)**:
 ```
-default-src 'self'; script-src 'self' 'nonce-<unique>'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; ...
+default-src 'self'; script-src 'self' 'nonce-<unique>'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'
 ```
 
 **Benefits**: Inline scripts execute only if they carry the correct nonce. Any XSS-injected script without the nonce is blocked, protecting against inline script injection attacks.

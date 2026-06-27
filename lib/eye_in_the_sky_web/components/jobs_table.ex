@@ -116,11 +116,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   <div class="min-w-0">
                     <div class="flex items-center gap-1.5">
                       <h3 class="font-medium text-sm truncate">{job.name}</h3>
-                      <%= if job_state == :running do %>
-                        <span class="badge badge-warning badge-xs animate-pulse shrink-0">
-                          running
-                        </span>
-                      <% end %>
+                      <.running_badge job_state={job_state} mobile={true} />
                     </div>
                     <%= if job.description do %>
                       <p class="text-mini text-base-content/60 mt-0.5 truncate">{job.description}</p>
@@ -140,25 +136,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             </div>
 
             <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
-            <%= if mobile_failed_run do %>
-              <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-                <span class="badge badge-xs badge-error">failed</span>
-                <span class="text-xs text-error/70 truncate flex-1">
-                  {format_relative_time(mobile_failed_run.started_at)}{if mobile_failed_run.result,
-                    do: ": #{String.slice(mobile_failed_run.result, 0, 60)}",
-                    else: ""}
-                </span>
-                <button
-                  class="btn btn-ghost btn-sm min-h-[44px] text-error shrink-0"
-                  phx-click="run_now"
-                  phx-value-id={job.id}
-                  phx-target={@target}
-                  title="Retry"
-                >
-                  <.icon name="hero-arrow-path" class="size-3" />
-                </button>
-              </div>
-            <% end %>
+            <.failed_run_banner failed_run={mobile_failed_run} target={@target} job_id={job.id} />
 
             <div class="mt-3 flex items-center justify-between">
               <span class="text-xs text-base-content/60">Enabled</span>
@@ -183,46 +161,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <span class="text-right">{job.run_count || 0}</span>
             </div>
 
-            <div class="mt-3 flex items-center justify-end gap-1 border-t border-base-content/10 pt-2">
-              <label class="flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer">
-                <input
-                  type="checkbox"
-                  class="toggle toggle-xs toggle-primary"
-                  checked={job.enabled}
-                  phx-click="toggle_job"
-                  phx-value-id={job.id}
-                  phx-target={@target}
-                />
-              </label>
-              <button
-                class="btn btn-ghost btn-sm min-h-[44px]"
-                phx-click="run_now"
-                phx-value-id={job.id}
-                phx-target={@target}
-                title="Run Now"
-              >
-                <.icon name="hero-play" class="size-3" />
-              </button>
-              <button
-                class="btn btn-ghost btn-sm min-h-[44px]"
-                phx-click="edit_job"
-                phx-value-id={job.id}
-                phx-target={@target}
-                title="Edit"
-              >
-                <.icon name="hero-pencil-square" class="size-3" />
-              </button>
-              <button
-                class="btn btn-ghost btn-sm min-h-[44px] text-error"
-                phx-click="delete_job"
-                phx-value-id={job.id}
-                phx-target={@target}
-                data-confirm="Delete this job?"
-                title="Delete"
-              >
-                <.icon name="hero-trash" class="size-3" />
-              </button>
-            </div>
+            <.job_actions job={job} target={@target} mobile={true} />
 
             <%= if @expanded_job_id == job.id do %>
               <div class="mt-3 rounded-lg bg-base-200/50 p-2">
@@ -304,9 +243,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 >
                   <div class="flex items-center gap-1.5">
                     <div class="font-medium">{job.name}</div>
-                    <%= if row_state == :running do %>
-                      <span class="badge badge-warning badge-xs animate-pulse">running</span>
-                    <% end %>
+                    <.running_badge job_state={row_state} mobile={false} />
                   </div>
                   <%= if job.description do %>
                     <p class="text-xs text-base-content/50 mt-0.5">{job.description}</p>
@@ -315,25 +252,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     <span class="badge badge-xs badge-ghost">system</span>
                   <% end %>
                   <% failed_run = Map.get(@last_failed_runs, job.id) %>
-                  <%= if failed_run do %>
-                    <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      <span class="badge badge-xs badge-error">failed</span>
-                      <span class="text-xs text-error/70">
-                        {format_relative_time(failed_run.started_at)}{if failed_run.result,
-                          do: ": #{String.slice(failed_run.result, 0, 60)}",
-                          else: ""}
-                      </span>
-                      <button
-                        class="btn btn-ghost btn-sm min-h-[44px] text-error"
-                        phx-click="run_now"
-                        phx-value-id={job.id}
-                        phx-target={@target}
-                        title="Retry"
-                      >
-                        <.icon name="hero-arrow-path" class="size-3" />
-                      </button>
-                    </div>
-                  <% end %>
+                  <.failed_run_banner failed_run={failed_run} target={@target} job_id={job.id} />
                 </td>
                 <%= if @show_origin do %>
                   <td>
@@ -389,41 +308,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   </div>
                 </td>
                 <td>
-                  <div class="flex items-center gap-1">
-                    <button
-                      class="btn btn-ghost btn-sm min-h-[44px]"
-                      phx-click="run_now"
-                      phx-value-id={job.id}
-                      phx-target={@target}
-                      title="Run Now"
-                      aria-label="Run job now"
-                    >
-                      <.icon name="hero-play" class="size-3.5" />
-                    </button>
-                    <%= if job.origin != "system" do %>
-                      <button
-                        class="btn btn-ghost btn-sm min-h-[44px]"
-                        phx-click="edit_job"
-                        phx-value-id={job.id}
-                        phx-target={@target}
-                        title="Edit"
-                        aria-label="Edit job"
-                      >
-                        <.icon name="hero-pencil-square" class="size-3.5" />
-                      </button>
-                      <button
-                        class="btn btn-ghost btn-sm min-h-[44px] text-error"
-                        phx-click="delete_job"
-                        phx-value-id={job.id}
-                        phx-target={@target}
-                        data-confirm="Delete this job?"
-                        title="Delete"
-                        aria-label="Delete job"
-                      >
-                        <.icon name="hero-trash" class="size-3.5" />
-                      </button>
-                    <% end %>
-                  </div>
+                  <.job_actions job={job} target={@target} mobile={false} />
                 </td>
               </tr>
               <%= if @expanded_job_id == job.id do %>
@@ -498,6 +383,126 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <.icon name="hero-plus" class="size-4" /> Create Job
             </button>
           </div>
+        <% end %>
+      </div>
+    <% end %>
+    """
+  end
+
+  # Private component: running badge indicator
+  defp running_badge(assigns) do
+    ~H"""
+    <%= if @job_state == :running do %>
+      <span class={["badge badge-warning badge-xs animate-pulse", if(@mobile, do: "shrink-0", else: "")]}>
+        running
+      </span>
+    <% end %>
+    """
+  end
+
+  # Private component: failed run banner with retry button
+  defp failed_run_banner(assigns) do
+    ~H"""
+    <%= if @failed_run do %>
+      <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+        <span class="badge badge-xs badge-error">failed</span>
+        <span class="text-xs text-error/70 truncate flex-1">
+          {format_relative_time(@failed_run.started_at)}{if @failed_run.result,
+            do: ": #{String.slice(@failed_run.result, 0, 60)}",
+            else: ""}
+        </span>
+        <button
+          class="btn btn-ghost btn-sm min-h-[44px] text-error shrink-0"
+          phx-click="run_now"
+          phx-value-id={@job_id}
+          phx-target={@target}
+          title="Retry"
+        >
+          <.icon name="hero-arrow-path" class="size-3" />
+        </button>
+      </div>
+    <% end %>
+    """
+  end
+
+  # Private component: job action buttons (edit, delete, run)
+  defp job_actions(assigns) do
+    ~H"""
+    <%= if @mobile do %>
+      <div class="mt-3 flex items-center justify-end gap-1 border-t border-base-content/10 pt-2">
+        <label class="flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer">
+          <input
+            type="checkbox"
+            class="toggle toggle-xs toggle-primary"
+            checked={@job.enabled}
+            phx-click="toggle_job"
+            phx-value-id={@job.id}
+            phx-target={@target}
+          />
+        </label>
+        <button
+          class="btn btn-ghost btn-sm min-h-[44px]"
+          phx-click="run_now"
+          phx-value-id={@job.id}
+          phx-target={@target}
+          title="Run Now"
+        >
+          <.icon name="hero-play" class="size-3" />
+        </button>
+        <button
+          class="btn btn-ghost btn-sm min-h-[44px]"
+          phx-click="edit_job"
+          phx-value-id={@job.id}
+          phx-target={@target}
+          title="Edit"
+        >
+          <.icon name="hero-pencil-square" class="size-3" />
+        </button>
+        <button
+          class="btn btn-ghost btn-sm min-h-[44px] text-error"
+          phx-click="delete_job"
+          phx-value-id={@job.id}
+          phx-target={@target}
+          data-confirm="Delete this job?"
+          title="Delete"
+        >
+          <.icon name="hero-trash" class="size-3" />
+        </button>
+      </div>
+    <% else %>
+      <div class="flex items-center gap-1">
+        <button
+          class="btn btn-ghost btn-sm min-h-[44px]"
+          phx-click="run_now"
+          phx-value-id={@job.id}
+          phx-target={@target}
+          title="Run Now"
+          aria-label="Run job now"
+        >
+          <.icon name="hero-play" class="size-3.5" />
+        </button>
+        <%= if @job.origin != "system" do %>
+          <button
+            class="btn btn-ghost btn-sm min-h-[44px]"
+            phx-click="edit_job"
+            phx-value-id={@job.id}
+            phx-target={@target}
+            title="Edit"
+            aria-label="Edit job"
+          >
+            <.icon name="hero-pencil-square" class="size-3.5" />
+          </button>
+          <button
+            class="btn btn-ghost btn-sm min-h-[44px] text-error"
+            phx-click="delete_job"
+            phx-value-id={@job.id}
+            phx-target={@target}
+            data-confirm="Delete this job?"
+            title="Delete"
+            aria-label="Delete job"
+          >
+            <.icon name="hero-trash" class="size-3.5" />
+          </button>
         <% end %>
       </div>
     <% end %>

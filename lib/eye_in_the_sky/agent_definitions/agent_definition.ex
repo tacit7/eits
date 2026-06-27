@@ -53,6 +53,8 @@ defmodule EyeInTheSky.AgentDefinitions.AgentDefinition do
     |> validate_required(@required_fields)
     |> validate_inclusion(:scope, ["global", "project"])
     |> validate_project_scope()
+    |> unique_constraint(:slug, name: "agent_definitions_global_slug")
+    |> unique_constraint(:slug, name: "agent_definitions_project_slug")
   end
 
   defp validate_project_scope(changeset) do

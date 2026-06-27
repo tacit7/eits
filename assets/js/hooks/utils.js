@@ -71,7 +71,7 @@ export function showSessionFailureToast({ title, reason } = {}) {
   setTimeout(() => alertEl.remove(), SESSION_FAILURE_TOAST_TTL_MS)
 }
 
-export const debounce = (fn, wait = 120) => {
+const debounce = (fn, wait = 120) => {
   let timeoutId
   const wrapped = (...args) => {
     clearTimeout(timeoutId)

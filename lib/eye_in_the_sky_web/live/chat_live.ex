@@ -206,7 +206,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
           all_projects={@all_projects}
           prompts={@prompts}
           agent_templates={@agent_templates}
-          uploads={@uploads}
         />
       </div>
     </div>
@@ -255,6 +254,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
     </div>
     """
   end
+
+  attr :uploads, :any, required: true
 
   defp upload_tray(assigns) do
     ~H"""
@@ -313,6 +314,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
     </form>
     """
   end
+
+  attr :show, :any, required: true
+  attr :all_projects, :list, required: true
+  attr :prompts, :list, required: true
+  attr :agent_templates, :list, required: true
 
   defp agent_drawer(assigns) do
     ~H"""

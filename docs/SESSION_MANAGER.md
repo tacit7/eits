@@ -417,6 +417,41 @@ Pre-tool-use hooks (e.g., `eits-task-gate.sh`) can check the session's read_only
 
 ---
 
+## Sessions.HookRegistrar Sub-Module
+
+Hook session registration was extracted from the main Sessions module into `EyeInTheSky.Sessions.HookRegistrar` (64 lines, commit 1779981c) to separate hook-driven registration logic from general session management. The Sessions module delegates the entry point via `defdelegate`:
+
+### register_from_hook/2
+
+```elixir
+@spec register_from_hook(map(), integer() | nil) ::
+        {:ok, %{session: Session.t(), agent: struct()}}
+        | {:error, :agent | :session, Ecto.Changeset.t()}
+def register_from_hook(params, project_id)
+```
+
+**Purpose:** Register a new session from a SessionStart hook payload (e.g., `eits-session-startup.sh`).
+
+**Input Parameters:**
+- `params` (map) — raw hook payload with keys: `session_id`, `agent_id`, `agent_description`, `description`, `project_name`, `worktree_path`, `model`, `name`, `provider`, `entrypoint`, `read_only`
+- `project_id` (integer | nil) — pre-resolved project ID (may be nil if project wasn't found during startup)
+
+**Workflow:**
+1. **Find or create agent** — Calls `Agents.find_or_create_agent/1` with agent attributes (UUID, description, project context, source: "hook")
+2. **Parse model info** — Extracts model provider and name via `ModelInfo.parse_model_string/1`
+3. **Create session** — Calls either `Sessions.create_session_with_model/1` or `Sessions.create_session/1` depending on whether model_name was parsed
+4. **Fire event** — On success, fires `Events.session_started/1` for downstream listeners
+5. **Return result** — Returns `{:ok, %{session: session, agent: agent}}` on success, or `{:error, :agent | :session, changeset}` on failure
+
+**Error handling:**
+- Returns `{:error, :agent, changeset}` if agent creation fails
+- Returns `{:error, :session, changeset}` if session creation fails
+- Either error short-circuits the workflow — both agent and session must succeed
+
+**Usage:** Called by the startup hook when initializing a new Claude Code session.
+
+---
+
 ## Session Auto-Registration (Startup Hook)
 
 The startup hook (`priv/scripts/eits-session-startup.sh`) now automatically registers new sessions when they are not pre-registered (e.g., not spawned by the orchestrator). This eliminates the need for manual `eits-init` invocation in normal operation.
@@ -518,6 +553,47 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 - `POST /api/v1/sessions/:uuid/context` — Upsert context
 
 This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
+
+### Session UUID Validation (get_session_by_uuid/1)
+
+The `Sessions.get_session_by_uuid/1` function validates UUID format before querying the database to prevent `Ecto.Query.CastError` exceptions when non-UUID strings are passed (commit 0c5f130b):
+
+```elixir
+@spec get_session_by_uuid(String.t()) :: {:ok, Session.t()} | {:error, :not_found}
+def get_session_by_uuid(uuid) when is_binary(uuid) do
+  case Ecto.UUID.cast(uuid) do
+    {:ok, _} -> get_by_uuid(uuid)
+    :error -> {:error, :not_found}
+  end
+end
+```
+
+**Problem:** `Sessions.resolve/1` passes arbitrary strings (e.g., filenames, numeric IDs) to `get_session_by_uuid`. When a non-UUID string was passed directly to `Repo.get_by`, PostgreSQL would raise `Ecto.Query.CastError`, crashing the request.
+
+**Solution:** Validate UUID format using `Ecto.UUID.cast/1` before querying:
+- `{:ok, _}` — UUID is valid, proceed to `get_by_uuid/1`
+- `:error` — Not a valid UUID, return `{:error, :not_found}` gracefully
+
+**Impact:**
+- Non-UUID strings (e.g., filenames from worktree paths) return `:not_found` instead of raising
+- Sessions REST API routes that accept numeric IDs or UUIDs continue to work — `resolve/1` tries numeric lookup first, then falls back to UUID validation
+- Graceful degradation: malformed UUID strings are treated as "no session found" rather than server errors
+
+**Example flow:**
+```bash
+# Valid UUID
+curl /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47
+# → get_session_by_uuid validates, finds session
+
+# Invalid UUID (e.g., a filename)
+curl /api/v1/sessions/.claude/worktrees/fix-bug/notes.md
+# → Ecto.UUID.cast fails, returns {:error, :not_found}
+# → 404 response (graceful)
+
+# Numeric ID still works (resolve tries this first)
+curl /api/v1/sessions/3185
+# → resolve tries numeric lookup, succeeds
+```
 
 ### Agent Type Resolution for IAM Policy Evaluation
 
@@ -1454,6 +1530,25 @@ defp broadcast_with_session_updated(session, event_fn) do
   Events.session_updated(session)
 end
 ```
+
+### Sessions.BroadcastEvents Sub-Module
+
+Session PubSub broadcasts were extracted from the main Sessions module into `EyeInTheSky.Sessions.BroadcastEvents` (30 lines, commit 1779981c) to keep broadcast logic separate from session CRUD operations. The Sessions module delegates these functions via `defdelegate`:
+
+**Functions in BroadcastEvents:**
+
+| Function | Broadcasts | Purpose |
+|----------|----------|---------|
+| `broadcast_session_updated(session)` | `session_updated` | Generic status update after PATCH or mutation |
+| `broadcast_session_completed(session)` | `session_completed` + `session_updated` | Session marked completed |
+| `broadcast_session_waiting(session)` | `agent_stopped` + `session_updated` | Session parked to waiting |
+| `broadcast_status_side_effects(session, status)` | `agent_stopped`/`agent_working` + `session_updated` | Status PATCH with arbitrary new status |
+
+**Private helper:**
+`broadcast_with_session_updated/2` — applies a primary event function then always appends `session_updated`, ensuring all broadcast operations always include the updated session state for UI consistency.
+
+**Implementation detail:**
+The extracted module contains only pure event broadcast functions — no database queries, no side effects beyond PubSub. This keeps the Sessions context boundary clear: CRUD operations in Sessions, broadcast logic in BroadcastEvents.
 
 ### set_session_idle/1
 

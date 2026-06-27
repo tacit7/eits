@@ -12,6 +12,49 @@ How EITS creates, runs, streams, and resumes sessions across multiple providers:
 
 This document focuses on Codex and Gemini integration patterns. For Claude-specific details, see `AGENT_WORKER_QUEUE.md`.
 
+## Available Models
+
+### Claude Models
+
+The following Claude models are available for agent spawning and DM sessions:
+
+| Model | Display Name | Description |
+|-------|--------------|-------------|
+| `claude-opus-4-8` | Opus 4.8 (Default) | Most capable model for complex work · 1M context |
+| `claude-sonnet-4-6` | Sonnet 4.6 | Efficient for routine tasks · 1M context |
+| `sonnet[1m]` | Sonnet 4.6 (1M context) | Extended context version · $3/$15 per Mtok (usage credits) |
+| `claude-haiku-4-5-20251001` | Haiku 4.5 | Fastest for quick answers |
+
+The `claude-opus-4-8`, `claude-sonnet-4-6`, and `claude-haiku-4-5-20251001` are the recommended production-ready models. The `sonnet[1m]` variant provides an extended 1M token context window for tasks requiring larger context, though it draws from usage credits instead of Max plan benefits.
+
+**Model Aliasing**: Short aliases like `"opus"`, `"sonnet"`, `"haiku"` are normalized to their full slugs at spawn time. The alias resolution is:
+- `"opus"` → `claude-opus-4-8`
+- `"sonnet"` → `claude-sonnet-4-6`
+- `"haiku"` → `claude-haiku-4-5-20251001`
+
+Older Claude models (Opus 4.7, 4.6, 4.5, Sonnet 4.5, etc.) remain in `ModelConfig.claude_models/0` for backward compatibility with stored sessions but are not shown in the new agent form or DM model menu.
+
+### Codex Models
+
+The following Codex models are available for agent spawning:
+
+| Model | Display Name | Description |
+|-------|--------------|-------------|
+| `gpt-5.3-codex` | GPT-5.3 Codex (Default) | Coding-optimized model · recommended for code generation and review |
+| `gpt-5.5` | GPT-5.5 | Frontier model for complex coding, research, and real-world work |
+| `gpt-5.2` | GPT-5.2 | Optimized for professional work and long-running agents |
+| `gpt-5.4` | GPT-5.4 | Strong model for everyday coding |
+| `gpt-5.4-mini` | GPT-5.4 Mini | Small, fast, and cost-efficient for simpler tasks |
+
+The display list is curated to five production models. Older models (GPT-5.2 Codex, GPT-5.1 variants, etc.) remain in `ModelConfig.codex_models/0` for backward compatibility but are not shown in new agent forms.
+
+### Model Defaults
+
+When a session is spawned without an explicit model choice:
+- **Claude sessions**: Default to `claude-opus-4-8` (via `ModelHelpers.default_model_for/1`)
+- **Codex sessions**: Default to `gpt-5.3-codex` (via `ModelHelpers.default_model_for/1`)
+- **Gemini sessions**: Default to `gemini-2.5-flash`
+
 ## Architecture
 
 ```

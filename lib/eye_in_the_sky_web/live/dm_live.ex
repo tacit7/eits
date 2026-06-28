@@ -40,12 +40,31 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
-    mount_with_session(socket, session_id_param, params)
+    if connected?(socket) do
+      mount_with_session(socket, session_id_param, params)
+    else
+      {:ok, dead_render_defaults(socket, params)}
+    end
   end
 
   # ---------------------------------------------------------------------------
   # Mount helpers — decomposed from mount/3
   # ---------------------------------------------------------------------------
+
+  defp dead_render_defaults(socket, params) do
+    stub_session = %EyeInTheSky.Sessions.Session{}
+    stub_agent = %EyeInTheSky.Agents.Agent{}
+
+    socket
+    |> assign(:allow_split, true)
+    |> MountState.assign_sidebar_context(params)
+    |> MountState.assign_session_state(stub_session, stub_agent)
+    |> MountState.assign_essential_defaults(stub_session)
+    |> assign(:pty_pid, nil)
+    |> assign(:pty_pending_launch, false)
+    |> assign(:pty_launched_at, nil)
+    |> MessageHandlers.load_messages_on_mount()
+  end
 
   defp mount_with_session(socket, session_id_param, params) do
     case Sessions.resolve(session_id_param) do

@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
   """
 
   import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [connected?: 1, stream: 4]
 
   alias EyeInTheSky.Canvases
   alias EyeInTheSky.Projects
@@ -38,10 +39,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
     |> assign(:visible_count, page_size())
     |> assign(:has_more, false)
     |> assign(:editing_session_id, nil)
-    |> assign(:canvases, Canvases.list_canvases())
-    |> assign(:projects, Projects.list_projects())
     |> assign(:show_new_canvas_for, nil)
     |> assign(:top_bar_cta, %{label: "New Agent", event: "toggle_new_session_drawer"})
-    |> Loader.load_agents()
+    |> then(fn s ->
+      if connected?(socket) do
+        s
+        |> assign(:canvases, Canvases.list_canvases())
+        |> assign(:projects, Projects.list_projects())
+        |> Loader.load_agents()
+      else
+        s
+        |> assign(:canvases, [])
+        |> assign(:projects, [])
+        |> stream(:session_list, [], reset: true, dom_id: fn a -> "ps-#{a.id}" end)
+      end
+    end)
   end
 end

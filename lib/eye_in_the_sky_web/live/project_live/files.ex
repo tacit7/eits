@@ -32,6 +32,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       |> assign(:file_path, nil)
       |> assign(:file_full_path, nil)
       |> assign(:file_content, nil)
+      |> assign(:file_hash, nil)
       |> assign(:file_type, nil)
       |> assign(:file_tree, [])
       |> assign(:files, [])
@@ -197,6 +198,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
            |> assign(:file_path, path)
            |> assign(:file_full_path, full_path)
            |> assign(:file_content, content)
+           |> assign(:file_hash, hash_content(content))
            |> assign(:file_type, detect_file_type(path))
            |> assign(:files, [])
            |> assign(:error, nil)}
@@ -265,29 +267,35 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   @impl true
-  def handle_event("file_save", %{"content" => content}, socket) do
+  def handle_event("file_save", %{"content" => content} = payload, socket) do
     project = socket.assigns.project
-    full_path = socket.assigns.file_full_path
+    payload_path = Map.get(payload, "path", "")
+    original_hash = Map.get(payload, "original_hash", "")
 
-    cond do
-      is_nil(full_path) ->
-        {:reply, %{error: "No file open"}, socket}
+    with {:ok, full_path} <- resolve_write_target(payload_path, socket.assigns.file_full_path, project.path),
+         :ok <- verify_disk_hash(full_path, original_hash),
+         :ok <- File.write(full_path, content) do
+      new_hash = hash_content(content)
 
-      not path_within?(full_path, project.path) ->
+      {:reply, %{ok: true, new_hash: new_hash},
+       socket
+       |> assign(:file_content, content)
+       |> assign(:file_hash, new_hash)
+       |> assign(:file_full_path, full_path)
+       |> put_flash(:info, "Saved")}
+    else
+      {:error, :no_path} ->
+        {:reply, %{error: "No file path"}, socket}
+
+      {:error, :access_denied} ->
         {:reply, %{error: "Access denied"}, socket}
 
-      true ->
-        case File.write(full_path, content) do
-          :ok ->
-            {:reply, %{ok: true},
-             socket
-             |> assign(:file_content, content)
-             |> put_flash(:info, "Saved")}
+      {:error, :conflict} ->
+        {:reply, %{error: "file changed on disk"}, socket}
 
-          {:error, reason} ->
-            {:reply, %{error: "Write failed: #{reason}"},
-             socket |> put_flash(:error, "Save failed: #{reason}")}
-        end
+      {:error, reason} ->
+        {:reply, %{error: "Write failed: #{reason}"},
+         socket |> put_flash(:error, "Save failed: #{reason}")}
     end
   end
 
@@ -306,11 +314,43 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     {:noreply, socket}
   end
 
+  defp hash_content(content), do: :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
+
+  # When the client supplies a path, use it (prevents stale-assign race condition
+  # where user switches files mid-save). When it's absent, fall back to the
+  # socket assign so the old test payload `%{"content" => ...}` still works.
+  defp resolve_write_target("", fallback, project_path) when is_binary(fallback) do
+    if path_within?(fallback, project_path), do: {:ok, fallback}, else: {:error, :access_denied}
+  end
+
+  defp resolve_write_target("", _, _), do: {:error, :no_path}
+
+  defp resolve_write_target(path, _fallback, project_path) when is_binary(project_path) do
+    full_path = Path.join(project_path, path)
+    if path_within?(full_path, project_path), do: {:ok, full_path}, else: {:error, :access_denied}
+  end
+
+  defp resolve_write_target(_, _, _), do: {:error, :no_path}
+
+  defp verify_disk_hash(_full_path, ""), do: :ok
+
+  defp verify_disk_hash(full_path, expected_hash) do
+    case File.read(full_path) do
+      {:ok, disk_content} ->
+        if hash_content(disk_content) == expected_hash, do: :ok, else: {:error, :conflict}
+
+      {:error, _} ->
+        {:error, :conflict}
+    end
+  end
+
   attr :error, :string, default: nil
   attr :file_content, :string, default: nil
+  attr :file_hash, :string, default: nil
   attr :file_type, :string, default: nil
   attr :file_path, :string, default: nil
   attr :project, :map, required: true
+  attr :socket, :any, required: true
   attr :show_back_button, :boolean, default: false
   attr :empty_label, :string, default: "Select a file"
   attr :empty_description, :string, default: "Choose a file from the tree to view its contents"
@@ -340,8 +380,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         <div class="flex-1 min-h-0 overflow-hidden">
           <.file_content_viewer
             file_content={@file_content}
+            file_hash={@file_hash}
             file_type={@file_type}
             file_path={@file_path}
+            socket={@socket}
           />
         </div>
       </div>
@@ -358,8 +400,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   end
 
   attr :file_content, :string, required: true
+  attr :file_hash, :string, default: nil
   attr :file_type, :string, default: nil
   attr :file_path, :string, default: nil
+  attr :socket, :any, required: true
 
   defp file_content_viewer(assigns) do
     assigns = assign(assigns, :editor_id, "file-editor-#{:erlang.phash2(assigns.file_path)}")
@@ -369,9 +413,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       id={@editor_id}
       name="FileEditor"
       ssr={false}
+      socket={@socket}
       props={
         %{
           content: @file_content,
+          hash: @file_hash || "",
           lang: language_class(@file_type),
           path: @file_path || "",
           readonly: false
@@ -465,8 +511,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   attr :file_tree, :list, required: true
   attr :project, :any, required: true
+  attr :socket, :any, required: true
   attr :error, :string
   attr :file_content, :string
+  attr :file_hash, :string
   attr :file_type, :string
   attr :file_path, :string
 
@@ -487,15 +535,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           </ul>
         </div>
       </div>
-      
+
     <!-- File Content Viewer -->
       <div class="flex-1 min-h-0 overflow-hidden">
         <.file_content_pane
           error={@error}
           file_content={@file_content}
+          file_hash={@file_hash}
           file_type={@file_type}
           file_path={@file_path}
           project={@project}
+          socket={@socket}
           show_back_button={false}
           empty_label="Select a file"
           empty_description="Choose a file from the tree to view its contents"
@@ -507,9 +557,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   attr :files, :list, required: true
   attr :file_content, :string
+  attr :file_hash, :string
   attr :file_type, :string
   attr :file_path, :string
   attr :project, :any, required: true
+  attr :socket, :any, required: true
   attr :error, :string
 
   defp file_list_view(assigns) do
@@ -547,9 +599,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         <.file_content_pane
           error={@error}
           file_content={@file_content}
+          file_hash={@file_hash}
           file_type={@file_type}
           file_path={@file_path}
           project={@project}
+          socket={@socket}
           show_back_button={true}
           empty_label="No files"
           empty_description="This directory is empty"

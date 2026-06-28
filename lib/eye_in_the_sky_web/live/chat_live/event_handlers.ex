@@ -22,62 +22,73 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   def handle_event("change_channel", %{"channel_id" => channel_id}, socket) do
-    {:noreply, push_patch(socket, to: ~p"/chat?channel_id=#{channel_id}")}
+    session_id = get_session_id(socket)
+
+    if channel_member?(channel_id, session_id) do
+      {:noreply, push_patch(socket, to: ~p"/chat?channel_id=#{channel_id}")}
+    else
+      {:noreply, put_flash(socket, :error, "You are not a member of that channel")}
+    end
   end
 
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
     session_id = get_session_id(socket)
-    {image_infos, content_blocks} = consume_and_persist_agent_images(socket)
 
-    # Wrap message + attachments in a single transaction so the Postgres NOTIFY
-    # (which triggers the :new_message PubSub broadcast) fires only after both
-    # are committed — eliminating the race where subscribers see a message with
-    # no attachments.
-    result =
-      Repo.transaction(fn ->
-        case ChannelMessages.send_channel_message(%{
-               channel_id: channel_id,
-               session_id: session_id,
-               sender_role: "user",
-               recipient_role: "agent",
-               provider: "claude",
-               body: body
-             }) do
-          {:ok, message} ->
-            Enum.each(image_infos, &create_attachment_or_rollback(message.id, &1))
-            message
+    if not channel_member?(channel_id, session_id) do
+      {:noreply, put_flash(socket, :error, "You are not a member of that channel")}
+    else
+      {image_infos, content_blocks} = consume_and_persist_agent_images(socket)
 
-          {:error, changeset} ->
-            Repo.rollback(changeset)
-        end
-      end)
+      # Wrap message + attachments in a single transaction so the Postgres NOTIFY
+      # (which triggers the :new_message PubSub broadcast) fires only after both
+      # are committed — eliminating the race where subscribers see a message with
+      # no attachments.
+      result =
+        Repo.transaction(fn ->
+          case ChannelMessages.send_channel_message(%{
+                 channel_id: channel_id,
+                 session_id: session_id,
+                 sender_role: "user",
+                 recipient_role: "agent",
+                 provider: "claude",
+                 body: body
+               }) do
+            {:ok, message} ->
+              Enum.each(image_infos, &create_attachment_or_rollback(message.id, &1))
+              message
 
-    case result do
-      {:ok, message} ->
-        serialized =
-          message
-          |> Repo.preload([:session, :reactions, :attachments])
-          |> ChatPresenter.serialize_message()
-
-        Channels.mark_as_read(channel_id, session_id)
-        ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
-
-        # Guard against race where PubSub broadcast appends message before this assign.
-        # The broadcast fires after transaction commit but before this case block executes.
-        already_present = Enum.any?(socket.assigns.messages, &(&1.id == message.id))
-
-        updated_socket =
-          if already_present do
-            socket
-          else
-            assign(socket, :messages, socket.assigns.messages ++ [serialized])
+            {:error, changeset} ->
+              Repo.rollback(changeset)
           end
+        end)
 
-        {:noreply, updated_socket |> refresh_members_and_picker()}
+      case result do
+        {:ok, message} ->
+          serialized =
+            message
+            |> Repo.preload([:session, :reactions, :attachments])
+            |> ChatPresenter.serialize_message()
 
-      {:error, _} ->
-        Enum.each(image_infos, fn {path, _entry, _size} -> File.rm(path) end)
-        {:noreply, put_flash(socket, :error, "Failed to send message")}
+          Channels.mark_as_read(channel_id, session_id)
+          ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
+
+          # Guard against race where PubSub broadcast appends message before this assign.
+          # The broadcast fires after transaction commit but before this case block executes.
+          already_present = Enum.any?(socket.assigns.messages, &(&1.id == message.id))
+
+          updated_socket =
+            if already_present do
+              socket
+            else
+              assign(socket, :messages, socket.assigns.messages ++ [serialized])
+            end
+
+          {:noreply, updated_socket |> refresh_members_and_picker()}
+
+        {:error, _} ->
+          Enum.each(image_infos, fn {path, _entry, _size} -> File.rm(path) end)
+          {:noreply, put_flash(socket, :error, "Failed to send message")}
+      end
     end
   end
 
@@ -185,14 +196,15 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
 
   def handle_event("search_channel_messages", %{"query" => query}, socket) do
     channel_id = socket.assigns.active_channel_id
+    session_id = get_session_id(socket)
 
     search_results =
-      if String.trim(query) == "" do
-        []
-      else
+      if channel_member?(channel_id, session_id) && String.trim(query) != "" do
         channel_id
         |> Messages.search_messages_for_channel(query)
         |> ChatPresenter.serialize_messages()
+      else
+        []
       end
 
     {:noreply,
@@ -305,6 +317,9 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   end
 
   defp get_session_id(socket), do: socket.assigns[:session_id]
+
+  defp channel_member?(_channel_id, nil), do: false
+  defp channel_member?(channel_id, session_id), do: Channels.member?(channel_id, session_id)
 
   defp reload_messages(socket) do
     ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)

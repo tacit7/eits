@@ -1,4 +1,4 @@
-defmodule EyeInTheSky.Sessions.Queries do
+defmodule EyeInTheSky.Sessions.OverviewQueries do
   @moduledoc """
   Complex query views for sessions: overview rows, filtered listing, and FTS.
 

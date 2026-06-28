@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
   alias EyeInTheSky.{Agents, Messages, Notes, Projects, Repo, Sessions, Tasks}
   alias EyeInTheSky.Agents.AgentManager
+  alias Ecto.Multi
 
   # ---------------------------------------------------------------------------
   # palette:sessions
@@ -341,7 +342,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
           status_filter: "all"
         )
 
-      next_uuid = find_adjacent_session(sessions, current_uuid, direction)
+      next_uuid = find_adjacent(sessions, current_uuid, direction)
 
       if next_uuid do
         url = "/projects/#{project_id}/sessions/#{next_uuid}/chat"
@@ -373,7 +374,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
     if project_id do
       tasks = Tasks.list_tasks_for_project(project_id, sort_by: "created_asc", limit: 200)
-      next_uuid = find_adjacent_task(tasks, current_task_uuid, direction)
+      next_uuid = find_adjacent(tasks, current_task_uuid, direction)
 
       if next_uuid do
         url = "/projects/#{project_id}/tasks?task=#{next_uuid}"
@@ -447,14 +448,6 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     end
   end
 
-  defp find_adjacent_task(tasks, current_uuid, direction) do
-    find_adjacent(tasks, current_uuid, direction)
-  end
-
-  defp find_adjacent_session(sessions, current_uuid, direction) do
-    find_adjacent(sessions, current_uuid, direction)
-  end
-
   defp do_create_chat(session_uuid, params, socket) do
     project_id = Projects.parse_project_id(params["project_id"])
 
@@ -465,31 +458,36 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     }
 
     result =
-      case Agents.find_or_create_agent(agent_attrs) do
-        {:ok, agent} ->
-          session_attrs = %{
-            uuid: session_uuid,
-            agent_id: agent.id,
-            name: params["name"],
-            project_id: project_id,
-            model_provider: "manual",
-            model_name: "chat",
-            status: "idle",
-            started_at: DateTime.utc_now()
-          }
+      Multi.new()
+      |> Multi.run(:agent, fn _repo, _changes ->
+        Agents.find_or_create_agent(agent_attrs)
+      end)
+      |> Multi.run(:session, fn _repo, %{agent: agent} ->
+        session_attrs = %{
+          uuid: session_uuid,
+          agent_id: agent.id,
+          name: params["name"],
+          project_id: project_id,
+          model_provider: "manual",
+          model_name: "chat",
+          status: "idle",
+          started_at: DateTime.utc_now()
+        }
 
-          case Sessions.create_session_with_model(session_attrs) do
-            {:ok, session} ->
-              %{ok: true, session_uuid: session.uuid}
+        Sessions.create_session_with_model(session_attrs)
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{session: session}} ->
+          %{ok: true, session_uuid: session.uuid}
 
-            {:error, reason} ->
-              Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
-              %{ok: false, error: "Failed to create session"}
-          end
-
-        {:error, reason} ->
+        {:error, :agent, reason, _changes} ->
           Logger.warning("palette create-chat: agent creation failed: #{inspect(reason)}")
           %{ok: false, error: "Failed to create agent"}
+
+        {:error, :session, reason, _changes} ->
+          Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
+          %{ok: false, error: "Failed to create session"}
       end
 
     {:halt, push_event(socket, "palette:create-chat-result", result)}

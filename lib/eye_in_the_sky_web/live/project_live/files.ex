@@ -49,24 +49,33 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> put_flash(:error, "Invalid project ID")}
 
       project_id ->
-        project = Projects.get_project!(project_id)
+        case Projects.get_project(project_id) do
+          {:error, :not_found} ->
+            {:ok,
+             socket
+             |> assign(:page_title, "Project Not Found")
+             |> assign(:project, nil)
+             |> assign(:error, "Project not found")
+             |> put_flash(:error, "Project not found")}
 
-        socket =
-          socket
-          |> assign(:page_title, "Files - #{project.name}")
-          |> assign(:project, project)
-          |> assign(:sidebar_tab, :files)
-          |> assign(:sidebar_project, project)
+          {:ok, project} ->
+            socket =
+              socket
+              |> assign(:page_title, "Files - #{project.name}")
+              |> assign(:project, project)
+              |> assign(:sidebar_tab, :files)
+              |> assign(:sidebar_project, project)
 
-        socket =
-          if project.path do
-            tree = build_file_tree(project.path, project.path)
-            assign(socket, :file_tree, tree)
-          else
-            socket
-          end
+            socket =
+              if project.path do
+                tree = build_file_tree(project.path, project.path)
+                assign(socket, :file_tree, tree)
+              else
+                socket
+              end
 
-        {:ok, socket}
+            {:ok, socket}
+        end
     end
   end
 

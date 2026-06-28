@@ -31,6 +31,9 @@ eye_in_the_sky_web-*.tar
 # Ignore digested assets cache.
 /priv/static/cache_manifest.json
 
+# Phoenix digested static assets (mix phx.digest output: <name>-<md5>.ext)
+/priv/static/**/*-????????????????????????????????.*
+
 # Vite prod build output (fingerprinted files and compressed artifacts)
 /priv/static/.vite/
 /priv/static/**/*.gz

@@ -370,7 +370,7 @@ export const VimNav = {
     }
     const list = this.currentList()
     if (!list) return []
-    return [...list.querySelectorAll<HTMLElement>("[data-vim-list-item]")]
+    return [...list.querySelectorAll("[data-vim-list-item]")] as HTMLElement[]
   },
 
   focusListItem(index: number): void {
@@ -498,7 +498,7 @@ export const VimNav = {
       if (action.name === "list_open_tab") {
         const item = this.currentListItems()[this.listFocusIndex]
         if (!item) return
-        const anchor = (item.tagName === "A" ? item : item.querySelector<HTMLAnchorElement>("a[href]")) as HTMLAnchorElement | null
+        const anchor = (item.tagName === "A" ? item : item.querySelector("a[href]")) as HTMLAnchorElement | null
         const href = anchor?.getAttribute("href")
         if (href) window.open(href, "_blank", "noopener,noreferrer")
         return
@@ -556,7 +556,7 @@ export const VimNav = {
         if (!item) return
         const selector = item.dataset.vimRenameTarget
         if (!selector) return
-        const input = item.querySelector<HTMLElement>(selector)
+        const input = item.querySelector(selector) as HTMLElement | null
         if (!input) return
         input.focus()
         if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) {
@@ -833,7 +833,7 @@ export const VimNav = {
     const overlay = this._quickDmOverlayBase()
     overlay.innerHTML = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:16px 20px;width:420px;max-width:90vw;font-family:monospace;color:var(--color-base-content)"><div style="font-size:13px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">DM: ${escapeHtml(this._quickDmTargetName)}</div><textarea id="vim-qdm-input" placeholder="Type your message…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--color-base-300);border-radius:4px;font-family:monospace;font-size:12px;background:var(--color-base-200);color:var(--color-base-content);resize:none;min-height:72px" rows="3"></textarea><div style="margin-top:8px;font-size:9px;opacity:0.4">Enter to send &nbsp;|&nbsp; Esc cancel</div></div>`
 
-    const textarea = overlay.querySelector<HTMLTextAreaElement>("#vim-qdm-input")
+    const textarea = overlay.querySelector("#vim-qdm-input") as HTMLTextAreaElement | null
     if (textarea) {
       textarea.focus()
       textarea.addEventListener("keydown", (e: KeyboardEvent) => {

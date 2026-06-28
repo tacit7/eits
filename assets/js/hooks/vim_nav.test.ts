@@ -2292,7 +2292,7 @@ describe("hint mode (f key)", () => {
     const h = makeHook()
     h.mounted()
     h.enterHintMode()
-    const labels = [...h.hintOverlayEl!.querySelectorAll<HTMLElement>("[data-hint-label]")]
+    const labels = ([...h.hintOverlayEl!.querySelectorAll("[data-hint-label]")] as HTMLElement[])
       .map(b => b.dataset.hintLabel)
     expect(labels).toEqual(["a", "b", "c"])
   })

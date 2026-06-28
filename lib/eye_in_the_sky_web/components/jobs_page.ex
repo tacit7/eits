@@ -92,6 +92,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       |> assign_new(:filter_origin, fn -> "all" end)
       |> assign_new(:running_ids, fn -> MapSet.new(ScheduledJobs.list_running_job_ids()) end)
       |> assign_new(:last_run_map, fn -> ScheduledJobs.last_run_status_map() end)
+      |> assign_new(:last_n_runs_map, fn -> %{} end)
       |> assign_new(:active_tab, fn -> :all_jobs end)
       |> assign_new(:confirm_run_modal_job, fn -> nil end)
       |> assign_new(:bulk_selected_jobs, fn -> MapSet.new() end)
@@ -382,6 +383,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
     else
       all_jobs = ScheduledJobs.list_jobs()
+      job_ids = Enum.map(all_jobs, & &1.id)
 
       socket
       |> assign(:all_jobs, all_jobs)
@@ -390,6 +392,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         if(apply_filters, do: apply_job_filters(all_jobs, socket.assigns), else: all_jobs)
       )
       |> assign(:last_failed_runs, load_last_failed_runs(all_jobs))
+      |> assign(:last_n_runs_map, ScheduledJobs.last_n_runs_for_jobs(job_ids))
     end
   end
 

@@ -15,7 +15,7 @@ defmodule EyeInTheSky.Sessions do
   alias EyeInTheSky.Sessions.Loader
   alias EyeInTheSky.Sessions.ModelInfo
   alias EyeInTheSky.Sessions.Query
-  alias EyeInTheSky.Sessions.Queries
+  alias EyeInTheSky.Sessions.OverviewQueries
   alias EyeInTheSky.Sessions.Session
   alias EyeInTheSky.Sessions.StatusTransitions
   alias EyeInTheSky.Settings.JsonSettings
@@ -177,10 +177,10 @@ defmodule EyeInTheSky.Sessions do
   end
 
 
-  defdelegate list_sessions_filtered(opts \\ []), to: Queries
-  defdelegate list_session_overview_rows(opts \\ []), to: Queries
-  defdelegate get_session_overview_row(session_id), to: Queries
-  defdelegate count_session_overview_rows(opts \\ []), to: Queries
+  defdelegate list_sessions_filtered(opts \\ []), to: OverviewQueries
+  defdelegate list_session_overview_rows(opts \\ []), to: OverviewQueries
+  defdelegate get_session_overview_row(session_id), to: OverviewQueries
+  defdelegate count_session_overview_rows(opts \\ []), to: OverviewQueries
 
   defdelegate load_session_data(session_id, opts \\ []), to: Loader
   defdelegate get_session_counts(session_id), to: Loader

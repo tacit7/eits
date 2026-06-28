@@ -89,6 +89,41 @@ LiveViews mount twice (disconnected + connected). Only do side effects when `con
 - timers
 - DB writes / external calls
 
+### Safe Resource Lookups in LiveViews
+
+Use the safe `get_project/1` (returns `{:ok, project} | {:error, :not_found}`) instead of `get_project!/1` (raises) when loading resources based on user input (params, route IDs). This allows proper error handling in `mount/3` without crashing the session.
+
+**Pattern (commit 651dcafc):**
+
+```elixir
+# ❌ Wrong: get_project! crashes if project not found
+def mount(%{"project_id" => project_id}, _session, socket) do
+  project = Projects.get_project!(project_id)  # FunctionClauseError if nil
+  {:ok, assign(socket, :project, project)}
+end
+
+# ✅ Correct: get_project/1 returns tagged tuple
+def mount(%{"project_id" => project_id}, _session, socket) do
+  case Projects.get_project(project_id) do
+    {:error, :not_found} ->
+      {:ok,
+       socket
+       |> assign(:project, nil)
+       |> assign(:error, "Project not found")
+       |> put_flash(:error, "Project not found")}
+
+    {:ok, project} ->
+      {:ok,
+       socket
+       |> assign(:project, project)
+       |> assign(:sidebar_tab, :files)
+       |> assign(:sidebar_project, project)}
+  end
+end
+```
+
+**Rule:** Use safe `get_*` functions in `mount/3` and event handlers where user input is the source. Reserve bang variants (`get_*!`) for internal code paths where the record must exist (preloaded associations, post-lookup operations).
+
 ---
 
 ## UI / UX (Tailwind-first)
@@ -1158,6 +1193,76 @@ import EyeInTheSkyWeb.Components.Rail.Modals.NewChannel, only: [new_channel_moda
 - **Maintainability:** Changes to modal styling don't affect the rail panel logic
 
 **Result:** Monolithic `Rail.Flyout` reduced by ~300 lines; modal logic now discoverable in dedicated sub-modules.
+
+### Modal Rendering Placement: Top-Level vs Nested
+
+**Rule:** Render modals at the **parent component top-level** (e.g., `Rail.render/1`), NOT nested inside sub-components (e.g., `Flyout.render/1`). Sub-components should stay focused on their primary responsibility (navigation, content) without managing modal state.
+
+**Pattern (commit 44a8dcac):**
+
+```elixir
+# ❌ Wrong: Modals nested inside Flyout sub-component
+defmodule Rail.Flyout do
+  attr :rail_modal, :any, default: nil
+  attr :show_new_channel_form, :boolean, default: false
+
+  def flyout(assigns) do
+    ~H"""
+    <!-- Navigation content -->
+    <div class="flyout-content">...</div>
+
+    <!-- Modals: clutters Flyout with state management -->
+    <.new_channel_modal :if={@show_new_channel_form} myself={@myself} />
+    <.rail_modal :if={@rail_modal in [:new_task, :new_prompt]} modal={@rail_modal} myself={@myself} />
+    <.task_detail_modal :if={match?({:view_task, _, _}, @rail_modal)} ... />
+    """
+  end
+end
+
+# ✅ Correct: Modals rendered at Rail top-level; Flyout is navigation-only
+defmodule Rail do
+  def render(assigns) do
+    ~H"""
+    <.flyout
+      open={@open}
+      mobile_open={@mobile_open}
+      myself={@myself}
+    />
+
+    <!-- Modals rendered at top-level alongside NewSessionModal -->
+    <.new_channel_modal :if={@show_new_channel_form} myself={@myself} />
+    <.rail_modal :if={@rail_modal in [:new_task, :new_prompt]} modal={@rail_modal} myself={@myself} />
+    <.task_detail_modal :if={match?({:view_task, _, _}, @rail_modal)} ... />
+    <.note_detail_modal :if={match?({:view_note, _, _}, @rail_modal)} ... />
+    """
+  end
+end
+
+defmodule Rail.Flyout do
+  # Note: Modals (rail_modal, task_detail_modal, note_detail_modal, new_channel_modal)
+  # are now rendered in Rail.render/1, not here. Flyout focuses on navigation only.
+
+  def flyout(assigns) do
+    ~H"""
+    <!-- Navigation content only -->
+    <div class="flyout-content">...</div>
+    """
+  end
+end
+```
+
+**Why this pattern:**
+- **Separation of concerns:** Sub-components (Flyout, FilePanel) manage their content; the parent (Rail) manages modal orchestration
+- **State clarity:** Modal state lives in the parent LiveView, not scattered across nested components
+- **Reusability:** Modals can be rendered from multiple parents without duplication
+- **Maintainability:** Adding a new modal requires only parent-level changes; sub-components stay unchanged
+
+**Result (commit 44a8dcac):**
+- `Rail.Flyout`: 412 → 378 lines (removed 4 modal imports + 2 modal attrs)
+- Modals now sit at `Rail` top-level alongside `NewSessionModal`
+- Event handlers target `@myself` (Rail's handle_event), same as before — no behavior change
+
+**Rule:** Modals belong at the component that owns the state (usually the Page LiveView or main Layout component), not nested inside focused sub-components. Sub-component `render/1` should handle content and UI; parent handles orchestration.
 
 ---
 
@@ -2825,6 +2930,157 @@ end
 
 ---
 
+## LiveView Action Modules
+
+**Problem:** Large LiveViews accumulate dozens of `handle_event` handlers in a single file, making it hard to find related logic and test individual actions.
+
+**Solution:** Extract event handlers into dedicated Action modules that follow the pattern `YourLive.NameActions` or `YourLive.Name` (sub-namespace). Each Action module focuses on a single domain (session actions, state actions, UI actions).
+
+**Pattern (commits 9b0d6428, 59cae09d):**
+
+```elixir
+# ❌ Before: All event handlers in Rail.ex (monolithic)
+defmodule Rail do
+  def handle_event("select_session", %{"id" => id}, socket) do
+    # ... 20+ lines of session selection logic
+  end
+
+  def handle_event("delete_session", %{"id" => id}, socket) do
+    # ... session deletion
+  end
+
+  def handle_event("rename_session", %{"id" => id, "name" => name}, socket) do
+    # ... session rename
+  end
+
+  def handle_event("toggle_files", _, socket) do
+    # ... file panel toggle
+  end
+
+  def handle_event("expand_file", %{"path" => path}, socket) do
+    # ... file tree expansion
+  end
+
+  # ... 30+ more handlers
+end
+
+# ✅ After: Extract related handlers into Action modules
+defmodule Rail.SessionActions do
+  alias EyeInTheSky.{Sessions, Projects, Notes}
+
+  def handle_select_session(id, socket) do
+    case Sessions.get_session(id) do
+      {:ok, session} ->
+        {:noreply, assign(socket, :selected_session, session)}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+    end
+  end
+
+  def handle_delete_session(id, socket) do
+    case Sessions.delete_session(id) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:selected_session, nil)
+         |> load_sessions()}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete session")}
+    end
+  end
+
+  def handle_rename_session(id, name, socket) do
+    case Sessions.get_session(id) do
+      {:ok, session} ->
+        case Sessions.update_session(session, %{name: name}) do
+          {:ok, updated} ->
+            {:noreply, stream_insert(socket, :sessions, updated)}
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to rename session")}
+        end
+      {:error, :not_found} ->
+        {:noreply, socket}
+    end
+  end
+end
+
+defmodule Rail.StateActions do
+  def handle_toggle_files(socket) do
+    new_open = !socket.assigns.show_files
+    {:noreply, assign(socket, :show_files, new_open)}
+  end
+
+  def handle_expand_file(path, socket) do
+    expanded = socket.assigns.expanded_paths || MapSet.new()
+    new_expanded =
+      if MapSet.member?(expanded, path) do
+        MapSet.delete(expanded, path)
+      else
+        MapSet.put(expanded, path)
+      end
+
+    {:noreply, assign(socket, :expanded_paths, new_expanded)}
+  end
+end
+
+# Main LiveView delegates to Action modules
+defmodule Rail do
+  alias Rail.{SessionActions, StateActions}
+
+  def handle_event("select_session", %{"id" => id}, socket) do
+    SessionActions.handle_select_session(id, socket)
+  end
+
+  def handle_event("delete_session", %{"id" => id}, socket) do
+    SessionActions.handle_delete_session(id, socket)
+  end
+
+  def handle_event("rename_session", params, socket) do
+    SessionActions.handle_rename_session(params["id"], params["name"], socket)
+  end
+
+  def handle_event("toggle_files", _, socket) do
+    StateActions.handle_toggle_files(socket)
+  end
+
+  def handle_event("expand_file", %{"path" => path}, socket) do
+    StateActions.handle_expand_file(path, socket)
+  end
+end
+```
+
+**Key patterns:**
+- **Naming:** `YourLive.NameActions` or `YourLive.Name` (e.g., `Rail.SessionActions`, `Rail.StateActions`)
+- **Module-level aliases:** Promote context aliases to the top of the Action module:
+  ```elixir
+  alias EyeInTheSky.{Sessions, Projects, Notes}
+  alias EyeInTheSkyWeb.Components.Rail.Modals.RailModal
+  ```
+- **Handler naming:** `handle_action_name/2` (socket as last param) — consistent signature for all handlers
+- **Return value:** Same as `handle_event/3`: `{:noreply, socket}` or `{:reply, data, socket}`
+- **Thin delegation:** Main LiveView's `handle_event/3` remains thin — just delegates to the action module
+
+**When to extract:**
+- LiveView file exceeds 300 lines
+- 15+ `handle_event` clauses
+- Handlers cluster around specific domains (sessions, state, UI)
+- Business logic dominates (context calls, stream operations, flash messages)
+
+**Benefits:**
+- **Testability:** Action modules can be unit-tested independently (mock socket, verify assigns)
+- **Discoverability:** Related handlers live together; easier to find and modify
+- **Reusability:** Actions can be called from multiple LiveViews or components
+- **Maintainability:** Main LiveView stays focused on routing events; Action modules handle logic
+
+**Result (commits 9b0d6428, 59cae09d):**
+- `Rail.ex`: 967 → 388 lines (extracted handle_event logic)
+- New `Rail.SessionActions` (106 lines) + `Rail.StateActions` (289 lines)
+- Main `Rail` now routes events cleanly; Action modules own the logic
+
+**Rule:** LiveViews with 15+ `handle_event` clauses should extract handlers into Action modules (one module per domain). Keep the main LiveView thin — it routes and mounts; Action modules implement.
+
+---
+
 ## Module Extraction from Large Contexts
 
 When a context module grows large with distinct responsibilities, extract domain logic into sub-modules. Each sub-module focuses on a single concern (data transformation, parsing, building, validation) and is tested independently.
@@ -3517,6 +3773,119 @@ end
 1. Join the tables in one query
 2. Batch-load related data in groups
 3. Use `Repo.preload(..., in_parallel: true)` for multiple preloads
+
+---
+
+## Ecto.Multi for Atomic Multi-Step Operations
+
+**Problem:** Context functions that chain multiple DB operations (insert, update, delete) have gaps between operations. If one operation fails midway, partial state remains in the database.
+
+**Solution:** Use `Ecto.Multi` to wrap related operations in a transaction. All steps succeed or none do.
+
+**Pattern (commit 19d709ef):**
+
+```elixir
+# ❌ Before: Two separate operations with race condition gap
+def do_create_chat(session_uuid, params, socket) do
+  agent_attrs = %{
+    path: params["path"],
+    name: "chat"
+  }
+
+  result =
+    case Agents.find_or_create_agent(agent_attrs) do
+      {:ok, agent} ->
+        session_attrs = %{
+          uuid: session_uuid,
+          agent_id: agent.id,
+          name: params["name"],
+          project_id: project_id,
+          model_provider: "manual",
+          model_name: "chat",
+          status: "idle",
+          started_at: DateTime.utc_now()
+        }
+
+        case Sessions.create_session_with_model(session_attrs) do
+          {:ok, session} ->
+            %{ok: true, session_uuid: session.uuid}
+
+          {:error, reason} ->
+            Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
+            %{ok: false, error: "Failed to create session"}
+        end
+
+      {:error, reason} ->
+        Logger.warning("palette create-chat: agent creation failed: #{inspect(reason)}")
+        %{ok: false, error: "Failed to create agent"}
+    end
+
+  {:halt, push_event(socket, "palette:create-chat-result", result)}
+end
+
+# ✅ After: Atomic via Ecto.Multi
+def do_create_chat(session_uuid, params, socket) do
+  agent_attrs = %{
+    path: params["path"],
+    name: "chat"
+  }
+
+  result =
+    Multi.new()
+    |> Multi.run(:agent, fn _repo, _changes ->
+      Agents.find_or_create_agent(agent_attrs)
+    end)
+    |> Multi.run(:session, fn _repo, %{agent: agent} ->
+      session_attrs = %{
+        uuid: session_uuid,
+        agent_id: agent.id,
+        name: params["name"],
+        project_id: project_id,
+        model_provider: "manual",
+        model_name: "chat",
+        status: "idle",
+        started_at: DateTime.utc_now()
+      }
+
+      Sessions.create_session_with_model(session_attrs)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{session: session}} ->
+        %{ok: true, session_uuid: session.uuid}
+
+      {:error, :agent, reason, _changes} ->
+        Logger.warning("palette create-chat: agent creation failed: #{inspect(reason)}")
+        %{ok: false, error: "Failed to create agent"}
+
+      {:error, :session, reason, _changes} ->
+        Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
+        %{ok: false, error: "Failed to create session"}
+    end
+
+  {:halt, push_event(socket, "palette:create-chat-result", result)}
+end
+```
+
+**When to use Ecto.Multi:**
+- 2+ DB operations that must succeed or fail together
+- Multi-step workflows (create → verify → update)
+- Batch operations with atomic requirements
+- Operations that depend on intermediate results (e.g., create agent, then create session with agent.id)
+
+**Key patterns:**
+- `Multi.run(:name, fn _repo, %{prior_step: value} -> ... end)` — pass prior results via destructuring
+- `Repo.transaction(multi)` — executes all steps atomically; returns `{:ok, %{step_name: result}}` or `{:error, failed_step, reason, changes_so_far}`
+- Error clause matches `{:error, step_name, reason, changes_so_far}` to identify which step failed
+- All steps must return `{:ok, value}` or `{:error, reason}`
+
+**Benefits:**
+- No partial state — all steps or nothing
+- Error handling is explicit per-step
+- Prior results are passed through the pipeline automatically
+- Clear audit trail of which step failed
+
+**Rule:** When writing a context function with 2+ Repo operations, wrap them in `Ecto.Multi` and `Repo.transaction`. Use `Multi.run` for context function calls; use `Multi.insert`, `Multi.update`, `Multi.delete` for direct changeset operations.
 
 ---
 

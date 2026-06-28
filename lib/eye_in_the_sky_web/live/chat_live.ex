@@ -141,6 +141,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:active_channel, active_channel)
       |> assign(:active_channel_id, channel_id)
       |> assign(:messages, data.messages)
+      |> assign(:received_message_ids, MapSet.new(data.messages || [], & &1.id))
       |> assign(:has_more_messages, length(data.messages) == 100)
       |> assign(:unread_counts, unread_counts)
       |> assign(:active_thread, data.active_thread)

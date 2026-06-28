@@ -1,7 +1,7 @@
 <script>
   import { formatTime, formatDateRelative } from '../../utils/datetime.js'
   import { autoScroll } from '../../actions/autoScroll.js'
-  import { tick } from 'svelte'
+  import { tick, onMount } from 'svelte'
   import { marked } from 'marked'
   import DOMPurify from 'dompurify'
   import ThreadPanel from '../ThreadPanel.svelte'
@@ -22,6 +22,13 @@
   export let messageSearchResults = []
   export let live
 
+  // liveMessages is the client-maintained message list. The `messages` prop is a
+  // frozen first-paint snapshot; new messages arrive via push_event deltas.
+  // This reactive declaration resets liveMessages when the prop reference changes
+  // (channel switch), while push_event handlers append/update/delete in place.
+  let liveMessages = [...messages]
+  $: liveMessages = [...messages]
+
   let loadingOlder = false
   let openOverflowId = null
   let inspectMessage = null
@@ -38,12 +45,29 @@
     inspectMessage = null
   }
 
-  function loadOlderMessages() {
-    if (!messages.length || loadingOlder) return
-    loadingOlder = true
-    live.pushEvent('load_older_messages', { before_id: String(messages[0].id) }, () => {
+  onMount(() => {
+    live.handleEvent('chat:message_appended', ({ message }) => {
+      liveMessages = [...liveMessages, message]
+    })
+
+    live.handleEvent('chat:message_updated', ({ message }) => {
+      liveMessages = liveMessages.map(m => m.id === message.id ? message : m)
+    })
+
+    live.handleEvent('chat:message_deleted', ({ id }) => {
+      liveMessages = liveMessages.filter(m => m.id !== id)
+    })
+
+    live.handleEvent('chat:messages_prepended', ({ messages: older }) => {
+      liveMessages = [...older, ...liveMessages]
       loadingOlder = false
     })
+  })
+
+  function loadOlderMessages() {
+    if (!liveMessages.length || loadingOlder) return
+    loadingOlder = true
+    live.pushEvent('load_older_messages', { before_id: String(liveMessages[0].id) })
   }
 
   let inputValue = ''
@@ -70,8 +94,8 @@
   let searchInput
   let searchDebounce = null
 
-  // Use server-side FTS results when a query is active; fall back to full message list.
-  $: filteredMessages = searchQuery.trim() ? messageSearchResults : messages
+  // Use server-side FTS results when a query is active; fall back to live message list.
+  $: filteredMessages = searchQuery.trim() ? messageSearchResults : liveMessages
 
   function handleSearchInput() {
     clearTimeout(searchDebounce)

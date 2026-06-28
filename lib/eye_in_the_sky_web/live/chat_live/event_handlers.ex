@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   use EyeInTheSkyWeb, :verified_routes
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [cancel_upload: 3, put_flash: 3, push_patch: 2]
+  import Phoenix.LiveView, only: [cancel_upload: 3, put_flash: 3, push_event: 3, push_patch: 2]
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{ChannelMessages, Channels, FileAttachments, MessageReactions, Messages, Repo}
@@ -72,15 +72,21 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
           Channels.mark_as_read(channel_id, session_id)
           ChannelHelpers.route_to_members(channel_id, body, session_id, content_blocks)
 
-          # Guard against race where PubSub broadcast appends message before this assign.
+          # Guard against race where PubSub broadcast pushes delta before this case block.
           # The broadcast fires after transaction commit but before this case block executes.
-          already_present = Enum.any?(socket.assigns.messages, &(&1.id == message.id))
+          already_present =
+            MapSet.member?(socket.assigns.received_message_ids, message.id)
 
           updated_socket =
             if already_present do
               socket
             else
-              assign(socket, :messages, socket.assigns.messages ++ [serialized])
+              socket
+              |> assign(
+                :received_message_ids,
+                MapSet.put(socket.assigns.received_message_ids, message.id)
+              )
+              |> push_event("chat:message_appended", %{message: serialized})
             end
 
           {:noreply, updated_socket |> refresh_members_and_picker()}
@@ -175,7 +181,14 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
 
     case MessageReactions.toggle_reaction(message_id, session_id, emoji) do
       {:ok, _action} ->
-        {:noreply, assign(socket, :messages, reload_messages(socket))}
+        updated =
+          message_id
+          |> String.to_integer()
+          |> Messages.get_message!()
+          |> Repo.preload([:session, :reactions, :attachments])
+          |> ChatPresenter.serialize_message()
+
+        {:noreply, push_event(socket, "chat:message_updated", %{message: updated})}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to add reaction")}
@@ -190,7 +203,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
       id ->
         message = Messages.get_message!(id)
         {:ok, _} = Messages.delete_message(message)
-        {:noreply, assign(socket, :messages, reload_messages(socket))}
+        {:noreply, push_event(socket, "chat:message_deleted", %{id: id})}
     end
   end
 
@@ -272,13 +285,12 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
           ChannelMessages.list_messages_for_channel(channel_id, before_id: before_id, limit: 50)
           |> ChatPresenter.serialize_messages()
 
-        messages = older ++ socket.assigns.messages
         has_more = length(older) == 50
 
         {:noreply,
          socket
-         |> assign(:messages, messages)
-         |> assign(:has_more_messages, has_more)}
+         |> assign(:has_more_messages, has_more)
+         |> push_event("chat:messages_prepended", %{messages: older, has_more: has_more})}
     end
   end
 
@@ -320,11 +332,6 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
 
   defp channel_member?(_channel_id, nil), do: false
   defp channel_member?(channel_id, session_id), do: Channels.member?(channel_id, session_id)
-
-  defp reload_messages(socket) do
-    ChannelMessages.list_messages_for_channel(socket.assigns.active_channel_id)
-    |> ChatPresenter.serialize_messages()
-  end
 
   defp refresh_members_and_picker(socket) do
     channel_id = socket.assigns.active_channel_id

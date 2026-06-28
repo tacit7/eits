@@ -2,6 +2,54 @@
 
 The Eye in the Sky web application spawns Claude Code CLI subprocesses to handle DM conversations, agent sessions, and project-scoped prompts. Session management uses a DynamicSupervisor pattern for per-session process isolation.
 
+---
+
+## Sessions Context Architecture
+
+The Sessions context (`lib/eye_in_the_sky/sessions/`) has been refactored into focused sub-modules for better separation of concerns:
+
+### Module Organization
+
+The main `Sessions` module now acts as a facade, delegating to three specialized sub-modules while maintaining the same public API:
+
+| Module | Responsibility | Functions |
+|--------|---|---|
+| **`Sessions.Query`** | Read-only session retrieval and queries | `list_sessions/1`, `get_session/1`, `list_active_sessions/0`, `get_session_by_uuid/1`, `list_sessions_for_agent/2`, `list_project_sessions_with_agent/2`, `count_and_ids_for_project/1`, etc. |
+| **`Sessions.StatusTransitions`** | State-changing operations and transitions | `set_session_idle/1`, `end_session/2`, `archive_session/1`, `unarchive_session/1`, `update_session/2`, `batch_delete_sessions/1` |
+| **`Sessions.Events`** | PubSub event broadcasting | `broadcast_session_updated/1`, `broadcast_session_completed/1`, `broadcast_session_waiting/1`, `broadcast_status_side_effects/2` (delegates to `BroadcastEvents`) |
+| **`Sessions`** (facade) | Unified public API and delegation | Delegates to Query, StatusTransitions, and Events; maintains backward compatibility |
+
+### Design Rationale
+
+- **Query isolation:** All read operations are co-located in `Sessions.Query`, making it easy to identify and optimize slow queries
+- **State changes:** All mutations go through `Sessions.StatusTransitions`, centralizing side effects and making transition logic discoverable
+- **Event broadcasting:** Broadcasting logic is separated from CRUD, keeping the Sessions context boundary clear (data changes in StatusTransitions, events in Sessions.Events)
+- **Facade pattern:** The main `Sessions` module delegates via `defdelegate`, preserving the original public API — callers don't need to know about the sub-modules
+- **No API breakage:** All existing function calls to `Sessions.*` continue to work unchanged
+
+### Example Delegation
+
+From the main `Sessions` module:
+
+```elixir
+# Query delegation
+defdelegate list_sessions(opts), to: Query
+defdelegate get_session(id), to: Query
+defdelegate list_sessions_for_agent(agent_id, opts), to: Query
+
+# Status transition delegation
+defdelegate set_session_idle(session), to: StatusTransitions
+defdelegate end_session(session, opts), to: StatusTransitions
+defdelegate archive_session(session), to: StatusTransitions
+defdelegate update_session(session, attrs), to: StatusTransitions
+
+# Event delegation
+defdelegate broadcast_session_updated(session), to: Events
+defdelegate broadcast_session_completed(session), to: Events
+```
+
+---
+
 ## Architecture Overview
 
 ```
@@ -1509,18 +1557,20 @@ The partial indexes filter on `status IN ["idle", "waiting"]` and `archived_at I
 
 ## PubSub Broadcasts for Session Updates
 
-PubSub broadcasts for session status updates are emitted from the Sessions context (`lib/eye_in_the_sky/sessions.ex`), not the controller layer. This keeps broadcast logic co-located with the data modifications that trigger them and keeps the web layer free of direct domain event calls.
+PubSub broadcasts for session status updates are emitted from the Sessions context via the `Sessions.Events` sub-module, not the controller layer. This keeps broadcast logic co-located with the data modifications that trigger them and keeps the web layer free of direct domain event calls.
 
-### Broadcast Functions
+### Broadcast Functions via Sessions.Events
 
-All broadcast helpers live in `EyeInTheSky.Sessions`:
+All broadcast helpers are accessed through `EyeInTheSky.Sessions.Events`, which delegates to `EyeInTheSky.Sessions.BroadcastEvents`:
 
 | Function | Events fired | Use case |
 |---|---|---|
-| `broadcast_session_updated(session)` | `session_updated` | Generic status update; called after PATCH |
-| `broadcast_session_completed(session)` | `session_completed` + `session_updated` | Session marked completed |
-| `broadcast_session_waiting(session)` | `agent_stopped` + `session_updated` | Session parked to waiting |
-| `broadcast_status_side_effects(session, status)` | `agent_stopped` or `agent_working` + `session_updated` | Status PATCH with arbitrary new status |
+| `Sessions.broadcast_session_updated(session)` | `session_updated` | Generic status update; called after PATCH |
+| `Sessions.broadcast_session_completed(session)` | `session_completed` + `session_updated` | Session marked completed |
+| `Sessions.broadcast_session_waiting(session)` | `agent_stopped` + `session_updated` | Session parked to waiting |
+| `Sessions.broadcast_status_side_effects(session, status)` | `agent_stopped` or `agent_working` + `session_updated` | Status PATCH with arbitrary new status |
+
+(Note: Callers use the `Sessions.*` public API; the Events sub-module is an internal delegation layer.)
 
 `broadcast_session_completed` and `broadcast_session_waiting` are implemented via a private helper `broadcast_with_session_updated/2` that accepts the primary event function and always appends `session_updated` (commit ffda2181):
 
@@ -1531,9 +1581,23 @@ defp broadcast_with_session_updated(session, event_fn) do
 end
 ```
 
+### Sessions.Events Sub-Module
+
+The `Sessions.Events` module is a delegation layer for PubSub broadcasting. It exports functions that delegate to `BroadcastEvents`:
+
+```elixir
+# Sessions.Events module
+defdelegate broadcast_session_updated(session), to: BroadcastEvents
+defdelegate broadcast_session_completed(session), to: BroadcastEvents
+defdelegate broadcast_session_waiting(session), to: BroadcastEvents
+defdelegate broadcast_status_side_effects(session, status), to: BroadcastEvents
+```
+
+This structure keeps the Sessions context boundary clear: data mutations in `StatusTransitions`, event broadcasts in `Events` (delegating to `BroadcastEvents`).
+
 ### Sessions.BroadcastEvents Sub-Module
 
-Session PubSub broadcasts were extracted from the main Sessions module into `EyeInTheSky.Sessions.BroadcastEvents` (30 lines, commit 1779981c) to keep broadcast logic separate from session CRUD operations. The Sessions module delegates these functions via `defdelegate`:
+Session PubSub broadcasts are implemented in `EyeInTheSky.Sessions.BroadcastEvents` (30 lines, commit 1779981c), which contains pure event broadcast functions — no database queries, no side effects beyond PubSub.
 
 **Functions in BroadcastEvents:**
 
@@ -1547,12 +1611,9 @@ Session PubSub broadcasts were extracted from the main Sessions module into `Eye
 **Private helper:**
 `broadcast_with_session_updated/2` — applies a primary event function then always appends `session_updated`, ensuring all broadcast operations always include the updated session state for UI consistency.
 
-**Implementation detail:**
-The extracted module contains only pure event broadcast functions — no database queries, no side effects beyond PubSub. This keeps the Sessions context boundary clear: CRUD operations in Sessions, broadcast logic in BroadcastEvents.
-
 ### set_session_idle/1
 
-`Sessions.set_session_idle/1` updates session status to `"idle"` and fires `Events.agent_stopped` on the updated struct in one call. Previously, the web layer called `update_session` then fired `agent_stopped` with the stale pre-update struct. Use this in cancel/stop handlers:
+`Sessions.set_session_idle/1` (implemented in `Sessions.StatusTransitions`) updates session status to `"idle"` and fires `Events.agent_stopped` on the updated struct in one call. Previously, the web layer called `update_session` then fired `agent_stopped` with the stale pre-update struct. Use this in cancel/stop handlers:
 
 ```elixir
 Sessions.set_session_idle(session)
@@ -1563,7 +1624,7 @@ Sessions.set_session_idle(session)
 
 ### Archive / Unarchive
 
-`archive_session/1` and `unarchive_session/1` both delegate to a private `set_archived/2` that accepts either a `DateTime` value or `nil`. Both fire `session_updated` after the DB write:
+`archive_session/1` and `unarchive_session/1` (both in `Sessions.StatusTransitions`) delegate to a private `set_archived/2` that accepts either a `DateTime` value or `nil`. Both fire `session_updated` after the DB write:
 
 ```elixir
 def archive_session(%Session{} = session), do: set_archived(session, DateTime.utc_now())

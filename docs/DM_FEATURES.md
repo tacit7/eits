@@ -1750,6 +1750,84 @@ Settings handlers were extracted into a dedicated `SettingsHandlers` module (com
 
 ---
 
+## DmLive.Actions Module Extraction
+
+**Commit:** `c01b76f9`
+
+The `DmLive.Actions` module houses core `handle_event` callbacks extracted from `DmLive`, following the LiveView Action module extraction pattern to improve code organization and maintainability.
+
+**Module location:** `lib/eye_in_the_sky_web/live/dm_live/actions.ex` (310 lines)
+
+**Purpose:**
+- Extracts general-purpose UI event handlers from the main LiveView file
+- Keeps modal toggles, note creation, message pagination, file operations, and display mode toggles organized in a dedicated module
+- Reduces cognitive load on the main `DmLive` file by separating concerns
+
+**Event Categories Handled:**
+
+1. **PTY Terminal Events**
+   - `handle_pty_input/2` — Write data to PTY terminal
+   - `handle_pty_resize/2` — Handle terminal resize with launch command firing
+
+2. **Tab & UI Toggles**
+   - `handle_change_tab/2` — Switch between Messages, Tasks, Notes, etc. tabs
+   - `handle_toggle_context_meter/1` — Toggle context meter overlay
+   - `handle_toggle_new_task_drawer/1` — Toggle new task modal
+
+3. **Modal & Drawer Controls**
+   - Overlay state management for task detail, effort menu, model selection
+   - Drawer visibility toggles for task creation, note creation
+
+4. **Message & File Operations**
+   - Message pagination and list loading
+   - File upload handling
+   - Display mode toggles for diffs and commits
+
+**Integration with DmLive:**
+
+`DmLive` delegates event handling to `DmLive.Actions` via module imports:
+
+```elixir
+import EyeInTheSkyWeb.DmLive.Actions
+```
+
+Event handlers in `DmLive.handle_event/3` delegate to the appropriate action function:
+
+```elixir
+def handle_event("change_tab", params, socket) do
+  handle_change_tab(socket, params)
+end
+```
+
+**Related Modules:**
+
+The Actions pattern is used alongside other extraction modules for complete DM feature organization:
+- `DmLive.ExternalActions` — Third-party integrations (sessions, agents, etc.)
+- `DmLive.TabHelpers` — Tab-specific logic (Messages, Tasks, Notes, Settings)
+- `DmLive.FileAutocomplete` — File path autocomplete server logic
+- `DmLive.MessageHandlers` — Message delivery and UI updates
+
+**Type Specifications:**
+
+All functions include `@spec` annotations for clarity:
+```elixir
+@spec handle_change_tab(Phoenix.LiveView.Socket.t(), map()) ::
+  {:noreply, Phoenix.LiveView.Socket.t()}
+```
+
+**Pattern Established:**
+
+This follows the LiveView Action module extraction pattern used elsewhere in the EITS codebase (e.g., `ProjectLive.Actions`, `AgentLive.Actions`). Extracting actions into dedicated modules:
+- Improves code organization and discoverability
+- Makes testing easier (can test handlers in isolation)
+- Reduces main LiveView file bloat
+- Establishes clear separation of concerns
+
+**File:**
+- `lib/eye_in_the_sky_web/live/dm_live/actions.ex` — Complete action handler module
+
+---
+
 ## Desktop Top Bar
 
 **Commits:** `d6c5ae2e`, `ef000cd3`, `b58104ad`, `fa1f2f94`, `37c837a9`

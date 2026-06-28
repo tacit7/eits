@@ -12,6 +12,8 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   index on source_uuid combined with `on_conflict: :nothing`.
   """
 
+  import Ecto.Query
+
   alias EyeInTheSky.{Events, Messages}
   alias EyeInTheSky.Messages.Message
   alias EyeInTheSky.Repo
@@ -273,13 +275,23 @@ defmodule EyeInTheSky.Messages.BulkImporter do
 
   # Fetch inserted messages by source_uuid and broadcast each to the session topic.
   # This ensures the DM page receives real-time updates when BulkImporter inserts messages.
+  # Batch-loads all messages in one query to avoid N+1 per-message database reads.
   defp broadcast_inserted_messages(session_id, source_uuids) do
+    # Batch-load all messages by source_uuid in a single query
+    messages_by_source_uuid =
+      Message
+      |> where([m], m.source_uuid in ^source_uuids)
+      |> select([m], {m.source_uuid, m})
+      |> Repo.all()
+      |> Map.new()
+
+    # Look up messages from the map and broadcast each
     Enum.each(source_uuids, fn source_uuid ->
-      case Messages.get_message_by_source_uuid(source_uuid) do
+      case Map.fetch(messages_by_source_uuid, source_uuid) do
         {:ok, message} ->
           Events.session_new_message(session_id, message)
 
-        {:error, :not_found} ->
+        :error ->
           Logger.debug("BulkImporter: inserted message not found for source_uuid #{source_uuid}")
       end
     end)

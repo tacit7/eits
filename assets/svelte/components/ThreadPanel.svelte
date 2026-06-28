@@ -123,7 +123,7 @@
           <div class="text-[11px] font-medium text-base-content/30 uppercase tracking-wider mb-3">
             {thread.replies.length} {thread.replies.length === 1 ? 'reply' : 'replies'}
           </div>
-          {#each thread.replies as reply}
+          {#each thread.replies as reply (reply.id)}
             <div class="mb-4">
               <div class="flex items-baseline gap-2 mb-1">
                 <span class="text-[13px] font-semibold {reply.sender_role === 'user' ? 'text-base-content/70' : 'text-primary/80'}">
@@ -155,6 +155,7 @@
       <textarea
         bind:value={replyInput}
         on:keydown={handleKeydown}
+        aria-label="Reply to thread"
         placeholder="Reply to thread… (⌘↵ to send)"
         rows="3"
         class="w-full textarea textarea-sm bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 text-sm resize-none focus:border-primary/30 focus:bg-base-100 transition-colors"

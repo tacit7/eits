@@ -46,7 +46,7 @@
 <div class="max-w-4xl mx-auto">
   <!-- Task List -->
   <div class="space-y-0">
-    {#each tasks as task}
+    {#each tasks as task (task.id)}
       {@const priority = getPriorityFlag(task.priority)}
       {@const dueDate = formatDateRelative(task.due_at)}
       {@const overdue = isOverdue(task.due_at)}
@@ -123,7 +123,7 @@
 
                   {#if task.tags && task.tags.length > 0}
                     <div class="flex items-center gap-1">
-                      {#each task.tags as tag}
+                      {#each task.tags as tag (tag.name)}
                         <span class="badge badge-outline badge-xs">
                           {tag.name}
                         </span>

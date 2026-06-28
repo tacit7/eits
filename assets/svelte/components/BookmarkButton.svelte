@@ -81,6 +81,8 @@
   disabled={loading}
   class="btn btn-ghost {buttonSizeClasses[size]} {showLabel ? 'gap-2' : 'btn-square'} hover:bg-base-200 transition-colors"
   title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+  aria-label={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+  aria-pressed={isBookmarked}
 >
   {#if loading}
     <span class="loading loading-spinner {sizeClasses[size]}"></span>

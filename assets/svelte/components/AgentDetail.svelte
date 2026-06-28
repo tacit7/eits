@@ -42,6 +42,19 @@
   export let showNoteModal = false
   export let showTaskModal = false
 
+  let noteDialog
+  let taskDialog
+
+  $: if (noteDialog) {
+    if (showNoteModal && !noteDialog.open) noteDialog.showModal()
+    else if (!showNoteModal) noteDialog.close()
+  }
+
+  $: if (taskDialog) {
+    if (showTaskModal && !taskDialog.open) taskDialog.showModal()
+    else if (!showTaskModal) taskDialog.close()
+  }
+
   const tabs = [
     {
       key: "tasks",
@@ -231,7 +244,7 @@
             {/if}
 
             <label class="swap swap-rotate btn btn-ghost btn-sm btn-circle">
-              <input type="checkbox" class="theme-controller" value="dark" />
+              <input type="checkbox" aria-label="Toggle theme" class="theme-controller" value="dark" />
               <!-- sun icon -->
               <span class="swap-on h-5 w-5">{@html SunSvg}</span>
               <!-- moon icon -->
@@ -287,7 +300,7 @@
       <div class="border-b border-base-300">
         <div class="px-6">
           <div role="tablist" aria-label="Session sections" class="flex items-center gap-1 -mb-px">
-            {#each tabs as t}
+            {#each tabs as t (t.key)}
               <button
                 role="tab"
                 id={`tab-${t.key}`}
@@ -333,12 +346,12 @@
 </div>
 
 <!-- Add Note Modal -->
-<dialog class="modal {showNoteModal ? 'modal-open' : ''}">
+<dialog bind:this={noteDialog} class="modal" aria-labelledby="note-modal-title">
   <div class="modal-box">
     <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" on:click={() => live.pushEvent('close_modal')}>✕</button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>✕</button>
     </form>
-    <h3 class="font-bold text-lg mb-4">Add Note</h3>
+    <h3 id="note-modal-title" class="font-bold text-lg mb-4">Add Note</h3>
     <form on:submit|preventDefault={(e) => {
       const formData = new FormData(e.target);
       live.pushEvent('save_note', { body: formData.get('body') });
@@ -371,12 +384,12 @@
 </dialog>
 
 <!-- Add Task Modal -->
-<dialog class="modal {showTaskModal ? 'modal-open' : ''}">
+<dialog bind:this={taskDialog} class="modal" aria-labelledby="task-modal-title">
   <div class="modal-box">
     <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" on:click={() => live.pushEvent('close_modal')}>✕</button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>✕</button>
     </form>
-    <h3 class="font-bold text-lg mb-4">Create New Task</h3>
+    <h3 id="task-modal-title" class="font-bold text-lg mb-4">Create New Task</h3>
     <form on:submit|preventDefault={(e) => {
       const formData = new FormData(e.target);
       live.pushEvent('save_task', {

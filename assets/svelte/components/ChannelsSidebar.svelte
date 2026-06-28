@@ -260,11 +260,11 @@
 
   <div class="channel-list">
     {#if channels && channels.length > 0}
-      {#each channels as channel}
+      {#each channels as channel (channel.id)}
         <div
           class="channel-item {isActive(channel.id) ? 'active' : ''}"
           on:click={() => selectChannel(channel.id)}
-          on:keydown={(e) => e.key === 'Enter' && selectChannel(channel.id)}
+          on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectChannel(channel.id) } }}
           role="button"
           tabindex="0"
         >

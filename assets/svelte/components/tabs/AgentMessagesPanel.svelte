@@ -1,6 +1,7 @@
 <script>
   import { formatTime, formatDateRelative } from '../../utils/datetime.js'
   import { autoScroll } from '../../actions/autoScroll.js'
+  import { tick } from 'svelte'
   import { marked } from 'marked'
   import DOMPurify from 'dompurify'
   import ThreadPanel from '../ThreadPanel.svelte'
@@ -24,7 +25,18 @@
   let loadingOlder = false
   let openOverflowId = null
   let inspectMessage = null
+  let inspectDialog
   let openReactionPickerId = null
+
+  async function openInspect(msg) {
+    inspectMessage = msg
+    await tick()
+    inspectDialog?.showModal()
+  }
+  function closeInspect() {
+    inspectDialog?.close()
+    inspectMessage = null
+  }
 
   function loadOlderMessages() {
     if (!messages.length || loadingOlder) return
@@ -116,9 +128,6 @@
     }
     if (e.key === 'Escape' && openReactionPickerId !== null) {
       openReactionPickerId = null
-    }
-    if (e.key === 'Escape' && inspectMessage !== null) {
-      inspectMessage = null
     }
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
       const idx = parseInt(e.key, 10) - 1
@@ -625,6 +634,7 @@
             on:input={handleSearchInput}
             type="text"
             placeholder="Search messages..."
+            aria-label="Search messages"
             class="w-full input input-xs bg-base-200/50 border-base-content/8 pl-8 pr-4 text-base placeholder:text-base-content/25 focus:border-primary/30"
             autocomplete="off"
           />
@@ -670,7 +680,7 @@
 
     {#if filteredMessages && filteredMessages.length > 0}
       <div class="space-y-0">
-        {#each processedMessages as message, idx}
+        {#each processedMessages as message, idx (message.id)}
           <!-- Date separator -->
           {#if idx === 0 || formatDateRelative(processedMessages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
             <div class="flex items-center gap-3 my-4">
@@ -756,6 +766,7 @@
                       {#if message.sender_role === 'agent'}
                         {@html renderMarkdownBody(message.body, mentionNameMap)}
                       {:else if searchQuery.trim()}
+                        <!-- highlightMatch escapes via escapeHtml() before injecting <mark>; do not bypass -->
                         <span class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words whitespace-pre-wrap" contenteditable="false">{@html highlightMatch(message.body || '', searchQuery)}</span>
                       {:else}
                         <p class="whitespace-pre-wrap">{@html renderBody(message.body, mentionNameMap)}</p>
@@ -765,7 +776,7 @@
                     <!-- Image attachments -->
                     {#if message.attachments && message.attachments.length > 0}
                       <div class="mt-2 flex flex-wrap gap-2">
-                        {#each message.attachments as attachment}
+                        {#each message.attachments as attachment (attachment.url)}
                           {#if attachment.content_type && attachment.content_type.startsWith('image/')}
                             <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block flex-shrink-0">
                               <img
@@ -814,7 +825,7 @@
                     <!-- Reactions -->
                     {#if message.reactions && message.reactions.length > 0}
                       <div class="mt-2 flex flex-wrap gap-1">
-                        {#each message.reactions as reaction}
+                        {#each message.reactions as reaction (reaction.emoji)}
                           <button
                             class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] bg-base-content/[0.05] hover:bg-primary/10 hover:text-primary transition-colors"
                             on:click={() => live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji: reaction.emoji })}
@@ -842,13 +853,14 @@
                   </div>
 
                   <!-- Hover actions: scoped to content column -->
-                  <div class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
+                  <div class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
                 <!-- Reaction picker -->
                 <div class="relative">
                   <button
                     class="p-1 rounded text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                     on:click|stopPropagation={() => openReactionPickerId = openReactionPickerId === message.id ? null : message.id}
                     title="Add reaction"
+                    aria-label="Add reaction"
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.536-4.464a.75.75 0 1 0-1.061-1.061 3.5 3.5 0 0 1-4.95 0 .75.75 0 0 0-1.06 1.06 5 5 0 0 0 7.07 0ZM9 8.5c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S7.448 7 8 7s1 .672 1 1.5Zm3 1.5c.552 0 1-.672 1-1.5S12.552 7 12 7s-1 .672-1 1.5.448 1.5 1 1.5Z" clip-rule="evenodd"/></svg>
                   </button>
@@ -857,7 +869,7 @@
                       class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-xl shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
                       on:click|stopPropagation
                     >
-                      {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji}
+                      {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji (emoji)}
                         <button
                           class="text-lg hover:bg-base-content/[0.08] rounded p-1 transition-colors cursor-pointer leading-none"
                           on:click={() => { live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji }); openReactionPickerId = null }}
@@ -872,6 +884,7 @@
                   class="p-1 rounded text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                   on:click={() => live.pushEvent('open_thread', { message_id: String(message.id) })}
                   title="Reply in thread"
+                  aria-label="Reply in thread"
                 >
                   <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-4 4V5Z" clip-rule="evenodd"/></svg>
                 </button>
@@ -880,6 +893,7 @@
                   class="p-1 rounded text-base-content/30 hover:text-base-content/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                   on:click={() => navigator.clipboard.writeText(message.body || '')}
                   title="Copy message"
+                  aria-label="Copy message"
                 >
                   <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                 </button>
@@ -889,6 +903,7 @@
                     class="p-1 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                     on:click|stopPropagation={() => openOverflowId = openOverflowId === message.id ? null : message.id}
                     title="More actions"
+                    aria-label="More actions"
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
                   </button>
@@ -897,7 +912,7 @@
                       <button
                         type="button"
                         class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
-                        on:click|stopPropagation={() => { inspectMessage = message; openOverflowId = null }}
+                        on:click|stopPropagation={() => { openInspect(message); openOverflowId = null }}
                       >
                         Inspect
                       </button>
@@ -986,6 +1001,7 @@
             on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
             on:keydown={handleInputKeydown}
             placeholder="Message agents…"
+            aria-label="Message"
             class="textarea w-full text-sm rounded-lg bg-transparent border-0 placeholder:text-base-content/25 focus:ring-0 focus:outline-none transition-colors resize-none overflow-y-auto text-base-content p-0"
             rows="1"
             style="max-height: 7.5rem; line-height: 1.5rem;"
@@ -995,7 +1011,7 @@
           <!-- @ Autocomplete Dropdown -->
           {#if showAutocomplete && autocompleteOptions.length > 0}
             <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
-              {#each autocompleteOptions as option, idx}
+              {#each autocompleteOptions as option, idx (option.id)}
                 <button
                   type="button"
                   class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors {idx === selectedAutocompleteIndex ? 'bg-base-content/[0.12]' : 'hover:bg-base-content/[0.08]'}"
@@ -1013,7 +1029,7 @@
           <!-- / Slash Command Autocomplete Dropdown -->
           {#if showSlashAutocomplete && slashOptions.length > 0}
             <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-xl shadow-xl max-h-[280px] overflow-y-auto z-50">
-              {#each groupSlashItems(slashOptions) as entry, idx}
+              {#each groupSlashItems(slashOptions) as entry, idx (entry.header ? `header:${entry.type}` : `${entry.type}:${entry.slug}`)}
                 {#if entry.header}
                   <div class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/60 bg-base-content/[0.06] sticky top-0">
                     {{ skill: 'Skills', command: 'Commands', agent: 'Agents', prompt: 'Prompts' }[entry.type] || entry.type}
@@ -1076,15 +1092,17 @@
   {/if}
 
   {#if inspectMessage}
-    <div class="modal modal-open z-50">
+    <dialog bind:this={inspectDialog} class="modal" aria-labelledby="inspect-title" on:close={closeInspect}>
       <div class="modal-box max-w-2xl">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="font-bold text-sm">Message #{inspectMessage.id}</h3>
-          <button class="btn btn-xs btn-ghost" on:click={() => inspectMessage = null}>Close</button>
+          <h3 id="inspect-title" class="font-bold text-sm">Message #{inspectMessage.id}</h3>
+          <button class="btn btn-xs btn-ghost" on:click={() => inspectDialog?.close()} aria-label="Close">Close</button>
         </div>
         <pre class="text-xs bg-base-200 rounded-lg p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
       </div>
-      <div class="modal-backdrop" on:click={() => inspectMessage = null}></div>
-    </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
   {/if}
 </div>

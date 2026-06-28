@@ -1607,7 +1607,7 @@ Valid models (--provider claude, default):
               claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001
 
 Valid models (--provider codex):
-  gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
+  gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
 
 Valid models (--provider gemini):
   gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
@@ -1680,8 +1680,8 @@ USAGE
           codex)
             if [[ -n "$model" ]]; then
               case "$model" in
-                gpt-5.4|gpt-5.2-codex|gpt-5.1-codex-max|gpt-5.4-mini|gpt-5.3-codex|gpt-5.2) ;;
-                *) die "invalid model '$model' for provider 'codex'. Valid: gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2" ;;
+                gpt-5.5|gpt-5.4|gpt-5.2-codex|gpt-5.1-codex-max|gpt-5.4-mini|gpt-5.3-codex|gpt-5.2) ;;
+                *) die "invalid model '$model' for provider 'codex'. Valid: gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2" ;;
               esac
             fi ;;
           gemini)

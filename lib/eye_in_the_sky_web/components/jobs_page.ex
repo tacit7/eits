@@ -381,6 +381,10 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         if(apply_filters, do: apply_job_filters(all_global, socket.assigns), else: all_global)
       )
       |> assign(:last_failed_runs, load_last_failed_runs(all_project ++ all_global))
+      |> assign(
+        :last_n_runs_map,
+        ScheduledJobs.last_n_runs_for_jobs(Enum.map(all_project ++ all_global, & &1.id))
+      )
     else
       all_jobs = ScheduledJobs.list_jobs()
       job_ids = Enum.map(all_jobs, & &1.id)

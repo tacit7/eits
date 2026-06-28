@@ -7,6 +7,8 @@
  * (vs data-cs-id in ChatWindowHook).
  */
 
+import { initResizeObserver } from './utils'
+
 export const TerminalWindowHook = {
   mounted() {
     this.el.style.zIndex = "1"
@@ -73,22 +75,9 @@ export const TerminalWindowHook = {
   },
 
   _initResize() {
-    this._width  = this.el.offsetWidth
-    this._height = this.el.offsetHeight
-
-    const observer = new ResizeObserver(() => {
-      this._width  = this.el.offsetWidth
-      this._height = this.el.offsetHeight
-      clearTimeout(this._resizePersistTimer)
-      this._resizePersistTimer = setTimeout(() => {
-        if (this._destroyed) return
-        const w = this.el.offsetWidth
-        const h = this.el.offsetHeight
-        this.pushEvent("terminal_resized", { id: this._terminalId(), w, h })
-      }, 400)
+    initResizeObserver(this, (w, h) => {
+      this.pushEvent("terminal_resized", { id: this._terminalId(), w, h })
     })
-    observer.observe(this.el)
-    this._windowResizeObserver = observer
   },
 
   _raiseToFront() {

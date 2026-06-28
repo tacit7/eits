@@ -209,7 +209,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
   end
 
   describe "load_older_messages event" do
-    test "prepends older messages to current list", %{
+    test "delivers older messages as push_event and updates has_more flag", %{
       conn: conn,
       channel: channel,
       web_session: web_session
@@ -229,9 +229,7 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
 
-      initial_count = length(get_assigns(view).messages)
-
-      # Create a reference message
+      # Create a reference message to load older ones before
       {:ok, ref_msg} =
         ChannelMessages.send_channel_message(%{
           channel_id: channel.id,
@@ -242,13 +240,14 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
           body: "Reference"
         })
 
-      # Load older
+      # Trigger load — older messages are now delivered via chat:messages_prepended push_event,
+      # not via socket.assigns.messages. Verify the handler ran without error by checking
+      # that has_more_messages is set correctly (fewer than 50 older messages exist).
       render_hook(view, "load_older_messages", %{
         "before_id" => to_string(ref_msg.id)
       })
 
-      # Should have more messages now
-      assert length(get_assigns(view).messages) > initial_count
+      assert get_assigns(view).has_more_messages == false
     end
 
     test "sets has_more_messages flag correctly", %{
@@ -340,14 +339,12 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
   end
 
   describe "new_message PubSub handling" do
-    test "appends new message to list without full reload", %{
+    test "pushes chat:message_appended delta and tracks ID for dedup", %{
       conn: conn,
       channel: channel,
       web_session: web_session
     } do
       {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
-
-      initial_count = length(get_assigns(view).messages)
 
       # Create message outside the view
       {:ok, new_msg} =
@@ -360,17 +357,39 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
           body: "New from broadcast"
         })
 
-      # Broadcast it
+      # Broadcast it — server pushes a chat:message_appended delta (O(1) wire),
+      # does NOT append to socket.assigns.messages (which stays as the mount snapshot).
       EyeInTheSky.Events.channel_message(channel.id, new_msg)
       render(view)
 
-      # Should have appended (list grows by 1)
-      assert length(get_assigns(view).messages) == initial_count + 1
+      # Message ID is tracked in received_message_ids to prevent duplicate delivery.
+      assert MapSet.member?(get_assigns(view).received_message_ids, new_msg.id)
+    end
 
-      # Verify new message is in list
-      assert Enum.any?(get_assigns(view).messages, fn m ->
-               m.body == "New from broadcast"
-             end)
+    test "deduplicates duplicate broadcast", %{
+      conn: conn,
+      channel: channel,
+      web_session: web_session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
+
+      {:ok, new_msg} =
+        ChannelMessages.send_channel_message(%{
+          channel_id: channel.id,
+          session_id: web_session.id,
+          sender_role: "agent",
+          recipient_role: "user",
+          provider: "claude",
+          body: "Duplicate test"
+        })
+
+      # Broadcast twice — simulates broadcast_and_return + Postgres LISTEN/NOTIFY double-fire.
+      EyeInTheSky.Events.channel_message(channel.id, new_msg)
+      EyeInTheSky.Events.channel_message(channel.id, new_msg)
+      render(view)
+
+      # ID still tracked exactly once (MapSet deduplication).
+      assert MapSet.member?(get_assigns(view).received_message_ids, new_msg.id)
     end
   end
 

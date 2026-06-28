@@ -33,25 +33,23 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
 
     # Guard against duplicate broadcasts (broadcast_and_return fires immediately;
     # NotifyListener fires again via Postgres LISTEN/NOTIFY for the same insert).
-    already_present = Enum.any?(socket.assigns.messages, &(&1.id == message.id))
+    already_present = MapSet.member?(socket.assigns.received_message_ids, message.id)
 
     if already_present do
       Logger.info("📬 Skipping duplicate message id=#{message.id}")
       {:noreply, socket}
     else
       # Preload associations required by ChatPresenter.serialize_message,
-      # then append — avoids re-fetching the entire message list on every push.
+      # then push a delta — avoids re-serializing the entire message history.
       serialized =
         message
         |> ChannelMessages.preload_for_serialization()
         |> ChatPresenter.serialize_message()
 
-      messages = socket.assigns.messages ++ [serialized]
-
       channels = load_channels(socket.assigns.project_id)
       unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
 
-      Logger.info("📬 Appended message id=#{message.id}, total=#{length(messages)}")
+      Logger.info("📬 Pushed delta for message id=#{message.id}")
 
       Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
         id: "app-rail",
@@ -60,8 +58,9 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
 
       {:noreply,
        socket
-       |> assign(:messages, messages)
-       |> assign(:unread_counts, unread_counts)}
+       |> assign(:received_message_ids, MapSet.put(socket.assigns.received_message_ids, message.id))
+       |> assign(:unread_counts, unread_counts)
+       |> Phoenix.LiveView.push_event("chat:message_appended", %{message: serialized})}
     end
   end
 

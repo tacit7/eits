@@ -1,6 +1,8 @@
 // assets/js/hooks/note_full_editor.js
 // CodeMirror is loaded lazily on first mount to keep the initial JS bundle small.
 
+import { loadCMModulesAndCompartments, mountCMView, destroyCMView } from "./cm_editor_setup"
+
 export const NoteFullEditorHook = {
   async mounted() {
     this._destroyed = false
@@ -10,28 +12,13 @@ export const NoteFullEditorHook = {
 
     const statusEl = document.getElementById("note-editor-status")
 
-    const [
-      { EditorView, keymap, highlightActiveLine, lineNumbers },
-      { EditorState },
-      { defaultKeymap, history, historyKeymap },
-      { makeThemeCompartment },
-      { makeTabSizeExtension, makeFontSizeExtension, makeVimExtension },
-      { syntaxHighlighting, defaultHighlightStyle },
-      { markdown },
-    ] = await Promise.all([
-      import("@codemirror/view"),
-      import("@codemirror/state"),
-      import("@codemirror/commands"),
-      import("../cm_theme"),
-      import("../cm_settings"),
-      import("@codemirror/language"),
-      import("@codemirror/lang-markdown"),
-    ])
-
-    const { extension: themeExtension, watch } = await makeThemeCompartment()
-    const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
-    const { extension: fontExtension, watch: watchFont } = await makeFontSizeExtension()
-    const { extension: vimExtension, watch: watchVim } = await makeVimExtension()
+    const {
+      EditorView, keymap, highlightActiveLine, lineNumbers,
+      EditorState, defaultKeymap, history, historyKeymap,
+      syntaxHighlighting, defaultHighlightStyle, markdown,
+      themeExtension, tabExtension, fontExtension, vimExtension,
+      watch, tabWatch, watchFont, watchVim,
+    } = await loadCMModulesAndCompartments()
 
     const saveKeymap = keymap.of([
       {
@@ -82,12 +69,7 @@ export const NoteFullEditorHook = {
     ]
 
     if (this._destroyed) return
-    const state = EditorState.create({ doc: body, extensions })
-    this._view = new EditorView({ state, parent: this.el })
-    this._cleanupTheme = watch(this._view)
-    this._cleanupTabSize = tabWatch(this._view)
-    this._cleanupFontSize = watchFont(this._view)
-    this._cleanupVim = watchVim(this._view)
+    mountCMView(this, { EditorState, EditorView, doc: body, extensions, watch, tabWatch, watchFont, watchVim })
 
     // Wire Tab on title input to focus the editor
     const titleInput = document.getElementById("note-title-input")
@@ -123,13 +105,6 @@ export const NoteFullEditorHook = {
     if (saveBtn && this._saveBtnHandler) {
       saveBtn.removeEventListener("click", this._saveBtnHandler)
     }
-    if (this._cleanupTheme) this._cleanupTheme()
-    if (this._cleanupTabSize) this._cleanupTabSize()
-    if (this._cleanupFontSize) this._cleanupFontSize()
-    if (this._cleanupVim) this._cleanupVim()
-    if (this._view) {
-      this._view.destroy()
-      this._view = null
-    }
+    destroyCMView(this)
   }
 }

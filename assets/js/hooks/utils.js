@@ -71,6 +71,23 @@ export function showSessionFailureToast({ title, reason } = {}) {
   setTimeout(() => alertEl.remove(), SESSION_FAILURE_TOAST_TTL_MS)
 }
 
+export function initResizeObserver(hook, onResize) {
+  hook._width  = hook.el.offsetWidth
+  hook._height = hook.el.offsetHeight
+
+  const observer = new ResizeObserver(() => {
+    hook._width  = hook.el.offsetWidth
+    hook._height = hook.el.offsetHeight
+    clearTimeout(hook._resizePersistTimer)
+    hook._resizePersistTimer = setTimeout(() => {
+      if (hook._destroyed) return
+      onResize(hook.el.offsetWidth, hook.el.offsetHeight)
+    }, 400)
+  })
+  observer.observe(hook.el)
+  hook._windowResizeObserver = observer
+}
+
 const debounce = (fn, wait = 120) => {
   let timeoutId
   const wrapped = (...args) => {

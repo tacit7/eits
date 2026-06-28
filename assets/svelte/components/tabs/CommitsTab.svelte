@@ -13,7 +13,7 @@
   <!-- Left: Commit List -->
   <div class="overflow-y-auto">
     <div class="space-y-1">
-      {#each commits as commit}
+      {#each commits as commit (commit.commit_hash)}
         <button
           class="btn btn-ghost w-full justify-start text-left p-3 h-auto"
           class:btn-active={selectedCommit?.commit_hash === commit.commit_hash}

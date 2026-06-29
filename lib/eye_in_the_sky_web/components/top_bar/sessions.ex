@@ -55,26 +55,12 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
       id="sessions-sort-dropdown"
       phx-update="ignore"
       phx-hook="SortDropdown"
-      data-label={
-        case @sort_by do
-          "name" -> "Name"
-          "agent" -> "Agent"
-          "model" -> "Model"
-          _ -> "Last msg"
-        end
-      }
+      data-label={sort_label(@sort_by)}
       class="dropdown"
     >
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort:
-        <span class="js-sort-label">
-          {case @sort_by do
-            "name" -> "Name"
-            "agent" -> "Agent"
-            "model" -> "Model"
-            _ -> "Last msg"
-          end}
-        </span>
+        <span class="js-sort-label">{sort_label(@sort_by)}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
@@ -95,4 +81,9 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
     </details>
     """
   end
+
+  defp sort_label("name"), do: "Name"
+  defp sort_label("agent"), do: "Agent"
+  defp sort_label("model"), do: "Model"
+  defp sort_label(_), do: "Last msg"
 end

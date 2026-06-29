@@ -70,12 +70,12 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
       id="notes-sort-dropdown"
       phx-update="ignore"
       phx-hook="SortDropdown"
-      data-label={if @sort_by == "oldest", do: "Oldest", else: "Newest"}
+      data-label={sort_label(@sort_by)}
       class="dropdown"
     >
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort:
-        <span class="js-sort-label">{if @sort_by == "oldest", do: "Oldest", else: "Newest"}</span>
+        <span class="js-sort-label">{sort_label(@sort_by)}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
@@ -104,4 +104,7 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
     <% end %>
     """
   end
+
+  defp sort_label("oldest"), do: "Oldest"
+  defp sort_label(_), do: "Newest"
 end

@@ -12,7 +12,7 @@ defmodule EyeInTheSky.Tasks do
   alias EyeInTheSky.Tasks.{Task, WorkflowState}
   alias EyeInTheSky.Utils.ToolHelpers
 
-  @full_task_preloads [:state, :tags, :sessions, :checklist_items]
+  @full_task_preloads [:state, :tags, :sessions, :checklist_items, :agent]
 
   # Workflow state ID accessors — source of truth is WorkflowState
   defdelegate state_todo, to: WorkflowState, as: :todo_id

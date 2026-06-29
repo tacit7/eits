@@ -730,7 +730,7 @@ TASKS_HELP
       # --mine/--assigned: tasks where current session is the active executor (linked via task_sessions)
       # --created-by: tasks created by the current session (via created_by_session_id)
       # Project default: EITS_PROJECT_ID is used when no --project flag is given and --all is not set.
-      local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0 _tag_flag=0 _json=0 _project_flag=0
+      local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0 _tag_flag=0 _json=0 _project_flag=0 _limit_flag=0
       local _since_cutoff="" _stale_since_cutoff="" _list_project="${EITS_PROJECT_ID:-}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -768,7 +768,7 @@ TASKS_HELP
               in-review|review)  qs="${qs}&state_id=4"; shift 2 ;;
               *) die "unknown state name: $2" ;;
             esac ;;
-          --limit|-l) qs="${qs}&limit=$2";      shift 2 ;;
+          --limit|-l) _limit_flag=1; qs="${qs}&limit=$2";      shift 2 ;;
           --mine|--assigned) [[ $_session_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine/--assigned requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --created-by) local _creator="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_creator" ]] || die "--created-by requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&created_by_session_id=$_creator"; shift ;;
           --all)      _all_flag=1; shift ;;
@@ -778,19 +778,26 @@ TASKS_HELP
           *) die "unknown flag: $1" ;;
         esac
       done
-      # Session scope: default to current session unless --all, --session, --mine, --agent, or --tag
+      # Session scope: default to current session, unless overridden by --all, --session,
+      # --mine, --agent, --tag, or an explicit --project (explicit project = project-wide).
       local _silent_scope=0
-      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 && $_tag_flag -eq 0 ]]; then
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 && $_tag_flag -eq 0 && $_project_flag -eq 0 ]]; then
         local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
         if [[ -n "$_self" ]]; then
           qs="${qs}&session_id=$_self"
           _silent_scope=1
         fi
       fi
-      # Project scope: always inject EITS_PROJECT_ID unless --project was given explicitly.
-      # --all only bypasses session scoping, not project scoping.
-      if [[ $_project_flag -eq 0 && -n "$_list_project" ]]; then
+      # Project scope: inject the project unless --all (all projects). Uses an explicit
+      # --project value when given, otherwise the EITS_PROJECT_ID default.
+      # --all bypasses both session and project scoping.
+      if [[ $_all_flag -eq 0 && -n "$_list_project" ]]; then
         qs="${qs}&project_id=$_list_project"
+      fi
+      # Default limit: server caps at 50 when no limit is passed, silently truncating
+      # project-wide lists. Default to 200 unless the caller set --limit explicitly.
+      if [[ $_limit_flag -eq 0 ]]; then
+        qs="${qs}&limit=200"
       fi
       local _resp; _resp=$(_curl "$BASE_URL/tasks?${qs#&}")
       # --since: keep tasks created at or after the cutoff

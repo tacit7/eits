@@ -778,8 +778,7 @@ TASKS_HELP
           *) die "unknown flag: $1" ;;
         esac
       done
-      # Agent-centric default: when running as an agent, scope to current session
-      # unless --all, --session, --mine, --agent, or --tag explicitly overrides the scope
+      # Session scope: default to current session unless --all, --session, --mine, --agent, or --tag
       local _silent_scope=0
       if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 && $_tag_flag -eq 0 ]]; then
         local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
@@ -788,8 +787,9 @@ TASKS_HELP
           _silent_scope=1
         fi
       fi
-      # Project default: inject EITS_PROJECT_ID unless --all or --project was given explicitly
-      if [[ $_all_flag -eq 0 && $_project_flag -eq 0 && -n "$_list_project" ]]; then
+      # Project scope: always inject EITS_PROJECT_ID unless --project was given explicitly.
+      # --all only bypasses session scoping, not project scoping.
+      if [[ $_project_flag -eq 0 && -n "$_list_project" ]]; then
         qs="${qs}&project_id=$_list_project"
       fi
       local _resp; _resp=$(_curl "$BASE_URL/tasks?${qs#&}")

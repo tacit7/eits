@@ -5,10 +5,7 @@ export const KanbanKeyboard = {
       const tag = e.target.tagName
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.target.isContentEditable) return
 
-      if (e.key === "n" && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault()
-        this.pushEvent("toggle_new_task_drawer", {})
-      } else if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault()
         const searchInput = this.el.querySelector("input[name='query']")
         if (searchInput) searchInput.focus()

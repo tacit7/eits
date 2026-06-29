@@ -244,10 +244,10 @@ _parse_duration() {
 # Table renderers — accept raw API JSON on stdin or as $1
 _tbl_sessions() {
   local data="${1:-$(cat)}"
-  local count; count=$(echo "$data" | jq '[.sessions[]?] | length')
+  local count; count=$(echo "$data" | jq '[(.results // .sessions)[]?] | length')
   printf '%-10s  %-38s  %-6s  %s\n' "STATUS" "NAME" "ID" "AGE"
   printf '%-10s  %-38s  %-6s  %s\n' "----------" "--------------------------------------" "------" "---"
-  echo "$data" | jq -r '.sessions[]? | [
+  echo "$data" | jq -r '(.results // .sessions)[]? | [
     (.status // "-"),
     (.name // "(unnamed)"),
     ((.id) | tostring),

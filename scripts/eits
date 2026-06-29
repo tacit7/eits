@@ -787,20 +787,18 @@ TASKS_HELP
           *) die "unknown flag: $1" ;;
         esac
       done
-      # Session scope: default to current session, unless overridden by --all, --session,
-      # --mine, --agent, --tag, or an explicit --project (explicit project = project-wide).
+      # Session scope: default to current session unless --all, --session, --mine, --agent, or --tag.
       local _silent_scope=0
-      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 && $_tag_flag -eq 0 && $_project_flag -eq 0 ]]; then
+      if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 && $_tag_flag -eq 0 ]]; then
         local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
         if [[ -n "$_self" ]]; then
           qs="${qs}&session_id=$_self"
           _silent_scope=1
         fi
       fi
-      # Project scope: inject the project unless --all (all projects).
-      # Uses explicit --project, then EITS_PROJECT_ID, then falls back to path=$PWD
-      # (server resolves project from path — one round-trip, no pre-resolution).
-      if [[ $_all_flag -eq 0 ]]; then
+      # Project scope: always inject project (--all only bypasses session scope, not project).
+      # Uses explicit --project, then EITS_PROJECT_ID, then falls back to path=$PWD.
+      if [[ $_project_flag -eq 0 ]]; then
         if [[ -n "$_list_project" ]]; then
           qs="${qs}&project_id=$_list_project"
         else

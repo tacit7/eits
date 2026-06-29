@@ -73,7 +73,7 @@ defmodule EyeInTheSky.Tasks.Queries do
       |> maybe_since(opts)
       |> maybe_stale_since(opts)
       |> order_by([t], desc: t.priority, asc: t.created_at)
-      |> preload([:state, :tags])
+      |> preload([:state, :tags, :sessions])
       |> QueryBuilder.maybe_limit(opts)
       |> QueryBuilder.maybe_offset(opts)
       |> Repo.all()

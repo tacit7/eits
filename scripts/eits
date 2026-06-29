@@ -265,19 +265,19 @@ _tbl_sessions() {
 _tbl_tasks() {
   local data="${1:-$(cat)}"
   local count; count=$(echo "$data" | jq '[.tasks[]?] | length')
-  printf '%-14s  %-44s  %-6s  %s\n' "STATE" "TITLE" "ID" "AGENT"
-  printf '%-14s  %-44s  %-6s  %s\n' "--------------" "--------------------------------------------" "------" "------"
+  printf '%-14s  %-44s  %-6s  %s\n' "STATE" "TITLE" "ID" "SESSION"
+  printf '%-14s  %-44s  %-6s  %s\n' "--------------" "--------------------------------------------" "------" "-------"
   echo "$data" | jq -r '.tasks[]? | [
     (.state // "-"),
     (.title // "(untitled)"),
     ((.id) | tostring),
-    ((.agent_id // "") | tostring)
-  ] | @tsv' | while IFS=$'\t' read -r state title id agent_id; do
+    ((.session_id // "") | tostring)
+  ] | @tsv' | while IFS=$'\t' read -r state title id session_id; do
     printf '%-14s  %-44s  %-6s  %s\n' \
       "$(_trunc "$state" 14)" \
       "$(_trunc "$title" 44)" \
       "$id" \
-      "$agent_id"
+      "$session_id"
   done
   if [[ -n "$count" ]]; then printf '\n%s task(s)\n' "$count"; fi
 }

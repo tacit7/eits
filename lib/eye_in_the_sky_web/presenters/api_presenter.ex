@@ -15,7 +15,10 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       priority: task.priority,
       state: loaded_field(task.state, :name),
       state_id: task.state_id,
-      agent_id: task.agent_id,
+      session_id: case task.sessions do
+        sessions when is_list(sessions) -> sessions |> List.first() |> then(&(&1 && &1.id))
+        _ -> nil
+      end,
       due_at: task.due_at,
       created_at: format_dt(task.created_at),
       updated_at: format_dt(task.updated_at)

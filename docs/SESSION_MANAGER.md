@@ -16,7 +16,8 @@ The main `Sessions` module now acts as a facade, delegating to three specialized
 |--------|---|---|
 | **`Sessions.Query`** | Read-only session retrieval and queries | `list_sessions/1`, `get_session/1`, `list_active_sessions/0`, `get_session_by_uuid/1`, `list_sessions_for_agent/2`, `list_project_sessions_with_agent/2`, `count_and_ids_for_project/1`, etc. |
 | **`Sessions.StatusTransitions`** | State-changing operations and transitions | `set_session_idle/1`, `end_session/2`, `archive_session/1`, `unarchive_session/1`, `update_session/2`, `batch_delete_sessions/1` |
-| **`Sessions.Events`** | PubSub event broadcasting | `broadcast_session_updated/1`, `broadcast_session_completed/1`, `broadcast_session_waiting/1`, `broadcast_status_side_effects/2` (delegates to `BroadcastEvents`) |
+| **`Sessions.OverviewQueries`** | Complex/aggregated queries for the overview page | `list_sessions_for_scope/1`, `count_sessions_by_status/1`, etc. (file: `sessions/queries.ex`) |
+| **`Sessions.Events`** | PubSub event broadcasting (implementations inline, no BroadcastEvents delegate) | `broadcast_session_updated/1`, `broadcast_session_completed/1`, `broadcast_session_waiting/1`, `broadcast_status_side_effects/2` |
 | **`Sessions`** (facade) | Unified public API and delegation | Delegates to Query, StatusTransitions, and Events; maintains backward compatibility |
 
 ### Design Rationale
@@ -1561,7 +1562,7 @@ PubSub broadcasts for session status updates are emitted from the Sessions conte
 
 ### Broadcast Functions via Sessions.Events
 
-All broadcast helpers are accessed through `EyeInTheSky.Sessions.Events`, which delegates to `EyeInTheSky.Sessions.BroadcastEvents`:
+All broadcast helpers are accessed through `EyeInTheSky.Sessions.Events`. As of commit 76580e6d, `Sessions.BroadcastEvents` has been deleted — its implementations are now inline in `Sessions.Events` directly (no more `defdelegate` indirection).
 
 | Function | Events fired | Use case |
 |---|---|---|
@@ -1570,7 +1571,7 @@ All broadcast helpers are accessed through `EyeInTheSky.Sessions.Events`, which 
 | `Sessions.broadcast_session_waiting(session)` | `agent_stopped` + `session_updated` | Session parked to waiting |
 | `Sessions.broadcast_status_side_effects(session, status)` | `agent_stopped` or `agent_working` + `session_updated` | Status PATCH with arbitrary new status |
 
-(Note: Callers use the `Sessions.*` public API; the Events sub-module is an internal delegation layer.)
+(Note: Callers use the `Sessions.*` public API; the Events sub-module is an internal implementation detail.)
 
 `broadcast_session_completed` and `broadcast_session_waiting` are implemented via a private helper `broadcast_with_session_updated/2` that accepts the primary event function and always appends `session_updated` (commit ffda2181):
 
@@ -1583,33 +1584,21 @@ end
 
 ### Sessions.Events Sub-Module
 
-The `Sessions.Events` module is a delegation layer for PubSub broadcasting. It exports functions that delegate to `BroadcastEvents`:
+`Sessions.Events` contains the PubSub broadcast implementations directly. `Sessions.BroadcastEvents` was deleted in commit 76580e6d — its functions were merged into `Sessions.Events`, removing the `defdelegate` layer that previously existed:
 
 ```elixir
-# Sessions.Events module
+# Before (deleted): Sessions.Events delegated to BroadcastEvents
 defdelegate broadcast_session_updated(session), to: BroadcastEvents
-defdelegate broadcast_session_completed(session), to: BroadcastEvents
-defdelegate broadcast_session_waiting(session), to: BroadcastEvents
-defdelegate broadcast_status_side_effects(session, status), to: BroadcastEvents
+
+# After: implementations are inline in Sessions.Events
+def broadcast_session_updated(session), do: Phoenix.PubSub.broadcast(...)
 ```
 
-This structure keeps the Sessions context boundary clear: data mutations in `StatusTransitions`, event broadcasts in `Events` (delegating to `BroadcastEvents`).
+This structure keeps the Sessions context boundary clear: data mutations in `StatusTransitions`, event broadcasts in `Events`.
 
-### Sessions.BroadcastEvents Sub-Module
+### Sessions.OverviewQueries Sub-Module
 
-Session PubSub broadcasts are implemented in `EyeInTheSky.Sessions.BroadcastEvents` (30 lines, commit 1779981c), which contains pure event broadcast functions — no database queries, no side effects beyond PubSub.
-
-**Functions in BroadcastEvents:**
-
-| Function | Broadcasts | Purpose |
-|----------|----------|---------|
-| `broadcast_session_updated(session)` | `session_updated` | Generic status update after PATCH or mutation |
-| `broadcast_session_completed(session)` | `session_completed` + `session_updated` | Session marked completed |
-| `broadcast_session_waiting(session)` | `agent_stopped` + `session_updated` | Session parked to waiting |
-| `broadcast_status_side_effects(session, status)` | `agent_stopped`/`agent_working` + `session_updated` | Status PATCH with arbitrary new status |
-
-**Private helper:**
-`broadcast_with_session_updated/2` — applies a primary event function then always appends `session_updated`, ensuring all broadcast operations always include the updated session state for UI consistency.
+Complex aggregated queries used by the overview/project sessions page live in `Sessions.OverviewQueries` (file: `lib/eye_in_the_sky/sessions/queries.ex`). The module was renamed from `Sessions.Queries` to `Sessions.OverviewQueries` in commit 76580e6d to distinguish it from `Sessions.Query` (basic CRUD reads). All `defdelegate` lines in `sessions.ex` were updated accordingly.
 
 ### set_session_idle/1
 

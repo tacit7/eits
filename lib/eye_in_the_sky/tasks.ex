@@ -182,6 +182,25 @@ defmodule EyeInTheSky.Tasks do
   end
 
   @doc """
+  Creates a task and atomically applies associations (session link, tags, tag IDs).
+  Rolls back the task insert if any association write fails.
+  `attrs` is the task attribute map; `params` is the raw string-keyed params map
+  passed straight through to `associate_task/2`.
+  """
+  def create_with_associations(attrs, params) do
+    Repo.transaction(fn ->
+      case create_task(attrs) do
+        {:ok, task} ->
+          associate_task(task, params)
+          task
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc """
   Quick-creates a task with just a title, state, and project.
   Used by kanban quick-add and similar minimal-input flows.
   """

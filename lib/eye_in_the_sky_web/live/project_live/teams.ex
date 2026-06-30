@@ -272,6 +272,53 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   end
 
   @impl true
+  def handle_event("exit_select_mode", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:selected_ids, MapSet.new())
+     |> assign(:select_mode, false)}
+  end
+
+  @impl true
+  def handle_event(
+        "select_range",
+        %{"anchor_id" => anchor_id, "target_id" => target_id, "ordered_ids" => raw_ordered_ids},
+        socket
+      ) do
+    visible_ids =
+      socket.assigns.all_teams
+      |> Enum.map(&to_string(&1.id))
+      |> MapSet.new()
+
+    ordered_ids =
+      raw_ordered_ids
+      |> Enum.map(&to_string/1)
+      |> Enum.filter(&MapSet.member?(visible_ids, &1))
+
+    anchor = to_string(anchor_id)
+    target = to_string(target_id)
+
+    anchor_idx = Enum.find_index(ordered_ids, &(&1 == anchor))
+    target_idx = Enum.find_index(ordered_ids, &(&1 == target))
+
+    if is_nil(anchor_idx) or is_nil(target_idx) do
+      {:noreply, socket}
+    else
+      range_ids =
+        ordered_ids
+        |> Enum.slice(min(anchor_idx, target_idx)..max(anchor_idx, target_idx))
+        |> MapSet.new()
+
+      selected = MapSet.union(socket.assigns.selected_ids, range_ids)
+
+      {:noreply,
+       socket
+       |> assign(:selected_ids, selected)
+       |> assign(:select_mode, MapSet.size(selected) > 0)}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="overflow-y-auto px-4 sm:px-6 py-6" style="scrollbar-width: none;">
@@ -314,32 +361,42 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           }
         />
       <% else %>
-        <%= if @select_mode do %>
-          <div class="flex items-center gap-2 px-4 py-2 bg-base-200 rounded-lg mb-2">
-            <div phx-click="toggle_select_all" class="cursor-pointer flex items-center">
+        <%= if MapSet.size(@selected_ids) > 0 do %>
+          <% all_selected = MapSet.size(@selected_ids) == length(@all_teams) && length(@all_teams) > 0 %>
+          <% some_selected = MapSet.size(@selected_ids) > 0 && !all_selected %>
+          <div class="mt-2 flex items-center gap-3 pl-4 sm:pl-0 py-1.5">
+            <div phx-click="toggle_select_all" class="cursor-pointer sm:-ml-5">
               <.square_checkbox
                 id="teams-select-all"
-                checked={MapSet.size(@selected_ids) == length(@all_teams) && length(@all_teams) > 0}
+                checked={all_selected}
+                indeterminate={some_selected}
                 aria-label="Select all teams"
               />
             </div>
-
-            <span class="text-sm text-base-content/70 flex-1">
+            <span class="text-mini text-base-content/50 font-medium">
               {MapSet.size(@selected_ids)} selected
             </span>
-
             <button
               phx-click="delete_selected"
-              class="btn btn-ghost btn-sm text-error/70 hover:text-error hover:bg-error/10 gap-1"
+              class="btn btn-ghost btn-xs text-warning/70 hover:text-warning hover:bg-warning/10 gap-1 min-h-[44px] min-w-[44px]"
             >
-              <.icon name="hero-trash-mini" class="size-3.5" /> Archive
+              <.icon name="hero-archive-box-mini" class="size-3.5" /> Archive
+            </button>
+            <button
+              phx-click="exit_select_mode"
+              class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+              aria-label="Exit select mode"
+            >
+              <.icon name="hero-x-mark" class="size-4" />
             </button>
           </div>
         <% end %>
+        <div phx-hook="ShiftSelect" id="teams-list-shift-wrapper" data-list-id="team-list">
         <div id="team-list" phx-update="stream" class="divide-y divide-base-content/8" data-vim-list>
           <div
             :for={{dom_id, team} <- @streams.team_list}
             id={dom_id}
+            data-row-id={team.id}
             class={[
               "py-1 group/row flex items-center gap-1 relative",
               if(MapSet.member?(@selected_ids, to_string(team.id)),
@@ -415,6 +472,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
               </button>
             </div>
           </div>
+        </div>
         </div>
       <% end %>
     </div>

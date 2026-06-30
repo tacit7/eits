@@ -293,7 +293,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex flex-col overflow-hidden px-4 sm:px-6 lg:px-8 py-6" phx-hook="GlobalKeydown" id="project-tasks-page">
+    <div class="flex flex-col overflow-hidden px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]" phx-hook="GlobalKeydown" id="project-tasks-page">
       <div class="max-w-4xl mx-auto">
         <%!-- Mobile-only action bar --%>
         <div class="mb-4 flex md:hidden items-center justify-end gap-2">

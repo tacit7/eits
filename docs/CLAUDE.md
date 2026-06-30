@@ -1,5 +1,6 @@
 # docs/ — Documentation Index
 
+- [BULK_SELECT_PATTERN.md](BULK_SELECT_PATTERN.md) — Bulk select/delete pattern for LiveView list pages: stream reinsert gotcha, ShiftSelect hook wiring, all handlers
 - [TERMINAL_PTY.md](TERMINAL_PTY.md) — PTY terminal: erlexec gotchas, data flow, xterm.js hook, supervision, embedding guide
 - [SECURITY.md](SECURITY.md) — Auth, session handling, rate limiting, secrets, transport security
 - [REST_API.md](REST_API.md) — Full API endpoint reference

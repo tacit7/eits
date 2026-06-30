@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
   @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
+  alias EyeInTheSkyWeb.TopBar.Helpers
 
   use Phoenix.VerifiedRoutes,
     endpoint: EyeInTheSkyWeb.Endpoint,
@@ -70,16 +71,16 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
       id="notes-sort-dropdown"
       phx-update="ignore"
       phx-hook="SortDropdown"
-      data-label={sort_label(@sort_by)}
+      data-label={Helpers.sort_label(@sort_by, sort_options(), "Newest")}
       class="dropdown"
     >
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort:
-        <span class="js-sort-label">{sort_label(@sort_by)}</span>
+        <span class="js-sort-label">{Helpers.sort_label(@sort_by, sort_options(), "Newest")}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
-        <%= for {value, label} <- [{"newest", "Newest"}, {"oldest", "Oldest"}] do %>
+        <%= for {value, label} <- sort_options() do %>
           <li>
             <button
               phx-click="sort_notes"
@@ -105,6 +106,10 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
     """
   end
 
-  defp sort_label("oldest"), do: "Oldest"
-  defp sort_label(_), do: "Newest"
+  defp sort_options do
+    [
+      {"newest", "Newest"},
+      {"oldest", "Oldest"}
+    ]
+  end
 end

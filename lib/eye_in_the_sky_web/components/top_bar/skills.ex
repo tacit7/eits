@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.TopBar.Skills do
   @moduledoc false
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
+  alias EyeInTheSkyWeb.TopBar.Helpers
 
   use Phoenix.VerifiedRoutes,
     endpoint: EyeInTheSkyWeb.Endpoint,
@@ -84,11 +85,11 @@ defmodule EyeInTheSkyWeb.TopBar.Skills do
       id="skills-sort-dropdown"
       phx-update="ignore"
       phx-hook="SortDropdown"
-      data-label={sort_label(@sort_by)}
+      data-label={Helpers.sort_label(@sort_by, sort_options())}
       class="dropdown"
     >
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-        Sort: <span class="js-sort-label">{sort_label(@sort_by)}</span>
+        Sort: <span class="js-sort-label">{Helpers.sort_label(@sort_by, sort_options())}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
       <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[140px]">
@@ -130,7 +131,4 @@ defmodule EyeInTheSkyWeb.TopBar.Skills do
 
   defp type_label(v), do: Enum.find_value(type_options(), "All", fn {k, l} -> k == v && l end)
   defp scope_label(v), do: Enum.find_value(scope_options(), "All", fn {k, l} -> k == v && l end)
-
-  defp sort_label(v),
-    do: Enum.find_value(sort_options(), "Name A–Z", fn {k, l} -> k == v && l end)
 end

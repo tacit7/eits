@@ -49,9 +49,14 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.Claude.SDK.Registry,
           # ETS-backed registry for tracking running Gemini stream tasks
           EyeInTheSky.Gemini.StreamHandler.Registry,
-          # DynamicSupervisor for persistent agent workers
+          # DynamicSupervisor for persistent agent workers.
+          # max_children caps concurrent live AgentWorkers; tune via
+          # AGENT_SUPERVISOR_MAX_CHILDREN (see config/runtime.exs). Default 50.
           {DynamicSupervisor,
-           name: EyeInTheSky.Claude.AgentSupervisor, strategy: :one_for_one, max_children: 50},
+           name: EyeInTheSky.Claude.AgentSupervisor,
+           strategy: :one_for_one,
+           max_children:
+             Application.get_env(:eye_in_the_sky, :agent_supervisor_max_children, 50)},
           # DynamicSupervisor for per-channel chat workers
           {DynamicSupervisor, name: EyeInTheSky.Claude.ChatSupervisor, strategy: :one_for_one},
           # Oban job processing (includes Cron plugin for JobDispatcherWorker)

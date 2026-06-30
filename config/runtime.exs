@@ -66,6 +66,13 @@ end
 # network-reachable.
 config :eye_in_the_sky, :disable_auth, get_env.("DISABLE_AUTH") in ~w(true 1)
 
+# Max concurrent AgentWorker processes under EyeInTheSky.Claude.AgentSupervisor.
+# Each active session holds one worker (kept alive 30 min past last activity),
+# so raise this when running many parallel agents/teams. Default 50.
+config :eye_in_the_sky,
+       :agent_supervisor_max_children,
+       String.to_integer(get_env.("AGENT_SUPERVISOR_MAX_CHILDREN") || "50")
+
 # WebAuthn — extra allowed origins (comma-separated).
 webauthn_extra_raw =
   get_env.("WEBAUTHN_EXTRA_ORIGINS")

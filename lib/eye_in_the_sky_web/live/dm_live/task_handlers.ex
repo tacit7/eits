@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
   import EyeInTheSkyWeb.ControllerHelpers, only: [maybe_opt: 3]
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Settings
   alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
@@ -37,7 +38,11 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
     task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
 
     opts =
-      [description: task.title, instructions: task_prompt, model: "sonnet"]
+      [
+        description: task.title,
+        instructions: task_prompt,
+        model: Settings.get("default_model") || "sonnet"
+      ]
       |> maybe_opt(:project_id, project_id)
       |> maybe_opt(:project_path, project_path)
 

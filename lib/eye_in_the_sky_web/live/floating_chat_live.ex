@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Settings
   alias EyeInTheSky.{Messages, Sessions}
 
   require Logger
@@ -90,7 +91,9 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   defp handle_fab_event("fab_send_message", %{"session_id" => session_id, "body" => body}, socket) do
     case Messages.send_to_session(session_id, body) do
       {:ok, session} ->
-        case AgentManager.continue_session(session.id, body, model: "sonnet") do
+        case AgentManager.continue_session(session.id, body,
+               model: Settings.get("default_model") || "sonnet"
+             ) do
           {:ok, _} ->
             {:halt, switch_active_session(socket, session.id)}
 
@@ -141,7 +144,9 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
        ) do
     case Messages.send_to_session(session_id, body) do
       {:ok, session} ->
-        case AgentManager.continue_session(session.id, body, model: "sonnet") do
+        case AgentManager.continue_session(session.id, body,
+               model: Settings.get("default_model") || "sonnet"
+             ) do
           {:ok, _} ->
             {:halt, socket}
 
@@ -336,5 +341,4 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
       statuses: socket.assigns.fab_statuses
     )
   end
-
 end

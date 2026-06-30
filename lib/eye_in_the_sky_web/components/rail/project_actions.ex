@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Components.Rail.Loader
 
   def handle_select_project(%{"project_id" => id_str}, socket) do
@@ -153,7 +154,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
            AgentManager.create_agent(
              project_id: project.id,
              project_path: project.path,
-             model: "sonnet",
+             model: Settings.get("default_model") || "sonnet",
              eits_workflow: "0"
            ) do
       {:noreply, push_navigate(socket, to: "/dm/#{session.id}")}

@@ -314,55 +314,94 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           }
         />
       <% else %>
+        <%= if @select_mode do %>
+          <div class="flex items-center gap-2 px-4 py-2 bg-base-200 rounded-lg mb-2">
+            <div phx-click="toggle_select_all" class="cursor-pointer flex items-center">
+              <.square_checkbox
+                id="teams-select-all"
+                checked={MapSet.size(@selected_ids) == length(@teams) && length(@teams) > 0}
+                aria-label="Select all teams"
+              />
+            </div>
+
+            <span class="text-sm text-base-content/70 flex-1">
+              {MapSet.size(@selected_ids)} selected
+            </span>
+
+            <button
+              phx-click="delete_selected"
+              class="btn btn-ghost btn-sm text-error/70 hover:text-error hover:bg-error/10 gap-1"
+            >
+              <.icon name="hero-trash-mini" class="size-3.5" /> Archive
+            </button>
+          </div>
+        <% end %>
         <div id="team-list" phx-update="stream" class="divide-y divide-base-content/8" data-vim-list>
           <div
             :for={{dom_id, team} <- @streams.team_list}
             id={dom_id}
-            class="py-1 group flex items-center gap-1"
+            class="py-1 group flex items-center gap-1 relative"
           >
-            <.link
-              navigate={
-                cond do
-                  @project -> ~p"/projects/#{@project.id}/teams/#{team.id}"
-                  team.project_id -> ~p"/projects/#{team.project_id}/teams/#{team.id}"
-                  true -> "#"
-                end
-              }
-              class="flex-1 py-2 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0 [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
-              data-vim-list-item
-            >
-              <.status_dot status={team_status_atom(team.members)} size="sm" />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-base-content/85 truncate">
-                    {team.name}
-                  </span>
-                  <%= if team.status == "archived" do %>
-                    <span class="text-[10px] text-base-content/35 font-medium">archived</span>
-                  <% end %>
-                </div>
-                <div class="flex items-center gap-1.5 mt-0.5 text-[10px] text-base-content/40 font-mono">
-                  <span>{length(team.members)} members</span>
-                  <%= if active_member_count(team.members) > 0 do %>
-                    <span class="text-base-content/20">·</span>
-                    <span class="text-success/70">{active_member_count(team.members)} active</span>
-                  <% end %>
-                  <%= if team.description do %>
-                    <span class="text-base-content/20">·</span>
-                    <span class="truncate font-sans text-base-content/35">{team.description}</span>
-                  <% end %>
-                </div>
-              </div>
-              <.icon name="hero-chevron-right" class="size-3.5 text-base-content/20 flex-shrink-0" />
-            </.link>
-            <button
-              phx-click="delete_team"
+            <div
+              class={[
+                "absolute left-0 top-0 bottom-0 flex items-center pl-2 z-10 transition-opacity",
+                if(@select_mode, do: "opacity-100", else: "opacity-0 group-hover:opacity-100")
+              ]}
+              phx-click="toggle_select"
               phx-value-id={team.id}
-              class="shrink-0 p-1.5 rounded text-base-content/20 hover:text-error/60 hover:bg-base-200 transition-colors opacity-0 group-hover:opacity-100 min-h-[36px] min-w-[36px] flex items-center justify-center"
-              title="Delete team"
             >
-              <.icon name="hero-trash" class="size-3.5" />
-            </button>
+              <.square_checkbox
+                id={"team-checkbox-#{team.id}"}
+                checked={MapSet.member?(@selected_ids, to_string(team.id))}
+                aria-label={"Select team #{team.name}"}
+              />
+            </div>
+
+            <div class={["flex items-center gap-1 w-full min-w-0 transition-all", if(@select_mode, do: "pl-7", else: "")]}>
+              <.link
+                navigate={
+                  cond do
+                    @project -> ~p"/projects/#{@project.id}/teams/#{team.id}"
+                    team.project_id -> ~p"/projects/#{team.project_id}/teams/#{team.id}"
+                    true -> "#"
+                  end
+                }
+                class="flex-1 py-2 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0 [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
+                data-vim-list-item
+              >
+                <.status_dot status={team_status_atom(team.members)} size="sm" />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-base-content/85 truncate">
+                      {team.name}
+                    </span>
+                    <%= if team.status == "archived" do %>
+                      <span class="text-[10px] text-base-content/35 font-medium">archived</span>
+                    <% end %>
+                  </div>
+                  <div class="flex items-center gap-1.5 mt-0.5 text-[10px] text-base-content/40 font-mono">
+                    <span>{length(team.members)} members</span>
+                    <%= if active_member_count(team.members) > 0 do %>
+                      <span class="text-base-content/20">·</span>
+                      <span class="text-success/70">{active_member_count(team.members)} active</span>
+                    <% end %>
+                    <%= if team.description do %>
+                      <span class="text-base-content/20">·</span>
+                      <span class="truncate font-sans text-base-content/35">{team.description}</span>
+                    <% end %>
+                  </div>
+                </div>
+                <.icon name="hero-chevron-right" class="size-3.5 text-base-content/20 flex-shrink-0" />
+              </.link>
+              <button
+                phx-click="delete_team"
+                phx-value-id={team.id}
+                class="shrink-0 p-1.5 rounded text-base-content/20 hover:text-error/60 hover:bg-base-200 transition-colors opacity-0 group-hover:opacity-100 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                title="Delete team"
+              >
+                <.icon name="hero-trash" class="size-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       <% end %>

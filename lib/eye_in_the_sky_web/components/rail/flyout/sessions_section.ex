@@ -256,7 +256,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
               class="inline-flex items-center gap-0.5 text-primary/55"
               title={@session.git_worktree_path}
             >
-              <.icon name="hero-code-bracket-mini" class="size-2.5" />
+              <.custom_icon name="lucide-git-branch" class="size-2.5" />
               {Path.basename(@session.git_worktree_path)}
             </span>
           <% end %>

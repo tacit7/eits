@@ -381,12 +381,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       </button>
       <div class="w-px h-4 bg-base-content/[0.10] flex-shrink-0" />
 
-      <%!-- Segment 3: Effort level picker — sits outside overflow clip so dropdown can escape --%>
-      <div class="dropdown dropdown-top" id="reasoning-pill-effort-dropdown">
+      <%!-- Segment 3: Effort level picker --%>
+      <%!-- phx-click must be on the .dropdown div (not the inner button) so that --%>
+      <%!-- focus stays on the child after the LiveView re-render, keeping the    --%>
+      <%!-- DaisyUI :focus-within selector true and the menu visible.             --%>
+      <div
+        class="dropdown dropdown-top"
+        phx-click="toggle_effort_menu"
+        id="reasoning-pill-effort-dropdown"
+      >
         <button
           type="button"
           tabindex="0"
-          phx-click="toggle_effort_menu"
           title="Reasoning effort"
           class="flex items-center gap-1 px-2 h-6 text-[11px] font-medium text-base-content/50 hover:text-base-content/75 transition-colors rounded-r-lg"
           id="reasoning-pill-effort-button"

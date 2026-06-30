@@ -54,6 +54,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     :watchdog_run_ref,
     :handler_pid,
     :idle_timer_ref,
+    # When the worker last became parked (idle, empty queue). Used to pick the
+    # coldest worker to evict when the AgentSupervisor is at capacity.
+    :idle_since,
     status: :idle,
     queue: [],
     stream: nil,
@@ -149,6 +152,19 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     end
   end
 
+  @doc """
+  Returns `{parked?, idle_since}` for an eviction decision, given a worker pid.
+
+  A worker is "parked" (safe to evict) only when it is idle with an empty queue —
+  no in-flight SDK call and no queued messages to lose. `idle_since` is when it
+  last became parked. A busy, dead, or unresponsive worker reports `{false, nil}`.
+  """
+  def eviction_snapshot(pid) when is_pid(pid) do
+    GenServer.call(pid, :eviction_snapshot, 250)
+  catch
+    :exit, _ -> {false, nil}
+  end
+
   defp with_worker(session_id, fun, default) do
     case Registry.lookup(@registry, {:session, session_id}) do
       [{pid, _}] -> fun.(pid)
@@ -210,6 +226,12 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   def handle_call(:get_stream_state, _from, state) do
     buf = if state.stream, do: StreamAssemblerDispatcher.buffer(state.stream), else: ""
     {:reply, buf, state}
+  end
+
+  @impl true
+  def handle_call(:eviction_snapshot, _from, state) do
+    parked? = state.status == :idle and state.queue == []
+    {:reply, {parked?, state.idle_since}, state}
   end
 
   @impl true

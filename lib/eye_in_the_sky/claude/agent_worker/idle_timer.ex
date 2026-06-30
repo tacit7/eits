@@ -14,7 +14,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.IdleTimer do
   def schedule(state) do
     state = cancel(state)
     ref = Process.send_after(self(), :idle_timeout, @idle_timeout_ms)
-    %{state | idle_timer_ref: ref}
+    %{state | idle_timer_ref: ref, idle_since: DateTime.utc_now()}
   end
 
   @doc "Cancel the idle timer if one is running."

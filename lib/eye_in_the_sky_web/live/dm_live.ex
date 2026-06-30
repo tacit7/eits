@@ -231,6 +231,17 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
+  def handle_event("toggle_plan_mode", _params, socket) do
+    opts = socket.assigns.session_cli_opts || []
+    new_opts =
+      if Keyword.get(opts, :plan, false) do
+        Keyword.delete(opts, :plan)
+      else
+        Keyword.put(opts, :plan, true)
+      end
+    {:noreply, assign(socket, :session_cli_opts, new_opts)}
+  end
+
   def handle_event("set_notify_on_stop", params, socket),
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 

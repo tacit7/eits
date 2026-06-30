@@ -116,69 +116,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
   end
 
   # ---------------------------------------------------------------------------
-  # gemini_models/0
-  # ---------------------------------------------------------------------------
-
-  describe "gemini_models/0" do
-    test "returns a non-empty list" do
-      assert ModelHelpers.gemini_models() != []
-    end
-
-    test "every entry is a {binary, binary} tuple" do
-      for {value, label} <- ModelHelpers.gemini_models() do
-        assert is_binary(value)
-        assert is_binary(label)
-      end
-    end
-
-    test "no duplicate values" do
-      values = ModelHelpers.gemini_models() |> Enum.map(&elem(&1, 0))
-      assert Enum.uniq(values) == values
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # gemini_models_with_meta/0
-  # ---------------------------------------------------------------------------
-
-  describe "gemini_models_with_meta/0" do
-    test "returns a non-empty list" do
-      assert ModelHelpers.gemini_models_with_meta() != []
-    end
-
-    test "every entry is a 4-element tuple with binary fields" do
-      for entry <- ModelHelpers.gemini_models_with_meta() do
-        assert tuple_size(entry) == 4
-
-        {value, label, description, color} = entry
-        assert is_binary(value)
-        assert is_binary(label)
-        assert is_binary(description)
-        assert is_binary(color)
-      end
-    end
-
-    test "values match the base gemini_models/0 list" do
-      base_values = ModelHelpers.gemini_models() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
-
-      meta_values =
-        ModelHelpers.gemini_models_with_meta() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
-
-      assert meta_values == base_values
-    end
-  end
-
-  # ---------------------------------------------------------------------------
   # models_for_provider/1
   # ---------------------------------------------------------------------------
 
   describe "models_for_provider/1" do
     test "\"codex\" returns codex models" do
       assert ModelHelpers.models_for_provider("codex") == ModelHelpers.codex_models()
-    end
-
-    test "\"gemini\" returns gemini models" do
-      assert ModelHelpers.models_for_provider("gemini") == ModelHelpers.gemini_models()
     end
 
     test "\"claude\" returns claude models" do
@@ -212,14 +155,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert Enum.all?(slugs, &is_binary/1)
     end
 
-    test "returns a list of binaries for gemini" do
-      slugs = ModelHelpers.valid_model_slugs("gemini")
-      assert is_list(slugs)
-      assert Enum.all?(slugs, &is_binary/1)
-    end
-
     test "no duplicate slugs for any provider" do
-      for provider <- ["claude", "codex", "gemini", nil, "unknown"] do
+      for provider <- ["claude", "codex", nil, "unknown"] do
         slugs = ModelHelpers.valid_model_slugs(provider)
         assert Enum.uniq(slugs) == slugs, "duplicates for provider #{inspect(provider)}"
       end
@@ -262,7 +199,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     test "already-full slug passes through unchanged" do
       assert ModelHelpers.normalize_model_alias("claude-opus-4-7") == "claude-opus-4-7"
       assert ModelHelpers.normalize_model_alias("gpt-5.5") == "gpt-5.5"
-      assert ModelHelpers.normalize_model_alias("gemini-2.5-pro") == "gemini-2.5-pro"
+      assert ModelHelpers.normalize_model_alias("gpt-5.1-codex-mini") == "gpt-5.1-codex-mini"
     end
 
     test "nil returns default sonnet slug" do
@@ -283,10 +220,6 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.default_model_for("codex") == "gpt-5.5"
     end
 
-    test "\"gemini\" returns gemini-2.5-flash" do
-      assert ModelHelpers.default_model_for("gemini") == "gemini-2.5-flash"
-    end
-
     test "\"claude\" returns claude-opus-4-7" do
       assert ModelHelpers.default_model_for("claude") == "claude-opus-4-7"
     end
@@ -304,9 +237,6 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.default_model_for("codex") in ModelHelpers.valid_model_slugs("codex")
     end
 
-    test "default for gemini is in valid_model_slugs" do
-      assert ModelHelpers.default_model_for("gemini") in ModelHelpers.valid_model_slugs("gemini")
-    end
   end
 
   # ---------------------------------------------------------------------------
@@ -323,11 +253,6 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     test "known codex slug returns its label" do
       assert ModelHelpers.model_display_name("gpt-5.5") == "GPT-5.5"
       assert ModelHelpers.model_display_name("gpt-5.4-mini") == "GPT-5.4 Mini"
-    end
-
-    test "known gemini slug returns its label" do
-      assert ModelHelpers.model_display_name("gemini-2.5-pro") == "Gemini 2.5 Pro"
-      assert ModelHelpers.model_display_name("gemini-2.5-flash") == "Gemini 2.5 Flash"
     end
 
     test "short alias \"opus\" returns \"Opus 4.7\"" do

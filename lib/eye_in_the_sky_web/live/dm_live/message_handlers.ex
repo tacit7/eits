@@ -18,7 +18,6 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   alias EyeInTheSky.Claude.SessionImporter
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
-  alias EyeInTheSky.Gemini.SessionImporter, as: GeminiImporter
   alias EyeInTheSky.Messages
   alias EyeInTheSky.Repo
   alias EyeInTheSkyWeb.DmLive.MessageGrouper
@@ -106,30 +105,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       "codex" ->
         sync_codex_session_file(socket)
 
-      "gemini" ->
-        sync_gemini_session_file(socket)
-
       _ ->
         sync_claude_session_file(socket)
-    end
-  end
-
-  defp sync_gemini_session_file(socket) do
-    session_id = socket.assigns.session_id
-    session_uuid = socket.assigns.session_uuid
-
-    project_path =
-      case SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent) do
-        {:ok, path} -> path
-        _ -> nil
-      end
-
-    case GeminiImporter.sync(session_uuid, project_path, session_id) do
-      {:ok, %{inserted: _, updated: _} = counts} ->
-        {:ok, socket, counts}
-
-      {:error, reason} ->
-        {:error, reason}
     end
   end
 
@@ -185,9 +162,6 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
           case session.provider do
             "codex" ->
               sync_codex_async(session_id, session_uuid)
-
-            "gemini" ->
-              sync_gemini_async(session_id, session_uuid, session, agent)
 
             _ ->
               sync_claude_async(session_id, session_uuid, session, agent)
@@ -332,25 +306,6 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   end
 
   # Async-safe variants — take plain data, no socket. Used by load_messages_on_mount/1.
-
-  # Conditional auto-sync for Gemini:
-  # * DB has messages: skip to avoid duplicate inserts (UUID spaces differ).
-  # * DB is empty: full file sync so conversation history appears on first load.
-  defp sync_gemini_async(session_id, session_uuid, session, agent) do
-    db_count = EyeInTheSky.Messages.count_messages_for_session(session_id)
-
-    if db_count > 0 do
-      {:ok, %{inserted: 0, updated: 0}}
-    else
-      project_path =
-        case SessionHelpers.resolve_project_path(session, agent) do
-          {:ok, path} -> path
-          _ -> nil
-        end
-
-      GeminiImporter.sync(session_uuid, project_path, session_id)
-    end
-  end
 
   defp sync_claude_async(session_id, session_uuid, session, agent) do
     with {:ok, project_path} <- SessionHelpers.resolve_project_path(session, agent) do

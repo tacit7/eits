@@ -136,27 +136,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpersTest do
     end
   end
 
-  describe "handle_reload_from_session_file/2 — gemini provider" do
-    test "returns info flash without calling any file reader for gemini sessions" do
-      agent = Factory.create_agent()
-      session = Factory.create_session(agent, %{provider: "gemini"})
-
-      socket =
-        build_socket(%{
-          session: session,
-          session_id: session.id,
-          session_uuid: session.uuid,
-          agent: agent
-        })
-
-      load_fn = fn s -> s end
-
-      {:noreply, result} = DmExportHelpers.handle_reload_from_session_file(socket, load_fn)
-
-      assert result.assigns.flash["info"] =~ "database"
-    end
-  end
-
   describe "handle_reload_from_session_file/2 — claude provider, no project path" do
     test "returns error flash when session has no project path configured" do
       agent = Factory.create_agent()

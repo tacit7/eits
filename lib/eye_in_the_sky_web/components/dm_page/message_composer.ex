@@ -278,24 +278,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
                         </a>
                       </li>
                     <% end %>
-                  <% @provider == "gemini" -> %>
-                    <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Gemini</li>
-                    <%= for {model, label, desc, color} <- ModelHelpers.gemini_models_with_meta() do %>
-                      <li>
-                        <a
-                          phx-click="select_model"
-                          phx-value-model={model}
-                          phx-value-effort=""
-                          class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                        >
-                          <.icon name="hero-sparkles" class={"size-4 #{color}"} />
-                          <div>
-                            <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                            <div class="text-mini text-base-content/40">{desc}</div>
-                          </div>
-                        </a>
-                      </li>
-                    <% end %>
                   <% true -> %>
                     <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
                     <%= for {model, label, desc, color} <- ModelHelpers.claude_models_with_meta() do %>
@@ -502,14 +484,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
             <span class="text-xs text-base-content/40 font-mono">
               {format_number(@context_used)} / {format_number(@context_window)}
             </span>
-            <%!--
-              Session-level total_cost_usd cache is intentionally hidden for
-              Gemini sessions for now. Per-message metrics still render in
-              the bubble footer. The cache + backfill code stays in place
-              (see Sessions.increment_usage_cache, mix gemini.backfill_metadata)
-              so we can flip this back on when we trust the numbers.
-            --%>
-            <%= if @total_cost > 0 and @provider != "gemini" do %>
+            <%= if @total_cost > 0 do %>
               <span class="text-xs font-mono text-base-content/40">
                 {format_cost(@total_cost)}
               </span>

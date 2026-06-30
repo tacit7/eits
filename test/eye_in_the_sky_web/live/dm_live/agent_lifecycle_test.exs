@@ -30,16 +30,10 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycleTest do
            "Expected push_event '#{event_name}' to be in #{inspect(events)}"
   end
 
-  # sync_and_reload/1 → sync_messages_from_session_file/1 → sync_gemini_session_file/1
-  # accesses socket.assigns.session_uuid and socket.assigns.agent (for resolve_project_path).
-  # Tests that use gemini provider must supply both assigns. Use gemini_session_with_agent/0
-  # to get {session, agent} pair, then build_socket with session_uuid + agent included.
-  defp gemini_session(session), do: %{session | provider: "gemini"}
-
   defp gemini_session_with_agent do
     agent = Factory.create_agent()
     session = Factory.create_session(agent)
-    {gemini_session(session), agent}
+    {session, agent}
   end
 
   describe "handle_claude_response/3" do

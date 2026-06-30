@@ -41,9 +41,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
       "codex" ->
         reload_codex_session(socket, load_messages_fn)
 
-      "gemini" ->
-        reload_gemini_session(socket, load_messages_fn)
-
       _ ->
         reload_claude_session(socket, load_messages_fn)
     end
@@ -75,15 +72,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to reload: #{inspect(reason)}")}
     end
-  end
-
-  defp reload_gemini_session(socket, load_messages_fn) do
-    # Gemini sessions are continuously synced from the database via BulkImporter.
-    # File-based reload is unreliable because the Gemini CLI uses its own session
-    # UUID space that differs from ours — attempting a file read consistently
-    # returns :not_found and confuses users. Just reload from the database directly.
-    socket = load_messages_fn.(socket)
-    {:noreply, put_flash(socket, :info, "Messages loaded from database")}
   end
 
   defp reload_codex_session(socket, load_messages_fn) do

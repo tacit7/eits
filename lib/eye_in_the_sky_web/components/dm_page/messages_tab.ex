@@ -92,6 +92,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <div id="grouped-messages-stream" phx-update="stream">
                 <div :for={{dom_id, item} <- @streams.grouped_messages} id={dom_id}>
                   <.tool_cluster :if={item.type == :cluster} events={item.data} meta={item.meta} />
+                  <.cluster_summary :if={item.type == :cluster_summary} data={item.data} />
                   <.message_item
                     :if={item.type == :message}
                     message={item.data}
@@ -421,9 +422,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           &#9658;
         </span>
         <span class="text-nano font-mono">{@meta.count} tool events</span>
-        <%= for {type, count} <- @meta.type_counts do %>
+        <%= for group <- @meta.tool_groups do %>
           <span class="rounded-sm px-1 py-px bg-base-content/[0.05] text-nano font-mono text-[var(--text-disabled)]">
-            {type} &times;{count}
+            {group.name} &times;{group.count}
           </span>
         <% end %>
         <%= if @meta.duration_ms do %>
@@ -435,14 +436,55 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           {relative_time(@meta.first_at)}
         </span>
       </summary>
-      <div class="pl-5 mt-0.5 space-y-px">
-        <%= for event <- @events do %>
-          <div class="max-w-full px-1">
-            <.message_body message={event} compact={true} />
-          </div>
+      <div class="pl-2 mt-0.5 space-y-0.5">
+        <%= for group <- @meta.tool_groups do %>
+          <details class="group/tool">
+            <summary class="flex items-center gap-1.5 px-1 py-0.5 cursor-pointer list-none text-[var(--text-disabled)] hover:text-[var(--text-muted)] select-none">
+              <span class="group-open/tool:rotate-90 transition-transform duration-100 text-[9px]">
+                &#9658;
+              </span>
+              <span class="text-nano font-mono">{group.name}</span>
+              <span class="text-nano font-mono opacity-60">&times;{group.count}</span>
+            </summary>
+            <div class="pl-4 mt-0.5 space-y-px">
+              <%= for event <- group.events do %>
+                <div class="max-w-full px-1">
+                  <.message_body message={event} compact={true} />
+                </div>
+              <% end %>
+            </div>
+          </details>
         <% end %>
       </div>
     </details>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # cluster_summary component
+  # ---------------------------------------------------------------------------
+
+  attr :data, :map, required: true
+
+  defp cluster_summary(%{data: %{files: [], cost_usd: nil}} = assigns) do
+    ~H""
+  end
+
+  defp cluster_summary(assigns) do
+    ~H"""
+    <div class="pl-[33px] pb-1">
+      <span class="text-nano font-mono text-[var(--text-disabled)]">
+        <%= if @data.files != [] do %>
+          <span>{length(@data.files)} {if length(@data.files) == 1, do: "file", else: "files"} &middot; </span>
+          <span>{@data.files |> Enum.map(&Path.basename/1) |> Enum.join(", ")}</span>
+        <% end %>
+        <%= if @data.cost_usd do %>
+          <span class={[@data.files != [] && "ml-1"]}>
+            ${:erlang.float_to_binary(@data.cost_usd, decimals: 4)}
+          </span>
+        <% end %>
+      </span>
+    </div>
     """
   end
 end

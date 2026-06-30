@@ -558,9 +558,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                 class="btn btn-ghost btn-sm justify-start gap-2 text-left w-full"
               >
                 <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
-                <span class={["badge badge-xs shrink-0", session_status_class(s.status)]}>
-                  {s.status}
-                </span>
+                <.status_badge status={s.status} size="xs" class="shrink-0" label={s.status} />
               </button>
             <% end %>
             <%= if @filtered_sessions == [] do %>
@@ -700,16 +698,4 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     socket
   end
 
-  # Canvas-specific session badge colors. Differs from status_badge_color/1 in
-  # core_components.ex (which uses :working=success/:waiting=info for agent
-  # display). For canvas session pills, "working"=primary (blue/active),
-  # "waiting"=warning (amber).
-  defp session_status_class("working"), do: "badge-primary"
-  defp session_status_class("idle"), do: "badge-ghost"
-  defp session_status_class("waiting"), do: "badge-warning"
-  defp session_status_class("completed"), do: "badge-success"
-  defp session_status_class("failed"), do: "badge-error"
-  defp session_status_class("compacting"), do: "badge-warning"
-  defp session_status_class("archived"), do: "badge-ghost"
-  defp session_status_class(_), do: "badge-ghost"
 end

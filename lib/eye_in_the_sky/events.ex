@@ -69,6 +69,9 @@ defmodule EyeInTheSky.Events do
   @doc "Subscribe to real-time stream deltas for a session."
   def subscribe_dm_stream(session_id), do: sub("dm:#{session_id}:stream")
 
+  @doc "Unsubscribe from real-time stream deltas for a session."
+  def unsubscribe_dm_stream(session_id), do: unsub("dm:#{session_id}:stream")
+
   @doc "Subscribe to queued-prompt updates for a session."
   def subscribe_dm_queue(session_id), do: sub("dm:#{session_id}:queue")
 

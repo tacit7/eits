@@ -45,6 +45,9 @@
     inspectMessage = null
   }
 
+  // Per-session live streaming state: { [sessionId]: { content, tool } }
+  let streamStates = {}
+
   onMount(() => {
     live.handleEvent('chat:message_appended', ({ message }) => {
       liveMessages = [...liveMessages, message]
@@ -61,6 +64,16 @@
     live.handleEvent('chat:messages_prepended', ({ messages: older }) => {
       liveMessages = [...older, ...liveMessages]
       loadingOlder = false
+    })
+
+    live.handleEvent('chat:stream_update', ({ session_id, content, tool }) => {
+      streamStates = { ...streamStates, [String(session_id)]: { content, tool } }
+    })
+
+    live.handleEvent('chat:stream_cleared', ({ session_id }) => {
+      const next = { ...streamStates }
+      delete next[String(session_id)]
+      streamStates = next
     })
   })
 
@@ -1054,23 +1067,36 @@
     </button>
   {/if}
 
-  <!-- Typing indicator -->
+  <!-- Live stream preview + working indicator -->
   {#if workingMembers.length > 0}
-    <div class="flex-shrink-0 px-4 py-1">
-      <div class="flex items-center gap-2 text-xs text-base-content/50">
-        <span class="inline-flex gap-[3px]">
-          <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
-        </span>
-        <span>
-          {#if workingMembers.length === 1}
-            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> is working
-          {:else if workingMembers.length === 2}
-            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> and <span class="font-medium text-base-content/50">{workingMembers[1].name}</span> are working
-          {:else}
-            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> and {workingMembers.length - 1} others are working
-          {/if}
-        </span>
-      </div>
+    <div class="flex-shrink-0 px-4 py-1.5 space-y-1.5">
+      {#each workingMembers as member (member.id)}
+        {@const state = streamStates[String(member.id)]}
+        {#if state && (state.content || state.tool)}
+          <!-- Stream preview bubble for this member -->
+          <div class="rounded-xl border border-base-content/10 bg-base-200/60 px-3 py-2 text-xs text-base-content/70 max-w-[720px]">
+            <div class="flex items-center gap-1.5 mb-1">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse flex-shrink-0"></span>
+              <span class="font-medium text-base-content/50 font-mono">{member.name}</span>
+              {#if state.tool}
+                <span class="ml-auto font-mono text-[10px] text-primary/60 bg-primary/10 px-1.5 py-0.5 rounded">{state.tool}</span>
+              {/if}
+            </div>
+            {#if state.content}
+              <p class="font-mono text-[11px] text-base-content/50 leading-relaxed line-clamp-3 whitespace-pre-wrap break-words">
+                {state.content.length > 300 ? '…' + state.content.slice(-300) : state.content}
+              </p>
+            {/if}
+          </div>
+        {:else}
+          <!-- Plain pulsing dot when no stream content yet -->
+          <div class="flex items-center gap-2 text-xs text-base-content/50">
+            <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
+            <span class="font-medium text-base-content/50">{member.name}</span>
+            <span>is working</span>
+          </div>
+        {/if}
+      {/each}
     </div>
   {/if}
 

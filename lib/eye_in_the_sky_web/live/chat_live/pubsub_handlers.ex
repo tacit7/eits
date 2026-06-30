@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.ChannelMessages
+  alias EyeInTheSky.Channels
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
@@ -46,7 +47,11 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
         |> ChannelMessages.preload_for_serialization()
         |> ChatPresenter.serialize_message()
 
-      channels = load_channels(socket.assigns.project_id)
+      channels =
+        case Channels.list_channels_for_project(socket.assigns.project_id) do
+          channels when is_list(channels) -> channels
+          _ -> []
+        end
       unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
 
       Logger.info("📬 Pushed delta for message id=#{message.id}")
@@ -67,13 +72,4 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
   # Private helpers
 
   defp get_session_id(socket), do: socket.assigns[:session_id]
-
-  defp load_channels(project_id) do
-    alias EyeInTheSky.Channels
-
-    case Channels.list_channels_for_project(project_id) do
-      channels when is_list(channels) -> channels
-      _ -> []
-    end
-  end
 end

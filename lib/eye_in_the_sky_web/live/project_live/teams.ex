@@ -30,8 +30,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         socket
         |> assign(:all_teams, teams)
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+        |> assign(:selected_ids, MapSet.new())
+        |> assign(:select_mode, false)
       else
         socket
+        |> assign(:selected_ids, MapSet.new())
+        |> assign(:select_mode, false)
       end
 
     {:ok, socket}
@@ -62,8 +66,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         socket
         |> assign(:all_teams, teams)
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+        |> assign(:selected_ids, MapSet.new())
+        |> assign(:select_mode, false)
       else
         socket
+        |> assign(:selected_ids, MapSet.new())
+        |> assign(:select_mode, false)
       end
 
     {:ok, socket}

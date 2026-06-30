@@ -39,10 +39,14 @@ SESSION_UUID="${EITS_SESSION_UUID:-}"
 
 EITS_URL="${EITS_URL:-http://localhost:5001/api/v1}"
 
+EITS_API_KEY="${EITS_API_KEY:-}"
+auth_header=""
+[ -n "$EITS_API_KEY" ] && auth_header="Authorization: Bearer ${EITS_API_KEY}"
+
 curl -sf --max-time 5 \
   -X PATCH "${EITS_URL}/sessions/${SESSION_UUID}" \
   -H "Content-Type: application/json" \
-  -H "X-Agent-ID: ${EITS_AGENT_UUID:-}" \
+  ${auth_header:+-H "$auth_header"} \
   -d "{\"worktree_path\": \"${worktree_path}\"}" \
   >/dev/null 2>&1 || true
 

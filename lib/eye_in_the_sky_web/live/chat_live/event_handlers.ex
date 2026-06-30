@@ -181,14 +181,19 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
 
     case MessageReactions.toggle_reaction(message_id, session_id, emoji) do
       {:ok, _action} ->
-        updated =
-          message_id
-          |> String.to_integer()
-          |> Messages.get_message!()
-          |> Repo.preload([:session, :reactions, :attachments])
-          |> ChatPresenter.serialize_message()
+        case parse_int(message_id) do
+          nil ->
+            {:noreply, put_flash(socket, :error, "Invalid message ID")}
 
-        {:noreply, push_event(socket, "chat:message_updated", %{message: updated})}
+          id ->
+            updated =
+              id
+              |> Messages.get_message!()
+              |> Repo.preload([:session, :reactions, :attachments])
+              |> ChatPresenter.serialize_message()
+
+            {:noreply, push_event(socket, "chat:message_updated", %{message: updated})}
+        end
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to add reaction")}

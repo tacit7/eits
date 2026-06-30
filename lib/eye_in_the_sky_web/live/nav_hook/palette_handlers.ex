@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   require Logger
 
   import Phoenix.LiveView, only: [push_event: 3]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.{Agents, Messages, Notes, Projects, Repo, Sessions, Tasks}
   alias EyeInTheSky.Agents.AgentManager
@@ -322,7 +323,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
     # Extract project_id from path: /projects/5/sessions/uuid/chat -> 5
     project_id =
       case Regex.run(~r{^/projects/(\d+)}, current_path) do
-        [_, id] -> String.to_integer(id)
+        [_, id] -> parse_int(id)
         _ -> nil
       end
 
@@ -368,7 +369,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
 
     project_id =
       case Regex.run(~r{^/projects/(\d+)}, current_path) do
-        [_, id] -> String.to_integer(id)
+        [_, id] -> parse_int(id)
         _ -> nil
       end
 

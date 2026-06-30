@@ -217,6 +217,61 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   end
 
   @impl true
+  def handle_event("toggle_select", %{"id" => id}, socket) do
+    id = to_string(id)
+    selected_ids = socket.assigns.selected_ids
+
+    selected_ids =
+      if MapSet.member?(selected_ids, id) do
+        MapSet.delete(selected_ids, id)
+      else
+        MapSet.put(selected_ids, id)
+      end
+
+    select_mode = MapSet.size(selected_ids) > 0
+
+    {:noreply,
+     socket
+     |> assign(:selected_ids, selected_ids)
+     |> assign(:select_mode, select_mode)}
+  end
+
+  @impl true
+  def handle_event("toggle_select_all", _params, socket) do
+    all_ids =
+      socket.assigns.all_teams
+      |> Enum.map(&to_string(&1.id))
+      |> MapSet.new()
+
+    {selected_ids, select_mode} =
+      if MapSet.size(socket.assigns.selected_ids) == MapSet.size(all_ids) do
+        {MapSet.new(), false}
+      else
+        {all_ids, true}
+      end
+
+    {:noreply,
+     socket
+     |> assign(:selected_ids, selected_ids)
+     |> assign(:select_mode, select_mode)}
+  end
+
+  @impl true
+  def handle_event("delete_selected", _params, socket) do
+    ids =
+      socket.assigns.selected_ids
+      |> MapSet.to_list()
+      |> Enum.map(&String.to_integer/1)
+
+    Teams.batch_delete_teams(ids)
+
+    {:noreply,
+     socket
+     |> assign(:selected_ids, MapSet.new())
+     |> assign(:select_mode, false)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="overflow-y-auto px-4 sm:px-6 py-6" style="scrollbar-width: none;">

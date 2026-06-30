@@ -114,6 +114,47 @@ WHERE status = 'processing'
 ORDER BY inserted_at;
 ```
 
+## Supervisor Capacity, Idle Timeout, and Eviction
+
+Workers run under `EyeInTheSky.Claude.AgentSupervisor` — a `DynamicSupervisor`
+(`strategy: :one_for_one`, children are `restart: :transient`). One live worker
+per active session; concurrency is bounded by `max_children`.
+
+**Capacity (configurable).** Default cap is **50**, overridable at runtime via the
+`AGENT_SUPERVISOR_MAX_CHILDREN` env var with no recompile. The value is read in
+`config/runtime.exs` into `:agent_supervisor_max_children` and applied to the
+child spec in `application.ex`.
+
+**Idle timeout (30 min).** A worker schedules an idle timer whenever it becomes
+**parked** — `status: :idle` with an empty queue. If no job arrives within
+`@idle_timeout_ms` (`AgentWorker.IdleTimer`, 30 min), it exits `:normal`. Because
+the child is `:transient`, a normal exit is **not** restarted, so the slot is
+freed. This is the steady-state reclaim path.
+
+**Eviction on capacity.** When `DynamicSupervisor.start_child` returns
+`{:error, :max_children}`, `SessionBridge` does **not** drop the message. It:
+
+1. Scans the registry and asks each worker for an `eviction_snapshot/1` →
+   `{parked?, idle_since}`. A worker is *parked* only when idle with an empty
+   queue (`idle_since` is stamped in `IdleTimer.schedule/1`).
+2. Terminates the worker parked **longest** (smallest `idle_since`) via
+   `terminate_child` (synchronous — the slot is genuinely free on return).
+3. Retries `start_child` **once** (guarded by an `evicted?` flag to prevent
+   eviction loops).
+
+**No message is lost.** A parked worker has no in-flight SDK call and nothing
+queued, and its conversation context is persisted (`session.uuid` +
+`provider_conversation_id`). The evicted session transparently respawns and
+resumes on its next message.
+
+**Genuinely-full fallback.** If every worker is busy (`:running` / `:retry_wait`,
+or idle with a non-empty queue), there is nothing safe to evict — the
+`{:error, :max_children}` surfaces to the caller. That is a real concurrency
+limit; raise the cap. Eviction is the safety net, not a substitute for capacity.
+
+> Eviction only ever targets parked workers, so in-flight and queued work is
+> never discarded. Verified in `test/eye_in_the_sky/claude/agent_worker/eviction_test.exs`.
+
 ## Agent Result Save Timing
 
 `AgentWorkerEvents.on_sdk_completed/3` saves the agent result **synchronously** via a direct call, not via `Task.start/1` or other async dispatch.
@@ -156,6 +197,9 @@ When `on_sdk_completed/3` persists the assistant reply via `record_incoming_repl
 |------|---------------|
 | `lib/eye_in_the_sky/claude/agent_worker.ex` | Queue logic, `normalize_context/1`, `admit_idle/2`, `handle_transient_error/1`, `handle_systemic_error/2`, message trace-id generation and propagation |
 | `lib/eye_in_the_sky/claude/agent_worker/retry_policy.ex` | Retry scheduling, queue drain on exhaustion |
+| `lib/eye_in_the_sky/claude/agent_worker/idle_timer.ex` | 30-min idle timeout; stamps `idle_since` when a worker parks |
+| `lib/eye_in_the_sky/agents/agent_manager/session_bridge.ex` | `start_child` spawn/retry, `evict_parked_worker/0` (evict longest-parked worker on `:max_children`) |
+| `lib/eye_in_the_sky/application.ex` | `AgentSupervisor` child spec; reads `:agent_supervisor_max_children` |
 | `lib/eye_in_the_sky/agent_worker_events.ex` | `on_queue_drained/4`, `on_current_job_failed/2`, `classify_failure_reason/1`, broadcast isolation via TaskSupervisor |
 | `lib/eye_in_the_sky/messages.ex` | `mark_processing/1`, `mark_delivered/1`, `mark_failed/2` |
 | `lib/eye_in_the_sky/messages/trace.ex` | `Trace.new/0` generates url-safe trace IDs, `Trace.set_in_logger/1` attaches to Logger metadata |

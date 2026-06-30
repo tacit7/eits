@@ -10,7 +10,7 @@
 - [DM_FEATURES.md](DM_FEATURES.md) — DM/messaging features
 - [SESSION_MANAGER.md](SESSION_MANAGER.md) — Session lifecycle
 - [WORKERS.md](WORKERS.md) — Background workers
-- [AGENT_WORKER_QUEUE.md](AGENT_WORKER_QUEUE.md) — AgentWorker queue, message lifecycle states (pending→processing→delivered/failed), error paths
+- [AGENT_WORKER_QUEUE.md](AGENT_WORKER_QUEUE.md) — AgentWorker queue, message lifecycle states (pending→processing→delivered/failed), error paths, supervisor capacity + worker eviction
 - [KANBAN.md](KANBAN.md) — Kanban board
 - [COMMAND_PALETTE.md](COMMAND_PALETTE.md) — Command palette
 - [chat-mention-workflow.md](chat-mention-workflow.md) — Chat @mention system

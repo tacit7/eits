@@ -98,6 +98,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     prev_role={item.prev_role}
                     agent={@agent}
                     session={@session}
+                    search_query={@message_search_query}
                   />
                 </div>
               </div>
@@ -177,6 +178,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :prev_role, :any, default: nil
   attr :agent, :map, default: nil
   attr :session, :map, default: nil
+  attr :search_query, :string, default: ""
 
   defp message_item(assigns) do
     role =
@@ -250,7 +252,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           <%= if @is_tool_event do %>
             <%!-- Tool events: subordinate rendering — compact + muted --%>
             <div class="pl-[33px]">
-              <.message_body message={@message} compact={true} />
+              <.message_body message={@message} compact={true} search_query={@search_query} />
             </div>
           <% else %>
             <%= if @role == :user do %>
@@ -274,7 +276,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   "px-3 py-2 bg-[var(--prompt-bg)] border border-[var(--border-subtle)] rounded-md text-[12.5px] leading-[1.5] break-words text-base-content/60",
                   @show_header && "ml-7"
                 ]}>
-                  <.message_body message={@message} compact={false} />
+                  <.message_body message={@message} compact={false} search_query={@search_query} />
                 </div>
                 <.message_attachments attachments={@message.attachments || []} />
               </div>
@@ -323,7 +325,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   @tier not in [:primary, :secondary] &&
                     "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content"
                 ]}>
-                  <.message_body message={@message} compact={false} />
+                  <.message_body message={@message} compact={false} search_query={@search_query} />
                 </div>
                 <.message_attachments attachments={@message.attachments || []} />
                 <%!-- Metadata footer — only on primary tier --%>

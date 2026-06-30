@@ -296,8 +296,8 @@
   const DOMPURIFY_CONFIG = {
     ALLOWED_TAGS: ['p', 'strong', 'em', 'b', 'i', 'code', 'pre', 'ul', 'ol', 'li',
                    'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'a',
-                   'span', 'hr', 'del', 's'],
-    ALLOWED_ATTR: ['class', 'href', 'target', 'rel']
+                   'span', 'hr', 'del', 's', 'details', 'summary'],
+    ALLOWED_ATTR: ['class', 'href', 'target', 'rel', 'open']
   }
 
   function renderMarkdownBody(body, nameMap = {}) {
@@ -312,6 +312,50 @@
       const display = name ? escapeHtml(name) : token
       return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary" data-session-id="${token}">@${display}</span>`
     })
+  }
+
+  // Splits an agent message body into text and tool_call segments.
+  // Blank lines (outside fenced code blocks) delimit segments.
+  // Pattern A: > `ToolName` rest...
+  // Pattern B: Tool: ToolName\ncontent
+  function parseBodySegments(body) {
+    if (!body) return []
+    const lines = body.split('\n')
+    let inFence = false
+    const chunks = []
+    let current = []
+    for (const line of lines) {
+      if (line.trimStart().startsWith('```')) inFence = !inFence
+      if (!inFence && line.trim() === '') {
+        if (current.length > 0) { chunks.push(current.join('\n')); current = [] }
+      } else {
+        current.push(line)
+      }
+    }
+    if (current.length > 0) chunks.push(current.join('\n'))
+    return chunks.map(chunk => {
+      const matchA = chunk.match(/^>\s+`([^`]+)`(.*)/)
+      if (matchA) return { type: 'tool_call', name: matchA[1], rest: matchA[2].trim() }
+      const matchB = chunk.match(/^Tool:\s+(\S+)\n?([\s\S]*)/)
+      if (matchB) return { type: 'tool_call', name: matchB[1], rest: matchB[2].trim() }
+      return { type: 'text', text: chunk }
+    })
+  }
+
+  // Returns sanitized HTML for a compact collapsible tool call row.
+  function renderToolCall(name, rest) {
+    const stripped = (rest || '').replace(/^\s*[{[]\s*/, '').replace(/\s*[}\]]\s*$/, '')
+    const preview = stripped.slice(0, 80) + (stripped.length > 80 ? '…' : '')
+    const escapedName = escapeHtml(name)
+    const escapedPreview = escapeHtml(preview)
+    const escapedFull = escapeHtml(rest || '')
+    return '<details class="my-0.5 rounded border border-base-content/[0.08] overflow-hidden">' +
+      '<summary class="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none text-xs font-mono text-base-content/50 hover:text-base-content/70 hover:bg-base-content/[0.05] transition-colors">' +
+      '<span class="text-primary/60 font-semibold">' + escapedName + '</span>' +
+      (escapedPreview ? '<span class="ml-1.5 text-base-content/35 truncate max-w-xs">' + escapedPreview + '</span>' : '') +
+      '</summary>' +
+      '<pre class="px-2 py-1.5 text-xs font-mono text-base-content/50 bg-base-200 overflow-x-auto whitespace-pre-wrap break-all m-0">' + escapedFull + '</pre>' +
+      '</details>'
   }
 
   function truncate(str, max = 10) {
@@ -786,9 +830,29 @@
                   {/if}
 
                   <div class="max-w-[580px]">
+                    {#if message.sender_role === 'agent' && message.metadata?.thinking}
+                      {@const thinking = message.metadata.thinking}
+                      <details
+                        class="border-l-2 border-primary/50 bg-base-200/60 rounded overflow-hidden mb-2"
+                        open={!!(searchQuery && thinking.toLowerCase().includes(searchQuery.toLowerCase()))}
+                      >
+                        <summary class="flex items-center gap-1.5 px-2 py-1.5 cursor-pointer select-none text-xs text-base-content/50 hover:text-base-content/70 transition-colors">
+                          <span aria-hidden="true">✦</span>
+                          <span class="font-medium">Thinking</span>
+                        </summary>
+                        <pre class="px-2.5 py-2 text-xs font-mono text-base-content/50 overflow-x-auto whitespace-pre-wrap break-words">{thinking}</pre>
+                      </details>
+                    {/if}
                     <div class="message-body mt-2 text-sm leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
-                        {@html renderMarkdownBody(message.body, mentionNameMap)}
+                        {@const segments = parseBodySegments(message.body)}
+                        {#each segments as seg}
+                          {#if seg.type === 'tool_call'}
+                            {@html DOMPurify.sanitize(renderToolCall(seg.name, seg.rest), DOMPURIFY_CONFIG)}
+                          {:else}
+                            {@html renderMarkdownBody(seg.text, mentionNameMap)}
+                          {/if}
+                        {/each}
                       {:else if searchQuery.trim()}
                         <!-- highlightMatch escapes via escapeHtml() before injecting <mark>; do not bypass -->
                         <span class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words whitespace-pre-wrap" contenteditable="false">{@html highlightMatch(message.body || '', searchQuery)}</span>

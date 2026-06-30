@@ -1001,6 +1001,89 @@ The SDK no longer forces `include_partial_messages: true`, allowing the session'
 
 ---
 
+## JobsLiveHandlers: Shared Jobs Event Delegation
+
+Extracted shared module unifying event handling across the two Jobs LiveView surfaces (ProjectLive.Jobs and OverviewLive.Jobs), eliminating ~80 lines of duplicated code.
+
+**Problem solved:** Both ProjectLive.Jobs and OverviewLive.Jobs had identical `handle_info` and `handle_event` clauses for job management (run_now, edit_job, delete_job, etc.) plus a catch-all relay to the JobsPage component. The differences were minimal: project_id context for ownership validation.
+
+**Solution:** `EyeInTheSkyWeb.Live.Shared.JobsLiveHandlers` exports four handler functions that both LiveViews delegate to, parameterized by `project_id` (nil for global, integer for scoped view).
+
+### Handler Functions
+
+**`handle_jobs_info/2`**
+- Delegates `handle_info/2` for all message types
+- Routes `:jobs_updated` and `:do_reload_jobs` to JobsPage component
+- Propagates `{:jobs_page_flash, level, msg}` flashes to parent socket
+- Catch-all matches any unknown message and returns noreply (no-op)
+
+**`handle_run_now/3`**
+- `handle_run_now(id, socket, project_id)` processes "run_now" button clicks
+- Parses job ID via `JobsHelpers.parse_job_id/1`
+- Validates ownership when `project_id != nil` (scoped view) — returns "Access denied" flash if mismatch
+- Calls `ScheduledJobs.run_now(int_id, project_id)` and flashes result
+
+**`handle_guarded_event/5`**
+- `handle_guarded_event(event, id_or_job_id, params, socket, project_id)` validates ownership before relaying
+- Used for: `edit_job`, `toggle_job`, `delete_job`, `expand_job`, `edit_schedule`
+- Parses ID, loads job, checks ownership (when `project_id != nil`), then sends component update via `send_update(JobsPage, id: "jobs-page", event_relay: {event, params})`
+- Returns flash on error; silent send_update on success
+
+**`handle_fallback_event/4`**
+- `handle_fallback_event(event, params, socket, project_id)` is the blanket catch-all for unguarded events
+- **Scoped view** (`project_id != nil`): relay all events to JobsPage component unconditionally
+- **Global view** (`project_id == nil`): whitelist-only — only relay if event is in `@forwarded_events`, else flash "Unknown event"
+- Whitelisted events: `new_job`, `cancel_form`, `change_job_type`, `change_schedule_type`, `validate_cron`, `save_job`, `confirm_run_job`, `cancel_run_job`, `toggle_claude_drawer`, `switch_tab`, `cancel_schedule`, `save_schedule`, `filter_jobs`, `toggle_job_select`, `select_all_jobs`, `bulk_enable`, `bulk_disable`, `clear_bulk_selection`
+
+**Why whitelist global?** The global (admin) view can see jobs from all projects. Refusing unknown events prevents accidental relay of internal or misspelled events that could enable privilege escalation or data leakage.
+
+### LiveView Integration
+
+Both LiveViews delegate three handle_event clauses and all handle_info to JobsLiveHandlers:
+
+```elixir
+# ProjectLive.Jobs
+def handle_info(msg, socket), do: JobsLiveHandlers.handle_jobs_info(msg, socket)
+
+def handle_event("run_now", %{"id" => id}, socket) do
+  JobsLiveHandlers.handle_run_now(id, socket, socket.assigns.project_id)
+end
+
+def handle_event(event, %{"id" => id} = params, socket)
+    when event in ["edit_job", "toggle_job", "delete_job", "expand_job"] do
+  JobsLiveHandlers.handle_guarded_event(event, id, params, socket, socket.assigns.project_id)
+end
+
+def handle_event(event, params, socket) do
+  JobsLiveHandlers.handle_fallback_event(event, params, socket, socket.assigns.project_id)
+end
+```
+
+OverviewLive.Jobs uses the same delegation pattern (with project_id = nil for global scope).
+
+### Component Assignment Fix
+
+`load_jobs/2` in `components/jobs_page.ex` now assigns `last_n_runs_map` for the project-scoped branch (both `all_project` and `all_global` jobs):
+
+```elixir
+|> assign(
+  :last_n_runs_map,
+  ScheduledJobs.last_n_runs_for_jobs(Enum.map(all_project ++ all_global, & &1.id))
+)
+```
+
+This was previously missing, causing the run-count chart to fail renders in the scoped view.
+
+**Code locations:**
+- `lib/eye_in_the_sky_web/live/shared/jobs_live_handlers.ex` — all four handler functions and `@forwarded_events` whitelist
+- `lib/eye_in_the_sky_web/live/project_live/jobs.ex` — delegation calls
+- `lib/eye_in_the_sky_web/live/overview_live/jobs.ex` — delegation calls
+- `lib/eye_in_the_sky_web/components/jobs_page.ex` — `load_jobs/2` last_n_runs_map assignment
+
+**Commits:** 3f621b4e (add OverviewLive.Jobs), 1194bf4f (extract JobsLiveHandlers, fix audit findings), 922f8f17 (merge)
+
+---
+
 ## Common Patterns
 
 ### Error Handling

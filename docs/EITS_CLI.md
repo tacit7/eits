@@ -71,6 +71,7 @@ eits sessions list [--search <q>] [--name <partial>] [--status <s>] \
   [--limit <n>] [--include-archived] [--with-tasks]
 # --agent-slug: filter by agent definition slug (e.g. "eits-cli-expert")
 # --agent: filter by agent UUID (mutually exclusive with --search/--status/--project/--mine)
+# API response structure: returns .results (sessions array); falls back to .sessions for backward compatibility
 
 eits sessions get <uuid>
 eits sessions get self                         # Use current $EITS_SESSION_UUID
@@ -128,10 +129,18 @@ eits sessions reopen [<uuid|self>]
 eits tasks list [--project <id>] [--session <uuid>] [--q <query>|--search <query>] \
   [--state <id>] [--state-name <todo|in-progress|done|in-review>] \
   [--agent <uuid>] [--mine|--assigned] [--created-by] [--all] [--limit <n>]
-# Default: lists only current session's tasks when EITS_SESSION_UUID is set
-# --all: override to list across all sessions
+# Default: lists current session's tasks AND scopes to current project (EITS_PROJECT_ID or path=$PWD fallback)
+# --all: bypass session scope only (list all sessions in current project; project scope always applies)
+# --project <id>: explicit project override disables implicit session scope (lists project-wide tasks)
 # --mine / --assigned: tasks where current session is the active executor (linked via task_sessions after claim)
 # --created-by: tasks created by the current session (via created_by_session_id)
+#
+# **Project Scoping Behavior:**
+# - Default: EITS_PROJECT_ID is injected into the query automatically
+# - When EITS_PROJECT_ID is unset, falls back to path=$PWD (server resolves project from filesystem path)
+# - --all bypasses session scope only — project scope always applies
+# - --project <id>: explicit project override removes automatic session-scope injection
+# - API response includes both session_id (from first linked session) and agent_id (task's assigned agent)
 
 eits tasks active [--json]
 eits tasks mine [--json]
@@ -209,6 +218,16 @@ eits tasks states
 ### Exit codes
 
 `tasks list` and other table-printing commands are safe to use in scripts with `set -euo pipefail`. The `[[ cond ]] && cmd` pattern was replaced with `if/fi` guards so empty-result branches no longer exit 1 under pipefail. This applies to `_tbl_tasks`, `_tbl_sessions`, `_tbl_notes`, `_tbl_commits`, `channels list`, and `channels members`.
+
+### tasks list output format
+
+CLI table output columns:
+- **STATE**: Task workflow state (To Do, In Progress, In Review, Done)
+- **TITLE**: Task title (truncated to 44 chars)
+- **ID**: Task numeric ID
+- **SESSION**: Session ID of the first linked session (from `task_sessions`). Blank if no sessions are linked.
+
+API JSON response includes both `session_id` (from first linked session) and `agent_id` (task's assigned agent UUID, if any) in the task object. The CLI table shows SESSION; use `--json` for full response with both fields.
 
 ### Workflow states
 
@@ -406,7 +425,7 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 - Aliases: opus, opus[1m], sonnet, sonnet[1m], haiku
 
 `--provider codex`:
-- gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
+- gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
 
 `--provider gemini`:
 - gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite

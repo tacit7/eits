@@ -237,7 +237,31 @@ IAM.attach_documents_to_agent_type("code-reviewer", [1, 2, 3])
 # {:ok, 2}  → 2 new attachments; doc already attached is skipped (ON CONFLICT DO NOTHING)
 ```
 
-Transactional. Cache invalidated only on full success.
+Builds all rows up front and calls `Repo.insert_all` in a single batch operation
+instead of looping with individual inserts. The `on_conflict: :nothing` and
+`conflict_target: [:agent_type, :document_id]` semantics are preserved to skip
+already-attached rows without raising constraint violations. Wrapped in `try/rescue`
+so error returns (invalid FKs, Postgres connection errors) propagate cleanly to callers.
+
+Cache invalidated only on full success.
+
+### Adding a Policy to a Document
+
+```elixir
+IAM.add_policy_to_document(document_id, policy_id)
+# {:ok, %DocumentPolicy{}} — policy attached to document
+# {:error, :document_not_found | :policy_not_found}
+```
+
+Validates that both the document and policy exist before creating the attachment.
+Uses explicit `case` statements for clarity:
+- If document doesn't exist, returns `{:error, :document_not_found}`
+- If policy doesn't exist, returns `{:error, :policy_not_found}`
+- Otherwise calls `do_insert_document_policy/2` to create the attachment
+
+This function is used when attaching a single policy to a document interactively,
+as opposed to `attach_documents_to_agent_type/2` which bulk-attaches multiple
+documents to an agent type.
 
 ### Source Metadata
 

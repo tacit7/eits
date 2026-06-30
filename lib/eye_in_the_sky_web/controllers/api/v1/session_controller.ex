@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   Query params: q, limit (default 20)
   """
   def index(conn, params) do
-    opts = build_session_filter_opts(params)
+    opts = Sessions.FilterParams.build(params)
     results = Sessions.list_sessions_filtered(opts)
 
     with_tasks = params["with_tasks"] in ["true", "1", true]
@@ -506,39 +506,4 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
   defp maybe_put_read_only(attrs, _), do: attrs
 
-  defp maybe_put_session_opt(opts, _key, nil), do: opts
-  defp maybe_put_session_opt(opts, _key, false), do: opts
-  defp maybe_put_session_opt(opts, key, value), do: Keyword.put(opts, key, value)
-
-  defp build_session_filter_opts(params) do
-    agent_int_id =
-      if params["agent_id"], do: resolve_agent_int_id(params["agent_id"]), else: nil
-
-    parent_session_int_id =
-      if params["parent_session_id"] do
-        case Sessions.resolve(params["parent_session_id"]) do
-          {:ok, s} -> s.id
-          _ -> nil
-        end
-      end
-
-    include_archived = params["include_archived"] in ["true", "1", true]
-    name = if params["name"] && params["name"] != "", do: params["name"]
-
-    agent_def_slug =
-      if params["agent_def_slug"] && params["agent_def_slug"] != "", do: params["agent_def_slug"]
-
-    [search_query: params["q"] || ""]
-    |> maybe_put_session_opt(
-      :project_id,
-      params["project_id"] && parse_int(params["project_id"], nil)
-    )
-    |> maybe_put_session_opt(:status_filter, params["status"])
-    |> maybe_put_session_opt(:agent_id, agent_int_id)
-    |> maybe_put_session_opt(:parent_session_id, parent_session_int_id)
-    |> maybe_put_session_opt(:include_archived, include_archived && true)
-    |> maybe_put_session_opt(:name_filter, name)
-    |> maybe_put_session_opt(:agent_def_slug, agent_def_slug)
-    |> Keyword.put(:limit, parse_int(params["limit"], 20))
-  end
 end

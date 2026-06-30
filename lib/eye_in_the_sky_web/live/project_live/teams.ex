@@ -219,6 +219,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   @impl true
   def handle_event("toggle_select", %{"id" => id}, socket) do
     id = to_string(id)
+    was_select_mode = socket.assigns.select_mode
     selected_ids = socket.assigns.selected_ids
 
     selected_ids =
@@ -230,10 +231,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     select_mode = MapSet.size(selected_ids) > 0
 
-    {:noreply,
-     socket
-     |> assign(:selected_ids, selected_ids)
-     |> assign(:select_mode, select_mode)}
+    socket =
+      socket
+      |> assign(:selected_ids, selected_ids)
+      |> assign(:select_mode, select_mode)
+
+    # When select_mode flips, reinsert all rows so checkboxes show/hide across the list
+    socket =
+      if select_mode != was_select_mode,
+        do: reinsert_all_teams(socket),
+        else: socket
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -250,10 +259,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         {all_ids, true}
       end
 
-    {:noreply,
-     socket
-     |> assign(:selected_ids, selected_ids)
-     |> assign(:select_mode, select_mode)}
+    socket =
+      socket
+      |> assign(:selected_ids, selected_ids)
+      |> assign(:select_mode, select_mode)
+      |> reinsert_all_teams()
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -273,10 +285,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
   @impl true
   def handle_event("exit_select_mode", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:selected_ids, MapSet.new())
-     |> assign(:select_mode, false)}
+    socket =
+      socket
+      |> assign(:selected_ids, MapSet.new())
+      |> assign(:select_mode, false)
+      |> reinsert_all_teams()
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -547,6 +562,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       {:error, _} ->
         {:noreply, socket}
     end
+  end
+
+  defp reinsert_all_teams(socket) do
+    Enum.reduce(socket.assigns.all_teams, socket, fn team, acc ->
+      stream_insert(acc, :team_list, team)
+    end)
   end
 
   defp active_member_count(members), do: Enum.count(members, &(&1.status == "active"))

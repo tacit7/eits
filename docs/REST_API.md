@@ -1189,6 +1189,60 @@ eits dm inbox --session 42 --since 2026-03-17T10:00:00Z
 
 ---
 
+### GET /api/v1/dm/:id
+
+Fetch a single DM by message ID and return its **full body** (the inbox list
+truncates bodies for table display; use this to read a message in full).
+
+**Path params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | integer | yes | Message ID (from the `id` field of `GET /api/v1/dm`) |
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session` | string or integer | no | Caller session (UUID or integer). May also be supplied via the `x-eits-session` request header. When present, the caller is verified to be the message's recipient. |
+
+**Recipient scoping:** if `session` (or the `x-eits-session` header) is provided
+and the caller is **not** the recipient (`to_session_id`), the request returns
+`403 Forbidden`. If no caller session is supplied, no recipient check is applied.
+
+**Response:** `200 OK`
+
+```json
+{
+  "id": 123,
+  "uuid": "msg-uuid",
+  "body": "Full untruncated message body...",
+  "from_session_id": 40,
+  "to_session_id": 42,
+  "inserted_at": "2026-03-17T10:30:00Z"
+}
+```
+
+**Errors:**
+
+| Status | When |
+|--------|------|
+| `400 Bad Request` | `id` is not an integer |
+| `403 Forbidden` | caller session supplied but is not the recipient |
+| `404 Not Found` | no message with that ID |
+
+**Example:**
+
+```bash
+curl localhost:5001/api/v1/dm/123
+curl "localhost:5001/api/v1/dm/123?session=42"
+curl -H "x-eits-session: 42" localhost:5001/api/v1/dm/123
+eits dm read 123          # human-readable
+eits dm read 123 --json   # machine-readable
+```
+
+---
+
 ### POST /api/v1/dm
 
 Send a message to an agent session. Rate-limited to protect against message injection flooding.

@@ -482,9 +482,15 @@ eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <is
 eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json]
 # List inbound DMs for a session (CLI-side inbox polling)
 # inbox is an alias for list
+# The table lists an ID column first — copy it into `eits dm read <id>`
 # --from: filter by sender (optional)
 # --since: return only messages inserted after ISO8601 timestamp (optional)
 # --since-session: filter to DMs received since this session started (suppresses stale DMs from prior resume sessions)
+
+eits dm read <id> [--json]
+# Print a single DM's FULL body by message ID (the inbox table truncates bodies).
+# Recipient-scoped: 403 if the caller session is not the message recipient.
+# --json: machine-readable {id, uuid, body, from_session_id, to_session_id, inserted_at}
 
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
 # Send a direct message to an agent session

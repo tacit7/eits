@@ -325,7 +325,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
     ~H"""
     <div
       class={[
-        "inline-flex items-center rounded-lg border overflow-hidden transition-colors",
+        "inline-flex items-center rounded-lg border transition-colors",
         if(@thinking_enabled and @is_claude,
           do: "border-primary/30 bg-primary/[0.04]",
           else: "border-base-content/[0.10] bg-base-content/[0.03]"
@@ -340,7 +340,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
           phx-click="toggle_thinking"
           title={if @thinking_enabled, do: "Thinking on — click to disable", else: "Enable extended thinking"}
           class={[
-            "flex items-center gap-1.5 px-2.5 h-6 text-[11px] font-medium transition-colors",
+            "flex items-center gap-1.5 px-2.5 h-6 text-[11px] font-medium transition-colors rounded-l-lg",
             if(@thinking_enabled,
               do: "text-primary hover:text-primary/80",
               else: "text-base-content/40 hover:text-base-content/65"
@@ -353,7 +353,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
         <div class="w-px h-4 bg-base-content/[0.10] flex-shrink-0" />
       <% else %>
         <%!-- Codex / Pi: always-on indicator, non-interactive --%>
-        <span class="flex items-center gap-1.5 px-2.5 h-6 text-[11px] font-medium text-base-content/40 select-none">
+        <span class="flex items-center gap-1.5 px-2.5 h-6 text-[11px] font-medium text-base-content/40 select-none rounded-l-lg">
           <.icon name="hero-sparkles" class="size-3 flex-shrink-0" />
           <span>Think</span>
         </span>
@@ -381,14 +381,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       </button>
       <div class="w-px h-4 bg-base-content/[0.10] flex-shrink-0" />
 
-      <%!-- Segment 3: Effort level picker --%>
+      <%!-- Segment 3: Effort level picker — sits outside overflow clip so dropdown can escape --%>
       <div class="dropdown dropdown-top" id="reasoning-pill-effort-dropdown">
         <button
           type="button"
           tabindex="0"
           phx-click="toggle_effort_menu"
           title="Reasoning effort"
-          class="flex items-center gap-1 px-2 h-6 text-[11px] font-medium text-base-content/50 hover:text-base-content/75 transition-colors"
+          class="flex items-center gap-1 px-2 h-6 text-[11px] font-medium text-base-content/50 hover:text-base-content/75 transition-colors rounded-r-lg"
           id="reasoning-pill-effort-button"
         >
           <span>{DmHelpers.effort_display_name(@selected_effort)}</span>

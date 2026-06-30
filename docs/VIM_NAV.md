@@ -27,6 +27,10 @@ The vim navigation system is modularized into four TypeScript files under `asset
 
 - **`vim_nav_hints.ts`** — Hint mode system. Exports `_generateHintLabels()` (generates alphabetic labels for list items), `createHintOverlay()` (builds the hint badge overlay DOM), and `filterHintBadges()` (filters badges on keystroke and updates visibility).
 
+### TypeScript Patterns
+
+**DOM type casting**: `vim_nav.ts` uses `querySelector()` / `querySelectorAll()` without type arguments, paired with `as` type casts for the result. This avoids svelte-check errors when tsconfig path mapping (`paths: { "*": ["../deps/*"] }`) interferes with lib.dom type resolution. Example: `list.querySelectorAll("[data-vim-list-item]") as HTMLElement[]` instead of `list.querySelectorAll<HTMLElement>("[data-vim-list-item]")`.
+
 ---
 
 ## Global (always active)
@@ -191,6 +195,21 @@ When a focused session is archived or deleted, vim-nav automatically refocuses t
 | `j` / `k` | Navigate task list |
 | `Enter` | Open focused task detail drawer |
 | `f f` | Toggle filter drawer |
+
+---
+
+## Kanban page
+
+The kanban page uses standard list navigation (`j`/`k`, `Enter`, etc.). There is no bare `n` key on the kanban page — it was removed to avoid conflicting with vim-nav's `Space n` chord for creating new items.
+
+| Keys | Action |
+|---|---|
+| `j` / `k` | Navigate task list |
+| `Enter` | Open focused task detail |
+| `{` / `}` | Jump between kanban columns (group separators) |
+| `Space n k` | Create new kanban task (uses Space leader, not bare `n`) |
+
+---
 
 ## Task navigation (projects page) — `route_suffix:/projects`
 

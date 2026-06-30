@@ -238,10 +238,10 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("toggle_plan_mode", _params, socket) do
     opts = socket.assigns.session_cli_opts || []
     new_opts =
-      if Keyword.get(opts, :plan, false) do
-        Keyword.delete(opts, :plan)
+      if Keyword.get(opts, :permission_mode) == "plan" do
+        Keyword.delete(opts, :permission_mode)
       else
-        Keyword.put(opts, :plan, true)
+        Keyword.put(opts, :permission_mode, "plan")
       end
     {:noreply, assign(socket, :session_cli_opts, new_opts)}
   end

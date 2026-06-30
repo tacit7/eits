@@ -319,7 +319,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
             <div phx-click="toggle_select_all" class="cursor-pointer flex items-center">
               <.square_checkbox
                 id="teams-select-all"
-                checked={MapSet.size(@selected_ids) == length(@teams) && length(@teams) > 0}
+                checked={MapSet.size(@selected_ids) == length(@all_teams) && length(@all_teams) > 0}
                 aria-label="Select all teams"
               />
             </div>

@@ -340,12 +340,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           <div
             :for={{dom_id, team} <- @streams.team_list}
             id={dom_id}
-            class="py-1 group flex items-center gap-1 relative"
+            class={[
+              "py-1 group/row flex items-center gap-1 relative",
+              if(MapSet.member?(@selected_ids, to_string(team.id)),
+                do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg",
+                else: ""
+              )
+            ]}
           >
             <div
               class={[
-                "absolute left-0 top-0 bottom-0 flex items-center pl-2 z-10 transition-opacity",
-                if(@select_mode, do: "opacity-100", else: "opacity-0 group-hover:opacity-100")
+                "p-1 absolute z-10 top-1/2 -translate-y-1/2",
+                "left-4 sm:left-[-0.875rem]",
+                if(@select_mode,
+                  do: "opacity-100 scale-100",
+                  else:
+                    "opacity-0 scale-75 group-hover/row:opacity-100 group-hover/row:scale-100 transition duration-100"
+                )
               ]}
               phx-click="toggle_select"
               phx-value-id={team.id}
@@ -353,11 +364,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
               <.square_checkbox
                 id={"team-checkbox-#{team.id}"}
                 checked={MapSet.member?(@selected_ids, to_string(team.id))}
+                checkbox_area={true}
                 aria-label={"Select team #{team.name}"}
               />
             </div>
 
-            <div class={["flex items-center gap-1 w-full min-w-0 transition-all", if(@select_mode, do: "pl-7", else: "")]}>
+            <div class={["flex items-center gap-1 w-full min-w-0", if(@select_mode, do: "pl-10 sm:pl-0", else: "")]}>
               <.link
                 navigate={
                   cond do

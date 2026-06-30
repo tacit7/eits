@@ -158,13 +158,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
             type="button"
             phx-click="toggle_plan_mode"
             title={
-              if Keyword.get(@session_cli_opts, :plan, false),
+              if Keyword.get(@session_cli_opts, :permission_mode) == "plan",
                 do: "Plan mode on — click to disable",
                 else: "Enable plan mode (agent will propose changes before acting)"
             }
             class={[
               "flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg transition-colors",
-              if(Keyword.get(@session_cli_opts, :plan, false),
+              if(Keyword.get(@session_cli_opts, :permission_mode) == "plan",
                 do: "text-warning bg-warning/10 hover:bg-warning/15",
                 else: "text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5"
               )

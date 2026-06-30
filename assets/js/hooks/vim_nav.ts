@@ -95,11 +95,8 @@ export const VimNav = {
   _quickDmTargetUuid: "" as string,
   _quickDmTargetName: "" as string,
   _quickDmComposeHandler: null as ((e: Event) => void) | null,
-  // Recent session cycling (c-o / c-i) — uses palette:recent-sessions backend data
-  _recentSessions: [] as Array<{ uuid: string; name: string }>,
+  // Recent session cycling (c-o / c-i) — cursor into the sessionStorage visit ring buffer
   _recentSessionIdx: -1 as number,
-  _recentSessionsFetchedAt: 0 as number,
-  _pendingRecentNav: null as ("prev" | "next") | null,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -145,14 +142,6 @@ export const VimNav = {
     this.handleEvent("vim:quick-dm-result", ({ ok, error }: { ok: boolean; error?: string }) => {
       this._hideQuickDm()
       if (!ok && error) console.warn("[vim-nav] quick DM failed:", error)
-    })
-    this.handleEvent("palette:recent-sessions-result", ({ sessions }: { sessions: Array<{ uuid: string; name: string }> }) => {
-      this._recentSessions = sessions
-      this._recentSessionsFetchedAt = Date.now()
-      if (this._pendingRecentNav) {
-        this._doNavigateRecent(this._pendingRecentNav)
-        this._pendingRecentNav = null
-      }
     })
     this._quickDmComposeHandler = (e: Event) => {
       const { uuid, name } = (e as CustomEvent).detail ?? {}
@@ -263,19 +252,12 @@ export const VimNav = {
         }
         return
       }
-      // Ctrl-O / Ctrl-I: cycle through recent sessions (sorted by last_activity_at).
-      // Ctrl-O goes to an older session (higher index in desc list).
-      // Ctrl-I goes to a more recent session (lower index).
+      // Ctrl-O / Ctrl-I: cycle through sessions YOU personally visited (sessionStorage ring buffer).
+      // Ctrl-O goes to the session visited before the current one.
+      // Ctrl-I goes to the session visited after (more recently).
       if (key === "o" || key === "i") {
         event.preventDefault()
-        const dir = key === "o" ? "prev" : "next"
-        const now = Date.now()
-        if (this._recentSessions.length === 0 || (now - this._recentSessionsFetchedAt) > 30_000) {
-          this._pendingRecentNav = dir
-          this.pushEvent("palette:recent-sessions", {})
-        } else {
-          this._doNavigateRecent(dir)
-        }
+        this._doNavigateRecent(key === "o" ? "prev" : "next")
         return
       }
     }
@@ -826,27 +808,32 @@ export const VimNav = {
   },
 
   _doNavigateRecent(dir: "prev" | "next") {
-    const sessions = this._recentSessions
+    // Read the visit ring buffer maintained by _recordSessionVisit (sessionStorage).
+    // Index 0 = most recently visited session. This tracks YOUR navigation, not global activity.
+    let sessions: Array<{ uuid: string; name: string }>
+    try {
+      sessions = JSON.parse(sessionStorage.getItem("vim-nav:recent-sessions") || "[]")
+    } catch { sessions = [] }
     if (!sessions.length) return
 
     const currentUuid = window.location.pathname.match(/^\/dm\/([0-9a-f-]{36})/)?.[1]
 
     if (this._recentSessionIdx === -1) {
-      // Anchor cursor to current session position, then step in the requested direction.
+      // First press: anchor cursor to current URL, then step in the requested direction.
       const foundIdx = currentUuid ? sessions.findIndex(s => s.uuid === currentUuid) : -1
       if (dir === "prev") {
-        // Go to an older session: step past current (or start at 0 if not in list).
+        // Go to a previously visited session (step backward in visit history).
         this._recentSessionIdx = foundIdx === -1 ? 0 : Math.min(foundIdx + 1, sessions.length - 1)
       } else {
-        // Go to a more recent session: step before current.
-        if (foundIdx <= 0) return  // already at most-recent or not in list — nothing newer
+        // Go to the session visited more recently than the current one.
+        if (foundIdx <= 0) return  // already at the most-recently-visited or not in history
         this._recentSessionIdx = foundIdx - 1
       }
     } else {
       if (dir === "prev") {
         this._recentSessionIdx = Math.min(this._recentSessionIdx + 1, sessions.length - 1)
       } else {
-        if (this._recentSessionIdx === 0) return  // already at most-recent
+        if (this._recentSessionIdx === 0) return  // already at most-recently-visited
         this._recentSessionIdx = this._recentSessionIdx - 1
       }
     }

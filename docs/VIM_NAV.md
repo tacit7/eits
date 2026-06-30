@@ -41,8 +41,8 @@ The vim navigation system is modularized into four TypeScript files under `asset
 | `:` | Command palette |
 | `[` | Go back (browser history) |
 | `]` | Go forward (browser history) |
-| `Ctrl-o` | Go to older recent session |
-| `Ctrl-i` | Go to newer recent session |
+| `Ctrl-o` | Go to previously visited session |
+| `Ctrl-i` | Go to more recently visited session |
 | `q` | Close flyout |
 | `/` | Focus search *(requires `data-vim-search` on page)* |
 
@@ -148,7 +148,7 @@ Active on any page with `data-vim-list`.
 
 **Numeric count prefix**: Type a number before `j`, `k`, or `G` to repeat the motion (`3j` moves down 3, `5k` moves up 5, `10G` jumps to item 10). The accumulated count is shown in the status bar. Pressing `Escape` or waiting 2s clears the count.
 
-**Recent session cycling (`Ctrl-o`/`Ctrl-i`)**: Navigates directly between sessions sorted by last activity (same data source as `Space f r s`). `Ctrl-o` jumps to an older session; `Ctrl-i` jumps to a more recently active one. The cursor re-anchors to your current session URL on every page navigation. The session list is fetched from the backend on first use and cached for 30 seconds. `Ctrl-i` is a no-op when you are already on the most recently active session.
+**Recent session cycling (`Ctrl-o`/`Ctrl-i`)**: Navigates through sessions YOU personally visited in this browser tab, in visit order (most-recently-visited first). `Ctrl-o` jumps to the session you visited before the current one. `Ctrl-i` jumps to the session you visited more recently (reverse direction). The cursor re-anchors to your current session URL on every page navigation. `Ctrl-i` is a no-op when you are already at the most recently visited session. History resets on page reload.
 
 **Half-page scroll (`Ctrl-d`/`Ctrl-u`)**: Moves focus by approximately half the visible list height. The step size is calculated from the list container's `clientHeight` divided by the first item's `offsetHeight`. Falls back to 1 if items have zero height (e.g., in jsdom). These bindings work in normal mode only and are ignored in insert mode or when the cursor is in an editable field.
 

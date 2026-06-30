@@ -38,15 +38,19 @@ Older Claude models (Opus 4.7, 4.6, 4.5, Sonnet 4.5, etc.) remain in `ModelConfi
 
 The following Codex models are available for agent spawning:
 
-| Model | Display Name | Description |
-|-------|--------------|-------------|
-| `gpt-5.3-codex` | GPT-5.3 Codex (Default) | Coding-optimized model · recommended for code generation and review |
-| `gpt-5.5` | GPT-5.5 | Frontier model for complex coding, research, and real-world work |
-| `gpt-5.2` | GPT-5.2 | Optimized for professional work and long-running agents |
-| `gpt-5.4` | GPT-5.4 | Strong model for everyday coding |
-| `gpt-5.4-mini` | GPT-5.4 Mini | Small, fast, and cost-efficient for simpler tasks |
+| Model | Display Name | Context Window | Max Output | Description |
+|-------|--------------|-----------------|------------|-------------|
+| `gpt-5.5` | GPT-5.5 | 1,050,000 tokens | 128k tokens | Frontier model for complex coding, research, and real-world work |
+| `gpt-5.3-codex` | GPT-5.3 Codex (Default) | 400,000 tokens | 128k tokens | Coding-optimized model · recommended for code generation and review |
+| `gpt-5.4` | GPT-5.4 | 1,000,000 tokens | — | Strong model for everyday coding |
+| `gpt-5.2` | GPT-5.2 | 400,000 tokens | 128k tokens | Optimized for professional work and long-running agents |
+| `gpt-5.4-mini` | GPT-5.4 Mini | — | — | Small, fast, and cost-efficient for simpler tasks |
 
 The display list is curated to five production models. Older models (GPT-5.2 Codex, GPT-5.1 variants, etc.) remain in `ModelConfig.codex_models/0` for backward compatibility but are not shown in new agent forms.
+
+**When adding a new Codex model**, update both:
+- `lib/eye_in_the_sky/codex/models.ex` — add context window and max output token metadata to `@context_windows` and `@max_output_tokens` maps
+- `scripts/eits` — add the model to the valid models list (line ~1610 in help text, line ~1683 in case pattern for validation)
 
 ### Model Defaults
 

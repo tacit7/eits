@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-05-01
-Last updated: 2026-05-24 (IAM context preload layer, transaction removal in document policy insertion)
+Last updated: 2026-06-28 (Channel membership authorization, FileEditor path traversal fix + optimistic concurrency via hash, npm CVE fixes: dompurify XSS, svelte SSR XSS, vite, devalue DoS, undici)
 
 ## Authentication
 
@@ -310,6 +310,49 @@ File access handlers use `FileHelpers.path_within?/2` (realpath-based comparison
 - Previously, `File.exists?` was the only check, allowing any path to be opened via a crafted WebSocket event.
 - Now uses `path_within?` against the allowlist, rejecting all paths outside `~/.claude`.
 
+**File editor** (`project_live/files.ex`):
+- The `file_save` handler validates that the supplied path is within the project scope using `path_within?(full_path, project_path)`.
+- Client-supplied paths are resolved relative to the project root; traversal attempts (e.g., `../../../etc/passwd`) are rejected with `{:error, :access_denied}`.
+- When the client omits the path (empty string), the handler falls back to the socket assign to maintain backward compatibility with test payloads.
+- If no path is resolvable (neither client-supplied nor fallback), the operation fails with `{:error, :no_path}`.
+- The `socket={@socket}` parameter is passed to `FileEditor` LiveSvelte component to enable proper `live` injection in the client-side editor library.
+
+### Channel Membership Authorization
+
+Channel operations now enforce membership verification before mutation or read operations.
+
+**Operations protected** (`chat_live/event_handlers.ex`):
+- `change_channel`: Verifies session is a member of the target channel before navigating to it
+- `send_channel_message`: Verifies membership before accepting the message submission
+- `search_channel_messages`: Verifies membership before executing the channel search query
+
+**Authorization check**:
+```elixir
+defp channel_member?(_channel_id, nil), do: false
+defp channel_member?(channel_id, session_id), do: Channels.member?(channel_id, session_id)
+```
+
+- Returns `false` if `session_id` is nil (unauthenticated request)
+- Queries `Channels.member?(channel_id, session_id)` for positive confirmation
+- Rejected requests receive `403` error via `put_flash(socket, :error, "You are not a member of that channel")`
+
+**Impact**: Prevents unauthorized sessions from sending or searching messages in channels they do not belong to.
+
+### Optimistic Concurrency Control — File Editor Hash Matching
+
+File save operations use SHA-256 hash verification to detect concurrent writes and prevent lost updates.
+
+**Implementation** (`project_live/files.ex`):
+- On file load, `hash_content(content)` computes SHA-256 hash of the file and assigns it to the client: `assign(:file_hash, hash_content(content))`
+- On file save, client sends back the `original_hash` from when the file was loaded
+- Server verifies the disk version matches `original_hash` via `verify_disk_hash(full_path, original_hash)`:
+  - If hash matches, the file hasn't changed since load → save proceeds with new `new_hash`
+  - If hash doesn't match, another writer has modified the file → returns `{:error, :conflict}` and `"file changed on disk"` message
+  - Client can then reload and retry
+- Reply includes `new_hash` for round-trip concurrency tracking
+
+**Benefits**: Eliminates lost-update anomalies when multiple sessions edit the same file. Users see immediate feedback if their changes would clobber concurrent edits.
+
 ### Database
 
 - All database access uses Ecto with parameterized queries — no raw SQL.
@@ -614,8 +657,26 @@ Security-relevant dependencies:
 | `bandit` | ~> 1.5 | HTTP server |
 | `web_push_encryption` | ~> 0.3 | VAPID-signed web push |
 | `dotenvy` | ~> 0.8 | Environment variable loading from `.env` |
-| `vite` | 6.4.2 | Asset bundler and dev server |
+| `vite` | 6.4.3 | Asset bundler and dev server |
 | `postcss` | 8.5.13 | CSS processor |
+| `dompurify` | 3.4.11 | XSS prevention in HTML sanitization |
+| `svelte` | 5.56.4 | Frontend component framework |
+| `devalue` | 5.8.1 | Serialization library |
+| `undici` | 7.28.0 | HTTP client (transitive) |
+
+### JavaScript Dependency Security Updates
+
+**Round 2026-06-27** resolved 5 CVEs in JavaScript dependencies via `npm audit fix`:
+
+| Package | Old | New | CVEs Fixed |
+|---------|-----|-----|-----------|
+| `dompurify` | 3.4.1 | 3.4.11 | Multiple XSS bypasses, IN_PLACE mode vulnerability |
+| `svelte` | 5.53.12 | 5.56.4 | SSR XSS via hydratable promise serialization |
+| `vite` | 6.4.2 | 6.4.3 | High-severity vulnerability |
+| `devalue` | 5.6.4 | 5.8.1 | Denial-of-Service via sparse array deserialization |
+| `undici` | 7.24.7 | 7.28.0 | High-severity vulnerability (transitive dep) |
+
+**Verification**: `npm audit` reports 0 vulnerabilities after update; all existing tests (vitest 318/318) pass; `mix compile` and `vite build` complete without warnings or errors.
 
 ## Identity and Access Management (IAM)
 

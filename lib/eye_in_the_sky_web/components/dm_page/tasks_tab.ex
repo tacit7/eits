@@ -119,9 +119,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                 <%= if has_expandable do %>
                   <div class="collapse-content px-0 pt-0 pb-4 pl-8">
                     <%= if task.description do %>
-                      <div class="text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap mb-2">
-                        {String.trim(task.description)}
-                      </div>
+                      <div class="text-sm text-base-content/65 leading-relaxed whitespace-pre-wrap mb-2">{String.trim(task.description)}</div>
                     <% end %>
                     <%= for note <- Map.get(task, :notes, []) do %>
                       <div class="mt-1.5 rounded-lg bg-base-200/60 px-3 py-2">

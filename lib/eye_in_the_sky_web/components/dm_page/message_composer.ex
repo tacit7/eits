@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
   attr :processing, :boolean, default: false
   attr :slash_items, :list, default: []
   attr :thinking_enabled, :boolean, default: false
+  attr :show_thinking_blocks, :boolean, default: false
   attr :max_budget_usd, :any, default: nil
   attr :provider, :string, default: "claude"
   attr :context_used, :integer, default: 0
@@ -152,21 +153,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
           >
             <span class="text-xs font-semibold tracking-tight select-none">Aa</span>
           </button>
-          <%!-- Thinking toggle --%>
-          <button
-            type="button"
-            phx-click="toggle_thinking"
-            title={if @thinking_enabled, do: "Thinking on — click to disable", else: "Enable extended thinking"}
-            class={[
-              "flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg transition-colors",
-              if(@thinking_enabled,
-                do: "text-primary bg-primary/10 hover:bg-primary/15",
-                else: "text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5"
-              )
-            ]}
-          >
-            <.icon name="hero-sparkles" class="size-4" />
-          </button>
           <%!-- Plan mode toggle --%>
           <button
             type="button"
@@ -200,61 +186,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
               class="w-16 bg-transparent border-0 outline-none focus:ring-0 text-xs placeholder:text-base-content/20 font-mono p-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
-          <%= if String.starts_with?(@selected_model, "claude-opus") or @selected_model in ["opus", "opus[1m]"] do %>
-            <div
-              class="dropdown dropdown-top"
-              phx-click="toggle_effort_menu"
-              id="effort-selector-dropdown"
-            >
-              <button
-                type="button"
-                tabindex="0"
-                class="flex items-center gap-1.5 px-2 h-6 rounded-md text-[11px] font-medium text-base-content/55 bg-base-content/[0.05] border border-[var(--border-subtle)] hover:text-base-content/75 hover:bg-base-content/[0.08] transition-colors"
-                id="effort-selector-button"
-              >
-                <.icon name="hero-adjustments-horizontal" class="size-3" />
-                <span>{DmHelpers.effort_display_name(@selected_effort)}</span>
-                <.icon name="hero-chevron-down-mini" class="size-3 flex-shrink-0" />
-              </button>
-              <%= if @active_overlay == :effort_menu do %>
-                <ul
-                  tabindex="0"
-                  class="dropdown-content menu z-[1] w-48 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
-                  id="effort-selector-menu"
-                >
-                  <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">
-                    Effort Level
-                  </li>
-                  <%= for {label, value, desc, icon_color} <- [
-                    {"Low", "low", "Faster and cheaper", "text-success"},
-                    {"Medium", "medium", "Balanced (default)", "text-info"},
-                    {"High", "high", "Deeper reasoning", "text-warning"},
-                    {"Max", "max", "Maximum effort", "text-error"}
-                  ] do %>
-                    <li>
-                      <a
-                        phx-click="select_effort"
-                        phx-value-effort={value}
-                        class={[
-                          "flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]",
-                          @selected_effort == value && "bg-base-content/[0.06]"
-                        ]}
-                      >
-                        <.icon name="hero-adjustments-horizontal" class={"size-4 #{icon_color}"} />
-                        <div>
-                          <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                          <div class="text-mini text-base-content/40">{desc}</div>
-                        </div>
-                        <%= if @selected_effort == value do %>
-                          <.icon name="hero-check-mini" class="size-4 text-primary ml-auto" />
-                        <% end %>
-                      </a>
-                    </li>
-                  <% end %>
-                </ul>
-              <% end %>
-            </div>
-          <% end %>
+          <%!-- ReasoningPill: [🧠 Thinking] | [👁] | [effort ▾] --%>
+          <.reasoning_pill
+            provider={@provider}
+            thinking_enabled={@thinking_enabled}
+            show_thinking_blocks={@show_thinking_blocks}
+            selected_effort={@selected_effort}
+            active_overlay={@active_overlay}
+          />
         </div>
 
         <%!-- Center: context meter --%>
@@ -368,6 +307,148 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       </div>
     </form>
     """
+  end
+
+  # ─── ReasoningPill ───────────────────────────────────────────────────────────
+
+  attr :provider, :string, required: true
+  attr :thinking_enabled, :boolean, required: true
+  attr :show_thinking_blocks, :boolean, required: true
+  attr :selected_effort, :string, required: true
+  attr :active_overlay, :any, required: true
+
+  defp reasoning_pill(assigns) do
+    # Classify provider for rendering decisions
+    assigns =
+      assign(assigns, :is_claude, assigns.provider not in ["codex", "pi"])
+
+    ~H"""
+    <div
+      class={[
+        "inline-flex items-center rounded-lg border overflow-hidden transition-colors",
+        if(@thinking_enabled and @is_claude,
+          do: "border-primary/30 bg-primary/[0.04]",
+          else: "border-base-content/[0.10] bg-base-content/[0.03]"
+        )
+      ]}
+      id="reasoning-pill"
+    >
+      <%!-- Segment 1: Thinking toggle (Claude only) --%>
+      <%= if @is_claude do %>
+        <button
+          type="button"
+          phx-click="toggle_thinking"
+          title={if @thinking_enabled, do: "Thinking on — click to disable", else: "Enable extended thinking"}
+          class={[
+            "flex items-center gap-1.5 px-2.5 h-6 text-[11px] font-medium transition-colors",
+            if(@thinking_enabled,
+              do: "text-primary hover:text-primary/80",
+              else: "text-base-content/40 hover:text-base-content/65"
+            )
+          ]}
+        >
+          <.icon name="hero-sparkles" class="size-3 flex-shrink-0" />
+          <span>Think</span>
+        </button>
+        <div class="w-px h-4 bg-base-content/[0.10] flex-shrink-0" />
+      <% else %>
+        <%!-- Codex / Pi: always-on indicator, non-interactive --%>
+        <span class="flex items-center gap-1.5 px-2.5 h-6 text-[11px] font-medium text-base-content/40 select-none">
+          <.icon name="hero-sparkles" class="size-3 flex-shrink-0" />
+          <span>Think</span>
+        </span>
+        <div class="w-px h-4 bg-base-content/[0.10] flex-shrink-0" />
+      <% end %>
+
+      <%!-- Segment 2: Show/hide thinking blocks --%>
+      <button
+        type="button"
+        phx-click="toggle_show_thinking"
+        title={if @show_thinking_blocks, do: "Thinking blocks visible — click to hide", else: "Show thinking blocks in chat"}
+        class={[
+          "flex items-center justify-center w-6 h-6 transition-colors",
+          if(@show_thinking_blocks,
+            do: "text-base-content/70 hover:text-base-content/90",
+            else: "text-base-content/30 hover:text-base-content/55"
+          )
+        ]}
+      >
+        <%= if @show_thinking_blocks do %>
+          <.icon name="hero-eye" class="size-3" />
+        <% else %>
+          <.icon name="hero-eye-slash" class="size-3" />
+        <% end %>
+      </button>
+      <div class="w-px h-4 bg-base-content/[0.10] flex-shrink-0" />
+
+      <%!-- Segment 3: Effort level picker --%>
+      <div class="dropdown dropdown-top" id="reasoning-pill-effort-dropdown">
+        <button
+          type="button"
+          tabindex="0"
+          phx-click="toggle_effort_menu"
+          title="Reasoning effort"
+          class="flex items-center gap-1 px-2 h-6 text-[11px] font-medium text-base-content/50 hover:text-base-content/75 transition-colors"
+          id="reasoning-pill-effort-button"
+        >
+          <span>{DmHelpers.effort_display_name(@selected_effort)}</span>
+          <.icon name="hero-chevron-down-mini" class="size-3 flex-shrink-0" />
+        </button>
+        <%= if @active_overlay == :effort_menu do %>
+          <ul
+            tabindex="0"
+            class="dropdown-content menu z-[1] w-52 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg mb-1"
+            id="reasoning-pill-effort-menu"
+          >
+            <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">
+              Effort Level
+            </li>
+            <%= for {label, value, desc, color} <- effort_levels(@is_claude) do %>
+              <li>
+                <a
+                  phx-click="select_effort"
+                  phx-value-effort={value}
+                  class={[
+                    "flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-base-content/[0.04]",
+                    @selected_effort == value && "bg-base-content/[0.06]"
+                  ]}
+                >
+                  <div>
+                    <div class={"text-sm font-semibold " <> color}>{label}</div>
+                    <div class="text-mini text-base-content/40">{desc}</div>
+                  </div>
+                  <%= if @selected_effort == value do %>
+                    <.icon name="hero-check-mini" class="size-4 text-primary ml-auto" />
+                  <% end %>
+                </a>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  # Effort level menu items per provider variant.
+  defp effort_levels(true = _is_claude) do
+    [
+      {"Auto", "auto", "Let Claude decide", "text-base-content/70"},
+      {"Low", "low", "Faster, cheaper", "text-success"},
+      {"Medium", "medium", "Balanced (default)", "text-info"},
+      {"High", "high", "Deeper reasoning", "text-warning"},
+      {"XHigh", "xhigh", "Extended reasoning", "text-orange-400"},
+      {"Max", "max", "Maximum effort", "text-error"}
+    ]
+  end
+
+  defp effort_levels(false) do
+    [
+      {"Low", "low", "Faster, cheaper", "text-success"},
+      {"Medium", "medium", "Balanced (default)", "text-info"},
+      {"High", "high", "Deeper reasoning", "text-warning"},
+      {"XHigh", "xhigh", "Extended reasoning", "text-orange-400"}
+    ]
   end
 
   # ─── Context meter ──────────────────────────────────────────────────────────

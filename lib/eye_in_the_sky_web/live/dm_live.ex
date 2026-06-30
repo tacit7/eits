@@ -231,6 +231,10 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 
+  def handle_event("toggle_show_thinking", _params, socket) do
+    {:noreply, assign(socket, :show_thinking_blocks, !socket.assigns.show_thinking_blocks)}
+  end
+
   def handle_event("toggle_plan_mode", _params, socket) do
     opts = socket.assigns.session_cli_opts || []
     new_opts =
@@ -769,6 +773,7 @@ defmodule EyeInTheSkyWeb.DmLive do
             effort: @selected_effort,
             processing: @processing,
             thinking_enabled: @thinking_enabled,
+            show_thinking_blocks: @show_thinking_blocks,
             max_budget_usd: @max_budget_usd,
             compacting: @compacting,
             context_used: @context_used,

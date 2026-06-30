@@ -206,9 +206,11 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
   defdelegate model_display_name(slug), to: EyeInTheSkyWeb.Helpers.ModelHelpers
 
+  def effort_display_name("auto"), do: "Auto"
   def effort_display_name("low"), do: "Low"
   def effort_display_name("medium"), do: "Medium"
   def effort_display_name("high"), do: "High"
+  def effort_display_name("xhigh"), do: "XHigh"
   def effort_display_name("max"), do: "Max"
   def effort_display_name(_), do: "Medium"
 

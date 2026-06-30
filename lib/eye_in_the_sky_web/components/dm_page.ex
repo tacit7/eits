@@ -507,6 +507,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               processing={@session_state.processing}
               slash_items={@slash_items}
               thinking_enabled={@session_state.thinking_enabled}
+              show_thinking_blocks={Map.get(@session_state, :show_thinking_blocks, false)}
               max_budget_usd={@session_state.max_budget_usd}
               provider={@agent.provider}
               context_used={@session_state.context_used}

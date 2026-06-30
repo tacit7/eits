@@ -3083,3 +3083,220 @@ describe("quick DM commands (m on sessions page, Space d m global)", () => {
     expect(h.quickDmOverlayEl).toBeNull()
   })
 })
+
+describe("ctrl-o / ctrl-i recent session cycling", () => {
+  // UUIDs must be exactly 36 chars to satisfy the /^\/dm\/([0-9a-f-]{36})/ regex.
+  const UUID_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  const UUID_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  const UUID_C = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+  const UUID_D = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+  const SESSIONS = [
+    { uuid: UUID_A, name: "Alpha" },
+    { uuid: UUID_B, name: "Beta" },
+    { uuid: UUID_C, name: "Gamma" },
+    { uuid: UUID_D, name: "Delta" },
+  ]
+
+  afterEach(() => { document.body.innerHTML = "" })
+
+  // Each test that cares about the URL explicitly sets window.location.
+  // Relying on beforeEach for location doesn't work reliably within a describe
+  // block — subsequent Object.defineProperty calls can fail silently in jsdom
+  // once the original location descriptor is gone. Self-contained setup is safer.
+  function setLocation(pathname: string): ReturnType<typeof vi.fn> {
+    const assign = vi.fn()
+    Object.defineProperty(window, "location", {
+      value: { pathname, assign },
+      writable: true,
+      configurable: true,
+    })
+    return assign
+  }
+
+  function pressCtrlKey(h: any, key: "o" | "i"): KeyboardEvent {
+    const evt = new KeyboardEvent("keydown", { key, ctrlKey: true, cancelable: true })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    h.handleKey(evt)
+    return evt
+  }
+
+  it("ctrl-o fires palette:recent-sessions when cache is empty", () => {
+    setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = []
+    pressCtrlKey(h, "o")
+    expect(h.pushEvent).toHaveBeenCalledWith("palette:recent-sessions", {})
+    expect(h._pendingRecentNav).toBe("prev")
+  })
+
+  it("ctrl-i fires palette:recent-sessions when cache is empty", () => {
+    setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = []
+    pressCtrlKey(h, "i")
+    expect(h.pushEvent).toHaveBeenCalledWith("palette:recent-sessions", {})
+    expect(h._pendingRecentNav).toBe("next")
+  })
+
+  it("ctrl-o fires fetch when cache is stale (>30s)", () => {
+    setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now() - 31_000
+    pressCtrlKey(h, "o")
+    expect(h.pushEvent).toHaveBeenCalledWith("palette:recent-sessions", {})
+  })
+
+  it("ctrl-o navigates to older session (index+1) from current URL", () => {
+    const assign = setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    // UUID_B is at index 1. c-o goes to index 2 (UUID_C).
+    pressCtrlKey(h, "o")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_C}`)
+    expect(h._recentSessionIdx).toBe(2)
+  })
+
+  it("ctrl-i navigates to more recent session (index-1) from current URL", () => {
+    const assign = setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    // UUID_B is at index 1. c-i goes to index 0 (UUID_A).
+    pressCtrlKey(h, "i")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_A}`)
+    expect(h._recentSessionIdx).toBe(0)
+  })
+
+  it("ctrl-i is a no-op when current URL is already the most-recent session (index 0)", () => {
+    const assign = setLocation(`/dm/${UUID_A}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    pressCtrlKey(h, "i")
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("ctrl-o clamps at last item when already at oldest session", () => {
+    const assign = setLocation(`/dm/${UUID_D}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    // UUID_D is at index 3 (last). c-o tries index 4 but clamps to 3 — same session.
+    pressCtrlKey(h, "o")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_D}`)
+    expect(h._recentSessionIdx).toBe(3)
+  })
+
+  it("ctrl-o when not on a session page jumps to index 0", () => {
+    const assign = setLocation("/projects/1/tasks")
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    pressCtrlKey(h, "o")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_A}`)
+    expect(h._recentSessionIdx).toBe(0)
+  })
+
+  it("ctrl-i when not on a session page is a no-op (nothing newer than unknown)", () => {
+    const assign = setLocation("/projects/1/tasks")
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    pressCtrlKey(h, "i")
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("consecutive ctrl-o presses advance the cursor without re-anchoring to URL", () => {
+    // First press: anchor to UUID_B (index 1), advance to index 2.
+    const assign1 = setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    pressCtrlKey(h, "o")
+    expect(h._recentSessionIdx).toBe(2)
+    expect(assign1).toHaveBeenCalledWith(`/dm/${UUID_C}`)
+    // Second press: cursor is at 2, advance to 3 regardless of URL.
+    const assign2 = setLocation(`/dm/${UUID_C}`)
+    pressCtrlKey(h, "o")
+    expect(h._recentSessionIdx).toBe(3)
+    expect(assign2).toHaveBeenCalledWith(`/dm/${UUID_D}`)
+  })
+
+  it("ctrl-i after ctrl-o reverses direction", () => {
+    // c-o from UUID_B (index 1) → index 2. c-i → back to index 1.
+    const assign = setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    pressCtrlKey(h, "o")
+    expect(h._recentSessionIdx).toBe(2)
+    pressCtrlKey(h, "i")
+    expect(h._recentSessionIdx).toBe(1)
+    expect(assign).toHaveBeenLastCalledWith(`/dm/${UUID_B}`)
+  })
+
+  it("_recentSessionIdx reset to -1 causes re-anchor on next press", () => {
+    // Simulate: cursor was at 0 from a prior sequence, then _onPageLoad reset it to -1.
+    // Next c-o should re-anchor from the current URL (UUID_C = index 2) and advance to 3.
+    const assign = setLocation(`/dm/${UUID_C}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    h._recentSessionIdx = -1  // reset as _onPageLoad would
+    pressCtrlKey(h, "o")
+    expect(h._recentSessionIdx).toBe(3)
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_D}`)
+  })
+
+  it("_doNavigateRecent resolves pending nav on cache arrival", () => {
+    const assign = setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = []
+    h._recentSessionsFetchedAt = 0
+    h._recentSessionIdx = -1
+    pressCtrlKey(h, "o")
+    expect(h._pendingRecentNav).toBe("prev")
+    // Simulate backend result arriving
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    h._doNavigateRecent(h._pendingRecentNav!)
+    h._pendingRecentNav = null
+    // UUID_B is index 1, "prev" → index 2 (UUID_C)
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_C}`)
+  })
+
+  it("ctrl-o does nothing in insert mode", () => {
+    const assign = setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "insert"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    pressCtrlKey(h, "o")
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("ctrl-o prevents default browser action", () => {
+    setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessions = [...SESSIONS]
+    h._recentSessionsFetchedAt = Date.now()
+    const evt = pressCtrlKey(h, "o")
+    expect(evt.defaultPrevented).toBe(true)
+  })
+})

@@ -250,6 +250,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
             <span>·</span>
             <span>{relative_time(@session.last_activity_at)}</span>
           <% end %>
+          <%= if @session.git_worktree_path do %>
+            <span>·</span>
+            <span
+              class="inline-flex items-center gap-0.5 text-primary/55"
+              title={@session.git_worktree_path}
+            >
+              <.icon name="hero-code-bracket-mini" class="size-2.5" />
+              {Path.basename(@session.git_worktree_path)}
+            </span>
+          <% end %>
         </div>
       </div>
     </.link>

@@ -36,9 +36,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.NoteDetail do
       <%!-- Body --%>
       <div class="flex-1 min-h-0 overflow-y-auto">
         <%= if @note.body && @note.body != "" do %>
-          <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">
-            {@note.body}
-          </p>
+          <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">{@note.body}</p>
         <% else %>
           <p class="text-xs text-base-content/30 italic">No content.</p>
         <% end %>

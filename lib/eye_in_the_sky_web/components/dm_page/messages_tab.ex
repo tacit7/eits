@@ -133,9 +133,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   </div>
                 <% end %>
                 <%= if @stream.content not in [nil, ""] do %>
-                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">
-                    {String.trim_leading(@stream.content)}
-                  </div>
+                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">{String.trim_leading(@stream.content)}</div>
                 <% end %>
               </div>
             </div>

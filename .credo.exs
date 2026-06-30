@@ -4,10 +4,10 @@
       name: "default",
       files: %{
         included: ["lib/"],
-        excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/"]
+        excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/", ~r"/checks/"]
       },
       plugins: [{ExSlop, []}],
-      requires: [],
+      requires: ["lib/eye_in_the_sky/checks/heex_whitespace_pre_inline.ex"],
       strict: false,
       parse_timeout: 5000,
       color: true,
@@ -63,6 +63,9 @@
           {Credo.Check.Refactor.Nesting, [max_nesting: 3]},
           {Credo.Check.Refactor.UnlessWithElse, []},
           {Credo.Check.Refactor.WithClauses, []},
+
+          # Custom
+          {EyeInTheSky.Checks.HEExWhitespacePreInline, []},
 
           # Warnings
           {Credo.Check.Warning.ApplicationConfigInModuleAttribute, []},

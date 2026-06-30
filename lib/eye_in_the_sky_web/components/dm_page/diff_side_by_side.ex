@@ -60,9 +60,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
         {@side.new_line_number}
       </span>
       <span class="w-3 flex-shrink-0 text-center text-success/70 select-none">+</span>
-      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/90">
-        {@side.content}
-      </span>
+      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/90">{@side.content}</span>
     </div>
     """
   end
@@ -74,9 +72,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
         {@side.old_line_number}
       </span>
       <span class="w-3 flex-shrink-0 text-center text-error/70 select-none">-</span>
-      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/90">
-        {@side.content}
-      </span>
+      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/90">{@side.content}</span>
     </div>
     """
   end
@@ -88,9 +84,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
         {@side.old_line_number}
       </span>
       <span class="w-3 flex-shrink-0 text-center text-base-content/20 select-none"></span>
-      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/60">
-        {@side.content}
-      </span>
+      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/60">{@side.content}</span>
     </div>
     """
   end

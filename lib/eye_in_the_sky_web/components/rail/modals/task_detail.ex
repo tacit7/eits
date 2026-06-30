@@ -46,9 +46,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
       <%!-- Description --%>
       <div class="flex-1 min-h-0 overflow-y-auto">
         <%= if @task.description && @task.description != "" do %>
-          <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">
-            {@task.description}
-          </p>
+          <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">{@task.description}</p>
         <% else %>
           <p class="text-xs text-base-content/30 italic">No description.</p>
         <% end %>

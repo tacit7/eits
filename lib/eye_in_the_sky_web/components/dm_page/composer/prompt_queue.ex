@@ -37,9 +37,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
                       class="size-3 text-base-content/20 flex-shrink-0 transition-transform group-open/pq:rotate-90"
                     />
                   </summary>
-                  <p class="mt-2 text-xs text-base-content/60 whitespace-pre-wrap break-words leading-relaxed">
-                    {msg}
-                  </p>
+                  <p class="mt-2 text-xs text-base-content/60 whitespace-pre-wrap break-words leading-relaxed">{msg}</p>
                 </details>
               <% else %>
                 <span class="text-xs text-base-content/50 flex-1 min-w-0">

@@ -118,6 +118,21 @@ defmodule EyeInTheSky.Teams do
     |> tap_broadcast(:team_deleted)
   end
 
+  @doc "Archive multiple teams by ID list. Calls delete_team/1 for each and returns {count, archived}."
+  def batch_delete_teams(ids) when is_list(ids) do
+    teams = Enum.map(ids, &get_team!/1)
+
+    archived =
+      Enum.filter(teams, fn team ->
+        case delete_team(team) do
+          {:ok, _} -> true
+          _ -> false
+        end
+      end)
+
+    {length(archived), archived}
+  end
+
   # ── Members ────────────────────────────────────────────────
 
   def list_members(team_id) do

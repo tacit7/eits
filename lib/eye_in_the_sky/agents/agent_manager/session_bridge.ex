@@ -12,6 +12,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
   alias EyeInTheSky.Claude.AgentWorker
 
   @registry EyeInTheSky.Claude.AgentRegistry
+  @supervisor EyeInTheSky.Claude.AgentSupervisor
   @supported_providers ["claude", "codex"]
 
   @doc """
@@ -170,10 +171,13 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
       worktree: extra_opts[:worktree]
     ]
 
-    case DynamicSupervisor.start_child(
-           EyeInTheSky.Claude.AgentSupervisor,
-           {AgentWorker, opts}
-         ) do
+    start_child(session, provider, opts, _evicted? = false)
+  end
+
+  # Starts the worker child, reclaiming a slot once if the AgentSupervisor is at
+  # capacity. `evicted?` guards against unbounded eviction loops under contention.
+  defp start_child(session, provider, opts, evicted?) do
+    case DynamicSupervisor.start_child(@supervisor, {AgentWorker, opts}) do
       {:ok, pid} ->
         Logger.info("✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}")
 
@@ -186,10 +190,74 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
 
         {:ok, pid, provider}
 
+      {:error, :max_children} when not evicted? ->
+        case evict_parked_worker() do
+          {:ok, evicted_session_id} ->
+            Logger.info(
+              "spawn_worker: AgentSupervisor full — evicted parked worker session.id=#{evicted_session_id} to make room for session.id=#{session.id}"
+            )
+
+            start_child(session, provider, opts, true)
+
+          :none ->
+            Logger.error(
+              "❌ spawn_worker: AgentSupervisor at capacity, no parked worker to evict for session.id=#{session.id}"
+            )
+
+            {:error, :max_children}
+        end
+
       {:error, reason} = error ->
         Logger.error("❌ spawn_worker: failed for session.id=#{session.id} - #{inspect(reason)}")
 
         error
     end
   end
+
+  # Frees one AgentSupervisor slot by evicting the worker parked the longest.
+  # Candidates are ranked coldest-first from an advisory snapshot, then evicted
+  # atomically: evict_if_parked/1 self-stops a worker only if it is still parked
+  # when the call is handled, so a worker that started work since the snapshot is
+  # skipped (no in-flight or queued work is ever discarded). The evicted session's
+  # context is persisted (session uuid + provider_conversation_id), so it respawns
+  # and resumes on its next message. Returns {:ok, session_id}, or :none when no
+  # worker is parked.
+  defp evict_parked_worker do
+    @registry
+    |> Registry.select([{{{:session, :"$1"}, :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    |> Enum.map(fn {session_id, pid} -> {session_id, pid, AgentWorker.eviction_snapshot(pid)} end)
+    |> Enum.filter(fn {_session_id, _pid, {evictable?, _since}} -> evictable? end)
+    |> Enum.sort_by(&parked_since_unix/1)
+    |> evict_first_parked()
+  end
+
+  defp evict_first_parked([]), do: :none
+
+  defp evict_first_parked([{session_id, pid, _snap} | rest]) do
+    # Monitor before the call so we can't miss the worker's exit. On :ok we wait
+    # for :DOWN — the worker's exit signal reaches the (linked) supervisor before
+    # our subsequent start_child call, so the slot is reclaimed before the retry.
+    ref = Process.monitor(pid)
+
+    case AgentWorker.evict_if_parked(pid) do
+      :ok ->
+        receive do
+          {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+        after
+          5_000 -> Process.demonitor(ref, [:flush])
+        end
+
+        {:ok, session_id}
+
+      :busy ->
+        Process.demonitor(ref, [:flush])
+        evict_first_parked(rest)
+    end
+  end
+
+  # nil idle_since (worker parked without a stamp — shouldn't happen) sorts oldest.
+  defp parked_since_unix({_session_id, _pid, {_evictable?, nil}}), do: 0
+
+  defp parked_since_unix({_session_id, _pid, {_evictable?, %DateTime{} = since}}),
+    do: DateTime.to_unix(since, :microsecond)
 end

@@ -110,6 +110,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:cumulative_diff, nil)
     |> assign(:reload_timer, nil)
     |> assign(:thinking_enabled, get_in(effective, ["general", "thinking_enabled"]))
+    |> assign(:show_thinking_blocks, false)
     |> assign(:max_budget_usd, get_in(effective, ["general", "max_budget_usd"]))
     |> assign(:session_cli_opts, [])
     |> assign(:compacting, session.status == "compacting")

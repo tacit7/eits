@@ -68,6 +68,54 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @doc """
+  GET /api/v1/dm/:id - Fetch a single DM by integer ID.
+  The caller must be the recipient (to_session_id matches the session param or current session).
+  Query params:
+    - session (optional): integer session ID or UUID of the requesting session (default: resolved from auth)
+  """
+  def show_dm(conn, %{"id" => id} = params) do
+    session_raw = params["session"] || get_req_header(conn, "x-eits-session") |> List.first()
+
+    case parse_int(id) do
+      nil ->
+        {:error, :bad_request, "id must be an integer"}
+
+      msg_id ->
+        case Messages.get_message(msg_id) do
+          nil ->
+            {:error, :not_found, "DM not found"}
+
+          msg ->
+            # If caller provides a session, verify they are the recipient
+            with {:ok, caller_id} <- resolve_caller_session(session_raw, msg) do
+              if caller_id != nil and msg.to_session_id != caller_id do
+                {:error, :forbidden, "You are not the recipient of this message"}
+              else
+                json(conn, %{
+                  id: msg.id,
+                  uuid: msg.uuid,
+                  body: msg.body,
+                  from_session_id: msg.from_session_id,
+                  to_session_id: msg.to_session_id,
+                  inserted_at: msg.inserted_at
+                })
+              end
+            end
+        end
+    end
+  end
+
+  defp resolve_caller_session(nil, _msg), do: {:ok, nil}
+  defp resolve_caller_session("", _msg), do: {:ok, nil}
+
+  defp resolve_caller_session(raw, _msg) do
+    case SessionResolver.resolve(raw) do
+      {:ok, session} -> {:ok, session.id}
+      {:error, _} -> {:ok, nil}
+    end
+  end
+
+  @doc """
   POST /api/v1/dm - Send a direct message to an agent session.
   Body:
     - from_session_id (required): integer session ID or UUID of the sending session

@@ -2391,18 +2391,20 @@ cmd_jobs() {
 _tbl_dm() {
   local data="${1:-$(cat)}"
   local count; count=$(echo "$data" | jq '[.messages[]?] | length')
-  printf '%-8s  %-52s  %s\n' "FROM" "MESSAGE" "AGE"
-  printf '%-8s  %-52s  %s\n' "--------" "----------------------------------------------------" "---"
+  printf '%-10s  %-8s  %-48s  %s\n' "ID" "FROM" "MESSAGE" "AGE"
+  printf '%-10s  %-8s  %-48s  %s\n' "----------" "--------" "------------------------------------------------" "---"
   echo "$data" | jq -r '.messages[]? | [
+    ((.id // "-") | tostring),
     ((.from_session_id // "-") | tostring),
     (.body // ""),
     (.inserted_at // "")
-  ] | @tsv' | while IFS=$'\t' read -r from body ts; do
+  ] | @tsv' | while IFS=$'\t' read -r id from body ts; do
     # single-line body: collapse newlines, strip leading "DM from:..." prefix agents sometimes echo
     local _body; _body=$(printf '%s' "$body" | tr '\n' ' ' | sed 's/^DM from:[^ ]* ([^)]*) //')
-    printf '%-8s  %-52s  %s\n' \
+    printf '%-10s  %-8s  %-48s  %s\n' \
+      "$id" \
       "$(_trunc "$from" 8)" \
-      "$(_trunc "$_body" 52)" \
+      "$(_trunc "$_body" 48)" \
       "$(_age "$ts")"
   done
   if [[ -n "$count" ]]; then printf '\n%s message(s)\n' "$count"; fi
@@ -2506,10 +2508,41 @@ EOF
     return
   fi
 
-  # send subcommand (default when no list/inbox keyword)
+  # read subcommand: fetch one DM by ID
+  if [[ "$sub" == "read" ]]; then
+    shift || true
+    local _dm_id="${1:-}"; [[ -n "$_dm_id" ]] || die "usage: eits dm read <id> [--json]"
+    shift || true
+    local _json=0
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --json|-j) _json=1; shift ;;
+        *) die "unknown flag: $1" ;;
+      esac
+    done
+    local _session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+    local _qs=""; [[ -n "$_session" ]] && _qs="?session=$_session"
+    local _resp; _resp=$(_curl "${BASE_URL}/dm/${_dm_id}${_qs}") || return 1
+    if [[ $_json -eq 1 ]]; then
+      printf '%s\n' "$_resp" | jq .
+    else
+      local _from _body _ts
+      _from=$(printf '%s' "$_resp" | jq -r '.from_session_id // "-"')
+      _body=$(printf '%s' "$_resp" | jq -r '.body // ""' | sed 's/^DM from:[^ ]* ([^)]*) //')
+      _ts=$(printf '%s' "$_resp" | jq -r '.inserted_at // ""')
+      printf 'ID:   %s\n' "$(printf '%s' "$_resp" | jq -r '.id // "-"')"
+      printf 'From: %s\n' "$_from"
+      printf 'Age:  %s\n' "$(_age "$_ts")"
+      printf '\n%s\n' "$_body"
+    fi
+    return
+  fi
+
+  # send subcommand (default when no list/inbox/read keyword)
   if [[ "$sub" == "--help" || "$sub" == "-h" ]]; then
     cat <<EOF
 usage: eits dm inbox|list [options]           — show inbound messages
+       eits dm read <id> [--json]             — read one DM by ID (full body)
        eits dm --to <id> --message <text>     — send a DM
 
 Send:
@@ -2525,6 +2558,8 @@ Read:
   eits dm inbox --from <id>             Filter by sender
   eits dm inbox --since <iso8601>       Messages after timestamp
   eits dm inbox --team-only             Only DMs from sessions in shared teams
+  eits dm read <id>                     Full body of one message by ID
+  eits dm read <id> --json              Machine-readable
 EOF
     return 0
   fi

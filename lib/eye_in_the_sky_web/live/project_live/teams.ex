@@ -236,11 +236,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:selected_ids, selected_ids)
       |> assign(:select_mode, select_mode)
 
-    # When select_mode flips, reinsert all rows so checkboxes show/hide across the list
+    # When select_mode flips, reinsert all rows so checkboxes show/hide across the list.
+    # Otherwise reinsert just the toggled row so its checked state updates.
     socket =
-      if select_mode != was_select_mode,
-        do: reinsert_all_teams(socket),
-        else: socket
+      if select_mode != was_select_mode do
+        reinsert_all_teams(socket)
+      else
+        case Enum.find(socket.assigns.all_teams, &(to_string(&1.id) == id)) do
+          nil -> socket
+          team -> stream_insert(socket, :team_list, team)
+        end
+      end
 
     {:noreply, socket}
   end
@@ -326,10 +332,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
       selected = MapSet.union(socket.assigns.selected_ids, range_ids)
 
-      {:noreply,
-       socket
-       |> assign(:selected_ids, selected)
-       |> assign(:select_mode, MapSet.size(selected) > 0)}
+      socket =
+        socket
+        |> assign(:selected_ids, selected)
+        |> assign(:select_mode, MapSet.size(selected) > 0)
+        |> reinsert_all_teams()
+
+      {:noreply, socket}
     end
   end
 

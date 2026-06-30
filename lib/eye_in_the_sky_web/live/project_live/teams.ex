@@ -368,7 +368,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="overflow-y-auto px-4 sm:px-6 py-6" style="scrollbar-width: none;">
+    <div class="flex overflow-hidden overflow-y-auto px-4 sm:px-6 py-6" style="scrollbar-width: none;">
       <div class="mb-3 flex items-center justify-between">
         <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
           {length(@all_teams)} teams

@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   alias EyeInTheSky.Teams
   alias EyeInTheSky.Teams.Team
   alias EyeInTheSky.Teams.TeamMember
+  alias EyeInTheSkyWeb.Live.Shared.BulkHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
@@ -32,10 +33,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
         |> assign(:selected_ids, MapSet.new())
         |> assign(:select_mode, false)
+        |> assign(:show_archive_confirm, false)
       else
         socket
         |> assign(:selected_ids, MapSet.new())
         |> assign(:select_mode, false)
+        |> assign(:show_archive_confirm, false)
       end
 
     {:ok, socket}
@@ -68,10 +71,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
         |> assign(:selected_ids, MapSet.new())
         |> assign(:select_mode, false)
+        |> assign(:show_archive_confirm, false)
       else
         socket
         |> assign(:selected_ids, MapSet.new())
         |> assign(:select_mode, false)
+        |> assign(:show_archive_confirm, false)
       end
 
     {:ok, socket}
@@ -275,18 +280,36 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   end
 
   @impl true
-  def handle_event("delete_selected", _params, socket) do
+  def handle_event("confirm_archive_selected", _params, socket) do
+    {:noreply, assign(socket, :show_archive_confirm, true)}
+  end
+
+  @impl true
+  def handle_event("cancel_archive_selected", _params, socket) do
+    {:noreply, assign(socket, :show_archive_confirm, false)}
+  end
+
+  @impl true
+  def handle_event("archive_selected", _params, socket) do
     ids =
       socket.assigns.selected_ids
       |> MapSet.to_list()
       |> Enum.map(&String.to_integer/1)
 
-    Teams.batch_delete_teams(ids)
+    total = length(ids)
+    {archived, _} = Teams.batch_delete_teams(ids)
 
-    {:noreply,
-     socket
-     |> assign(:selected_ids, MapSet.new())
-     |> assign(:select_mode, false)}
+    {flash_level, flash_msg} =
+      BulkHelpers.build_bulk_flash(archived, total, verb: "Archived", entity: "team")
+
+    socket =
+      socket
+      |> assign(:show_archive_confirm, false)
+      |> assign(:selected_ids, MapSet.new())
+      |> assign(:select_mode, false)
+      |> Phoenix.LiveView.put_flash(flash_level, flash_msg)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -401,7 +424,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
               {MapSet.size(@selected_ids)} selected
             </span>
             <button
-              phx-click="delete_selected"
+              phx-click="confirm_archive_selected"
               class="btn btn-ghost btn-xs text-warning/70 hover:text-warning hover:bg-warning/10 gap-1 min-h-[44px] min-w-[44px]"
             >
               <.icon name="hero-archive-box-mini" class="size-3.5" /> Archive
@@ -499,6 +522,30 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         </div>
         </div>
       <% end %>
+
+      <dialog
+        id="teams-archive-confirm-modal"
+        class={"modal modal-bottom sm:modal-middle " <> if(@show_archive_confirm, do: "modal-open", else: "")}
+      >
+        <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+          <h3 class="text-lg font-bold">Archive teams</h3>
+          <p class="py-4 text-sm text-base-content/70">
+            <% count = MapSet.size(@selected_ids) %>
+            Archive {count} selected team{if count == 1, do: "", else: "s"}? Archived teams can be restored later.
+          </p>
+          <div class="modal-action">
+            <button phx-click="cancel_archive_selected" class="btn btn-sm btn-ghost min-h-[44px]">
+              Cancel
+            </button>
+            <button phx-click="archive_selected" class="btn btn-sm btn-warning min-h-[44px]">
+              Archive
+            </button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button phx-click="cancel_archive_selected">close</button>
+        </form>
+      </dialog>
     </div>
     """
   end

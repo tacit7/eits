@@ -1,9 +1,7 @@
 defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   @moduledoc false
   use EyeInTheSkyWeb, :html
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
-
-  # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
   # sessions_filters — scope toggle + search
   # ---------------------------------------------------------------------------
 
@@ -246,10 +244,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
         </div>
         <div class="text-nano text-base-content/48 mt-0.5 flex items-center gap-1">
           <span class="text-base-content/30">#{@session.id}</span>
-          <%= if @session.last_activity_at do %>
-            <span>·</span>
-            <span>{relative_time(@session.last_activity_at)}</span>
-          <% end %>
           <%= if @session.git_worktree_path do %>
             <span>·</span>
             <span

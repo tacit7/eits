@@ -214,33 +214,50 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
     end
   end
 
-  # Frees one AgentSupervisor slot by terminating the worker parked (idle, empty
-  # queue) the longest. Its conversation context is persisted (session uuid +
-  # provider_conversation_id), so it respawns and resumes on its next message —
-  # no message is lost. Returns {:ok, session_id} or :none when all workers are busy.
+  # Frees one AgentSupervisor slot by evicting the worker parked the longest.
+  # Candidates are ranked coldest-first from an advisory snapshot, then evicted
+  # atomically: evict_if_parked/1 self-stops a worker only if it is still parked
+  # when the call is handled, so a worker that started work since the snapshot is
+  # skipped (no in-flight or queued work is ever discarded). The evicted session's
+  # context is persisted (session uuid + provider_conversation_id), so it respawns
+  # and resumes on its next message. Returns {:ok, session_id}, or :none when no
+  # worker is parked.
   defp evict_parked_worker do
-    parked =
-      @registry
-      |> Registry.select([{{{:session, :"$1"}, :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
-      |> Enum.map(fn {session_id, pid} ->
-        {session_id, pid, AgentWorker.eviction_snapshot(pid)}
-      end)
-      |> Enum.filter(fn {_session_id, _pid, {parked?, _since}} -> parked? end)
+    @registry
+    |> Registry.select([{{{:session, :"$1"}, :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    |> Enum.map(fn {session_id, pid} -> {session_id, pid, AgentWorker.eviction_snapshot(pid)} end)
+    |> Enum.filter(fn {_session_id, _pid, {evictable?, _since}} -> evictable? end)
+    |> Enum.sort_by(&parked_since_unix/1)
+    |> evict_first_parked()
+  end
 
-    case parked do
-      [] ->
-        :none
+  defp evict_first_parked([]), do: :none
 
-      candidates ->
-        {session_id, pid, _snap} = Enum.min_by(candidates, &parked_since_unix/1)
-        DynamicSupervisor.terminate_child(@supervisor, pid)
+  defp evict_first_parked([{session_id, pid, _snap} | rest]) do
+    # Monitor before the call so we can't miss the worker's exit. On :ok we wait
+    # for :DOWN — the worker's exit signal reaches the (linked) supervisor before
+    # our subsequent start_child call, so the slot is reclaimed before the retry.
+    ref = Process.monitor(pid)
+
+    case AgentWorker.evict_if_parked(pid) do
+      :ok ->
+        receive do
+          {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+        after
+          5_000 -> Process.demonitor(ref, [:flush])
+        end
+
         {:ok, session_id}
+
+      :busy ->
+        Process.demonitor(ref, [:flush])
+        evict_first_parked(rest)
     end
   end
 
   # nil idle_since (worker parked without a stamp — shouldn't happen) sorts oldest.
-  defp parked_since_unix({_session_id, _pid, {_parked?, nil}}), do: 0
+  defp parked_since_unix({_session_id, _pid, {_evictable?, nil}}), do: 0
 
-  defp parked_since_unix({_session_id, _pid, {_parked?, %DateTime{} = since}}),
+  defp parked_since_unix({_session_id, _pid, {_evictable?, %DateTime{} = since}}),
     do: DateTime.to_unix(since, :microsecond)
 end

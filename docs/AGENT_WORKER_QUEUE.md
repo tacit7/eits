@@ -129,31 +129,38 @@ child spec in `application.ex`.
 **parked** — `status: :idle` with an empty queue. If no job arrives within
 `@idle_timeout_ms` (`AgentWorker.IdleTimer`, 30 min), it exits `:normal`. Because
 the child is `:transient`, a normal exit is **not** restarted, so the slot is
-freed. This is the steady-state reclaim path.
+freed. This is the steady-state reclaim path. Note a `:failed` worker is **not**
+idle-reaped (it never scheduled a timer) — eviction is its only reclaim path.
 
 **Eviction on capacity.** When `DynamicSupervisor.start_child` returns
 `{:error, :max_children}`, `SessionBridge` does **not** drop the message. It:
 
-1. Scans the registry and asks each worker for an `eviction_snapshot/1` →
-   `{parked?, idle_since}`. A worker is *parked* only when idle with an empty
+1. Scans the registry and ranks candidates by `eviction_snapshot/1` →
+   `{evictable?, idle_since}`, coldest (smallest `idle_since`) first. A worker is
+   *evictable* only when it holds no work: `:idle` **or** `:failed` with an empty
    queue (`idle_since` is stamped in `IdleTimer.schedule/1`).
-2. Terminates the worker parked **longest** (smallest `idle_since`) via
-   `terminate_child` (synchronous — the slot is genuinely free on return).
-3. Retries `start_child` **once** (guarded by an `evicted?` flag to prevent
-   eviction loops).
+2. Walks candidates coldest-first and **atomically** evicts the first still-parked
+   one: `evict_if_parked/1` self-stops the worker (`:stop, :normal`) inside its own
+   message loop, *only if it is still evictable when the call is handled*. A worker
+   that started work since the snapshot replies `:busy` and is skipped.
+3. Waits for the evicted worker's `:DOWN` (the exit reaches the linked supervisor
+   before the retry call, so the slot is reclaimed), then retries `start_child`
+   **once** (guarded by an `evicted?` flag to prevent eviction loops).
 
-**No message is lost.** A parked worker has no in-flight SDK call and nothing
-queued, and its conversation context is persisted (`session.uuid` +
-`provider_conversation_id`). The evicted session transparently respawns and
-resumes on its next message.
+**No in-flight or queued work is discarded.** The atomic re-check in step 2 closes
+the snapshot→terminate race: a worker is only ever stopped while still parked, so
+it has no live SDK call and nothing queued. Its conversation context is persisted
+(`session.uuid` + `provider_conversation_id`), so the evicted session transparently
+respawns and resumes on its next message.
 
-**Genuinely-full fallback.** If every worker is busy (`:running` / `:retry_wait`,
-or idle with a non-empty queue), there is nothing safe to evict — the
-`{:error, :max_children}` surfaces to the caller. That is a real concurrency
-limit; raise the cap. Eviction is the safety net, not a substitute for capacity.
+**Genuinely-full fallback.** If every worker holds work (`:running` / `:retry_wait`,
+or any status with a non-empty queue), nothing is evictable — `{:error, :max_children}`
+surfaces to the caller. That is a real concurrency limit; raise the cap. Eviction
+is the safety net, not a substitute for capacity.
 
-> Eviction only ever targets parked workers, so in-flight and queued work is
-> never discarded. Verified in `test/eye_in_the_sky/claude/agent_worker/eviction_test.exs`.
+> Verified in `test/eye_in_the_sky/claude/agent_worker/eviction_test.exs`:
+> the predicate excludes `:running`/`:retry_wait`/queued work, and `evict_if_parked`
+> stops a parked worker but replies `:busy` for one that has started work.
 
 ## Agent Result Save Timing
 

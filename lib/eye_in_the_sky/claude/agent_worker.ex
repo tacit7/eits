@@ -153,17 +153,39 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   @doc """
-  Returns `{parked?, idle_since}` for an eviction decision, given a worker pid.
+  Returns `{evictable?, idle_since}` for ranking eviction candidates, given a pid.
 
-  A worker is "parked" (safe to evict) only when it is idle with an empty queue —
-  no in-flight SDK call and no queued messages to lose. `idle_since` is when it
-  last became parked. A busy, dead, or unresponsive worker reports `{false, nil}`.
+  A worker is evictable only when it holds no in-flight or queued work — `:idle`
+  or `:failed` with an empty queue. (`:failed` workers carry no SDK call and no
+  queue, recover to `:idle` on their next message, and have no idle timer, so
+  eviction is their only reclaim path.) `idle_since` is when it last parked.
+  This is an advisory snapshot for ordering; `evict_if_parked/1` re-checks
+  atomically before actually terminating. A busy/dead worker reports `{false, nil}`.
   """
   def eviction_snapshot(pid) when is_pid(pid) do
     GenServer.call(pid, :eviction_snapshot, 250)
   catch
     :exit, _ -> {false, nil}
   end
+
+  @doc """
+  Atomically evicts a worker iff it is still evictable at the moment the call is
+  handled. The worker self-stops (`:normal`, not restarted — `restart: :transient`)
+  only when it holds no in-flight or queued work, closing the snapshot→terminate
+  race. Returns `:ok` when it stopped, `:busy` when it had started work in the
+  meantime (or is dead/unresponsive) — the caller then tries the next candidate.
+  """
+  def evict_if_parked(pid) when is_pid(pid) do
+    GenServer.call(pid, :evict_if_parked, 250)
+  catch
+    :exit, _ -> :busy
+  end
+
+  # A worker is evictable when it holds no work: idle or failed, empty queue.
+  # :running / :retry_wait always have in-flight or queued work; idle-with-queue
+  # is about to process. Never evict those.
+  defp evictable?(%__MODULE__{status: status, queue: []}) when status in [:idle, :failed], do: true
+  defp evictable?(%__MODULE__{}), do: false
 
   defp with_worker(session_id, fun, default) do
     case Registry.lookup(@registry, {:session, session_id}) do
@@ -230,8 +252,17 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def handle_call(:eviction_snapshot, _from, state) do
-    parked? = state.status == :idle and state.queue == []
-    {:reply, {parked?, state.idle_since}, state}
+    {:reply, {evictable?(state), state.idle_since}, state}
+  end
+
+  @impl true
+  def handle_call(:evict_if_parked, _from, state) do
+    if evictable?(state) do
+      Logger.info("AgentWorker: evicted (parked) to free a slot, session_id=#{state.session_id}")
+      {:stop, :normal, :ok, state}
+    else
+      {:reply, :busy, state}
+    end
   end
 
   @impl true

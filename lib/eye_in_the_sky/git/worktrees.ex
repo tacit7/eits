@@ -176,6 +176,24 @@ defmodule EyeInTheSky.Git.Worktrees do
     end
   end
 
+  @doc """
+  Resolves the current branch name for a git worktree at `wt_path`.
+
+  Returns the branch name as a string, or `nil` if `wt_path` is `nil` or the
+  git command fails (e.g. detached HEAD, not a git repo).
+  """
+  @spec resolve_branch_name(String.t() | nil) :: String.t() | nil
+  def resolve_branch_name(nil), do: nil
+
+  def resolve_branch_name(wt_path) do
+    case System.cmd("git", ["-C", wt_path, "symbolic-ref", "--short", "HEAD"],
+           stderr_to_stdout: true
+         ) do
+      {branch, 0} -> String.trim(branch)
+      _ -> nil
+    end
+  end
+
   # Computes a relative traversal path from `from_dir` to `target`.
   # Unlike Path.relative_to/2 (which only strips a common prefix), this builds
   # the correct "../../../..." traversal when the paths diverge above their

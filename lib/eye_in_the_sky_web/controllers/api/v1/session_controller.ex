@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
   alias EyeInTheSky.{Agents, Commits, Contexts, Notes, Projects, Sessions, Tasks}
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Git.Worktrees
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -219,7 +220,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       tasks = Tasks.list_tasks_for_session(session.id)
       notes = Notes.list_notes_for_session(session.id, limit: 5)
       commits = Commits.list_commits_for_session(session.id, limit: 5)
-      branch_name = resolve_branch_name(session.git_worktree_path)
+      branch_name = Worktrees.resolve_branch_name(session.git_worktree_path)
 
       json(
         conn,
@@ -492,17 +493,6 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   defp handle_terminal_status(session, status) do
     member_status = if status == "failed", do: "failed", else: "done"
     EyeInTheSky.Teams.mark_member_done_by_session(session.id, member_status)
-  end
-
-  defp resolve_branch_name(nil), do: nil
-
-  defp resolve_branch_name(wt_path) do
-    case System.cmd("git", ["-C", wt_path, "symbolic-ref", "--short", "HEAD"],
-           stderr_to_stdout: true
-         ) do
-      {branch, 0} -> String.trim(branch)
-      _ -> nil
-    end
   end
 
   defp maybe_put_read_only(attrs, nil), do: attrs

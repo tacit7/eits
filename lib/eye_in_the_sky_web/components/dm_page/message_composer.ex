@@ -152,6 +152,40 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
           >
             <span class="text-xs font-semibold tracking-tight select-none">Aa</span>
           </button>
+          <%!-- Thinking toggle --%>
+          <button
+            type="button"
+            phx-click="toggle_thinking"
+            title={if @thinking_enabled, do: "Thinking on — click to disable", else: "Enable extended thinking"}
+            class={[
+              "flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg transition-colors",
+              if(@thinking_enabled,
+                do: "text-primary bg-primary/10 hover:bg-primary/15",
+                else: "text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5"
+              )
+            ]}
+          >
+            <.icon name="hero-sparkles" class="size-4" />
+          </button>
+          <%!-- Plan mode toggle --%>
+          <button
+            type="button"
+            phx-click="toggle_plan_mode"
+            title={
+              if Keyword.get(@session_cli_opts, :plan, false),
+                do: "Plan mode on — click to disable",
+                else: "Enable plan mode (agent will propose changes before acting)"
+            }
+            class={[
+              "flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg transition-colors",
+              if(Keyword.get(@session_cli_opts, :plan, false),
+                do: "text-warning bg-warning/10 hover:bg-warning/15",
+                else: "text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5"
+              )
+            ]}
+          >
+            <.icon name="hero-book-open" class="size-4" />
+          </button>
           <.live_file_input upload={@uploads.files} class="hidden" />
           <%!-- Budget cap input --%>
           <div class="flex items-center gap-0.5 text-xs text-base-content/40">

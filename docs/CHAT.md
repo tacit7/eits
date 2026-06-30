@@ -52,9 +52,10 @@ Response saved via Messages.record_incoming_reply
     |
     v
 ChatLive receives {:new_message, _} via PubSub
-    |-- Deduplication guard: skip if message.id already in socket.assigns.messages
+    |-- Deduplication guard: skip if message.id in socket.assigns.received_message_ids (MapSet)
     |-- Preload associations via ChannelMessages.preload_for_serialization([:session, :reactions, :attachments])
-    |-- Append message and update UI
+    |-- Push chat:message_appended delta to client (O(1) wire: just the new message)
+    |-- AgentMessagesPanel.svelte receives delta and appends to liveMessages locally
 ```
 
 ### REST API Message Flow
@@ -420,6 +421,17 @@ GenServer that polls the DB every 2 seconds for new messages written by external
 
 Disable in test: `config :eye_in_the_sky_web, EyeInTheSkyWeb.Messages.Broadcaster, enabled: false`.
 
+### BulkImporter (`lib/eye_in_the_sky/messages/bulk_importer.ex`)
+
+Batch-imports messages from external sources (e.g., CLI agents, MCP servers). Inserts messages and broadcasts them to PubSub.
+
+**Message Broadcast Optimization**:
+- `broadcast_inserted_messages(session_id, source_uuids)` fetches all messages in one batch query instead of N per-message lookups
+- Single `WHERE source_uuid IN (...)` query loads all messages, keyed by source_uuid in a Map
+- Iteration over source_uuids performs O(1) Map.fetch lookups and broadcasts each message
+- Replaces N `Messages.get_message_by_source_uuid(source_uuid)` calls with one batch + map iteration
+- Error handling: `Map.fetch` returns `:error` (no match) instead of `{:error, :not_found}` tuple
+
 ## PubSub Topics
 
 All PubSub goes through `EyeInTheSkyWeb.Events` (never call `Phoenix.PubSub` directly).
@@ -431,18 +443,28 @@ All PubSub goes through `EyeInTheSkyWeb.Events` (never call `Phoenix.PubSub` dir
 | `agent:working` | `{:agent_working, uuid, id}` | `AgentWorker`, `SessionWorker` | `ChatLive`, `DmLive` |
 | `agent:working` | `{:agent_stopped, uuid, id}` | `AgentWorker`, `SessionWorker` | `ChatLive`, `DmLive` |
 
-## PubSub Handler Deduplication
+## PubSub Handler Deduplication and Delta Delivery
 
 Multiple broadcasts can fire for a single message insert:
 
 1. `broadcast_and_return` from `Messages.create_channel_message` (immediate, from creating process)
 2. `NotifyListener` via Postgres LISTEN/NOTIFY (async, fires for every table insert)
 
-Both send identical `{:new_message, msg}` payloads to the `channel:<id>:messages` topic. Without deduplication, the message renders twice in the UI.
+Both send identical `{:new_message, msg}` payloads to the `channel:<id>:messages` topic. Without deduplication, the message would be processed twice.
 
-**Solution**: `PubSubHandlers.handle_info({:new_message, msg})` checks if `msg.id` already exists in `socket.assigns.messages` before appending. Silently skips duplicates with a log trace.
+**Deduplication**: `PubSubHandlers.handle_info({:new_message, msg})` maintains a `received_message_ids` MapSet in `socket.assigns` for O(1) membership testing. Duplicate IDs are silently skipped with a log trace.
 
-This also allows us to keep `Repo.preload(msg, [:session, :reactions])` in the handler context rather than the DB layer — the PubSub handler is the natural serialization boundary (now delegated to `ChannelMessages.preload_for_serialization/1`).
+**Delta Delivery Pattern**: Instead of appending to `socket.assigns.messages`, the handler now pushes a `chat:message_appended` event with just the serialized message to the client. This reduces wire traffic from O(history) to O(1) per message — only the new message is sent, not the entire message list.
+
+The `messages` assign remains as a frozen first-paint snapshot (set during mount). New messages arrive via push_event deltas to the frontend, where `AgentMessagesPanel.svelte` maintains `liveMessages` locally and updates it reactively.
+
+**Related Deltas**:
+- `chat:message_appended` — new message arrives; client appends to `liveMessages`
+- `chat:message_updated` — reaction toggled; sent with full updated message; client maps over `liveMessages` and updates matching ID
+- `chat:message_deleted` — message deleted; sent with ID only; client filters `liveMessages` to remove matching ID
+- `chat:messages_prepended` — older messages loaded; sent with array of older messages; client prepends to `liveMessages`
+
+The preload (`ChannelMessages.preload_for_serialization/1`) happens in the handler context once, avoiding redundant DB queries.
 
 ## REST API
 
@@ -627,6 +649,21 @@ Svelte component handling message display and input for `/chat`.
 
 **Props**: `activeChannelId`, `messages`, `activeAgents`, `channelMembers`, `workingAgents`, `slashItems`, `live`
 
+**Local State — Delta Pattern**:
+- `liveMessages` — client-maintained message list, synchronized with server via push_event deltas
+- The `messages` prop is a frozen first-paint snapshot (set at mount); it changes only when switching channels (prop reference change)
+- New messages, edits, and deletions arrive via `push_event` deltas, not full list reassignments
+- `onMount` registers handlers for `chat:message_appended`, `chat:message_updated`, `chat:message_deleted`, `chat:messages_prepended`
+- `$: liveMessages = [...messages]` resets on channel switch (prop ref change), allowing efficient reuse across channel navigation
+- All message operations use `liveMessages` instead of `messages` (display, search, load-older logic)
+- **Wire efficiency**: O(1) per message instead of O(history) — only deltas sent, not full history on every change
+
+**Push Event Handlers** (registered in `onMount`):
+- `chat:message_appended` — new message; append to `liveMessages`
+- `chat:message_updated` — message changed (e.g., reaction toggled); map `liveMessages` and update matching ID
+- `chat:message_deleted` — message deleted; filter `liveMessages` to remove matching ID
+- `chat:messages_prepended` — older messages loaded; prepend older array to start of `liveMessages`
+
 **Features**:
 - Message list with provider icons (opacity 30, tooltip), timestamps, date separators
 - Turn-boundary spacing (mt-4) for grouping rhythm
@@ -645,8 +682,8 @@ Svelte component handling message display and input for `/chat`.
   - Agent items now include most recent session_id for proper mention routing
 - Cmd/Ctrl+1-9 keyboard shortcuts to switch channels (1=first, 9=last channel)
 - Message history navigation (up/down arrows, 50 message buffer)
-- Auto-scroll on new messages
-- Delete message button (hover reveal)
+- Auto-scroll on new messages (triggered by `liveMessages` length changes)
+- Delete message button (hover reveal) — triggers `delete_message` event, server pushes `chat:message_deleted` delta
 - Composer hint text shows `@` to mention (not `@id` to mention)
 
 ### DmPage Component

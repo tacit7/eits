@@ -3340,6 +3340,635 @@ export const SessionsDropdownGuard = {
 
 ---
 
+## JavaScript Hook Patterns
+
+### Shared CodeMirror Setup Helpers
+
+**Problem:** Multiple CodeMirror hooks (note_editor.js, note_full_editor.js) repeat the same lazy-loading logic for CodeMirror modules and extension setup. This creates maintenance burden — updating the extension list requires changes in multiple files.
+
+**Solution:** Extract shared setup into dedicated modules in `assets/js/hooks/`.
+
+**Pattern (commit d52ef723):**
+
+| Helper | Module | Purpose |
+|--------|--------|---------|
+| `loadCMModulesAndCompartments()` | `cm_editor_setup.js` | Lazy-load CodeMirror modules (view, state, commands, language, markdown), create compartments (theme, tab size, font size, vim), return all together |
+| `mountCMView(hook, opts)` | `cm_editor_setup.js` | Mount EditorView, attach cleanup handlers for theme/tab/font/vim watchers |
+| `destroyCMView(hook)` | `cm_editor_setup.js` | Destroy view, call all cleanup functions (theme, tab, font, vim) |
+| `initResizeObserver(hook, callback)` | `utils.js` | Track element dimension changes, debounce persistence calls, call callback(w, h) on resize |
+
+**Before (duplicated setup):**
+```javascript
+// assets/js/hooks/note_editor.js — 47 lines of module imports + setup
+export const NoteEditorHook = {
+  async mounted() {
+    const [
+      { EditorView, keymap, highlightActiveLine },
+      { EditorState },
+      // ... 5 more imports
+    ] = await Promise.all([...])
+    
+    const { extension: themeExtension, watch } = await makeThemeCompartment()
+    const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
+    // ... similar for font, vim
+    
+    const state = EditorState.create({ doc, extensions })
+    this._view = new EditorView({ state, parent: this.el })
+    this._cleanupTheme = watch(this._view)
+    // ... attach other watchers
+  }
+}
+
+// assets/js/hooks/note_full_editor.js — identical setup repeated
+export const NoteFullEditorHook = {
+  async mounted() {
+    const [
+      { EditorView, keymap, highlightActiveLine },
+      { EditorState },
+      // ... identical 30+ lines
+    ] = await Promise.all([...])
+    // ... same mounting logic
+  }
+}
+```
+
+**After (shared helpers):**
+```javascript
+// assets/js/hooks/cm_editor_setup.js — single source of truth
+export async function loadCMModulesAndCompartments() {
+  const [
+    viewModule,
+    { EditorState },
+    // ...
+  ] = await Promise.all([...])
+  
+  const { extension: themeExtension, watch } = await makeThemeCompartment()
+  // ... build other compartments
+  
+  return {
+    EditorView, keymap, highlightActiveLine,
+    EditorState, defaultKeymap, history, historyKeymap,
+    themeExtension, tabExtension, fontExtension, vimExtension,
+    watch, tabWatch, watchFont, watchVim,
+  }
+}
+
+export function mountCMView(hook, { EditorState, EditorView, doc, extensions, watch, tabWatch, watchFont, watchVim }) {
+  const state = EditorState.create({ doc, extensions })
+  hook._view = new EditorView({ state, parent: hook.el })
+  hook._cleanupTheme = watch(hook._view)
+  hook._cleanupTabSize = tabWatch(hook._view)
+  hook._cleanupFontSize = watchFont(hook._view)
+  hook._cleanupVim = watchVim(hook._view)
+}
+
+export function destroyCMView(hook) {
+  if (hook._cleanupTheme) hook._cleanupTheme()
+  if (hook._cleanupTabSize) hook._cleanupTabSize()
+  if (hook._cleanupFontSize) hook._cleanupFontSize()
+  if (hook._cleanupVim) hook._cleanupVim()
+  if (hook._view) {
+    hook._view.destroy()
+    hook._view = null
+  }
+}
+
+// assets/js/hooks/note_editor.js — now clean
+import { loadCMModulesAndCompartments, mountCMView, destroyCMView } from "./cm_editor_setup"
+
+export const NoteEditorHook = {
+  async mounted() {
+    const modules = await loadCMModulesAndCompartments()
+    // ... setup extensions with modules
+    mountCMView(this, { EditorState, EditorView, doc: body, extensions, ... })
+  },
+  
+  destroyed() {
+    destroyCMView(this)
+  }
+}
+```
+
+**Resize Observer Helper (utils.js):**
+
+Extract common resize tracking logic used by multiple window hooks (chat_window_hook, terminal_window_hook):
+
+```javascript
+// assets/js/hooks/utils.js
+export function initResizeObserver(hook, onResize) {
+  hook._width = hook.el.offsetWidth
+  hook._height = hook.el.offsetHeight
+
+  const observer = new ResizeObserver(() => {
+    hook._width = hook.el.offsetWidth
+    hook._height = hook.el.offsetHeight
+    
+    clearTimeout(hook._resizePersistTimer)
+    hook._resizePersistTimer = setTimeout(() => {
+      if (hook._destroyed) return
+      onResize(hook._width, hook._height)
+    }, 400)
+  })
+  
+  observer.observe(hook.el)
+  hook._windowResizeObserver = observer
+}
+
+// Usage in chat_window_hook.js
+import { initResizeObserver } from './utils'
+
+initResizeObserver(this, (w, h) => {
+  this.pushEvent("window_resized", { id: this.el.dataset.csId, w, h })
+  saveWindowLayout(this.el.dataset.csId, left, top, w, h)
+})
+```
+
+**When to extract:**
+- Same hook setup logic appears in 2+ hooks
+- Module imports are identical
+- Cleanup/destruction patterns are the same
+- Window geometry tracking (ResizeObserver) is reused
+
+**Rule:** Extract common hook setup to `cm_editor_setup.js` or `utils.js`. Don't duplicate module loads or extent setup across multiple hooks. Use lazy imports to keep the initial JS bundle small.
+
+---
+
+## LiveView mount/3 Hygiene
+
+### Guard DB Queries Behind connected?
+
+**Problem:** LiveView's `mount/3` runs twice: once for the dead render (no socket connection) and once for the live render (after connection). Database queries in the initial render waste CPU and DB connections.
+
+**Solution:** Guard all DB queries, PubSub subscriptions, and side effects behind `connected?(socket)`.
+
+**Pattern (commit 26699b8d):**
+
+**Before (wasteful):**
+```elixir
+# lib/eye_in_the_sky_web_web/live/project_live/sessions/state.ex
+def mount(%{"project_id" => project_id} = params, _session, socket) do
+  socket = assign(socket, :project_id, project_id)
+  
+  # WRONG: These run on dead render, then again on live render
+  canvases = Canvases.list_canvases(project_id)       # DB query #1
+  projects = Projects.list_projects_for_workspace()   # DB query #2
+  agents = Agents.list_agents_for_scope(scope)        # DB query #3
+  
+  socket =
+    socket
+    |> assign(:canvases, canvases)
+    |> assign(:projects, projects)
+    |> assign(:agents, agents)
+  
+  {:ok, socket}
+end
+```
+
+On a high-traffic page (project sessions is the most-viewed), this doubles DB load every time someone loads the page.
+
+**After (optimized):**
+```elixir
+def mount(%{"project_id" => project_id} = params, _session, socket) do
+  socket = assign(socket, :project_id, project_id)
+  
+  socket =
+    if connected?(socket) do
+      # Only run on live render (connected)
+      canvases = Canvases.list_canvases(project_id)
+      projects = Projects.list_projects_for_workspace()
+      agents = Agents.list_agents_for_scope(scope)
+      
+      socket
+      |> assign(:canvases, canvases)
+      |> assign(:projects, projects)
+      |> assign(:agents, agents)
+    else
+      # Dead render: use defaults
+      socket
+      |> assign(:canvases, [])
+      |> assign(:projects, [])
+      |> assign(:agents, [])
+    end
+  
+  {:ok, socket}
+end
+```
+
+**Impact (commit 26699b8d):** Applied to 3 LiveViews (dm_live.ex, project_live/sessions/state.ex, workspace_live/sessions_live.ex). Halves DB load on project sessions (the most-visited page).
+
+**What still runs in dead render:**
+- Route parameter extraction (`%{"project_id" => ...}`)
+- Static assignments (IDs, feature flags)
+- Format/parsing logic
+
+**What must be guarded:**
+- All `Repo.*` calls
+- PubSub subscriptions
+- Timers / async tasks
+- External API calls
+
+**Rule:** Every DB query, subscription, and side effect in `mount/3` must be wrapped in `if connected?(socket)`. Dead render assigns should use empty defaults (`[]`, `nil`, `%{}`). Verify templates render correctly with empty state.
+
+---
+
+## Svelte Accessibility Patterns
+
+### 1. aria-live Regions for Dynamic Content
+
+Add polite and assertive aria-live regions to the app layout so screen readers announce important updates.
+
+**Pattern (commit 3f447d81):**
+
+```heex
+<!-- lib/eye_in_the_sky_web_web/components/layouts/app.html.heex -->
+<div class="min-h-screen flex flex-col">
+  <!-- Polite announcements: status updates, new messages (doesn't interrupt) -->
+  <div id="live-polite-region" aria-live="polite" aria-atomic="true" class="sr-only" />
+  
+  <!-- Assertive announcements: errors, critical alerts (interrupts current screen reader) -->
+  <div id="live-assertive-region" aria-live="assertive" aria-atomic="true" class="sr-only" />
+  
+  <!-- Rest of layout -->
+</div>
+```
+
+**Usage in Svelte components:**
+
+```svelte
+<!-- assets/svelte/components/AgentDetail.svelte -->
+<script>
+  function updateAgent() {
+    // ... update logic
+    const announcement = `Agent ${agent.name} updated successfully`
+    const region = document.getElementById('live-polite-region')
+    if (region) region.textContent = announcement
+  }
+</script>
+```
+
+**When to use:**
+- Polite (`aria-live="polite"`): Messages, notifications, status updates — doesn't interrupt
+- Assertive (`aria-live="assertive"`): Errors, warnings, critical alerts — interrupts immediately
+
+**Rule:** Always use aria-live regions for dynamic announcements. Never rely on visual-only feedback.
+
+---
+
+### 2. Native Dialog Elements with showModal()
+
+Use `<dialog>` elements with `.showModal()` instead of CSS-toggled modals. Native dialogs provide automatic focus trapping and Escape-key handling.
+
+**Pattern (commit 3f447d81, 6067618a):**
+
+**Before (CSS toggle, no focus management):**
+```svelte
+<script>
+  let showModal = false
+</script>
+
+<!-- Doesn't trap focus, Escape doesn't close automatically -->
+<div class="modal" class:modal-open={showModal} on:keydown|capture={...}>
+  <div class="modal-box">
+    <h2>Inspect</h2>
+    <input bind:value={message} />
+    <button on:click={() => showModal = false}>Close</button>
+  </div>
+</div>
+```
+
+**After (native dialog with .showModal()):**
+```svelte
+<script>
+  let dialogEl
+  let message = ''
+
+  function openModal() {
+    dialogEl?.showModal()
+  }
+
+  function closeModal() {
+    dialogEl?.close()
+  }
+</script>
+
+<!-- Focus trapped automatically, Escape closes automatically -->
+<dialog bind:this={dialogEl} class="modal rounded-lg shadow-lg p-6">
+  <h2>Inspect</h2>
+  <input bind:value={message} />
+  <button on:click={closeModal} aria-label="Close modal">Close</button>
+</dialog>
+
+<button on:click={openModal}>Open</button>
+```
+
+**Benefits:**
+- **Focus trap:** Native browser behavior — focus can't escape the modal
+- **Escape key:** Built-in — no manual keydown handling needed
+- **Backdrop:** Automatic — semi-transparent overlay included
+- **Screen reader support:** Announced as a dialog, content is isolated
+
+**CSS for native dialog:**
+```css
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+dialog {
+  border: none;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  padding: 1.5rem;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+```
+
+**Rule:** All modals must use `<dialog>` with `.showModal()`. No CSS-toggle modals. This is required for a11y.
+
+---
+
+### 3. Keyed Each Loops
+
+Use `{#each items as item (item.id)}` to give each DOM node a stable identity. Prevents state loss during list updates.
+
+**Pattern (commit 3f447d81):**
+
+**Before (no keys):**
+```svelte
+<script>
+  let sessions = [...]
+  let selectedId = null
+</script>
+
+<!-- Without keys, DOM nodes are reused by position, not identity -->
+<!-- If sessions reorder, selected state can stick to the wrong row -->
+{#each sessions as session}
+  <div on:click={() => selectedId = session.id} class={selectedId === session.id ? 'selected' : ''}>
+    {session.name}
+  </div>
+{/each}
+```
+
+**After (keyed):**
+```svelte
+<script>
+  let sessions = [...]
+  let selectedId = null
+</script>
+
+<!-- Keys ensure each DOM element stays with the same data item -->
+{#each sessions as session (session.id)}
+  <div on:click={() => selectedId = session.id} class={selectedId === session.id ? 'selected' : ''}>
+    {session.name}
+  </div>
+{/each}
+```
+
+**What breaks without keys:**
+- Form input values stick to DOM nodes (position-based)
+- Transitions fire on the wrong items
+- Component state (focus, open dropdowns) persists in the wrong row after reorder
+
+**Rule:** Every `{#each}` loop MUST have a key expression: `{#each items as item (item.id)}`. Use a unique ID; avoid array indexes as keys.
+
+---
+
+### 4. Aria-label on Buttons and Inputs
+
+Add `aria-label` to icon-only buttons and placeholder-only inputs so screen readers announce their purpose.
+
+**Pattern (commit 3f447d81, 6067618a):**
+
+**Before (no labels):**
+```svelte
+<!-- Icon-only button: screen readers don't know what it does -->
+<button on:click={openModal} class="btn btn-sm btn-ghost">
+  <Icon name="hero-magnifying-glass" />
+</button>
+
+<!-- Search input with only placeholder: no label -->
+<input type="text" placeholder="Search messages..." />
+
+<!-- Checkbox without associated label -->
+<input type="checkbox" bind:checked={starred} />
+```
+
+**After (with aria-label):**
+```svelte
+<!-- Icon button has a clear label -->
+<button on:click={openModal} aria-label="Open message inspector">
+  <Icon name="hero-magnifying-glass" />
+</button>
+
+<!-- Input has both placeholder and aria-label -->
+<input
+  type="text"
+  placeholder="Search messages..."
+  aria-label="Search messages by content or sender"
+/>
+
+<!-- Checkbox has associated label -->
+<label>
+  <input type="checkbox" bind:checked={starred} />
+  Mark as starred
+</label>
+```
+
+**Rule:** Every button without visible text needs `aria-label`. Every input with only a placeholder needs `aria-label`. Visible labels via `<label>` are preferred when space allows.
+
+---
+
+### 5. Space Key Handling for role=button Divs
+
+When using divs with `role="button"`, add Space key handling via `on:keydown` or `on:keyup`.
+
+**Pattern (commit 3f447d81):**
+
+```svelte
+<script>
+  function handleSpaceKey(e) {
+    if (e.key === ' ' || e.code === 'Space') {
+      e.preventDefault()
+      handleClick()
+    }
+  }
+
+  function handleClick() {
+    // action
+  }
+</script>
+
+<div
+  role="button"
+  tabindex="0"
+  on:click={handleClick}
+  on:keydown={handleSpaceKey}
+  aria-label="Toggle setting"
+>
+  <!-- content -->
+</div>
+```
+
+**Why:** The Space key is expected to activate buttons. Divs with `role="button"` must respond to Space the same way a real `<button>` does.
+
+**Rule:** If you use `role="button"`, also add `tabindex="0"`, `aria-label`, and `on:keydown` handler for Space/Enter. Better: use actual `<button>` elements when possible.
+
+---
+
+## Ecto Patterns
+
+### Batch Inserts with insert_all
+
+**Problem:** Context functions that create multiple related rows loop over `Repo.insert` per item. This creates N+1 inserts and makes transactions harder to reason about.
+
+**Solution:** Build all row data up front and call `Repo.insert_all` once.
+
+**Pattern (commit ed78523b):**
+
+**Before (N+1 inserts):**
+```elixir
+# lib/eye_in_the_sky/iam.ex
+def attach_documents_to_agent_type(agent_type, document_ids) do
+  result =
+    Repo.transaction(fn ->
+      Enum.reduce_while(document_ids, 0, fn doc_id, count ->
+        attrs = %{agent_type: agent_type, document_id: doc_id}
+        changeset = AgentTypeDocument.changeset(%AgentTypeDocument{}, attrs)
+
+        case Repo.insert(changeset,
+               on_conflict: :nothing,
+               conflict_target: [:agent_type, :document_id]
+             ) do
+          {:ok, %AgentTypeDocument{id: nil}} ->
+            {:cont, count}
+
+          {:ok, _atd} ->
+            {:cont, count + 1}
+
+          {:error, changeset} ->
+            Repo.rollback({:changeset, changeset})
+        end
+      end)
+    end)
+
+  case result do
+    {:ok, count} ->
+      invalidate_cache()
+      {:ok, count}
+
+    {:error, {:changeset, cs}} ->
+      {:error, cs}
+
+    {:error, reason} ->
+      {:error, reason}
+  end
+end
+```
+
+**After (single insert_all):**
+```elixir
+def attach_documents_to_agent_type(agent_type, document_ids) do
+  now = DateTime.utc_now()
+
+  rows =
+    Enum.map(document_ids, fn doc_id ->
+      %{agent_type: agent_type, document_id: doc_id, inserted_at: now, updated_at: now}
+    end)
+
+  try do
+    {count, _} =
+      Repo.insert_all(AgentTypeDocument, rows,
+        on_conflict: :nothing,
+        conflict_target: [:agent_type, :document_id]
+      )
+
+    invalidate_cache()
+    {:ok, count}
+  rescue
+    e -> {:error, e}
+  end
+end
+```
+
+**Why this is better:**
+- Single database round-trip instead of N+1
+- `on_conflict: :nothing` semantics preserved (deduplicates on unique constraint)
+- Error handling via `try/rescue` keeps the return path alive (`{:error, term()}`)
+- Faster on large batches (50 docs: 1 query instead of 50)
+
+**When to use:**
+- Creating 3+ rows with the same schema
+- Batch operations (attach all documents, link all tags)
+- Ensuring atomicity of multi-row changes
+
+**Key detail:** Set `inserted_at` and `updated_at` to the same value (`DateTime.utc_now()`) before calling `insert_all`. Postgres will override them, but passing explicit values ensures consistency.
+
+**Rule:** Replace `Enum.reduce` loops over `Repo.insert` with `Repo.insert_all`. Use `on_conflict: :nothing` to skip duplicates safely. Wrap in `try/rescue` if error handling is needed.
+
+---
+
+### Explicit Case Statements Over || Tricks
+
+**Problem:** Using the `||` operator with `Repo.get` to provide atom fallbacks makes code harder to read and creates implicit type mixing (struct vs atom).
+
+**Solution:** Use explicit `case` statements to make nil/struct branches unambiguous.
+
+**Pattern (commit ed78523b):**
+
+**Before (implicit || fallback):**
+```elixir
+def add_policy_to_document(document_id, policy_id) do
+  with %PolicyDocument{} <- Repo.get(PolicyDocument, document_id) || :doc_not_found,
+       %Policy{} <- Repo.get(Policy, policy_id) || :policy_not_found do
+    do_insert_document_policy(document_id, policy_id)
+  else
+    :doc_not_found -> {:error, :document_not_found}
+    :policy_not_found -> {:error, :policy_not_found}
+  end
+end
+```
+
+**Confusing because:**
+- `||` returns the fallback if the left side is falsy (nil, false)
+- Pattern matching on `:doc_not_found` (an atom) is indirect
+- Reader must understand that `Repo.get` returns nil, then `||` provides the atom
+
+**After (explicit case):**
+```elixir
+def add_policy_to_document(document_id, policy_id) do
+  case Repo.get(PolicyDocument, document_id) do
+    nil ->
+      {:error, :document_not_found}
+
+    %PolicyDocument{} ->
+      case Repo.get(Policy, policy_id) do
+        nil -> {:error, :policy_not_found}
+        %Policy{} -> do_insert_document_policy(document_id, policy_id)
+      end
+  end
+end
+```
+
+**Why this is better:**
+- Nil and struct branches are visually distinct
+- No implicit type coercion (atom from ||)
+- Each error path is explicit
+- Easier to add logging/debugging to specific branches
+
+**When to prefer case over with:**
+- Multiple sequential lookups with different error meanings
+- Need to distinguish between nil and struct clearly
+- Error handling per lookup (not a single unified error)
+
+**When to keep with:**
+- All results use the same error tag
+- Pattern is simple (1–2 lookups)
+- Each step is independent
+
+**Rule:** Avoid `|| :atom` fallbacks in `with` statements. Use nested `case` when distinguishing nil from struct is important for clarity. This trades nesting for explicit intent.
+
+---
+
 ## Database Query Patterns (Ecto)
 
 ### Golden Rule: Push Filters to the Database

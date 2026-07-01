@@ -8,7 +8,6 @@ defmodule EyeInTheSky.Codex.SessionReader do
   - Relevant payload types: "session_meta", "user_message", "agent_message", "token_count"
   """
 
-  require Logger
 
   @doc """
   Finds the Codex session JSONL file for a given thread_id.

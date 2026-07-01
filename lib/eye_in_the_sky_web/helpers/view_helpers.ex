@@ -78,11 +78,11 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
 
   @doc """
   Truncate text to a given max length (default 50), appending "…" when truncated.
-  Returns empty string for nil input.
+  Returns nil for nil or non-binary input so callers can use || fallback chains.
   """
   def truncate_text(text), do: truncate_text(text, 50)
 
-  def truncate_text(nil, _max), do: ""
+  def truncate_text(nil, _max), do: nil
 
   def truncate_text(text, max) when is_binary(text) do
     if String.length(text) > max do
@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
     end
   end
 
-  def truncate_text(_, _), do: ""
+  def truncate_text(_, _), do: nil
 
   # ── Number / cost helpers ──────────────────────────────────────────────────
 

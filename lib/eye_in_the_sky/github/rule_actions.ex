@@ -1,6 +1,5 @@
 defmodule EyeInTheSky.Github.RuleActions do
   @moduledoc false
-  require Logger
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Events

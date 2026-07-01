@@ -157,13 +157,6 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
     else
       {:error, code, message} ->
         conn |> put_status(:bad_request) |> json(%{error_code: code, message: message})
-
-      error ->
-        Logger.error("Unexpected validation error in spawn: #{inspect(error)}")
-
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error_code: "internal_error", message: "An unexpected error occurred"})
     end
   end
 

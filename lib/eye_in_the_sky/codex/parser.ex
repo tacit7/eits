@@ -276,6 +276,4 @@ defmodule EyeInTheSky.Codex.Parser do
     end)
     |> Enum.map_join("", fn item -> item["text"] || "" end)
   end
-
-  defp extract_text_from_content(_), do: ""
 end

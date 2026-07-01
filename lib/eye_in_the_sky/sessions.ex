@@ -9,7 +9,6 @@ defmodule EyeInTheSky.Sessions do
 
   import Ecto.Query, warn: false
 
-  require Logger
 
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Sessions.Loader

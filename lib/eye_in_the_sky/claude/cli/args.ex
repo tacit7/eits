@@ -151,7 +151,7 @@ defmodule EyeInTheSky.Claude.CLI.Args do
     args =
       args
       |> maybe_bool_flag("--verbose", verbose)
-      |> maybe_bool_flag("--dangerously-skip-permissions", opts[:skip_permissions])
+      |> maybe_bool_flag("--dangerously-skip-permissions", opts[:skip_permissions] && opts[:permission_mode] in [nil, ""])
       |> maybe_bool_flag("--sandbox", opts[:sandbox] == true)
       |> maybe_bool_flag("--chrome", opts[:chrome] == true)
       |> maybe_bool_flag("--no-chrome", opts[:chrome] == false)

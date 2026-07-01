@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
       |> assign(:show_all, false)
       |> assign(:prompts, [])
       |> assign(:selected_prompt, nil)
+      |> assign(:detail_tab, :preview)
 
     {:ok, socket}
   end
@@ -56,7 +57,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   @impl true
   def handle_event("select_prompt", %{"uuid" => uuid}, socket) do
     selected = Enum.find(socket.assigns.prompts, &(&1.uuid == uuid))
-    {:noreply, assign(socket, :selected_prompt, selected)}
+    {:noreply, assign(socket, selected_prompt: selected, detail_tab: :preview)}
+  end
+
+  @impl true
+  def handle_event("set_detail_tab", %{"tab" => tab}, socket) do
+    {:noreply, assign(socket, :detail_tab, String.to_existing_atom(tab))}
   end
 
   defp load_prompts(socket) do
@@ -254,16 +260,44 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                 <.icon name="hero-arrow-top-right-on-square" class="size-3.5" /> Edit
               </.link>
             </div>
+            <div class="flex items-center gap-1 mt-3">
+              <button
+                phx-click="set_detail_tab"
+                phx-value-tab="preview"
+                class={"px-3 py-1 rounded text-xs font-medium " <>
+                  if(@detail_tab == :preview,
+                    do: "bg-base-content/8 text-base-content",
+                    else: "text-base-content/50 hover:text-base-content")}
+              >
+                Preview
+              </button>
+              <button
+                phx-click="set_detail_tab"
+                phx-value-tab="raw"
+                class={"px-3 py-1 rounded text-xs font-medium " <>
+                  if(@detail_tab == :raw,
+                    do: "bg-base-content/8 text-base-content",
+                    else: "text-base-content/50 hover:text-base-content")}
+              >
+                Raw
+              </button>
+            </div>
           </div>
 
-          <div class="flex-1 overflow-y-auto px-6 py-5" style="scrollbar-width: none;">
-            <div class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-3">
-              Prompt Text
-            </div>
-            <pre class="bg-base-200/50 rounded-lg px-4 py-4 text-xs font-mono text-base-content/80 whitespace-pre-wrap break-words leading-relaxed overflow-x-auto"><code>{@selected_prompt.prompt_text}</code></pre>
-
+          <div class="flex-1 overflow-y-auto" style="scrollbar-width: none;">
+            <%= if @detail_tab == :preview do %>
+              <div
+                id={"proj-prompt-viewer-#{@selected_prompt.uuid}"}
+                class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                phx-hook="MarkdownMessage"
+                data-raw-body={@selected_prompt.prompt_text}
+              >
+              </div>
+            <% else %>
+              <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_prompt.prompt_text}</pre>
+            <% end %>
             <%= if @selected_prompt.created_by do %>
-              <div class="mt-5 text-xs text-base-content/40">
+              <div class="px-6 pb-4 text-xs text-base-content/40">
                 Created by <span class="text-base-content/60">{@selected_prompt.created_by}</span>
               </div>
             <% end %>

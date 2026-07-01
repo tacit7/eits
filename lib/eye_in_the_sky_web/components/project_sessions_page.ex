@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   def page(assigns) do
     ~H"""
     <div
-      class="flex flex-col bg-base-100 min-h-full px-4 sm:px-6 lg:px-8 min-w-[860px]"
+      class="flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]"
       id="sessions-page-root"
       phx-hook="DmHistoryCleanup"
     >

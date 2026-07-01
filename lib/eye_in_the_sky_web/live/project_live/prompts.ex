@@ -67,6 +67,38 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     {:noreply, assign(socket, :detail_tab, String.to_existing_atom(tab))}
   end
 
+  @impl true
+  def handle_event("edit_content", _, socket),
+    do: {:noreply, assign(socket, :detail_tab, :edit)}
+
+  @impl true
+  def handle_event("cancel_edit", _, socket),
+    do: {:noreply, assign(socket, :detail_tab, :preview)}
+
+  @impl true
+  def handle_event("file_changed", %{"content" => content}, socket) do
+    case socket.assigns.selected_prompt do
+      nil ->
+        {:noreply, socket}
+
+      prompt ->
+        case Prompts.update_prompt(prompt, %{prompt_text: content}) do
+          {:ok, updated} ->
+            socket =
+              socket
+              |> load_prompts()
+              |> assign(:selected_prompt, updated)
+              |> assign(:detail_tab, :preview)
+              |> put_flash(:info, "Prompt saved")
+
+            {:noreply, socket}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, "Failed to save prompt")}
+        end
+    end
+  end
+
   defp load_prompts(socket) do
     show_all = Map.get(socket.assigns, :show_all, false)
     query = socket.assigns.search_query
@@ -230,51 +262,73 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                 navigate={~p"/projects/#{@project.id}/prompts/#{@selected_prompt.uuid}"}
                 class="btn btn-ghost btn-xs gap-1 flex-shrink-0"
               >
-                <.icon name="hero-arrow-top-right-on-square" class="size-3.5" /> Edit
+                <.icon name="hero-arrow-top-right-on-square" class="size-3.5" /> Full edit
               </.link>
             </div>
             <div class="flex items-center gap-1 mt-3">
-              <button
-                phx-click="set_detail_tab"
-                phx-value-tab="preview"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
-                  if(@detail_tab == :preview,
-                    do: "bg-base-content/8 text-base-content",
-                    else: "text-base-content/50 hover:text-base-content")}
-              >
-                Preview
-              </button>
-              <button
-                phx-click="set_detail_tab"
-                phx-value-tab="raw"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
-                  if(@detail_tab == :raw,
-                    do: "bg-base-content/8 text-base-content",
-                    else: "text-base-content/50 hover:text-base-content")}
-              >
-                Raw
-              </button>
+              <%= if @detail_tab == :edit do %>
+                <span class="text-[10px] text-base-content/40 mr-2">Ctrl+S to save</span>
+                <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+              <% else %>
+                <button
+                  phx-click="set_detail_tab"
+                  phx-value-tab="preview"
+                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                    if(@detail_tab == :preview,
+                      do: "bg-base-content/8 text-base-content",
+                      else: "text-base-content/50 hover:text-base-content")}
+                >
+                  Preview
+                </button>
+                <button
+                  phx-click="set_detail_tab"
+                  phx-value-tab="raw"
+                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                    if(@detail_tab == :raw,
+                      do: "bg-base-content/8 text-base-content",
+                      else: "text-base-content/50 hover:text-base-content")}
+                >
+                  Raw
+                </button>
+                <button
+                  phx-click="edit_content"
+                  class="px-3 py-1 rounded text-xs font-medium text-base-content/50 hover:text-base-content"
+                >
+                  Edit
+                </button>
+              <% end %>
             </div>
           </div>
 
-          <div class="flex-1 overflow-y-auto" style="scrollbar-width: none;">
-            <%= if @detail_tab == :preview do %>
-              <div
-                id={"proj-prompt-viewer-#{@selected_prompt.uuid}"}
-                class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
-                phx-hook="MarkdownMessage"
-                data-raw-body={@selected_prompt.prompt_text}
-              >
-              </div>
-            <% else %>
-              <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_prompt.prompt_text}</pre>
-            <% end %>
-            <%= if @selected_prompt.created_by do %>
-              <div class="px-6 pb-4 text-xs text-base-content/40">
-                Created by <span class="text-base-content/60">{@selected_prompt.created_by}</span>
-              </div>
-            <% end %>
-          </div>
+          <%= if @detail_tab == :edit do %>
+            <div
+              id={"proj-prompt-editor-#{@selected_prompt.uuid}"}
+              phx-hook="CodeMirror"
+              phx-update="ignore"
+              data-content={Base.encode64(@selected_prompt.prompt_text || "")}
+              data-lang="markdown"
+              class="flex-1 overflow-hidden min-h-0"
+            ></div>
+          <% else %>
+            <div class="flex-1 overflow-y-auto" style="scrollbar-width: none;">
+              <%= if @detail_tab == :preview do %>
+                <div
+                  id={"proj-prompt-viewer-#{@selected_prompt.uuid}"}
+                  class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                  phx-hook="MarkdownMessage"
+                  data-raw-body={@selected_prompt.prompt_text}
+                >
+                </div>
+              <% else %>
+                <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_prompt.prompt_text}</pre>
+              <% end %>
+              <%= if @selected_prompt.created_by do %>
+                <div class="px-6 pb-4 text-xs text-base-content/40">
+                  Created by <span class="text-base-content/60">{@selected_prompt.created_by}</span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
         </div>
       <% end %>
     </div>

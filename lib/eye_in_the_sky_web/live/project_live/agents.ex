@@ -87,6 +87,42 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_event("edit_content", _, socket),
+    do: {:noreply, assign(socket, :detail_tab, :edit)}
+
+  @impl true
+  def handle_event("cancel_edit", _, socket),
+    do: {:noreply, assign(socket, :detail_tab, :preview)}
+
+  @impl true
+  def handle_event("file_changed", %{"content" => content}, socket) do
+    case socket.assigns.selected_agent do
+      %{abs_path: path, id: id} when is_binary(path) ->
+        if open_path_allowed?(path, socket) do
+          case File.write(path, content) do
+            :ok ->
+              socket =
+                socket
+                |> load_agents()
+                |> reselect_agent(id)
+                |> assign(:detail_tab, :preview)
+                |> put_flash(:info, "Agent saved")
+
+              {:noreply, socket}
+
+            {:error, reason} ->
+              {:noreply, put_flash(socket, :error, "Failed to save agent: #{inspect(reason)}")}
+          end
+        else
+          {:noreply, put_flash(socket, :error, "Write not permitted for this path")}
+        end
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "No file path available")}
+    end
+  end
+
+  @impl true
   def handle_event("toggle_new_agent_form", _params, socket) do
     {:noreply,
      socket
@@ -300,40 +336,68 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
               </div>
             </div>
             <div class="flex items-center gap-1 mt-3">
-              <button
-                phx-click="set_detail_tab"
-                phx-value-tab="preview"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
-                  if(@detail_tab == :preview, do: "bg-base-content/8 text-base-content", else: "text-base-content/50 hover:text-base-content")}
-              >
-                Preview
-              </button>
-              <button
-                phx-click="set_detail_tab"
-                phx-value-tab="raw"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
-                  if(@detail_tab == :raw, do: "bg-base-content/8 text-base-content", else: "text-base-content/50 hover:text-base-content")}
-              >
-                Raw
-              </button>
-              <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
-                {FileHelpers.format_size(@selected_agent.size)}
-              </span>
+              <%= if @detail_tab == :edit do %>
+                <span class="text-[10px] text-base-content/40 mr-2">Ctrl+S to save</span>
+                <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+              <% else %>
+                <button
+                  phx-click="set_detail_tab"
+                  phx-value-tab="preview"
+                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                    if(@detail_tab == :preview,
+                      do: "bg-base-content/8 text-base-content",
+                      else: "text-base-content/50 hover:text-base-content")}
+                >
+                  Preview
+                </button>
+                <button
+                  phx-click="set_detail_tab"
+                  phx-value-tab="raw"
+                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                    if(@detail_tab == :raw,
+                      do: "bg-base-content/8 text-base-content",
+                      else: "text-base-content/50 hover:text-base-content")}
+                >
+                  Raw
+                </button>
+                <%= if is_binary(@selected_agent.abs_path) do %>
+                  <button
+                    phx-click="edit_content"
+                    class="px-3 py-1 rounded text-xs font-medium text-base-content/50 hover:text-base-content"
+                  >
+                    Edit
+                  </button>
+                <% end %>
+                <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
+                  {FileHelpers.format_size(@selected_agent.size)}
+                </span>
+              <% end %>
             </div>
           </div>
-          <div class="flex-1 overflow-y-auto">
-            <%= if @detail_tab == :preview do %>
-              <div
-                id={"proj-agent-viewer-#{@selected_agent.id}"}
-                class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
-                phx-hook="MarkdownMessage"
-                data-raw-body={@selected_agent.content}
-              >
-              </div>
-            <% else %>
-              <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_agent.content}</pre>
-            <% end %>
-          </div>
+          <%= if @detail_tab == :edit do %>
+            <div
+              id={"proj-agent-editor-#{@selected_agent.id}"}
+              phx-hook="CodeMirror"
+              phx-update="ignore"
+              data-content={Base.encode64(@selected_agent.content || "")}
+              data-lang={edit_language(@selected_agent)}
+              class="flex-1 overflow-hidden min-h-0"
+            ></div>
+          <% else %>
+            <div class="flex-1 overflow-y-auto">
+              <%= if @detail_tab == :preview do %>
+                <div
+                  id={"proj-agent-viewer-#{@selected_agent.id}"}
+                  class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                  phx-hook="MarkdownMessage"
+                  data-raw-body={@selected_agent.content}
+                >
+                </div>
+              <% else %>
+                <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_agent.content}</pre>
+              <% end %>
+            </div>
+          <% end %>
         </div>
       <% end %>
     </div>
@@ -418,18 +482,43 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   defp source_label(:project_agents), do: "project"
   defp source_label(_), do: "unknown"
 
-  defp open_path_allowed?(path, socket) do
-    user_dir = Path.expand("~/.claude/agents")
+  defp edit_language(%{path: path}) when is_binary(path), do: lang_from_path(path)
+  defp edit_language(%{abs_path: path}) when is_binary(path), do: lang_from_path(path)
+  defp edit_language(_), do: "markdown"
 
-    project_dir =
+  defp lang_from_path(path) do
+    case Path.extname(path) do
+      ".yaml" -> "yaml"
+      ".yml" -> "yaml"
+      ".json" -> "json"
+      _ -> "markdown"
+    end
+  end
+
+  defp reselect_agent(socket, id) do
+    selected = Enum.find(socket.assigns.agents, &(&1.id == id))
+    assign(socket, :selected_agent, selected)
+  end
+
+  defp open_path_allowed?(path, socket) do
+    expanded = Path.expand(path)
+    expanded_user = Path.expand("~/.claude/agents")
+
+    project_root =
       case socket.assigns[:project] do
-        %{path: p} when is_binary(p) and p != "" -> Path.join(p, ".claude/agents")
+        %{path: p} when is_binary(p) and p != "" -> Path.expand(Path.join(p, ".claude/agents"))
         _ -> nil
       end
 
-    File.exists?(path) &&
-      (String.starts_with?(path, user_dir) ||
-         (not is_nil(project_dir) && String.starts_with?(path, project_dir)))
+    in_user_dir = String.starts_with?(expanded, expanded_user <> "/")
+
+    in_project_dir =
+      case project_root do
+        nil -> false
+        root -> String.starts_with?(expanded, root <> "/")
+      end
+
+    File.exists?(path) && (in_user_dir || in_project_dir)
   end
 
   defp create_new_agent(agent_name, description, socket) do

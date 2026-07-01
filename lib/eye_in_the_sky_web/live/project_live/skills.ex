@@ -81,6 +81,42 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_event("edit_content", _, socket),
+    do: {:noreply, assign(socket, :detail_tab, :edit)}
+
+  @impl true
+  def handle_event("cancel_edit", _, socket),
+    do: {:noreply, assign(socket, :detail_tab, :preview)}
+
+  @impl true
+  def handle_event("file_changed", %{"content" => content}, socket) do
+    case socket.assigns.selected_skill do
+      %{abs_path: path, id: id} when is_binary(path) ->
+        if skill_write_allowed?(path, socket) do
+          case File.write(path, content) do
+            :ok ->
+              socket =
+                socket
+                |> load_skills()
+                |> reselect_skill(id)
+                |> assign(:detail_tab, :preview)
+                |> put_flash(:info, "Skill saved")
+
+              {:noreply, socket}
+
+            {:error, reason} ->
+              {:noreply, put_flash(socket, :error, "Failed to save skill: #{inspect(reason)}")}
+          end
+        else
+          {:noreply, put_flash(socket, :error, "Write not permitted for this path")}
+        end
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "No file path available")}
+    end
+  end
+
+  @impl true
   def handle_event("set_notify_on_stop", params, socket),
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
@@ -248,44 +284,68 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
               </button>
             </div>
             <div class="flex items-center gap-1 mt-3">
-              <button
-                phx-click="set_detail_tab"
-                phx-value-tab="preview"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
-                  if(@detail_tab == :preview,
-                    do: "bg-base-content/8 text-base-content",
-                    else: "text-base-content/50 hover:text-base-content")}
-              >
-                Preview
-              </button>
-              <button
-                phx-click="set_detail_tab"
-                phx-value-tab="raw"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
-                  if(@detail_tab == :raw,
-                    do: "bg-base-content/8 text-base-content",
-                    else: "text-base-content/50 hover:text-base-content")}
-              >
-                Raw
-              </button>
-              <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
-                {FileHelpers.format_size(@selected_skill.size)}
-              </span>
+              <%= if @detail_tab == :edit do %>
+                <span class="text-[10px] text-base-content/40 mr-2">Ctrl+S to save</span>
+                <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+              <% else %>
+                <button
+                  phx-click="set_detail_tab"
+                  phx-value-tab="preview"
+                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                    if(@detail_tab == :preview,
+                      do: "bg-base-content/8 text-base-content",
+                      else: "text-base-content/50 hover:text-base-content")}
+                >
+                  Preview
+                </button>
+                <button
+                  phx-click="set_detail_tab"
+                  phx-value-tab="raw"
+                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                    if(@detail_tab == :raw,
+                      do: "bg-base-content/8 text-base-content",
+                      else: "text-base-content/50 hover:text-base-content")}
+                >
+                  Raw
+                </button>
+                <%= if is_binary(@selected_skill.abs_path) do %>
+                  <button
+                    phx-click="edit_content"
+                    class="px-3 py-1 rounded text-xs font-medium text-base-content/50 hover:text-base-content"
+                  >
+                    Edit
+                  </button>
+                <% end %>
+                <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
+                  {FileHelpers.format_size(@selected_skill.size)}
+                </span>
+              <% end %>
             </div>
           </div>
-          <div class="flex-1 overflow-y-auto">
-            <%= if @detail_tab == :preview do %>
-              <div
-                id={"proj-skill-viewer-#{@selected_skill.id}"}
-                class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
-                phx-hook="MarkdownMessage"
-                data-raw-body={@selected_skill.content}
-              >
-              </div>
-            <% else %>
-              <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_skill.content}</pre>
-            <% end %>
-          </div>
+          <%= if @detail_tab == :edit do %>
+            <div
+              id={"proj-skill-editor-#{@selected_skill.id}"}
+              phx-hook="CodeMirror"
+              phx-update="ignore"
+              data-content={Base.encode64(@selected_skill.content || "")}
+              data-lang={edit_language(@selected_skill)}
+              class="flex-1 overflow-hidden min-h-0"
+            ></div>
+          <% else %>
+            <div class="flex-1 overflow-y-auto">
+              <%= if @detail_tab == :preview do %>
+                <div
+                  id={"proj-skill-viewer-#{@selected_skill.id}"}
+                  class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                  phx-hook="MarkdownMessage"
+                  data-raw-body={@selected_skill.content}
+                >
+                </div>
+              <% else %>
+                <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_skill.content}</pre>
+              <% end %>
+            </div>
+          <% end %>
         </div>
       <% end %>
     </div>
@@ -301,4 +361,43 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   defp source_label(:commands), do: "command"
   defp source_label(:project_skills), do: "project skill"
   defp source_label(:project_commands), do: "project cmd"
+
+  defp edit_language(%{path: path}) when is_binary(path), do: lang_from_path(path)
+  defp edit_language(%{abs_path: path}) when is_binary(path), do: lang_from_path(path)
+  defp edit_language(_), do: "markdown"
+
+  defp lang_from_path(path) do
+    case Path.extname(path) do
+      ".yaml" -> "yaml"
+      ".yml" -> "yaml"
+      ".json" -> "json"
+      _ -> "markdown"
+    end
+  end
+
+  defp reselect_skill(socket, id) do
+    selected = Enum.find(socket.assigns.skills, &(&1.id == id))
+    assign(socket, :selected_skill, selected)
+  end
+
+  defp skill_write_allowed?(path, socket) do
+    expanded = Path.expand(path)
+    expanded_user_skills = Path.expand("~/.claude/skills")
+    expanded_user_commands = Path.expand("~/.claude/commands")
+
+    project_roots =
+      case socket.assigns[:project] do
+        %{path: p} when is_binary(p) and p != "" ->
+          [
+            Path.expand(Path.join(p, ".claude/skills")),
+            Path.expand(Path.join(p, ".claude/commands"))
+          ]
+
+        _ ->
+          []
+      end
+
+    allowed = [expanded_user_skills, expanded_user_commands | project_roots]
+    Enum.any?(allowed, fn root -> String.starts_with?(expanded, root <> "/") end)
+  end
 end

@@ -299,7 +299,6 @@ defmodule EyeInTheSky.Notes do
     where(query, [n], n.parent_type == ^type and (n.parent_id == ^id_str or n.parent_id == ^uuid))
   end
 
-
   defp resolve_session(session_id) do
     Sessions.resolve(to_string(session_id))
   end

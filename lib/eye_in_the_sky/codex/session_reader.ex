@@ -8,7 +8,6 @@ defmodule EyeInTheSky.Codex.SessionReader do
   - Relevant payload types: "session_meta", "user_message", "agent_message", "token_count"
   """
 
-
   @doc """
   Finds the Codex session JSONL file for a given thread_id.
   Codex stores sessions in: ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<thread_id>.jsonl

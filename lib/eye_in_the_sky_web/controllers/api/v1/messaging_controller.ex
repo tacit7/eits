@@ -76,32 +76,41 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   def show_dm(conn, %{"id" => id} = params) do
     session_raw = params["session"] || get_req_header(conn, "x-eits-session") |> List.first()
 
+    with {:ok, msg_id} <- parse_dm_id(id),
+         {:ok, msg} <- Messages.get_message(msg_id),
+         :ok <- authorize_dm_recipient(session_raw, msg) do
+      json(conn, %{
+        id: msg.id,
+        uuid: msg.uuid,
+        body: msg.body,
+        from_session_id: msg.from_session_id,
+        to_session_id: msg.to_session_id,
+        inserted_at: msg.inserted_at
+      })
+    else
+      {:error, :bad_id} -> {:error, :bad_request, "id must be an integer"}
+      {:error, :not_found} -> {:error, :not_found, "DM not found"}
+      {:error, :forbidden} -> {:error, :forbidden, "You are not the recipient of this message"}
+    end
+  end
+
+  defp parse_dm_id(id) do
     case parse_int(id) do
-      nil ->
-        {:error, :bad_request, "id must be an integer"}
+      nil -> {:error, :bad_id}
+      msg_id -> {:ok, msg_id}
+    end
+  end
 
-      msg_id ->
-        case Messages.get_message(msg_id) do
-          {:error, :not_found} ->
-            {:error, :not_found, "DM not found"}
+  defp authorize_dm_recipient(session_raw, msg) do
+    case resolve_caller_session(session_raw, msg) do
+      {:ok, caller_id} when caller_id != nil and caller_id != msg.to_session_id ->
+        {:error, :forbidden}
 
-          {:ok, msg} ->
-            # If caller provides a session, verify they are the recipient
-            with {:ok, caller_id} <- resolve_caller_session(session_raw, msg) do
-              if caller_id != nil and msg.to_session_id != caller_id do
-                {:error, :forbidden, "You are not the recipient of this message"}
-              else
-                json(conn, %{
-                  id: msg.id,
-                  uuid: msg.uuid,
-                  body: msg.body,
-                  from_session_id: msg.from_session_id,
-                  to_session_id: msg.to_session_id,
-                  inserted_at: msg.inserted_at
-                })
-              end
-            end
-        end
+      {:ok, _} ->
+        :ok
+
+      error ->
+        error
     end
   end
 

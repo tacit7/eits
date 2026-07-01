@@ -4,7 +4,6 @@ defmodule EyeInTheSky.Messages.Trace do
   single message's journey across logs, telemetry, and PubSub events.
   """
 
-
   @type trace_id :: String.t()
 
   @doc "Generates a new short trace id (not a UUID — these appear in log lines)."

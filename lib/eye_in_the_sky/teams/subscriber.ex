@@ -9,7 +9,6 @@ defmodule EyeInTheSky.Teams.Subscriber do
 
   use GenServer
 
-
   alias EyeInTheSky.{Events, Teams}
 
   def start_link(_opts) do

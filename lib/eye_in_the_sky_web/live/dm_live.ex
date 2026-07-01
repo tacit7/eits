@@ -727,7 +727,6 @@ defmodule EyeInTheSkyWeb.DmLive do
      assign(socket, :active_overlay, toggle_overlay(socket.assigns.active_overlay, overlay))}
   end
 
-
   defp subscribe_dm_pty(socket, session_uuid) do
     session_key = "dm-#{session_uuid}"
     {:ok, pty_pid} = PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)

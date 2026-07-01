@@ -11,9 +11,9 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   import Phoenix.LiveView, only: [push_event: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
+  alias Ecto.Multi
   alias EyeInTheSky.{Agents, Messages, Notes, Projects, Repo, Sessions, Tasks}
   alias EyeInTheSky.Agents.AgentManager
-  alias Ecto.Multi
 
   # ---------------------------------------------------------------------------
   # palette:sessions

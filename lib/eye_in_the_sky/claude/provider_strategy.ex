@@ -8,7 +8,6 @@ defmodule EyeInTheSky.Claude.ProviderStrategy do
   All implementations return `{:ok, sdk_ref, handler_pid}` or `{:error, reason}`.
   """
 
-
   alias EyeInTheSky.Claude.ContentBlock
 
   @type sdk_result :: {:ok, reference(), pid()} | {:error, term()}

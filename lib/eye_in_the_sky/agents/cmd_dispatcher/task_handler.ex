@@ -15,7 +15,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
       task tag <id> <tag_id>
   """
 
-
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
   alias EyeInTheSky.{Notes, Tasks}
   alias EyeInTheSky.Tasks.WorkflowState

@@ -305,7 +305,7 @@ defmodule EyeInTheSky.IAM.Evaluator do
   defp instruct_message(%Policy{builtin_matcher: key} = p, ctx) when is_binary(key) do
     with {:ok, mod} <- EyeInTheSky.IAM.BuiltinMatcher.Registry.fetch(key),
          true <- function_exported?(mod, :instruction_message, 2),
-         msg when is_binary(msg) <- apply(mod, :instruction_message, [p, ctx]) do
+         msg when is_binary(msg) <- mod.instruction_message(p, ctx) do
       msg
     else
       _ -> message_for(p)

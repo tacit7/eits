@@ -8,8 +8,8 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Agents.AgentManager
-  alias EyeInTheSky.Settings
   alias EyeInTheSky.{Messages, Sessions}
+  alias EyeInTheSky.Settings
 
   require Logger
 

@@ -108,9 +108,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       {:ok, _} ->
         :ok
-
-      error ->
-        error
     end
   end
 

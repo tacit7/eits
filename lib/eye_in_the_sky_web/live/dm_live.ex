@@ -810,6 +810,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         dm_settings_scope={@dm_settings_scope}
         dm_settings_subtab={@dm_settings_subtab}
         syncing={@syncing}
+        session_cli_opts={@session_cli_opts}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

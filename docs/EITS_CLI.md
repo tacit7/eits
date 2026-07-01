@@ -404,6 +404,8 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Worktree cleanup**: `--stash-if-dirty` auto-stashes uncommitted changes before worktree creation (instead of failing with dirty_working_tree error).
 
+**Effort level**: `--effort-level <level>` sets reasoning effort for the spawned agent. Valid levels: `low`, `medium`, `high`, `max`. This is passed to Claude CLI as the `--effort` flag. Defaults to the session's configured effort level if not specified.
+
 **Team joining**: `--team-name` (by name) or `--team-id` (by integer ID, mutually exclusive). `--team-id` is resolved to team name via GET /teams/:id. If `--team-id` is not found, spawn prints a warning to stderr and continues without team assignment.
 
 **Worktree conflict detection**: When `--worktree` is specified, spawn checks if dangling worktrees are registered (via `git worktree list`). If found, warns to stderr suggesting `git worktree prune` to avoid name conflicts with merged branches.

@@ -959,6 +959,59 @@ A markdown format toolbar (Aa button) in the DM composer enables inline text for
 - `lib/eye_in_the_sky_web/components/dm_page/composer.ex` — HEEx format bar
 - `assets/js/hooks/dm_composer.js` — selection wrapping logic
 
+### ReasoningPill: Extended Thinking & Plan Mode (commits d170a9b4, e6c926a7, aa7bccc5)
+
+**Display:** Horizontal pill in the composer footer showing thinking status, plan mode toggle, and effort level selector.
+
+**Segments:**
+
+1. **Thinking Toggle** (Claude only, hidden for Codex/Gemini)
+   - Shows icon + "Think" label
+   - Click to enable/disable extended thinking
+   - Styled with rounded-left corners
+   - When thinking is off: light text, hover brightens
+   - When thinking is on: warning color background (`bg-warning/[0.04]`), warning text
+
+2. **Separator Divider**
+   - 1px vertical line between segments
+   - Subtle background color (`bg-base-content/[0.10]`)
+   - 4px height, flex-shrink-0
+
+3. **Effort Level Picker** (DaisyUI dropdown)
+   - Displays current effort level (Low/Medium/High/Max)
+   - Click to open dropdown menu listing available levels
+   - Styled with rounded-right corners
+   - Muted text, hover brightens
+   - **Layout fix (commit aa7bccc5):** Removed `overflow-hidden` from pill wrapper to allow dropdown menu to escape and render fully. Per-segment rounded corners replace the overflow clip.
+   - **Interaction fix (commit e6c926a7):** `phx-click` moved from button to parent `.dropdown` div. This keeps focus on the dropdown container after LiveView re-renders, ensuring the DaisyUI `:focus-within` selector remains true and the menu stays visible after server round-trip.
+
+**Plan Mode Toggle (commit d170a9b4)**
+
+The plan button (icon button left of effort segment) toggles `permission_mode: "plan"` in session CLI options.
+
+- **Before:** Button toggled `plan: true` in opts, but `build_args` was ignored by the flag builder (was looking for `permission_mode`).
+- **After:** Button now sets `permission_mode: "plan"` (or clears it). The flag is correctly passed to Claude CLI as `--permission-mode plan`.
+- **UI:** Plan button shows warning color when active, muted when inactive.
+
+**Effort Level Flag (commit d170a9b4)**
+
+The selected effort level is now passed to Claude CLI via `--effort <level>` flag.
+
+- **Before:** Only `CLAUDE_CODE_EFFORT_LEVEL` env var was set; `--effort` flag was missing from args.
+- **After:** `build_args/1` in `CLI.Args` now includes `--effort` flag mapped from `opts[:effort_level]`.
+- **Possible values:** `low`, `medium`, `high`, `max` (matched to Sonnet/Opus model tiers).
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/components/dm_page/message_composer.ex` — ReasoningPill component (three segments)
+- `lib/eye_in_the_sky/claude/cli/args.ex` — `build_args/1` includes `--effort` flag
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — `toggle_plan_mode` and `toggle_effort_menu` handlers
+
+**Styling notes:**
+- Wrapper: `inline-flex items-center rounded-lg border transition-colors` (no overflow-hidden)
+- First segment (thinking): `rounded-l-lg`
+- Last segment (effort): `rounded-r-lg`
+- Divider: `w-px h-4 bg-base-content/[0.10] flex-shrink-0`
+
 ### Prompt Queue Accordion (commit cb354c03)
 
 **Display:** Queue rows in the prompt queue section collapse/expand based on message length.

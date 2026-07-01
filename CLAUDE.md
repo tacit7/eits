@@ -8,6 +8,16 @@ Phoenix/Elixir web app that provides a monitoring UI for Eye in the Sky.
 
 This project uses Phoenix LiveView with Elixir. Primary languages: Elixir/HEEx, TypeScript, JavaScript, Rust (Tauri). Use Tailwind CSS for styling.
 
+## Branching Strategy
+
+**`main` is always clean and deployable.** No direct commits to main.
+
+- **`features` branch** — landing zone for small features, UI tweaks, and incremental improvements that don't warrant their own worktree. Work directly on `features`, commit there, and merge to main when ready.
+- **Worktrees** — for anything larger, parallel agent work, or changes that need an isolated server instance. Each worktree gets its own branch.
+- **`tauri` worktree** — permanent, never delete (see below).
+
+When in doubt: small = `features` branch, large or parallel = worktree.
+
 ## Git Worktrees
 
 **Always start any code change work in a worktree.** Never modify files directly in the main project directory. Create a worktree first, make changes there, then merge/PR back.

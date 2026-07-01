@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.SessionHelpers do
 
     [model: model]
     |> then(fn opts ->
-      if is_binary(effort_level) and effort_level != "",
+      if is_binary(effort_level) and effort_level not in ["", "auto"],
         do: Keyword.put(opts, :effort_level, effort_level),
         else: opts
     end)

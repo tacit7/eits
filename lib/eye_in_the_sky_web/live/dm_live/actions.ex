@@ -15,7 +15,6 @@ defmodule EyeInTheSkyWeb.DmLive.Actions do
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSkyWeb.DmLive.{FileAutocomplete, TabHelpers, ExternalActions}
 
-  require Logger
 
   @default_message_limit 50
   @message_page_size 20

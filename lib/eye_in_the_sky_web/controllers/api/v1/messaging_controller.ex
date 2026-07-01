@@ -82,10 +82,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       msg_id ->
         case Messages.get_message(msg_id) do
-          nil ->
+          {:error, :not_found} ->
             {:error, :not_found, "DM not found"}
 
-          msg ->
+          {:ok, msg} ->
             # If caller provides a session, verify they are the recipient
             with {:ok, caller_id} <- resolve_caller_session(session_raw, msg) do
               if caller_id != nil and msg.to_session_id != caller_id do

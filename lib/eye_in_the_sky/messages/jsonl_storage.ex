@@ -144,8 +144,6 @@ defmodule EyeInTheSky.Messages.JsonlStorage do
     end
   end
 
-  defp parse_unix_timestamp(_), do: nil
-
   @doc """
   Writes all messages for a session to JSONL file.
   Useful for bulk initialization or migration.

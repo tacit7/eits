@@ -5,7 +5,6 @@ defmodule EyeInTheSky.Tasks do
 
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Tasks.Task
 
-  require Logger
   import Ecto.Query, warn: false
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Repo

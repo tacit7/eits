@@ -19,7 +19,6 @@ defmodule EyeInTheSky.Messages do
   alias EyeInTheSky.Messages.Sync
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Sessions
-  require Logger
 
   # ---------------------------------------------------------------------------
   # Session-scoped message loading (JSONL-aware) — delegated to Messages.Sync

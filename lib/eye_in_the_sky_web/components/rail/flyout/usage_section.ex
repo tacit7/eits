@@ -167,8 +167,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
   defp format_dollars(n) when is_integer(n), do: :erlang.float_to_binary(n * 1.0, decimals: 2)
 
   # Converts ISO8601 resets_at to "57m" / "1d 19h" / "3h 20m" style string.
-  defp format_reset(nil), do: nil
-
+  # Called only when resets_at is non-nil (guarded by :if at the call site).
   defp format_reset(iso) do
     case DateTime.from_iso8601(iso) do
       {:ok, dt, _} ->

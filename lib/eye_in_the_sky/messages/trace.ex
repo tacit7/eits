@@ -4,7 +4,6 @@ defmodule EyeInTheSky.Messages.Trace do
   single message's journey across logs, telemetry, and PubSub events.
   """
 
-  require Logger
 
   @type trace_id :: String.t()
 

@@ -1,6 +1,5 @@
 defmodule EyeInTheSky.Github.WebhookRulesExecutor do
   @moduledoc false
-  require Logger
 
   alias EyeInTheSky.Github.RuleActions
   alias EyeInTheSky.Github.WebhookRules

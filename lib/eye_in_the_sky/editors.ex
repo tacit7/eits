@@ -2,9 +2,13 @@ defmodule EyeInTheSky.Editors do
   @moduledoc """
   Registry of known external editors with detection and async launch.
 
-  `detect_installed/0` scans PATH (and macOS /Applications) to find which
-  editors are actually available on this machine. The result is used to
-  populate the split-button dropdown on agents, skills, and files pages.
+  `detect_installed/0` returns the subset of editors found on this machine.
+  Detection checks extra PATH directories before the process PATH — important
+  because a Phoenix server launched as a macOS GUI app (launchd, nohup, etc.)
+  may not inherit the user's shell PATH and could be missing /opt/homebrew/bin.
+
+  `open/2` launches using the resolved binary path captured at detection time,
+  not by re-searching PATH at launch time.
   """
 
   @editors [
@@ -25,6 +29,14 @@ defmodule EyeInTheSky.Editors do
     Path.expand("~/projects")
   ]
 
+  # Extra directories to probe before the process PATH — macOS GUI processes
+  # often don't inherit Homebrew or user-local bin dirs.
+  @extra_path_dirs [
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    "/usr/local/sbin"
+  ]
+
   @doc "All editor IDs in registry order."
   def all_ids, do: Enum.map(@editors, & &1.id)
 
@@ -32,38 +44,48 @@ defmodule EyeInTheSky.Editors do
   def all, do: @editors
 
   @doc """
-  Returns the subset of editors whose binary is found in PATH or (macOS)
-  in /Applications. List is in registry order.
+  Returns the subset of editors found on this machine, each enriched with
+  a `:cmd` field holding the resolved binary path (or macOS open invocation).
+
+  List is in registry order. Call once at mount; cache in assigns.
   """
   def detect_installed do
-    Enum.filter(@editors, &installed?/1)
+    dirs = build_search_dirs()
+
+    @editors
+    |> Enum.flat_map(fn ed ->
+      case resolve(ed, dirs) do
+        nil -> []
+        cmd -> [Map.put(ed, :cmd, cmd)]
+      end
+    end)
   end
 
   @doc """
   Find an editor struct by id. Returns `nil` if unknown.
+  Does NOT check whether the editor is installed — use detect_installed/0 for that.
   """
   def find(id), do: Enum.find(@editors, &(&1.id == id))
 
   @doc """
   Open `path` in the editor identified by `editor_id`.
 
-  Returns `{:ok, label}` and starts the launch in a supervised task so the
-  LiveView is not blocked. Returns `{:error, reason}` on validation failure
-  (unknown editor, editor not installed, path not allowed, path not found).
+  Resolves the binary at call time (so a fresh install is picked up without
+  waiting for a server restart). Returns `{:ok, label}` on success or
+  `{:error, reason}` on validation failure.
   """
   def open(editor_id, path) when is_binary(editor_id) and is_binary(path) do
-    with {:editor, %{bin: bin, label: label} = _ed} <- {:editor, find(editor_id)},
-         {:installed, true} <- {:installed, !!System.find_executable(bin)},
+    dirs = build_search_dirs()
+
+    with {:editor, %{label: label} = ed} <- {:editor, find(editor_id)},
+         {:cmd, cmd} when is_binary(cmd) <- {:cmd, resolve(ed, dirs)},
          {:allowed, true} <- {:allowed, path_allowed?(path)},
          {:exists, true} <- {:exists, File.exists?(path)} do
-      Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-        System.cmd(bin, [path], stderr_to_stdout: true, cd: "/")
-      end)
-
+      launch(cmd, path)
       {:ok, label}
     else
       {:editor, nil} -> {:error, :unknown_editor}
-      {:installed, false} -> {:error, :not_installed}
+      {:cmd, nil} -> {:error, :not_installed}
       {:allowed, false} -> {:error, :not_allowed}
       {:exists, false} -> {:error, :not_found}
     end
@@ -71,32 +93,79 @@ defmodule EyeInTheSky.Editors do
 
   # --- Private ---
 
-  defp installed?(%{bin: bin}) do
-    !!System.find_executable(bin) || mac_app_exists?(bin)
+  # Build the list of directories to search, extra dirs first so they win
+  # over whatever the process inherited as PATH.
+  defp build_search_dirs do
+    home = System.get_env("HOME", "")
+
+    extra =
+      [@extra_path_dirs, [Path.join(home, ".local/bin")]]
+      |> List.flatten()
+
+    from_path =
+      case System.get_env("PATH") do
+        nil -> []
+        path_str -> String.split(path_str, ":")
+      end
+
+    (extra ++ from_path)
+    |> Enum.uniq()
+    |> Enum.filter(&File.dir?/1)
   end
 
-  # macOS: check /Applications and ~/Applications by matching the bin name
-  # against known app bundle patterns. Only runs on darwin.
-  defp mac_app_exists?(bin) do
+  # Try binary search first, then macOS app bundle fallback.
+  defp resolve(%{bin: bin} = ed, dirs) do
+    find_binary(bin, dirs) || mac_app_cmd(ed)
+  end
+
+  # Walk dirs looking for an executable named `bin`.
+  defp find_binary(bin, dirs) do
+    Enum.find_value(dirs, fn dir ->
+      candidate = Path.join(dir, bin)
+
+      if File.regular?(candidate) && executable?(candidate) do
+        candidate
+      end
+    end)
+  end
+
+  # On macOS: check /Applications and ~/Applications for a known .app bundle.
+  # Returns the `open -a <AppName>` command string if found, else nil.
+  defp mac_app_cmd(%{bin: bin}) do
     case :os.type() do
       {:unix, :darwin} ->
         home = System.get_env("HOME", "")
+        roots = ["/Applications", Path.join(home, "Applications")]
+        names = mac_app_names(bin)
 
-        roots = [
-          "/Applications",
-          Path.join(home, "Applications")
-        ]
-
-        app_names = mac_app_names(bin)
-
-        Enum.any?(roots, fn root ->
-          Enum.any?(app_names, fn name ->
-            File.exists?(Path.join(root, "#{name}.app"))
+        Enum.find_value(roots, fn root ->
+          Enum.find_value(names, fn name ->
+            bundle = Path.join(root, "#{name}.app")
+            if File.exists?(bundle), do: "__open_a__:#{name}", else: nil
           end)
         end)
 
       _ ->
-        false
+        nil
+    end
+  end
+
+  defp launch("__open_a__:" <> app_name, path) do
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      System.cmd("open", ["-a", app_name, path], stderr_to_stdout: true)
+    end)
+  end
+
+  defp launch(cmd, path) do
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      System.cmd(cmd, [path], stderr_to_stdout: true, cd: "/")
+    end)
+  end
+
+  defp executable?(path) do
+    case File.stat(path) do
+      {:ok, %File.Stat{type: :regular, mode: mode}} -> Bitwise.band(mode, 0o111) != 0
+      _ -> false
     end
   end
 

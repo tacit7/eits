@@ -3841,6 +3841,17 @@ EOF
 
   [[ -e "$HOME/.local/bin/eits" ]] && paths+=("$HOME/.local/bin/eits")
 
+  # The .pkg installer symlinks /usr/local/bin/eits → the app bundle's CLI.
+  # Only remove it when it is ours (symlink into the EITS bundle or config dir)
+  # — never delete an unrelated /usr/local/bin/eits the user put there.
+  if [[ -L "/usr/local/bin/eits" ]]; then
+    local _target
+    _target="$(readlink /usr/local/bin/eits)"
+    case "$_target" in
+      *"Eye in the Sky.app"*|*"/eits/"*) paths+=("/usr/local/bin/eits") ;;
+    esac
+  fi
+
   if [[ $remove_app -eq 1 ]]; then
     local bundle_id="com.eits.EyeInTheSky"
     local app_path

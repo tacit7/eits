@@ -138,6 +138,16 @@ jobs:
             sed -i '' "s|^DATABASE_URL=ecto://postgres@|DATABASE_URL=ecto://${REAL_USER}@|" "$ENV_FILE"
           fi
 
+          # Install the eits CLI onto PATH. Symlink (not copy) so app updates
+          # automatically update the CLI. /usr/local/bin is on the default
+          # macOS PATH — no shell-profile editing needed. Runs as root here.
+          BUNDLED_CLI="/Applications/Eye in the Sky.app/Contents/Resources/scripts/eits"
+          if [[ -f "$BUNDLED_CLI" ]]; then
+            mkdir -p /usr/local/bin
+            ln -sf "$BUNDLED_CLI" /usr/local/bin/eits
+            chmod +x "$BUNDLED_CLI"
+          fi
+
           exit 0
           POSTINSTALL
           chmod +x pkg-scripts/postinstall

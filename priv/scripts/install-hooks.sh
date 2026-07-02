@@ -123,9 +123,9 @@ if [[ -n "$EITS_CLI" ]] && [[ -f "$EITS_CLI" ]]; then
   # Record the repo root so 'eits skills install' can find priv/skills/ even when
   # running from the copied ~/.local/bin/eits (which has no symlink to follow).
   # This installer lives at priv/scripts/install-hooks.sh, so two levels up is repo root.
-  local _installer_dir
+  # NOTE: top-level script scope — `local` is illegal here (aborted installs at
+  # this exact point before the settings.json merge ever ran).
   _installer_dir="$(cd "$(dirname "$0")" && pwd)"
-  local _repo_root
   _repo_root="$(cd "$_installer_dir/../.." && pwd)"
   if [[ -d "$_repo_root/priv/skills" ]]; then
     mkdir -p "$HOME/.config/eits"

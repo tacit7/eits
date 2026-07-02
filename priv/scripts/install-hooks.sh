@@ -120,6 +120,19 @@ if [[ -n "$EITS_CLI" ]] && [[ -f "$EITS_CLI" ]]; then
   chmod +x "$BIN_DIR/eits"
   echo "✓ eits CLI installed to $BIN_DIR/eits"
 
+  # Record the repo root so 'eits skills install' can find priv/skills/ even when
+  # running from the copied ~/.local/bin/eits (which has no symlink to follow).
+  # This installer lives at priv/scripts/install-hooks.sh, so two levels up is repo root.
+  local _installer_dir
+  _installer_dir="$(cd "$(dirname "$0")" && pwd)"
+  local _repo_root
+  _repo_root="$(cd "$_installer_dir/../.." && pwd)"
+  if [[ -d "$_repo_root/priv/skills" ]]; then
+    mkdir -p "$HOME/.config/eits"
+    echo "$_repo_root" > "$HOME/.config/eits/repo_root"
+    echo "✓ Repo root recorded to ~/.config/eits/repo_root"
+  fi
+
   # Add ~/.local/bin to PATH in shell profiles if not already there
   for profile in "$HOME/.zprofile" "$HOME/.bash_profile"; do
     if [[ -f "$profile" ]] || [[ "$profile" == "$HOME/.zprofile" ]]; then

@@ -705,19 +705,21 @@ eits worktree remove <branch> [--project-path <path>]
 ## hooks
 
 ```bash
-eits hooks install     # Install EITS Claude Code hooks into ~/.claude/settings.json
-eits hooks uninstall   # Remove EITS-managed hooks from ~/.claude/settings.json
+eits hooks install [--project]     # Install EITS Claude Code hooks
+eits hooks uninstall [--project]   # Remove EITS-managed hooks
 ```
 
 **`eits hooks install`** performs a complete hook setup:
-1. Copies core hook scripts to `~/.config/eits/hooks/` (eits-lib.sh, eits-session-startup.sh, eits-session-resume.sh, etc.)
+1. Copies core hook scripts to `~/.config/eits/hooks/` (eits-lib.sh, eits-session-startup.sh, eits-session-resume.sh, etc.) — always the global location, regardless of `--project`
 2. Installs the eits CLI binary to `~/.local/bin/eits` and makes it executable
 3. Patches shell profiles (`~/.zprofile`, `~/.bash_profile`) to add `~/.local/bin` to `PATH` if not already present
-4. Merges EITS hook entries into `~/.claude/settings.json` without overwriting unrelated entries
+4. Merges EITS hook entries into `~/.claude/settings.json` (or, with `--project`, into `<cwd>/.claude/settings.local.json`) without overwriting unrelated entries
 5. Provides feedback on what was installed
 
+**`--project`**: registers hooks in `<cwd>/.claude/settings.local.json` instead of the global `~/.claude/settings.json` — scopes EITS to **this repo only**; no other Claude Code session on the machine is affected. Run from the project root. `settings.local.json` is meant to be per-developer and gitignored — the installer adds it to `.gitignore` automatically if this looks like a git repo and it isn't already covered. Hook scripts and the CLI itself are still installed to the shared global locations either way (they're inert until a settings file references them, so there's nothing project-scoped to install for them — `--project` only changes *where the registration is written*).
+
 **`eits hooks uninstall`** removes EITS-managed hooks:
-1. Removes EITS hook entries from `~/.claude/settings.json`
+1. Removes EITS hook entries from `~/.claude/settings.json` (or `<cwd>/.claude/settings.local.json` with `--project`)
 2. Does NOT delete script files or the eits CLI binary — only removes the hook registrations
 
 **Why use this**: Claude Code hooks are the primary mechanism for automatic session tracking, context injection, and task lifecycle management. This command automates the setup that would otherwise require manual script copying and JSON editing.
@@ -727,15 +729,17 @@ eits hooks uninstall   # Remove EITS-managed hooks from ~/.claude/settings.json
 ## skills
 
 ```bash
-eits skills install     # Copy priv/skills/eits-* into ~/.claude/skills/
-eits skills list        # Show staleness status of installed eits-* skills
+eits skills install [--project]   # Copy priv/skills/eits-* into ~/.claude/skills/
+eits skills list [--project]      # Show staleness status of installed eits-* skills
 ```
 
 **`eits skills install`** copies every `priv/skills/eits-*` directory from the repo into `~/.claude/skills/`, replacing existing copies. Symlinks are converted to real files so installed skills remain functional regardless of repo path changes.
 
 - Runs from anywhere — resolves the repo root from the script's real path (symlinks unwound)
 - Set `EITS_REPO=/path/to/eits/web` if auto-detection fails (e.g., non-standard install layouts)
-- Options: `--force` (reserved; install always overwrites)
+- Options: `--force` (reserved; install always overwrites), `--project`
+
+**`--project`**: installs into `<cwd>/.claude/skills/` instead of the global `~/.claude/skills/` — scopes skills to **this repo only**. Run from the project root.
 
 **`eits skills list`** shows what would be installed without making changes:
 
@@ -750,25 +754,36 @@ eits skills list        # Show staleness status of installed eits-* skills
 
 ---
 
+## install
+
+```bash
+eits install [--project]
+```
+
+Alias for `eits hooks install` followed by `eits skills install` — the full EITS Claude Code integration in one command, global by default or project-scoped with `--project`. This exists purely for discoverability: `eits install` is the obvious thing to type on a machine or in a repo that doesn't have EITS set up yet, and `hooks install` as the actual entry point is easy to miss. Counterpart: `eits uninstall`.
+
+---
+
 ## uninstall
 
 ```bash
-eits uninstall [--app] [--db] [--all] [--dry-run] [--yes]
+eits uninstall [--app] [--db] [--all] [--project] [--dry-run] [--yes]
 ```
 
-Removes EITS integration from the machine. Default scope: every EITS hook entry in `~/.claude/settings.json` (workflow hooks, IAM hooks, repo-path hooks — other hooks and settings are preserved), `~/.config/eits/`, `~/.claude/skills/eits-*`, and the `~/.local/bin/eits` CLI copy.
+Removes EITS integration. Default scope (global, machine-wide): every EITS hook entry in `~/.claude/settings.json` (workflow hooks, IAM hooks, repo-path hooks — other hooks and settings are preserved), `~/.config/eits/`, `~/.claude/skills/eits-*`, and the `~/.local/bin/eits` CLI copy.
 
 | Flag | Effect |
 |------|--------|
-| `--app` | Also remove the desktop `.app` bundle and its `~/Library` data (Application Support, Caches, WebKit, Preferences, Saved State, Logs) |
-| `--db` | Also `dropdb eits_dev` — **destructive**, all sessions/tasks/messages lost |
-| `--all` | `--app --db` |
+| `--app` | Also remove the desktop `.app` bundle and its `~/Library` data (Application Support, Caches, WebKit, Preferences, Saved State, Logs). Ignored with `--project`. |
+| `--db` | Also `dropdb eits_dev` — **destructive**, all sessions/tasks/messages lost. Ignored with `--project`. |
+| `--all` | `--app --db`. Ignored with `--project`. |
+| `--project` | Uninstall the **project-scoped** install instead: removes EITS hook entries from `<cwd>/.claude/settings.local.json` and `eits-*` skills from `<cwd>/.claude/skills/`. Counterpart to `eits hooks install --project` / `eits skills install --project`. Never touches the global machine install, the desktop app, or the database. Run from the project root. |
 | `--dry-run` | Print the removal manifest without touching anything |
 | `--yes`, `-y` | Skip the confirmation prompt |
 
-Refuses to run while the desktop app is open (the app re-installs IAM hooks on every launch). Homebrew packages are never touched.
+Global (non-`--project`) uninstall refuses to run while the desktop app is open (the app re-installs IAM hooks on every launch). Homebrew packages are never touched.
 
-**Why use this**: install artifacts are spread across four locations (`~/.claude`, `~/.config/eits`, `~/.local/bin`, `~/Library`); removing them by hand is error-prone and stale IAM hooks left in `settings.json` curl a dead endpoint on every Claude Code tool call.
+**Why use this**: install artifacts are spread across four locations (`~/.claude`, `~/.config/eits`, `~/.local/bin`, `~/Library`), or — for a project-scoped install — the project's own `.claude/`; removing them by hand is error-prone and stale IAM hooks left in `settings.json` curl a dead endpoint on every Claude Code tool call.
 
 ---
 

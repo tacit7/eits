@@ -67,7 +67,25 @@ defmodule EyeInTheSky.Claude.CLI.Env do
     env = maybe_add_env(env, "EITS_AGENT_ID", opts[:eits_agent_id])
     env = maybe_add_env(env, "EITS_CHANNEL_ID", opts[:eits_channel_id])
     env = maybe_add_env(env, "EITS_WORKFLOW", opts[:eits_workflow] || "1")
+    env = put_default_eits_url(env)
     maybe_add_env(env, "CLAUDE_CODE_EFFORT_LEVEL", opts[:effort_level])
+  end
+
+  # Point spawned agents (and the eits CLI they invoke) at THIS server's API.
+  # The CLI's baked-in default is port 5001 (the dev server), which is wrong
+  # for the desktop app (port 34877 by default, possibly changed in Settings).
+  # An EITS_URL already present in the environment is respected.
+  defp put_default_eits_url(env) do
+    if Enum.any?(env, fn {k, _} -> k == ~c"EITS_URL" end) do
+      env
+    else
+      port =
+        Application.get_env(:eye_in_the_sky, EyeInTheSkyWeb.Endpoint, [])
+        |> Keyword.get(:http, [])
+        |> Keyword.get(:port)
+
+      maybe_add_env(env, "EITS_URL", port && "http://127.0.0.1:#{port}/api/v1")
+    end
   end
 
   defp blocked_key?("ANTHROPIC_API_KEY", true), do: false

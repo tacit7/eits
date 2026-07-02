@@ -10,6 +10,24 @@
 
 set -euo pipefail
 
+# Base URL resolution:
+#   1. EITS_URL env var (explicit override)
+#   2. port from ~/.config/eits/desktop.json (Settings → Desktop, desktop app)
+#   3. EITS_URL from ~/.config/eits/.env (written by the .pkg installer)
+#   4. default http://localhost:5001/api/v1 (dev server)
+# Desktop installs serve on port 34877 by default — NOT 5001 — so without
+# steps 2–3 the CLI can't reach the API on a machine running only the app.
+_eits_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/eits"
+if [[ -z "${EITS_URL:-}" ]]; then
+  if [[ -f "$_eits_config_dir/desktop.json" ]] && command -v jq &>/dev/null; then
+    _desktop_port="$(jq -r '.port // empty' "$_eits_config_dir/desktop.json" 2>/dev/null)"
+    [[ -n "$_desktop_port" ]] && EITS_URL="http://localhost:${_desktop_port}/api/v1"
+  fi
+  if [[ -z "${EITS_URL:-}" ]] && [[ -f "$_eits_config_dir/.env" ]]; then
+    _env_url="$(grep -m1 '^EITS_URL=' "$_eits_config_dir/.env" | cut -d= -f2-)"
+    [[ -n "$_env_url" ]] && EITS_URL="$_env_url"
+  fi
+fi
 BASE_URL="${EITS_URL:-http://localhost:5001/api/v1}"
 AUTH_ARGS=()
 [[ -n "${EITS_API_KEY:-}" ]] && AUTH_ARGS=(-H "Authorization: Bearer ${EITS_API_KEY}")

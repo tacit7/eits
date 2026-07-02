@@ -133,6 +133,14 @@ jobs:
             chown "$REAL_USER" "$ENV_FILE"
           fi
 
+          # Record the API URL for the eits CLI (terminal use — spawned agents
+          # get EITS_URL injected with the live port by the server itself).
+          # Matches the app's default port; Settings → Desktop port changes are
+          # picked up via desktop.json, which the CLI prefers over this value.
+          if ! grep -q '^EITS_URL=' "$ENV_FILE" 2>/dev/null; then
+            printf 'EITS_URL=http://localhost:34877/api/v1\n' >> "$ENV_FILE"
+          fi
+
           # Fix wrong postgres user in an existing .env
           if grep -q "^DATABASE_URL=ecto://postgres@" "$ENV_FILE" 2>/dev/null; then
             sed -i '' "s|^DATABASE_URL=ecto://postgres@|DATABASE_URL=ecto://${REAL_USER}@|" "$ENV_FILE"

@@ -479,6 +479,14 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         // WKWebView would get a redirect loop if force_ssl is active.
         command.env("PHX_DISABLE_FORCE_SSL", "1");
 
+        // Bind loopback only: the embedded server runs with DISABLE_AUTH=true,
+        // so it must not be reachable from the LAN. Remote access goes through
+        // a local proxy (e.g. `tailscale serve localhost:5050`) — see
+        // docs/TAURI_SETUP.md. Launch with EITS_BIND=all to opt into LAN exposure.
+        if std::env::var("EITS_BIND").is_err() {
+            command.env("EITS_BIND", "loopback");
+        }
+
         // Required by runtime.exs in prod — raises if absent.
         // For the desktop app: DATABASE_URL points to local Postgres,
         // SECRET_KEY_BASE is a stable desktop-only secret (not web-facing).

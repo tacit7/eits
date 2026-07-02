@@ -3618,6 +3618,18 @@ _skills_repo_root() {
     fi
   done
 
+  # Check repo root recorded by 'eits hooks install' — written to ~/.config/eits/repo_root
+  # at install time so a copied ~/.local/bin/eits (not a symlink) can find priv/skills/.
+  local config_file="${HOME}/.config/eits/repo_root"
+  if [[ -f "$config_file" ]]; then
+    local recorded
+    recorded="$(tr -d '[:space:]' < "$config_file")"
+    if [[ -n "$recorded" ]] && [[ -d "$recorded/priv/skills" ]]; then
+      echo "$(cd "$recorded" && pwd)"
+      return 0
+    fi
+  fi
+
   # Explicit override
   if [[ -n "${EITS_REPO:-}" ]] && [[ -d "${EITS_REPO}/priv/skills" ]]; then
     echo "$(cd "$EITS_REPO" && pwd)"
@@ -3754,8 +3766,11 @@ usage: eits skills <install|list>
   list        Show which eits-* skills would be installed and their current
               status: missing, symlink, stale, or current.
 
-Repo root is resolved from this script's real path (symlinks unwound).
-Override with EITS_REPO=/path/to/eits/web if auto-detection fails.
+Repo root is resolved in order:
+  1. Relative to this script's real path (symlinks unwound)
+  2. ~/.config/eits/repo_root (written by 'eits hooks install')
+  3. EITS_REPO env var
+  4. Error with instructions
 EOF
       ;;
     *)

@@ -259,35 +259,38 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
       <%!-- Desktop detail panel --%>
       <%= if @selected_skill do %>
         <div class="hidden md:flex flex-col flex-1 overflow-hidden">
-          <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
-            <div class="flex items-start justify-between gap-4">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <code class="text-base font-semibold text-base-content">
-                    /{@selected_skill.slug}
-                  </code>
-                  <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
-                    source_badge_class(@selected_skill.source)}>
-                    {source_label(@selected_skill.source)}
-                  </span>
-                </div>
-                <p class="text-xs text-base-content/45 font-mono truncate">{@selected_skill.path}</p>
-                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
-                  {@selected_skill.description}
-                </p>
-              </div>
-              <button
-                phx-click="close_viewer"
-                class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
-              >
-                <.icon name="hero-x-mark" class="size-4" />
-              </button>
+          <%= if @detail_tab == :edit do %>
+            <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/8 flex items-center gap-3">
+              <code class="text-xs text-base-content/50 font-mono truncate flex-1">{@selected_skill.path}</code>
+              <span class="text-[10px] text-base-content/40">Ctrl+S to save</span>
+              <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
             </div>
-            <div class="flex items-center gap-1 mt-3">
-              <%= if @detail_tab == :edit do %>
-                <span class="text-[10px] text-base-content/40 mr-2">Ctrl+S to save</span>
-                <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
-              <% else %>
+          <% else %>
+            <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <code class="text-base font-semibold text-base-content">
+                      /{@selected_skill.slug}
+                    </code>
+                    <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
+                      source_badge_class(@selected_skill.source)}>
+                      {source_label(@selected_skill.source)}
+                    </span>
+                  </div>
+                  <p class="text-xs text-base-content/45 font-mono truncate">{@selected_skill.path}</p>
+                  <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                    {@selected_skill.description}
+                  </p>
+                </div>
+                <button
+                  phx-click="close_viewer"
+                  class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
+                >
+                  <.icon name="hero-x-mark" class="size-4" />
+                </button>
+              </div>
+              <div class="flex items-center gap-1 mt-3">
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="preview"
@@ -319,9 +322,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                 <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
                   {FileHelpers.format_size(@selected_skill.size)}
                 </span>
-              <% end %>
+              </div>
             </div>
-          </div>
+          <% end %>
           <%= if @detail_tab == :edit do %>
             <div
               id={"proj-skill-editor-#{@selected_skill.id}"}

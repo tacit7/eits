@@ -288,58 +288,61 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
       <%= if @selected_agent do %>
         <div class="hidden md:flex flex-col flex-1 overflow-hidden">
-          <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
-            <div class="flex items-start justify-between gap-4">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <code class="text-base font-semibold text-base-content">
-                    {@selected_agent.name}
-                  </code>
-                  <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <> source_badge_class(@selected_agent.source)}>
-                    {source_label(@selected_agent.source)}
-                  </span>
-                  <%= if @selected_agent.model do %>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-base-content/5 text-base-content/50">
-                      {@selected_agent.model}
+          <%= if @detail_tab == :edit do %>
+            <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/8 flex items-center gap-3">
+              <code class="text-xs text-base-content/50 font-mono truncate flex-1">{@selected_agent.path}</code>
+              <span class="text-[10px] text-base-content/40">Ctrl+S to save</span>
+              <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+            </div>
+          <% else %>
+            <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <code class="text-base font-semibold text-base-content">
+                      {@selected_agent.name}
+                    </code>
+                    <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <> source_badge_class(@selected_agent.source)}>
+                      {source_label(@selected_agent.source)}
                     </span>
-                  <% end %>
-                </div>
-                <p class="text-xs text-base-content/45 font-mono truncate">{@selected_agent.path}</p>
-                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
-                  {@selected_agent.description}
-                </p>
-                <%= if @selected_agent.tools != [] do %>
-                  <div class="flex flex-wrap gap-1 mt-2">
-                    <%= for tool <- @selected_agent.tools do %>
-                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-base-content/5 text-base-content/50">
-                        {tool}
+                    <%= if @selected_agent.model do %>
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-base-content/5 text-base-content/50">
+                        {@selected_agent.model}
                       </span>
                     <% end %>
                   </div>
-                <% end %>
+                  <p class="text-xs text-base-content/45 font-mono truncate">{@selected_agent.path}</p>
+                  <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                    {@selected_agent.description}
+                  </p>
+                  <%= if @selected_agent.tools != [] do %>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                      <%= for tool <- @selected_agent.tools do %>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-base-content/5 text-base-content/50">
+                          {tool}
+                        </span>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
+                <div class="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    phx-click="open_file"
+                    title="Open in editor"
+                    class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                  >
+                    <.icon name="hero-arrow-top-right-on-square" class="size-4" />
+                  </button>
+                  <button
+                    phx-click="close_viewer"
+                    title="Close"
+                    class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                  >
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
+                </div>
               </div>
-              <div class="flex items-center gap-1 flex-shrink-0">
-                <button
-                  phx-click="open_file"
-                  title="Open in editor"
-                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
-                >
-                  <.icon name="hero-arrow-top-right-on-square" class="size-4" />
-                </button>
-                <button
-                  phx-click="close_viewer"
-                  title="Close"
-                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
-                >
-                  <.icon name="hero-x-mark" class="size-4" />
-                </button>
-              </div>
-            </div>
-            <div class="flex items-center gap-1 mt-3">
-              <%= if @detail_tab == :edit do %>
-                <span class="text-[10px] text-base-content/40 mr-2">Ctrl+S to save</span>
-                <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
-              <% else %>
+              <div class="flex items-center gap-1 mt-3">
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="preview"
@@ -371,9 +374,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                 <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
                   {FileHelpers.format_size(@selected_agent.size)}
                 </span>
-              <% end %>
+              </div>
             </div>
-          </div>
+          <% end %>
           <%= if @detail_tab == :edit do %>
             <div
               id={"proj-agent-editor-#{@selected_agent.id}"}

@@ -28,7 +28,8 @@
       "target/rel": "rel",
       "setup.command": "setup.command",
       "../scripts/eits": "scripts/eits",
-      "../priv/scripts": "priv/scripts"
+      "../priv/scripts": "priv/scripts",
+      "../priv/skills": "priv/skills"
     },
     "macOS": {
       "entitlements": "Entitlements.plist"

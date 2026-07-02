@@ -331,6 +331,14 @@ pub fn run() {
             let port = resolved_port().to_string();
             install_iam_hooks(&port);
 
+            // --- EITS skills installer ---
+            // Copy priv/skills/eits-* into ~/.claude/skills/ on every startup
+            // so agents running under this app can see the /eits-* skills
+            // without a manual `eits skills install`. Idempotent (install
+            // always overwrites with the bundled copy) and fail-open: a
+            // missing bundle dir or copy error is logged, never fatal.
+            install_skills(app);
+
             // --- Notification permission (macOS requires explicit grant) ---
             // Without this, show() silently succeeds but no notification appears.
             {
@@ -951,6 +959,98 @@ fn install_iam_hooks(port: &str) {
         },
         Err(e) => log!("[eits-tauri] Could not serialize settings.json: {e}"),
     }
+}
+
+/// Copies every `priv/skills/eits-*` directory from the app bundle into
+/// `~/.claude/skills/`, replacing existing copies — same operation as
+/// `eits skills install`, run automatically so a fresh desktop install has
+/// working `/eits-*` skills without a manual CLI step.
+///
+/// Fail-open: any missing resource dir, missing HOME, or I/O error is logged
+/// and skipped. Runs synchronously in `setup()` — this is a handful of small
+/// directory copies, not worth a background thread.
+fn install_skills(app: &tauri::App) {
+    let skills_src = match app.path().resource_dir() {
+        Ok(d) => d.join("priv").join("skills"),
+        Err(e) => {
+            log!("[eits-tauri] skills: resource_dir() failed: {e}");
+            return;
+        }
+    };
+    if !skills_src.is_dir() {
+        log!(
+            "[eits-tauri] skills: bundle has no priv/skills at {} — skipping",
+            skills_src.display()
+        );
+        return;
+    }
+
+    let home = match std::env::var("HOME") {
+        Ok(h) => std::path::PathBuf::from(h),
+        Err(_) => {
+            log!("[eits-tauri] skills: HOME not set; skills not installed");
+            return;
+        }
+    };
+    let dest_root = home.join(".claude").join("skills");
+    if let Err(e) = std::fs::create_dir_all(&dest_root) {
+        log!("[eits-tauri] skills: could not create {}: {e}", dest_root.display());
+        return;
+    }
+
+    let entries = match std::fs::read_dir(&skills_src) {
+        Ok(e) => e,
+        Err(e) => {
+            log!("[eits-tauri] skills: could not read {}: {e}", skills_src.display());
+            return;
+        }
+    };
+
+    let mut installed = 0usize;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !name.starts_with("eits-") {
+            continue;
+        }
+
+        let dest = dest_root.join(name);
+        // Overwrite: remove any existing copy (dir or stale symlink) first,
+        // same semantics as `eits skills install`.
+        let _ = std::fs::remove_dir_all(&dest);
+        let _ = std::fs::remove_file(&dest);
+
+        if let Err(e) = copy_dir_recursive(&path, &dest) {
+            log!("[eits-tauri] skills: failed to install {name}: {e}");
+        } else {
+            installed += 1;
+        }
+    }
+
+    log!("[eits-tauri] skills: installed {installed} skill(s) to {}", dest_root.display());
+}
+
+/// Recursive directory copy — std::fs has no built-in for this.
+fn copy_dir_recursive(src: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dest)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let dest_path = dest.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&entry.path(), &dest_path)?;
+        } else if file_type.is_file() {
+            std::fs::copy(entry.path(), &dest_path)?;
+        }
+        // Symlinks in the source tree are skipped — the bundle should not
+        // contain any (Tauri resource copying resolves them at build time).
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

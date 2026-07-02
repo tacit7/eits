@@ -353,47 +353,19 @@ if (window.__TAURI_INTERNALS__) {
   })
 }
 
-// Tauri file drop: forward native OS file drops (from Finder) to DM LiveView.
-// WKWebView does NOT fire HTML5 drag events for native drags, so this is the
-// only path for files dragged from Finder into the app window.
-// The Rust side emits tauri:file-drop with { paths: ["/abs/path", ...] }.
-window.addEventListener('tauri:file-drop', (e) => {
-  const paths = e.detail?.paths ?? []
-  if (!paths.length) return
-  // Target the DM page — that's where file drops are handled.
-  const target = document.getElementById('dm-page')
-  if (target && window.liveSocket) {
-    const view = window.liveSocket.getViewByEl(target)
-    if (view) {
-      view.pushEvent('tauri_file_drop', { paths })
-      return
-    }
-  }
-})
+// Tauri file drop forwarding lives in the DragUpload hook (hooks/drag_upload.js)
+// — hooks are the only public API for pushing events to a LiveView.
+// The phx:pick_folder and tauri:session-action bridges live in the RailState
+// hook (hooks/rail_state.js) for the same reason: the previous app.js relays
+// called view.pushEventTo, which does not exist on LiveView's View class, so
+// every event was dropped silently (project creation via the native folder
+// picker was a no-op through v0.3.9).
 
 // --- Tauri command bridges ---------------------------------------------------
 // LiveView pushes these events via push_event/3 when it needs a native dialog
 // or a new window — the server can't open a dialog or window directly.
 if (window.__TAURI_INTERNALS__) {
   const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args ?? {})
-
-  // phx:pick_folder — opens a native folder picker, pushes result back to the
-  // originating LiveView component via pushEventTo('folder_picked', {path}).
-  // On cancel, pushes an empty payload so the server shows the text-input fallback.
-  window.addEventListener('phx:pick_folder', () => {
-    invoke('pick_folder').then((path) => {
-      const rail = document.getElementById('app-rail')
-      if (!rail || !window.liveSocket) return
-      const view = window.liveSocket.getViewByEl(rail)
-      if (!view) return
-      if (path) {
-        view.pushEventTo(rail, 'folder_picked', { path })
-      } else {
-        // Cancelled — show the inline text-input fallback.
-        view.pushEventTo(rail, 'folder_picked', {})
-      }
-    })
-  })
 
   // phx:open_in_window — opens path in a new app window.
   // Payload: { path: "/projects/3" }
@@ -425,30 +397,7 @@ if (window.__TAURI_INTERNALS__) {
     }).catch((err) => console.error('[tauri] context menu error:', err))
   })
 
-  // tauri:session-action — fired by Rust after a context menu selection that
-  // needs a LiveView round-trip (archive, rename, etc).
-  // Payload: { action: 'archive_session', session_id: 123, extra: {} }
-  window.addEventListener('tauri:session-action', (e) => {
-    const rail = document.getElementById('app-rail')
-    if (!rail || !window.liveSocket) return
-    const view = window.liveSocket.getViewByEl(rail)
-    if (!view) return
-
-    const { action, session_id, extra } = e.detail ?? {}
-    if (!action) return
-
-    view.pushEventTo(rail, action, { session_id: String(session_id), ...(extra ?? {}) })
-  })
-
-} else {
-  // Not in Tauri — fall back to showing the inline text input when the
-  // server fires phx:pick_folder (no native dialog available).
-  window.addEventListener('phx:pick_folder', () => {
-    const rail = document.getElementById('app-rail')
-    if (!rail || !window.liveSocket) return
-    const view = window.liveSocket.getViewByEl(rail)
-    if (view) view.pushEventTo(rail, 'folder_picked', {})
-  })
+  // tauri:session-action handling lives in the RailState hook — see note above.
 }
 
 // The lines below enable quality of life phoenix_live_reload

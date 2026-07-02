@@ -58,6 +58,42 @@ export const RailState = {
     this._openHandler = () => this.pushEventTo(this.el, 'open_mobile', {})
     this.el.addEventListener('rail:open', this._openHandler)
 
+    // --- Tauri bridges -------------------------------------------------------
+    // These MUST live in a hook: hooks are the only public API that can push
+    // events to a LiveComponent (view.pushEventTo does not exist on the View
+    // class — using it silently drops the event; that bug shipped in ≤0.3.9
+    // and made native-dialog project creation a no-op).
+
+    // phx:pick_folder — server asks for a folder. In Tauri, open the native
+    // picker and push the result back; empty payload = cancelled/no Tauri,
+    // which the server renders as the inline text-input fallback.
+    this._pickFolderHandler = () => {
+      if (window.__TAURI_INTERNALS__) {
+        window.__TAURI_INTERNALS__
+          .invoke('pick_folder', {})
+          .then((path) => {
+            this.pushEventTo(this.el, 'folder_picked', path ? { path } : {})
+          })
+          .catch((err) => {
+            console.error('[tauri] pick_folder failed:', err)
+            this.pushEventTo(this.el, 'folder_picked', {})
+          })
+      } else {
+        this.pushEventTo(this.el, 'folder_picked', {})
+      }
+    }
+    window.addEventListener('phx:pick_folder', this._pickFolderHandler)
+
+    // tauri:session-action — fired by Rust after a native context-menu
+    // selection that needs a LiveView round-trip (archive, rename, etc).
+    // Payload: { action: 'archive_session', session_id: 123, extra: {} }
+    this._sessionActionHandler = (e) => {
+      const { action, session_id, extra } = e.detail ?? {}
+      if (!action) return
+      this.pushEventTo(this.el, action, { session_id: String(session_id), ...(extra ?? {}) })
+    }
+    window.addEventListener('tauri:session-action', this._sessionActionHandler)
+
     if (TOUCH_DEVICE) {
       // Swipe left on open flyout → close
       this._flyoutGesture = createSwipeDetector({
@@ -86,6 +122,12 @@ export const RailState = {
   destroyed() {
     if (this._openHandler) {
       this.el.removeEventListener('rail:open', this._openHandler)
+    }
+    if (this._pickFolderHandler) {
+      window.removeEventListener('phx:pick_folder', this._pickFolderHandler)
+    }
+    if (this._sessionActionHandler) {
+      window.removeEventListener('tauri:session-action', this._sessionActionHandler)
     }
     if (this._flyoutGesture) {
       const flyoutPanel = this.el.querySelector('[data-flyout-panel]')

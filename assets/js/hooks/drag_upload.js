@@ -42,9 +42,17 @@ export const DragUpload = {
       this._overlay?.classList.add('hidden')
     }
 
-    this._onTauriDrop = () => {
+    this._onTauriDrop = (e) => {
       this._active = false
       this._overlay?.classList.add('hidden')
+      // Forward the dropped file paths to the DM LiveView. Must go through a
+      // hook: this.pushEvent is the only public API for pushing to the view
+      // (the old app.js relay used the nonexistent view.pushEvent and dropped
+      // every native file drop silently).
+      const paths = e.detail?.paths ?? []
+      if (paths.length) {
+        this.pushEvent('tauri_file_drop', { paths })
+      }
     }
 
     window.addEventListener('dragenter', this._onDragEnter)

@@ -190,10 +190,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
                |> assign(:sidebar_project, project)}
 
             {:error, _} ->
-              {:noreply, socket}
+              {:noreply, put_flash(socket, :error, "Could not add project at #{path}")}
           end
         else
-          {:noreply, socket}
+          # Surface the failure — a silent {:noreply, socket} here cost multiple
+          # debugging rounds (nothing appears in the UI and nothing is logged).
+          errors =
+            changeset.errors
+            |> Enum.map(fn {field, {msg, _}} -> "#{field} #{msg}" end)
+            |> Enum.join(", ")
+
+          {:noreply, put_flash(socket, :error, "Could not add project: #{errors}")}
         end
     end
   end

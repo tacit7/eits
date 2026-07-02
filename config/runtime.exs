@@ -15,6 +15,14 @@ dot_env_files =
 runtime_env = source!(dot_env_files ++ [System.get_env()])
 get_env = fn key -> runtime_env[key] end
 
+# Desktop app (ElixirKit): the release's stdout is the Rust<->BEAM protocol
+# channel, so Logger writes to stdout fail and every message double-prints as
+# "Failed to write log message to stdout, trying stderr". Send logs straight
+# to stderr when running under ElixirKit (env set by src-tauri/src/lib.rs).
+if get_env.("ELIXIRKIT_PUBSUB") do
+  config :logger, :default_handler, config: %{type: :standard_error}
+end
+
 # Tauri desktop branch: DISABLE_AUTH defaults to "1" — this app is local-only,
 # never network-reachable. Overridden by the .env file if present.
 disable_auth = get_env.("DISABLE_AUTH") || "1"

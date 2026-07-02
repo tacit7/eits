@@ -13,8 +13,22 @@
 ```bash
 brew install elixir node postgresql caddy
 brew services start postgresql
-createuser -P postgres   # password: postgres
+createuser -s -P postgres   # password: postgres — NOT optional, see below
 ```
+
+> **The `createuser` step is mandatory on Homebrew Postgres.** Homebrew
+> initializes Postgres with a superuser named after your **macOS user**, not
+> `postgres` — but `config/dev.exs` connects as `postgres`/`postgres`. Skipping
+> this step fails later at `mix ecto.create` with:
+>
+> ```
+> FATAL 28000 (invalid_authorization_specification) role "postgres" does not exist
+> ```
+>
+> Fix: run `createuser -s -P postgres` (enter `postgres` as the password). The
+> `-s` (superuser) flag lets the role create the `eits_dev` database. If the
+> role already exists without a password, set one with:
+> `psql -d postgres -c "ALTER ROLE postgres WITH PASSWORD 'postgres';"`
 
 ## 1. Clone & Deps
 

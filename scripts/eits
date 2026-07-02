@@ -3583,6 +3583,187 @@ EOF
   esac
 }
 
+# ── skills ─────────────────────────────────────────────────────────────────────
+# Resolve the repo root from this script's real path, following symlinks.
+# Returns empty string on failure.
+_skills_repo_root() {
+  local self
+  if command -v realpath &>/dev/null; then
+    self="$(realpath "$0")"
+  else
+    # Fallback: follow readlink manually (macOS readlink lacks -f)
+    self="$0"
+    local target
+    while target="$(readlink "$self" 2>/dev/null)"; do
+      case "$target" in
+        /*) self="$target" ;;
+        *)  self="$(dirname "$self")/$target" ;;
+      esac
+    done
+    self="$(cd "$(dirname "$self")" && pwd)/$(basename "$self")"
+  fi
+  local self_dir
+  self_dir="$(cd "$(dirname "$self")" && pwd)"
+
+  # Try relative paths from the script's real location.
+  # Dev layout:  scripts/eits  → repo root is one level up
+  # Installed:   the symlink resolution above already unwound to the real path
+  local candidate
+  for candidate in \
+    "$self_dir/.." \
+    "$self_dir/../.."; do
+    if [[ -d "$candidate/priv/skills" ]]; then
+      echo "$(cd "$candidate" && pwd)"
+      return 0
+    fi
+  done
+
+  # Explicit override
+  if [[ -n "${EITS_REPO:-}" ]] && [[ -d "${EITS_REPO}/priv/skills" ]]; then
+    echo "$(cd "$EITS_REPO" && pwd)"
+    return 0
+  fi
+
+  return 1
+}
+
+_skills_install() {
+  local src="$1" dst="$2" force="${3:-0}"
+  local skills=()
+  while IFS= read -r d; do skills+=("$d"); done \
+    < <(find "$src" -maxdepth 1 -mindepth 1 -type d -name 'eits-*' | sort)
+
+  if [[ ${#skills[@]} -eq 0 ]]; then
+    die "no eits-* skill directories found in $src"
+  fi
+
+  mkdir -p "$dst"
+  local count=0
+
+  for skill_path in "${skills[@]}"; do
+    local name
+    name="$(basename "$skill_path")"
+    local dest="$dst/$name"
+
+    # If destination is a symlink, remove it so rsync copies real files
+    if [[ -L "$dest" ]]; then
+      unlink "$dest"
+    fi
+
+    rsync -a --delete "$skill_path/" "$dest/"
+    echo "✓ $name"
+    count=$((count + 1))
+  done
+
+  echo ""
+  echo "Installed $count skill(s) to $dst"
+}
+
+_skills_list() {
+  local src="$1" dst="$2"
+  local skills=()
+  while IFS= read -r d; do skills+=("$d"); done \
+    < <(find "$src" -maxdepth 1 -mindepth 1 -type d -name 'eits-*' | sort)
+
+  if [[ ${#skills[@]} -eq 0 ]]; then
+    echo "no eits-* skill directories found in $src"
+    return 0
+  fi
+
+  printf "%-28s  %s\n" "SKILL" "STATUS"
+  printf "%-28s  %s\n" "----------------------------" "-------"
+
+  for skill_path in "${skills[@]}"; do
+    local name
+    name="$(basename "$skill_path")"
+    local dest="$dst/$name"
+
+    if [[ ! -e "$dest" ]] && [[ ! -L "$dest" ]]; then
+      printf "%-28s  missing\n" "$name"
+    elif [[ -L "$dest" ]]; then
+      local target
+      target="$(readlink "$dest")"
+      printf "%-28s  symlink → %s\n" "$name" "$target"
+    else
+      # Check staleness: any source file newer than its installed counterpart?
+      local stale=0
+      while IFS= read -r f; do
+        local rel="${f#${skill_path}/}"
+        if [[ ! -f "$dest/$rel" ]] || [[ "$f" -nt "$dest/$rel" ]]; then
+          stale=1
+          break
+        fi
+      done < <(find "$skill_path" -type f)
+      if [[ $stale -eq 1 ]]; then
+        printf "%-28s  stale\n" "$name"
+      else
+        printf "%-28s  current\n" "$name"
+      fi
+    fi
+  done
+}
+
+cmd_skills() {
+  local subcmd="${1:-install}"; shift || true
+
+  local repo_root
+  repo_root="$(_skills_repo_root)" || \
+    die "Could not locate EITS repo root (priv/skills/ not found). Set EITS_REPO=/path/to/eits/web or run from inside the project."
+
+  local skills_src="$repo_root/priv/skills"
+  local skills_dst="${HOME}/.claude/skills"
+
+  case "$subcmd" in
+    install)
+      local force=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --force|-f) force=1; shift ;;
+          --help|-h)
+            cat <<EOF
+usage: eits skills install [--force]
+
+Copy every priv/skills/eits-* directory into ~/.claude/skills/, replacing
+existing copies (including symlinks). Skills are installed as real files so
+they stay current independently of the repo path.
+
+Options:
+  --force, -f   Always overwrite (default: overwrite anyway; reserved for
+                future idempotency checks)
+
+Repo root: $repo_root
+EOF
+            return 0
+            ;;
+          *) die "unknown option: $1 (try: eits skills install --help)" ;;
+        esac
+      done
+      _skills_install "$skills_src" "$skills_dst" "$force"
+      ;;
+    list|--list|-l)
+      _skills_list "$skills_src" "$skills_dst"
+      ;;
+    --help|-h)
+      cat <<EOF
+usage: eits skills <install|list>
+
+  install     Copy every priv/skills/eits-* directory into ~/.claude/skills/,
+              replacing existing copies (symlinks are converted to real files).
+              Options: --force
+
+  list        Show which eits-* skills would be installed and their current
+              status: missing, symlink, stale, or current.
+
+Repo root is resolved from this script's real path (symlinks unwound).
+Override with EITS_REPO=/path/to/eits/web if auto-detection fails.
+EOF
+      ;;
+    *)
+      die "unknown skills subcommand: $subcmd (try: install, list)"
+      ;;
+  esac
+}
+
 cmd_queue() {
   local subcmd="${1:-}"; shift || true
   [[ "${subcmd:-}" == "--help" || "${subcmd:-}" == "-h" ]] && {
@@ -4458,6 +4639,7 @@ Commands:
   timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   hooks         install|uninstall   (install EITS Claude Code hooks into ~/.claude/settings.json)
+  skills        install|list   (sync priv/skills/eits-* to ~/.claude/skills/)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
@@ -4500,6 +4682,7 @@ case "$cmd" in
   timer)         cmd_timer         "$@" ;;
   worktree)      cmd_worktree      "$@" ;;
   hooks)         cmd_hooks         "$@" ;;
+  skills)        cmd_skills        "$@" ;;
   queue)         cmd_queue         "$@" ;;
   search)        cmd_search        "$@" ;;
   messages)      cmd_messages      "$@" ;;

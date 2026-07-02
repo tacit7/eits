@@ -724,6 +724,32 @@ eits hooks uninstall   # Remove EITS-managed hooks from ~/.claude/settings.json
 
 ---
 
+## skills
+
+```bash
+eits skills install     # Copy priv/skills/eits-* into ~/.claude/skills/
+eits skills list        # Show staleness status of installed eits-* skills
+```
+
+**`eits skills install`** copies every `priv/skills/eits-*` directory from the repo into `~/.claude/skills/`, replacing existing copies. Symlinks are converted to real files so installed skills remain functional regardless of repo path changes.
+
+- Runs from anywhere — resolves the repo root from the script's real path (symlinks unwound)
+- Set `EITS_REPO=/path/to/eits/web` if auto-detection fails (e.g., non-standard install layouts)
+- Options: `--force` (reserved; install always overwrites)
+
+**`eits skills list`** shows what would be installed without making changes:
+
+| STATUS | Meaning |
+|--------|---------|
+| `missing` | Skill exists in repo but not in `~/.claude/skills/` |
+| `symlink` | Destination is a symlink (will be converted on install) |
+| `stale` | Installed copy has files older than the repo source |
+| `current` | Installed copy is up to date |
+
+**Why use this**: Skills in `~/.claude/skills/` were previously maintained as manual symlinks that silently go stale when the repo moves or the worktree is deleted. This command keeps installed skills in sync with the repo without manual copying.
+
+---
+
 ## Hooks & Server Availability
 
 EITS hooks (stored in `priv/scripts/` and `.claude/hooks/`) use a shared TCP probe guard (`eits-lib.sh`) to verify the server is available before making API calls. If the server is down, the hook silently exits (exit 0) instead of hanging or erroring.

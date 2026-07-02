@@ -138,44 +138,85 @@ The two `rel` directories are distinct:
 ## Runtime environment
 
 The bundled `.app` does not read shell environment variables when launched via
-Finder or the Dock. All runtime configuration is stored in
-`~/.config/eits/.env` and loaded at startup by `config/runtime.exs` via Dotenvy.
+Finder or the Dock. The Rust layer in `src-tauri/src/lib.rs` (`elixir_command`)
+injects a fixed set of env vars before spawning the Elixir release. In addition,
+`config/runtime.exs` reads `.env` and `.env.local` from the release working
+directory via Dotenvy — if those files exist they override the values injected
+by Rust.
 
-### `setup.command` — first-run provisioner
+### How env provisioning works
 
-Run once in Terminal after installing the DMG:
+`lib.rs` unconditionally sets these vars in the prod build path:
 
-```bash
-open "/Applications/Eye in the Sky.app/Contents/Resources/setup.command"
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `PHX_SERVER` | `true` | Tells Phoenix to start the HTTP endpoint |
+| `PHX_HOST` | `127.0.0.1` | Phoenix URL config — keeps links local |
+| `PORT` | `5050` | Avoids port conflict with the dev server on 5001 |
+| `DISABLE_AUTH` | `true` | Bypasses passkey auth; WKWebView origin mismatch makes WebAuthn impractical locally |
+| `BYPASS_AUTH` | `true` | Secondary auth bypass flag checked by some auth paths |
+| `DATABASE_SSL_VERIFY` | `false` | Bundled ERTS has no OpenSSL; local Postgres has no SSL |
+| `PHX_DISABLE_FORCE_SSL` | `1` | Disables HSTS + HTTPS redirect so WKWebView doesn't loop on `http://` |
+
+`lib.rs` also provides **hardcoded fallbacks** for two vars when they are not
+already present in the environment:
+
+| Variable | Fallback value | Note |
+|----------|---------------|------|
+| `DATABASE_URL` | `postgres://postgres:postgres@localhost/eits_dev?sslmode=disable` | Works with a standard PostgreSQL install; **fails on Homebrew Postgres** where the superuser is your OS login name, not `postgres` |
+| `SECRET_KEY_BASE` | Hardcoded hex string in source | Acceptable for a single-machine desktop app not exposed to the network; all users share the same key unless overridden |
+
+To override either fallback, set the variable in your shell before launching
+the binary directly, or place it in `.env`/`.env.local` inside the release
+directory (`Eye in the Sky.app/Contents/Resources/rel/`).
+
+### Manual first-run setup
+
+There is no automated provisioner bundled with this build. Before first launch:
+
+1. **Ensure PostgreSQL is running:**
+   ```bash
+   brew install postgresql@17
+   brew services start postgresql@17
+   ```
+
+2. **Create the database:**
+   ```bash
+   createdb eits_dev
+   ```
+
+3. **Run migrations** (using the bundled release binary):
+   ```bash
+   REL="/Applications/Eye in the Sky.app/Contents/Resources/rel"
+   DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" \
+   DATABASE_SSL_VERIFY=false \
+   PHX_SERVER=false \
+   DISABLE_AUTH=1 \
+   SECRET_KEY_BASE="$(openssl rand -hex 64)" \
+   "$REL/bin/eye_in_the_sky" eval "EyeInTheSky.Release.migrate()"
+   ```
+
+4. **Override the DATABASE_URL fallback** if you are on Homebrew PostgreSQL (the
+   default fallback uses `postgres` user which doesn't exist on Homebrew installs):
+   ```bash
+   # Launch directly with the correct user
+   DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" \
+     "/Applications/Eye in the Sky.app/Contents/MacOS/eye-in-the-sky"
+   ```
+
+> **Note:** A shell script provisioner (`setup.command`) that automates steps
+> 1–4, generates a unique `SECRET_KEY_BASE`, and installs Claude Code hooks is
+> under development in the `tauri` branch but is not yet bundled in this build.
+
+### `WEBAUTHN_EXTRA_ORIGINS`
+
+To add extra allowed WebSocket origins (e.g. for Tailscale access), set this
+var in the shell before launching the binary directly, or add it to `.env`
+inside the release directory:
+
 ```
-
-`setup.command` is idempotent — safe to re-run. It:
-
-1. Installs Homebrew if missing.
-2. Installs and starts PostgreSQL 17 via Homebrew.
-3. Creates the `eits_dev` database (`createdb eits_dev`).
-4. Writes `~/.config/eits/.env` with:
-   - `DATABASE_URL=ecto://<OS-username>@localhost/eits_dev` — uses `$(whoami)` because Homebrew PostgreSQL creates a superuser named after the installing user, **not** `postgres`.
-   - `SECRET_KEY_BASE` — generated fresh via `openssl rand -hex 64`. Never hardcoded; all installs get a unique key.
-   - `PHX_SERVER=true`, `PHX_DISABLE_FORCE_SSL=1`, `DISABLE_AUTH=1`, `DATABASE_SSL_VERIFY=false`
-5. Patches an existing `.env` if `DATABASE_URL` still references `postgres` (upgrade path from older installs).
-6. Symlinks `~/.config/eits/.env` into the release directory so the release finds it at `rel/.env`.
-7. Runs database migrations via `bin/eye_in_the_sky eval "EyeInTheSky.Release.migrate()"`.
-8. Optionally installs Claude Code hooks (interactive prompt).
-
-### Key runtime env vars
-
-| Variable | Set by | Purpose |
-|----------|--------|---------|
-| `DATABASE_URL` | `setup.command` | PostgreSQL connection; must match OS username for Homebrew installs |
-| `SECRET_KEY_BASE` | `setup.command` (generated) | Phoenix session signing; unique per install |
-| `PHX_HOST` | `lib.rs` (`elixir_command`) | Set to `127.0.0.1`; controls the Phoenix URL config |
-| `PORT` | `lib.rs` | `5050` — avoids port conflict with the dev server on 5001 |
-| `DISABLE_AUTH` | `lib.rs` + `~/.config/eits/.env` | Bypasses passkey auth; WKWebView origin mismatch makes WebAuthn impractical locally |
-| `PHX_DISABLE_FORCE_SSL` | `~/.config/eits/.env` | Disables HSTS + HTTPS redirect so WKWebView doesn't loop on `http://` |
-| `DATABASE_SSL_VERIFY` | `lib.rs` | `false` — bundled ERTS has no OpenSSL; local Postgres has no SSL anyway |
-| `RELEASE_DISTRIBUTION` | `lib.rs` | `none` — disables Erlang distribution to avoid EPMD conflicts with a running dev server |
-| `WEBAUTHN_EXTRA_ORIGINS` | manual / Tailscale section | Additional allowed WebSocket origins |
+WEBAUTHN_EXTRA_ORIGINS=https://<machine>.<tailnet>.ts.net
+```
 
 ### Why `PHX_INSECURE_COOKIES=1` is baked at compile time
 
@@ -185,33 +226,35 @@ WebKit drops cookies with `Secure` flag over `http://`. Without `PHX_INSECURE_CO
 
 ## Launching the bundled app
 
-After `setup.command` runs, click the app icon normally. The Rust layer starts
-the Elixir release, waits for Phoenix to broadcast `"ready"` over ElixirKit
-PubSub, then creates the WKWebView window pointing at `http://127.0.0.1:5050`.
+Click the app icon to launch normally. The Rust layer starts the Elixir
+release, waits for Phoenix to broadcast `"ready"` over ElixirKit PubSub, then
+creates the WKWebView window pointing at `http://127.0.0.1:5050`.
 
 **Do not use `open -n "Eye in the Sky.app"`** to launch programmatically.
-Launch Services does not pass shell env vars, so any variables not in
-`~/.config/eits/.env` will be missing. Always invoke the binary directly if
-you need custom env:
+Launch Services does not pass shell env vars. Always invoke the Tauri binary
+directly if you need custom env overrides:
 
 ```bash
 # Direct binary launch (inherits shell env)
 "/Applications/Eye in the Sky.app/Contents/MacOS/eye-in-the-sky"
 
-# With overrides
-PORT=5050 RELEASE_NODE=eits_tauri \
+# With a custom DATABASE_URL (e.g. Homebrew Postgres)
+DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" \
   "/Applications/Eye in the Sky.app/Contents/MacOS/eye-in-the-sky"
 ```
 
-If you need to run the bundled app **alongside** the dev server (port 5001), add:
+If you need to run the bundled app **alongside** the dev server (port 5001),
+the Elixir release will attempt to use the same Erlang node name. The Rust
+layer does not set `RELEASE_DISTRIBUTION`, so you need to set it manually
+before launching the binary to prevent EPMD collisions:
 
 ```bash
-RELEASE_DISTRIBUTION=none PORT=5050 \
+RELEASE_DISTRIBUTION=none \
   "/Applications/Eye in the Sky.app/Contents/MacOS/eye-in-the-sky"
 ```
 
-`RELEASE_DISTRIBUTION=none` prevents the EPMD node-name collision that occurs
-when two BEAM nodes try to use the same `-sname eye_in_the_sky`.
+This avoids the `name eye_in_the_sky seems to be in use by another Erlang node`
+error. The `PORT=5050` is already set by `lib.rs`, so no port conflict occurs.
 
 ---
 
@@ -266,8 +309,8 @@ No certificate management required.
 
 **4. Allow the Tailscale origin for LiveView WebSockets and passkeys:**
 
-Add your Tailscale hostname to `WEBAUTHN_EXTRA_ORIGINS` in
-`~/.config/eits/.env`, then restart the app:
+Set `WEBAUTHN_EXTRA_ORIGINS` before launching the binary, or add it to `.env`
+inside the release directory (`Eye in the Sky.app/Contents/Resources/rel/.env`):
 
 ```
 WEBAUTHN_EXTRA_ORIGINS=https://<machine>.<tailnet>.ts.net
@@ -322,8 +365,8 @@ runs on every startup).
 | Symptom | Likely cause | Check |
 |---------|--------------|-------|
 | App launches but clicks do nothing | WebSocket origin rejected | `WEBAUTHN_EXTRA_ORIGINS` missing or `check_origin` blocking the socket. Check `/tmp/tauri-*.log` for `Could not check origin`. |
-| `VAPID_PRIVATE_KEY is required in production` crash | `DISABLE_AUTH` not set | Ensure `~/.config/eits/.env` contains `DISABLE_AUTH=1` |
-| `role "postgres" does not exist` | `DATABASE_URL` still uses wrong user | Re-run `setup.command`; it patches the URL to use `$(whoami)` |
+| `VAPID_PRIVATE_KEY is required in production` crash | `DISABLE_AUTH` not set | Launch with `DISABLE_AUTH=1` or add it to `rel/.env` in the app bundle |
+| `role "postgres" does not exist` | `DATABASE_URL` uses wrong user | Override: `DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" <binary>` |
 | Port 5050 already in use | Dev server or stale process | `lsof -i :5050`; kill the conflicting process |
 | `EACCES` during build | Stale `target/release/rel/` | `mv src-tauri/target/release/rel /tmp/rel-stale && cargo tauri build` |
-| `name eye_in_the_sky seems to be in use` | EPMD node collision | Bundled release is using `-sname`; set `RELEASE_DISTRIBUTION=none` or use a unique `RELEASE_NODE` |
+| `name eye_in_the_sky seems to be in use` | EPMD node collision with running dev server | `RELEASE_DISTRIBUTION=none <binary>` (must be set before launch; lib.rs does not set it automatically) |

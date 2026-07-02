@@ -584,6 +584,12 @@ The app spawns Claude CLI processes as Erlang Ports via `EyeInTheSky.Claude.CLI`
 - Idle timeout (configurable, default 5 minutes) kills stalled processes.
 - Process cancellation sends `SIGTERM` to the process group, with `SIGKILL` fallback.
 
+**Permission mode flag suppression**:
+- The `--dangerously-skip-permissions` flag is suppressed whenever `permission_mode` is set to a non-empty value.
+- **Why**: `--dangerously-skip-permissions` overrides `--permission-mode`, making plan mode (and any other explicit permission mode) a no-op. Allowing both flags simultaneously creates a dangerous situation where the operator intends to enforce a permission mode (e.g., plan mode for interactive review) but the skip flag silently bypasses all controls.
+- **Implementation** (`lib/eye_in_the_sky/claude/cli/args.ex`): The flag builder uses conditional logic: `maybe_bool_flag("--dangerously-skip-permissions", opts[:skip_permissions] && opts[:permission_mode] in [nil, ""])`. This ensures the skip flag is only emitted when `permission_mode` is absent or empty.
+- **Effect**: Whenever an explicit permission mode is in use, the application automatically suppresses the skip flag, ensuring that permission controls remain effective.
+
 **Environment variable filtering** (`EyeInTheSky.Claude.CLI.Env`):
 - Sensitive environment variables are stripped from spawned Claude processes to prevent credential leakage.
 - **Blocked variables**: `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `BINDIR`, `ROOTDIR`, `EMU`, `SECRET_KEY_BASE`, `DATABASE_URL`

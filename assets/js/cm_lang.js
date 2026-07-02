@@ -30,8 +30,11 @@ export async function loadLanguage(lang) {
     }
     case "markdown":
     case "md": {
-      const { markdown } = await import("@codemirror/lang-markdown")
-      return markdown()
+      const [{ markdown }, { languages }] = await Promise.all([
+        import("@codemirror/lang-markdown"),
+        import("@codemirror/language-data"),
+      ])
+      return markdown({ codeLanguages: languages })
     }
     case "json": {
       const { json } = await import("@codemirror/lang-json")

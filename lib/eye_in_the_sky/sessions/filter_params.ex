@@ -1,4 +1,5 @@
 defmodule EyeInTheSky.Sessions.FilterParams do
+  @moduledoc false
   alias EyeInTheSky.{Agents, Sessions, Utils.ToolHelpers}
 
   @doc """

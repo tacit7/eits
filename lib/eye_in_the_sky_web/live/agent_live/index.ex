@@ -9,7 +9,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
   import EyeInTheSkyWeb.Components.SessionCard
   import EyeInTheSkyWeb.Components.AgentList
 
-
   @default_refresh_ms 300_000
 
   @impl true

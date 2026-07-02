@@ -404,7 +404,7 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Worktree cleanup**: `--stash-if-dirty` auto-stashes uncommitted changes before worktree creation (instead of failing with dirty_working_tree error).
 
-**Effort level**: `--effort-level <level>` sets reasoning effort for the spawned agent. Valid levels: `low`, `medium`, `high`, `max`. This is passed to Claude CLI as the `--effort` flag. Defaults to the session's configured effort level if not specified.
+**Effort level**: `--effort-level <level>` sets reasoning effort for the spawned agent. Valid levels: `low`, `medium`, `high`, `auto`. When set to `auto`, the CLI decides the effort level and no `--effort` flag is sent. Valid non-auto levels are `low`, `medium`, `high`, `max`. Defaults to the session's configured effort level if not specified.
 
 **Team joining**: `--team-name` (by name) or `--team-id` (by integer ID, mutually exclusive). `--team-id` is resolved to team name via GET /teams/:id. If `--team-id` is not found, spawn prints a warning to stderr and continues without team assignment.
 
@@ -413,6 +413,8 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 **Summary output**: Spawn emits a final compact JSON summary as the last line of output. This enables reliable extraction of spawn results via `| tail -1 | jq .session_uuid` even when other verbose output precedes it. The summary includes `session_id`, `session_uuid`, `agent_id`, `worktree_path`, and `branch_name` (null fields omitted).
 
 **Sandbox**: `--yolo` bypasses sandbox restrictions. `--provider codex` defaults `bypass_sandbox` to true (can be overridden with explicit flags if needed).
+
+**Permission mode**: `--permission-mode <mode>` sets the permission interaction mode for the spawned agent (e.g., `plan`, `default`, or other modes supported by Claude CLI). When a permission mode is explicitly set, the `--dangerously-skip-permissions` flag is automatically suppressed, ensuring that explicit permission modes like `plan` mode cannot be overridden by skip-permissions behavior.
 
 **Session linking**: `--parent-session-id` accepts integer session ID (preferred) or UUID, linking the spawned agent's session to a parent. Prefer `$EITS_SESSION_ID` (integer) for compatibility.
 

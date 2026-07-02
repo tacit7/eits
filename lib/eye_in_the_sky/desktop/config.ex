@@ -69,4 +69,36 @@ defmodule EyeInTheSky.Desktop.Config do
   end
 
   def write_port(_), do: {:error, :invalid}
+
+  @doc """
+  Whether the user has granted global Claude Code hooks + skills install.
+  Mirrors `hooks_consent/0` in `src-tauri/src/lib.rs` — both sides read/write
+  the same `"hooks_consent"` key ("granted" | "denied") in this file.
+
+  Returns `nil` when never asked (first launch hasn't run the consent dialog
+  yet — the Rust side owns that; this module is read/write-only for it).
+  """
+  def hooks_consent do
+    case read_config() do
+      %{"hooks_consent" => "granted"} -> true
+      %{"hooks_consent" => "denied"} -> false
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Change the hooks/skills consent decision from within the app (Settings →
+  Desktop). Takes effect on next launch — the Rust installer only runs in
+  `setup()`, before Elixir boots. Returns :ok or {:error, reason}.
+  """
+  def write_hooks_consent(granted?) when is_boolean(granted?) do
+    path = config_path()
+    value = if granted?, do: "granted", else: "denied"
+
+    with :ok <- File.mkdir_p(Path.dirname(path)),
+         config = Map.put(read_config(), "hooks_consent", value),
+         :ok <- File.write(path, Jason.encode!(config, pretty: true)) do
+      :ok
+    end
+  end
 end

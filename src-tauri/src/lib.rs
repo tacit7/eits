@@ -133,6 +133,106 @@ fn desktop_config_port() -> Option<u16> {
     }
 }
 
+/// Path to `desktop.json`, honoring `XDG_CONFIG_HOME` — mirrors
+/// `EyeInTheSky.Desktop.Config.config_path/0` on the Elixir side. Both sides
+/// must agree on this path since they read/write the same file.
+fn desktop_config_path() -> Option<std::path::PathBuf> {
+    let config_base = std::env::var("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .ok()
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|h| std::path::PathBuf::from(h).join(".config"))
+        })?;
+    Some(config_base.join("eits").join("desktop.json"))
+}
+
+fn read_desktop_config() -> serde_json::Value {
+    desktop_config_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .filter(serde_json::Value::is_object)
+        .unwrap_or_else(|| serde_json::json!({}))
+}
+
+/// Merge-write a single key into `desktop.json`, preserving other keys —
+/// same semantics as `EyeInTheSky.Desktop.Config.write_port/1`.
+fn write_desktop_config_key(key: &str, value: serde_json::Value) {
+    let Some(path) = desktop_config_path() else {
+        log!("[eits-tauri] desktop.json: HOME/XDG_CONFIG_HOME not set; could not persist {key}");
+        return;
+    };
+    let mut config = read_desktop_config();
+    if let Some(obj) = config.as_object_mut() {
+        obj.insert(key.to_string(), value);
+    }
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            log!("[eits-tauri] desktop.json: could not create {}: {e}", parent.display());
+            return;
+        }
+    }
+    match serde_json::to_string_pretty(&config) {
+        Ok(s) => {
+            if let Err(e) = std::fs::write(&path, s) {
+                log!("[eits-tauri] desktop.json: could not write {}: {e}", path.display());
+            }
+        }
+        Err(e) => log!("[eits-tauri] desktop.json: could not serialize: {e}"),
+    }
+}
+
+/// Whether the user has granted global Claude Code hooks + skills install.
+/// `None` = never asked yet (first launch); `Some(bool)` = a prior answer.
+fn hooks_consent() -> Option<bool> {
+    match read_desktop_config().get("hooks_consent").and_then(|v| v.as_str()) {
+        Some("granted") => Some(true),
+        Some("denied") => Some(false),
+        _ => None,
+    }
+}
+
+fn set_hooks_consent(granted: bool) {
+    let value = if granted { "granted" } else { "denied" };
+    write_desktop_config_key("hooks_consent", serde_json::json!(value));
+}
+
+/// Ask the user, once, whether EITS may install its Claude Code integration
+/// globally. This writes into `~/.claude/settings.json` (hook entries) and
+/// `~/.claude/skills/` — files shared by EVERY Claude Code session on the
+/// machine, not just EITS, so it is not something to do silently.
+///
+/// Blocking native dialog: acceptable here because this runs once, early in
+/// `setup()`, before the window is shown or the Elixir release is spawned.
+/// The answer is persisted to `desktop.json` so this never asks again unless
+/// the user changes their mind in Settings → Desktop.
+fn ask_hooks_consent(app: &tauri::App) -> bool {
+    if let Some(answer) = hooks_consent() {
+        return answer;
+    }
+
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+
+    let granted = app
+        .dialog()
+        .message(
+            "EITS can install Claude Code hooks and skills so any Claude Code \
+             session on this Mac reports tool activity to EITS and can use \
+             the /eits-* skills — not just sessions started from this app.\n\n\
+             This writes to ~/.claude/settings.json and ~/.claude/skills/. \
+             You can change this later in Settings → Desktop.",
+        )
+        .title("Install EITS Claude Code integration?")
+        .kind(MessageDialogKind::Info)
+        .buttons(MessageDialogButtons::YesNo)
+        .blocking_show();
+
+    set_hooks_consent(granted);
+    log!("[eits-tauri] hooks/skills consent: {}", if granted { "granted" } else { "denied" });
+    granted
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize file logging first — before anything else so even early panics are captured.
@@ -324,20 +424,28 @@ pub fn run() {
                 }
             }
 
-            // --- IAM hook installer ---
-            // Write ~/.claude/settings.json hooks on every startup so agents
-            // automatically POST tool events to the local IAM endpoint.
-            // Idempotent: refreshes entries whose port went stale.
-            let port = resolved_port().to_string();
-            install_iam_hooks(&port);
+            // --- IAM hooks + skills installer (consent-gated) ---
+            // Both write into files SHARED by every Claude Code session on
+            // this machine (~/.claude/settings.json, ~/.claude/skills/), not
+            // just EITS — so ask once on first launch rather than doing it
+            // silently. The answer is persisted in desktop.json; revisit it
+            // any time via Settings → Desktop.
+            if ask_hooks_consent(app) {
+                // Write ~/.claude/settings.json hooks on every startup so
+                // agents automatically POST tool events to the local IAM
+                // endpoint. Idempotent: refreshes entries whose port went
+                // stale.
+                let port = resolved_port().to_string();
+                install_iam_hooks(&port);
 
-            // --- EITS skills installer ---
-            // Copy priv/skills/eits-* into ~/.claude/skills/ on every startup
-            // so agents running under this app can see the /eits-* skills
-            // without a manual `eits skills install`. Idempotent (install
-            // always overwrites with the bundled copy) and fail-open: a
-            // missing bundle dir or copy error is logged, never fatal.
-            install_skills(app);
+                // Copy priv/skills/eits-* into ~/.claude/skills/ on every
+                // startup so agents running under this app can see the
+                // /eits-* skills without a manual `eits skills install`.
+                // Idempotent (install always overwrites with the bundled
+                // copy) and fail-open: a missing bundle dir or copy error is
+                // logged, never fatal.
+                install_skills(app);
+            }
 
             // --- Notification permission (macOS requires explicit grant) ---
             // Without this, show() silently succeeds but no notification appears.

@@ -73,6 +73,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:generated_api_key, nil)
       |> assign(:desktop_mode?, Desktop.desktop_mode?())
       |> assign(:desktop_port, DesktopConfig.configured_port())
+      |> assign(:hooks_consent, DesktopConfig.hooks_consent())
 
     {:ok, socket}
   end
@@ -107,6 +108,29 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
       _ ->
         {:noreply, put_flash(socket, :error, "Could not save port")}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_hooks_consent", %{"granted" => granted_str}, socket) do
+    granted? = granted_str == "true"
+
+    case DesktopConfig.write_hooks_consent(granted?) do
+      :ok ->
+        message =
+          if granted? do
+            "Hooks/skills will be installed next launch"
+          else
+            "Hooks/skills will not be installed next launch (existing ones are not removed — use eits uninstall)"
+          end
+
+        {:noreply,
+         socket
+         |> assign(:hooks_consent, granted?)
+         |> put_flash(:info, message)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not save preference")}
     end
   end
 

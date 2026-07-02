@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
 
   import EyeInTheSkyWeb.Helpers.FileHelpers,
     only: [
@@ -20,7 +21,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   require Logger
 
-  alias EyeInTheSky.{Events, Projects}
+  alias EyeInTheSky.{Editors, Events, Projects, Settings}
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @ignored_dirs ~w(node_modules _build deps dist .elixir_ls __pycache__ target vendor)
@@ -39,6 +41,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       |> assign(:view_mode, :list)
       |> assign(:error, nil)
       |> assign(:subscribed_editor_id, nil)
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     case parse_int(id) do
       nil ->
@@ -305,6 +309,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
+  def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
+    project_path = socket.assigns.project.path
+
+    if is_binary(project_path) && path_within?(path, project_path) do
+      ViewHelpers.handle_open_in_editor(path, editor_id, socket)
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
+  @impl true
   def handle_info({:editor_push, op, payload}, socket) do
     {:noreply, push_event(socket, "cm:#{op}", payload)}
   end
@@ -350,11 +365,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   attr :file_hash, :string, default: nil
   attr :file_type, :string, default: nil
   attr :file_path, :string, default: nil
+  attr :file_full_path, :string, default: nil
   attr :project, :map, required: true
   attr :socket, :any, required: true
   attr :show_back_button, :boolean, default: false
   attr :empty_label, :string, default: "Select a file"
   attr :empty_description, :string, default: "Choose a file from the tree to view its contents"
+  attr :installed_editors, :list, default: []
+  attr :preferred_editor, :string, default: "code"
 
   defp file_content_pane(assigns) do
     ~H"""
@@ -368,16 +386,24 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     <% end %>
     <%= if @file_content do %>
       <div class="flex flex-col h-full">
-        <%= if @show_back_button && @file_path && @file_path != "." do %>
-          <div class="px-4 py-2 border-b border-base-300 shrink-0">
+        <div class="flex items-center gap-2 px-3 py-1.5 border-b border-base-300 shrink-0 bg-base-100">
+          <%= if @show_back_button && @file_path && @file_path != "." do %>
             <.link
               patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-              class="btn btn-sm btn-ghost btn-square"
+              class="btn btn-ghost btn-xs btn-square"
             >
               <.icon name="hero-arrow-left" class="size-4" />
             </.link>
-          </div>
-        <% end %>
+          <% end %>
+          <span class="text-xs text-base-content/50 font-mono truncate flex-1 min-w-0">
+            {@file_path}
+          </span>
+          <.open_in_editor_button
+            path={@file_full_path || ""}
+            installed_editors={@installed_editors}
+            preferred_editor={@preferred_editor}
+          />
+        </div>
         <div class="flex-1 min-h-0 overflow-hidden">
           <.file_content_viewer
             file_content={@file_content}
@@ -518,6 +544,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   attr :file_hash, :string
   attr :file_type, :string
   attr :file_path, :string
+  attr :file_full_path, :string, default: nil
+  attr :installed_editors, :list, default: []
+  attr :preferred_editor, :string, default: "code"
+  attr :view_mode, :atom, default: :list
 
   defp file_tree_view(assigns) do
     ~H"""
@@ -545,11 +575,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           file_hash={@file_hash}
           file_type={@file_type}
           file_path={@file_path}
+          file_full_path={@file_full_path}
           project={@project}
           socket={@socket}
           show_back_button={false}
           empty_label="Select a file"
           empty_description="Choose a file from the tree to view its contents"
+          installed_editors={@installed_editors}
+          preferred_editor={@preferred_editor}
         />
       </div>
     </div>
@@ -561,9 +594,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   attr :file_hash, :string
   attr :file_type, :string
   attr :file_path, :string
+  attr :file_full_path, :string, default: nil
   attr :project, :any, required: true
   attr :socket, :any, required: true
   attr :error, :string
+  attr :installed_editors, :list, default: []
+  attr :preferred_editor, :string, default: "code"
+  attr :view_mode, :atom, default: :list
 
   defp file_list_view(assigns) do
     ~H"""
@@ -603,11 +640,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           file_hash={@file_hash}
           file_type={@file_type}
           file_path={@file_path}
+          file_full_path={@file_full_path}
           project={@project}
           socket={@socket}
           show_back_button={true}
           empty_label="No files"
           empty_description="This directory is empty"
+          installed_editors={@installed_editors}
+          preferred_editor={@preferred_editor}
         />
       <% end %>
     </div>

@@ -2,11 +2,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
 
@@ -26,6 +29,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       |> assign(:new_agent_name, "")
       |> assign(:new_agent_description, "")
       |> assign(:top_bar_cta, %{label: "New", event: "toggle_new_agent_form"})
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     socket = if connected?(socket), do: load_agents(socket), else: socket
 
@@ -66,14 +71,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   end
 
   @impl true
-  def handle_event("open_file", _params, socket) do
-    case socket.assigns.selected_agent do
-      %{abs_path: path} when is_binary(path) ->
-        if open_path_allowed?(path, socket), do: ViewHelpers.open_in_system(path)
-        {:noreply, socket}
-
-      _ ->
-        {:noreply, socket}
+  def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
+    if open_path_allowed?(path, socket) do
+      ViewHelpers.handle_open_in_editor(path, editor_id, socket)
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
     end
   end
 
@@ -326,13 +328,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                   <% end %>
                 </div>
                 <div class="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    phx-click="open_file"
-                    title="Open in editor"
-                    class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
-                  >
-                    <.icon name="hero-arrow-top-right-on-square" class="size-4" />
-                  </button>
+                  <.open_in_editor_button
+                    path={@selected_agent.abs_path || ""}
+                    installed_editors={@installed_editors}
+                    preferred_editor={@preferred_editor}
+                  />
                   <button
                     phx-click="close_viewer"
                     title="Close"
@@ -494,6 +494,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       ".yaml" -> "yaml"
       ".yml" -> "yaml"
       ".json" -> "json"
+      ".ex" -> "elixir"
+      ".exs" -> "elixir"
+      ".js" -> "javascript"
+      ".ts" -> "typescript"
+      ".css" -> "css"
+      ".html" -> "html"
+      ".heex" -> "html"
+      ".sh" -> "shell"
+      ".bash" -> "shell"
+      ".md" -> "markdown"
       _ -> "markdown"
     end
   end

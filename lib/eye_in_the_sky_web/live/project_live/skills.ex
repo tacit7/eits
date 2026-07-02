@@ -1,10 +1,13 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.SkillsHelpers
 
@@ -24,6 +27,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
       |> assign(:filtered_skills, [])
       |> assign(:selected_skill, nil)
       |> assign(:detail_tab, :preview)
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     socket = if connected?(socket), do: load_skills(socket), else: socket
 
@@ -82,14 +87,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("open_file", _params, socket) do
-    case socket.assigns.selected_skill do
-      %{abs_path: path} when is_binary(path) ->
-        if skill_write_allowed?(path, socket), do: ViewHelpers.open_in_vscode(path)
-        {:noreply, socket}
-
-      _ ->
-        {:noreply, socket}
+  def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
+    if skill_write_allowed?(path, socket) do
+      ViewHelpers.handle_open_in_editor(path, editor_id, socket)
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
     end
   end
 
@@ -297,15 +299,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                   </p>
                 </div>
                 <div class="flex items-center gap-1 flex-shrink-0">
-                  <%= if is_binary(@selected_skill.abs_path) do %>
-                    <button
-                      phx-click="open_file"
-                      title="Open in VS Code"
-                      class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
-                    >
-                      <.icon name="hero-arrow-top-right-on-square" class="size-4" />
-                    </button>
-                  <% end %>
+                  <.open_in_editor_button
+                    path={@selected_skill.abs_path || ""}
+                    installed_editors={@installed_editors}
+                    preferred_editor={@preferred_editor}
+                  />
                   <button
                     phx-click="close_viewer"
                     class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
@@ -398,6 +396,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
       ".yaml" -> "yaml"
       ".yml" -> "yaml"
       ".json" -> "json"
+      ".ex" -> "elixir"
+      ".exs" -> "elixir"
+      ".js" -> "javascript"
+      ".ts" -> "typescript"
+      ".css" -> "css"
+      ".html" -> "html"
+      ".heex" -> "html"
+      ".sh" -> "shell"
+      ".bash" -> "shell"
+      ".md" -> "markdown"
       _ -> "markdown"
     end
   end

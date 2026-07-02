@@ -425,10 +425,11 @@ defmodule EyeInTheSky.IAM.Seeds do
           :ok
 
         {:error, changeset} ->
+          # Details go in the message, not metadata — the default log formatter
+          # drops custom metadata, which made this failure undiagnosable from
+          # the packaged app's log.
           Logger.error(
-            "IAM built-in seed failed",
-            system_key: attrs[:system_key],
-            errors: inspect(changeset.errors)
+            "IAM built-in seed failed: #{attrs[:system_key]} — #{inspect(changeset.errors)}"
           )
       end
     end)

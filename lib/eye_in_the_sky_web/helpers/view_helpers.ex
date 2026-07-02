@@ -134,4 +134,5 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   def short_model(name), do: ModelHelpers.model_display_name(name)
 
   defdelegate open_in_system(path), to: EyeInTheSkyWeb.Helpers.SystemHelpers
+  defdelegate open_in_vscode(path), to: EyeInTheSkyWeb.Helpers.SystemHelpers
 end

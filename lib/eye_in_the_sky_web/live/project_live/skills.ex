@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
 
   alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.SkillsHelpers
@@ -79,6 +80,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
     do: {:noreply, assign(socket, :detail_tab, :raw)}
 
   def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("open_file", _params, socket) do
+    case socket.assigns.selected_skill do
+      %{abs_path: path} when is_binary(path) ->
+        if skill_write_allowed?(path, socket), do: ViewHelpers.open_in_vscode(path)
+        {:noreply, socket}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("edit_content", _, socket),
@@ -283,12 +296,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                     {@selected_skill.description}
                   </p>
                 </div>
-                <button
-                  phx-click="close_viewer"
-                  class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
-                >
-                  <.icon name="hero-x-mark" class="size-4" />
-                </button>
+                <div class="flex items-center gap-1 flex-shrink-0">
+                  <%= if is_binary(@selected_skill.abs_path) do %>
+                    <button
+                      phx-click="open_file"
+                      title="Open in VS Code"
+                      class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                    >
+                      <.icon name="hero-arrow-top-right-on-square" class="size-4" />
+                    </button>
+                  <% end %>
+                  <button
+                    phx-click="close_viewer"
+                    class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
+                  >
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
+                </div>
               </div>
               <div class="flex items-center gap-1 mt-3">
                 <button

@@ -3586,13 +3586,23 @@ cmd_hooks() {
       ;;
     --help|-h)
       cat <<EOF
-usage: eits hooks <install|uninstall>
+usage: eits hooks <install|uninstall> [--project]
 
   install     Copy hook scripts to ~/.config/eits/hooks/, install the eits CLI
               to ~/.local/bin/eits, and merge hooks into ~/.claude/settings.json.
 
   uninstall   Remove EITS-managed hook entries from ~/.claude/settings.json.
               Does not delete scripts or the eits CLI binary.
+
+  --project   Scope hooks to THIS repo only: register them in
+              <cwd>/.claude/settings.local.json instead of the global
+              ~/.claude/settings.json. No other Claude Code session on the
+              machine is affected. Run from the project root. Offers to add
+              .claude/settings.local.json to .gitignore if it's not already
+              covered — that file is meant to be per-developer, never
+              committed. Scripts/CLI are still installed to the shared global
+              locations either way (inert until a settings file references
+              them). 'eits uninstall --project' is the counterpart.
 EOF
       ;;
     *)
@@ -3745,13 +3755,14 @@ cmd_skills() {
 
   case "$subcmd" in
     install)
-      local force=0
+      local force=0 project=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --force|-f) force=1; shift ;;
+          --force|-f)  force=1;   shift ;;
+          --project)   project=1; shift ;;
           --help|-h)
             cat <<EOF
-usage: eits skills install [--force]
+usage: eits skills install [--force] [--project]
 
 Copy every priv/skills/eits-* directory into ~/.claude/skills/, replacing
 existing copies (including symlinks). Skills are installed as real files so
@@ -3760,6 +3771,9 @@ they stay current independently of the repo path.
 Options:
   --force, -f   Always overwrite (default: overwrite anyway; reserved for
                 future idempotency checks)
+  --project     Install into <cwd>/.claude/skills/ instead of the global
+                ~/.claude/skills/ — scopes skills to THIS repo only. Run
+                from the project root.
 
 Repo root: $repo_root
 EOF
@@ -3768,21 +3782,33 @@ EOF
           *) die "unknown option: $1 (try: eits skills install --help)" ;;
         esac
       done
+      [[ $project -eq 1 ]] && skills_dst="$(pwd)/.claude/skills"
       _skills_install "$skills_src" "$skills_dst" "$force"
       ;;
     list|--list|-l)
+      local project=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) project=1; shift ;;
+          *) die "unknown option: $1 (try: eits skills list --help)" ;;
+        esac
+      done
+      [[ $project -eq 1 ]] && skills_dst="$(pwd)/.claude/skills"
       _skills_list "$skills_src" "$skills_dst"
       ;;
     --help|-h)
       cat <<EOF
-usage: eits skills <install|list>
+usage: eits skills <install|list> [--project]
 
   install     Copy every priv/skills/eits-* directory into ~/.claude/skills/,
               replacing existing copies (symlinks are converted to real files).
-              Options: --force
+              Options: --force, --project
 
   list        Show which eits-* skills would be installed and their current
               status: missing, symlink, stale, or current.
+
+  --project   Target <cwd>/.claude/skills/ instead of the global
+              ~/.claude/skills/ — scopes skills to THIS repo only.
 
 Repo root is resolved in order:
   1. Relative to this script's real path (symlinks unwound)
@@ -3797,24 +3823,175 @@ EOF
   esac
 }
 
+# ── install (top-level alias) ─────────────────────────────────────────────────
+# 'eits hooks install' and 'eits skills install' both exist and both work —
+# this is purely a discoverability front door: `eits install` is the obvious
+# thing to type on a machine that doesn't have EITS set up yet, and 'hooks
+# install' as the actual entry point is not something a new user would guess.
+# Counterpart to 'eits uninstall'.
+cmd_install() {
+  local project=0
+  local -a passthrough=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --project) project=1; passthrough+=(--project); shift ;;
+      --help|-h)
+        cat <<EOF
+usage: eits install [--project]
+
+Runs 'eits hooks install' then 'eits skills install' — the global,
+machine-wide EITS Claude Code integration in one command.
+
+  --project   Scope both to THIS repo only (<cwd>/.claude/settings.local.json
+              and <cwd>/.claude/skills/) instead of the global ~/.claude/.
+              Run from the project root. See 'eits hooks install --help'
+              and 'eits skills install --help' for details.
+
+Counterpart: 'eits uninstall' (add --project to match).
+EOF
+        return 0
+        ;;
+      *) die "unknown option: $1 (try: eits install --help)" ;;
+    esac
+  done
+
+  echo "== eits hooks install ${passthrough[*]:-} =="
+  cmd_hooks install "${passthrough[@]}"
+  echo ""
+  echo "== eits skills install ${passthrough[*]:-} =="
+  cmd_skills install "${passthrough[@]}"
+}
+
 # ── uninstall ──────────────────────────────────────────────────────────────────
 # Remove everything EITS installs onto a machine. Default scope: Claude Code
 # hook entries (workflow + IAM + repo-path), ~/.config/eits/, eits-* skills,
 # and the ~/.local/bin/eits CLI copy. The desktop app bundle and the Postgres
 # database are only touched behind explicit flags.
+
+# Counterpart to 'eits hooks install --project' / 'eits skills install
+# --project'. Only touches THIS repo's .claude/ directory — never the
+# global ~/.claude/settings.json, ~/.claude/skills/, or ~/.config/eits/.
+_uninstall_project() {
+  local dry_run="$1" assume_yes="$2"
+
+  local settings="$(pwd)/.claude/settings.local.json"
+  local skills_dst="$(pwd)/.claude/skills"
+
+  local -a skill_paths=()
+  local skill
+  for skill in "$skills_dst"/eits-*; do
+    [[ -e "$skill" ]] && skill_paths+=("$skill")
+  done
+
+  echo "Project-scoped EITS uninstall (in $(pwd)) will remove:"
+  echo "  - EITS hook entries from .claude/settings.local.json"
+  local p
+  for p in "${skill_paths[@]}"; do
+    echo "  - ${p#$(pwd)/}"
+  done
+
+  if [[ "$dry_run" -eq 1 ]]; then
+    echo ""
+    echo "(dry run — nothing was removed)"
+    return 0
+  fi
+
+  if [[ "$assume_yes" -ne 1 ]]; then
+    printf "Proceed? [y/N] "
+    local reply
+    read -r reply
+    [[ "$reply" == "y" || "$reply" == "Y" ]] || { echo "Aborted."; return 1; }
+  fi
+
+  if [[ -f "$settings" ]]; then
+    python3 - "$settings" <<'PYEOF'
+import sys, json
+
+settings_path = sys.argv[1]
+MARKERS = ("/api/v1/iam/hook", "/priv/scripts/eits-", "/.config/eits/hooks/")
+
+with open(settings_path) as f:
+    root = json.load(f)
+
+if not isinstance(root, dict):
+    print("  - settings.local.json root is not an object; no hooks removed")
+    sys.exit(0)
+
+hooks = root.get("hooks", {})
+if not isinstance(hooks, dict):
+    print("  - settings.local.json hooks field is not an object; no hooks removed")
+    sys.exit(0)
+
+changed = False
+
+def is_eits(entry):
+    if not isinstance(entry, dict):
+        return False
+    cmd = entry.get("command", "")
+    return isinstance(cmd, str) and any(m in cmd for m in MARKERS)
+
+for event, groups in list(hooks.items()):
+    if not isinstance(groups, list):
+        continue
+    kept = []
+    for group in groups:
+        if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+            kept.append(group)
+            continue
+        inner = group["hooks"]
+        filtered = [h for h in inner if not is_eits(h)]
+        if len(filtered) != len(inner):
+            changed = True
+        if filtered:
+            group = dict(group)
+            group["hooks"] = filtered
+            kept.append(group)
+        else:
+            changed = True
+    hooks[event] = kept
+
+root["hooks"] = {k: v for k, v in hooks.items() if v}
+if not root["hooks"]:
+    root.pop("hooks")
+
+if changed:
+    with open(settings_path, "w") as f:
+        json.dump(root, f, indent=2)
+        f.write("\n")
+    print("  ✓ EITS hook entries removed from .claude/settings.local.json")
+else:
+    print("  - no EITS hook entries found in .claude/settings.local.json")
+PYEOF
+  else
+    echo "  - .claude/settings.local.json not found; no hooks to remove"
+  fi
+
+  for p in "${skill_paths[@]}"; do
+    if rm -rf "$p" 2>/dev/null; then
+      echo "  ✓ removed ${p#$(pwd)/}"
+    else
+      echo "  ✗ could not remove ${p#$(pwd)/}" >&2
+    fi
+  done
+
+  echo ""
+  echo "Done. Global machine install (if any) is untouched — use 'eits uninstall' without --project for that."
+}
+
 cmd_uninstall() {
-  local remove_app=0 remove_db=0 dry_run=0 assume_yes=0
+  local remove_app=0 remove_db=0 dry_run=0 assume_yes=0 project=0
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --app)     remove_app=1; shift ;;
       --db)      remove_db=1;  shift ;;
       --all)     remove_app=1; remove_db=1; shift ;;
+      --project) project=1;    shift ;;
       --dry-run) dry_run=1;    shift ;;
       --yes|-y)  assume_yes=1; shift ;;
       --help|-h)
         cat <<EOF
-usage: eits uninstall [--app] [--db] [--all] [--dry-run] [--yes]
+usage: eits uninstall [--app] [--db] [--all] [--project] [--dry-run] [--yes]
 
 Removes EITS integration from this machine. Default scope:
   - EITS hook entries in ~/.claude/settings.json
@@ -3829,17 +4006,29 @@ Flags:
   --db       also DROP the eits_dev PostgreSQL database (DESTRUCTIVE —
              all sessions, tasks, messages, and settings are lost)
   --all      = --app --db
+  --project  Uninstall the PROJECT-scoped install instead: removes EITS
+             hook entries from <cwd>/.claude/settings.local.json and
+             eits-* skills from <cwd>/.claude/skills/ (counterpart to
+             'eits hooks install --project' / 'eits skills install
+             --project'). Does not touch the global machine install, the
+             desktop app, or the database — --app/--db/--all are ignored
+             with --project. Run from the project root.
   --dry-run  print what would be removed without touching anything
   --yes, -y  skip the confirmation prompt
 
-Quit the desktop app before uninstalling — it re-installs its IAM hooks
-on every launch, which would undo the hook removal.
+Quit the desktop app before a global (non --project) uninstall — it
+re-installs its IAM hooks on every launch, which would undo the removal.
 EOF
         return 0
         ;;
       *) die "unknown option: $1 (try: eits uninstall --help)" ;;
     esac
   done
+
+  if [[ $project -eq 1 ]]; then
+    _uninstall_project "$dry_run" "$assume_yes"
+    return $?
+  fi
 
   # Refuse to run while the desktop app is open: it re-installs IAM hooks on
   # launch and holds the database open.
@@ -4880,9 +5069,10 @@ Commands:
                 status <id> [--wait]   ← blocks until all members done/failed; exits 0 all done, 1 any failed
   timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
-  hooks         install|uninstall   (install EITS Claude Code hooks into ~/.claude/settings.json)
-  skills        install|list   (sync priv/skills/eits-* to ~/.claude/skills/)
-  uninstall     [--app] [--db] [--all] [--dry-run] [--yes]   (remove EITS from this machine)
+  hooks         install|uninstall [--project]   (install EITS Claude Code hooks into ~/.claude/settings.json)
+  skills        install|list [--project]   (sync priv/skills/eits-* to ~/.claude/skills/)
+  install       [--project]   (alias: hooks install + skills install)
+  uninstall     [--app] [--db] [--all] [--project] [--dry-run] [--yes]   (remove EITS from this machine)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
@@ -4926,6 +5116,7 @@ case "$cmd" in
   worktree)      cmd_worktree      "$@" ;;
   hooks)         cmd_hooks         "$@" ;;
   skills)        cmd_skills        "$@" ;;
+  install)       cmd_install       "$@" ;;
   uninstall)     cmd_uninstall     "$@" ;;
   queue)         cmd_queue         "$@" ;;
   search)        cmd_search        "$@" ;;

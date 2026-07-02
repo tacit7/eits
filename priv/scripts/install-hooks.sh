@@ -1,26 +1,37 @@
 #!/usr/bin/env bash
 # install-hooks.sh — installs EITS Claude Code hooks into ~/.claude/settings.json
+# (or, with --project, into <cwd>/.claude/settings.local.json for this repo only)
 #
 # Usage:
-#   install-hooks.sh [--scripts-dir <dir>] [--eits-cli <path>] [--uninstall]
+#   install-hooks.sh [--scripts-dir <dir>] [--eits-cli <path>] [--project] [--uninstall]
 #
 # --scripts-dir   directory containing eits-*.sh scripts (default: same dir as this script)
 # --eits-cli      path to the eits CLI binary to install (default: look next to scripts-dir)
-# --uninstall     remove EITS hooks from ~/.claude/settings.json
+# --project       register hooks in <cwd>/.claude/settings.local.json instead of the
+#                 global ~/.claude/settings.json — scopes EITS hooks to THIS repo only,
+#                 without affecting any other Claude Code session on the machine. Run
+#                 from the project root. settings.local.json is meant to be gitignored
+#                 (per-developer); this script offers to add that entry if missing.
+# --uninstall     remove EITS hooks from the target settings file
 #
-# Installs scripts to ~/.config/eits/hooks/ and eits CLI to ~/.local/bin/eits.
-# Merges hooks into ~/.claude/settings.json without overwriting unrelated entries.
+# Scripts and the eits CLI are always installed to the shared, global locations
+# (~/.config/eits/hooks/, ~/.local/bin/eits) regardless of --project — they are inert
+# until referenced by a settings.json hooks entry, so there is nothing project-scoped
+# to install for them; --project only changes WHERE the hook registration is written.
+# Merges hooks into the target file without overwriting unrelated entries.
 
 set -euo pipefail
 
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 EITS_CLI=""
 UNINSTALL=0
+PROJECT=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --scripts-dir) SCRIPTS_DIR="$2"; shift 2 ;;
     --eits-cli)    EITS_CLI="$2";    shift 2 ;;
+    --project)     PROJECT=1;        shift   ;;
     --uninstall)   UNINSTALL=1;      shift   ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
@@ -28,7 +39,21 @@ done
 
 HOOKS_DIR="$HOME/.config/eits/hooks"
 BIN_DIR="$HOME/.local/bin"
-SETTINGS="$HOME/.claude/settings.json"
+
+if [[ $PROJECT -eq 1 ]]; then
+  SETTINGS="$(pwd)/.claude/settings.local.json"
+
+  # settings.local.json is meant to be per-developer and gitignored — offer to
+  # add the entry if this looks like a git repo and it's not already covered.
+  if [[ $UNINSTALL -eq 0 ]] && [[ -d "$(pwd)/.git" ]]; then
+    if ! git -C "$(pwd)" check-ignore -q .claude/settings.local.json 2>/dev/null; then
+      echo ".claude/settings.local.json" >> "$(pwd)/.gitignore"
+      echo "✓ Added .claude/settings.local.json to .gitignore"
+    fi
+  fi
+else
+  SETTINGS="$HOME/.claude/settings.json"
+fi
 
 # ── Core scripts that back the Claude Code hooks ───────────────────────────────
 CORE_SCRIPTS=(

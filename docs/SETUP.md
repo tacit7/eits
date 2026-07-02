@@ -4,8 +4,8 @@
 
 | Dependency | Version | Notes |
 |-----------|---------|-------|
-| Elixir | 1.15+ | OTP 26+ included |
-| Node.js | 22 LTS | Svelte 5 + Vite require 18+ |
+| Elixir | 1.19 (OTP 28) | See `.tool-versions` for exact pins |
+| Node.js | 20 LTS | See `.tool-versions` for exact pins |
 | PostgreSQL | 12+ | `eits_dev` database |
 | Caddy | any | HTTPS proxy for WebAuthn |
 | NATS | optional | Port 4222, currently disabled in code |
@@ -533,7 +533,7 @@ Open that URL on the device you want to register (e.g., iPhone). The passkey wil
 - Caddy `tls internal` auto-generates and manages the local cert; run `caddy trust` once to install the CA
 - Phoenix serves plain HTTP on port 5001; Caddy handles all TLS on port 443
 - `.env` is loaded automatically at startup via `dotenvy`; copy `.env.example` to get started
-- No `.tool-versions` or `.nvmrc` — use Node 22 LTS
+- `.tool-versions` at repo root pins Elixir, Erlang/OTP, and Node versions (asdf/mise format) — this is the canonical version reference
 - Oban background jobs require the DB to be up before server starts
 - `mix precommit` runs compile + deps.unlock + format + test in one shot; run before committing
 

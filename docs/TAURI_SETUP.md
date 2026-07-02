@@ -383,6 +383,31 @@ runs on every startup).
 
 ---
 
+## Uninstall
+
+Quit the desktop app first — it re-installs its IAM hooks on every launch
+(the command refuses to run while the app is open). Then:
+
+```bash
+eits uninstall              # hooks + ~/.config/eits + eits-* skills + CLI copy
+eits uninstall --app        # …plus the .app bundle and its ~/Library data
+eits uninstall --all        # …plus DROP the eits_dev database (DESTRUCTIVE)
+eits uninstall --dry-run    # preview what would be removed
+```
+
+The default scope removes every EITS hook entry from
+`~/.claude/settings.json` (workflow, IAM, and repo-path hooks) while leaving
+all other hooks and settings untouched, and deletes `~/.config/eits/`,
+`~/.claude/skills/eits-*`, and `~/.local/bin/eits`. The app bundle and the
+database are only removed behind explicit flags. Homebrew packages (elixir,
+postgresql, caddy) are never touched.
+
+If the CLI itself is already gone, run it straight from a repo checkout
+(`./scripts/eits uninstall`) or remove the pieces by hand — the manifest
+above is the complete list.
+
+---
+
 ## Diagnostic tips
 
 | Symptom | Likely cause | Check |

@@ -750,6 +750,28 @@ eits skills list        # Show staleness status of installed eits-* skills
 
 ---
 
+## uninstall
+
+```bash
+eits uninstall [--app] [--db] [--all] [--dry-run] [--yes]
+```
+
+Removes EITS integration from the machine. Default scope: every EITS hook entry in `~/.claude/settings.json` (workflow hooks, IAM hooks, repo-path hooks — other hooks and settings are preserved), `~/.config/eits/`, `~/.claude/skills/eits-*`, and the `~/.local/bin/eits` CLI copy.
+
+| Flag | Effect |
+|------|--------|
+| `--app` | Also remove the desktop `.app` bundle and its `~/Library` data (Application Support, Caches, WebKit, Preferences, Saved State, Logs) |
+| `--db` | Also `dropdb eits_dev` — **destructive**, all sessions/tasks/messages lost |
+| `--all` | `--app --db` |
+| `--dry-run` | Print the removal manifest without touching anything |
+| `--yes`, `-y` | Skip the confirmation prompt |
+
+Refuses to run while the desktop app is open (the app re-installs IAM hooks on every launch). Homebrew packages are never touched.
+
+**Why use this**: install artifacts are spread across four locations (`~/.claude`, `~/.config/eits`, `~/.local/bin`, `~/Library`); removing them by hand is error-prone and stale IAM hooks left in `settings.json` curl a dead endpoint on every Claude Code tool call.
+
+---
+
 ## Hooks & Server Availability
 
 EITS hooks (stored in `priv/scripts/` and `.claude/hooks/`) use a shared TCP probe guard (`eits-lib.sh`) to verify the server is available before making API calls. If the server is down, the hook silently exits (exit 0) instead of hanging or erroring.

@@ -993,6 +993,14 @@ The plan button (icon button left of effort segment) toggles `permission_mode: "
 - **After:** Button now sets `permission_mode: "plan"` (or clears it). The flag is correctly passed to Claude CLI as `--permission-mode plan`.
 - **UI:** Plan button shows warning color when active, muted when inactive.
 
+**Plan Button Indicator Fix (commit 70580de8)**
+
+The plan button now correctly shows the active state when toggled. Previously, the `session_cli_opts` assign was updated in the DmLive handler but was never passed to the `DmPage.dm_page` component in the render function. The composer always received an empty `[]` value, causing the plan button indicator to never show active state even though the plan mode was toggled on.
+
+- **Before:** `DmPage.dm_page` was called without the `session_cli_opts` attribute; composer received empty opts.
+- **After:** `session_cli_opts={@session_cli_opts}` is now passed to the component, ensuring the composer displays the correct active/inactive state for the plan button.
+- **Result:** Plan button indicator now reflects the actual plan mode state in the session CLI options.
+
 **Effort Level Flag (commit d170a9b4)**
 
 The selected effort level is now passed to Claude CLI via `--effort <level>` flag.

@@ -118,6 +118,35 @@ Spawns the actual `claude` binary as a port. Accepts `:session_ref` in opts so t
 
 The port handler process is `spawn_link`ed from within CLI. In the DynamicSupervisor setup, the caller is always the SessionWorker, so the link chain is: Worker <-> Handler <-> Port.
 
+### Effort Level Handling
+
+When spawning Claude sessions, the system can optionally pass an `effort_level` parameter that controls the reasoning depth for the Claude model. The effort level is passed to the Claude CLI via the `--effort` flag.
+
+**Effort Level Contract:**
+
+The `effort_level` parameter can be:
+- A specific level string: `"low"`, `"medium"`, `"high"`, `"xhigh"`, or `"max"` — these are passed to the CLI as `--effort <level>`
+- An empty string `""` — no `--effort` flag is sent
+- The string `"auto"` — no `--effort` flag is sent; the CLI decides the effort level
+
+**Key behavior:** When `effort_level` is `"auto"`, the `--effort` flag is **not** passed to the Claude CLI. This means the CLI uses its default reasoning behavior without explicit direction from the caller.
+
+**Implementation** in `lib/eye_in_the_sky_web/live/shared/session_helpers.ex`:
+```elixir
+[model: model]
+|> then(fn opts ->
+  if is_binary(effort_level) and effort_level not in ["", "auto"],
+    do: Keyword.put(opts, :effort_level, effort_level),
+    else: opts
+end)
+```
+
+The condition filters out both empty strings and `"auto"`, ensuring neither generates a `--effort` flag in the spawned process arguments.
+
+**Previous behavior (buggy):** The condition previously only filtered empty strings (`effort_level != ""`). Selecting "Auto" in the UI would emit `--effort auto`, which the Claude CLI does not accept as a valid level, causing session spawn failures.
+
+**Result:** Users can now select "Auto" (or `"auto"` programmatically) to let the Claude CLI determine reasoning depth automatically, without forcing a specific level.
+
 ### Registry (`EyeInTheSkyWeb.Claude.Registry`)
 
 Elixir Registry with `keys: :duplicate`. Each worker registers under two keys:

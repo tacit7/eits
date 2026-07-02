@@ -404,7 +404,7 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Worktree cleanup**: `--stash-if-dirty` auto-stashes uncommitted changes before worktree creation (instead of failing with dirty_working_tree error).
 
-**Effort level**: `--effort-level <level>` sets reasoning effort for the spawned agent. Valid levels: `low`, `medium`, `high`, `max`. This is passed to Claude CLI as the `--effort` flag. Defaults to the session's configured effort level if not specified.
+**Effort level**: `--effort-level <level>` sets reasoning effort for the spawned agent. Valid levels: `low`, `medium`, `high`, `auto`. When set to `auto`, the CLI decides the effort level and no `--effort` flag is sent. Valid non-auto levels are `low`, `medium`, `high`, `max`. Defaults to the session's configured effort level if not specified.
 
 **Team joining**: `--team-name` (by name) or `--team-id` (by integer ID, mutually exclusive). `--team-id` is resolved to team name via GET /teams/:id. If `--team-id` is not found, spawn prints a warning to stderr and continues without team assignment.
 
@@ -413,6 +413,8 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 **Summary output**: Spawn emits a final compact JSON summary as the last line of output. This enables reliable extraction of spawn results via `| tail -1 | jq .session_uuid` even when other verbose output precedes it. The summary includes `session_id`, `session_uuid`, `agent_id`, `worktree_path`, and `branch_name` (null fields omitted).
 
 **Sandbox**: `--yolo` bypasses sandbox restrictions. `--provider codex` defaults `bypass_sandbox` to true (can be overridden with explicit flags if needed).
+
+**Permission mode**: `--permission-mode <mode>` sets the permission interaction mode for the spawned agent (e.g., `plan`, `default`, or other modes supported by Claude CLI). When a permission mode is explicitly set, the `--dangerously-skip-permissions` flag is automatically suppressed, ensuring that explicit permission modes like `plan` mode cannot be overridden by skip-permissions behavior.
 
 **Session linking**: `--parent-session-id` accepts integer session ID (preferred) or UUID, linking the spawned agent's session to a parent. Prefer `$EITS_SESSION_ID` (integer) for compatibility.
 
@@ -719,6 +721,54 @@ eits hooks uninstall   # Remove EITS-managed hooks from ~/.claude/settings.json
 2. Does NOT delete script files or the eits CLI binary — only removes the hook registrations
 
 **Why use this**: Claude Code hooks are the primary mechanism for automatic session tracking, context injection, and task lifecycle management. This command automates the setup that would otherwise require manual script copying and JSON editing.
+
+---
+
+## skills
+
+```bash
+eits skills install     # Copy priv/skills/eits-* into ~/.claude/skills/
+eits skills list        # Show staleness status of installed eits-* skills
+```
+
+**`eits skills install`** copies every `priv/skills/eits-*` directory from the repo into `~/.claude/skills/`, replacing existing copies. Symlinks are converted to real files so installed skills remain functional regardless of repo path changes.
+
+- Runs from anywhere — resolves the repo root from the script's real path (symlinks unwound)
+- Set `EITS_REPO=/path/to/eits/web` if auto-detection fails (e.g., non-standard install layouts)
+- Options: `--force` (reserved; install always overwrites)
+
+**`eits skills list`** shows what would be installed without making changes:
+
+| STATUS | Meaning |
+|--------|---------|
+| `missing` | Skill exists in repo but not in `~/.claude/skills/` |
+| `symlink` | Destination is a symlink (will be converted on install) |
+| `stale` | Installed copy has files older than the repo source |
+| `current` | Installed copy is up to date |
+
+**Why use this**: Skills in `~/.claude/skills/` were previously maintained as manual symlinks that silently go stale when the repo moves or the worktree is deleted. This command keeps installed skills in sync with the repo without manual copying.
+
+---
+
+## uninstall
+
+```bash
+eits uninstall [--app] [--db] [--all] [--dry-run] [--yes]
+```
+
+Removes EITS integration from the machine. Default scope: every EITS hook entry in `~/.claude/settings.json` (workflow hooks, IAM hooks, repo-path hooks — other hooks and settings are preserved), `~/.config/eits/`, `~/.claude/skills/eits-*`, and the `~/.local/bin/eits` CLI copy.
+
+| Flag | Effect |
+|------|--------|
+| `--app` | Also remove the desktop `.app` bundle and its `~/Library` data (Application Support, Caches, WebKit, Preferences, Saved State, Logs) |
+| `--db` | Also `dropdb eits_dev` — **destructive**, all sessions/tasks/messages lost |
+| `--all` | `--app --db` |
+| `--dry-run` | Print the removal manifest without touching anything |
+| `--yes`, `-y` | Skip the confirmation prompt |
+
+Refuses to run while the desktop app is open (the app re-installs IAM hooks on every launch). Homebrew packages are never touched.
+
+**Why use this**: install artifacts are spread across four locations (`~/.claude`, `~/.config/eits`, `~/.local/bin`, `~/Library`); removing them by hand is error-prone and stale IAM hooks left in `settings.json` curl a dead endpoint on every Claude Code tool call.
 
 ---
 

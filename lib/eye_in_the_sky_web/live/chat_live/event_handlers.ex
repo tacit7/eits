@@ -34,9 +34,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
     session_id = get_session_id(socket)
 
-    if not channel_member?(channel_id, session_id) do
-      {:noreply, put_flash(socket, :error, "You are not a member of that channel")}
-    else
+    if channel_member?(channel_id, session_id) do
       {image_infos, content_blocks} = consume_and_persist_agent_images(socket)
 
       # Wrap message + attachments in a single transaction so the Postgres NOTIFY
@@ -95,6 +93,8 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
           Enum.each(image_infos, fn {path, _entry, _size} -> File.rm(path) end)
           {:noreply, put_flash(socket, :error, "Failed to send message")}
       end
+    else
+      {:noreply, put_flash(socket, :error, "You are not a member of that channel")}
     end
   end
 

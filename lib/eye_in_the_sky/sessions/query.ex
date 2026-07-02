@@ -345,7 +345,7 @@ defmodule EyeInTheSky.Sessions.Query do
     count = Repo.one(count_query)
 
     # Get IDs (limited to 10000 to avoid OOM)
-    ids_query = base_query |> select([s], s.id) |> limit(10000)
+    ids_query = base_query |> select([s], s.id) |> limit(10_000)
     ids = Repo.all(ids_query)
 
     {count, ids}

@@ -9,12 +9,11 @@ defmodule EyeInTheSky.Sessions do
 
   import Ecto.Query, warn: false
 
-
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Sessions.Loader
   alias EyeInTheSky.Sessions.ModelInfo
-  alias EyeInTheSky.Sessions.Query
   alias EyeInTheSky.Sessions.OverviewQueries
+  alias EyeInTheSky.Sessions.Query
   alias EyeInTheSky.Sessions.Session
   alias EyeInTheSky.Sessions.StatusTransitions
   alias EyeInTheSky.Settings.JsonSettings
@@ -148,7 +147,6 @@ defmodule EyeInTheSky.Sessions do
     |> Repo.update()
   end
 
-
   @doc """
   Atomically increments the cached token and cost totals on a session row.
 
@@ -174,7 +172,6 @@ defmodule EyeInTheSky.Sessions do
   def change_session(%Session{} = session, attrs \\ %{}) do
     Session.changeset(session, attrs)
   end
-
 
   defdelegate list_sessions_filtered(opts \\ []), to: OverviewQueries
   defdelegate list_session_overview_rows(opts \\ []), to: OverviewQueries

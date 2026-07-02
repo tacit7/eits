@@ -6,8 +6,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.RateLimitClient
-  alias EyeInTheSky.{Prompts, Tasks}
   alias EyeInTheSky.Projects.FileTree
+  alias EyeInTheSky.{Prompts, Tasks}
   alias EyeInTheSkyWeb.Components.Rail.{Loader, ProjectActions}
 
   def handle_refresh_usage(params, socket) do

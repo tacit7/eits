@@ -68,6 +68,71 @@ fn take_pending_nav() -> Option<String> {
     lock.lock().ok().and_then(|mut g| g.take())
 }
 
+/// Default HTTP port for the embedded Phoenix server. Uncommon registered-range
+/// port ("EITS" on a phone keypad → 3487, plus a digit) chosen to avoid the
+/// crowded dev-port space (3000/4000/5000/5050/8080) and the OS ephemeral range.
+const DEFAULT_PORT: u16 = 34877;
+
+/// Resolve the port for the embedded Phoenix server. Resolution order:
+///   1. `PORT` env var — explicit override, used as-is (no availability scan)
+///   2. `port` field in `$XDG_CONFIG_HOME/eits/desktop.json` (default
+///      `~/.config/eits/desktop.json`) — written by the in-app Settings →
+///      Desktop tab; takes effect on next launch
+///   3. `DEFAULT_PORT`
+/// For cases 2–3, if the port is busy the next 9 ports are scanned and the
+/// first free one is used, so a collision never prevents launch. The result is
+/// computed once and cached — every caller sees the same port.
+fn resolved_port() -> &'static str {
+    static PORT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    PORT.get_or_init(|| {
+        if let Ok(p) = std::env::var("PORT") {
+            return p;
+        }
+        let base = desktop_config_port().unwrap_or(DEFAULT_PORT);
+        for offset in 0..10u16 {
+            let candidate = match base.checked_add(offset) {
+                Some(c) => c,
+                None => break,
+            };
+            if std::net::TcpListener::bind(("127.0.0.1", candidate)).is_ok() {
+                if offset > 0 {
+                    eprintln!(
+                        "[eits-tauri] port {base} busy; falling back to {candidate}"
+                    );
+                }
+                return candidate.to_string();
+            }
+        }
+        eprintln!(
+            "[eits-tauri] ports {base}..{} all busy; proceeding with {base} anyway",
+            base.saturating_add(9)
+        );
+        base.to_string()
+    })
+}
+
+/// Read the `port` field from the desktop config file, if present and valid.
+fn desktop_config_port() -> Option<u16> {
+    let config_base = std::env::var("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .ok()
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|h| std::path::PathBuf::from(h).join(".config"))
+        })?;
+    let raw = std::fs::read_to_string(config_base.join("eits/desktop.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let port = v.get("port")?.as_u64().and_then(|p| u16::try_from(p).ok())?;
+    // Reject privileged and ephemeral-range ports.
+    if (1024..=49151).contains(&port) {
+        Some(port)
+    } else {
+        eprintln!("[eits-tauri] desktop.json port {port} out of range 1024-49151; ignoring");
+        None
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize file logging first — before anything else so even early panics are captured.
@@ -216,7 +281,7 @@ pub fn run() {
                 "menu_always_on_top" => toggle_always_on_top(app),
                 "menu_reload" => {
                     if let Some(window) = app.get_webview_window("main") {
-                        let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+                        let port = resolved_port().to_string();
                         let url = format!("http://127.0.0.1:{}", port);
                         if let Ok(parsed) = url.parse::<tauri::Url>() {
                             let _ = window.navigate(parsed);
@@ -260,7 +325,10 @@ pub fn run() {
             }
 
             // --- IAM hook installer ---
-            let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+            // Write ~/.claude/settings.json hooks on every startup so agents
+            // automatically POST tool events to the local IAM endpoint.
+            // Idempotent: refreshes entries whose port went stale.
+            let port = resolved_port().to_string();
             install_iam_hooks(&port);
 
             // --- Notification permission (macOS requires explicit grant) ---
@@ -542,7 +610,7 @@ fn toggle_always_on_top(app_handle: &tauri::AppHandle) {
 }
 
 fn create_window(app_handle: &tauri::AppHandle) {
-    let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+    let port = resolved_port().to_string();
     let url = format!("http://127.0.0.1:{}", port);
     let parsed_url: tauri::Url = url.parse().unwrap();
 
@@ -590,7 +658,7 @@ fn create_window(app_handle: &tauri::AppHandle) {
 fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
     let n = WINDOW_COUNTER.fetch_add(1, Ordering::Relaxed);
     let label = format!("window-{}", n);
-    let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+    let port = resolved_port().to_string();
     let url = format!("http://127.0.0.1:{}{}", port, path);
     let parsed_url: tauri::Url = match url.parse() {
         Ok(u) => u,
@@ -660,7 +728,7 @@ fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
     if let Some(window) = app_handle.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
-        let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+        let port = resolved_port().to_string();
         let url = format!("http://127.0.0.1:{}{}", port, path);
         if let Ok(parsed) = url.parse::<tauri::Url>() {
             let _ = window.navigate(parsed);
@@ -725,7 +793,7 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
     if cfg!(debug_assertions) {
         let mut command = elixirkit::mix("phx.server", &[]);
         command.current_dir("..");
-        command.env("PORT", "5050");
+        command.env("PORT", resolved_port());
         command.env("DISABLE_AUTH", "true");
         command.env("SKIP_WATCHERS", "1");
         command
@@ -733,16 +801,27 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         let mut command = elixirkit::release(rel_dir, "eye_in_the_sky");
         command.env("PHX_SERVER", "true");
         command.env("PHX_HOST", "127.0.0.1");
-        command.env("PORT", "5050");
+        command.env("PORT", resolved_port());
         command.env("DISABLE_AUTH", "true");
         command.env("BYPASS_AUTH", "true");
         command.env("DATABASE_SSL_VERIFY", "false");
+        // Prevent Phoenix from redirecting http://localhost:<port> → https://
+        // WKWebView would get a redirect loop if force_ssl is active.
         command.env("PHX_DISABLE_FORCE_SSL", "1");
         // Disable Erlang distribution — the desktop app is standalone and does
         // not need distributed Erlang. Without this, if a dev server (mix phx.server)
         // is running on the same machine, both processes try to register the same
         // node name and the release refuses to start.
         command.env("RELEASE_DISTRIBUTION", "none");
+
+        // Bind loopback only: the embedded server runs with DISABLE_AUTH=true,
+        // so it must not be reachable from the LAN. Remote access goes through
+        // a local proxy (e.g. `tailscale serve localhost:<port>`) — see
+        // docs/TAURI_SETUP.md. Launch with EITS_BIND=all to opt into LAN exposure.
+        if std::env::var("EITS_BIND").is_err() {
+            command.env("EITS_BIND", "loopback");
+        }
+
         // DATABASE_URL and SECRET_KEY_BASE are intentionally NOT set here.
         // They are read from ~/.config/eits/.env by runtime.exs at startup.
         // setup.command creates that file with the correct OS-user credentials.
@@ -822,24 +901,29 @@ fn install_iam_hooks(port: &str) {
             continue;
         }
 
-        let already = event_hooks
-            .as_array()
-            .map(|groups| {
-                groups.iter().any(|g| {
-                    g.get("hooks")
-                        .and_then(|h| h.as_array())
-                        .map(|entries| {
-                            entries.iter().any(|e| {
-                                e.get("command")
-                                    .and_then(|c| c.as_str())
-                                    .map(|s| s.contains("iam/hook"))
-                                    .unwrap_or(false)
-                            })
-                        })
-                        .unwrap_or(false)
-                })
-            })
-            .unwrap_or(false);
+        // Walk existing entries: refresh any iam/hook command whose port is
+        // stale (the resolved port can change across launches — config edits
+        // or busy-port fallback). Track whether any entry references us at all.
+        let mut already = false;
+        for group in event_hooks.as_array_mut().unwrap().iter_mut() {
+            let Some(entries) = group.get_mut("hooks").and_then(|h| h.as_array_mut()) else {
+                continue;
+            };
+            for entry in entries.iter_mut() {
+                let is_ours = entry
+                    .get("command")
+                    .and_then(|c| c.as_str())
+                    .map(|s| s.contains("iam/hook"))
+                    .unwrap_or(false);
+                if is_ours {
+                    already = true;
+                    if entry.get("command").and_then(|c| c.as_str()) != Some(cmd.as_str()) {
+                        entry["command"] = serde_json::json!(cmd);
+                        installed_any = true;
+                    }
+                }
+            }
+        }
 
         if !already {
             event_hooks.as_array_mut().unwrap().push(group_entry.clone());
@@ -848,7 +932,7 @@ fn install_iam_hooks(port: &str) {
     }
 
     if !installed_any {
-        log!("[eits-tauri] IAM hooks already present in settings.json; nothing to do");
+        log!("[eits-tauri] IAM hooks already present and current in settings.json; nothing to do");
         return;
     }
 

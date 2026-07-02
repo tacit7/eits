@@ -453,7 +453,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp maybe_start_usage_async(socket, _section), do: socket
 
-
   @impl true
   def render(assigns) do
     ~H"""

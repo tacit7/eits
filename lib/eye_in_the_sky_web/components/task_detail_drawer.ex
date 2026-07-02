@@ -193,7 +193,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                     navigate={"/dm/#{List.first(@task.sessions) && List.first(@task.sessions).uuid}"}
                     class={[
                       "ml-2 shrink-0 text-base-content/30 hover:text-primary transition-colors",
-                      if(is_nil(@task.sessions) || @task.sessions == [],
+                      if(@task.sessions == [],
                         do: "pointer-events-none opacity-40",
                         else: ""
                       )

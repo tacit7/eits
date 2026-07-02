@@ -11,10 +11,9 @@ defmodule EyeInTheSkyWeb.DmLive.Actions do
   import Phoenix.LiveView, only: [put_flash: 3, push_event: 3, cancel_upload: 3]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
-  alias EyeInTheSky.{Notes, FileAttachments}
   alias EyeInTheSky.Claude.AgentWorker
-  alias EyeInTheSkyWeb.DmLive.{FileAutocomplete, TabHelpers, ExternalActions}
-
+  alias EyeInTheSky.{FileAttachments, Notes}
+  alias EyeInTheSkyWeb.DmLive.{ExternalActions, FileAutocomplete, TabHelpers}
 
   @default_message_limit 50
   @message_page_size 20

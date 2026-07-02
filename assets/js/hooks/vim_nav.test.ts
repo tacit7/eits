@@ -3265,4 +3265,37 @@ describe("ctrl-o / ctrl-i recent session cycling", () => {
     const evt = pressCtrlKey(h, "i")
     expect(evt.defaultPrevented).toBe(true)
   })
+
+  it("ctrl-o anchors from data-session-uuid attribute when URL uses integer ID", () => {
+    // Flyout navigation uses /dm/<integer> not /dm/<uuid>. The DOM renders data-session-uuid
+    // on the message composer. _doNavigateRecent should prefer the DOM attribute.
+    setLocation("/dm/9999")  // integer URL — regex fallback won't match
+    seedHistory(VISIT_HISTORY)
+    // UUID_B is at index 1 in history. Simulate the DM page rendering its UUID in the DOM.
+    const el = document.createElement("div")
+    el.setAttribute("data-session-uuid", UUID_B)
+    document.body.appendChild(el)
+    const h = makeHook()
+    h.mode = "normal"
+    // Should anchor at UUID_B (index 1) and step to index 2 (UUID_C).
+    const assign = setLocation("/dm/9999")
+    pressCtrlKey(h, "o")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_C}`)
+    expect(h._recentSessionIdx).toBe(2)
+  })
+
+  it("ctrl-i anchors from data-session-uuid attribute when URL uses integer ID", () => {
+    setLocation("/dm/9999")
+    seedHistory(VISIT_HISTORY)
+    const el = document.createElement("div")
+    el.setAttribute("data-session-uuid", UUID_B)
+    document.body.appendChild(el)
+    const h = makeHook()
+    h.mode = "normal"
+    const assign = setLocation("/dm/9999")
+    // UUID_B is at index 1. c-i should go to index 0 (UUID_A).
+    pressCtrlKey(h, "i")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_A}`)
+    expect(h._recentSessionIdx).toBe(0)
+  })
 })

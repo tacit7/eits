@@ -49,7 +49,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   All team operations are available via the eits CLI. See `docs/REST_API.md`.
   """
 
-
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.{DmHandler, Helpers, TaskHandler}
   alias EyeInTheSky.{AsyncTask, ChannelMessages, Commits, Notes, Tasks}

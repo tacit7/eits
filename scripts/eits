@@ -3583,6 +3583,400 @@ EOF
   esac
 }
 
+# ── skills ─────────────────────────────────────────────────────────────────────
+# Resolve the repo root from this script's real path, following symlinks.
+# Returns empty string on failure.
+_skills_repo_root() {
+  local self
+  if command -v realpath &>/dev/null; then
+    self="$(realpath "$0")"
+  else
+    # Fallback: follow readlink manually (macOS readlink lacks -f)
+    self="$0"
+    local target
+    while target="$(readlink "$self" 2>/dev/null)"; do
+      case "$target" in
+        /*) self="$target" ;;
+        *)  self="$(dirname "$self")/$target" ;;
+      esac
+    done
+    self="$(cd "$(dirname "$self")" && pwd)/$(basename "$self")"
+  fi
+  local self_dir
+  self_dir="$(cd "$(dirname "$self")" && pwd)"
+
+  # Try relative paths from the script's real location.
+  # Dev layout:  scripts/eits  → repo root is one level up
+  # Installed:   the symlink resolution above already unwound to the real path
+  local candidate
+  for candidate in \
+    "$self_dir/.." \
+    "$self_dir/../.."; do
+    if [[ -d "$candidate/priv/skills" ]]; then
+      echo "$(cd "$candidate" && pwd)"
+      return 0
+    fi
+  done
+
+  # Check repo root recorded by 'eits hooks install' — written to ~/.config/eits/repo_root
+  # at install time so a copied ~/.local/bin/eits (not a symlink) can find priv/skills/.
+  local config_file="${HOME}/.config/eits/repo_root"
+  if [[ -f "$config_file" ]]; then
+    local recorded
+    recorded="$(tr -d '[:space:]' < "$config_file")"
+    if [[ -n "$recorded" ]] && [[ -d "$recorded/priv/skills" ]]; then
+      echo "$(cd "$recorded" && pwd)"
+      return 0
+    fi
+  fi
+
+  # Explicit override
+  if [[ -n "${EITS_REPO:-}" ]] && [[ -d "${EITS_REPO}/priv/skills" ]]; then
+    echo "$(cd "$EITS_REPO" && pwd)"
+    return 0
+  fi
+
+  return 1
+}
+
+_skills_install() {
+  local src="$1" dst="$2" force="${3:-0}"
+  local skills=()
+  while IFS= read -r d; do skills+=("$d"); done \
+    < <(find "$src" -maxdepth 1 -mindepth 1 -type d -name 'eits-*' | sort)
+
+  if [[ ${#skills[@]} -eq 0 ]]; then
+    die "no eits-* skill directories found in $src"
+  fi
+
+  mkdir -p "$dst"
+  local count=0
+
+  for skill_path in "${skills[@]}"; do
+    local name
+    name="$(basename "$skill_path")"
+    local dest="$dst/$name"
+
+    # If destination is a symlink, remove it so rsync copies real files
+    if [[ -L "$dest" ]]; then
+      unlink "$dest"
+    fi
+
+    rsync -a --delete "$skill_path/" "$dest/"
+    echo "✓ $name"
+    count=$((count + 1))
+  done
+
+  echo ""
+  echo "Installed $count skill(s) to $dst"
+}
+
+_skills_list() {
+  local src="$1" dst="$2"
+  local skills=()
+  while IFS= read -r d; do skills+=("$d"); done \
+    < <(find "$src" -maxdepth 1 -mindepth 1 -type d -name 'eits-*' | sort)
+
+  if [[ ${#skills[@]} -eq 0 ]]; then
+    echo "no eits-* skill directories found in $src"
+    return 0
+  fi
+
+  printf "%-28s  %s\n" "SKILL" "STATUS"
+  printf "%-28s  %s\n" "----------------------------" "-------"
+
+  for skill_path in "${skills[@]}"; do
+    local name
+    name="$(basename "$skill_path")"
+    local dest="$dst/$name"
+
+    if [[ ! -e "$dest" ]] && [[ ! -L "$dest" ]]; then
+      printf "%-28s  missing\n" "$name"
+    elif [[ -L "$dest" ]]; then
+      local target
+      target="$(readlink "$dest")"
+      printf "%-28s  symlink → %s\n" "$name" "$target"
+    else
+      # Check staleness: any source file newer than its installed counterpart?
+      local stale=0
+      while IFS= read -r f; do
+        local rel="${f#${skill_path}/}"
+        if [[ ! -f "$dest/$rel" ]] || [[ "$f" -nt "$dest/$rel" ]]; then
+          stale=1
+          break
+        fi
+      done < <(find "$skill_path" -type f)
+      if [[ $stale -eq 1 ]]; then
+        printf "%-28s  stale\n" "$name"
+      else
+        printf "%-28s  current\n" "$name"
+      fi
+    fi
+  done
+}
+
+cmd_skills() {
+  local subcmd="${1:-install}"; shift || true
+
+  local repo_root
+  repo_root="$(_skills_repo_root)" || \
+    die "Could not locate EITS repo root (priv/skills/ not found). Set EITS_REPO=/path/to/eits/web or run from inside the project."
+
+  local skills_src="$repo_root/priv/skills"
+  local skills_dst="${HOME}/.claude/skills"
+
+  case "$subcmd" in
+    install)
+      local force=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --force|-f) force=1; shift ;;
+          --help|-h)
+            cat <<EOF
+usage: eits skills install [--force]
+
+Copy every priv/skills/eits-* directory into ~/.claude/skills/, replacing
+existing copies (including symlinks). Skills are installed as real files so
+they stay current independently of the repo path.
+
+Options:
+  --force, -f   Always overwrite (default: overwrite anyway; reserved for
+                future idempotency checks)
+
+Repo root: $repo_root
+EOF
+            return 0
+            ;;
+          *) die "unknown option: $1 (try: eits skills install --help)" ;;
+        esac
+      done
+      _skills_install "$skills_src" "$skills_dst" "$force"
+      ;;
+    list|--list|-l)
+      _skills_list "$skills_src" "$skills_dst"
+      ;;
+    --help|-h)
+      cat <<EOF
+usage: eits skills <install|list>
+
+  install     Copy every priv/skills/eits-* directory into ~/.claude/skills/,
+              replacing existing copies (symlinks are converted to real files).
+              Options: --force
+
+  list        Show which eits-* skills would be installed and their current
+              status: missing, symlink, stale, or current.
+
+Repo root is resolved in order:
+  1. Relative to this script's real path (symlinks unwound)
+  2. ~/.config/eits/repo_root (written by 'eits hooks install')
+  3. EITS_REPO env var
+  4. Error with instructions
+EOF
+      ;;
+    *)
+      die "unknown skills subcommand: $subcmd (try: install, list)"
+      ;;
+  esac
+}
+
+# ── uninstall ──────────────────────────────────────────────────────────────────
+# Remove everything EITS installs onto a machine. Default scope: Claude Code
+# hook entries (workflow + IAM + repo-path), ~/.config/eits/, eits-* skills,
+# and the ~/.local/bin/eits CLI copy. The desktop app bundle and the Postgres
+# database are only touched behind explicit flags.
+cmd_uninstall() {
+  local remove_app=0 remove_db=0 dry_run=0 assume_yes=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --app)     remove_app=1; shift ;;
+      --db)      remove_db=1;  shift ;;
+      --all)     remove_app=1; remove_db=1; shift ;;
+      --dry-run) dry_run=1;    shift ;;
+      --yes|-y)  assume_yes=1; shift ;;
+      --help|-h)
+        cat <<EOF
+usage: eits uninstall [--app] [--db] [--all] [--dry-run] [--yes]
+
+Removes EITS integration from this machine. Default scope:
+  - EITS hook entries in ~/.claude/settings.json
+    (workflow hooks, IAM hooks, and repo-path hooks)
+  - ~/.config/eits/            (hook scripts, desktop.json, repo_root)
+  - ~/.claude/skills/eits-*
+  - ~/.local/bin/eits          (the installed CLI copy)
+
+Flags:
+  --app      also remove the desktop app bundle and its Library data
+             (Application Support, Caches, WebKit, Preferences, Saved State)
+  --db       also DROP the eits_dev PostgreSQL database (DESTRUCTIVE —
+             all sessions, tasks, messages, and settings are lost)
+  --all      = --app --db
+  --dry-run  print what would be removed without touching anything
+  --yes, -y  skip the confirmation prompt
+
+Quit the desktop app before uninstalling — it re-installs its IAM hooks
+on every launch, which would undo the hook removal.
+EOF
+        return 0
+        ;;
+      *) die "unknown option: $1 (try: eits uninstall --help)" ;;
+    esac
+  done
+
+  # Refuse to run while the desktop app is open: it re-installs IAM hooks on
+  # launch and holds the database open.
+  if [[ $dry_run -eq 0 ]] && pgrep -f "Eye in the Sky.app/Contents/MacOS" &>/dev/null; then
+    die "The Eye in the Sky desktop app is running. Quit it first, then re-run."
+  fi
+
+  # ── Build the removal manifest ────────────────────────────────────────────
+  local -a paths=()
+  local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/eits"
+  [[ -e "$config_dir" ]] && paths+=("$config_dir")
+
+  local skill
+  for skill in "$HOME/.claude/skills/"eits-*; do
+    [[ -e "$skill" ]] && paths+=("$skill")
+  done
+
+  [[ -e "$HOME/.local/bin/eits" ]] && paths+=("$HOME/.local/bin/eits")
+
+  if [[ $remove_app -eq 1 ]]; then
+    local bundle_id="com.eits.EyeInTheSky"
+    local app_path
+    for app_path in \
+      "/Applications/Eye in the Sky.app" \
+      "$HOME/Applications/Eye in the Sky.app" \
+      "$HOME/Library/Application Support/$bundle_id" \
+      "$HOME/Library/Caches/$bundle_id" \
+      "$HOME/Library/WebKit/$bundle_id" \
+      "$HOME/Library/Preferences/$bundle_id.plist" \
+      "$HOME/Library/Saved Application State/$bundle_id.savedState" \
+      "$HOME/Library/Logs/$bundle_id"; do
+      [[ -e "$app_path" ]] && paths+=("$app_path")
+    done
+  fi
+
+  # ── Report ────────────────────────────────────────────────────────────────
+  echo "EITS uninstall will remove:"
+  echo "  - EITS hook entries from ~/.claude/settings.json"
+  local p
+  for p in "${paths[@]}"; do
+    echo "  - $p"
+  done
+  if [[ $remove_db -eq 1 ]]; then
+    echo "  - PostgreSQL database eits_dev (DESTRUCTIVE — all data lost)"
+  fi
+
+  if [[ $dry_run -eq 1 ]]; then
+    echo ""
+    echo "(dry run — nothing was removed)"
+    return 0
+  fi
+
+  if [[ $assume_yes -ne 1 ]]; then
+    printf "Proceed? [y/N] "
+    local reply
+    read -r reply
+    [[ "$reply" == "y" || "$reply" == "Y" ]] || { echo "Aborted."; return 1; }
+  fi
+
+  # ── 1. Hook entries in ~/.claude/settings.json ────────────────────────────
+  # Removes every hook whose command references an EITS-managed target:
+  # the installed hooks dir, the IAM endpoint, or repo-path eits-*.sh scripts.
+  local settings="$HOME/.claude/settings.json"
+  if [[ -f "$settings" ]]; then
+    python3 - "$settings" "$config_dir/hooks" <<'PYEOF'
+import sys, json, os
+
+settings_path, hooks_dir = sys.argv[1], sys.argv[2]
+# Markers are as specific as possible: the exact IAM endpoint path (not the
+# looser "iam/hook", which could match an unrelated user hook).
+MARKERS = (hooks_dir, "/api/v1/iam/hook", "/priv/scripts/eits-")
+
+with open(settings_path) as f:
+    root = json.load(f)
+
+if not isinstance(root, dict):
+    print("  - settings.json root is not an object; no hooks removed")
+    sys.exit(0)
+
+hooks = root.get("hooks", {})
+if not isinstance(hooks, dict):
+    print("  - settings.json hooks field is not an object; no hooks removed")
+    sys.exit(0)
+
+changed = False
+
+def is_eits(entry):
+    if not isinstance(entry, dict):
+        return False
+    cmd = entry.get("command", "")
+    return isinstance(cmd, str) and any(m in cmd for m in MARKERS)
+
+for event, groups in list(hooks.items()):
+    if not isinstance(groups, list):
+        continue  # non-conforming shape — leave untouched
+    kept = []
+    for group in groups:
+        if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+            kept.append(group)  # not a shape we manage — preserve as-is
+            continue
+        inner = group["hooks"]
+        filtered = [h for h in inner if not is_eits(h)]
+        if len(filtered) != len(inner):
+            changed = True
+        if filtered:
+            group = dict(group)
+            group["hooks"] = filtered
+            kept.append(group)
+        else:
+            changed = True
+    hooks[event] = kept
+
+root["hooks"] = {k: v for k, v in hooks.items() if v}
+if not root["hooks"]:
+    root.pop("hooks")
+
+if changed:
+    with open(settings_path, "w") as f:
+        json.dump(root, f, indent=2)
+        f.write("\n")
+    print("  ✓ EITS hook entries removed from ~/.claude/settings.json")
+else:
+    print("  - no EITS hook entries found in ~/.claude/settings.json")
+PYEOF
+  else
+    echo "  - ~/.claude/settings.json not found; no hooks to remove"
+  fi
+
+  # ── 2. Files and directories ──────────────────────────────────────────────
+  for p in "${paths[@]}"; do
+    if rm -rf "$p" 2>/dev/null; then
+      echo "  ✓ removed $p"
+    else
+      echo "  ✗ could not remove $p" >&2
+    fi
+  done
+
+  # ── 3. Database ───────────────────────────────────────────────────────────
+  if [[ $remove_db -eq 1 ]]; then
+    if command -v dropdb &>/dev/null; then
+      if dropdb --if-exists eits_dev 2>/dev/null; then
+        echo "  ✓ dropped database eits_dev"
+      else
+        echo "  ✗ could not drop eits_dev (is Postgres running? try: dropdb eits_dev)" >&2
+      fi
+    else
+      echo "  ✗ dropdb not found; drop manually: psql -c 'DROP DATABASE eits_dev'" >&2
+    fi
+  fi
+
+  echo ""
+  echo "Done. Not removed unless flagged: desktop app (--app), database (--db)."
+  echo "Homebrew packages (elixir, postgresql, caddy) are never touched."
+}
+
 cmd_queue() {
   local subcmd="${1:-}"; shift || true
   [[ "${subcmd:-}" == "--help" || "${subcmd:-}" == "-h" ]] && {
@@ -4458,6 +4852,8 @@ Commands:
   timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
   hooks         install|uninstall   (install EITS Claude Code hooks into ~/.claude/settings.json)
+  skills        install|list   (sync priv/skills/eits-* to ~/.claude/skills/)
+  uninstall     [--app] [--db] [--all] [--dry-run] [--yes]   (remove EITS from this machine)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
@@ -4500,6 +4896,8 @@ case "$cmd" in
   timer)         cmd_timer         "$@" ;;
   worktree)      cmd_worktree      "$@" ;;
   hooks)         cmd_hooks         "$@" ;;
+  skills)        cmd_skills        "$@" ;;
+  uninstall)     cmd_uninstall     "$@" ;;
   queue)         cmd_queue         "$@" ;;
   search)        cmd_search        "$@" ;;
   messages)      cmd_messages      "$@" ;;

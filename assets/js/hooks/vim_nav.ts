@@ -816,7 +816,10 @@ export const VimNav = {
     } catch { sessions = [] }
     if (!sessions.length) return
 
-    const currentUuid = window.location.pathname.match(/^\/dm\/([0-9a-f-]{36})/)?.[1]
+    // Prefer the DOM attribute — works for both /dm/<uuid> and /dm/<integer> URLs.
+    const currentUuid =
+      (document.querySelector("[data-session-uuid]") as HTMLElement | null)?.dataset.sessionUuid
+      || window.location.pathname.match(/^\/dm\/([0-9a-f-]{36})/)?.[1]
 
     if (this._recentSessionIdx === -1) {
       // First press: anchor cursor to current URL, then step in the requested direction.
@@ -843,9 +846,14 @@ export const VimNav = {
   },
 
   _recordSessionVisit() {
-    const m = window.location.pathname.match(/^\/dm\/([0-9a-f-]{36})/)
-    if (!m) return
-    const uuid = m[1]
+    // Must be on a DM page — URL is either /dm/<uuid> or /dm/<integer>.
+    if (!window.location.pathname.startsWith("/dm/")) return
+    // Read UUID from the DOM attribute rendered by the DM page (always a real UUID regardless
+    // of whether the URL used an integer ID or a UUID). Falls back to URL extraction for UUID URLs.
+    const uuid =
+      (document.querySelector("[data-session-uuid]") as HTMLElement | null)?.dataset.sessionUuid
+      || window.location.pathname.match(/^\/dm\/([0-9a-f-]{36})/)?.[1]
+    if (!uuid) return
     const name = document.title || uuid.slice(0, 8)
     try {
       const key = "vim-nav:recent-sessions"

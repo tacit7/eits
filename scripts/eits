@@ -3779,6 +3779,204 @@ EOF
   esac
 }
 
+# ── uninstall ──────────────────────────────────────────────────────────────────
+# Remove everything EITS installs onto a machine. Default scope: Claude Code
+# hook entries (workflow + IAM + repo-path), ~/.config/eits/, eits-* skills,
+# and the ~/.local/bin/eits CLI copy. The desktop app bundle and the Postgres
+# database are only touched behind explicit flags.
+cmd_uninstall() {
+  local remove_app=0 remove_db=0 dry_run=0 assume_yes=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --app)     remove_app=1; shift ;;
+      --db)      remove_db=1;  shift ;;
+      --all)     remove_app=1; remove_db=1; shift ;;
+      --dry-run) dry_run=1;    shift ;;
+      --yes|-y)  assume_yes=1; shift ;;
+      --help|-h)
+        cat <<EOF
+usage: eits uninstall [--app] [--db] [--all] [--dry-run] [--yes]
+
+Removes EITS integration from this machine. Default scope:
+  - EITS hook entries in ~/.claude/settings.json
+    (workflow hooks, IAM hooks, and repo-path hooks)
+  - ~/.config/eits/            (hook scripts, desktop.json, repo_root)
+  - ~/.claude/skills/eits-*
+  - ~/.local/bin/eits          (the installed CLI copy)
+
+Flags:
+  --app      also remove the desktop app bundle and its Library data
+             (Application Support, Caches, WebKit, Preferences, Saved State)
+  --db       also DROP the eits_dev PostgreSQL database (DESTRUCTIVE —
+             all sessions, tasks, messages, and settings are lost)
+  --all      = --app --db
+  --dry-run  print what would be removed without touching anything
+  --yes, -y  skip the confirmation prompt
+
+Quit the desktop app before uninstalling — it re-installs its IAM hooks
+on every launch, which would undo the hook removal.
+EOF
+        return 0
+        ;;
+      *) die "unknown option: $1 (try: eits uninstall --help)" ;;
+    esac
+  done
+
+  # Refuse to run while the desktop app is open: it re-installs IAM hooks on
+  # launch and holds the database open.
+  if [[ $dry_run -eq 0 ]] && pgrep -f "Eye in the Sky.app/Contents/MacOS" &>/dev/null; then
+    die "The Eye in the Sky desktop app is running. Quit it first, then re-run."
+  fi
+
+  # ── Build the removal manifest ────────────────────────────────────────────
+  local -a paths=()
+  local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/eits"
+  [[ -e "$config_dir" ]] && paths+=("$config_dir")
+
+  local skill
+  for skill in "$HOME/.claude/skills/"eits-*; do
+    [[ -e "$skill" ]] && paths+=("$skill")
+  done
+
+  [[ -e "$HOME/.local/bin/eits" ]] && paths+=("$HOME/.local/bin/eits")
+
+  if [[ $remove_app -eq 1 ]]; then
+    local bundle_id="com.eits.EyeInTheSky"
+    local app_path
+    for app_path in \
+      "/Applications/Eye in the Sky.app" \
+      "$HOME/Applications/Eye in the Sky.app" \
+      "$HOME/Library/Application Support/$bundle_id" \
+      "$HOME/Library/Caches/$bundle_id" \
+      "$HOME/Library/WebKit/$bundle_id" \
+      "$HOME/Library/Preferences/$bundle_id.plist" \
+      "$HOME/Library/Saved Application State/$bundle_id.savedState" \
+      "$HOME/Library/Logs/$bundle_id"; do
+      [[ -e "$app_path" ]] && paths+=("$app_path")
+    done
+  fi
+
+  # ── Report ────────────────────────────────────────────────────────────────
+  echo "EITS uninstall will remove:"
+  echo "  - EITS hook entries from ~/.claude/settings.json"
+  local p
+  for p in "${paths[@]}"; do
+    echo "  - $p"
+  done
+  if [[ $remove_db -eq 1 ]]; then
+    echo "  - PostgreSQL database eits_dev (DESTRUCTIVE — all data lost)"
+  fi
+
+  if [[ $dry_run -eq 1 ]]; then
+    echo ""
+    echo "(dry run — nothing was removed)"
+    return 0
+  fi
+
+  if [[ $assume_yes -ne 1 ]]; then
+    printf "Proceed? [y/N] "
+    local reply
+    read -r reply
+    [[ "$reply" == "y" || "$reply" == "Y" ]] || { echo "Aborted."; return 1; }
+  fi
+
+  # ── 1. Hook entries in ~/.claude/settings.json ────────────────────────────
+  # Removes every hook whose command references an EITS-managed target:
+  # the installed hooks dir, the IAM endpoint, or repo-path eits-*.sh scripts.
+  local settings="$HOME/.claude/settings.json"
+  if [[ -f "$settings" ]]; then
+    python3 - "$settings" "$config_dir/hooks" <<'PYEOF'
+import sys, json, os
+
+settings_path, hooks_dir = sys.argv[1], sys.argv[2]
+# Markers are as specific as possible: the exact IAM endpoint path (not the
+# looser "iam/hook", which could match an unrelated user hook).
+MARKERS = (hooks_dir, "/api/v1/iam/hook", "/priv/scripts/eits-")
+
+with open(settings_path) as f:
+    root = json.load(f)
+
+if not isinstance(root, dict):
+    print("  - settings.json root is not an object; no hooks removed")
+    sys.exit(0)
+
+hooks = root.get("hooks", {})
+if not isinstance(hooks, dict):
+    print("  - settings.json hooks field is not an object; no hooks removed")
+    sys.exit(0)
+
+changed = False
+
+def is_eits(entry):
+    if not isinstance(entry, dict):
+        return False
+    cmd = entry.get("command", "")
+    return isinstance(cmd, str) and any(m in cmd for m in MARKERS)
+
+for event, groups in list(hooks.items()):
+    if not isinstance(groups, list):
+        continue  # non-conforming shape — leave untouched
+    kept = []
+    for group in groups:
+        if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+            kept.append(group)  # not a shape we manage — preserve as-is
+            continue
+        inner = group["hooks"]
+        filtered = [h for h in inner if not is_eits(h)]
+        if len(filtered) != len(inner):
+            changed = True
+        if filtered:
+            group = dict(group)
+            group["hooks"] = filtered
+            kept.append(group)
+        else:
+            changed = True
+    hooks[event] = kept
+
+root["hooks"] = {k: v for k, v in hooks.items() if v}
+if not root["hooks"]:
+    root.pop("hooks")
+
+if changed:
+    with open(settings_path, "w") as f:
+        json.dump(root, f, indent=2)
+        f.write("\n")
+    print("  ✓ EITS hook entries removed from ~/.claude/settings.json")
+else:
+    print("  - no EITS hook entries found in ~/.claude/settings.json")
+PYEOF
+  else
+    echo "  - ~/.claude/settings.json not found; no hooks to remove"
+  fi
+
+  # ── 2. Files and directories ──────────────────────────────────────────────
+  for p in "${paths[@]}"; do
+    if rm -rf "$p" 2>/dev/null; then
+      echo "  ✓ removed $p"
+    else
+      echo "  ✗ could not remove $p" >&2
+    fi
+  done
+
+  # ── 3. Database ───────────────────────────────────────────────────────────
+  if [[ $remove_db -eq 1 ]]; then
+    if command -v dropdb &>/dev/null; then
+      if dropdb --if-exists eits_dev 2>/dev/null; then
+        echo "  ✓ dropped database eits_dev"
+      else
+        echo "  ✗ could not drop eits_dev (is Postgres running? try: dropdb eits_dev)" >&2
+      fi
+    else
+      echo "  ✗ dropdb not found; drop manually: psql -c 'DROP DATABASE eits_dev'" >&2
+    fi
+  fi
+
+  echo ""
+  echo "Done. Not removed unless flagged: desktop app (--app), database (--db)."
+  echo "Homebrew packages (elixir, postgresql, caddy) are never touched."
+}
+
 cmd_queue() {
   local subcmd="${1:-}"; shift || true
   [[ "${subcmd:-}" == "--help" || "${subcmd:-}" == "-h" ]] && {
@@ -4655,6 +4853,7 @@ Commands:
   worktree      create|remove   (EITS Elixir projects only)
   hooks         install|uninstall   (install EITS Claude Code hooks into ~/.claude/settings.json)
   skills        install|list   (sync priv/skills/eits-* to ~/.claude/skills/)
+  uninstall     [--app] [--db] [--all] [--dry-run] [--yes]   (remove EITS from this machine)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
@@ -4698,6 +4897,7 @@ case "$cmd" in
   worktree)      cmd_worktree      "$@" ;;
   hooks)         cmd_hooks         "$@" ;;
   skills)        cmd_skills        "$@" ;;
+  uninstall)     cmd_uninstall     "$@" ;;
   queue)         cmd_queue         "$@" ;;
   search)        cmd_search        "$@" ;;
   messages)      cmd_messages      "$@" ;;

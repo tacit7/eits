@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
             phx-target={@myself}
             class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-base-content/50 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
           >
-            <.icon name="hero-plus-mini" class="size-3.5" /> New project
+            <.icon name="hero-plus-mini" class="size-3.5" /> Add repo
           </button>
         <% else %>
           <form

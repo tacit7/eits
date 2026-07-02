@@ -12,7 +12,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
-  @claude_dir Path.expand("~/.claude")
+  # Function, not attribute: compile-time ~ expansion bakes the build-machine home dir.
+  defp claude_dir, do: Path.expand("~/.claude")
 
   @impl true
   def mount(_params, _session, socket) do
@@ -21,7 +22,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
       |> assign(:page_title, "Config")
       |> assign(:sidebar_tab, :config)
       |> assign(:sidebar_project, nil)
-      |> assign(:claude_dir, @claude_dir)
+      |> assign(:claude_dir, claude_dir())
       |> assign(:files, [])
       |> assign(:current_path, nil)
       |> assign(:selected_file, nil)
@@ -42,7 +43,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
 
   @impl true
   def handle_event("view_file", %{"path" => path}, socket) do
-    if path_within?(path, @claude_dir) do
+    if path_within?(path, claude_dir()) do
       {:noreply, push_patch(socket, to: ~p"/config?path=#{relative_path(path)}")}
     else
       {:noreply, socket}
@@ -57,7 +58,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
       is_nil(path) ->
         {:noreply, put_flash(socket, :error, "No file selected")}
 
-      not String.starts_with?(path, @claude_dir) ->
+      not String.starts_with?(path, claude_dir()) ->
         {:noreply, put_flash(socket, :error, "Access denied")}
 
       true ->
@@ -93,7 +94,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   def handle_event("create_entry", %{"name" => raw_name}, socket) do
     name = String.trim(raw_name)
     current_rel = socket.assigns.current_path
-    base = if current_rel, do: Path.join(@claude_dir, current_rel), else: @claude_dir
+    base = if current_rel, do: Path.join(claude_dir(), current_rel), else: claude_dir()
 
     with :ok <- validate_entry_name(name),
          :ok <- validate_entry_path(base, name) do
@@ -122,7 +123,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
 
   defp validate_entry_path(base, name) do
     full = Path.join(base, name)
-    real_base = @claude_dir |> Path.expand() |> resolve_real_path()
+    real_base = claude_dir() |> Path.expand() |> resolve_real_path()
     # Resolve the *parent* directory (which must exist) to catch symlink traversal.
     # Appending the validated name is safe because name contains no "/" or "..".
     real_parent = base |> Path.expand() |> resolve_real_path()
@@ -168,8 +169,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   # ── Private helpers ──────────────────────────────────────────────────────────
 
   defp load_list_path(socket, path) do
-    if File.dir?(@claude_dir) do
-      case resolve_list_target(path, @claude_dir) do
+    if File.dir?(claude_dir()) do
+      case resolve_list_target(path, claude_dir()) do
         {:error, msg} -> assign(socket, :error, msg)
         {:ok, full_path, rel_path} -> dispatch_path(socket, full_path, rel_path, path)
       end
@@ -181,7 +182,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   defp dispatch_path(socket, full_path, rel_path, path) do
     cond do
       File.dir?(full_path) -> list_directory(socket, full_path, rel_path)
-      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path, @claude_dir)
+      File.regular?(full_path) -> read_file_for_display(socket, full_path, rel_path, claude_dir())
       true -> assign(socket, :error, "Path not found: #{path}")
     end
   end
@@ -222,13 +223,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
   end
 
   defp relative_path(path) do
-    String.replace_prefix(path, @claude_dir <> "/", "")
+    String.replace_prefix(path, claude_dir() <> "/", "")
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <%= if File.dir?(@claude_dir) do %>
+    <%= if File.dir?(claude_dir()) do %>
       <!-- Toolbar -->
       <div class="bg-base-100 border-b border-base-300">
         <div class="px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-2">

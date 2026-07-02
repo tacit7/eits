@@ -35,7 +35,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @known_editors ~w(code cursor vim nano zed)
 
-  @allowed_editor_roots [Path.expand("~/.claude")]
+  # Function, not attribute: compile-time ~ expansion bakes the build-machine home dir.
+  defp allowed_editor_roots, do: [Path.expand("~/.claude")]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -123,7 +124,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("open_in_editor", %{"path" => path}, socket) when byte_size(path) > 0 do
     editor = Settings.get("preferred_editor") || "code"
 
-    allowed? = Enum.any?(@allowed_editor_roots, &path_within?(path, &1))
+    allowed? = Enum.any?(allowed_editor_roots(), &path_within?(path, &1))
 
     cond do
       editor not in @known_editors ->

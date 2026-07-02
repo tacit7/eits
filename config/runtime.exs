@@ -220,15 +220,27 @@ if config_env() == :prod do
   check_origin =
     if get_env.("DISABLE_AUTH") in ~w(true 1), do: false, else: allowed_origins
 
+  # EITS_BIND controls the listen address:
+  #   "loopback" — bind 127.0.0.1 only. Set by the Tauri desktop app
+  #                (src-tauri/src/lib.rs) so the embedded server (which runs with
+  #                DISABLE_AUTH=true) is not reachable from the LAN. IPv4 loopback
+  #                specifically: the WKWebView and IAM hook curl commands connect
+  #                to http://127.0.0.1:<port>, which an IPv6-only ::1 bind would
+  #                refuse. Remote access still works via a local proxy such as
+  #                `tailscale serve` — see docs/TAURI_SETUP.md.
+  #   "all" / unset — bind all interfaces (IPv6 + IPv4). Default for server deploys.
+  # See https://hexdocs.pm/bandit/Bandit.html#t:options/0 for address details.
+  bind_ip =
+    case get_env.("EITS_BIND") do
+      "loopback" -> {127, 0, 0, 1}
+      _ -> {0, 0, 0, 0, 0, 0, 0, 0}
+    end
+
   config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     check_origin: check_origin,
     http: [
-      # Enable IPv6 and bind on all interfaces.
-      # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
-      # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
-      # for details about using IPv6 vs IPv4 and loopback vs public addresses.
-      ip: {0, 0, 0, 0, 0, 0, 0, 0},
+      ip: bind_ip,
       port: port
     ],
     secret_key_base: secret_key_base,

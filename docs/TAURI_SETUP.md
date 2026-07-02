@@ -260,23 +260,23 @@ error. The `PORT=5050` is already set by `lib.rs`, so no port conflict occurs.
 
 ## Remote access via Tailscale
 
-The embedded Phoenix server currently binds all interfaces:
+The embedded Phoenix server binds **loopback only** by default. The desktop
+app sets `EITS_BIND=loopback` (`src-tauri/src/lib.rs`), and `config/runtime.exs`
+maps that to `ip: {127, 0, 0, 1}` (IPv4 loopback — the WKWebView and IAM hooks
+connect to `http://127.0.0.1:<port>` explicitly). Server deployments, which
+don't set `EITS_BIND`, keep the previous all-interfaces binding.
 
-```elixir
-# config/runtime.exs:231
-ip: {0, 0, 0, 0, 0, 0, 0, 0},   # ::/0 — all interfaces
-```
+**Why loopback:** The app spawns Claude CLI subprocesses on behalf of agents,
+and the desktop bundle sets `DISABLE_AUTH=true` — so any network-reachable
+endpoint is effectively an unauthenticated RCE surface. Loopback binding means
+nothing on the LAN can reach port 5050; remote access goes through a local
+proxy (Tailscale, below), which connects to `localhost` from the same machine.
 
-**Security implication:** The app spawns Claude CLI subprocesses on behalf of
-agents. Any network-reachable unauthenticated endpoint is effectively an RCE
-surface. **Never expose port 5050 to the public internet.** The desktop app
-sets `DISABLE_AUTH=true`, which removes the passkey gate entirely.
-
-> **Known issue:** The server should bind loopback (`127.0.0.1`) by default.
-> A follow-up code change to `config/runtime.exs` is needed to set
-> `ip: {127, 0, 0, 1}` when running as the Tauri bundle. Do not change
-> `runtime.exs` in this branch — the binding change requires careful testing
-> against the dev-server path.
+**Opt-out:** To deliberately expose the server on the LAN, launch the app with
+`EITS_BIND=all` in its environment (e.g. from a terminal:
+`EITS_BIND=all open -a "Eye in the Sky"`, or via `launchctl setenv EITS_BIND all`).
+`lib.rs` only sets the default when the variable is absent. **Never do this on
+an untrusted network, and never expose port 5050 to the public internet.**
 
 ### Tailscale recipe
 

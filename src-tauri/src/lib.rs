@@ -203,11 +203,14 @@ fn set_hooks_consent(granted: bool) {
 /// `~/.claude/skills/` — files shared by EVERY Claude Code session on the
 /// machine, not just EITS, so it is not something to do silently.
 ///
-/// Blocking native dialog: acceptable here because this runs once, early in
-/// `setup()`, before the window is shown or the Elixir release is spawned.
-/// The answer is persisted to `desktop.json` so this never asks again unless
-/// the user changes their mind in Settings → Desktop.
-fn ask_hooks_consent(app: &tauri::App) -> bool {
+/// Uses `blocking_show()`, which the dialog plugin documents as unsafe to
+/// call on the main thread (it needs the platform event loop pumping to
+/// actually display/dismiss the native dialog — calling it inside `setup()`
+/// deadlocks before the event loop starts). MUST be invoked from a spawned
+/// thread, never directly from `setup()`. The answer is persisted to
+/// `desktop.json` so this never asks again unless the user changes their
+/// mind in Settings → Desktop.
+fn ask_hooks_consent(app: &tauri::AppHandle) -> bool {
     if let Some(answer) = hooks_consent() {
         return answer;
     }
@@ -430,22 +433,31 @@ pub fn run() {
             // just EITS — so ask once on first launch rather than doing it
             // silently. The answer is persisted in desktop.json; revisit it
             // any time via Settings → Desktop.
-            if ask_hooks_consent(app) {
-                // Write ~/.claude/settings.json hooks on every startup so
-                // agents automatically POST tool events to the local IAM
-                // endpoint. Idempotent: refreshes entries whose port went
-                // stale.
-                let port = resolved_port().to_string();
-                install_iam_hooks(&port);
+            //
+            // Spawned on its own thread: ask_hooks_consent's blocking_show()
+            // must not run on the main thread — Tauri's event loop, which
+            // actually pumps the native dialog, hasn't started yet inside
+            // setup(). Running here (main thread, pre-event-loop) would hang
+            // the app forever on first launch before the window even shows.
+            let app_handle_consent = app.handle().clone();
+            std::thread::spawn(move || {
+                if ask_hooks_consent(&app_handle_consent) {
+                    // Write ~/.claude/settings.json hooks on every startup so
+                    // agents automatically POST tool events to the local IAM
+                    // endpoint. Idempotent: refreshes entries whose port went
+                    // stale.
+                    let port = resolved_port().to_string();
+                    install_iam_hooks(&port);
 
-                // Copy priv/skills/eits-* into ~/.claude/skills/ on every
-                // startup so agents running under this app can see the
-                // /eits-* skills without a manual `eits skills install`.
-                // Idempotent (install always overwrites with the bundled
-                // copy) and fail-open: a missing bundle dir or copy error is
-                // logged, never fatal.
-                install_skills(app);
-            }
+                    // Copy priv/skills/eits-* into ~/.claude/skills/ on every
+                    // startup so agents running under this app can see the
+                    // /eits-* skills without a manual `eits skills install`.
+                    // Idempotent (install always overwrites with the bundled
+                    // copy) and fail-open: a missing bundle dir or copy error
+                    // is logged, never fatal.
+                    install_skills(&app_handle_consent);
+                }
+            });
 
             // --- Notification permission (macOS requires explicit grant) ---
             // Without this, show() silently succeeds but no notification appears.
@@ -1077,7 +1089,7 @@ fn install_iam_hooks(port: &str) {
 /// Fail-open: any missing resource dir, missing HOME, or I/O error is logged
 /// and skipped. Runs synchronously in `setup()` — this is a handful of small
 /// directory copies, not worth a background thread.
-fn install_skills(app: &tauri::App) {
+fn install_skills(app: &tauri::AppHandle) {
     let skills_src = match app.path().resource_dir() {
         Ok(d) => d.join("priv").join("skills"),
         Err(e) => {

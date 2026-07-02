@@ -5,6 +5,7 @@
 - [SECURITY.md](SECURITY.md) — Auth, session handling, rate limiting, secrets, transport security
 - [REST_API.md](REST_API.md) — Full API endpoint reference
 - [SETUP.md](SETUP.md) — Project setup guide
+- [TAURI_SETUP.md](TAURI_SETUP.md) — Desktop build setup: Rust/Tauri prerequisites, cargo tauri build, setup.command, runtime env, Tailscale remote access
 - [CODE_GUIDELINES.md](CODE_GUIDELINES.md) — Coding standards
 - [EITS_CLI.md](EITS_CLI.md) — CLI reference
 - [EITS_HOOKS.md](EITS_HOOKS.md) — Hook system

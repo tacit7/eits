@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       id="sessions-page-root"
       phx-hook="DmHistoryCleanup"
     >
-      <div class="max-w-4xl mx-auto">
+      <div>
         <%!-- Toolbar --%>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
           <%!-- Mobile action bar (desktop uses top bar) --%>

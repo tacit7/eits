@@ -83,11 +83,15 @@ The Tauri desktop app automatically installs IAM hooks on every launch via
 
 1. Reads the current `~/.claude/settings.json`
 2. Checks each event type independently for an existing `"iam/hook"` reference
-3. Adds the hook entry only if none exists (idempotent — no duplicates)
-4. Writes the file back
+3. Adds the hook entry if none exists; rewrites existing entries in place when
+   their embedded port no longer matches the resolved port (idempotent — no
+   duplicates, no writes when everything is current)
+4. Writes the file back only when something changed
 
-Port comes from the `PORT` env var (default `5050` in Tauri builds). This means hook
-installation is zero-touch for desktop users.
+Port comes from the resolution chain in `lib.rs` — `PORT` env var, then
+`~/.config/eits/desktop.json`, then the default `34877`, with a busy-port
+fallback scan (see docs/TAURI_SETUP.md "Port resolution"). This means hook
+installation is zero-touch for desktop users and survives port changes.
 
 ---
 

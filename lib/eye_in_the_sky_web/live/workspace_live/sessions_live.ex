@@ -17,9 +17,15 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
   def mount(_params, _session, socket) do
     workspace = socket.assigns.workspace
 
-    sessions = Sessions.list_sessions_for_scope(socket.assigns.scope, limit: @page_size + 1)
-    {sessions, has_more} = split_page(sessions, @page_size)
-    projects = Projects.list_projects_for_workspace(workspace.id)
+    {sessions, has_more, projects} =
+      if connected?(socket) do
+        sessions = Sessions.list_sessions_for_scope(socket.assigns.scope, limit: @page_size + 1)
+        {sessions, has_more} = split_page(sessions, @page_size)
+        projects = Projects.list_projects_for_workspace(workspace.id)
+        {sessions, has_more, projects}
+      else
+        {[], false, []}
+      end
 
     socket =
       socket

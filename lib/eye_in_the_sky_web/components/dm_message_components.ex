@@ -161,6 +161,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :message, :map, required: true
   attr :compact, :boolean, default: false
   attr :extra_id, :any, default: nil
+  attr :search_query, :string, default: ""
 
   def message_body(assigns) do
     raw_body = assigns.message.body || ""
@@ -232,7 +233,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       <% end %>
       <details
         :if={@thinking && @thinking != ""}
+        id={"#{@id_prefix}thinking-#{@message.id}"}
         class="group rounded border-l-2 border-primary/50 bg-[var(--surface-code)] overflow-hidden"
+        phx-hook="ExpandOnSearch"
+        data-thinking={@thinking}
+        data-query={@search_query}
       >
         <summary class={
           "flex items-center cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors " <>

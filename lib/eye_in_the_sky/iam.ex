@@ -325,12 +325,15 @@ defmodule EyeInTheSky.IAM do
           {:ok, DocumentPolicy.t()}
           | {:error, :document_not_found | :policy_not_found | :already_attached | Ecto.Changeset.t()}
   def add_policy_to_document(document_id, policy_id) do
-    with %PolicyDocument{} <- Repo.get(PolicyDocument, document_id) || :doc_not_found,
-         %Policy{} <- Repo.get(Policy, policy_id) || :policy_not_found do
-      do_insert_document_policy(document_id, policy_id)
-    else
-      :doc_not_found -> {:error, :document_not_found}
-      :policy_not_found -> {:error, :policy_not_found}
+    case Repo.get(PolicyDocument, document_id) do
+      nil ->
+        {:error, :document_not_found}
+
+      %PolicyDocument{} ->
+        case Repo.get(Policy, policy_id) do
+          nil -> {:error, :policy_not_found}
+          %Policy{} -> do_insert_document_policy(document_id, policy_id)
+        end
     end
   end
 
@@ -447,44 +450,24 @@ defmodule EyeInTheSky.IAM do
   def attach_documents_to_agent_type(_agent_type, []), do: {:ok, 0}
 
   def attach_documents_to_agent_type(agent_type, document_ids) do
-    result =
-      Repo.transaction(fn ->
-        Enum.reduce_while(document_ids, 0, fn doc_id, count ->
-          attrs = %{agent_type: agent_type, document_id: doc_id}
-          changeset = AgentTypeDocument.changeset(%AgentTypeDocument{}, attrs)
+    now = DateTime.utc_now()
 
-          # on_conflict: :nothing prevents Postgres from raising a unique violation,
-          # which would taint the transaction (ERROR 25P02 in_failed_sql_transaction)
-          # and make subsequent inserts fail. Already-attached rows are silently
-          # skipped; other constraint errors (e.g. bad FK) still propagate via
-          # {:error, changeset} from the changeset validation step.
-          case Repo.insert(changeset,
-                 on_conflict: :nothing,
-                 conflict_target: [:agent_type, :document_id]
-               ) do
-            {:ok, %AgentTypeDocument{id: nil}} ->
-              # on_conflict: :nothing — row already existed, no insert performed
-              {:cont, count}
-
-            {:ok, _atd} ->
-              {:cont, count + 1}
-
-            {:error, changeset} ->
-              Repo.rollback({:changeset, changeset})
-          end
-        end)
+    rows =
+      Enum.map(document_ids, fn doc_id ->
+        %{agent_type: agent_type, document_id: doc_id, inserted_at: now, updated_at: now}
       end)
 
-    case result do
-      {:ok, count} ->
-        invalidate_cache()
-        {:ok, count}
+    try do
+      {count, _} =
+        Repo.insert_all(AgentTypeDocument, rows,
+          on_conflict: :nothing,
+          conflict_target: [:agent_type, :document_id]
+        )
 
-      {:error, {:changeset, cs}} ->
-        {:error, cs}
-
-      {:error, reason} ->
-        {:error, reason}
+      invalidate_cache()
+      {:ok, count}
+    rescue
+      e -> {:error, e}
     end
   end
 

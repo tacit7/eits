@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Components.Rail.Loader
 
   def handle_select_project(%{"project_id" => id_str}, socket) do
@@ -107,10 +108,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  # Clicking "New project" triggers this. In Tauri context the JS bridge opens
-  # a native dialog (pick_folder command) and pushes folder_picked back.
-  # In a plain browser session the JS bridge is absent and we fall back to the
-  # inline text-input form (new_project_path assign set to "").
+  # Pushes a phx:pick_folder event to the client.
+  # In Tauri: JS invokes the native folder picker (Rust pick_folder command) and
+  # pushes folder_picked back. In the browser: JS immediately pushes folder_picked
+  # with an empty payload to show the inline text-input fallback.
   # NOTE: Creating a project does NOT auto-select it.
   def handle_show_new_project(socket) do
     {:noreply, push_event(socket, "pick_folder", %{})}
@@ -154,7 +155,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
            AgentManager.create_agent(
              project_id: project.id,
              project_path: project.path,
-             model: "sonnet",
+             model: Settings.get("default_model") || "sonnet",
              eits_workflow: "0"
            ) do
       {:noreply, push_navigate(socket, to: "/dm/#{session.id}")}
@@ -168,7 +169,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # Called by handle_event("folder_picked") in rail.ex — payload comes from the
   # Tauri pick_folder JS bridge after the user selects a folder.
   # If the path already exists as a project, switch to it rather than failing silently.
-  def handle_folder_picked(%{"path" => path}, socket) do
+  # path absent or empty → falls through to the inline text-input fallback clause below.
+  def handle_folder_picked(%{"path" => path}, socket) when is_binary(path) and path != "" do
     path = String.trim(path)
     name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
 

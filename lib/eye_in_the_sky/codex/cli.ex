@@ -90,6 +90,15 @@ defmodule EyeInTheSky.Codex.CLI do
     * `:full_auto` - `--full-auto` (default: true)
     * `:bypass_sandbox` - `--dangerously-bypass-approvals-and-sandbox` (default: true; overrides full_auto)
     * `:max_turns` - not directly supported by Codex; ignored
+
+  ## EITS env injection
+
+  EITS context vars (session UUID, agent ID, channel ID, etc.) are injected via
+  `-c shell_environment_policy.set.<KEY>="<VALUE>"` flags so they are available
+  inside every shell command the agent runs. This sub-command env layer bypasses
+  Codex's default variable filters. EITS_CHANNEL_ID is included here (unlike
+  `build_env/1`) because it must reach shell sub-commands, not just the Codex
+  process itself.
   """
   @spec build_args(cli_opts()) :: [String.t()]
   def build_args(caller_opts) do
@@ -278,6 +287,14 @@ defmodule EyeInTheSky.Codex.CLI do
       Enum.any?(@codex_blocked_prefixes, &String.starts_with?(key, &1))
   end
 
+  # Builds the OS-level environment for the spawned Codex process. Starts from
+  # the server's System.get_env/0, strips blocked vars (secrets, Erlang internals,
+  # release vars), then overlays EITS session/agent metadata.
+  #
+  # EITS_CHANNEL_ID is intentionally absent here — it flows via the
+  # shell_environment_policy.set sub-command layer in build_args/1, which makes
+  # it visible to every shell command the agent spawns. The process env only
+  # needs vars that Codex itself reads at startup.
   defp build_env(opts) do
     base_env =
       for {key, value} <- System.get_env(),

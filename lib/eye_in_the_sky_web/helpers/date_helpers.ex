@@ -83,10 +83,8 @@ defmodule EyeInTheSkyWeb.Helpers.DateHelpers do
   end
 
   def relative_time(%NaiveDateTime{} = naive) do
-    case DateTime.from_naive(naive, "Etc/UTC") do
-      {:ok, dt} -> relative_time(dt)
-      :error -> "—"
-    end
+    {:ok, dt} = DateTime.from_naive(naive, "Etc/UTC")
+    relative_time(dt)
   end
 
   def relative_time(_), do: "—"

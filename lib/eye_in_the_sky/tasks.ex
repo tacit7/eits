@@ -5,14 +5,13 @@ defmodule EyeInTheSky.Tasks do
 
   use EyeInTheSky.CrudHelpers, schema: EyeInTheSky.Tasks.Task
 
-  require Logger
   import Ecto.Query, warn: false
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Tasks.{Task, WorkflowState}
   alias EyeInTheSky.Utils.ToolHelpers
 
-  @full_task_preloads [:state, :tags, :sessions, :checklist_items]
+  @full_task_preloads [:state, :tags, :sessions, :checklist_items, :agent]
 
   # Workflow state ID accessors — source of truth is WorkflowState
   defdelegate state_todo, to: WorkflowState, as: :todo_id
@@ -108,27 +107,22 @@ defmodule EyeInTheSky.Tasks do
   Accepts a string that is either a UUID or a stringified integer ID.
   """
   def get_task_by_uuid_or_id(id_str) do
-    id_str = to_string(id_str)
+    case resolve_ids(id_str) do
+      {:error, :not_found} ->
+        {:error, :not_found}
 
-    task =
-      if int_id = ToolHelpers.parse_int(id_str) do
-        Repo.get(Task, int_id)
-      else
-        Repo.get_by(Task, uuid: id_str)
-      end
-
-    case task do
-      nil -> {:error, :not_found}
-      t -> {:ok, Repo.preload(t, @full_task_preloads)}
+      {:ok, {int_id, _uuid}} ->
+        task = Repo.get!(Task, int_id)
+        {:ok, Repo.preload(task, @full_task_preloads)}
     end
   end
 
   @doc """
-  Returns `{:ok, {integer_id, uuid}}` for a task identified by an integer ID or UUID string,
-  or `{:error, :not_found}` if no task is found. No preloads.
+  Resolves a task identifier (integer ID, UUID string, or stringified integer) to
+  `{:ok, {integer_id, uuid}}`, or `{:error, :not_found}` if no task is found. No preloads.
   """
-  def get_task_ids(id_str) do
-    id_str = to_string(id_str)
+  def resolve_ids(task_id) do
+    id_str = to_string(task_id)
 
     task =
       if int_id = ToolHelpers.parse_int(id_str) do
@@ -142,6 +136,12 @@ defmodule EyeInTheSky.Tasks do
       t -> {:ok, {t.id, t.uuid}}
     end
   end
+
+  @doc """
+  Returns `{:ok, {integer_id, uuid}}` for a task identified by an integer ID or UUID string,
+  or `{:error, :not_found}` if no task is found. No preloads.
+  """
+  def get_task_ids(id_str), do: resolve_ids(id_str)
 
   @doc """
   Returns `{integer_id, uuid}` for a task identified by an integer ID or UUID string.
@@ -178,6 +178,25 @@ defmodule EyeInTheSky.Tasks do
     end
 
     result
+  end
+
+  @doc """
+  Creates a task and atomically applies associations (session link, tags, tag IDs).
+  Rolls back the task insert if any association write fails.
+  `attrs` is the task attribute map; `params` is the raw string-keyed params map
+  passed straight through to `associate_task/2`.
+  """
+  def create_with_associations(attrs, params) do
+    Repo.transaction(fn ->
+      case create_task(attrs) do
+        {:ok, task} ->
+          associate_task(task, params)
+          task
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
   end
 
   @doc """
@@ -267,34 +286,35 @@ defmodule EyeInTheSky.Tasks do
     now = DateTime.utc_now()
 
     result =
-      Repo.transaction(fn ->
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:validate_task, fn repo, _changes ->
         locked_state =
           from(t in "tasks", where: t.id == ^task.id, select: t.state_id, lock: "FOR UPDATE")
-          |> Repo.one()
+          |> repo.one()
 
-        if is_nil(locked_state), do: Repo.rollback(:task_not_found)
-        # Reject In Progress tasks as a duplicate claim attempt
-        if locked_state == in_progress_id, do: Repo.rollback(:already_claimed)
-        # Reject Done/In Review — claiming them would silently regress their state
-        if locked_state != todo_id, do: Repo.rollback(:task_not_claimable)
-
-        Repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
-        Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
-
-        changeset = Task.changeset(task, %{state_id: in_progress_id, updated_at: now})
-
-        case Repo.update(changeset) do
-          {:ok, updated} -> updated
-          {:error, cs} -> Repo.rollback(cs)
+        cond do
+          is_nil(locked_state) -> {:error, :task_not_found}
+          locked_state == in_progress_id -> {:error, :already_claimed}
+          locked_state != todo_id -> {:error, :task_not_claimable}
+          true -> {:ok, locked_state}
         end
       end)
+      |> Ecto.Multi.run(:delete_old_sessions, fn repo, _changes ->
+        {count, _} = repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
+        {:ok, count}
+      end)
+      |> Ecto.Multi.run(:add_new_session, fn repo, _changes ->
+        repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+      end)
+      |> Ecto.Multi.update(:update_task, Task.changeset(task, %{state_id: in_progress_id, updated_at: now}))
+      |> Repo.transaction()
 
     case result do
-      {:ok, updated} ->
+      {:ok, %{update_task: updated}} ->
         EyeInTheSky.Events.task_updated(updated)
         {:ok, Repo.preload(updated, @full_task_preloads, force: true)}
 
-      {:error, reason} ->
+      {:error, _key, reason, _changes} ->
         {:error, reason}
     end
   end
@@ -357,23 +377,21 @@ defmodule EyeInTheSky.Tasks do
   """
   def delete_task_with_associations(%Task{} = task) do
     result =
-      Repo.transaction(fn ->
-        Repo.delete_all(from(t in "task_tags", where: t.task_id == ^task.id))
-        Repo.delete_all(from(t in "task_sessions", where: t.task_id == ^task.id))
-        Repo.delete_all(from(t in "commit_tasks", where: t.task_id == ^task.id))
-
-        case Repo.delete(task) do
-          {:ok, t} -> t
-          {:error, reason} -> Repo.rollback(reason)
-        end
-      end)
+      Ecto.Multi.new()
+      |> Ecto.Multi.delete_all(:delete_task_tags, from(t in "task_tags", where: t.task_id == ^task.id))
+      |> Ecto.Multi.delete_all(:delete_task_sessions, from(t in "task_sessions", where: t.task_id == ^task.id))
+      |> Ecto.Multi.delete_all(:delete_commit_tasks, from(t in "commit_tasks", where: t.task_id == ^task.id))
+      |> Ecto.Multi.delete(:delete_task, task)
+      |> Repo.transaction()
 
     case result do
-      {:ok, deleted} -> EyeInTheSky.Events.task_updated(deleted)
-      _ -> :ok
-    end
+      {:ok, %{delete_task: deleted}} ->
+        EyeInTheSky.Events.task_updated(deleted)
+        {:ok, deleted}
 
-    result
+      {:error, _key, reason, _changes} ->
+        {:error, reason}
+    end
   end
 
   @doc """
@@ -436,22 +454,29 @@ defmodule EyeInTheSky.Tasks do
       )
 
     result =
-      Repo.transaction(fn ->
-        task_ids = Repo.all(task_ids_query)
-
-        Repo.delete_all(from(tt in "task_tags", where: tt.task_id in ^task_ids))
-        Repo.delete_all(from(ts in "task_sessions", where: ts.task_id in ^task_ids))
-        Repo.delete_all(from(ct in "commit_tasks", where: ct.task_id in ^task_ids))
-
-        {deleted, _} =
-          Repo.delete_all(from(t in Task, where: t.id in ^task_ids))
-
-        deleted
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:get_task_ids, fn repo, _changes ->
+        task_ids = repo.all(task_ids_query)
+        {:ok, task_ids}
       end)
+      |> Ecto.Multi.run(:delete_task_tags, fn repo, %{get_task_ids: task_ids} ->
+        repo.delete_all(from(tt in "task_tags", where: tt.task_id in ^task_ids))
+      end)
+      |> Ecto.Multi.run(:delete_task_sessions, fn repo, %{get_task_ids: task_ids} ->
+        repo.delete_all(from(ts in "task_sessions", where: ts.task_id in ^task_ids))
+      end)
+      |> Ecto.Multi.run(:delete_commit_tasks, fn repo, %{get_task_ids: task_ids} ->
+        repo.delete_all(from(ct in "commit_tasks", where: ct.task_id in ^task_ids))
+      end)
+      |> Ecto.Multi.run(:delete_tasks, fn repo, %{get_task_ids: task_ids} ->
+        {deleted, _} = repo.delete_all(from(t in Task, where: t.id in ^task_ids))
+        {:ok, deleted}
+      end)
+      |> Repo.transaction()
 
     case result do
-      {:ok, count} -> {count, nil}
-      {:error, _} -> {0, nil}
+      {:ok, %{delete_tasks: count}} -> {count, nil}
+      {:error, _key, _reason, _changes} -> {0, nil}
     end
   end
 

@@ -9,7 +9,6 @@ defmodule EyeInTheSky.Teams.Subscriber do
 
   use GenServer
 
-  require Logger
 
   alias EyeInTheSky.{Events, Teams}
 

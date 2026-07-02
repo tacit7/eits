@@ -159,17 +159,21 @@ When an agent is spawned to handle a channel-routed prompt, its result is saved 
 1. `ChannelFanout` routes a channel prompt to AgentManager with `context[:reply_mode] = "cli_required"`
 2. AgentWorker threads `job_context` (the full context map) through to `WorkerEvents.on_result_received/2`
 3. `on_result_received` checks `get_in(job_context, ["reply_mode"]) == "cli_required"`
-4. If true: calls `save_to_session_transcript_only/5` instead of `save_result/6`
-5. If false or nil: normal flow — calls `save_result/6` and `maybe_fanout_mentions/3`
+4. If true: calls `save_result(session_id, provider, text, metadata, visibility: :session_only, context: job_context)`
+5. If false or nil: normal flow — calls `save_result(session_id, provider, text, metadata, channel_id: channel_id, source_uuid: source_uuid)` and `maybe_fanout_mentions/3`
 
-**save_to_session_transcript_only/5:**
-- Saves to the `messages` table with visibility metadata
-- Does NOT insert into `channel_messages` (no auto-mirror)
-- Sets metadata fields:
-  - `visibility: "session_only"` — marks as audit-only
-  - `source: "channel_prompt"` — indicates it came from a channel
-  - `channel_id`, `channel_message_id` — source breadcrumb
-- Returns `{:ok, message}` or `{:error, reason}`
+**Unified save_result/5:**
+`save_result/5` (private) handles both paths via an options map:
+- **Session-only path** (`visibility: :session_only`):
+  - Saves to the `messages` table with visibility metadata
+  - Does NOT insert into `channel_messages` (no auto-mirror)
+  - Sets metadata fields: `visibility: "session_only"`, `source: "channel_prompt"`, `channel_id`, `channel_message_id`
+  - Logs success: `"Saved channel-prompt reply to session transcript only"`
+  - Logs error: `"Transcript-only save failed: <reason>"` (distinct message for monitoring)
+- **Normal path** (nil `visibility`):
+  - Saves to `messages` table with optional `channel_id` and `source_uuid` kwargs
+  - Inserts into `channel_messages` if channel_id is set
+  - Logs error: `"DB save failed: <reason>"` (distinct message for monitoring)
 
 **Backward Compatibility:**
 - If `job_context` key is absent (callers not yet updated), falls through to normal path via matching on `not is_map_key(params, :job_context)`
@@ -177,11 +181,11 @@ When an agent is spawned to handle a channel-routed prompt, its result is saved 
 - Existing agents unaffected
 
 **Code locations:**
-- `lib/eye_in_the_sky/agent_worker_events.ex` — `on_result_received/2` guard and `save_to_session_transcript_only/5`
+- `lib/eye_in_the_sky/agent_worker_events.ex` — `on_result_received/2` guard and unified `save_result/5`
 - `lib/eye_in_the_sky/claude/agent_worker.ex` — threads `job_context` from `current_job`
 - Tests: `test/eye_in_the_sky/agent_worker_events_test.exs` — 5 new test cases covering cli_required guard, fallback to normal path, and backward compat
 
-**Commits:** 752f22c2 (add cli_required guard and save_to_session_transcript_only), 1baed13e (merge)
+**Commits:** 752f22c2 (add cli_required guard and save_to_session_transcript_only), 1baed13e (merge), 02d34f8d (refactor: merge duplicate save_result functions), f00267a5 (fix: restore distinct error log messages in merged save_result)
 
 ---
 
@@ -994,6 +998,89 @@ The SDK no longer forces `include_partial_messages: true`, allowing the session'
 - `lib/eye_in_the_sky/claude/sdk.ex` — removed `:include_partial_messages` from spawn opts
 
 **Commits:** 802c45b6 (fix: stop forcing --include-partial-messages in SDK path)
+
+---
+
+## JobsLiveHandlers: Shared Jobs Event Delegation
+
+Extracted shared module unifying event handling across the two Jobs LiveView surfaces (ProjectLive.Jobs and OverviewLive.Jobs), eliminating ~80 lines of duplicated code.
+
+**Problem solved:** Both ProjectLive.Jobs and OverviewLive.Jobs had identical `handle_info` and `handle_event` clauses for job management (run_now, edit_job, delete_job, etc.) plus a catch-all relay to the JobsPage component. The differences were minimal: project_id context for ownership validation.
+
+**Solution:** `EyeInTheSkyWeb.Live.Shared.JobsLiveHandlers` exports four handler functions that both LiveViews delegate to, parameterized by `project_id` (nil for global, integer for scoped view).
+
+### Handler Functions
+
+**`handle_jobs_info/2`**
+- Delegates `handle_info/2` for all message types
+- Routes `:jobs_updated` and `:do_reload_jobs` to JobsPage component
+- Propagates `{:jobs_page_flash, level, msg}` flashes to parent socket
+- Catch-all matches any unknown message and returns noreply (no-op)
+
+**`handle_run_now/3`**
+- `handle_run_now(id, socket, project_id)` processes "run_now" button clicks
+- Parses job ID via `JobsHelpers.parse_job_id/1`
+- Validates ownership when `project_id != nil` (scoped view) — returns "Access denied" flash if mismatch
+- Calls `ScheduledJobs.run_now(int_id, project_id)` and flashes result
+
+**`handle_guarded_event/5`**
+- `handle_guarded_event(event, id_or_job_id, params, socket, project_id)` validates ownership before relaying
+- Used for: `edit_job`, `toggle_job`, `delete_job`, `expand_job`, `edit_schedule`
+- Parses ID, loads job, checks ownership (when `project_id != nil`), then sends component update via `send_update(JobsPage, id: "jobs-page", event_relay: {event, params})`
+- Returns flash on error; silent send_update on success
+
+**`handle_fallback_event/4`**
+- `handle_fallback_event(event, params, socket, project_id)` is the blanket catch-all for unguarded events
+- **Scoped view** (`project_id != nil`): relay all events to JobsPage component unconditionally
+- **Global view** (`project_id == nil`): whitelist-only — only relay if event is in `@forwarded_events`, else flash "Unknown event"
+- Whitelisted events: `new_job`, `cancel_form`, `change_job_type`, `change_schedule_type`, `validate_cron`, `save_job`, `confirm_run_job`, `cancel_run_job`, `toggle_claude_drawer`, `switch_tab`, `cancel_schedule`, `save_schedule`, `filter_jobs`, `toggle_job_select`, `select_all_jobs`, `bulk_enable`, `bulk_disable`, `clear_bulk_selection`
+
+**Why whitelist global?** The global (admin) view can see jobs from all projects. Refusing unknown events prevents accidental relay of internal or misspelled events that could enable privilege escalation or data leakage.
+
+### LiveView Integration
+
+Both LiveViews delegate three handle_event clauses and all handle_info to JobsLiveHandlers:
+
+```elixir
+# ProjectLive.Jobs
+def handle_info(msg, socket), do: JobsLiveHandlers.handle_jobs_info(msg, socket)
+
+def handle_event("run_now", %{"id" => id}, socket) do
+  JobsLiveHandlers.handle_run_now(id, socket, socket.assigns.project_id)
+end
+
+def handle_event(event, %{"id" => id} = params, socket)
+    when event in ["edit_job", "toggle_job", "delete_job", "expand_job"] do
+  JobsLiveHandlers.handle_guarded_event(event, id, params, socket, socket.assigns.project_id)
+end
+
+def handle_event(event, params, socket) do
+  JobsLiveHandlers.handle_fallback_event(event, params, socket, socket.assigns.project_id)
+end
+```
+
+OverviewLive.Jobs uses the same delegation pattern (with project_id = nil for global scope).
+
+### Component Assignment Fix
+
+`load_jobs/2` in `components/jobs_page.ex` now assigns `last_n_runs_map` for the project-scoped branch (both `all_project` and `all_global` jobs):
+
+```elixir
+|> assign(
+  :last_n_runs_map,
+  ScheduledJobs.last_n_runs_for_jobs(Enum.map(all_project ++ all_global, & &1.id))
+)
+```
+
+This was previously missing, causing the run-count chart to fail renders in the scoped view.
+
+**Code locations:**
+- `lib/eye_in_the_sky_web/live/shared/jobs_live_handlers.ex` — all four handler functions and `@forwarded_events` whitelist
+- `lib/eye_in_the_sky_web/live/project_live/jobs.ex` — delegation calls
+- `lib/eye_in_the_sky_web/live/overview_live/jobs.ex` — delegation calls
+- `lib/eye_in_the_sky_web/components/jobs_page.ex` — `load_jobs/2` last_n_runs_map assignment
+
+**Commits:** 3f621b4e (add OverviewLive.Jobs), 1194bf4f (extract JobsLiveHandlers, fix audit findings), 922f8f17 (merge)
 
 ---
 

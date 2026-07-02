@@ -88,6 +88,7 @@ import {AgentCombobox} from "./hooks/agent_combobox"
 import {GlobalKeydown} from "./hooks/global_keydown"
 import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
 import {PreserveDetails} from "./hooks/preserve_details"
+import {ExpandOnSearch} from "./hooks/expand_on_search"
 import {VimNav} from "./hooks/vim_nav"
 import {TaskListSelection} from "./hooks/task_list_selection"
 import {DrawerDirtyForm} from "./hooks/drawer_dirty_form"
@@ -165,6 +166,7 @@ Hooks.AgentCombobox = AgentCombobox
 Hooks.GlobalKeydown = GlobalKeydown
 Hooks.DmHistoryCleanup = DmHistoryCleanup
 Hooks.PreserveDetails = PreserveDetails
+Hooks.ExpandOnSearch = ExpandOnSearch
 Hooks.SortDropdown = SortDropdown
 Hooks.TaskListSelection = TaskListSelection
 Hooks.DrawerDirtyForm = DrawerDirtyForm

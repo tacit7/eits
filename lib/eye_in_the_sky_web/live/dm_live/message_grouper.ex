@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
   Stream item shape:
     %{id: "msg-row-<msg_id>",     type: :message, data: msg, prev_role: role}
     %{id: "cluster-row-<first_id>", type: :cluster, data: events, meta: meta}
+    %{id: "cluster-summary-<first_id>", type: :cluster_summary, data: %{files: [...], cost_usd: float|nil, first_id: integer}}
 
   The ids deliberately differ from the component-internal ids used inside
   message_item ("dm-message-<id>") and tool_cluster ("cluster-<id>") to avoid
@@ -18,6 +19,9 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
 
   @tail_window 10
   @tool_types ~w(tool_use tool_result bash output)
+
+  # Tools whose input carries a file_path we want to surface in the summary.
+  @file_tools ~w(Write Edit Read)
 
   # ---------------------------------------------------------------------------
   # Public API
@@ -33,6 +37,10 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
 
   def to_stream_row({:cluster, [first | _] = events, meta}) do
     %{id: "cluster-row-#{first.id}", type: :cluster, data: events, meta: meta}
+  end
+
+  def to_stream_row({:cluster_summary, first_id, data}) do
+    %{id: "cluster-summary-#{first_id}", type: :cluster_summary, data: data}
   end
 
   @doc "Convenience: group_events then map to stream rows."
@@ -144,17 +152,84 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
         DateTime.diff(last.inserted_at, first.inserted_at, :millisecond)
       end
 
-    type_counts =
-      Enum.frequencies_by(events, fn msg ->
-        get_in(msg.metadata || %{}, ["stream_type"]) || "event"
-      end)
+    tool_groups = build_tool_groups(events)
 
-    {:cluster, events,
-     %{
-       count: length(events),
-       type_counts: type_counts,
-       first_at: first.inserted_at,
-       duration_ms: if(duration_ms && duration_ms > 1000, do: duration_ms)
-     }}
+    cluster =
+      {:cluster, events,
+       %{
+         count: length(events),
+         tool_groups: tool_groups,
+         first_at: first.inserted_at,
+         duration_ms: if(duration_ms && duration_ms > 1000, do: duration_ms)
+       }}
+
+    summary = build_cluster_summary(first.id, events)
+
+    [cluster, summary]
+  end
+
+  defp build_tool_groups(events) do
+    events
+    |> Enum.group_by(&extract_tool_name/1)
+    |> Enum.map(fn {name, group_events} ->
+      %{name: name, count: length(group_events), events: group_events}
+    end)
+    |> Enum.sort_by(fn g -> List.first(g.events).id end)
+  end
+
+  defp extract_tool_name(msg) do
+    get_in(msg.metadata || %{}, ["tool_name"]) ||
+      extract_tool_name_from_body(msg.body) ||
+      get_in(msg.metadata || %{}, ["stream_type"]) ||
+      "event"
+  end
+
+  defp extract_tool_name_from_body(nil), do: nil
+
+  defp extract_tool_name_from_body(body) do
+    trimmed = String.trim(body)
+
+    cond do
+      match = Regex.run(~r/^> `([^`]+)`/, trimmed, capture: :all_but_first) ->
+        List.first(match)
+
+      match = Regex.run(~r/^Tool: ([^\n(]+)/, trimmed, capture: :all_but_first) ->
+        match |> List.first() |> String.trim()
+
+      true ->
+        nil
+    end
+  end
+
+  defp build_cluster_summary(first_id, events) do
+    files =
+      events
+      |> Enum.filter(fn msg ->
+        tool_name = get_in(msg.metadata || %{}, ["tool_name"])
+        tool_name in @file_tools
+      end)
+      |> Enum.flat_map(fn msg ->
+        case get_in(msg.metadata || %{}, ["input", "file_path"]) do
+          nil -> []
+          path -> [path]
+        end
+      end)
+      |> Enum.uniq()
+
+    cost_usd =
+      events
+      |> Enum.flat_map(fn msg ->
+        case get_in(msg.metadata || %{}, ["total_cost_usd"]) do
+          nil -> []
+          cost when is_number(cost) -> [cost]
+          _ -> []
+        end
+      end)
+      |> case do
+        [] -> nil
+        costs -> Enum.sum(costs)
+      end
+
+    {:cluster_summary, first_id, %{files: files, cost_usd: cost_usd, first_id: first_id}}
   end
 end

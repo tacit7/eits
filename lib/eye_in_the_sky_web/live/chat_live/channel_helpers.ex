@@ -1,5 +1,4 @@
 defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
-  require Logger
 
   alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSky.Claude.ChannelFanout

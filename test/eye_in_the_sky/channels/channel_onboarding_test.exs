@@ -1,5 +1,5 @@
 defmodule EyeInTheSky.Channels.ChannelOnboardingTest do
-  use EyeInTheSky.DataCase, async: true
+  use EyeInTheSky.DataCase, async: false
 
   alias EyeInTheSky.Channels
   alias EyeInTheSky.Channels.{ChannelMember, ChannelOnboarding}

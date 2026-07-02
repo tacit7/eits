@@ -19,7 +19,6 @@ defmodule EyeInTheSky.Messages do
   alias EyeInTheSky.Messages.Sync
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Sessions
-  require Logger
 
   # ---------------------------------------------------------------------------
   # Session-scoped message loading (JSONL-aware) — delegated to Messages.Sync
@@ -256,9 +255,9 @@ defmodule EyeInTheSky.Messages do
   defp maybe_increment_session_cache(%Message{session_id: session_id, metadata: metadata})
        when is_map(metadata) do
     usage = Map.get(metadata, "usage") || Map.get(metadata, :usage) || %{}
-    input = get_int(usage, "input_tokens") + get_int(usage, :input_tokens)
-    output = get_int(usage, "output_tokens") + get_int(usage, :output_tokens)
-    cost = get_float(metadata, "total_cost_usd") + get_float(metadata, :total_cost_usd)
+    input = max(get_int(usage, "input_tokens"), get_int(usage, :input_tokens))
+    output = max(get_int(usage, "output_tokens"), get_int(usage, :output_tokens))
+    cost = max(get_float(metadata, "total_cost_usd"), get_float(metadata, :total_cost_usd))
     Sessions.increment_usage_cache(session_id, input + output, cost)
   end
 

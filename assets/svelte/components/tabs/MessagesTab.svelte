@@ -34,7 +34,7 @@
     class="flex-1 overflow-y-auto px-6 py-4"
   >
     {#if messages && messages.length > 0}
-      {#each messages as message, idx}
+      {#each messages as message, idx (message.id)}
         <!-- Date separator -->
         {#if idx === 0 || formatDateRelative(messages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
           <div class="flex items-center justify-center my-6">
@@ -131,6 +131,7 @@
       <input
         type="text"
         name="body"
+        aria-label="Send instruction to agent"
         placeholder="Send instruction to agent..."
         class="input input-bordered flex-1"
         autocomplete="off"

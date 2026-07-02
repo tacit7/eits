@@ -9,11 +9,12 @@ defmodule EyeInTheSky.ScheduledJobs.CronParser do
   @doc """
   Compute the next run DateTime for a job given its schedule type and value.
 
-  `from` defaults to `NaiveDateTime.utc_now()` when nil.
+  `from` defaults to `DateTime.utc_now()` when nil.
   `timezone` defaults to `"Etc/UTC"`.
   """
   def compute_next_run_at(schedule_type, schedule_value, from \\ nil, timezone \\ "Etc/UTC") do
-    utc_now = from || NaiveDateTime.utc_now()
+    base_time = from || DateTime.utc_now()
+    utc_now = to_naive(base_time)
 
     case schedule_type do
       "interval" ->
@@ -32,6 +33,10 @@ defmodule EyeInTheSky.ScheduledJobs.CronParser do
         nil
     end
   end
+
+  defp to_naive(%DateTime{} = dt), do: DateTime.to_naive(dt)
+  defp to_naive(%NaiveDateTime{} = ndt), do: ndt
+  defp to_naive(other), do: other
 
   defp next_cron_run_at(schedule_value, utc_now, timezone) do
     case Parser.parse(schedule_value) do

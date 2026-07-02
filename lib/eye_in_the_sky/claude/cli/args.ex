@@ -129,6 +129,7 @@ defmodule EyeInTheSky.Claude.CLI.Args do
     args = maybe_flag(args, "--permission-mode", opts[:permission_mode])
     args = maybe_flag(args, "--mcp-config", opts[:mcp_config])
     args = maybe_flag(args, "--thinking-budget-tokens", opts[:thinking_budget])
+    args = maybe_flag(args, "--effort", opts[:effort_level])
     args = maybe_flag(args, "--max-budget-usd", opts[:max_budget_usd])
     args = maybe_flag(args, "--agent", opts[:agent])
     args = maybe_flag(args, "--add-dir", opts[:add_dir])
@@ -150,7 +151,7 @@ defmodule EyeInTheSky.Claude.CLI.Args do
     args =
       args
       |> maybe_bool_flag("--verbose", verbose)
-      |> maybe_bool_flag("--dangerously-skip-permissions", opts[:skip_permissions])
+      |> maybe_bool_flag("--dangerously-skip-permissions", opts[:skip_permissions] && opts[:permission_mode] in [nil, ""])
       |> maybe_bool_flag("--sandbox", opts[:sandbox] == true)
       |> maybe_bool_flag("--chrome", opts[:chrome] == true)
       |> maybe_bool_flag("--no-chrome", opts[:chrome] == false)

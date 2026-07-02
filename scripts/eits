@@ -244,10 +244,10 @@ _parse_duration() {
 # Table renderers — accept raw API JSON on stdin or as $1
 _tbl_sessions() {
   local data="${1:-$(cat)}"
-  local count; count=$(echo "$data" | jq '[.sessions[]?] | length')
+  local count; count=$(echo "$data" | jq '[(.results // .sessions)[]?] | length')
   printf '%-10s  %-38s  %-6s  %s\n' "STATUS" "NAME" "ID" "AGE"
   printf '%-10s  %-38s  %-6s  %s\n' "----------" "--------------------------------------" "------" "---"
-  echo "$data" | jq -r '.sessions[]? | [
+  echo "$data" | jq -r '(.results // .sessions)[]? | [
     (.status // "-"),
     (.name // "(unnamed)"),
     ((.id) | tostring),
@@ -265,17 +265,19 @@ _tbl_sessions() {
 _tbl_tasks() {
   local data="${1:-$(cat)}"
   local count; count=$(echo "$data" | jq '[.tasks[]?] | length')
-  printf '%-14s  %-44s  %s\n' "STATE" "TITLE" "ID"
-  printf '%-14s  %-44s  %s\n' "--------------" "--------------------------------------------" "------"
+  printf '%-14s  %-44s  %-6s  %s\n' "STATE" "TITLE" "ID" "SESSION"
+  printf '%-14s  %-44s  %-6s  %s\n' "--------------" "--------------------------------------------" "------" "-------"
   echo "$data" | jq -r '.tasks[]? | [
     (.state // "-"),
     (.title // "(untitled)"),
-    ((.id) | tostring)
-  ] | @tsv' | while IFS=$'\t' read -r state title id; do
-    printf '%-14s  %-44s  %s\n' \
+    ((.id) | tostring),
+    ((.session_id // "") | tostring)
+  ] | @tsv' | while IFS=$'\t' read -r state title id session_id; do
+    printf '%-14s  %-44s  %-6s  %s\n' \
       "$(_trunc "$state" 14)" \
       "$(_trunc "$title" 44)" \
-      "$id"
+      "$id" \
+      "$session_id"
   done
   if [[ -n "$count" ]]; then printf '\n%s task(s)\n' "$count"; fi
 }
@@ -331,13 +333,13 @@ cmd_sessions() {
       # --name cannot combine with --agent or --mine
       # --parent: filter by parent session (integer ID or UUID); independent of other filters
       # --agent-slug: filter by agent definition slug (e.g. "eits-cli-expert"); combinable with --status, --project
-      local qs="" _agent_flag=0 _other_flag=0 _mine_flag=0 _json=0
+      local qs="" _agent_flag=0 _other_flag=0 _mine_flag=0 _json=0 _project_flag=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --search|-q)   [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--search cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&q=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --name|-n)     [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--name cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&name=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --status)      [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--status cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&status=$2";     shift 2 ;;
-          --project|-p)  [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--project cannot combine with --agent or --mine"; _other_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
+          --project|-p)  [[ $_agent_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--project cannot combine with --agent or --mine"; _other_flag=1; _project_flag=1; qs="${qs}&project_id=$2"; shift 2 ;;
           --agent)       [[ $_other_flag -eq 1 || $_mine_flag -eq 1 ]] && die "--agent is mutually exclusive with --search, --status, --project, and --mine"; _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --agent-slug)  qs="${qs}&agent_def_slug=$(printf '%s' "$2" | jq -Rr @uri)"; shift 2 ;;
           --parent)      qs="${qs}&parent_session_id=$2"; shift 2 ;;
@@ -349,6 +351,15 @@ cmd_sessions() {
           *) die "unknown flag: $1" ;;
         esac
       done
+      # Project scope: use explicit --project, then EITS_PROJECT_ID, then fall back to
+      # path=$PWD (server resolves project from path — one round-trip, no pre-resolution).
+      if [[ $_project_flag -eq 0 && $_agent_flag -eq 0 && $_mine_flag -eq 0 ]]; then
+        if [[ -n "${EITS_PROJECT_ID:-}" ]]; then
+          qs="${qs}&project_id=${EITS_PROJECT_ID}"
+        else
+          qs="${qs}&path=$(printf '%s' "${PWD}" | jq -Rr @uri)"
+        fi
+      fi
       local _resp; _resp=$(_curl "$BASE_URL/sessions?${qs#&}")
       if [[ $_json -eq 1 ]]; then echo "$_resp" | jq .; else _tbl_sessions "$_resp"; fi
       ;;
@@ -727,11 +738,12 @@ TASKS_HELP
       # current session's tasks. Pass --all to list across all sessions.
       # --mine/--assigned: tasks where current session is the active executor (linked via task_sessions)
       # --created-by: tasks created by the current session (via created_by_session_id)
-      local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0 _tag_flag=0 _json=0
-      local _since_cutoff="" _stale_since_cutoff=""
+      # Project default: EITS_PROJECT_ID is used when no --project flag is given and --all is not set.
+      local qs="" _session_flag=0 _mine_flag=0 _all_flag=0 _agent_flag=0 _tag_flag=0 _json=0 _project_flag=0 _limit_flag=0
+      local _since_cutoff="" _stale_since_cutoff="" _list_project="${EITS_PROJECT_ID:-}"
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --project|-p) qs="${qs}&project_id=$2"; shift 2 ;;
+          --project|-p) _project_flag=1; _list_project="$2"; shift 2 ;;
           --session|-s) [[ $_mine_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _session_flag=1; qs="${qs}&session_id=$2"; shift 2 ;;
           --agent|-a) _agent_flag=1; qs="${qs}&agent_id=$2"; shift 2 ;;
           --tag)
@@ -765,7 +777,7 @@ TASKS_HELP
               in-review|review)  qs="${qs}&state_id=4"; shift 2 ;;
               *) die "unknown state name: $2" ;;
             esac ;;
-          --limit|-l) qs="${qs}&limit=$2";      shift 2 ;;
+          --limit|-l) _limit_flag=1; qs="${qs}&limit=$2";      shift 2 ;;
           --mine|--assigned) [[ $_session_flag -eq 1 ]] && die "--mine/--assigned and --session are mutually exclusive"; _mine_flag=1; local _mine="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_mine" ]] || die "--mine/--assigned requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&session_id=$_mine"; shift ;;
           --created-by) local _creator="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"; [[ -n "$_creator" ]] || die "--created-by requires EITS_SESSION_UUID or EITS_SESSION_ID to be set"; qs="${qs}&created_by_session_id=$_creator"; shift ;;
           --all)      _all_flag=1; shift ;;
@@ -775,8 +787,7 @@ TASKS_HELP
           *) die "unknown flag: $1" ;;
         esac
       done
-      # Agent-centric default: when running as an agent, scope to current session
-      # unless --all, --session, --mine, --agent, or --tag explicitly overrides the scope
+      # Session scope: default to current session unless --all, --session, --mine, --agent, or --tag.
       local _silent_scope=0
       if [[ $_all_flag -eq 0 && $_session_flag -eq 0 && $_mine_flag -eq 0 && $_agent_flag -eq 0 && $_tag_flag -eq 0 ]]; then
         local _self="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
@@ -784,6 +795,20 @@ TASKS_HELP
           qs="${qs}&session_id=$_self"
           _silent_scope=1
         fi
+      fi
+      # Project scope: always inject project (--all only bypasses session scope, not project).
+      # Uses explicit --project, then EITS_PROJECT_ID, then falls back to path=$PWD.
+      if [[ $_project_flag -eq 0 ]]; then
+        if [[ -n "$_list_project" ]]; then
+          qs="${qs}&project_id=$_list_project"
+        else
+          qs="${qs}&path=$(printf '%s' "${PWD}" | jq -Rr @uri)"
+        fi
+      fi
+      # Default limit: server caps at 50 when no limit is passed, silently truncating
+      # project-wide lists. Default to 200 unless the caller set --limit explicitly.
+      if [[ $_limit_flag -eq 0 ]]; then
+        qs="${qs}&limit=200"
       fi
       local _resp; _resp=$(_curl "$BASE_URL/tasks?${qs#&}")
       # --since: keep tasks created at or after the cutoff
@@ -1607,7 +1632,7 @@ Valid models (--provider claude, default):
               claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001
 
 Valid models (--provider codex):
-  gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
+  gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
 
 Valid models (--provider gemini):
   gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
@@ -1680,8 +1705,8 @@ USAGE
           codex)
             if [[ -n "$model" ]]; then
               case "$model" in
-                gpt-5.4|gpt-5.2-codex|gpt-5.1-codex-max|gpt-5.4-mini|gpt-5.3-codex|gpt-5.2) ;;
-                *) die "invalid model '$model' for provider 'codex'. Valid: gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2" ;;
+                gpt-5.5|gpt-5.4|gpt-5.2-codex|gpt-5.1-codex-max|gpt-5.4-mini|gpt-5.3-codex|gpt-5.2) ;;
+                *) die "invalid model '$model' for provider 'codex'. Valid: gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2" ;;
               esac
             fi ;;
           gemini)
@@ -2366,18 +2391,20 @@ cmd_jobs() {
 _tbl_dm() {
   local data="${1:-$(cat)}"
   local count; count=$(echo "$data" | jq '[.messages[]?] | length')
-  printf '%-8s  %-52s  %s\n' "FROM" "MESSAGE" "AGE"
-  printf '%-8s  %-52s  %s\n' "--------" "----------------------------------------------------" "---"
+  printf '%-10s  %-8s  %-48s  %s\n' "ID" "FROM" "MESSAGE" "AGE"
+  printf '%-10s  %-8s  %-48s  %s\n' "----------" "--------" "------------------------------------------------" "---"
   echo "$data" | jq -r '.messages[]? | [
+    ((.id // "-") | tostring),
     ((.from_session_id // "-") | tostring),
     (.body // ""),
     (.inserted_at // "")
-  ] | @tsv' | while IFS=$'\t' read -r from body ts; do
+  ] | @tsv' | while IFS=$'\t' read -r id from body ts; do
     # single-line body: collapse newlines, strip leading "DM from:..." prefix agents sometimes echo
     local _body; _body=$(printf '%s' "$body" | tr '\n' ' ' | sed 's/^DM from:[^ ]* ([^)]*) //')
-    printf '%-8s  %-52s  %s\n' \
+    printf '%-10s  %-8s  %-48s  %s\n' \
+      "$id" \
       "$(_trunc "$from" 8)" \
-      "$(_trunc "$_body" 52)" \
+      "$(_trunc "$_body" 48)" \
       "$(_age "$ts")"
   done
   if [[ -n "$count" ]]; then printf '\n%s message(s)\n' "$count"; fi
@@ -2481,10 +2508,41 @@ EOF
     return
   fi
 
-  # send subcommand (default when no list/inbox keyword)
+  # read subcommand: fetch one DM by ID
+  if [[ "$sub" == "read" ]]; then
+    shift || true
+    local _dm_id="${1:-}"; [[ -n "$_dm_id" ]] || die "usage: eits dm read <id> [--json]"
+    shift || true
+    local _json=0
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --json|-j) _json=1; shift ;;
+        *) die "unknown flag: $1" ;;
+      esac
+    done
+    local _session="${EITS_SESSION_UUID:-${EITS_SESSION_ID:-}}"
+    local _qs=""; [[ -n "$_session" ]] && _qs="?session=$_session"
+    local _resp; _resp=$(_curl "${BASE_URL}/dm/${_dm_id}${_qs}") || return 1
+    if [[ $_json -eq 1 ]]; then
+      printf '%s\n' "$_resp" | jq .
+    else
+      local _from _body _ts
+      _from=$(printf '%s' "$_resp" | jq -r '.from_session_id // "-"')
+      _body=$(printf '%s' "$_resp" | jq -r '.body // ""' | sed 's/^DM from:[^ ]* ([^)]*) //')
+      _ts=$(printf '%s' "$_resp" | jq -r '.inserted_at // ""')
+      printf 'ID:   %s\n' "$(printf '%s' "$_resp" | jq -r '.id // "-"')"
+      printf 'From: %s\n' "$_from"
+      printf 'Age:  %s\n' "$(_age "$_ts")"
+      printf '\n%s\n' "$_body"
+    fi
+    return
+  fi
+
+  # send subcommand (default when no list/inbox/read keyword)
   if [[ "$sub" == "--help" || "$sub" == "-h" ]]; then
     cat <<EOF
 usage: eits dm inbox|list [options]           — show inbound messages
+       eits dm read <id> [--json]             — read one DM by ID (full body)
        eits dm --to <id> --message <text>     — send a DM
 
 Send:
@@ -2500,6 +2558,8 @@ Read:
   eits dm inbox --from <id>             Filter by sender
   eits dm inbox --since <iso8601>       Messages after timestamp
   eits dm inbox --team-only             Only DMs from sessions in shared teams
+  eits dm read <id>                     Full body of one message by ID
+  eits dm read <id> --json              Machine-readable
 EOF
     return 0
   fi
@@ -3468,6 +3528,61 @@ cmd_worktree() {
 
 _pending_log() { printf '%s/.eits/pending-annotations.log' "$HOME"; }
 
+# ── hooks ─────────────────────────────────────────────────────────────────────
+cmd_hooks() {
+  local subcmd="${1:-install}"; shift || true
+
+  # Resolve the install-hooks.sh script relative to this eits binary.
+  local self_dir
+  self_dir="$(cd "$(dirname "$0")" && pwd)"
+  local installer=""
+  # Look for install-hooks.sh alongside eits (dev) or under a sibling priv/scripts/ (installed)
+  for candidate in \
+    "$self_dir/../priv/scripts/install-hooks.sh" \
+    "$self_dir/../../priv/scripts/install-hooks.sh" \
+    "$HOME/Applications/Eye in the Sky.app/Contents/Resources/priv/scripts/install-hooks.sh" \
+    "/Applications/Eye in the Sky.app/Contents/Resources/priv/scripts/install-hooks.sh"; do
+    if [[ -f "$candidate" ]]; then
+      installer="$(cd "$(dirname "$candidate")" && pwd)/$(basename "$candidate")"
+      break
+    fi
+  done
+
+  if [[ -z "$installer" ]]; then
+    die "install-hooks.sh not found. Re-run from inside the EITS project or install the desktop app."
+  fi
+
+  local scripts_dir
+  scripts_dir="$(dirname "$installer")"
+
+  # Resolve the eits CLI path to pass to the installer
+  local eits_cli
+  eits_cli="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
+  case "$subcmd" in
+    install)
+      bash "$installer" --scripts-dir "$scripts_dir" --eits-cli "$eits_cli" "$@"
+      ;;
+    uninstall)
+      bash "$installer" --scripts-dir "$scripts_dir" --uninstall "$@"
+      ;;
+    --help|-h)
+      cat <<EOF
+usage: eits hooks <install|uninstall>
+
+  install     Copy hook scripts to ~/.config/eits/hooks/, install the eits CLI
+              to ~/.local/bin/eits, and merge hooks into ~/.claude/settings.json.
+
+  uninstall   Remove EITS-managed hook entries from ~/.claude/settings.json.
+              Does not delete scripts or the eits CLI binary.
+EOF
+      ;;
+    *)
+      die "unknown hooks subcommand: $subcmd (try: install, uninstall)"
+      ;;
+  esac
+}
+
 cmd_queue() {
   local subcmd="${1:-}"; shift || true
   [[ "${subcmd:-}" == "--help" || "${subcmd:-}" == "-h" ]] && {
@@ -4342,6 +4457,7 @@ Commands:
                 status <id> [--wait]   ← blocks until all members done/failed; exits 0 all done, 1 any failed
   timer         show|set|cancel   (default session: self / \$EITS_SESSION_UUID)
   worktree      create|remove   (EITS Elixir projects only)
+  hooks         install|uninstall   (install EITS Claude Code hooks into ~/.claude/settings.json)
   queue         status|flush    (drain ~/.eits/pending-annotations.log)
   search        <query> [--type sessions|tasks|notes] [--limit <n>] [--project <id>] [--json]
   codex         comment --pr <n> --body <text> [--repo <owner/repo>]   post PR comment as urielmaldonado-codex
@@ -4383,6 +4499,7 @@ case "$cmd" in
   teams)         cmd_teams         "$@" ;;
   timer)         cmd_timer         "$@" ;;
   worktree)      cmd_worktree      "$@" ;;
+  hooks)         cmd_hooks         "$@" ;;
   queue)         cmd_queue         "$@" ;;
   search)        cmd_search        "$@" ;;
   messages)      cmd_messages      "$@" ;;

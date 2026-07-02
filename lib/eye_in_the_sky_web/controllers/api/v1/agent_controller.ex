@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
 
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Agents.{AgentManager, SpawnValidator}
+  alias EyeInTheSky.Git.Worktrees
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   require Logger
@@ -156,13 +157,6 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
     else
       {:error, code, message} ->
         conn |> put_status(:bad_request) |> json(%{error_code: code, message: message})
-
-      error ->
-        Logger.error("Unexpected validation error in spawn: #{inspect(error)}")
-
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error_code: "internal_error", message: "An unexpected error occurred"})
     end
   end
 
@@ -176,7 +170,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
       session_id: session.id,
       session_uuid: session.uuid,
       worktree_path: worktree_path,
-      branch_name: resolve_branch_name(worktree_path)
+      branch_name: Worktrees.resolve_branch_name(worktree_path)
     }
 
     if team do
@@ -186,14 +180,4 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
     end
   end
 
-  defp resolve_branch_name(nil), do: nil
-
-  defp resolve_branch_name(wt_path) do
-    case System.cmd("git", ["-C", wt_path, "symbolic-ref", "--short", "HEAD"],
-           stderr_to_stdout: true
-         ) do
-      {branch, 0} -> String.trim(branch)
-      _ -> nil
-    end
-  end
 end

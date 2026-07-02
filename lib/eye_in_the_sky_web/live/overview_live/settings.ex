@@ -158,9 +158,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         key == "cm_tab_size" ->
           push_event(socket, "apply_cm_settings", %{cm_tab_size: value})
 
-        key == "palette_shortcut" ->
-          assign(socket, :palette_shortcut, value)
-
         true ->
           socket
       end
@@ -203,13 +200,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("reset_setting", %{"key" => key}, socket) do
     Settings.reset(key)
     settings = Settings.all()
-
-    socket =
-      if key == "palette_shortcut" do
-        assign(socket, :palette_shortcut, settings["palette_shortcut"] || "auto")
-      else
-        socket
-      end
 
     {:noreply, socket |> assign(:settings, settings) |> put_flash(:info, "Reset to default")}
   end

@@ -6,7 +6,10 @@ defmodule EyeInTheSky.Codex.Models do
   Models without confirmed window sizes return nil — do not guess.
   """
 
+  # When adding a model here, also update the valid models list in scripts/eits
+  # (case pattern ~line 1683 and the help text ~line 1610).
   @context_windows %{
+    "gpt-5.5" => 1_050_000,
     "gpt-5.4" => 1_000_000,
     "gpt-5.3-codex" => 400_000,
     "gpt-5.2" => 400_000,
@@ -17,6 +20,7 @@ defmodule EyeInTheSky.Codex.Models do
 
   # Max output tokens per model (where known)
   @max_output_tokens %{
+    "gpt-5.5" => 128_000,
     "gpt-5.3-codex" => 128_000,
     "gpt-5.2" => 128_000,
     "gpt-5.1-codex-max" => 128_000,

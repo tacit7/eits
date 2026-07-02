@@ -22,6 +22,10 @@ defmodule EyeInTheSkyWeb.ChatLive do
       socket
       |> assign(:session_id, session_id)
       |> assign(:working_agents, %{})
+      |> assign(:stream_content, "")
+      |> assign(:stream_tool, nil)
+      |> assign(:active_stream_session_id, nil)
+      |> assign(:subscribed_stream_sessions, MapSet.new())
       |> assign(:sidebar_tab, :chat)
       |> assign(:sidebar_project, nil)
       |> assign(:new_channel_name, nil)
@@ -141,6 +145,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:active_channel, active_channel)
       |> assign(:active_channel_id, channel_id)
       |> assign(:messages, data.messages)
+      |> assign(:received_message_ids, MapSet.new(data.messages || [], & &1.id))
       |> assign(:has_more_messages, length(data.messages) == 100)
       |> assign(:unread_counts, unread_counts)
       |> assign(:active_thread, data.active_thread)
@@ -158,6 +163,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
       |> assign(:message_search_query, "")
       |> assign(:message_search_results, [])
 
+    socket = manage_stream_subscriptions(socket, data.channel_members)
+
     if connected?(socket) do
       Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
         id: "app-rail",
@@ -166,6 +173,23 @@ defmodule EyeInTheSkyWeb.ChatLive do
     end
 
     socket
+  end
+
+  defp manage_stream_subscriptions(socket, channel_members) do
+    if connected?(socket) do
+      new_ids = channel_members |> Enum.map(& &1.session_id) |> MapSet.new()
+      old_ids = socket.assigns[:subscribed_stream_sessions] || MapSet.new()
+
+      MapSet.difference(old_ids, new_ids)
+      |> Enum.each(&EyeInTheSky.Events.unsubscribe_dm_stream/1)
+
+      MapSet.difference(new_ids, old_ids)
+      |> Enum.each(&EyeInTheSky.Events.subscribe_dm_stream/1)
+
+      assign(socket, :subscribed_stream_sessions, new_ids)
+    else
+      socket
+    end
   end
 
   defp load_channels(project_id) do
@@ -206,7 +230,6 @@ defmodule EyeInTheSkyWeb.ChatLive do
           all_projects={@all_projects}
           prompts={@prompts}
           agent_templates={@agent_templates}
-          uploads={@uploads}
         />
       </div>
     </div>
@@ -255,6 +278,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
     </div>
     """
   end
+
+  attr :uploads, :any, required: true
 
   defp upload_tray(assigns) do
     ~H"""
@@ -313,6 +338,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
     </form>
     """
   end
+
+  attr :show, :any, required: true
+  attr :all_projects, :list, required: true
+  attr :prompts, :list, required: true
+  attr :agent_templates, :list, required: true
 
   defp agent_drawer(assigns) do
     ~H"""

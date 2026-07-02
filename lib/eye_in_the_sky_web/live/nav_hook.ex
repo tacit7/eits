@@ -81,6 +81,11 @@ defmodule EyeInTheSkyWeb.NavHook do
         :handle_event,
         &PaletteAgentHandlers.handle_delete_agent/3
       )
+      |> attach_hook(
+        :palette_resume_agent,
+        :handle_event,
+        &PaletteAgentHandlers.handle_resume_agent/3
+      )
       |> attach_hook(:vim_quick_dm, :handle_event, &PaletteHandlers.handle_quick_dm_event/3)
 
     {:cont, socket}

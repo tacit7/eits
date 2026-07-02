@@ -158,7 +158,6 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   """
   def provider_icon("openai"), do: "/images/openai.svg"
   def provider_icon("codex"), do: "/images/openai.svg"
-  def provider_icon("gemini"), do: "/images/gemini.svg"
   def provider_icon(_), do: "/images/claude.svg"
 
   @doc """
@@ -167,13 +166,11 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   """
   def provider_icon_class("openai"), do: "dark:invert"
   def provider_icon_class("codex"), do: "dark:invert"
-  def provider_icon_class("gemini"), do: ""
   def provider_icon_class(_), do: ""
 
   def stream_provider_label(nil), do: "Agent"
   def stream_provider_label(%{provider: "codex"}), do: "Codex"
   def stream_provider_label(%{provider: "openai"}), do: "Codex"
-  def stream_provider_label(%{provider: "gemini"}), do: "Gemini"
   def stream_provider_label(_session), do: "Claude"
 
   # ---------------------------------------------------------------------------
@@ -209,9 +206,11 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
   defdelegate model_display_name(slug), to: EyeInTheSkyWeb.Helpers.ModelHelpers
 
+  def effort_display_name("auto"), do: "Auto"
   def effort_display_name("low"), do: "Low"
   def effort_display_name("medium"), do: "Medium"
   def effort_display_name("high"), do: "High"
+  def effort_display_name("xhigh"), do: "XHigh"
   def effort_display_name("max"), do: "Max"
   def effort_display_name(_), do: "Medium"
 

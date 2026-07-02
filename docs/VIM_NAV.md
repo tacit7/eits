@@ -15,6 +15,24 @@ In-app overlay: press `?` anywhere, or visit `/keybindings`.
 
 ---
 
+## Architecture
+
+The vim navigation system is modularized into four TypeScript files under `assets/js/hooks/`:
+
+- **`vim_nav.ts`** — Main orchestrator. Handles lifecycle (mount, destroy), mode transitions (normal ↔ insert), key buffering, command dispatch, and list/flyout navigation. Imports and delegates to specialized modules.
+
+- **`vim_nav_commands.ts`** — Command registry. Defines `COMMANDS` (keybinding to action mappings) and `PREFIXES` (multi-key sequences). The source of truth for all keybindings exported to the help overlay.
+
+- **`vim_nav_statusbar.ts`** — Statusbar rendering. Exports `Mode` type, `createStatusbar()` (builds the fixed statusbar element), and `updateStatusbar()` (updates display text and styling). Shows current mode and numeric count prefix.
+
+- **`vim_nav_hints.ts`** — Hint mode system. Exports `_generateHintLabels()` (generates alphabetic labels for list items), `createHintOverlay()` (builds the hint badge overlay DOM), and `filterHintBadges()` (filters badges on keystroke and updates visibility).
+
+### TypeScript Patterns
+
+**DOM type casting**: `vim_nav.ts` uses `querySelector()` / `querySelectorAll()` without type arguments, paired with `as` type casts for the result. This avoids svelte-check errors when tsconfig path mapping (`paths: { "*": ["../deps/*"] }`) interferes with lib.dom type resolution. Example: `list.querySelectorAll("[data-vim-list-item]") as HTMLElement[]` instead of `list.querySelectorAll<HTMLElement>("[data-vim-list-item]")`.
+
+---
+
 ## Global (always active)
 
 | Keys | Action |
@@ -23,6 +41,8 @@ In-app overlay: press `?` anywhere, or visit `/keybindings`.
 | `:` | Command palette |
 | `[` | Go back (browser history) |
 | `]` | Go forward (browser history) |
+| `Ctrl-o` | Go to previously visited session |
+| `Ctrl-i` | Go to more recently visited session |
 | `q` | Close flyout |
 | `/` | Focus search *(requires `data-vim-search` on page)* |
 
@@ -128,6 +148,8 @@ Active on any page with `data-vim-list`.
 
 **Numeric count prefix**: Type a number before `j`, `k`, or `G` to repeat the motion (`3j` moves down 3, `5k` moves up 5, `10G` jumps to item 10). The accumulated count is shown in the status bar. Pressing `Escape` or waiting 2s clears the count.
 
+**Recent session cycling (`Ctrl-o`/`Ctrl-i`)**: Navigates through sessions YOU personally visited in this browser tab, in visit order (most-recently-visited first). `Ctrl-o` jumps to the session you visited before the current one. `Ctrl-i` jumps to the session you visited more recently (reverse direction). The cursor re-anchors to your current session URL on every page navigation. `Ctrl-i` is a no-op when you are already at the most recently visited session. History resets on page reload.
+
 **Half-page scroll (`Ctrl-d`/`Ctrl-u`)**: Moves focus by approximately half the visible list height. The step size is calculated from the list container's `clientHeight` divided by the first item's `offsetHeight`. Falls back to 1 if items have zero height (e.g., in jsdom). These bindings work in normal mode only and are ignored in insert mode or when the cursor is in an editable field.
 
 **Group jump (`{`/`}`)**: Navigates between `data-vim-list-group` separator elements when present. Falls back to `gg`/`G` behavior when no separators exist in the DOM. Currently active on kanban column headers (via `data-vim-list-group` attribute on `.kanban-column`).
@@ -173,6 +195,21 @@ When a focused session is archived or deleted, vim-nav automatically refocuses t
 | `j` / `k` | Navigate task list |
 | `Enter` | Open focused task detail drawer |
 | `f f` | Toggle filter drawer |
+
+---
+
+## Kanban page
+
+The kanban page uses standard list navigation (`j`/`k`, `Enter`, etc.). There is no bare `n` key on the kanban page — it was removed to avoid conflicting with vim-nav's `Space n` chord for creating new items.
+
+| Keys | Action |
+|---|---|
+| `j` / `k` | Navigate task list |
+| `Enter` | Open focused task detail |
+| `{` / `}` | Jump between kanban columns (group separators) |
+| `Space n k` | Create new kanban task (uses Space leader, not bare `n`) |
+
+---
 
 ## Task navigation (projects page) — `route_suffix:/projects`
 

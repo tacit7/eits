@@ -289,30 +289,41 @@ When a canvas is activated, all persisted terminals are loaded and PTY servers a
 
 ### Terminal Event Handlers
 
-**`add_terminal`**
+Terminal event handlers have been extracted from `CanvasLive` into a dedicated module `CanvasLive.TerminalHandlers` for better code organization. Located at: `lib/eye_in_the_sky_web/live/canvas_live/terminal_handlers.ex`
+
+**CanvasLive delegates to TerminalHandlers:**
+
+**`add_terminal` → `TerminalHandlers.handle_add_terminal/1`**
 - Creates new CanvasTerminal record with default positions
 - Starts PTY with `subscriber_tag: terminal.id`
 - Adds to `canvas_terminals` and `terminal_pty_map`
 
-**`terminal_moved`**
+**`terminal_moved` → `TerminalHandlers.handle_terminal_moved/4`**
 - Receives `{id, x, y}` from TerminalWindowHook drag handler
 - Updates terminal layout via `Canvases.update_terminal_layout/2`
 
-**`terminal_resized`**
+**`terminal_resized` → `TerminalHandlers.handle_terminal_resized/4`**
 - Receives `{id, w, h}` from TerminalWindowHook resize observer
 - Updates terminal layout via `Canvases.update_terminal_layout/2`
 
-**`{:pty_output, terminal_id, data}`**
+**`{:pty_output, terminal_id, data}` → `TerminalHandlers.handle_pty_output/3`**
 - PubSub message from PtyServer (routed via `subscriber_tag`)
 - Dispatches output to TerminalWindowComponent via `send_update`
 
-**`{:pty_exited, terminal_id}`**
+**`{:pty_scroll_buffer, terminal_id, data}` → `TerminalHandlers.handle_pty_scroll_buffer/3`**
+- Scroll buffer replay on PTY (re-)subscribe
+- Routes same as live output via `send_update`
+
+**`{:pty_exited, terminal_id}` → `TerminalHandlers.handle_pty_exited/2`**
 - PtyServer process exited abnormally
 - Cleans up terminal state via `remove_terminal/2`
 
-**`{:remove_terminal_window, terminal_id}`**
+**`{:remove_terminal_window, terminal_id}` → `TerminalHandlers.handle_remove_terminal_window/2`**
 - Component requested close (user clicked close button)
-- Stops PtyServer, deletes terminal from DB, removes from state
+- Stops PtyServer, deletes terminal from DB, removes from state via `remove_terminal/2`
+
+**TerminalHandlers module also exports:**
+- `remove_terminal/2` (private) — Helper to remove terminal from socket state by ID
 
 ### Toolbar Support
 
@@ -543,7 +554,9 @@ Clicking a session name or message link within the canvas should route back to `
 
 - **Routes:** `lib/eye_in_the_sky_web/router.ex` (canvas routes in `:app` live_session)
 - **LiveView:** `lib/eye_in_the_sky_web/live/canvas_live.ex`
-- **Handlers:** `lib/eye_in_the_sky_web/live/agent_live/canvas_handlers.ex`
+- **Handlers:**
+  - `lib/eye_in_the_sky_web/live/agent_live/canvas_handlers.ex` (canvas management events)
+  - `lib/eye_in_the_sky_web/live/canvas_live/terminal_handlers.ex` (terminal event handlers extracted from CanvasLive)
 - **Components:**
   - `lib/eye_in_the_sky_web/components/chat_window_component.ex` (chat message windows)
   - `lib/eye_in_the_sky_web/components/terminal_window_component.ex` (terminal windows)

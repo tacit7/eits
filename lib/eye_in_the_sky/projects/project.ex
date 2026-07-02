@@ -37,6 +37,7 @@ defmodule EyeInTheSky.Projects.Project do
       :workspace_id
     ])
     |> validate_required([:name, :workspace_id])
-    |> unique_constraint(:path)
+    |> unique_constraint(:path, name: :projects_workspace_id_path_unique_index)
+    |> unique_constraint(:slug)
   end
 end

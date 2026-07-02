@@ -30,8 +30,8 @@ defmodule EyeInTheSky.QueryHelpers do
       queryable
       |> where([x], x.session_id == ^session_id)
       |> order_by(^order)
+      |> limit(^limit_val)
 
-    query = if limit_val, do: limit(query, ^limit_val), else: query
     offset_val = Keyword.get(opts, :offset)
     query = if offset_val, do: offset(query, ^offset_val), else: query
     query = if preloads != [], do: preload(query, ^preloads), else: query
@@ -73,8 +73,8 @@ defmodule EyeInTheSky.QueryHelpers do
       |> join(:inner, [x], j in ^join_table, on: field(j, ^entity_key) == x.id)
       |> where([x, j], field(j, ^session_key) == ^session_id)
       |> order_by([x], ^order)
+      |> limit(^limit_val)
 
-    query = if limit_val, do: limit(query, ^limit_val), else: query
     offset_val = Keyword.get(opts, :offset)
     query = if offset_val, do: offset(query, ^offset_val), else: query
     query = if preloads != [], do: preload(query, ^preloads), else: query

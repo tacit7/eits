@@ -6,6 +6,7 @@
   let bookmarkedAgents = []
   let selectedAgent = null
   let showChatModal = false
+  let chatDialog
 
   // Chat state
   let messages = []
@@ -44,6 +45,7 @@
     selectedAgent = agent
     showChatModal = true
     messages = []
+    if (chatDialog) chatDialog.showModal()
   }
 
   function closeChatModal() {
@@ -51,6 +53,7 @@
     selectedAgent = null
     messages = []
     inputValue = ''
+    if (chatDialog && chatDialog.open) chatDialog.close()
   }
 
   function handleSubmit() {
@@ -92,9 +95,11 @@
   <div
     tabindex="0"
     role="button"
+    aria-label="Bookmarked agents"
     class="btn btn-lg btn-circle"
     class:btn-primary={bookmarkedAgents.length > 0}
     class:btn-disabled={bookmarkedAgents.length === 0}
+    on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }}
   >
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
       <path d="M4.913 2.658c2.075-.27 4.19-.408 6.337-.408 2.147 0 4.262.139 6.337.408 1.922.25 3.291 1.861 3.405 3.727a4.403 4.403 0 00-1.032-.211 50.89 50.89 0 00-8.42 0c-2.358.196-4.04 2.19-4.04 4.434v4.286a4.47 4.47 0 002.433 3.984L7.28 21.53A.75.75 0 016 21v-4.03a48.527 48.527 0 01-1.087-.128C2.905 16.58 1.5 14.833 1.5 12.862V6.638c0-1.97 1.405-3.718 3.413-3.979z" />
@@ -107,7 +112,7 @@
   </div>
 
   <!-- Agent Buttons -->
-  {#each bookmarkedAgents as agent, index}
+  {#each bookmarkedAgents as agent (agent.session_id)}
     <button
       class="btn btn-circle btn-sm relative"
       on:click={() => handleAgentClick(agent)}
@@ -120,17 +125,18 @@
 </div>
 
 <!-- DaisyUI Modal for Chat -->
-{#if showChatModal && selectedAgent}
-  <dialog class="modal modal-open">
-    <div class="modal-box max-w-lg">
-      <!-- Header -->
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-          <h3 class="font-bold text-lg">{selectedAgent.name || 'Agent'}</h3>
+<dialog bind:this={chatDialog} class="modal" aria-labelledby="fab-chat-modal-title" on:close={closeChatModal}>
+  <div class="modal-box max-w-lg">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <h3 id="fab-chat-modal-title" class="font-bold text-lg">{selectedAgent?.name || 'Agent'}</h3>
+        {#if selectedAgent}
           <span class="badge badge-sm badge-outline font-mono">{selectedAgent.session_id.substring(0, 8)}</span>
-        </div>
-        <button class="btn btn-sm btn-circle btn-ghost" on:click={closeChatModal}>✕</button>
+        {/if}
       </div>
+      <button class="btn btn-sm btn-circle btn-ghost" aria-label="Close" on:click={closeChatModal}>✕</button>
+    </div>
 
       <!-- Messages Area -->
       <div class="bg-base-200 rounded-lg p-4 h-96 overflow-y-auto mb-4">
@@ -143,7 +149,7 @@
           </div>
         {:else}
           <div class="space-y-0">
-            {#each messages as message}
+            {#each messages as message (message.inserted_at + message.sender_role)}
               <div class="group py-2 px-1 rounded-lg hover:bg-base-content/[0.02] transition-colors">
                 <div class="flex items-start gap-2">
                   {#if message.sender_role === 'user'}
@@ -184,9 +190,7 @@
         </button>
       </form>
     </div>
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_click_events_have_key_events -->
-    <form method="dialog" class="modal-backdrop" on:click={closeChatModal}>
+    <form method="dialog" class="modal-backdrop">
       <button>close</button>
     </form>
-  </dialog>
-{/if}
+</dialog>

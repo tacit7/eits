@@ -178,6 +178,17 @@ mount/3 (single with chain)
 - Stream shows provider avatar (Claude or Codex) with thinking/tool indicators
 - Live-stream bubble with status indicator
 
+**Streaming bubble placement fix (commit 0cc7fc3f):**
+
+The streaming bubble in `messages_tab.ex` was previously nested inside both the `@syncing` and `@empty` conditional branches, making it invisible in two valid streaming states:
+
+- **`syncing=true`** — page is loading (skeleton visible); an agent can already be streaming a response
+- **`empty=true`** — session has no prior messages; first agent response starts streaming immediately
+
+The bubble and scroll anchor were moved to be inside `messages-container` but **outside** the `@syncing`/`@empty` tree. Live stream content is now always visible regardless of page load state or message history.
+
+**File:** `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex`
+
 ---
 
 ## Channel Marks as Read on Open
@@ -948,6 +959,83 @@ A markdown format toolbar (Aa button) in the DM composer enables inline text for
 - `lib/eye_in_the_sky_web/components/dm_page/composer.ex` — HEEx format bar
 - `assets/js/hooks/dm_composer.js` — selection wrapping logic
 
+### ReasoningPill: Extended Thinking & Plan Mode (commits d170a9b4, e6c926a7, aa7bccc5)
+
+**Display:** Horizontal pill in the composer footer showing thinking status, plan mode toggle, and effort level selector.
+
+**Segments:**
+
+1. **Thinking Toggle** (Claude only, hidden for Codex/Gemini)
+   - Shows icon + "Think" label
+   - Click to enable/disable extended thinking
+   - Styled with rounded-left corners
+   - When thinking is off: light text, hover brightens
+   - When thinking is on: warning color background (`bg-warning/[0.04]`), warning text
+
+2. **Separator Divider**
+   - 1px vertical line between segments
+   - Subtle background color (`bg-base-content/[0.10]`)
+   - 4px height, flex-shrink-0
+
+3. **Effort Level Picker** (DaisyUI dropdown)
+   - Displays current effort level (Low/Medium/High/Max)
+   - Click to open dropdown menu listing available levels
+   - Styled with rounded-right corners
+   - Muted text, hover brightens
+   - **Layout fix (commit aa7bccc5):** Removed `overflow-hidden` from pill wrapper to allow dropdown menu to escape and render fully. Per-segment rounded corners replace the overflow clip.
+   - **Interaction fix (commit e6c926a7):** `phx-click` moved from button to parent `.dropdown` div. This keeps focus on the dropdown container after LiveView re-renders, ensuring the DaisyUI `:focus-within` selector remains true and the menu stays visible after server round-trip.
+
+**Plan Mode Toggle (commit d170a9b4)**
+
+The plan button (icon button left of effort segment) toggles `permission_mode: "plan"` in session CLI options.
+
+- **Before:** Button toggled `plan: true` in opts, but `build_args` was ignored by the flag builder (was looking for `permission_mode`).
+- **After:** Button now sets `permission_mode: "plan"` (or clears it). The flag is correctly passed to Claude CLI as `--permission-mode plan`.
+- **UI:** Plan button shows warning color when active, muted when inactive.
+
+**Effort Level Flag (commit d170a9b4)**
+
+The selected effort level is now passed to Claude CLI via `--effort <level>` flag.
+
+- **Before:** Only `CLAUDE_CODE_EFFORT_LEVEL` env var was set; `--effort` flag was missing from args.
+- **After:** `build_args/1` in `CLI.Args` now includes `--effort` flag mapped from `opts[:effort_level]`.
+- **Possible values:** `low`, `medium`, `high`, `max` (matched to Sonnet/Opus model tiers).
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/components/dm_page/message_composer.ex` — ReasoningPill component (three segments)
+- `lib/eye_in_the_sky/claude/cli/args.ex` — `build_args/1` includes `--effort` flag
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — `toggle_plan_mode` and `toggle_effort_menu` handlers
+
+**Styling notes:**
+- Wrapper: `inline-flex items-center rounded-lg border transition-colors` (no overflow-hidden)
+- First segment (thinking): `rounded-l-lg`
+- Last segment (effort): `rounded-r-lg`
+- Divider: `w-px h-4 bg-base-content/[0.10] flex-shrink-0`
+
+### Prompt Queue Accordion (commit cb354c03)
+
+**Display:** Queue rows in the prompt queue section collapse/expand based on message length.
+
+**Behavior:**
+- **Short messages (≤80 characters):** Render flat without accordion, showing the full message inline
+- **Long messages (>80 characters):** Render as a collapsible `<details>` element with:
+  - **Summary:** Shows first 80 characters truncated with "…" ellipsis
+  - **Rotating chevron icon:** `hero-chevron-right` rotates 90° when expanded (group-open/pq:rotate-90)
+  - **Expanded body:** Shows full message with whitespace preserved (`whitespace-pre-wrap`)
+
+**Styling:**
+- Summary text styled with `text-xs text-base-content/50 truncate`
+- Expanded text uses `text-xs text-base-content/60 whitespace-pre-wrap break-words leading-relaxed`
+- Chevron transitions smoothly via `transition-transform` and `group-open/pq:rotate-90`
+- Named group `group/pq` used to scope the chevron rotation to the parent details element
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/components/dm_page/composer/prompt_queue.ex` — accordion logic with conditional `<details>` rendering
+- Decision made with `<% long? = String.length(msg) > 80 %>` to branch at render time
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/dm_page/composer/prompt_queue.ex`
+
 ### Composer Autocomplete and History
 
 See **Composer Autocomplete: @ File and @@ Agent** (above) for file and agent name completion.
@@ -1538,10 +1626,47 @@ The setting requires a page reload to take effect because:
 - Changing the toggle mid-session doesn't swap the interface until page refresh
 - UI note in settings clearly states this requirement
 
+**Session creation branching on dm_use_pty (commit 7250ab9a):**
+
+Previously, all three session creation callers unconditionally called `AgentManager.create_pty_session/1`, even when `dm_use_pty=false`. Because the DM page only subscribes to PTY output when `dm_use_pty=true` (default: false), newly created sessions would appear blank in web chat mode.
+
+All three callers now branch on the setting at creation time:
+
+```elixir
+create_fn =
+  if EyeInTheSky.Settings.get_boolean("dm_use_pty"),
+    do: &AgentManager.create_pty_session/1,
+    else: &AgentManager.create_agent/1
+```
+
+- `dm_use_pty=true` → `create_pty_session/1` (PTY-backed terminal interface)
+- `dm_use_pty=false` → `create_agent/1` (SDK/messages mode, default)
+
+**Callers updated:**
+- `lib/eye_in_the_sky_web/live/agent_live/index_actions.ex`
+- `lib/eye_in_the_sky_web/live/project_live/sessions/actions.ex`
+- `lib/eye_in_the_sky_web/live/workspace_live/sessions/actions.ex`
+
+**create_pty_session working directory fix (commit 7250ab9a):**
+
+`AgentManager.create_pty_session/1` was using `opts[:project_path]` (the base project directory) as the working directory for the Claude launch command. This ignored the git worktree path resolved by `RecordBuilder` when a worktree had been created for the agent.
+
+The function now uses `agent.git_worktree_path` with `opts[:project_path]` as fallback, matching the already-correct logic in `DmLive.build_launch_command`:
+
+```elixir
+working_path = agent.git_worktree_path || opts[:project_path]
+```
+
+**File:** `lib/eye_in_the_sky/agents/agent_manager.ex`
+
 **Files:**
 - `lib/eye_in_the_sky/settings.ex` — new setting `"dm_use_pty" => "false"` in defaults
 - `lib/eye_in_the_sky_web/live/dm_live.ex` — conditional PTY subscription on mount
 - `lib/eye_in_the_sky_web/live/overview_live/settings/general_tab.ex` — settings UI for toggle
+- `lib/eye_in_the_sky/agents/agent_manager.ex` — worktree path fix and create_fn branch (commit 7250ab9a)
+- `lib/eye_in_the_sky_web/live/agent_live/index_actions.ex` — branch on dm_use_pty (commit 7250ab9a)
+- `lib/eye_in_the_sky_web/live/project_live/sessions/actions.ex` — branch on dm_use_pty (commit 7250ab9a)
+- `lib/eye_in_the_sky_web/live/workspace_live/sessions/actions.ex` — branch on dm_use_pty (commit 7250ab9a)
 
 ---
 
@@ -1667,6 +1792,92 @@ Settings handlers were extracted into a dedicated `SettingsHandlers` module (com
 - Preserves ongoing live-stream display across message reloads
 
 **Result:** DmLive reduced from 746 to 631 lines; improved code organization and reusability.
+
+**L4: Redundant @impl true removal (ac2ff402)**
+- Removed ~60 redundant `@impl true` annotations from `handle_event/3`, `handle_info/2` callbacks throughout DmLive
+- These annotations were unnecessary since the module includes `use Phoenix.LiveView`, which establishes the default `@impl true` behavior for all callback functions
+- Cleaning up the boilerplate reduces visual noise and improves readability without changing behavior
+- Only removed where the default truly applies; any exceptional callback still retains explicit `@impl` if needed
+
+**Code reduction:** Removing annotations across ~400 lines of callback definitions
+
+---
+
+## DmLive.Actions Module Extraction
+
+**Commit:** `c01b76f9`
+
+The `DmLive.Actions` module houses core `handle_event` callbacks extracted from `DmLive`, following the LiveView Action module extraction pattern to improve code organization and maintainability.
+
+**Module location:** `lib/eye_in_the_sky_web/live/dm_live/actions.ex` (310 lines)
+
+**Purpose:**
+- Extracts general-purpose UI event handlers from the main LiveView file
+- Keeps modal toggles, note creation, message pagination, file operations, and display mode toggles organized in a dedicated module
+- Reduces cognitive load on the main `DmLive` file by separating concerns
+
+**Event Categories Handled:**
+
+1. **PTY Terminal Events**
+   - `handle_pty_input/2` — Write data to PTY terminal
+   - `handle_pty_resize/2` — Handle terminal resize with launch command firing
+
+2. **Tab & UI Toggles**
+   - `handle_change_tab/2` — Switch between Messages, Tasks, Notes, etc. tabs
+   - `handle_toggle_context_meter/1` — Toggle context meter overlay
+   - `handle_toggle_new_task_drawer/1` — Toggle new task modal
+
+3. **Modal & Drawer Controls**
+   - Overlay state management for task detail, effort menu, model selection
+   - Drawer visibility toggles for task creation, note creation
+
+4. **Message & File Operations**
+   - Message pagination and list loading
+   - File upload handling
+   - Display mode toggles for diffs and commits
+
+**Integration with DmLive:**
+
+`DmLive` delegates event handling to `DmLive.Actions` via module imports:
+
+```elixir
+import EyeInTheSkyWeb.DmLive.Actions
+```
+
+Event handlers in `DmLive.handle_event/3` delegate to the appropriate action function:
+
+```elixir
+def handle_event("change_tab", params, socket) do
+  handle_change_tab(socket, params)
+end
+```
+
+**Related Modules:**
+
+The Actions pattern is used alongside other extraction modules for complete DM feature organization:
+- `DmLive.ExternalActions` — Third-party integrations (sessions, agents, etc.)
+- `DmLive.TabHelpers` — Tab-specific logic (Messages, Tasks, Notes, Settings)
+- `DmLive.FileAutocomplete` — File path autocomplete server logic
+- `DmLive.MessageHandlers` — Message delivery and UI updates
+
+**Type Specifications:**
+
+All functions include `@spec` annotations for clarity:
+```elixir
+@spec handle_change_tab(Phoenix.LiveView.Socket.t(), map()) ::
+  {:noreply, Phoenix.LiveView.Socket.t()}
+```
+
+**Pattern Established:**
+
+This follows the LiveView Action module extraction pattern used elsewhere in the EITS codebase (e.g., `ProjectLive.Actions`, `AgentLive.Actions`). Extracting actions into dedicated modules:
+- Improves code organization and discoverability
+- Makes testing easier (can test handlers in isolation)
+- Reduces main LiveView file bloat
+- Establishes clear separation of concerns
+
+**File:**
+- `lib/eye_in_the_sky_web/live/dm_live/actions.ex` — Complete action handler module
 
 ---
 

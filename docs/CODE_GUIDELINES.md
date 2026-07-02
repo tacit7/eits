@@ -89,6 +89,41 @@ LiveViews mount twice (disconnected + connected). Only do side effects when `con
 - timers
 - DB writes / external calls
 
+### Safe Resource Lookups in LiveViews
+
+Use the safe `get_project/1` (returns `{:ok, project} | {:error, :not_found}`) instead of `get_project!/1` (raises) when loading resources based on user input (params, route IDs). This allows proper error handling in `mount/3` without crashing the session.
+
+**Pattern (commit 651dcafc):**
+
+```elixir
+# ❌ Wrong: get_project! crashes if project not found
+def mount(%{"project_id" => project_id}, _session, socket) do
+  project = Projects.get_project!(project_id)  # FunctionClauseError if nil
+  {:ok, assign(socket, :project, project)}
+end
+
+# ✅ Correct: get_project/1 returns tagged tuple
+def mount(%{"project_id" => project_id}, _session, socket) do
+  case Projects.get_project(project_id) do
+    {:error, :not_found} ->
+      {:ok,
+       socket
+       |> assign(:project, nil)
+       |> assign(:error, "Project not found")
+       |> put_flash(:error, "Project not found")}
+
+    {:ok, project} ->
+      {:ok,
+       socket
+       |> assign(:project, project)
+       |> assign(:sidebar_tab, :files)
+       |> assign(:sidebar_project, project)}
+  end
+end
+```
+
+**Rule:** Use safe `get_*` functions in `mount/3` and event handlers where user input is the source. Reserve bang variants (`get_*!`) for internal code paths where the record must exist (preloaded associations, post-lookup operations).
+
 ---
 
 ## UI / UX (Tailwind-first)
@@ -1128,6 +1163,106 @@ end
 ```
 
 **Result:** Monolithic 967-line `Rail.ex` → 466 lines + 621 lines distributed across sub-modules.
+
+### Rail Modals Sub-Module Extraction
+
+**Pattern (commit b32b58c0):** Flyout modal components were extracted from `Rail.Flyout` into dedicated sub-modules under `Rail.Modals`, keeping modal logic separate from panel layout.
+
+**Extracted modal modules:**
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `Rail.Modals.RailModal` | `lib/eye_in_the_sky_web_web/components/rail/modals/rail_modal.ex` | Shared modal container (backdrop, close button, sizing) |
+| `Rail.Modals.TaskDetail` | `lib/eye_in_the_sky_web_web/components/rail/modals/task_detail.ex` | Task detail modal: form, validation, submission |
+| `Rail.Modals.NoteDetail` | `lib/eye_in_the_sky_web_web/components/rail/modals/note_detail.ex` | Note detail modal: title/body input, star toggle |
+| `Rail.Modals.NewChannel` | `lib/eye_in_the_sky_web_web/components/rail/modals/new_channel.ex` | Channel creation modal: name input, submit |
+
+**Main Rail.Flyout now imports these components:**
+
+```elixir
+import EyeInTheSkyWeb.Components.Rail.Modals.RailModal, only: [rail_modal: 1]
+import EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail, only: [task_detail_modal: 1]
+import EyeInTheSkyWeb.Components.Rail.Modals.NoteDetail, only: [note_detail_modal: 1]
+import EyeInTheSkyWeb.Components.Rail.Modals.NewChannel, only: [new_channel_modal: 1]
+```
+
+**Why this pattern:**
+- **Modal isolation:** Modal logic (forms, state, submission) is separate from layout
+- **Reusability:** Modals can be rendered from multiple contexts without duplication
+- **Testability:** Each modal is independently testable as a component
+- **Maintainability:** Changes to modal styling don't affect the rail panel logic
+
+**Result:** Monolithic `Rail.Flyout` reduced by ~300 lines; modal logic now discoverable in dedicated sub-modules.
+
+### Modal Rendering Placement: Top-Level vs Nested
+
+**Rule:** Render modals at the **parent component top-level** (e.g., `Rail.render/1`), NOT nested inside sub-components (e.g., `Flyout.render/1`). Sub-components should stay focused on their primary responsibility (navigation, content) without managing modal state.
+
+**Pattern (commit 44a8dcac):**
+
+```elixir
+# ❌ Wrong: Modals nested inside Flyout sub-component
+defmodule Rail.Flyout do
+  attr :rail_modal, :any, default: nil
+  attr :show_new_channel_form, :boolean, default: false
+
+  def flyout(assigns) do
+    ~H"""
+    <!-- Navigation content -->
+    <div class="flyout-content">...</div>
+
+    <!-- Modals: clutters Flyout with state management -->
+    <.new_channel_modal :if={@show_new_channel_form} myself={@myself} />
+    <.rail_modal :if={@rail_modal in [:new_task, :new_prompt]} modal={@rail_modal} myself={@myself} />
+    <.task_detail_modal :if={match?({:view_task, _, _}, @rail_modal)} ... />
+    """
+  end
+end
+
+# ✅ Correct: Modals rendered at Rail top-level; Flyout is navigation-only
+defmodule Rail do
+  def render(assigns) do
+    ~H"""
+    <.flyout
+      open={@open}
+      mobile_open={@mobile_open}
+      myself={@myself}
+    />
+
+    <!-- Modals rendered at top-level alongside NewSessionModal -->
+    <.new_channel_modal :if={@show_new_channel_form} myself={@myself} />
+    <.rail_modal :if={@rail_modal in [:new_task, :new_prompt]} modal={@rail_modal} myself={@myself} />
+    <.task_detail_modal :if={match?({:view_task, _, _}, @rail_modal)} ... />
+    <.note_detail_modal :if={match?({:view_note, _, _}, @rail_modal)} ... />
+    """
+  end
+end
+
+defmodule Rail.Flyout do
+  # Note: Modals (rail_modal, task_detail_modal, note_detail_modal, new_channel_modal)
+  # are now rendered in Rail.render/1, not here. Flyout focuses on navigation only.
+
+  def flyout(assigns) do
+    ~H"""
+    <!-- Navigation content only -->
+    <div class="flyout-content">...</div>
+    """
+  end
+end
+```
+
+**Why this pattern:**
+- **Separation of concerns:** Sub-components (Flyout, FilePanel) manage their content; the parent (Rail) manages modal orchestration
+- **State clarity:** Modal state lives in the parent LiveView, not scattered across nested components
+- **Reusability:** Modals can be rendered from multiple parents without duplication
+- **Maintainability:** Adding a new modal requires only parent-level changes; sub-components stay unchanged
+
+**Result (commit 44a8dcac):**
+- `Rail.Flyout`: 412 → 378 lines (removed 4 modal imports + 2 modal attrs)
+- Modals now sit at `Rail` top-level alongside `NewSessionModal`
+- Event handlers target `@myself` (Rail's handle_event), same as before — no behavior change
+
+**Rule:** Modals belong at the component that owns the state (usually the Page LiveView or main Layout component), not nested inside focused sub-components. Sub-component `render/1` should handle content and UI; parent handles orchestration.
 
 ---
 
@@ -2795,6 +2930,157 @@ end
 
 ---
 
+## LiveView Action Modules
+
+**Problem:** Large LiveViews accumulate dozens of `handle_event` handlers in a single file, making it hard to find related logic and test individual actions.
+
+**Solution:** Extract event handlers into dedicated Action modules that follow the pattern `YourLive.NameActions` or `YourLive.Name` (sub-namespace). Each Action module focuses on a single domain (session actions, state actions, UI actions).
+
+**Pattern (commits 9b0d6428, 59cae09d):**
+
+```elixir
+# ❌ Before: All event handlers in Rail.ex (monolithic)
+defmodule Rail do
+  def handle_event("select_session", %{"id" => id}, socket) do
+    # ... 20+ lines of session selection logic
+  end
+
+  def handle_event("delete_session", %{"id" => id}, socket) do
+    # ... session deletion
+  end
+
+  def handle_event("rename_session", %{"id" => id, "name" => name}, socket) do
+    # ... session rename
+  end
+
+  def handle_event("toggle_files", _, socket) do
+    # ... file panel toggle
+  end
+
+  def handle_event("expand_file", %{"path" => path}, socket) do
+    # ... file tree expansion
+  end
+
+  # ... 30+ more handlers
+end
+
+# ✅ After: Extract related handlers into Action modules
+defmodule Rail.SessionActions do
+  alias EyeInTheSky.{Sessions, Projects, Notes}
+
+  def handle_select_session(id, socket) do
+    case Sessions.get_session(id) do
+      {:ok, session} ->
+        {:noreply, assign(socket, :selected_session, session)}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Session not found")}
+    end
+  end
+
+  def handle_delete_session(id, socket) do
+    case Sessions.delete_session(id) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:selected_session, nil)
+         |> load_sessions()}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete session")}
+    end
+  end
+
+  def handle_rename_session(id, name, socket) do
+    case Sessions.get_session(id) do
+      {:ok, session} ->
+        case Sessions.update_session(session, %{name: name}) do
+          {:ok, updated} ->
+            {:noreply, stream_insert(socket, :sessions, updated)}
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to rename session")}
+        end
+      {:error, :not_found} ->
+        {:noreply, socket}
+    end
+  end
+end
+
+defmodule Rail.StateActions do
+  def handle_toggle_files(socket) do
+    new_open = !socket.assigns.show_files
+    {:noreply, assign(socket, :show_files, new_open)}
+  end
+
+  def handle_expand_file(path, socket) do
+    expanded = socket.assigns.expanded_paths || MapSet.new()
+    new_expanded =
+      if MapSet.member?(expanded, path) do
+        MapSet.delete(expanded, path)
+      else
+        MapSet.put(expanded, path)
+      end
+
+    {:noreply, assign(socket, :expanded_paths, new_expanded)}
+  end
+end
+
+# Main LiveView delegates to Action modules
+defmodule Rail do
+  alias Rail.{SessionActions, StateActions}
+
+  def handle_event("select_session", %{"id" => id}, socket) do
+    SessionActions.handle_select_session(id, socket)
+  end
+
+  def handle_event("delete_session", %{"id" => id}, socket) do
+    SessionActions.handle_delete_session(id, socket)
+  end
+
+  def handle_event("rename_session", params, socket) do
+    SessionActions.handle_rename_session(params["id"], params["name"], socket)
+  end
+
+  def handle_event("toggle_files", _, socket) do
+    StateActions.handle_toggle_files(socket)
+  end
+
+  def handle_event("expand_file", %{"path" => path}, socket) do
+    StateActions.handle_expand_file(path, socket)
+  end
+end
+```
+
+**Key patterns:**
+- **Naming:** `YourLive.NameActions` or `YourLive.Name` (e.g., `Rail.SessionActions`, `Rail.StateActions`)
+- **Module-level aliases:** Promote context aliases to the top of the Action module:
+  ```elixir
+  alias EyeInTheSky.{Sessions, Projects, Notes}
+  alias EyeInTheSkyWeb.Components.Rail.Modals.RailModal
+  ```
+- **Handler naming:** `handle_action_name/2` (socket as last param) — consistent signature for all handlers
+- **Return value:** Same as `handle_event/3`: `{:noreply, socket}` or `{:reply, data, socket}`
+- **Thin delegation:** Main LiveView's `handle_event/3` remains thin — just delegates to the action module
+
+**When to extract:**
+- LiveView file exceeds 300 lines
+- 15+ `handle_event` clauses
+- Handlers cluster around specific domains (sessions, state, UI)
+- Business logic dominates (context calls, stream operations, flash messages)
+
+**Benefits:**
+- **Testability:** Action modules can be unit-tested independently (mock socket, verify assigns)
+- **Discoverability:** Related handlers live together; easier to find and modify
+- **Reusability:** Actions can be called from multiple LiveViews or components
+- **Maintainability:** Main LiveView stays focused on routing events; Action modules handle logic
+
+**Result (commits 9b0d6428, 59cae09d):**
+- `Rail.ex`: 967 → 388 lines (extracted handle_event logic)
+- New `Rail.SessionActions` (106 lines) + `Rail.StateActions` (289 lines)
+- Main `Rail` now routes events cleanly; Action modules own the logic
+
+**Rule:** LiveViews with 15+ `handle_event` clauses should extract handlers into Action modules (one module per domain). Keep the main LiveView thin — it routes and mounts; Action modules implement.
+
+---
+
 ## Module Extraction from Large Contexts
 
 When a context module grows large with distinct responsibilities, extract domain logic into sub-modules. Each sub-module focuses on a single concern (data transformation, parsing, building, validation) and is tested independently.
@@ -2875,6 +3161,111 @@ end
 
 ---
 
+## Desktop App Project Creation (Tauri)
+
+**Pattern (commit fcf54a6d):** The desktop app's folder picker was refactored to use Tauri-native `push_event` instead of `osascript` dialogs, and project creation now handles missing users/workspaces by lazy-creating defaults.
+
+### Folder Picker: osascript → Tauri push_event
+
+**Before (osascript blocking dialog):**
+```elixir
+# lib/eye_in_the_sky_web_web/components/rail.ex
+def handle_async(:pick_folder, _async_result, socket) do
+  case System.cmd("osascript", ["-e", "..."]) do
+    {path, 0} -> 
+      {:noreply, assign(socket, :selected_folder, path)}
+    _ -> 
+      {:noreply, socket}
+  end
+end
+```
+
+**Problem:** osascript dialogs appear behind the Tauri window on macOS, making the folder picker invisible to users.
+
+**After (Tauri-native bridge):**
+```elixir
+# lib/eye_in_the_sky_web_web/components/rail.ex
+def handle_event("folder_picked", %{"path" => path}, socket) do
+  {:noreply, assign(socket, :selected_folder, path)}
+end
+```
+
+The JavaScript side (already wired in Tauri) calls:
+```javascript
+this.pushEvent("folder_picked", { path: selectedPath })
+```
+
+**Why this works:**
+- Tauri's native file picker respects window z-ordering
+- No subprocess calls or osascript dependencies
+- Push events flow through the LiveView socket, maintaining session context
+- The same pattern works across platforms (macOS, Linux, Windows)
+
+**When to use:**
+- Any OS file/folder selection in the desktop app should use Tauri's native API
+- Avoid `System.cmd` for dialogs; it's subprocess-heavy and loses focus context
+
+---
+
+### Lazy Workspace Creation on Fresh Desktop Installs
+
+**Pattern (commit fcf54a6d):** When a desktop app with `DISABLE_AUTH=1` creates a project, there's no logged-in user to trigger workspace creation. `inject_workspace_id_if_missing/1` now creates defaults atomically.
+
+**Before (silent failure):**
+```elixir
+# lib/eye_in_the_sky/projects.ex
+defp inject_workspace_id_if_missing(attrs) do
+  case Repo.one(from w in Workspace, order_by: [asc: :id], limit: 1) do
+    nil -> attrs  # ❌ Project creation fails validation: no workspace_id
+    workspace -> Map.put(attrs, :workspace_id, workspace.id)
+  end
+end
+```
+
+On fresh desktop installs where `DISABLE_AUTH=1`, no user ever logs in, so no workspace is seeded. Project creation silently fails.
+
+**After (lazy-create with user fallback):**
+```elixir
+defp inject_workspace_id_if_missing(attrs) do
+  workspace =
+    case Repo.one(from w in Workspace, order_by: [asc: :id], limit: 1) do
+      nil ->
+        # No workspace yet — typical on fresh desktop installs (DISABLE_AUTH=1)
+        # Seed a default user + workspace now
+        {:ok, user} = EyeInTheSky.Accounts.get_or_create_user("desktop")
+        case EyeInTheSky.Workspaces.default_workspace_for_user(user) do
+          nil ->
+            case EyeInTheSky.Workspaces.create_default_workspace_for_user(user) do
+              {:ok, ws} -> ws
+              {:error, _} -> nil
+            end
+          ws ->
+            ws
+        end
+
+      ws ->
+        ws
+    end
+
+  if workspace, do: Map.put(attrs, :workspace_id, workspace.id), else: attrs
+end
+```
+
+**Why this pattern:**
+- **Handles fresh installs:** Desktop app can create projects without waiting for a login workflow
+- **Atomic:** If workspace creation fails, gracefully fall back to nil (project creation fails with validation error, not a crash)
+- **Idempotent:** Multiple calls to `get_or_create_user("desktop")` safely return the same user
+- **Context-owned:** All workspace/user logic is in the context layer, not scattered across controllers
+
+**When to apply:**
+- Any feature that requires a workspace to exist but may run before user login (especially in desktop/embedded contexts)
+- Use `get_or_create_*` patterns to collapse concurrent seeding races
+- Always chain with a fallback query (`default_workspace_for_user`) in case creation fails
+
+**Rule:** Desktop apps with `DISABLE_AUTH` must lazy-create required schemas (user, workspace) at the first real operation point, not at server startup. Keep the logic in context modules with clear fallback handling.
+
+---
+
 ## JavaScript MutationObserver Pattern for DOM State
 
 ### SessionsDropdownGuard Example
@@ -2946,6 +3337,635 @@ export const SessionsDropdownGuard = {
 
 **Rule:** Use MutationObserver + focus tracking for state that must survive stream patches. Do not use to work around missing `beforeUpdate` — if the hook element's attributes change, the standard callbacks will fire.
 
+
+---
+
+## JavaScript Hook Patterns
+
+### Shared CodeMirror Setup Helpers
+
+**Problem:** Multiple CodeMirror hooks (note_editor.js, note_full_editor.js) repeat the same lazy-loading logic for CodeMirror modules and extension setup. This creates maintenance burden — updating the extension list requires changes in multiple files.
+
+**Solution:** Extract shared setup into dedicated modules in `assets/js/hooks/`.
+
+**Pattern (commit d52ef723):**
+
+| Helper | Module | Purpose |
+|--------|--------|---------|
+| `loadCMModulesAndCompartments()` | `cm_editor_setup.js` | Lazy-load CodeMirror modules (view, state, commands, language, markdown), create compartments (theme, tab size, font size, vim), return all together |
+| `mountCMView(hook, opts)` | `cm_editor_setup.js` | Mount EditorView, attach cleanup handlers for theme/tab/font/vim watchers |
+| `destroyCMView(hook)` | `cm_editor_setup.js` | Destroy view, call all cleanup functions (theme, tab, font, vim) |
+| `initResizeObserver(hook, callback)` | `utils.js` | Track element dimension changes, debounce persistence calls, call callback(w, h) on resize |
+
+**Before (duplicated setup):**
+```javascript
+// assets/js/hooks/note_editor.js — 47 lines of module imports + setup
+export const NoteEditorHook = {
+  async mounted() {
+    const [
+      { EditorView, keymap, highlightActiveLine },
+      { EditorState },
+      // ... 5 more imports
+    ] = await Promise.all([...])
+    
+    const { extension: themeExtension, watch } = await makeThemeCompartment()
+    const { extension: tabExtension, watch: tabWatch } = await makeTabSizeExtension()
+    // ... similar for font, vim
+    
+    const state = EditorState.create({ doc, extensions })
+    this._view = new EditorView({ state, parent: this.el })
+    this._cleanupTheme = watch(this._view)
+    // ... attach other watchers
+  }
+}
+
+// assets/js/hooks/note_full_editor.js — identical setup repeated
+export const NoteFullEditorHook = {
+  async mounted() {
+    const [
+      { EditorView, keymap, highlightActiveLine },
+      { EditorState },
+      // ... identical 30+ lines
+    ] = await Promise.all([...])
+    // ... same mounting logic
+  }
+}
+```
+
+**After (shared helpers):**
+```javascript
+// assets/js/hooks/cm_editor_setup.js — single source of truth
+export async function loadCMModulesAndCompartments() {
+  const [
+    viewModule,
+    { EditorState },
+    // ...
+  ] = await Promise.all([...])
+  
+  const { extension: themeExtension, watch } = await makeThemeCompartment()
+  // ... build other compartments
+  
+  return {
+    EditorView, keymap, highlightActiveLine,
+    EditorState, defaultKeymap, history, historyKeymap,
+    themeExtension, tabExtension, fontExtension, vimExtension,
+    watch, tabWatch, watchFont, watchVim,
+  }
+}
+
+export function mountCMView(hook, { EditorState, EditorView, doc, extensions, watch, tabWatch, watchFont, watchVim }) {
+  const state = EditorState.create({ doc, extensions })
+  hook._view = new EditorView({ state, parent: hook.el })
+  hook._cleanupTheme = watch(hook._view)
+  hook._cleanupTabSize = tabWatch(hook._view)
+  hook._cleanupFontSize = watchFont(hook._view)
+  hook._cleanupVim = watchVim(hook._view)
+}
+
+export function destroyCMView(hook) {
+  if (hook._cleanupTheme) hook._cleanupTheme()
+  if (hook._cleanupTabSize) hook._cleanupTabSize()
+  if (hook._cleanupFontSize) hook._cleanupFontSize()
+  if (hook._cleanupVim) hook._cleanupVim()
+  if (hook._view) {
+    hook._view.destroy()
+    hook._view = null
+  }
+}
+
+// assets/js/hooks/note_editor.js — now clean
+import { loadCMModulesAndCompartments, mountCMView, destroyCMView } from "./cm_editor_setup"
+
+export const NoteEditorHook = {
+  async mounted() {
+    const modules = await loadCMModulesAndCompartments()
+    // ... setup extensions with modules
+    mountCMView(this, { EditorState, EditorView, doc: body, extensions, ... })
+  },
+  
+  destroyed() {
+    destroyCMView(this)
+  }
+}
+```
+
+**Resize Observer Helper (utils.js):**
+
+Extract common resize tracking logic used by multiple window hooks (chat_window_hook, terminal_window_hook):
+
+```javascript
+// assets/js/hooks/utils.js
+export function initResizeObserver(hook, onResize) {
+  hook._width = hook.el.offsetWidth
+  hook._height = hook.el.offsetHeight
+
+  const observer = new ResizeObserver(() => {
+    hook._width = hook.el.offsetWidth
+    hook._height = hook.el.offsetHeight
+    
+    clearTimeout(hook._resizePersistTimer)
+    hook._resizePersistTimer = setTimeout(() => {
+      if (hook._destroyed) return
+      onResize(hook._width, hook._height)
+    }, 400)
+  })
+  
+  observer.observe(hook.el)
+  hook._windowResizeObserver = observer
+}
+
+// Usage in chat_window_hook.js
+import { initResizeObserver } from './utils'
+
+initResizeObserver(this, (w, h) => {
+  this.pushEvent("window_resized", { id: this.el.dataset.csId, w, h })
+  saveWindowLayout(this.el.dataset.csId, left, top, w, h)
+})
+```
+
+**When to extract:**
+- Same hook setup logic appears in 2+ hooks
+- Module imports are identical
+- Cleanup/destruction patterns are the same
+- Window geometry tracking (ResizeObserver) is reused
+
+**Rule:** Extract common hook setup to `cm_editor_setup.js` or `utils.js`. Don't duplicate module loads or extent setup across multiple hooks. Use lazy imports to keep the initial JS bundle small.
+
+---
+
+## LiveView mount/3 Hygiene
+
+### Guard DB Queries Behind connected?
+
+**Problem:** LiveView's `mount/3` runs twice: once for the dead render (no socket connection) and once for the live render (after connection). Database queries in the initial render waste CPU and DB connections.
+
+**Solution:** Guard all DB queries, PubSub subscriptions, and side effects behind `connected?(socket)`.
+
+**Pattern (commit 26699b8d):**
+
+**Before (wasteful):**
+```elixir
+# lib/eye_in_the_sky_web_web/live/project_live/sessions/state.ex
+def mount(%{"project_id" => project_id} = params, _session, socket) do
+  socket = assign(socket, :project_id, project_id)
+  
+  # WRONG: These run on dead render, then again on live render
+  canvases = Canvases.list_canvases(project_id)       # DB query #1
+  projects = Projects.list_projects_for_workspace()   # DB query #2
+  agents = Agents.list_agents_for_scope(scope)        # DB query #3
+  
+  socket =
+    socket
+    |> assign(:canvases, canvases)
+    |> assign(:projects, projects)
+    |> assign(:agents, agents)
+  
+  {:ok, socket}
+end
+```
+
+On a high-traffic page (project sessions is the most-viewed), this doubles DB load every time someone loads the page.
+
+**After (optimized):**
+```elixir
+def mount(%{"project_id" => project_id} = params, _session, socket) do
+  socket = assign(socket, :project_id, project_id)
+  
+  socket =
+    if connected?(socket) do
+      # Only run on live render (connected)
+      canvases = Canvases.list_canvases(project_id)
+      projects = Projects.list_projects_for_workspace()
+      agents = Agents.list_agents_for_scope(scope)
+      
+      socket
+      |> assign(:canvases, canvases)
+      |> assign(:projects, projects)
+      |> assign(:agents, agents)
+    else
+      # Dead render: use defaults
+      socket
+      |> assign(:canvases, [])
+      |> assign(:projects, [])
+      |> assign(:agents, [])
+    end
+  
+  {:ok, socket}
+end
+```
+
+**Impact (commit 26699b8d):** Applied to 3 LiveViews (dm_live.ex, project_live/sessions/state.ex, workspace_live/sessions_live.ex). Halves DB load on project sessions (the most-visited page).
+
+**What still runs in dead render:**
+- Route parameter extraction (`%{"project_id" => ...}`)
+- Static assignments (IDs, feature flags)
+- Format/parsing logic
+
+**What must be guarded:**
+- All `Repo.*` calls
+- PubSub subscriptions
+- Timers / async tasks
+- External API calls
+
+**Rule:** Every DB query, subscription, and side effect in `mount/3` must be wrapped in `if connected?(socket)`. Dead render assigns should use empty defaults (`[]`, `nil`, `%{}`). Verify templates render correctly with empty state.
+
+---
+
+## Svelte Accessibility Patterns
+
+### 1. aria-live Regions for Dynamic Content
+
+Add polite and assertive aria-live regions to the app layout so screen readers announce important updates.
+
+**Pattern (commit 3f447d81):**
+
+```heex
+<!-- lib/eye_in_the_sky_web_web/components/layouts/app.html.heex -->
+<div class="min-h-screen flex flex-col">
+  <!-- Polite announcements: status updates, new messages (doesn't interrupt) -->
+  <div id="live-polite-region" aria-live="polite" aria-atomic="true" class="sr-only" />
+  
+  <!-- Assertive announcements: errors, critical alerts (interrupts current screen reader) -->
+  <div id="live-assertive-region" aria-live="assertive" aria-atomic="true" class="sr-only" />
+  
+  <!-- Rest of layout -->
+</div>
+```
+
+**Usage in Svelte components:**
+
+```svelte
+<!-- assets/svelte/components/AgentDetail.svelte -->
+<script>
+  function updateAgent() {
+    // ... update logic
+    const announcement = `Agent ${agent.name} updated successfully`
+    const region = document.getElementById('live-polite-region')
+    if (region) region.textContent = announcement
+  }
+</script>
+```
+
+**When to use:**
+- Polite (`aria-live="polite"`): Messages, notifications, status updates — doesn't interrupt
+- Assertive (`aria-live="assertive"`): Errors, warnings, critical alerts — interrupts immediately
+
+**Rule:** Always use aria-live regions for dynamic announcements. Never rely on visual-only feedback.
+
+---
+
+### 2. Native Dialog Elements with showModal()
+
+Use `<dialog>` elements with `.showModal()` instead of CSS-toggled modals. Native dialogs provide automatic focus trapping and Escape-key handling.
+
+**Pattern (commit 3f447d81, 6067618a):**
+
+**Before (CSS toggle, no focus management):**
+```svelte
+<script>
+  let showModal = false
+</script>
+
+<!-- Doesn't trap focus, Escape doesn't close automatically -->
+<div class="modal" class:modal-open={showModal} on:keydown|capture={...}>
+  <div class="modal-box">
+    <h2>Inspect</h2>
+    <input bind:value={message} />
+    <button on:click={() => showModal = false}>Close</button>
+  </div>
+</div>
+```
+
+**After (native dialog with .showModal()):**
+```svelte
+<script>
+  let dialogEl
+  let message = ''
+
+  function openModal() {
+    dialogEl?.showModal()
+  }
+
+  function closeModal() {
+    dialogEl?.close()
+  }
+</script>
+
+<!-- Focus trapped automatically, Escape closes automatically -->
+<dialog bind:this={dialogEl} class="modal rounded-lg shadow-lg p-6">
+  <h2>Inspect</h2>
+  <input bind:value={message} />
+  <button on:click={closeModal} aria-label="Close modal">Close</button>
+</dialog>
+
+<button on:click={openModal}>Open</button>
+```
+
+**Benefits:**
+- **Focus trap:** Native browser behavior — focus can't escape the modal
+- **Escape key:** Built-in — no manual keydown handling needed
+- **Backdrop:** Automatic — semi-transparent overlay included
+- **Screen reader support:** Announced as a dialog, content is isolated
+
+**CSS for native dialog:**
+```css
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+dialog {
+  border: none;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  padding: 1.5rem;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+```
+
+**Rule:** All modals must use `<dialog>` with `.showModal()`. No CSS-toggle modals. This is required for a11y.
+
+---
+
+### 3. Keyed Each Loops
+
+Use `{#each items as item (item.id)}` to give each DOM node a stable identity. Prevents state loss during list updates.
+
+**Pattern (commit 3f447d81):**
+
+**Before (no keys):**
+```svelte
+<script>
+  let sessions = [...]
+  let selectedId = null
+</script>
+
+<!-- Without keys, DOM nodes are reused by position, not identity -->
+<!-- If sessions reorder, selected state can stick to the wrong row -->
+{#each sessions as session}
+  <div on:click={() => selectedId = session.id} class={selectedId === session.id ? 'selected' : ''}>
+    {session.name}
+  </div>
+{/each}
+```
+
+**After (keyed):**
+```svelte
+<script>
+  let sessions = [...]
+  let selectedId = null
+</script>
+
+<!-- Keys ensure each DOM element stays with the same data item -->
+{#each sessions as session (session.id)}
+  <div on:click={() => selectedId = session.id} class={selectedId === session.id ? 'selected' : ''}>
+    {session.name}
+  </div>
+{/each}
+```
+
+**What breaks without keys:**
+- Form input values stick to DOM nodes (position-based)
+- Transitions fire on the wrong items
+- Component state (focus, open dropdowns) persists in the wrong row after reorder
+
+**Rule:** Every `{#each}` loop MUST have a key expression: `{#each items as item (item.id)}`. Use a unique ID; avoid array indexes as keys.
+
+---
+
+### 4. Aria-label on Buttons and Inputs
+
+Add `aria-label` to icon-only buttons and placeholder-only inputs so screen readers announce their purpose.
+
+**Pattern (commit 3f447d81, 6067618a):**
+
+**Before (no labels):**
+```svelte
+<!-- Icon-only button: screen readers don't know what it does -->
+<button on:click={openModal} class="btn btn-sm btn-ghost">
+  <Icon name="hero-magnifying-glass" />
+</button>
+
+<!-- Search input with only placeholder: no label -->
+<input type="text" placeholder="Search messages..." />
+
+<!-- Checkbox without associated label -->
+<input type="checkbox" bind:checked={starred} />
+```
+
+**After (with aria-label):**
+```svelte
+<!-- Icon button has a clear label -->
+<button on:click={openModal} aria-label="Open message inspector">
+  <Icon name="hero-magnifying-glass" />
+</button>
+
+<!-- Input has both placeholder and aria-label -->
+<input
+  type="text"
+  placeholder="Search messages..."
+  aria-label="Search messages by content or sender"
+/>
+
+<!-- Checkbox has associated label -->
+<label>
+  <input type="checkbox" bind:checked={starred} />
+  Mark as starred
+</label>
+```
+
+**Rule:** Every button without visible text needs `aria-label`. Every input with only a placeholder needs `aria-label`. Visible labels via `<label>` are preferred when space allows.
+
+---
+
+### 5. Space Key Handling for role=button Divs
+
+When using divs with `role="button"`, add Space key handling via `on:keydown` or `on:keyup`.
+
+**Pattern (commit 3f447d81):**
+
+```svelte
+<script>
+  function handleSpaceKey(e) {
+    if (e.key === ' ' || e.code === 'Space') {
+      e.preventDefault()
+      handleClick()
+    }
+  }
+
+  function handleClick() {
+    // action
+  }
+</script>
+
+<div
+  role="button"
+  tabindex="0"
+  on:click={handleClick}
+  on:keydown={handleSpaceKey}
+  aria-label="Toggle setting"
+>
+  <!-- content -->
+</div>
+```
+
+**Why:** The Space key is expected to activate buttons. Divs with `role="button"` must respond to Space the same way a real `<button>` does.
+
+**Rule:** If you use `role="button"`, also add `tabindex="0"`, `aria-label`, and `on:keydown` handler for Space/Enter. Better: use actual `<button>` elements when possible.
+
+---
+
+## Ecto Patterns
+
+### Batch Inserts with insert_all
+
+**Problem:** Context functions that create multiple related rows loop over `Repo.insert` per item. This creates N+1 inserts and makes transactions harder to reason about.
+
+**Solution:** Build all row data up front and call `Repo.insert_all` once.
+
+**Pattern (commit ed78523b):**
+
+**Before (N+1 inserts):**
+```elixir
+# lib/eye_in_the_sky/iam.ex
+def attach_documents_to_agent_type(agent_type, document_ids) do
+  result =
+    Repo.transaction(fn ->
+      Enum.reduce_while(document_ids, 0, fn doc_id, count ->
+        attrs = %{agent_type: agent_type, document_id: doc_id}
+        changeset = AgentTypeDocument.changeset(%AgentTypeDocument{}, attrs)
+
+        case Repo.insert(changeset,
+               on_conflict: :nothing,
+               conflict_target: [:agent_type, :document_id]
+             ) do
+          {:ok, %AgentTypeDocument{id: nil}} ->
+            {:cont, count}
+
+          {:ok, _atd} ->
+            {:cont, count + 1}
+
+          {:error, changeset} ->
+            Repo.rollback({:changeset, changeset})
+        end
+      end)
+    end)
+
+  case result do
+    {:ok, count} ->
+      invalidate_cache()
+      {:ok, count}
+
+    {:error, {:changeset, cs}} ->
+      {:error, cs}
+
+    {:error, reason} ->
+      {:error, reason}
+  end
+end
+```
+
+**After (single insert_all):**
+```elixir
+def attach_documents_to_agent_type(agent_type, document_ids) do
+  now = DateTime.utc_now()
+
+  rows =
+    Enum.map(document_ids, fn doc_id ->
+      %{agent_type: agent_type, document_id: doc_id, inserted_at: now, updated_at: now}
+    end)
+
+  try do
+    {count, _} =
+      Repo.insert_all(AgentTypeDocument, rows,
+        on_conflict: :nothing,
+        conflict_target: [:agent_type, :document_id]
+      )
+
+    invalidate_cache()
+    {:ok, count}
+  rescue
+    e -> {:error, e}
+  end
+end
+```
+
+**Why this is better:**
+- Single database round-trip instead of N+1
+- `on_conflict: :nothing` semantics preserved (deduplicates on unique constraint)
+- Error handling via `try/rescue` keeps the return path alive (`{:error, term()}`)
+- Faster on large batches (50 docs: 1 query instead of 50)
+
+**When to use:**
+- Creating 3+ rows with the same schema
+- Batch operations (attach all documents, link all tags)
+- Ensuring atomicity of multi-row changes
+
+**Key detail:** Set `inserted_at` and `updated_at` to the same value (`DateTime.utc_now()`) before calling `insert_all`. Postgres will override them, but passing explicit values ensures consistency.
+
+**Rule:** Replace `Enum.reduce` loops over `Repo.insert` with `Repo.insert_all`. Use `on_conflict: :nothing` to skip duplicates safely. Wrap in `try/rescue` if error handling is needed.
+
+---
+
+### Explicit Case Statements Over || Tricks
+
+**Problem:** Using the `||` operator with `Repo.get` to provide atom fallbacks makes code harder to read and creates implicit type mixing (struct vs atom).
+
+**Solution:** Use explicit `case` statements to make nil/struct branches unambiguous.
+
+**Pattern (commit ed78523b):**
+
+**Before (implicit || fallback):**
+```elixir
+def add_policy_to_document(document_id, policy_id) do
+  with %PolicyDocument{} <- Repo.get(PolicyDocument, document_id) || :doc_not_found,
+       %Policy{} <- Repo.get(Policy, policy_id) || :policy_not_found do
+    do_insert_document_policy(document_id, policy_id)
+  else
+    :doc_not_found -> {:error, :document_not_found}
+    :policy_not_found -> {:error, :policy_not_found}
+  end
+end
+```
+
+**Confusing because:**
+- `||` returns the fallback if the left side is falsy (nil, false)
+- Pattern matching on `:doc_not_found` (an atom) is indirect
+- Reader must understand that `Repo.get` returns nil, then `||` provides the atom
+
+**After (explicit case):**
+```elixir
+def add_policy_to_document(document_id, policy_id) do
+  case Repo.get(PolicyDocument, document_id) do
+    nil ->
+      {:error, :document_not_found}
+
+    %PolicyDocument{} ->
+      case Repo.get(Policy, policy_id) do
+        nil -> {:error, :policy_not_found}
+        %Policy{} -> do_insert_document_policy(document_id, policy_id)
+      end
+  end
+end
+```
+
+**Why this is better:**
+- Nil and struct branches are visually distinct
+- No implicit type coercion (atom from ||)
+- Each error path is explicit
+- Easier to add logging/debugging to specific branches
+
+**When to prefer case over with:**
+- Multiple sequential lookups with different error meanings
+- Need to distinguish between nil and struct clearly
+- Error handling per lookup (not a single unified error)
+
+**When to keep with:**
+- All results use the same error tag
+- Pattern is simple (1–2 lookups)
+- Each step is independent
+
+**Rule:** Avoid `|| :atom` fallbacks in `with` statements. Use nested `case` when distinguishing nil from struct is important for clarity. This trades nesting for explicit intent.
 
 ---
 
@@ -3382,6 +4402,119 @@ end
 1. Join the tables in one query
 2. Batch-load related data in groups
 3. Use `Repo.preload(..., in_parallel: true)` for multiple preloads
+
+---
+
+## Ecto.Multi for Atomic Multi-Step Operations
+
+**Problem:** Context functions that chain multiple DB operations (insert, update, delete) have gaps between operations. If one operation fails midway, partial state remains in the database.
+
+**Solution:** Use `Ecto.Multi` to wrap related operations in a transaction. All steps succeed or none do.
+
+**Pattern (commit 19d709ef):**
+
+```elixir
+# ❌ Before: Two separate operations with race condition gap
+def do_create_chat(session_uuid, params, socket) do
+  agent_attrs = %{
+    path: params["path"],
+    name: "chat"
+  }
+
+  result =
+    case Agents.find_or_create_agent(agent_attrs) do
+      {:ok, agent} ->
+        session_attrs = %{
+          uuid: session_uuid,
+          agent_id: agent.id,
+          name: params["name"],
+          project_id: project_id,
+          model_provider: "manual",
+          model_name: "chat",
+          status: "idle",
+          started_at: DateTime.utc_now()
+        }
+
+        case Sessions.create_session_with_model(session_attrs) do
+          {:ok, session} ->
+            %{ok: true, session_uuid: session.uuid}
+
+          {:error, reason} ->
+            Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
+            %{ok: false, error: "Failed to create session"}
+        end
+
+      {:error, reason} ->
+        Logger.warning("palette create-chat: agent creation failed: #{inspect(reason)}")
+        %{ok: false, error: "Failed to create agent"}
+    end
+
+  {:halt, push_event(socket, "palette:create-chat-result", result)}
+end
+
+# ✅ After: Atomic via Ecto.Multi
+def do_create_chat(session_uuid, params, socket) do
+  agent_attrs = %{
+    path: params["path"],
+    name: "chat"
+  }
+
+  result =
+    Multi.new()
+    |> Multi.run(:agent, fn _repo, _changes ->
+      Agents.find_or_create_agent(agent_attrs)
+    end)
+    |> Multi.run(:session, fn _repo, %{agent: agent} ->
+      session_attrs = %{
+        uuid: session_uuid,
+        agent_id: agent.id,
+        name: params["name"],
+        project_id: project_id,
+        model_provider: "manual",
+        model_name: "chat",
+        status: "idle",
+        started_at: DateTime.utc_now()
+      }
+
+      Sessions.create_session_with_model(session_attrs)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{session: session}} ->
+        %{ok: true, session_uuid: session.uuid}
+
+      {:error, :agent, reason, _changes} ->
+        Logger.warning("palette create-chat: agent creation failed: #{inspect(reason)}")
+        %{ok: false, error: "Failed to create agent"}
+
+      {:error, :session, reason, _changes} ->
+        Logger.warning("palette create-chat: session creation failed: #{inspect(reason)}")
+        %{ok: false, error: "Failed to create session"}
+    end
+
+  {:halt, push_event(socket, "palette:create-chat-result", result)}
+end
+```
+
+**When to use Ecto.Multi:**
+- 2+ DB operations that must succeed or fail together
+- Multi-step workflows (create → verify → update)
+- Batch operations with atomic requirements
+- Operations that depend on intermediate results (e.g., create agent, then create session with agent.id)
+
+**Key patterns:**
+- `Multi.run(:name, fn _repo, %{prior_step: value} -> ... end)` — pass prior results via destructuring
+- `Repo.transaction(multi)` — executes all steps atomically; returns `{:ok, %{step_name: result}}` or `{:error, failed_step, reason, changes_so_far}`
+- Error clause matches `{:error, step_name, reason, changes_so_far}` to identify which step failed
+- All steps must return `{:ok, value}` or `{:error, reason}`
+
+**Benefits:**
+- No partial state — all steps or nothing
+- Error handling is explicit per-step
+- Prior results are passed through the pipeline automatically
+- Clear audit trail of which step failed
+
+**Rule:** When writing a context function with 2+ Repo operations, wrap them in `Ecto.Multi` and `Repo.transaction`. Use `Multi.run` for context function calls; use `Multi.insert`, `Multi.update`, `Multi.delete` for direct changeset operations.
 
 ---
 

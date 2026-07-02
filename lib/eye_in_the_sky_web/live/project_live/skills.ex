@@ -160,7 +160,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                   <div class={[
                     "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
                     if(selected?,
-                      do: "bg-primary/5 border-l-2 border-primary",
+                      do: "bg-primary/5",
                       else: "hover:bg-base-content/4"
                     )
                   ]}>

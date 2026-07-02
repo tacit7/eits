@@ -146,10 +146,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       created_at: DateTime.utc_now()
     }
 
-    case Tasks.create_task(attrs) do
+    case Tasks.create_with_associations(attrs, params) do
       {:ok, task} ->
-        Tasks.associate_task(task, params)
-
         conn
         |> put_status(:created)
         |> json(%{success: true, message: "Task created", task_id: to_string(task.id)})

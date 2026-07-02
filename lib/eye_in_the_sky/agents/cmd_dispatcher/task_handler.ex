@@ -15,7 +15,6 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.TaskHandler do
       task tag <id> <tag_id>
   """
 
-  require Logger
 
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
   alias EyeInTheSky.{Notes, Tasks}

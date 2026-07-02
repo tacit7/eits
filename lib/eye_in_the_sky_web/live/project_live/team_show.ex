@@ -164,7 +164,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="overflow-y-auto" style="scrollbar-width: none;">
+    <div class="flex flex-col overflow-y-auto min-w-[860px]" style="scrollbar-width: none;">
       <%= if @team do %>
         <div class="px-4 sm:px-6 pt-4 pb-2 border-b border-base-content/8">
           <.link

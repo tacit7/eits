@@ -202,12 +202,11 @@ export const PtyHook = {
     })
 
     // Watch for DaisyUI theme changes and re-apply xterm theme.
-    // After updating colors, write cursor-home + clear-screen so xterm.js lands
-    // in a known cursor state before Ink's next re-render frame arrives.
-    // Without this, Ink's cursor tracking drifts and subsequent renders corrupt.
+    // Do NOT write escape sequences here — injecting \x1b[H\x1b[2J into the
+    // PTY input stream corrupts vim's cursor tracking and redraw state.
+    // xterm.js re-renders the buffer with new colors on its own.
     this._themeObserver = new MutationObserver(() => {
       term.options.theme = getXtermTheme()
-      term.write("\x1b[H\x1b[2J")
     })
     this._themeObserver.observe(document.documentElement, {
       attributes: true,

@@ -37,7 +37,6 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   end
 
   defp default_model_for_provider("codex"), do: ModelConfig.default_model("codex")
-  defp default_model_for_provider("gemini"), do: ModelConfig.default_model("gemini")
   defp default_model_for_provider(_), do: "haiku"
 
   defp coerce_int_id(nil, _field), do: {:ok, nil}

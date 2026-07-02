@@ -135,9 +135,7 @@ defmodule EyeInTheSky.IAM.HookResponse do
     end)
   end
 
-  defp event_name(:pre_tool_use), do: "PreToolUse"
   defp event_name(:post_tool_use), do: "PostToolUse"
   defp event_name(:stop), do: "Stop"
-  defp event_name(:user_prompt_submit), do: "UserPromptSubmit"
   defp event_name(_), do: "Unknown"
 end

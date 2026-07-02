@@ -69,6 +69,9 @@ defmodule EyeInTheSky.Events do
   @doc "Subscribe to real-time stream deltas for a session."
   def subscribe_dm_stream(session_id), do: sub("dm:#{session_id}:stream")
 
+  @doc "Unsubscribe from real-time stream deltas for a session."
+  def unsubscribe_dm_stream(session_id), do: unsub("dm:#{session_id}:stream")
+
   @doc "Subscribe to queued-prompt updates for a session."
   def subscribe_dm_queue(session_id), do: sub("dm:#{session_id}:queue")
 
@@ -375,6 +378,10 @@ defmodule EyeInTheSky.Events do
   @doc "Broadcast a delivery ID to wake the WebhookDispatcher."
   def github_webhook_received(delivery_id),
     do: broadcast("github:webhook_received", {:github_webhook_received, delivery_id})
+
+  @doc "Broadcast a GitHub webhook rule fired event to a custom topic."
+  def webhook_rule_fired(topic, message),
+    do: broadcast(topic, {:webhook_rule_fired, message})
 
   @doc "Subscribe to pull request update events."
   def subscribe_pull_requests, do: sub("pull_requests:updated")

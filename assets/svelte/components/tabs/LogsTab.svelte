@@ -34,7 +34,7 @@
   </div>
 
   <div class="flex-1 overflow-y-auto space-y-3">
-    {#each filteredLogs as log}
+    {#each filteredLogs as log (log.timestamp + log.message)}
       <div class="text-sm">
         <div class="flex items-center gap-2 mb-1">
           <span class="text-xs font-mono text-gray-500">

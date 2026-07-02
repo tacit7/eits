@@ -18,7 +18,8 @@ defmodule EyeInTheSky.ScheduledJobs.JobScheduler do
     now = DateTime.utc_now()
 
     from(j in ScheduledJob,
-      where: j.enabled and not is_nil(j.next_run_at) and j.next_run_at <= ^now
+      where: j.enabled and not is_nil(j.next_run_at) and j.next_run_at <= ^now,
+      limit: 100
     )
     |> Repo.all()
   end
@@ -71,7 +72,7 @@ defmodule EyeInTheSky.ScheduledJobs.JobScheduler do
   end
 
   def mark_job_executed(job) do
-    now = NaiveDateTime.utc_now()
+    now = DateTime.utc_now()
 
     next =
       compute_next_run_at(job.schedule_type, job.schedule_value, now, job.timezone || "Etc/UTC")

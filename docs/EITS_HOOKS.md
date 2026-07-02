@@ -7,6 +7,33 @@ Claude Code integration scripts that manage session lifecycle, context injection
 
 ---
 
+## Installation
+
+EITS hooks are automatically registered using the `eits hooks install` command:
+
+```bash
+eits hooks install
+```
+
+This command:
+1. **Copies hook scripts** from `priv/scripts/` to `~/.config/eits/hooks/` (preserves permissions)
+2. **Installs the eits CLI** to `~/.local/bin/eits` for global availability
+3. **Updates your shell profile** (`~/.zprofile` / `~/.bash_profile`) to add `~/.local/bin` to `PATH`
+4. **Merges hook entries** into `~/.claude/settings.json` without overwriting existing unrelated settings
+5. **Reports what was installed** and when to open a new terminal for PATH changes to take effect
+
+### Uninstalling
+
+To remove EITS hook registrations from `~/.claude/settings.json`:
+
+```bash
+eits hooks uninstall
+```
+
+This removes all EITS-managed hook entries but leaves the script files and eits CLI binary in place.
+
+---
+
 ## How Context Injection Works
 
 Context injection differs by hook type:

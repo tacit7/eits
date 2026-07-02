@@ -4,7 +4,7 @@ defmodule EyeInTheSky.SessionsTest do
   import EyeInTheSky.Factory
 
   alias EyeInTheSky.{Commits, Logs, Messages, Notes, Sessions, Tasks}
-  alias EyeInTheSky.Sessions.Queries
+  alias EyeInTheSky.Sessions.OverviewQueries
   alias EyeInTheSky.Tasks.WorkflowState
 
   # ---------------------------------------------------------------------------
@@ -282,16 +282,16 @@ defmodule EyeInTheSky.SessionsTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Sessions.Queries.list_sessions_filtered/1
+  # Sessions.OverviewQueries.list_sessions_filtered/1
   # ---------------------------------------------------------------------------
 
-  describe "Queries.list_sessions_filtered/1 — status filters" do
+  describe "OverviewQueries.list_sessions_filtered/1 — status filters" do
     test "status 'active' returns only non-ended sessions (excludes discovered agents)" do
       agent = create_agent(%{status: "working"})
       active_session = create_session(agent, %{status: "working"})
       _ended_session = create_session(agent, %{status: "completed", ended_at: DateTime.utc_now()})
 
-      results = Queries.list_sessions_filtered(status_filter: "active")
+      results = OverviewQueries.list_sessions_filtered(status_filter: "active")
       ids = Enum.map(results, & &1.id)
 
       assert active_session.id in ids
@@ -304,7 +304,7 @@ defmodule EyeInTheSky.SessionsTest do
       working_agent = create_agent(%{status: "working"})
       working_session = create_session(working_agent, %{status: "working"})
 
-      results = Queries.list_sessions_filtered(status_filter: "active")
+      results = OverviewQueries.list_sessions_filtered(status_filter: "active")
       ids = Enum.map(results, & &1.id)
 
       assert working_session.id in ids
@@ -316,7 +316,7 @@ defmodule EyeInTheSky.SessionsTest do
       ended = create_session(agent, %{status: "completed", ended_at: DateTime.utc_now()})
       active = create_session(agent, %{status: "working"})
 
-      results = Queries.list_sessions_filtered(status_filter: "completed")
+      results = OverviewQueries.list_sessions_filtered(status_filter: "completed")
       ids = Enum.map(results, & &1.id)
 
       assert ended.id in ids
@@ -330,7 +330,7 @@ defmodule EyeInTheSky.SessionsTest do
       working_agent = create_agent(%{status: "working"})
       _other_session = create_session(working_agent, %{status: "working"})
 
-      results = Queries.list_sessions_filtered(status_filter: "stale")
+      results = OverviewQueries.list_sessions_filtered(status_filter: "stale")
       ids = Enum.map(results, & &1.id)
 
       assert stale_session.id in ids
@@ -344,7 +344,7 @@ defmodule EyeInTheSky.SessionsTest do
       normal_agent = create_agent(%{status: "working"})
       _normal_session = create_session(normal_agent)
 
-      results = Queries.list_sessions_filtered(status_filter: "discovered")
+      results = OverviewQueries.list_sessions_filtered(status_filter: "discovered")
       ids = Enum.map(results, & &1.id)
 
       assert disc_session.id in ids
@@ -356,7 +356,7 @@ defmodule EyeInTheSky.SessionsTest do
       active = create_session(agent, %{status: "working"})
       ended = create_session(agent, %{status: "completed", ended_at: DateTime.utc_now()})
 
-      results = Queries.list_sessions_filtered(status_filter: "all")
+      results = OverviewQueries.list_sessions_filtered(status_filter: "all")
       ids = Enum.map(results, & &1.id)
 
       assert active.id in ids
@@ -367,19 +367,19 @@ defmodule EyeInTheSky.SessionsTest do
       agent = create_agent()
       session = create_session(agent)
 
-      results = Queries.list_sessions_filtered(status_filter: "nonexistent")
+      results = OverviewQueries.list_sessions_filtered(status_filter: "nonexistent")
       ids = Enum.map(results, & &1.id)
 
       assert session.id in ids
     end
   end
 
-  describe "Queries.list_sessions_filtered/1 — search" do
+  describe "OverviewQueries.list_sessions_filtered/1 — search" do
     test "empty search_query returns results without FTS filter" do
       agent = create_agent()
       session = create_session(agent, %{name: "findable session"})
 
-      results = Queries.list_sessions_filtered(search_query: "", status_filter: "all")
+      results = OverviewQueries.list_sessions_filtered(search_query: "", status_filter: "all")
       ids = Enum.map(results, & &1.id)
 
       assert session.id in ids
@@ -390,17 +390,17 @@ defmodule EyeInTheSky.SessionsTest do
       _session = create_session(agent)
 
       # The context doesn't enforce min length — that's the LiveView's job
-      results = Queries.list_sessions_filtered(search_query: "ab", status_filter: "all")
+      results = OverviewQueries.list_sessions_filtered(search_query: "ab", status_filter: "all")
       assert is_list(results)
     end
   end
 
-  describe "Queries.list_sessions_filtered/1 — limit and offset" do
+  describe "OverviewQueries.list_sessions_filtered/1 — limit and offset" do
     test "limit caps result count" do
       agent = create_agent()
       for _ <- 1..5, do: create_session(agent)
 
-      results = Queries.list_sessions_filtered(status_filter: "all", limit: 2)
+      results = OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 2)
       assert length(results) <= 2
     end
 
@@ -408,23 +408,23 @@ defmodule EyeInTheSky.SessionsTest do
       agent = create_agent()
       for _ <- 1..4, do: create_session(agent)
 
-      all_results = Queries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 0)
-      offset_results = Queries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 2)
+      all_results = OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 0)
+      offset_results = OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 2)
 
       assert length(offset_results) < length(all_results)
     end
   end
 
   # ---------------------------------------------------------------------------
-  # Sessions.Queries.get_session_overview_row/1
+  # Sessions.OverviewQueries.get_session_overview_row/1
   # ---------------------------------------------------------------------------
 
-  describe "Queries.get_session_overview_row/1" do
+  describe "OverviewQueries.get_session_overview_row/1" do
     test "returns {:ok, row} with expected shape for existing session" do
       agent = create_agent()
       session = create_session(agent)
 
-      assert {:ok, row} = Queries.get_session_overview_row(session.id)
+      assert {:ok, row} = OverviewQueries.get_session_overview_row(session.id)
 
       assert row.id == session.id
       assert row.uuid == session.uuid
@@ -437,7 +437,7 @@ defmodule EyeInTheSky.SessionsTest do
     end
 
     test "returns {:error, :not_found} for non-existent session" do
-      assert {:error, :not_found} = Queries.get_session_overview_row(0)
+      assert {:error, :not_found} = OverviewQueries.get_session_overview_row(0)
     end
 
     test "returns {:error, :not_found} for archived session" do
@@ -445,14 +445,14 @@ defmodule EyeInTheSky.SessionsTest do
       session = create_session(agent)
       Sessions.archive_session(session)
 
-      assert {:error, :not_found} = Queries.get_session_overview_row(session.id)
+      assert {:error, :not_found} = OverviewQueries.get_session_overview_row(session.id)
     end
 
     test "current_task_title is nil when session has no in-progress task" do
       agent = create_agent()
       session = create_session(agent)
 
-      {:ok, row} = Queries.get_session_overview_row(session.id)
+      {:ok, row} = OverviewQueries.get_session_overview_row(session.id)
       assert is_nil(row.current_task_title)
     end
 
@@ -462,7 +462,7 @@ defmodule EyeInTheSky.SessionsTest do
       task = in_progress_task(%{title: "doing important work"})
       Tasks.link_session_to_task(task.id, session.id)
 
-      {:ok, row} = Queries.get_session_overview_row(session.id)
+      {:ok, row} = OverviewQueries.get_session_overview_row(session.id)
       assert row.current_task_title == "doing important work"
     end
 
@@ -472,21 +472,21 @@ defmodule EyeInTheSky.SessionsTest do
       task = create_task(%{title: "todo task", state_id: 1})
       Tasks.link_session_to_task(task.id, session.id)
 
-      {:ok, row} = Queries.get_session_overview_row(session.id)
+      {:ok, row} = OverviewQueries.get_session_overview_row(session.id)
       assert is_nil(row.current_task_title)
     end
   end
 
   # ---------------------------------------------------------------------------
-  # Sessions.Queries.list_session_overview_rows/1
+  # Sessions.OverviewQueries.list_session_overview_rows/1
   # ---------------------------------------------------------------------------
 
-  describe "Queries.list_session_overview_rows/1" do
+  describe "OverviewQueries.list_session_overview_rows/1" do
     test "returns rows with expected shape" do
       agent = create_agent()
       _session = create_session(agent)
 
-      rows = Queries.list_session_overview_rows(limit: 10)
+      rows = OverviewQueries.list_session_overview_rows(limit: 10)
 
       assert is_list(rows)
       assert rows != []
@@ -504,7 +504,7 @@ defmodule EyeInTheSky.SessionsTest do
       session = create_session(agent)
       Sessions.archive_session(session)
 
-      rows = Queries.list_session_overview_rows(limit: 100)
+      rows = OverviewQueries.list_session_overview_rows(limit: 100)
       ids = Enum.map(rows, & &1.id)
 
       refute session.id in ids
@@ -515,7 +515,7 @@ defmodule EyeInTheSky.SessionsTest do
       session = create_session(agent)
       Sessions.archive_session(session)
 
-      rows = Queries.list_session_overview_rows(limit: 100, include_archived: true)
+      rows = OverviewQueries.list_session_overview_rows(limit: 100, include_archived: true)
       ids = Enum.map(rows, & &1.id)
 
       assert session.id in ids
@@ -525,21 +525,21 @@ defmodule EyeInTheSky.SessionsTest do
       agent = create_agent()
       for _ <- 1..5, do: create_session(agent)
 
-      rows = Queries.list_session_overview_rows(limit: 2)
+      rows = OverviewQueries.list_session_overview_rows(limit: 2)
       assert length(rows) <= 2
     end
   end
 
   # ---------------------------------------------------------------------------
-  # Sessions.Queries.count_session_overview_rows/1
+  # Sessions.OverviewQueries.count_session_overview_rows/1
   # ---------------------------------------------------------------------------
 
-  describe "Queries.count_session_overview_rows/1" do
+  describe "OverviewQueries.count_session_overview_rows/1" do
     test "returns integer count" do
       agent = create_agent()
       create_session(agent)
 
-      count = Queries.count_session_overview_rows()
+      count = OverviewQueries.count_session_overview_rows()
       assert is_integer(count)
       assert count > 0
     end
@@ -547,20 +547,20 @@ defmodule EyeInTheSky.SessionsTest do
     test "excludes archived sessions from count" do
       agent = create_agent()
       session = create_session(agent)
-      before_count = Queries.count_session_overview_rows()
+      before_count = OverviewQueries.count_session_overview_rows()
 
       Sessions.archive_session(session)
-      after_count = Queries.count_session_overview_rows()
+      after_count = OverviewQueries.count_session_overview_rows()
 
       assert after_count == before_count - 1
     end
   end
 
   # ---------------------------------------------------------------------------
-  # Sessions.Queries — delegate passthrough from Sessions module
+  # Sessions.OverviewQueries — delegate passthrough from Sessions module
   # ---------------------------------------------------------------------------
 
-  describe "Sessions context delegates to Queries" do
+  describe "Sessions context delegates to OverviewQueries" do
     test "Sessions.list_sessions_filtered/1 is callable and returns list" do
       agent = create_agent()
       _session = create_session(agent)

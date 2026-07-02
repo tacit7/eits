@@ -16,7 +16,7 @@
   <h3 class="text-sm font-semibold mb-3">Sessions</h3>
 
   <div class="flex-1 overflow-y-auto space-y-2">
-    {#each sessions as session}
+    {#each sessions as session (session.id)}
       <button
         class="w-full text-left p-3 rounded border hover:bg-gray-50 transition-colors"
         class:bg-indigo-50={session.id === activeSessionId}

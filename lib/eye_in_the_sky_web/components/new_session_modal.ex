@@ -57,7 +57,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     default_model =
       case provider do
         "codex" -> ModelConfig.default_model("codex")
-        "gemini" -> ModelConfig.default_model("gemini")
         _ -> default_claude_model()
       end
 
@@ -202,7 +201,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       >
         <option value="claude" selected={@selected_provider == "claude"}>Claude</option>
         <option value="codex" selected={@selected_provider == "codex"}>Codex</option>
-        <option value="gemini" selected={@selected_provider == "gemini"}>Gemini</option>
       </select>
     </div>
     """

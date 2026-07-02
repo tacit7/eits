@@ -1,6 +1,7 @@
 <script>
   import { formatTime, formatDateRelative } from '../../utils/datetime.js'
   import { autoScroll } from '../../actions/autoScroll.js'
+  import { tick, onMount } from 'svelte'
   import { marked } from 'marked'
   import DOMPurify from 'dompurify'
   import ThreadPanel from '../ThreadPanel.svelte'
@@ -21,17 +22,65 @@
   export let messageSearchResults = []
   export let live
 
+  // liveMessages is the client-maintained message list. The `messages` prop is a
+  // frozen first-paint snapshot; new messages arrive via push_event deltas.
+  // This reactive declaration resets liveMessages when the prop reference changes
+  // (channel switch), while push_event handlers append/update/delete in place.
+  let liveMessages = [...messages]
+  $: liveMessages = [...messages]
+
   let loadingOlder = false
   let openOverflowId = null
   let inspectMessage = null
+  let inspectDialog
   let openReactionPickerId = null
 
-  function loadOlderMessages() {
-    if (!messages.length || loadingOlder) return
-    loadingOlder = true
-    live.pushEvent('load_older_messages', { before_id: String(messages[0].id) }, () => {
+  async function openInspect(msg) {
+    inspectMessage = msg
+    await tick()
+    inspectDialog?.showModal()
+  }
+  function closeInspect() {
+    inspectDialog?.close()
+    inspectMessage = null
+  }
+
+  // Per-session live streaming state: { [sessionId]: { content, tool } }
+  let streamStates = {}
+
+  onMount(() => {
+    live.handleEvent('chat:message_appended', ({ message }) => {
+      liveMessages = [...liveMessages, message]
+    })
+
+    live.handleEvent('chat:message_updated', ({ message }) => {
+      liveMessages = liveMessages.map(m => m.id === message.id ? message : m)
+    })
+
+    live.handleEvent('chat:message_deleted', ({ id }) => {
+      liveMessages = liveMessages.filter(m => m.id !== id)
+    })
+
+    live.handleEvent('chat:messages_prepended', ({ messages: older }) => {
+      liveMessages = [...older, ...liveMessages]
       loadingOlder = false
     })
+
+    live.handleEvent('chat:stream_update', ({ session_id, content, tool }) => {
+      streamStates = { ...streamStates, [String(session_id)]: { content, tool } }
+    })
+
+    live.handleEvent('chat:stream_cleared', ({ session_id }) => {
+      const next = { ...streamStates }
+      delete next[String(session_id)]
+      streamStates = next
+    })
+  })
+
+  function loadOlderMessages() {
+    if (!liveMessages.length || loadingOlder) return
+    loadingOlder = true
+    live.pushEvent('load_older_messages', { before_id: String(liveMessages[0].id) })
   }
 
   let inputValue = ''
@@ -58,8 +107,8 @@
   let searchInput
   let searchDebounce = null
 
-  // Use server-side FTS results when a query is active; fall back to full message list.
-  $: filteredMessages = searchQuery.trim() ? messageSearchResults : messages
+  // Use server-side FTS results when a query is active; fall back to live message list.
+  $: filteredMessages = searchQuery.trim() ? messageSearchResults : liveMessages
 
   function handleSearchInput() {
     clearTimeout(searchDebounce)
@@ -116,9 +165,6 @@
     }
     if (e.key === 'Escape' && openReactionPickerId !== null) {
       openReactionPickerId = null
-    }
-    if (e.key === 'Escape' && inspectMessage !== null) {
-      inspectMessage = null
     }
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
       const idx = parseInt(e.key, 10) - 1
@@ -263,8 +309,8 @@
   const DOMPURIFY_CONFIG = {
     ALLOWED_TAGS: ['p', 'strong', 'em', 'b', 'i', 'code', 'pre', 'ul', 'ol', 'li',
                    'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'a',
-                   'span', 'hr', 'del', 's'],
-    ALLOWED_ATTR: ['class', 'href', 'target', 'rel']
+                   'span', 'hr', 'del', 's', 'details', 'summary'],
+    ALLOWED_ATTR: ['class', 'href', 'target', 'rel', 'open']
   }
 
   function renderMarkdownBody(body, nameMap = {}) {
@@ -279,6 +325,50 @@
       const display = name ? escapeHtml(name) : token
       return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary" data-session-id="${token}">@${display}</span>`
     })
+  }
+
+  // Splits an agent message body into text and tool_call segments.
+  // Blank lines (outside fenced code blocks) delimit segments.
+  // Pattern A: > `ToolName` rest...
+  // Pattern B: Tool: ToolName\ncontent
+  function parseBodySegments(body) {
+    if (!body) return []
+    const lines = body.split('\n')
+    let inFence = false
+    const chunks = []
+    let current = []
+    for (const line of lines) {
+      if (line.trimStart().startsWith('```')) inFence = !inFence
+      if (!inFence && line.trim() === '') {
+        if (current.length > 0) { chunks.push(current.join('\n')); current = [] }
+      } else {
+        current.push(line)
+      }
+    }
+    if (current.length > 0) chunks.push(current.join('\n'))
+    return chunks.map(chunk => {
+      const matchA = chunk.match(/^>\s+`([^`]+)`(.*)/)
+      if (matchA) return { type: 'tool_call', name: matchA[1], rest: matchA[2].trim() }
+      const matchB = chunk.match(/^Tool:\s+(\S+)\n?([\s\S]*)/)
+      if (matchB) return { type: 'tool_call', name: matchB[1], rest: matchB[2].trim() }
+      return { type: 'text', text: chunk }
+    })
+  }
+
+  // Returns sanitized HTML for a compact collapsible tool call row.
+  function renderToolCall(name, rest) {
+    const stripped = (rest || '').replace(/^\s*[{[]\s*/, '').replace(/\s*[}\]]\s*$/, '')
+    const preview = stripped.slice(0, 80) + (stripped.length > 80 ? '…' : '')
+    const escapedName = escapeHtml(name)
+    const escapedPreview = escapeHtml(preview)
+    const escapedFull = escapeHtml(rest || '')
+    return '<details class="my-0.5 rounded border border-base-content/[0.08] overflow-hidden">' +
+      '<summary class="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none text-xs font-mono text-base-content/50 hover:text-base-content/70 hover:bg-base-content/[0.05] transition-colors">' +
+      '<span class="text-primary/60 font-semibold">' + escapedName + '</span>' +
+      (escapedPreview ? '<span class="ml-1.5 text-base-content/35 truncate max-w-xs">' + escapedPreview + '</span>' : '') +
+      '</summary>' +
+      '<pre class="px-2 py-1.5 text-xs font-mono text-base-content/50 bg-base-200 overflow-x-auto whitespace-pre-wrap break-all m-0">' + escapedFull + '</pre>' +
+      '</details>'
   }
 
   function truncate(str, max = 10) {
@@ -625,6 +715,7 @@
             on:input={handleSearchInput}
             type="text"
             placeholder="Search messages..."
+            aria-label="Search messages"
             class="w-full input input-xs bg-base-200/50 border-base-content/8 pl-8 pr-4 text-base placeholder:text-base-content/25 focus:border-primary/30"
             autocomplete="off"
           />
@@ -670,7 +761,7 @@
 
     {#if filteredMessages && filteredMessages.length > 0}
       <div class="space-y-0">
-        {#each processedMessages as message, idx}
+        {#each processedMessages as message, idx (message.id)}
           <!-- Date separator -->
           {#if idx === 0 || formatDateRelative(processedMessages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
             <div class="flex items-center gap-3 my-4">
@@ -752,10 +843,31 @@
                   {/if}
 
                   <div class="max-w-[580px]">
+                    {#if message.sender_role === 'agent' && message.metadata?.thinking}
+                      {@const thinking = message.metadata.thinking}
+                      <details
+                        class="border-l-2 border-primary/50 bg-base-200/60 rounded overflow-hidden mb-2"
+                        open={!!(searchQuery && thinking.toLowerCase().includes(searchQuery.toLowerCase()))}
+                      >
+                        <summary class="flex items-center gap-1.5 px-2 py-1.5 cursor-pointer select-none text-xs text-base-content/50 hover:text-base-content/70 transition-colors">
+                          <span aria-hidden="true">✦</span>
+                          <span class="font-medium">Thinking</span>
+                        </summary>
+                        <pre class="px-2.5 py-2 text-xs font-mono text-base-content/50 overflow-x-auto whitespace-pre-wrap break-words">{thinking}</pre>
+                      </details>
+                    {/if}
                     <div class="message-body mt-2 text-sm leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
-                        {@html renderMarkdownBody(message.body, mentionNameMap)}
+                        {@const segments = parseBodySegments(message.body)}
+                        {#each segments as seg}
+                          {#if seg.type === 'tool_call'}
+                            {@html DOMPurify.sanitize(renderToolCall(seg.name, seg.rest), DOMPURIFY_CONFIG)}
+                          {:else}
+                            {@html renderMarkdownBody(seg.text, mentionNameMap)}
+                          {/if}
+                        {/each}
                       {:else if searchQuery.trim()}
+                        <!-- highlightMatch escapes via escapeHtml() before injecting <mark>; do not bypass -->
                         <span class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words whitespace-pre-wrap" contenteditable="false">{@html highlightMatch(message.body || '', searchQuery)}</span>
                       {:else}
                         <p class="whitespace-pre-wrap">{@html renderBody(message.body, mentionNameMap)}</p>
@@ -765,7 +877,7 @@
                     <!-- Image attachments -->
                     {#if message.attachments && message.attachments.length > 0}
                       <div class="mt-2 flex flex-wrap gap-2">
-                        {#each message.attachments as attachment}
+                        {#each message.attachments as attachment (attachment.url)}
                           {#if attachment.content_type && attachment.content_type.startsWith('image/')}
                             <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block flex-shrink-0">
                               <img
@@ -814,7 +926,7 @@
                     <!-- Reactions -->
                     {#if message.reactions && message.reactions.length > 0}
                       <div class="mt-2 flex flex-wrap gap-1">
-                        {#each message.reactions as reaction}
+                        {#each message.reactions as reaction (reaction.emoji)}
                           <button
                             class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] bg-base-content/[0.05] hover:bg-primary/10 hover:text-primary transition-colors"
                             on:click={() => live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji: reaction.emoji })}
@@ -842,13 +954,14 @@
                   </div>
 
                   <!-- Hover actions: scoped to content column -->
-                  <div class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
+                  <div class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-0.5 transition-opacity z-10">
                 <!-- Reaction picker -->
                 <div class="relative">
                   <button
                     class="p-1 rounded text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                     on:click|stopPropagation={() => openReactionPickerId = openReactionPickerId === message.id ? null : message.id}
                     title="Add reaction"
+                    aria-label="Add reaction"
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.536-4.464a.75.75 0 1 0-1.061-1.061 3.5 3.5 0 0 1-4.95 0 .75.75 0 0 0-1.06 1.06 5 5 0 0 0 7.07 0ZM9 8.5c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S7.448 7 8 7s1 .672 1 1.5Zm3 1.5c.552 0 1-.672 1-1.5S12.552 7 12 7s-1 .672-1 1.5.448 1.5 1 1.5Z" clip-rule="evenodd"/></svg>
                   </button>
@@ -857,7 +970,7 @@
                       class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-xl shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
                       on:click|stopPropagation
                     >
-                      {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji}
+                      {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji (emoji)}
                         <button
                           class="text-lg hover:bg-base-content/[0.08] rounded p-1 transition-colors cursor-pointer leading-none"
                           on:click={() => { live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji }); openReactionPickerId = null }}
@@ -872,6 +985,7 @@
                   class="p-1 rounded text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                   on:click={() => live.pushEvent('open_thread', { message_id: String(message.id) })}
                   title="Reply in thread"
+                  aria-label="Reply in thread"
                 >
                   <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-4 4V5Z" clip-rule="evenodd"/></svg>
                 </button>
@@ -880,6 +994,7 @@
                   class="p-1 rounded text-base-content/30 hover:text-base-content/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                   on:click={() => navigator.clipboard.writeText(message.body || '')}
                   title="Copy message"
+                  aria-label="Copy message"
                 >
                   <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                 </button>
@@ -889,6 +1004,7 @@
                     class="p-1 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                     on:click|stopPropagation={() => openOverflowId = openOverflowId === message.id ? null : message.id}
                     title="More actions"
+                    aria-label="More actions"
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
                   </button>
@@ -897,7 +1013,7 @@
                       <button
                         type="button"
                         class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
-                        on:click|stopPropagation={() => { inspectMessage = message; openOverflowId = null }}
+                        on:click|stopPropagation={() => { openInspect(message); openOverflowId = null }}
                       >
                         Inspect
                       </button>
@@ -951,23 +1067,36 @@
     </button>
   {/if}
 
-  <!-- Typing indicator -->
+  <!-- Live stream preview + working indicator -->
   {#if workingMembers.length > 0}
-    <div class="flex-shrink-0 px-4 py-1">
-      <div class="flex items-center gap-2 text-xs text-base-content/50">
-        <span class="inline-flex gap-[3px]">
-          <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
-        </span>
-        <span>
-          {#if workingMembers.length === 1}
-            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> is working
-          {:else if workingMembers.length === 2}
-            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> and <span class="font-medium text-base-content/50">{workingMembers[1].name}</span> are working
-          {:else}
-            <span class="font-medium text-base-content/50">{workingMembers[0].name}</span> and {workingMembers.length - 1} others are working
-          {/if}
-        </span>
-      </div>
+    <div class="flex-shrink-0 px-4 py-1.5 space-y-1.5">
+      {#each workingMembers as member (member.id)}
+        {@const state = streamStates[String(member.id)]}
+        {#if state && (state.content || state.tool)}
+          <!-- Stream preview bubble for this member -->
+          <div class="rounded-xl border border-base-content/10 bg-base-200/60 px-3 py-2 text-xs text-base-content/70 max-w-[720px]">
+            <div class="flex items-center gap-1.5 mb-1">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse flex-shrink-0"></span>
+              <span class="font-medium text-base-content/50 font-mono">{member.name}</span>
+              {#if state.tool}
+                <span class="ml-auto font-mono text-[10px] text-primary/60 bg-primary/10 px-1.5 py-0.5 rounded">{state.tool}</span>
+              {/if}
+            </div>
+            {#if state.content}
+              <p class="font-mono text-[11px] text-base-content/50 leading-relaxed line-clamp-3 whitespace-pre-wrap break-words">
+                {state.content.length > 300 ? '…' + state.content.slice(-300) : state.content}
+              </p>
+            {/if}
+          </div>
+        {:else}
+          <!-- Plain pulsing dot when no stream content yet -->
+          <div class="flex items-center gap-2 text-xs text-base-content/50">
+            <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
+            <span class="font-medium text-base-content/50">{member.name}</span>
+            <span>is working</span>
+          </div>
+        {/if}
+      {/each}
     </div>
   {/if}
 
@@ -986,6 +1115,7 @@
             on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
             on:keydown={handleInputKeydown}
             placeholder="Message agents…"
+            aria-label="Message"
             class="textarea w-full text-sm rounded-lg bg-transparent border-0 placeholder:text-base-content/25 focus:ring-0 focus:outline-none transition-colors resize-none overflow-y-auto text-base-content p-0"
             rows="1"
             style="max-height: 7.5rem; line-height: 1.5rem;"
@@ -995,7 +1125,7 @@
           <!-- @ Autocomplete Dropdown -->
           {#if showAutocomplete && autocompleteOptions.length > 0}
             <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
-              {#each autocompleteOptions as option, idx}
+              {#each autocompleteOptions as option, idx (option.id)}
                 <button
                   type="button"
                   class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors {idx === selectedAutocompleteIndex ? 'bg-base-content/[0.12]' : 'hover:bg-base-content/[0.08]'}"
@@ -1013,7 +1143,7 @@
           <!-- / Slash Command Autocomplete Dropdown -->
           {#if showSlashAutocomplete && slashOptions.length > 0}
             <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-xl shadow-xl max-h-[280px] overflow-y-auto z-50">
-              {#each groupSlashItems(slashOptions) as entry, idx}
+              {#each groupSlashItems(slashOptions) as entry, idx (entry.header ? `header:${entry.type}` : `${entry.type}:${entry.slug}`)}
                 {#if entry.header}
                   <div class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/60 bg-base-content/[0.06] sticky top-0">
                     {{ skill: 'Skills', command: 'Commands', agent: 'Agents', prompt: 'Prompts' }[entry.type] || entry.type}
@@ -1076,15 +1206,17 @@
   {/if}
 
   {#if inspectMessage}
-    <div class="modal modal-open z-50">
+    <dialog bind:this={inspectDialog} class="modal" aria-labelledby="inspect-title" on:close={closeInspect}>
       <div class="modal-box max-w-2xl">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="font-bold text-sm">Message #{inspectMessage.id}</h3>
-          <button class="btn btn-xs btn-ghost" on:click={() => inspectMessage = null}>Close</button>
+          <h3 id="inspect-title" class="font-bold text-sm">Message #{inspectMessage.id}</h3>
+          <button class="btn btn-xs btn-ghost" on:click={() => inspectDialog?.close()} aria-label="Close">Close</button>
         </div>
         <pre class="text-xs bg-base-200 rounded-lg p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
       </div>
-      <div class="modal-backdrop" on:click={() => inspectMessage = null}></div>
-    </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
   {/if}
 </div>

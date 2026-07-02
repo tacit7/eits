@@ -85,5 +85,6 @@ defmodule EyeInTheSky.Tasks.Task do
     |> validate_inclusion(:state_id, [1, 2, 3, 4], message: "must be a valid workflow state")
     |> validate_number(:project_id, greater_than: 0)
     |> foreign_key_constraint(:team_id)
+    |> unique_constraint(:uuid)
   end
 end

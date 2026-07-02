@@ -141,12 +141,12 @@ defmodule EyeInTheSky.Sessions.ToolEventRecorderTest do
     end
 
     test "respects provider override", %{session: session} do
-      params = %{"tool_name" => "Bash", "tool_input" => %{}, "provider" => "gemini"}
+      params = %{"tool_name" => "Bash", "tool_input" => %{}, "provider" => "codex"}
 
       assert :ok = ToolEventRecorder.record_tool_event(session, "post", params)
 
       [msg] = Messages.list_messages_for_session(session.id)
-      assert msg.provider == "gemini"
+      assert msg.provider == "codex"
     end
 
     test "defaults tool_input when missing", %{session: session} do

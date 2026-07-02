@@ -71,6 +71,7 @@ defmodule EyeInTheSky.Agents.Agent do
     ])
     |> maybe_generate_uuid()
     |> validate_required([])
+    |> unique_constraint(:uuid)
   end
 
   defp maybe_generate_uuid(changeset) do

@@ -9,12 +9,13 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Terminal.PtyServer
   alias EyeInTheSky.Terminal.PtySupervisor
+  alias EyeInTheSkyWeb.CanvasLive.TerminalHandlers
   alias EyeInTheSkyWeb.Components.ChatWindowComponent
   alias EyeInTheSkyWeb.Components.TerminalWindowComponent
 
   @impl true
   def mount(_params, _session, socket) do
-    {canvases, counts} =
+    {canvases, _counts} =
       if connected?(socket) do
         Events.subscribe_agent_working()
         {Canvases.list_canvases(), Canvases.count_sessions_per_canvas()}
@@ -32,7 +33,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
      |> assign(:subscribed_session_ids, [])
      |> assign(:creating_canvas, false)
      |> assign(:renaming_canvas_id, nil)
-     |> assign(:canvas_session_counts, counts)
      |> assign(:show_session_picker, false)
      |> assign(:session_search, "")
      |> assign(:filtered_sessions, [])
@@ -86,7 +86,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
          socket
          |> assign(:canvases, socket.assigns.canvases ++ [canvas])
          |> assign(:creating_canvas, false)
-         |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
          |> push_patch(to: ~p"/canvases/#{canvas.id}")}
 
       {:error, _} ->
@@ -198,48 +197,14 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     end
   end
 
-  def handle_event("add_terminal", _params, socket) do
-    canvas_id = socket.assigns.active_canvas_id
+  def handle_event("add_terminal", _params, socket),
+    do: TerminalHandlers.handle_add_terminal(socket)
 
-    if is_nil(canvas_id) do
-      {:noreply, socket}
-    else
-      offset = length(socket.assigns.canvas_sessions) + length(socket.assigns.canvas_terminals)
+  def handle_event("terminal_moved", %{"id" => id_str, "x" => x, "y" => y}, socket),
+    do: TerminalHandlers.handle_terminal_moved(id_str, x, y, socket)
 
-      attrs = %{
-        pos_x: 24 + offset * 32,
-        pos_y: 24 + offset * 32,
-        width: 620,
-        height: 400
-      }
-
-      case Canvases.create_terminal(canvas_id, attrs) do
-        {:ok, ct} ->
-          {:ok, pty_pid} =
-            PtySupervisor.find_or_start_pty(session_key: "canvas-terminal-#{ct.id}")
-
-          PtyServer.subscribe(pty_pid, self(), ct.id)
-
-          {:noreply,
-           socket
-           |> assign(:canvas_terminals, socket.assigns.canvas_terminals ++ [ct])
-           |> assign(:terminal_pty_map, Map.put(socket.assigns.terminal_pty_map, ct.id, pty_pid))}
-
-        {:error, _} ->
-          {:noreply, socket}
-      end
-    end
-  end
-
-  def handle_event("terminal_moved", %{"id" => id_str, "x" => x, "y" => y}, socket) do
-    if id = parse_int(id_str), do: Canvases.update_terminal_layout(id, %{pos_x: x, pos_y: y})
-    {:noreply, socket}
-  end
-
-  def handle_event("terminal_resized", %{"id" => id_str, "w" => w, "h" => h}, socket) do
-    if id = parse_int(id_str), do: Canvases.update_terminal_layout(id, %{width: w, height: h})
-    {:noreply, socket}
-  end
+  def handle_event("terminal_resized", %{"id" => id_str, "w" => w, "h" => h}, socket),
+    do: TerminalHandlers.handle_terminal_resized(id_str, w, h, socket)
 
   def handle_event(event, _params, socket) do
     Logger.warning("CanvasLive: unhandled event #{inspect(event)}")
@@ -314,41 +279,22 @@ defmodule EyeInTheSkyWeb.CanvasLive do
   end
 
   # Scroll buffer replay on (re-)subscribe — route same as live output
-  def handle_info({:pty_scroll_buffer, terminal_id, data}, socket) when byte_size(data) > 0 do
-    send_update(TerminalWindowComponent,
-      id: "terminal-window-#{terminal_id}",
-      pty_output: data
-    )
-
-    {:noreply, socket}
-  end
+  def handle_info({:pty_scroll_buffer, terminal_id, data}, socket) when byte_size(data) > 0,
+    do: TerminalHandlers.handle_pty_scroll_buffer(terminal_id, data, socket)
 
   def handle_info({:pty_scroll_buffer, _terminal_id, _empty}, socket), do: {:noreply, socket}
 
   # PTY output — tagged with terminal id
-  def handle_info({:pty_output, terminal_id, data}, socket) do
-    send_update(TerminalWindowComponent,
-      id: "terminal-window-#{terminal_id}",
-      pty_output: data
-    )
-
-    {:noreply, socket}
-  end
+  def handle_info({:pty_output, terminal_id, data}, socket),
+    do: TerminalHandlers.handle_pty_output(terminal_id, data, socket)
 
   # PTY exited — remove terminal window and clean up
-  def handle_info({:pty_exited, terminal_id}, socket) do
-    {:noreply, remove_terminal(socket, terminal_id)}
-  end
+  def handle_info({:pty_exited, terminal_id}, socket),
+    do: TerminalHandlers.handle_pty_exited(terminal_id, socket)
 
   # Component requested close
-  def handle_info({:remove_terminal_window, terminal_id}, socket) do
-    if pid = socket.assigns.terminal_pty_map[terminal_id] do
-      PtyServer.stop(pid)
-    end
-
-    Canvases.delete_terminal(terminal_id)
-    {:noreply, remove_terminal(socket, terminal_id)}
-  end
+  def handle_info({:remove_terminal_window, terminal_id}, socket),
+    do: TerminalHandlers.handle_remove_terminal_window(terminal_id, socket)
 
   def handle_info({:canvas_session_added, _payload}, socket) do
     case socket.assigns.active_canvas_id do
@@ -366,17 +312,13 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         new_session_ids = Enum.map(added, & &1.session_id)
         subscribe_all(new_session_ids)
 
-        new_count = length(socket.assigns.canvas_sessions) + length(added)
-        updated_counts = Map.put(socket.assigns.canvas_session_counts, canvas_id, new_count)
-
         {:noreply,
          socket
          |> assign(:canvas_sessions, socket.assigns.canvas_sessions ++ added)
          |> assign(
            :subscribed_session_ids,
            socket.assigns.subscribed_session_ids ++ new_session_ids
-         )
-         |> assign(:canvas_session_counts, updated_counts)}
+         )}
     end
   end
 
@@ -616,9 +558,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                 class="btn btn-ghost btn-sm justify-start gap-2 text-left w-full"
               >
                 <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
-                <span class={["badge badge-xs shrink-0", session_status_class(s.status)]}>
-                  {s.status}
-                </span>
+                <.status_badge status={s.status} size="xs" class="shrink-0" label={s.status} />
               </button>
             <% end %>
             <%= if @filtered_sessions == [] do %>
@@ -653,7 +593,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         :subscribed_session_ids,
         Enum.reject(socket.assigns.subscribed_session_ids, &(&1 == cs.session_id))
       )
-      |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
     else
       socket
     end
@@ -688,21 +627,11 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     |> assign(:active_canvas_id, canvas_id)
     |> assign(:canvas_sessions, [])
     |> assign(:subscribed_session_ids, [])
-    |> assign(:canvas_session_counts, %{})
     |> assign(:show_session_picker, false)
     |> assign(:filtered_sessions, [])
     |> assign(:session_search, "")
     |> assign(:canvas_terminals, [])
     |> assign(:terminal_pty_map, %{})
-  end
-
-  defp remove_terminal(socket, terminal_id) do
-    socket
-    |> assign(
-      :canvas_terminals,
-      Enum.reject(socket.assigns.canvas_terminals, &(&1.id == terminal_id))
-    )
-    |> assign(:terminal_pty_map, Map.delete(socket.assigns.terminal_pty_map, terminal_id))
   end
 
   defp activate_canvas(socket, canvas_id) do
@@ -734,7 +663,6 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       |> assign(:page_title, canvas_name <> " — Canvas")
       |> assign(:canvas_sessions, sessions)
       |> assign(:subscribed_session_ids, session_ids)
-      |> assign(:canvas_session_counts, Canvases.count_sessions_per_canvas())
       |> assign(:canvas_terminals, terminals)
       |> assign(:terminal_pty_map, pty_map)
     else
@@ -770,16 +698,4 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     socket
   end
 
-  # Canvas-specific session badge colors. Differs from status_badge_color/1 in
-  # core_components.ex (which uses :working=success/:waiting=info for agent
-  # display). For canvas session pills, "working"=primary (blue/active),
-  # "waiting"=warning (amber).
-  defp session_status_class("working"), do: "badge-primary"
-  defp session_status_class("idle"), do: "badge-ghost"
-  defp session_status_class("waiting"), do: "badge-warning"
-  defp session_status_class("completed"), do: "badge-success"
-  defp session_status_class("failed"), do: "badge-error"
-  defp session_status_class("compacting"), do: "badge-warning"
-  defp session_status_class("archived"), do: "badge-ghost"
-  defp session_status_class(_), do: "badge-ghost"
 end

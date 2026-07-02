@@ -34,7 +34,7 @@ export const CommandHistory = {
     }
     window.addEventListener('storage', this._onStorage)
 
-    this.el.addEventListener('keydown', (e) => {
+    this._boundKeydown = (e) => {
       // Shift+Enter - insert newline
       if (e.key === 'Enter' && e.shiftKey) {
         requestAnimationFrame(() => this.autoResize())
@@ -111,11 +111,13 @@ export const CommandHistory = {
         e.preventDefault()
         this.navigateHistory('next')
       }
-    })
+    }
+    this.el.addEventListener('keydown', this._boundKeydown)
 
-    this.el.addEventListener('input', () => {
+    this._boundInput = () => {
       this.autoResize()
-    })
+    }
+    this.el.addEventListener('input', this._boundInput)
 
     this.handleEvent('clear-input', () => {
       this.el.value = ''
@@ -138,6 +140,8 @@ export const CommandHistory = {
 
   destroyed() {
     window.removeEventListener('storage', this._onStorage)
+    if (this._boundKeydown) this.el.removeEventListener('keydown', this._boundKeydown)
+    if (this._boundInput) this.el.removeEventListener('input', this._boundInput)
     this._closeSearch()
     SlashCommandPopup.destroyed.call(this)
   },

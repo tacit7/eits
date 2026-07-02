@@ -2,6 +2,55 @@
 
 The Eye in the Sky web application spawns Claude Code CLI subprocesses to handle DM conversations, agent sessions, and project-scoped prompts. Session management uses a DynamicSupervisor pattern for per-session process isolation.
 
+---
+
+## Sessions Context Architecture
+
+The Sessions context (`lib/eye_in_the_sky/sessions/`) has been refactored into focused sub-modules for better separation of concerns:
+
+### Module Organization
+
+The main `Sessions` module now acts as a facade, delegating to three specialized sub-modules while maintaining the same public API:
+
+| Module | Responsibility | Functions |
+|--------|---|---|
+| **`Sessions.Query`** | Read-only session retrieval and queries | `list_sessions/1`, `get_session/1`, `list_active_sessions/0`, `get_session_by_uuid/1`, `list_sessions_for_agent/2`, `list_project_sessions_with_agent/2`, `count_and_ids_for_project/1`, etc. |
+| **`Sessions.StatusTransitions`** | State-changing operations and transitions | `set_session_idle/1`, `end_session/2`, `archive_session/1`, `unarchive_session/1`, `update_session/2`, `batch_delete_sessions/1` |
+| **`Sessions.OverviewQueries`** | Complex/aggregated queries for the overview page | `list_sessions_for_scope/1`, `count_sessions_by_status/1`, etc. (file: `sessions/queries.ex`) |
+| **`Sessions.Events`** | PubSub event broadcasting (implementations inline, no BroadcastEvents delegate) | `broadcast_session_updated/1`, `broadcast_session_completed/1`, `broadcast_session_waiting/1`, `broadcast_status_side_effects/2` |
+| **`Sessions`** (facade) | Unified public API and delegation | Delegates to Query, StatusTransitions, and Events; maintains backward compatibility |
+
+### Design Rationale
+
+- **Query isolation:** All read operations are co-located in `Sessions.Query`, making it easy to identify and optimize slow queries
+- **State changes:** All mutations go through `Sessions.StatusTransitions`, centralizing side effects and making transition logic discoverable
+- **Event broadcasting:** Broadcasting logic is separated from CRUD, keeping the Sessions context boundary clear (data changes in StatusTransitions, events in Sessions.Events)
+- **Facade pattern:** The main `Sessions` module delegates via `defdelegate`, preserving the original public API — callers don't need to know about the sub-modules
+- **No API breakage:** All existing function calls to `Sessions.*` continue to work unchanged
+
+### Example Delegation
+
+From the main `Sessions` module:
+
+```elixir
+# Query delegation
+defdelegate list_sessions(opts), to: Query
+defdelegate get_session(id), to: Query
+defdelegate list_sessions_for_agent(agent_id, opts), to: Query
+
+# Status transition delegation
+defdelegate set_session_idle(session), to: StatusTransitions
+defdelegate end_session(session, opts), to: StatusTransitions
+defdelegate archive_session(session), to: StatusTransitions
+defdelegate update_session(session, attrs), to: StatusTransitions
+
+# Event delegation
+defdelegate broadcast_session_updated(session), to: Events
+defdelegate broadcast_session_completed(session), to: Events
+```
+
+---
+
 ## Architecture Overview
 
 ```
@@ -417,6 +466,41 @@ Pre-tool-use hooks (e.g., `eits-task-gate.sh`) can check the session's read_only
 
 ---
 
+## Sessions.HookRegistrar Sub-Module
+
+Hook session registration was extracted from the main Sessions module into `EyeInTheSky.Sessions.HookRegistrar` (64 lines, commit 1779981c) to separate hook-driven registration logic from general session management. The Sessions module delegates the entry point via `defdelegate`:
+
+### register_from_hook/2
+
+```elixir
+@spec register_from_hook(map(), integer() | nil) ::
+        {:ok, %{session: Session.t(), agent: struct()}}
+        | {:error, :agent | :session, Ecto.Changeset.t()}
+def register_from_hook(params, project_id)
+```
+
+**Purpose:** Register a new session from a SessionStart hook payload (e.g., `eits-session-startup.sh`).
+
+**Input Parameters:**
+- `params` (map) — raw hook payload with keys: `session_id`, `agent_id`, `agent_description`, `description`, `project_name`, `worktree_path`, `model`, `name`, `provider`, `entrypoint`, `read_only`
+- `project_id` (integer | nil) — pre-resolved project ID (may be nil if project wasn't found during startup)
+
+**Workflow:**
+1. **Find or create agent** — Calls `Agents.find_or_create_agent/1` with agent attributes (UUID, description, project context, source: "hook")
+2. **Parse model info** — Extracts model provider and name via `ModelInfo.parse_model_string/1`
+3. **Create session** — Calls either `Sessions.create_session_with_model/1` or `Sessions.create_session/1` depending on whether model_name was parsed
+4. **Fire event** — On success, fires `Events.session_started/1` for downstream listeners
+5. **Return result** — Returns `{:ok, %{session: session, agent: agent}}` on success, or `{:error, :agent | :session, changeset}` on failure
+
+**Error handling:**
+- Returns `{:error, :agent, changeset}` if agent creation fails
+- Returns `{:error, :session, changeset}` if session creation fails
+- Either error short-circuits the workflow — both agent and session must succeed
+
+**Usage:** Called by the startup hook when initializing a new Claude Code session.
+
+---
+
 ## Session Auto-Registration (Startup Hook)
 
 The startup hook (`priv/scripts/eits-session-startup.sh`) now automatically registers new sessions when they are not pre-registered (e.g., not spawned by the orchestrator). This eliminates the need for manual `eits-init` invocation in normal operation.
@@ -518,6 +602,47 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 - `POST /api/v1/sessions/:uuid/context` — Upsert context
 
 This flexibility allows CLI scripts and hooks to use either the shorter numeric ID or the full UUID interchangeably.
+
+### Session UUID Validation (get_session_by_uuid/1)
+
+The `Sessions.get_session_by_uuid/1` function validates UUID format before querying the database to prevent `Ecto.Query.CastError` exceptions when non-UUID strings are passed (commit 0c5f130b):
+
+```elixir
+@spec get_session_by_uuid(String.t()) :: {:ok, Session.t()} | {:error, :not_found}
+def get_session_by_uuid(uuid) when is_binary(uuid) do
+  case Ecto.UUID.cast(uuid) do
+    {:ok, _} -> get_by_uuid(uuid)
+    :error -> {:error, :not_found}
+  end
+end
+```
+
+**Problem:** `Sessions.resolve/1` passes arbitrary strings (e.g., filenames, numeric IDs) to `get_session_by_uuid`. When a non-UUID string was passed directly to `Repo.get_by`, PostgreSQL would raise `Ecto.Query.CastError`, crashing the request.
+
+**Solution:** Validate UUID format using `Ecto.UUID.cast/1` before querying:
+- `{:ok, _}` — UUID is valid, proceed to `get_by_uuid/1`
+- `:error` — Not a valid UUID, return `{:error, :not_found}` gracefully
+
+**Impact:**
+- Non-UUID strings (e.g., filenames from worktree paths) return `:not_found` instead of raising
+- Sessions REST API routes that accept numeric IDs or UUIDs continue to work — `resolve/1` tries numeric lookup first, then falls back to UUID validation
+- Graceful degradation: malformed UUID strings are treated as "no session found" rather than server errors
+
+**Example flow:**
+```bash
+# Valid UUID
+curl /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47
+# → get_session_by_uuid validates, finds session
+
+# Invalid UUID (e.g., a filename)
+curl /api/v1/sessions/.claude/worktrees/fix-bug/notes.md
+# → Ecto.UUID.cast fails, returns {:error, :not_found}
+# → 404 response (graceful)
+
+# Numeric ID still works (resolve tries this first)
+curl /api/v1/sessions/3185
+# → resolve tries numeric lookup, succeeds
+```
 
 ### Agent Type Resolution for IAM Policy Evaluation
 
@@ -997,6 +1122,48 @@ eits agents spawn --agent setup-guardian --member-name alice --team-name builder
 
 ---
 
+## PTY Session Creation
+
+Two behaviors govern how sessions are created and launched from the web UI.
+
+### dm_use_pty Branching
+
+Session creation callers — `AgentLive.IndexActions`, `ProjectLive.Sessions.Actions`, and `WorkspaceLive.Sessions.Actions` — branch on the `dm_use_pty` setting when creating a new session:
+
+```elixir
+create_fn =
+  if EyeInTheSky.Settings.get_boolean("dm_use_pty"),
+    do: &AgentManager.create_pty_session/1,
+    else: &AgentManager.create_agent/1
+
+case create_fn.(opts) do
+  ...
+end
+```
+
+| `dm_use_pty` | Function called | Mode |
+|---|---|---|
+| `true` | `AgentManager.create_pty_session/1` | PTY (interactive terminal, xterm.js) |
+| `false` (default) | `AgentManager.create_agent/1` | SDK/messages mode |
+
+**Why:** The DM page only subscribes to PTY output when `dm_use_pty=true`. Before this fix, all three callers unconditionally called `create_pty_session` regardless of the setting, leaving the DM page blank for any session created with `dm_use_pty=false`.
+
+### Worktree Path in Launch Command
+
+`AgentManager.create_pty_session/1` now uses `agent.git_worktree_path` as the working directory in the Claude CLI launch command, falling back to `opts[:project_path]`:
+
+```elixir
+# Use the resolved worktree path from the agent record (set by RecordBuilder
+# after creating the git worktree), falling back to the raw project path.
+working_path = agent.git_worktree_path || opts[:project_path]
+cd_part = if working_path && working_path != "", do: "cd #{working_path} && ", else: ""
+launch_cmd = "#{cd_part}claude --session-id #{session.uuid}\n"
+```
+
+**Why:** Previously `create_pty_session` used `opts[:project_path]` (the base project directory) as the working directory, ignoring the git worktree path resolved by `RecordBuilder`. This caused the PTY session to launch Claude in the wrong directory when a session had a worktree. The DM page's `build_launch_command` already used the correct worktree path — this fix brings `create_pty_session` into alignment with that logic.
+
+---
+
 ## Worktree Management
 
 Agent workers use git worktrees to isolate CLI processes and prevent conflicts on concurrent spawns.
@@ -1391,18 +1558,20 @@ The partial indexes filter on `status IN ["idle", "waiting"]` and `archived_at I
 
 ## PubSub Broadcasts for Session Updates
 
-PubSub broadcasts for session status updates are emitted from the Sessions context (`lib/eye_in_the_sky/sessions.ex`), not the controller layer. This keeps broadcast logic co-located with the data modifications that trigger them and keeps the web layer free of direct domain event calls.
+PubSub broadcasts for session status updates are emitted from the Sessions context via the `Sessions.Events` sub-module, not the controller layer. This keeps broadcast logic co-located with the data modifications that trigger them and keeps the web layer free of direct domain event calls.
 
-### Broadcast Functions
+### Broadcast Functions via Sessions.Events
 
-All broadcast helpers live in `EyeInTheSky.Sessions`:
+All broadcast helpers are accessed through `EyeInTheSky.Sessions.Events`. As of commit 76580e6d, `Sessions.BroadcastEvents` has been deleted — its implementations are now inline in `Sessions.Events` directly (no more `defdelegate` indirection).
 
 | Function | Events fired | Use case |
 |---|---|---|
-| `broadcast_session_updated(session)` | `session_updated` | Generic status update; called after PATCH |
-| `broadcast_session_completed(session)` | `session_completed` + `session_updated` | Session marked completed |
-| `broadcast_session_waiting(session)` | `agent_stopped` + `session_updated` | Session parked to waiting |
-| `broadcast_status_side_effects(session, status)` | `agent_stopped` or `agent_working` + `session_updated` | Status PATCH with arbitrary new status |
+| `Sessions.broadcast_session_updated(session)` | `session_updated` | Generic status update; called after PATCH |
+| `Sessions.broadcast_session_completed(session)` | `session_completed` + `session_updated` | Session marked completed |
+| `Sessions.broadcast_session_waiting(session)` | `agent_stopped` + `session_updated` | Session parked to waiting |
+| `Sessions.broadcast_status_side_effects(session, status)` | `agent_stopped` or `agent_working` + `session_updated` | Status PATCH with arbitrary new status |
+
+(Note: Callers use the `Sessions.*` public API; the Events sub-module is an internal implementation detail.)
 
 `broadcast_session_completed` and `broadcast_session_waiting` are implemented via a private helper `broadcast_with_session_updated/2` that accepts the primary event function and always appends `session_updated` (commit ffda2181):
 
@@ -1413,9 +1582,27 @@ defp broadcast_with_session_updated(session, event_fn) do
 end
 ```
 
+### Sessions.Events Sub-Module
+
+`Sessions.Events` contains the PubSub broadcast implementations directly. `Sessions.BroadcastEvents` was deleted in commit 76580e6d — its functions were merged into `Sessions.Events`, removing the `defdelegate` layer that previously existed:
+
+```elixir
+# Before (deleted): Sessions.Events delegated to BroadcastEvents
+defdelegate broadcast_session_updated(session), to: BroadcastEvents
+
+# After: implementations are inline in Sessions.Events
+def broadcast_session_updated(session), do: Phoenix.PubSub.broadcast(...)
+```
+
+This structure keeps the Sessions context boundary clear: data mutations in `StatusTransitions`, event broadcasts in `Events`.
+
+### Sessions.OverviewQueries Sub-Module
+
+Complex aggregated queries used by the overview/project sessions page live in `Sessions.OverviewQueries` (file: `lib/eye_in_the_sky/sessions/queries.ex`). The module was renamed from `Sessions.Queries` to `Sessions.OverviewQueries` in commit 76580e6d to distinguish it from `Sessions.Query` (basic CRUD reads). All `defdelegate` lines in `sessions.ex` were updated accordingly.
+
 ### set_session_idle/1
 
-`Sessions.set_session_idle/1` updates session status to `"idle"` and fires `Events.agent_stopped` on the updated struct in one call. Previously, the web layer called `update_session` then fired `agent_stopped` with the stale pre-update struct. Use this in cancel/stop handlers:
+`Sessions.set_session_idle/1` (implemented in `Sessions.StatusTransitions`) updates session status to `"idle"` and fires `Events.agent_stopped` on the updated struct in one call. Previously, the web layer called `update_session` then fired `agent_stopped` with the stale pre-update struct. Use this in cancel/stop handlers:
 
 ```elixir
 Sessions.set_session_idle(session)
@@ -1426,7 +1613,7 @@ Sessions.set_session_idle(session)
 
 ### Archive / Unarchive
 
-`archive_session/1` and `unarchive_session/1` both delegate to a private `set_archived/2` that accepts either a `DateTime` value or `nil`. Both fire `session_updated` after the DB write:
+`archive_session/1` and `unarchive_session/1` (both in `Sessions.StatusTransitions`) delegate to a private `set_archived/2` that accepts either a `DateTime` value or `nil`. Both fire `session_updated` after the DB write:
 
 ```elixir
 def archive_session(%Session{} = session), do: set_archived(session, DateTime.utc_now())

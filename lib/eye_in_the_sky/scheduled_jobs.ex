@@ -225,26 +225,44 @@ defmodule EyeInTheSky.ScheduledJobs do
   end
 
   def bulk_update_enabled(job_ids, enabled, caller_project_id \\ nil) do
-    Enum.reduce(job_ids, {0, 0}, fn job_id, {succeeded, failed} ->
-      case get_job(job_id) do
-        {:ok, job} ->
-          apply_enabled_if_authorized(job, enabled, caller_project_id, {succeeded, failed})
+    # Batch-load all jobs to avoid N separate get_job queries
+    jobs_by_id =
+      ScheduledJob
+      |> where([j], j.id in ^job_ids)
+      |> Repo.all()
+      |> Map.new(&{&1.id, &1})
 
-        _ ->
-          {succeeded, failed + 1}
-      end
-    end)
-  end
+    # Separate authorized and unauthorized jobs
+    {authorized_ids, failed_count} =
+      Enum.reduce(job_ids, {[], 0}, fn job_id, {auth_acc, fail_acc} ->
+        case Map.fetch(jobs_by_id, job_id) do
+          {:ok, job} ->
+            if authorized?(job, caller_project_id) do
+              {[job_id | auth_acc], fail_acc}
+            else
+              {auth_acc, fail_acc + 1}
+            end
 
-  defp apply_enabled_if_authorized(job, enabled, caller_project_id, {succeeded, failed}) do
-    if authorized?(job, caller_project_id) do
-      case update_job_fields(job, %{enabled: enabled, updated_at: DateTime.utc_now()}) do
-        {:ok, _} -> {succeeded + 1, failed}
-        _ -> {succeeded, failed + 1}
+          :error ->
+            {auth_acc, fail_acc + 1}
+        end
+      end)
+
+    # Update all authorized jobs in a single query to avoid N separate update queries
+    succeeded_count =
+      if Enum.empty?(authorized_ids) do
+        0
+      else
+        {count, _} =
+          ScheduledJob
+          |> where([j], j.id in ^authorized_ids)
+          |> update([j], set: [enabled: ^enabled, updated_at: ^DateTime.utc_now()])
+          |> Repo.update_all([])
+
+        count
       end
-    else
-      {succeeded, failed + 1}
-    end
+
+    {succeeded_count, failed_count}
   end
 
   def change_job(%ScheduledJob{} = job, attrs \\ %{}) do

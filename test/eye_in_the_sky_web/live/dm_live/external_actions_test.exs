@@ -236,24 +236,6 @@ defmodule EyeInTheSkyWeb.DmLive.ExternalActionsTest do
       assert result.assigns.flash["error"] == nil
     end
 
-    @tag :host_dependent
-    test "passes validation for valid gemini UUID" do
-      session = Factory.new_session()
-      agent = create_agent_preloaded()
-      valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
-
-      socket =
-        build_socket(%{
-          session_uuid: valid_uuid,
-          session: %{session | provider: "gemini"},
-          agent: agent
-        })
-
-      {:noreply, result} = ExternalActions.handle_open_iterm(socket)
-
-      assert result.assigns.flash["error"] == nil
-    end
-
     test "defaults provider to claude when session.provider is nil" do
       session = Factory.new_session()
       agent = create_agent_preloaded()

@@ -2292,7 +2292,7 @@ describe("hint mode (f key)", () => {
     const h = makeHook()
     h.mounted()
     h.enterHintMode()
-    const labels = [...h.hintOverlayEl!.querySelectorAll<HTMLElement>("[data-hint-label]")]
+    const labels = ([...h.hintOverlayEl!.querySelectorAll("[data-hint-label]")] as HTMLElement[])
       .map(b => b.dataset.hintLabel)
     expect(labels).toEqual(["a", "b", "c"])
   })
@@ -3081,5 +3081,188 @@ describe("quick DM commands (m on sessions page, Space d m global)", () => {
     h.handleKey(event)
 
     expect(h.quickDmOverlayEl).toBeNull()
+  })
+})
+
+describe("ctrl-o / ctrl-i recent session cycling", () => {
+  // UUIDs must be exactly 36 chars to satisfy the /^\/dm\/([0-9a-f-]{36})/ regex.
+  const UUID_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  const UUID_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  const UUID_C = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+  const UUID_D = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+  // Visit history: index 0 = most recently visited. Matches sessionStorage ring buffer format.
+  const VISIT_HISTORY = [
+    { uuid: UUID_A, name: "Alpha" },   // most recently visited
+    { uuid: UUID_B, name: "Beta" },
+    { uuid: UUID_C, name: "Gamma" },
+    { uuid: UUID_D, name: "Delta" },   // oldest visit
+  ]
+
+  afterEach(() => {
+    document.body.innerHTML = ""
+    sessionStorage.clear()
+  })
+
+  // Each test that cares about the URL explicitly sets window.location.
+  // Relying on beforeEach for location doesn't work reliably within a describe
+  // block — subsequent Object.defineProperty calls can fail silently in jsdom
+  // once the original location descriptor is gone. Self-contained setup is safer.
+  function setLocation(pathname: string): ReturnType<typeof vi.fn> {
+    const assign = vi.fn()
+    Object.defineProperty(window, "location", {
+      value: { pathname, assign },
+      writable: true,
+      configurable: true,
+    })
+    return assign
+  }
+
+  function seedHistory(sessions: Array<{ uuid: string; name: string }>) {
+    sessionStorage.setItem("vim-nav:recent-sessions", JSON.stringify(sessions))
+  }
+
+  function pressCtrlKey(h: any, key: "o" | "i"): KeyboardEvent {
+    const evt = new KeyboardEvent("keydown", { key, ctrlKey: true, cancelable: true })
+    Object.defineProperty(evt, "target", { value: document.body, configurable: true })
+    h.handleKey(evt)
+    return evt
+  }
+
+  it("ctrl-o does nothing when visit history is empty", () => {
+    const assign = setLocation(`/dm/${UUID_B}`)
+    const h = makeHook()
+    h.mode = "normal"
+    // No sessionStorage data
+    pressCtrlKey(h, "o")
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("ctrl-o navigates to previously visited session from current URL", () => {
+    const assign = setLocation(`/dm/${UUID_B}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    // UUID_B is at index 1 in visit history. c-o should go to index 2 (UUID_C).
+    pressCtrlKey(h, "o")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_C}`)
+    expect(h._recentSessionIdx).toBe(2)
+  })
+
+  it("ctrl-i navigates to more recently visited session from current URL", () => {
+    const assign = setLocation(`/dm/${UUID_B}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    // UUID_B is at index 1. c-i should go to index 0 (UUID_A — most recently visited).
+    pressCtrlKey(h, "i")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_A}`)
+    expect(h._recentSessionIdx).toBe(0)
+  })
+
+  it("ctrl-i is a no-op when current URL is the most-recently-visited session", () => {
+    const assign = setLocation(`/dm/${UUID_A}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    pressCtrlKey(h, "i")
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("ctrl-o clamps at last (oldest) item when already at end of history", () => {
+    const assign = setLocation(`/dm/${UUID_D}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    // UUID_D is at index 3 (oldest). c-o tries index 4 but clamps to 3 — same session.
+    pressCtrlKey(h, "o")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_D}`)
+    expect(h._recentSessionIdx).toBe(3)
+  })
+
+  it("ctrl-o when not on a DM page jumps to most recently visited (index 0)", () => {
+    const assign = setLocation("/projects/1/tasks")
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    pressCtrlKey(h, "o")
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_A}`)
+    expect(h._recentSessionIdx).toBe(0)
+  })
+
+  it("ctrl-i when not on a DM page is a no-op (nowhere more recent to go)", () => {
+    const assign = setLocation("/projects/1/tasks")
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    pressCtrlKey(h, "i")
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("consecutive ctrl-o presses advance the cursor through visit history", () => {
+    // Start at UUID_B (index 1). c-o → index 2. c-o again → index 3.
+    const assign1 = setLocation(`/dm/${UUID_B}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    pressCtrlKey(h, "o")
+    expect(h._recentSessionIdx).toBe(2)
+    expect(assign1).toHaveBeenCalledWith(`/dm/${UUID_C}`)
+    // Second press uses cursor position (not URL), goes to index 3.
+    const assign2 = setLocation(`/dm/${UUID_C}`)
+    pressCtrlKey(h, "o")
+    expect(h._recentSessionIdx).toBe(3)
+    expect(assign2).toHaveBeenCalledWith(`/dm/${UUID_D}`)
+  })
+
+  it("ctrl-i after ctrl-o reverses direction", () => {
+    // c-o from UUID_B (index 1) → index 2. c-i → back to index 1.
+    const assign = setLocation(`/dm/${UUID_B}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    pressCtrlKey(h, "o")
+    expect(h._recentSessionIdx).toBe(2)
+    pressCtrlKey(h, "i")
+    expect(h._recentSessionIdx).toBe(1)
+    expect(assign).toHaveBeenLastCalledWith(`/dm/${UUID_B}`)
+  })
+
+  it("_recentSessionIdx reset to -1 causes re-anchor from URL on next press", () => {
+    // UUID_C is at index 2. c-o should advance to index 3 (UUID_D).
+    const assign = setLocation(`/dm/${UUID_C}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    h._recentSessionIdx = -1  // simulates _onPageLoad reset
+    pressCtrlKey(h, "o")
+    expect(h._recentSessionIdx).toBe(3)
+    expect(assign).toHaveBeenCalledWith(`/dm/${UUID_D}`)
+  })
+
+  it("ctrl-o does nothing in insert mode", () => {
+    const assign = setLocation(`/dm/${UUID_B}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "insert"
+    pressCtrlKey(h, "o")
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("ctrl-o prevents default browser action (Open File dialog)", () => {
+    setLocation(`/dm/${UUID_B}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    const evt = pressCtrlKey(h, "o")
+    expect(evt.defaultPrevented).toBe(true)
+  })
+
+  it("ctrl-i prevents default browser action", () => {
+    setLocation(`/dm/${UUID_B}`)
+    seedHistory(VISIT_HISTORY)
+    const h = makeHook()
+    h.mode = "normal"
+    const evt = pressCtrlKey(h, "i")
+    expect(evt.defaultPrevented).toBe(true)
   })
 })

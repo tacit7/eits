@@ -71,6 +71,7 @@ eits sessions list [--search <q>] [--name <partial>] [--status <s>] \
   [--limit <n>] [--include-archived] [--with-tasks]
 # --agent-slug: filter by agent definition slug (e.g. "eits-cli-expert")
 # --agent: filter by agent UUID (mutually exclusive with --search/--status/--project/--mine)
+# API response structure: returns .results (sessions array); falls back to .sessions for backward compatibility
 
 eits sessions get <uuid>
 eits sessions get self                         # Use current $EITS_SESSION_UUID
@@ -128,10 +129,18 @@ eits sessions reopen [<uuid|self>]
 eits tasks list [--project <id>] [--session <uuid>] [--q <query>|--search <query>] \
   [--state <id>] [--state-name <todo|in-progress|done|in-review>] \
   [--agent <uuid>] [--mine|--assigned] [--created-by] [--all] [--limit <n>]
-# Default: lists only current session's tasks when EITS_SESSION_UUID is set
-# --all: override to list across all sessions
+# Default: lists current session's tasks AND scopes to current project (EITS_PROJECT_ID or path=$PWD fallback)
+# --all: bypass session scope only (list all sessions in current project; project scope always applies)
+# --project <id>: explicit project override disables implicit session scope (lists project-wide tasks)
 # --mine / --assigned: tasks where current session is the active executor (linked via task_sessions after claim)
 # --created-by: tasks created by the current session (via created_by_session_id)
+#
+# **Project Scoping Behavior:**
+# - Default: EITS_PROJECT_ID is injected into the query automatically
+# - When EITS_PROJECT_ID is unset, falls back to path=$PWD (server resolves project from filesystem path)
+# - --all bypasses session scope only — project scope always applies
+# - --project <id>: explicit project override removes automatic session-scope injection
+# - API response includes both session_id (from first linked session) and agent_id (task's assigned agent)
 
 eits tasks active [--json]
 eits tasks mine [--json]
@@ -209,6 +218,16 @@ eits tasks states
 ### Exit codes
 
 `tasks list` and other table-printing commands are safe to use in scripts with `set -euo pipefail`. The `[[ cond ]] && cmd` pattern was replaced with `if/fi` guards so empty-result branches no longer exit 1 under pipefail. This applies to `_tbl_tasks`, `_tbl_sessions`, `_tbl_notes`, `_tbl_commits`, `channels list`, and `channels members`.
+
+### tasks list output format
+
+CLI table output columns:
+- **STATE**: Task workflow state (To Do, In Progress, In Review, Done)
+- **TITLE**: Task title (truncated to 44 chars)
+- **ID**: Task numeric ID
+- **SESSION**: Session ID of the first linked session (from `task_sessions`). Blank if no sessions are linked.
+
+API JSON response includes both `session_id` (from first linked session) and `agent_id` (task's assigned agent UUID, if any) in the task object. The CLI table shows SESSION; use `--json` for full response with both fields.
 
 ### Workflow states
 
@@ -385,6 +404,8 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 **Worktree cleanup**: `--stash-if-dirty` auto-stashes uncommitted changes before worktree creation (instead of failing with dirty_working_tree error).
 
+**Effort level**: `--effort-level <level>` sets reasoning effort for the spawned agent. Valid levels: `low`, `medium`, `high`, `max`. This is passed to Claude CLI as the `--effort` flag. Defaults to the session's configured effort level if not specified.
+
 **Team joining**: `--team-name` (by name) or `--team-id` (by integer ID, mutually exclusive). `--team-id` is resolved to team name via GET /teams/:id. If `--team-id` is not found, spawn prints a warning to stderr and continues without team assignment.
 
 **Worktree conflict detection**: When `--worktree` is specified, spawn checks if dangling worktrees are registered (via `git worktree list`). If found, warns to stderr suggesting `git worktree prune` to avoid name conflicts with merged branches.
@@ -406,7 +427,7 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 - Aliases: opus, opus[1m], sonnet, sonnet[1m], haiku
 
 `--provider codex`:
-- gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
+- gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
 
 `--provider gemini`:
 - gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
@@ -463,9 +484,15 @@ eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <is
 eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json]
 # List inbound DMs for a session (CLI-side inbox polling)
 # inbox is an alias for list
+# The table lists an ID column first — copy it into `eits dm read <id>`
 # --from: filter by sender (optional)
 # --since: return only messages inserted after ISO8601 timestamp (optional)
 # --since-session: filter to DMs received since this session started (suppresses stale DMs from prior resume sessions)
+
+eits dm read <id> [--json]
+# Print a single DM's FULL body by message ID (the inbox table truncates bodies).
+# Recipient-scoped: 403 if the caller session is not the message recipient.
+# --json: machine-readable {id, uuid, body, from_session_id, to_session_id, inserted_at}
 
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
 # Send a direct message to an agent session
@@ -670,6 +697,28 @@ eits worktree remove <branch> [--project-path <path>]
 ```
 
 **Note**: Scoped to EITS Elixir projects (.claude/worktrees/ layout, mix compile verification).
+
+---
+
+## hooks
+
+```bash
+eits hooks install     # Install EITS Claude Code hooks into ~/.claude/settings.json
+eits hooks uninstall   # Remove EITS-managed hooks from ~/.claude/settings.json
+```
+
+**`eits hooks install`** performs a complete hook setup:
+1. Copies core hook scripts to `~/.config/eits/hooks/` (eits-lib.sh, eits-session-startup.sh, eits-session-resume.sh, etc.)
+2. Installs the eits CLI binary to `~/.local/bin/eits` and makes it executable
+3. Patches shell profiles (`~/.zprofile`, `~/.bash_profile`) to add `~/.local/bin` to `PATH` if not already present
+4. Merges EITS hook entries into `~/.claude/settings.json` without overwriting unrelated entries
+5. Provides feedback on what was installed
+
+**`eits hooks uninstall`** removes EITS-managed hooks:
+1. Removes EITS hook entries from `~/.claude/settings.json`
+2. Does NOT delete script files or the eits CLI binary — only removes the hook registrations
+
+**Why use this**: Claude Code hooks are the primary mechanism for automatic session tracking, context injection, and task lifecycle management. This command automates the setup that would otherwise require manual script copying and JSON editing.
 
 ---
 

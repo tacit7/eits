@@ -81,9 +81,18 @@ Available current project commands:
 - **Behavior:**
   - Shows loading state while fetching sessions
   - Displays session name or description in submenu
+  - Hint shows project name and directory (`ProjectName · dirname`) when project is available
+  - Falls back to session status for sessions without an associated project
   - Ordered by last_activity_at (newest first)
   - Fetches all non-archived sessions
   - Click to navigate to session's DM page
+- **Backend:**
+  - Preloads `:project` association on sessions
+  - Returns `project_name` and `project_path` in `palette:recent-sessions-result` event
+- **Frontend:**
+  - Extracts directory name from `project_path` using `split("/").pop()`
+  - Builds hint label from `project_name` and extracted directory name
+  - Falls back to `status` field if `project_name` is null
 
 #### Go to Project
 - **ID:** `go-projects`

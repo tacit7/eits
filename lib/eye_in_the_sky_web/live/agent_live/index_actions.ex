@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Sessions
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
 
   require Logger
@@ -232,7 +233,7 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
             AgentManager.continue_session(
               session.id,
               direct_message_prompt(body),
-              model: "sonnet",
+              model: Settings.get("default_model") || "sonnet",
               project_path: project_path
             )
 

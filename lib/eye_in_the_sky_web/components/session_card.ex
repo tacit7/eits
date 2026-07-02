@@ -152,7 +152,10 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
               <.icon name="hero-command-line" class="size-3 text-base-content/40 flex-shrink-0" />
             <% end %>
             <%= if name = agent_display_name(@session) do %>
-              <span class="text-base-content/50 truncate min-w-0">{name}</span>
+              <span class="inline-flex items-center gap-0.5 text-base-content/50 min-w-0 truncate">
+                <.custom_icon name="lucide-robot" class="size-3 shrink-0 text-base-content/35" />
+                <span class="truncate">{name}</span>
+              </span>
               <span class="text-base-content/15">/</span>
             <% end %>
             <span class="font-mono">{Sessions.format_model_info(@session)}</span>
@@ -165,6 +168,16 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
             <%= if task_title = @session.current_task_title do %>
               <span class="text-base-content/15">/</span>
               <span class="truncate text-primary/60 font-medium">{task_title}</span>
+            <% end %>
+            <%= if @session.git_worktree_path do %>
+              <span class="text-base-content/15">/</span>
+              <span
+                class="inline-flex items-center gap-0.5 text-primary/55 shrink-0"
+                title={@session.git_worktree_path}
+              >
+                <.custom_icon name="lucide-git-branch" class="size-3" />
+                {Path.basename(@session.git_worktree_path)}
+              </span>
             <% end %>
           </div>
         </div>

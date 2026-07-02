@@ -1,4 +1,5 @@
 import { saveWindowLayout, saveWindowZ, saveWindowMinimized, loadWindowLayout } from './canvas_layout_hook'
+import { initResizeObserver } from './utils'
 
 const SNAP_THRESHOLD = 40
 
@@ -135,8 +136,8 @@ export const ChatWindowHook = {
 
     const onMouseUp = () => {
       this._dragging = false
-      document.removeEventListener("mousemove", onMouseMove)
-      document.removeEventListener("mouseup", onMouseUp)
+      document.removeEventListener("mousemove", this._boundDragMove)
+      document.removeEventListener("mouseup", this._boundDragUp)
       if (snapPreview) snapPreview.style.display = "none"
 
       const snap = activeSnap
@@ -174,7 +175,10 @@ export const ChatWindowHook = {
       }, 50)
     }
 
-    handle.addEventListener("mousedown", (e) => {
+    // Store bound handlers so destroyed() can remove them
+    this._boundDragMove = onMouseMove
+    this._boundDragUp = onMouseUp
+    this._boundDragStart = (e) => {
       // Let buttons inside the handle handle their own clicks (minimize, maximize, close).
       if (e.target.closest('button')) return
       e.preventDefault()
@@ -193,39 +197,24 @@ export const ChatWindowHook = {
 
       this._raiseToFront()
 
-      document.addEventListener("mousemove", onMouseMove)
-      document.addEventListener("mouseup", onMouseUp)
-    })
+      document.addEventListener("mousemove", this._boundDragMove)
+      document.addEventListener("mouseup", this._boundDragUp)
+    }
+
+    handle.addEventListener("mousedown", this._boundDragStart)
   },
 
   _initResize() {
     // Track current dimensions so updated() can restore them after a LiveView
     // patch (which re-writes the style attr from DB values and would otherwise
     // snap the window back to its last-saved size mid-interaction).
-    this._width  = this.el.offsetWidth
-    this._height = this.el.offsetHeight
-
-    const observer = new ResizeObserver(() => {
-      // Update tracked dims immediately — don't wait for the persist debounce —
-      // so updated() restores correctly if a message is sent mid-resize.
-      this._width  = this.el.offsetWidth
-      this._height = this.el.offsetHeight
-      clearTimeout(this._resizePersistTimer)
-      this._resizePersistTimer = setTimeout(() => {
-        if (this._destroyed) return
-        const w = this.el.offsetWidth
-        const h = this.el.offsetHeight
-        this.pushEvent("window_resized", {
-          id: this.el.dataset.csId, w, h
-        })
-        saveWindowLayout(this.el.dataset.csId,
-          parseInt(this.el.style.left, 10) || 0,
-          parseInt(this.el.style.top, 10)  || 0,
-          w, h)
-      }, 400)
+    initResizeObserver(this, (w, h) => {
+      this.pushEvent("window_resized", { id: this.el.dataset.csId, w, h })
+      saveWindowLayout(this.el.dataset.csId,
+        parseInt(this.el.style.left, 10) || 0,
+        parseInt(this.el.style.top, 10)  || 0,
+        w, h)
     })
-    observer.observe(this.el)
-    this._windowResizeObserver = observer
   },
 
   _initWindowControls() {
@@ -599,6 +588,15 @@ export const ChatWindowHook = {
     if (this._chatResizeObserver) this._chatResizeObserver.disconnect()
     document.removeEventListener("mousedown", this._onBlurWindows)
     window.removeEventListener("canvas:focus-session", this._onFocusSession)
+
+    // Clean up drag listeners if drag is in progress
+    if (this._boundDragStart) {
+      const handle = this.el.querySelector("[data-drag-handle]")
+      if (handle) handle.removeEventListener("mousedown", this._boundDragStart)
+    }
+    if (this._boundDragMove) document.removeEventListener("mousemove", this._boundDragMove)
+    if (this._boundDragUp) document.removeEventListener("mouseup", this._boundDragUp)
+
     this._userScrolled = true  // stop any pending force-scroll timeouts
   }
 }

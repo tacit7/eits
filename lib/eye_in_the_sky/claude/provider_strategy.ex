@@ -8,6 +8,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy do
   All implementations return `{:ok, sdk_ref, handler_pid}` or `{:error, reason}`.
   """
 
+
   alias EyeInTheSky.Claude.ContentBlock
 
   @type sdk_result :: {:ok, reference(), pid()} | {:error, term()}
@@ -43,6 +44,5 @@ defmodule EyeInTheSky.Claude.ProviderStrategy do
   @doc "Return the strategy module for a given provider string."
   @spec for_provider(String.t()) :: module()
   def for_provider("codex"), do: EyeInTheSky.Claude.ProviderStrategy.Codex
-  def for_provider("gemini"), do: EyeInTheSky.Claude.ProviderStrategy.Gemini
   def for_provider(_), do: EyeInTheSky.Claude.ProviderStrategy.Claude
 end

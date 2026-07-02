@@ -1,5 +1,5 @@
 defmodule EyeInTheSky.Codex.SessionReaderTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias EyeInTheSky.Codex.SessionReader
 

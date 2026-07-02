@@ -1,5 +1,7 @@
 // assets/js/hooks/vim_nav.ts
 import { COMMANDS, PREFIXES, type Command } from "./vim_nav_commands"
+import { createStatusbar, updateStatusbar, type Mode } from "./vim_nav_statusbar"
+import { _generateHintLabels, createHintOverlay, filterHintBadges } from "./vim_nav_hints"
 
 const EDITABLE_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"])
 
@@ -51,8 +53,6 @@ export function matchesKnownBindingOrPrefix(buffer: string[], key: string): bool
 // Re-export Command type for use in Task 3 hook implementation
 export type { Command }
 
-type Mode = "normal" | "insert"
-
 // LiveView injects `el` and `pushEvent` at mount — Phoenix ships no official TS types,
 // so we define the interface here for type safety.
 interface LiveViewHook {
@@ -62,51 +62,6 @@ interface LiveViewHook {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
-}
-
-function createStatusbar(): HTMLElement {
-  const el = document.createElement("div")
-  el.id = "vim-nav-statusbar"
-  el.setAttribute("aria-hidden", "true")
-  el.style.cssText = [
-    "position:fixed",
-    "bottom:12px",
-    "right:16px",
-    "z-index:9999",
-    "font-family:monospace",
-    "font-size:11px",
-    "padding:2px 6px",
-    "border-radius:3px",
-    "pointer-events:none",
-    "background:transparent",
-  ].join(";")
-  return el
-}
-
-function updateStatusbar(el: HTMLElement, mode: Mode, count = 0): void {
-  if (mode === "normal") {
-    el.textContent = count > 0 ? `[ NORMAL ] ${count}` : "[ NORMAL ]"
-    el.style.color = "var(--color-base-content)"
-    el.style.opacity = "0.55"
-  } else {
-    el.textContent = "[ INSERT ]"
-    el.style.color = "var(--color-info, var(--color-primary))"
-    el.style.opacity = "0.9"
-  }
-}
-
-function _generateHintLabels(count: number): string[] {
-  const alpha = "abcdefghijklmnopqrstuvwxyz"
-  const labels: string[] = []
-  for (let i = 0; labels.length < count && i < alpha.length; i++) {
-    labels.push(alpha[i])
-  }
-  for (let i = 0; labels.length < count && i < alpha.length; i++) {
-    for (let j = 0; labels.length < count && j < alpha.length; j++) {
-      labels.push(alpha[i] + alpha[j])
-    }
-  }
-  return labels
 }
 
 export const VimNav = {
@@ -140,6 +95,8 @@ export const VimNav = {
   _quickDmTargetUuid: "" as string,
   _quickDmTargetName: "" as string,
   _quickDmComposeHandler: null as ((e: Event) => void) | null,
+  // Recent session cycling (c-o / c-i) — cursor into the sessionStorage visit ring buffer
+  _recentSessionIdx: -1 as number,
 
   mounted() {
     if (!this.isEnabled()) return
@@ -163,6 +120,7 @@ export const VimNav = {
     this._onPageLoad = () => {
       this.clearListFocus()
       this._recordSessionVisit()
+      this._recentSessionIdx = -1
     }
     window.addEventListener("phx:page-loading-stop", this._onPageLoad)
 
@@ -294,6 +252,14 @@ export const VimNav = {
         }
         return
       }
+      // Ctrl-O / Ctrl-I: cycle through sessions YOU personally visited (sessionStorage ring buffer).
+      // Ctrl-O goes to the session visited before the current one.
+      // Ctrl-I goes to the session visited after (more recently).
+      if (key === "o" || key === "i") {
+        event.preventDefault()
+        this._doNavigateRecent(key === "o" ? "prev" : "next")
+        return
+      }
     }
 
     if (event.metaKey || event.ctrlKey || event.altKey) return
@@ -415,7 +381,7 @@ export const VimNav = {
     }
     const list = this.currentList()
     if (!list) return []
-    return [...list.querySelectorAll<HTMLElement>("[data-vim-list-item]")]
+    return [...list.querySelectorAll("[data-vim-list-item]")] as HTMLElement[]
   },
 
   focusListItem(index: number): void {
@@ -543,7 +509,7 @@ export const VimNav = {
       if (action.name === "list_open_tab") {
         const item = this.currentListItems()[this.listFocusIndex]
         if (!item) return
-        const anchor = (item.tagName === "A" ? item : item.querySelector<HTMLAnchorElement>("a[href]")) as HTMLAnchorElement | null
+        const anchor = (item.tagName === "A" ? item : item.querySelector("a[href]")) as HTMLAnchorElement | null
         const href = anchor?.getAttribute("href")
         if (href) window.open(href, "_blank", "noopener,noreferrer")
         return
@@ -601,7 +567,7 @@ export const VimNav = {
         if (!item) return
         const selector = item.dataset.vimRenameTarget
         if (!selector) return
-        const input = item.querySelector<HTMLElement>(selector)
+        const input = item.querySelector(selector) as HTMLElement | null
         if (!input) return
         input.focus()
         if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) {
@@ -805,36 +771,9 @@ export const VimNav = {
     this.hintBuffer = ""
     this.hintMode = true
 
-    const overlay = document.createElement("div")
-    overlay.id = "vim-nav-hints"
-    overlay.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999"
-    this.hintOverlayEl = overlay
+    this.hintOverlayEl = createHintOverlay(items, labels)
+    document.body.appendChild(this.hintOverlayEl)
 
-    items.forEach((item, i) => {
-      const rect = item.getBoundingClientRect()
-      const badge = document.createElement("span")
-      badge.dataset.hintLabel = labels[i]
-      badge.textContent = labels[i]
-      badge.style.cssText = [
-        "position:fixed",
-        `top:${rect.top + 4}px`,
-        `left:${rect.left + 4}px`,
-        "background:var(--color-warning,#f59e0b)",
-        "color:var(--color-warning-content,#000)",
-        "font-family:monospace",
-        "font-size:11px",
-        "font-weight:700",
-        "line-height:1",
-        "padding:1px 4px",
-        "border-radius:3px",
-        "pointer-events:none",
-        "z-index:9999",
-        "letter-spacing:0.05em",
-      ].join(";")
-      overlay.appendChild(badge)
-    })
-
-    document.body.appendChild(overlay)
     if (this.statusbarEl) {
       this.statusbarEl.textContent = "[ HINT ]"
       this.statusbarEl.style.color = "var(--color-warning, #f59e0b)"
@@ -855,37 +794,52 @@ export const VimNav = {
 
   _updateHintFilter(): void {
     if (!this.hintOverlayEl) return
-    const prefix = this.hintBuffer
-
-    // Find all matching labels
-    const matches = this.hintLabels.filter(h => h.label.startsWith(prefix))
+    const matches = filterHintBadges(this.hintOverlayEl, this.hintBuffer, this.hintLabels)
 
     if (matches.length === 0) {
       this.exitHintMode()
       return
     }
 
-    // Update badge visibility
-    this.hintOverlayEl.querySelectorAll<HTMLElement>("[data-hint-label]").forEach(badge => {
-      const label = badge.dataset.hintLabel!
-      if (label.startsWith(prefix)) {
-        badge.style.opacity = "1"
-        // Bold the typed prefix, normal for remaining chars
-        const typed = label.slice(0, prefix.length)
-        const rest = label.slice(prefix.length)
-        badge.innerHTML = typed
-          ? `<span style="opacity:0.5">${typed}</span>${rest}`
-          : label
-      } else {
-        badge.style.opacity = "0.15"
-      }
-    })
-
-    // Exact match — focus and exit
-    if (matches.length === 1 && matches[0].label === prefix) {
+    if (matches.length === 1 && matches[0].label === this.hintBuffer) {
       this.focusListItem(matches[0].index)
       this.exitHintMode()
     }
+  },
+
+  _doNavigateRecent(dir: "prev" | "next") {
+    // Read the visit ring buffer maintained by _recordSessionVisit (sessionStorage).
+    // Index 0 = most recently visited session. This tracks YOUR navigation, not global activity.
+    let sessions: Array<{ uuid: string; name: string }>
+    try {
+      sessions = JSON.parse(sessionStorage.getItem("vim-nav:recent-sessions") || "[]")
+    } catch { sessions = [] }
+    if (!sessions.length) return
+
+    const currentUuid = window.location.pathname.match(/^\/dm\/([0-9a-f-]{36})/)?.[1]
+
+    if (this._recentSessionIdx === -1) {
+      // First press: anchor cursor to current URL, then step in the requested direction.
+      const foundIdx = currentUuid ? sessions.findIndex(s => s.uuid === currentUuid) : -1
+      if (dir === "prev") {
+        // Go to a previously visited session (step backward in visit history).
+        this._recentSessionIdx = foundIdx === -1 ? 0 : Math.min(foundIdx + 1, sessions.length - 1)
+      } else {
+        // Go to the session visited more recently than the current one.
+        if (foundIdx <= 0) return  // already at the most-recently-visited or not in history
+        this._recentSessionIdx = foundIdx - 1
+      }
+    } else {
+      if (dir === "prev") {
+        this._recentSessionIdx = Math.min(this._recentSessionIdx + 1, sessions.length - 1)
+      } else {
+        if (this._recentSessionIdx === 0) return  // already at most-recently-visited
+        this._recentSessionIdx = this._recentSessionIdx - 1
+      }
+    }
+
+    const target = sessions[this._recentSessionIdx]
+    if (target) window.location.assign("/dm/" + target.uuid)
   },
 
   _recordSessionVisit() {
@@ -925,7 +879,7 @@ export const VimNav = {
     const overlay = this._quickDmOverlayBase()
     overlay.innerHTML = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:16px 20px;width:420px;max-width:90vw;font-family:monospace;color:var(--color-base-content)"><div style="font-size:13px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">DM: ${escapeHtml(this._quickDmTargetName)}</div><textarea id="vim-qdm-input" placeholder="Type your message…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--color-base-300);border-radius:4px;font-family:monospace;font-size:12px;background:var(--color-base-200);color:var(--color-base-content);resize:none;min-height:72px" rows="3"></textarea><div style="margin-top:8px;font-size:9px;opacity:0.4">Enter to send &nbsp;|&nbsp; Esc cancel</div></div>`
 
-    const textarea = overlay.querySelector<HTMLTextAreaElement>("#vim-qdm-input")
+    const textarea = overlay.querySelector("#vim-qdm-input") as HTMLTextAreaElement | null
     if (textarea) {
       textarea.focus()
       textarea.addEventListener("keydown", (e: KeyboardEvent) => {

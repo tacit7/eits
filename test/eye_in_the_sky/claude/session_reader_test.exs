@@ -1,5 +1,5 @@
 defmodule EyeInTheSky.Claude.SessionReaderTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias EyeInTheSky.Claude.SessionReader
 

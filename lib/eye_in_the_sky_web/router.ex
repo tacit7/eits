@@ -10,45 +10,7 @@ defmodule EyeInTheSkyWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers, %{}
     plug EyeInTheSkyWeb.Plugs.CspNonce
-    plug :put_csp
-  end
-
-  defp put_csp(conn, _opts) do
-    csp = build_csp(conn.assigns[:csp_nonce])
-    put_resp_header(conn, "content-security-policy", csp)
-  end
-
-  if Mix.env() == :dev do
-    defp build_csp(_nonce) do
-      port = System.get_env("VITE_PORT", "5173")
-      origin = "http://localhost:#{port}"
-      ws_origin = "ws://localhost:#{port}"
-      ip_origin = "http://127.0.0.1:#{port}"
-      ip_ws_origin = "ws://127.0.0.1:#{port}"
-
-      "default-src 'self'; " <>
-        "script-src 'self' 'unsafe-inline' #{origin} #{ip_origin}; " <>
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
-        "font-src 'self' data: https://fonts.gstatic.com; " <>
-        "img-src 'self' data: blob: #{origin} #{ip_origin}; " <>
-        "connect-src 'self' #{ws_origin} #{ip_ws_origin} ipc://localhost; " <>
-        "frame-ancestors 'none'; " <>
-        "object-src 'none'"
-    end
-  else
-    defp build_csp(nonce) do
-      script_src =
-        if nonce, do: "script-src 'self' 'nonce-#{nonce}'; ", else: "script-src 'self'; "
-
-      "default-src 'self'; " <>
-        script_src <>
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
-        "font-src 'self' data: https://fonts.gstatic.com; " <>
-        "img-src 'self' data: blob:; " <>
-        "connect-src 'self' ipc://localhost; " <>
-        "frame-ancestors 'none'; " <>
-        "object-src 'none'"
-    end
+    plug EyeInTheSkyWeb.Plugs.ContentSecurityPolicy
   end
 
   pipeline :require_auth do
@@ -144,6 +106,7 @@ defmodule EyeInTheSkyWeb.Router do
       live "/", AgentLive.Index, :index
       live "/usage", OverviewLive.Usage, :index
       live "/keybindings", OverviewLive.Keybindings, :index
+      live "/jobs", OverviewLive.Jobs, :index
       live "/skills", OverviewLive.Skills, :index
       live "/agents", OverviewLive.Agents, :index
       live "/prompts", OverviewLive.Prompts, :index
@@ -289,6 +252,7 @@ defmodule EyeInTheSkyWeb.Router do
 
     # Direct messages
     get "/dm", MessagingController, :list_dms
+    get "/dm/:id", MessagingController, :show_dm
     post "/dm", MessagingController, :dm
 
     # Channels

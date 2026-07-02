@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
   use EyeInTheSkyWeb, :live_view
 
   import EyeInTheSkyWeb.IAMLive.IAMComponents
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
@@ -52,17 +53,22 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
   end
 
   def handle_event("toggle_doc_selection", %{"doc_id" => doc_id_str}, socket) do
-    doc_id = String.to_integer(doc_id_str)
-    current = socket.assigns.add_selected_docs
+    case parse_int(doc_id_str) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Invalid document ID")}
 
-    updated =
-      if doc_id in current do
-        List.delete(current, doc_id)
-      else
-        [doc_id | current]
-      end
+      doc_id ->
+        current = socket.assigns.add_selected_docs
 
-    {:noreply, assign(socket, :add_selected_docs, updated)}
+        updated =
+          if doc_id in current do
+            List.delete(current, doc_id)
+          else
+            [doc_id | current]
+          end
+
+        {:noreply, assign(socket, :add_selected_docs, updated)}
+    end
   end
 
   def handle_event("attach_documents", _params, socket) do

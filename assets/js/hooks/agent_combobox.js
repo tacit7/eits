@@ -33,21 +33,23 @@ export const AgentCombobox = {
     this._input.addEventListener("keydown", this._onKeydown)
     document.addEventListener("mousedown", this._onClickOutside)
 
-    this._list.addEventListener("mousedown", (e) => {
+    this._boundMouseDown = (e) => {
       const li = e.target.closest("li[data-slug]")
       if (li) {
         e.preventDefault()
         this._select(li.dataset.slug, li.dataset.label)
       }
-    })
+    }
+    this._list.addEventListener("mousedown", this._boundMouseDown)
 
-    this._list.addEventListener("mousemove", (e) => {
+    this._boundMouseMove = (e) => {
       const li = e.target.closest("li[data-slug]")
       if (!li) return
       const items = Array.from(this._list.querySelectorAll("li[data-slug]"))
       const idx = items.indexOf(li)
       if (idx !== -1) this._setActive(idx)
-    })
+    }
+    this._list.addEventListener("mousemove", this._boundMouseMove)
 
     // Pre-select agent from data-prefill-slug if provided (e.g., from flyout click)
     const prefillSlug = this.el.dataset.prefillSlug
@@ -69,6 +71,8 @@ export const AgentCombobox = {
     this._input.removeEventListener("input", this._onInput)
     this._input.removeEventListener("keydown", this._onKeydown)
     document.removeEventListener("mousedown", this._onClickOutside)
+    if (this._boundMouseDown) this._list.removeEventListener("mousedown", this._boundMouseDown)
+    if (this._boundMouseMove) this._list.removeEventListener("mousemove", this._boundMouseMove)
   },
 
   // ---- private ----

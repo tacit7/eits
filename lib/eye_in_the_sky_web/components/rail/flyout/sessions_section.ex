@@ -1,9 +1,7 @@
 defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   @moduledoc false
   use EyeInTheSkyWeb, :html
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
-
-  # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
   # sessions_filters — scope toggle + search
   # ---------------------------------------------------------------------------
 
@@ -250,9 +248,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
         </div>
         <div class="text-nano text-base-content/48 mt-0.5 flex items-center gap-1">
           <span class="text-base-content/30">#{@session.id}</span>
-          <%= if @session.last_activity_at do %>
+          <%= if @session.git_worktree_path do %>
             <span>·</span>
-            <span>{relative_time(@session.last_activity_at)}</span>
+            <span
+              class="inline-flex items-center gap-0.5 text-primary/55"
+              title={@session.git_worktree_path}
+            >
+              <.custom_icon name="lucide-git-branch" class="size-2.5" />
+              {Path.basename(@session.git_worktree_path)}
+            </span>
           <% end %>
         </div>
       </div>

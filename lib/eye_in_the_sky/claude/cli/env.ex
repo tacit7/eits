@@ -83,10 +83,23 @@ defmodule EyeInTheSky.Claude.CLI.Env do
 
   # Unix-only: PATH entries are colon-separated. This project runs on macOS/Linux only.
   defp sanitize_path(path) do
-    path
-    |> String.split(":")
-    |> Enum.reject(&poisoned_path_entry?/1)
-    |> Enum.join(":")
+    entries =
+      path
+      |> String.split(":")
+      |> Enum.reject(&poisoned_path_entry?/1)
+
+    # Ensure standard bin dirs are present. Apps launched from Finder/Dock get
+    # a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin), so spawned agents inside
+    # the desktop app could not find the eits CLI (/usr/local/bin), Homebrew
+    # tools, or user-local binaries. Appended, so an existing PATH order wins.
+    # Path.expand runs here at RUNTIME — never bake "~" into an attribute.
+    standard = [
+      "/usr/local/bin",
+      "/opt/homebrew/bin",
+      Path.expand("~/.local/bin")
+    ]
+
+    Enum.join(entries ++ (standard -- entries), ":")
   end
 
   defp poisoned_path_entry?(entry) do

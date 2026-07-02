@@ -152,7 +152,7 @@ by Rust.
 |----------|-------|---------|
 | `PHX_SERVER` | `true` | Tells Phoenix to start the HTTP endpoint |
 | `PHX_HOST` | `127.0.0.1` | Phoenix URL config — keeps links local |
-| `PORT` | `5050` | Avoids port conflict with the dev server on 5001 |
+| `PORT` | resolved (default `34877`) | See "Port resolution" below — env override > `~/.config/eits/desktop.json` > default, with busy-port fallback |
 | `DISABLE_AUTH` | `true` | Bypasses passkey auth; WKWebView origin mismatch makes WebAuthn impractical locally |
 | `BYPASS_AUTH` | `true` | Secondary auth bypass flag checked by some auth paths |
 | `DATABASE_SSL_VERIFY` | `false` | Bundled ERTS has no OpenSSL; local Postgres has no SSL |
@@ -169,6 +169,26 @@ already present in the environment:
 To override either fallback, set the variable in your shell before launching
 the binary directly, or place it in `.env`/`.env.local` inside the release
 directory (`Eye in the Sky.app/Contents/Resources/rel/`).
+
+### Port resolution
+
+The embedded server's port is resolved by `lib.rs` (`resolved_port`) in this
+order:
+
+1. **`PORT` env var** — explicit override, used as-is (no availability scan)
+2. **`port` in `~/.config/eits/desktop.json`** (respects `XDG_CONFIG_HOME`) —
+   set it from the app: **Settings → Desktop → Server Port**. Valid range
+   1024–49151. Takes effect on next launch.
+3. **Default `34877`** — an uncommon registered-range port, chosen to avoid
+   the crowded dev-port space (3000/4000/5000/5050/8080) and the OS
+   ephemeral range.
+
+For cases 2–3, if the port is busy at launch the next 9 ports are scanned
+and the first free one is used — a collision never prevents startup. The
+IAM hook entries in `~/.claude/settings.json` are automatically rewritten
+with the actual port on every launch, so hooks keep working after a port
+change or fallback. If you use `tailscale serve`, re-point it after
+changing the port.
 
 ### Manual first-run setup
 
@@ -228,7 +248,7 @@ WebKit drops cookies with `Secure` flag over `http://`. Without `PHX_INSECURE_CO
 
 Click the app icon to launch normally. The Rust layer starts the Elixir
 release, waits for Phoenix to broadcast `"ready"` over ElixirKit PubSub, then
-creates the WKWebView window pointing at `http://127.0.0.1:5050`.
+creates the WKWebView window pointing at `http://127.0.0.1:34877`.
 
 **Do not use `open -n "Eye in the Sky.app"`** to launch programmatically.
 Launch Services does not pass shell env vars. Always invoke the Tauri binary
@@ -254,7 +274,8 @@ RELEASE_DISTRIBUTION=none \
 ```
 
 This avoids the `name eye_in_the_sky seems to be in use by another Erlang node`
-error. The `PORT=5050` is already set by `lib.rs`, so no port conflict occurs.
+error. The port is already set by `lib.rs` (see "Port resolution"), so no
+port conflict occurs.
 
 ---
 
@@ -269,14 +290,14 @@ don't set `EITS_BIND`, keep the previous all-interfaces binding.
 **Why loopback:** The app spawns Claude CLI subprocesses on behalf of agents,
 and the desktop bundle sets `DISABLE_AUTH=true` — so any network-reachable
 endpoint is effectively an unauthenticated RCE surface. Loopback binding means
-nothing on the LAN can reach port 5050; remote access goes through a local
+nothing on the LAN can reach the app's port; remote access goes through a local
 proxy (Tailscale, below), which connects to `localhost` from the same machine.
 
 **Opt-out:** To deliberately expose the server on the LAN, launch the app with
 `EITS_BIND=all` in its environment (e.g. from a terminal:
 `EITS_BIND=all open -a "Eye in the Sky"`, or via `launchctl setenv EITS_BIND all`).
 `lib.rs` only sets the default when the variable is absent. **Never do this on
-an untrusted network, and never expose port 5050 to the public internet.**
+an untrusted network, and never expose the app's port to the public internet.**
 
 ### Tailscale recipe
 
@@ -300,7 +321,7 @@ sudo tailscale up
 **3. Set up a Tailscale HTTPS reverse proxy:**
 
 ```bash
-tailscale serve --https=443 localhost:5050
+tailscale serve --https=443 localhost:34877
 ```
 
 This creates `https://<machine>.<tailnet>.ts.net` with a valid TLS certificate
@@ -351,8 +372,10 @@ runs a bare binary with no Info.plist to register the scheme).
 
 Every time the bundled app starts, `lib.rs` calls `install_iam_hooks()`. This
 writes Claude Code hooks into `~/.claude/settings.json` that POST tool events
-to `http://127.0.0.1:5050/api/v1/iam/hook`. The installation is idempotent —
-it skips hook groups that already reference `iam/hook`.
+to `http://127.0.0.1:<resolved port>/api/v1/iam/hook` (see "Port resolution").
+The installation is idempotent — existing `iam/hook` entries are left alone
+when their port is current, and rewritten in place when the resolved port has
+changed (config edit or busy-port fallback). No duplicates are ever added.
 
 If you do not want IAM hooks installed automatically, remove the existing
 entries from `~/.claude/settings.json` after quitting the app (the installer
@@ -367,6 +390,6 @@ runs on every startup).
 | App launches but clicks do nothing | WebSocket origin rejected | `WEBAUTHN_EXTRA_ORIGINS` missing or `check_origin` blocking the socket. Check `/tmp/tauri-*.log` for `Could not check origin`. |
 | `VAPID_PRIVATE_KEY is required in production` crash | `DISABLE_AUTH` not set | Launch with `DISABLE_AUTH=1` or add it to `rel/.env` in the app bundle |
 | `role "postgres" does not exist` | `DATABASE_URL` uses wrong user | Override: `DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" <binary>` |
-| Port 5050 already in use | Dev server or stale process | `lsof -i :5050`; kill the conflicting process |
+| Port already in use | Stale process on the configured port | Nothing to do — the app scans the next 9 ports automatically. To reclaim the original: `lsof -i :34877`; kill the conflicting process |
 | `EACCES` during build | Stale `target/release/rel/` | `mv src-tauri/target/release/rel /tmp/rel-stale && cargo tauri build` |
 | `name eye_in_the_sky seems to be in use` | EPMD node collision with running dev server | `RELEASE_DISTRIBUTION=none <binary>` (must be set before launch; lib.rs does not set it automatically) |

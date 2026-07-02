@@ -8,8 +8,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
+  alias EyeInTheSky.Desktop
+  alias EyeInTheSky.Desktop.Config, as: DesktopConfig
+
   alias EyeInTheSkyWeb.OverviewLive.Settings.{
     AuthTab,
+    DesktopTab,
     EditorTab,
     GeneralTab,
     PricingTab,
@@ -27,7 +31,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     {"autumn", "Autumn"}
   ]
 
-  @valid_tabs ~w(general editor auth workflow pricing system)
+  @valid_tabs ~w(general editor auth workflow pricing system desktop)
 
   @known_editors ~w(code cursor vim nano zed)
 
@@ -66,6 +70,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:flash_key, nil)
       |> assign(:active_tab, :general)
       |> assign(:generated_api_key, nil)
+      |> assign(:desktop_mode?, Desktop.desktop_mode?())
+      |> assign(:desktop_port, DesktopConfig.configured_port())
 
     {:ok, socket}
   end
@@ -84,6 +90,23 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   @impl true
   def handle_event("set_tab", %{"tab" => tab}, socket) do
     {:noreply, push_patch(socket, to: ~p"/settings?tab=#{tab}")}
+  end
+
+  @impl true
+  def handle_event("save_desktop_port", %{"port" => port_str}, socket) do
+    with {port, ""} <- Integer.parse(to_string(port_str)),
+         :ok <- DesktopConfig.write_port(port) do
+      {:noreply,
+       socket
+       |> assign(:desktop_port, port)
+       |> put_flash(:info, "Port saved — restart the desktop app to apply")}
+    else
+      {:error, :out_of_range} ->
+        {:noreply, put_flash(socket, :error, "Port must be between 1024 and 49151")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not save port")}
+    end
   end
 
   @impl true
@@ -269,7 +292,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         <div class="tabs tabs-bordered overflow-x-auto flex-nowrap whitespace-nowrap">
           <%= for {label, key} <- [
             {"General", "general"}, {"Editor", "editor"}, {"Auth & Keys", "auth"},
-            {"Workflow", "workflow"}, {"Pricing", "pricing"}, {"System", "system"}
+            {"Workflow", "workflow"}, {"Pricing", "pricing"}, {"System", "system"},
+            {"Desktop", "desktop"}
           ] do %>
             <button
               class={"tab #{if @active_tab == String.to_existing_atom(key), do: "tab-active", else: ""}"}
@@ -292,6 +316,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   defp render_tab(%{active_tab: :workflow} = assigns), do: WorkflowTab.render(assigns)
   defp render_tab(%{active_tab: :pricing} = assigns), do: PricingTab.render(assigns)
   defp render_tab(%{active_tab: :system} = assigns), do: SystemTab.render(assigns)
+  defp render_tab(%{active_tab: :desktop} = assigns), do: DesktopTab.render(assigns)
 
   defp render_tab(%{active_tab: _} = assigns) do
     ~H[<p class="text-sm text-base-content/50 px-2 py-4">Coming soon</p>]

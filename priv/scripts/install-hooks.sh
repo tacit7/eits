@@ -45,7 +45,10 @@ if [[ $PROJECT -eq 1 ]]; then
 
   # settings.local.json is meant to be per-developer and gitignored — offer to
   # add the entry if this looks like a git repo and it's not already covered.
-  if [[ $UNINSTALL -eq 0 ]] && [[ -d "$(pwd)/.git" ]]; then
+  # NOTE: `[[ -d .git ]]` misses git worktrees, where .git is a FILE (a
+  # "gitdir: ..." pointer), not a directory — `git rev-parse` handles both
+  # a normal repo and a worktree checkout correctly.
+  if [[ $UNINSTALL -eq 0 ]] && git -C "$(pwd)" rev-parse --is-inside-work-tree &>/dev/null; then
     if ! git -C "$(pwd)" check-ignore -q .claude/settings.local.json 2>/dev/null; then
       echo ".claude/settings.local.json" >> "$(pwd)/.gitignore"
       echo "✓ Added .claude/settings.local.json to .gitignore"

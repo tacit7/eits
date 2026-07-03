@@ -1,5 +1,5 @@
-// DmComposer: keyboard-aware layout, Aa format toolbar, @-file mention picker,
-// draft persistence, and clipboard paste for the DM message form.
+// DmComposer: keyboard-aware layout, Aa format toolbar, draft persistence,
+// and clipboard paste for the DM message form.
 //
 // Keyboard layout: on mobile, when the software keyboard opens the visual viewport
 // height shrinks while window.innerHeight stays fixed. This hook listens to
@@ -8,11 +8,6 @@
 //
 // Format toolbar: the Aa button toggles a format strip. Each button wraps the
 // current textarea selection with markdown syntax.
-//
-// @-file mention picker: intercepts '@' in the textarea, queries the server via
-// the existing list_files event, and shows a floating dropdown with keyboard
-// navigation. ArrowUp/Down moves selection, Enter/Tab inserts, Escape closes.
-//
 // Draft persistence: saves textarea content to localStorage on every input event,
 // restores on mount. Key: dm-draft:{session_uuid}. Clears on form submit.
 //
@@ -134,18 +129,6 @@ export const DmComposer = {
       input.addEventListener('paste', this._onPaste)
     }
 
-    // ── @ File mention picker ─────────────────────────────────────────────────
-    this._picker = null
-    this._pickerEntries = []
-    this._pickerIdx = 0
-    this._atTriggerPos = -1
-
-    if (input) {
-      this._onPickerInput = () => this._handlePickerInput(input)
-      this._onPickerKeydown = (e) => this._handlePickerKeydown(e, input)
-      input.addEventListener('input', this._onPickerInput)
-      input.addEventListener('keydown', this._onPickerKeydown)
-    }
   },
 
   // ── Format apply ─────────────────────────────────────────────────────────
@@ -224,139 +207,6 @@ export const DmComposer = {
     ta.focus()
   },
 
-  // ── @ File mention picker internals ──────────────────────────────────────
-  _handlePickerInput(ta) {
-    const pos    = ta.selectionStart
-    const before = ta.value.slice(0, pos)
-    // Match an @ not preceded by a word char, followed by a path-safe string
-    const match  = before.match(/@([\w./\-]*)$/)
-
-    if (match) {
-      const partial = match[1]
-      this._atTriggerPos = pos - partial.length - 1
-      this._fetchFiles(partial)
-    } else {
-      this._closePicker()
-    }
-  },
-
-  _fetchFiles(partial) {
-    this.pushEvent('list_files', { partial, root: 'project' }, (reply) => {
-      if (!reply) return
-      this._pickerEntries = reply.entries || []
-      this._pickerIdx = 0
-      if (this._pickerEntries.length > 0) {
-        this._renderPicker()
-      } else {
-        this._closePicker()
-      }
-    })
-  },
-
-  _renderPicker() {
-    if (!this._picker) {
-      this._picker = document.createElement('div')
-      this._picker.id = 'dm-file-picker'
-      this._picker.className = [
-        'fixed z-[200] bg-base-200 border border-base-content/15',
-        'rounded-xl shadow-2xl overflow-hidden',
-        'w-72 max-h-52 overflow-y-auto',
-      ].join(' ')
-      document.body.appendChild(this._picker)
-    }
-
-    const form = this.el
-    const rect = form.getBoundingClientRect()
-    const pickerHeight = Math.min(this._pickerEntries.length * 34 + 10, 208)
-    this._picker.style.left = `${rect.left + 8}px`
-    this._picker.style.top  = `${rect.top - pickerHeight - 4}px`
-
-    const html = this._pickerEntries.map((entry, i) => {
-      const icon   = entry.is_dir ? '📁' : '📄'
-      const active = i === this._pickerIdx ? 'bg-base-content/10' : 'hover:bg-base-content/[0.06]'
-      return `<div class="flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs ${active} transition-colors" data-idx="${i}">
-        <span>${icon}</span>
-        <span class="font-mono text-base-content/70 truncate">${entry.name}</span>
-        ${entry.is_dir ? '<span class="ml-auto text-base-content/30 text-[10px]">dir</span>' : ''}
-      </div>`
-    }).join('')
-
-    this._picker.innerHTML = html
-
-    this._picker.querySelectorAll('[data-idx]').forEach(el => {
-      el.addEventListener('mousedown', (e) => {
-        e.preventDefault()
-        this._selectEntry(parseInt(el.dataset.idx, 10), document.getElementById('message-input'))
-      })
-    })
-  },
-
-  _handlePickerKeydown(e, ta) {
-    if (!this._picker) return
-
-    if (e.key === 'Escape') {
-      e.stopPropagation()
-      this._closePicker()
-      return
-    }
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      this._pickerIdx = Math.min(this._pickerIdx + 1, this._pickerEntries.length - 1)
-      this._renderPicker()
-      return
-    }
-
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      this._pickerIdx = Math.max(this._pickerIdx - 1, 0)
-      this._renderPicker()
-      return
-    }
-
-    if (e.key === 'Enter' || e.key === 'Tab') {
-      if (this._pickerEntries.length > 0) {
-        e.preventDefault()
-        this._selectEntry(this._pickerIdx, ta)
-      }
-    }
-  },
-
-  _selectEntry(idx, ta) {
-    const entry = this._pickerEntries[idx]
-    if (!entry || !ta) return
-
-    const val    = ta.value
-    const before = val.slice(0, this._atTriggerPos)
-    const after  = val.slice(ta.selectionStart)
-
-    ta.value = before + entry.insert_text + (entry.is_dir ? '' : ' ') + after
-
-    if (entry.is_dir) {
-      // Keep picker open so the user can navigate into the directory
-      this._atTriggerPos = before.length + 1
-      ta.selectionStart = ta.selectionEnd = before.length + entry.insert_text.length
-      ta.dispatchEvent(new Event('input', { bubbles: true }))
-      this._fetchFiles(entry.path)
-    } else {
-      const newPos = before.length + entry.insert_text.length + 1
-      ta.selectionStart = ta.selectionEnd = newPos
-      ta.dispatchEvent(new Event('input', { bubbles: true }))
-      this._closePicker()
-    }
-
-    ta.focus()
-  },
-
-  _closePicker() {
-    if (this._picker) {
-      this._picker.remove()
-      this._picker = null
-    }
-    this._pickerEntries = []
-    this._atTriggerPos = -1
-  },
-
   // ── Cleanup ───────────────────────────────────────────────────────────────
   destroyed() {
     if (window.visualViewport) {
@@ -373,12 +223,8 @@ export const DmComposer = {
     if (bar && this._onFmtClick)     bar.removeEventListener('click', this._onFmtClick)
     if (input) {
       if (this._onDraftInput)        input.removeEventListener('input', this._onDraftInput)
-      if (this._onPickerInput)       input.removeEventListener('input', this._onPickerInput)
-      if (this._onPickerKeydown)     input.removeEventListener('keydown', this._onPickerKeydown)
       if (this._onPaste)             input.removeEventListener('paste', this._onPaste)
     }
     if (this._onFormSubmit) this.el.removeEventListener('submit', this._onFormSubmit)
-
-    this._closePicker()
   }
 }

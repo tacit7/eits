@@ -24,12 +24,17 @@ defmodule EyeInTheSky.Codex.CLI do
   @type spawn_result :: {:ok, port(), reference()} | {:error, term()}
 
   @default_idle_timeout_ms :infinity
-  @standard_paths [
-    "/usr/local/bin/codex",
-    "/opt/homebrew/bin/codex",
-    Path.expand("~/.local/bin/codex"),
-    Path.expand("~/.cargo/bin/codex")
-  ]
+  # Function, not attribute: Path.expand("~") in an attribute bakes the BUILD
+  # machine home dir into releases (broken on any other username).
+  defp standard_paths do
+    [
+      "/usr/local/bin/codex",
+      "/opt/homebrew/bin/codex",
+      Path.expand("~/.local/bin/codex"),
+      Path.expand("~/.cargo/bin/codex")
+    ]
+  end
+
   @persistent_term_key {__MODULE__, :codex_binary_path}
 
   # ---------------------------------------------------------------------------
@@ -329,11 +334,11 @@ defmodule EyeInTheSky.Codex.CLI do
       path = System.find_executable("codex") ->
         {:ok, path}
 
-      path = EyeInTheSky.CLI.Port.find_in_standard_paths(@standard_paths) ->
+      path = EyeInTheSky.CLI.Port.find_in_standard_paths(standard_paths()) ->
         {:ok, path}
 
       true ->
-        {:error, {:binary_not_found, checked_paths: @standard_paths}}
+        {:error, {:binary_not_found, checked_paths: standard_paths()}}
     end
   end
 end

@@ -23,6 +23,47 @@ defmodule EyeInTheSkyWeb.DmLive.UploadHelpers do
     end)
   end
 
+  # Process files dropped via Tauri native drag (paths are absolute OS paths).
+  # Copies each file to the same upload destination as browser uploads and
+  # returns the same shape of file_data map so message_handlers can treat them
+  # identically.
+  def consume_tauri_files(socket) do
+    paths = socket.assigns[:tauri_dropped_files] || []
+
+    results =
+      Enum.flat_map(paths, fn path ->
+        case File.stat(path) do
+          {:ok, %{size: size}} ->
+            client_name = Path.basename(path)
+            destination = upload_destination(client_name)
+            File.mkdir_p!(Path.dirname(destination))
+
+            case File.cp(path, destination) do
+              :ok ->
+                [
+                  %{
+                    storage_path: destination,
+                    filename: Path.basename(destination),
+                    original_filename: client_name,
+                    content_type: MIME.from_path(client_name),
+                    size_bytes: size
+                  }
+                ]
+
+              {:error, reason} ->
+                Logger.warning("Failed to copy Tauri dropped file #{path}: #{inspect(reason)}")
+                []
+            end
+
+          {:error, reason} ->
+            Logger.warning("Cannot stat Tauri dropped file #{path}: #{inspect(reason)}")
+            []
+        end
+      end)
+
+    results
+  end
+
   def build_message_body(body, []), do: body
 
   def build_message_body(body, uploaded_files) do

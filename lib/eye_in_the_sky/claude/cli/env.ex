@@ -67,7 +67,25 @@ defmodule EyeInTheSky.Claude.CLI.Env do
     env = maybe_add_env(env, "EITS_AGENT_ID", opts[:eits_agent_id])
     env = maybe_add_env(env, "EITS_CHANNEL_ID", opts[:eits_channel_id])
     env = maybe_add_env(env, "EITS_WORKFLOW", opts[:eits_workflow] || "1")
+    env = put_default_eits_url(env)
     maybe_add_env(env, "CLAUDE_CODE_EFFORT_LEVEL", opts[:effort_level])
+  end
+
+  # Point spawned agents (and the eits CLI they invoke) at THIS server's API.
+  # The CLI's baked-in default is port 5001 (the dev server), which is wrong
+  # for the desktop app (port 34877 by default, possibly changed in Settings).
+  # An EITS_URL already present in the environment is respected.
+  defp put_default_eits_url(env) do
+    if Enum.any?(env, fn {k, _} -> k == ~c"EITS_URL" end) do
+      env
+    else
+      port =
+        Application.get_env(:eye_in_the_sky, EyeInTheSkyWeb.Endpoint, [])
+        |> Keyword.get(:http, [])
+        |> Keyword.get(:port)
+
+      maybe_add_env(env, "EITS_URL", port && "http://127.0.0.1:#{port}/api/v1")
+    end
   end
 
   defp blocked_key?("ANTHROPIC_API_KEY", true), do: false
@@ -83,10 +101,23 @@ defmodule EyeInTheSky.Claude.CLI.Env do
 
   # Unix-only: PATH entries are colon-separated. This project runs on macOS/Linux only.
   defp sanitize_path(path) do
-    path
-    |> String.split(":")
-    |> Enum.reject(&poisoned_path_entry?/1)
-    |> Enum.join(":")
+    entries =
+      path
+      |> String.split(":")
+      |> Enum.reject(&poisoned_path_entry?/1)
+
+    # Ensure standard bin dirs are present. Apps launched from Finder/Dock get
+    # a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin), so spawned agents inside
+    # the desktop app could not find the eits CLI (/usr/local/bin), Homebrew
+    # tools, or user-local binaries. Appended, so an existing PATH order wins.
+    # Path.expand runs here at RUNTIME — never bake "~" into an attribute.
+    standard = [
+      "/usr/local/bin",
+      "/opt/homebrew/bin",
+      Path.expand("~/.local/bin")
+    ]
+
+    Enum.join(entries ++ (standard -- entries), ":")
   end
 
   defp poisoned_path_entry?(entry) do

@@ -335,6 +335,71 @@ document.addEventListener('click', (e) => {
   }
 }, true) // capture phase — runs before LiveView's own click handler
 
+// Tauri window drag: wry's built-in data-tauri-drag-region detection may not
+// fire for external-URL webviews. We implement it explicitly: mousedown on
+// any [data-tauri-drag-region] element (excluding interactive children) calls
+// start_dragging. Requires core:window:allow-start-dragging in capabilities.
+if (window.__TAURI_INTERNALS__) {
+  document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return
+    const dragEl = e.composedPath().find(el =>
+      el instanceof Element && el.hasAttribute('data-tauri-drag-region')
+    )
+    if (!dragEl) return
+    // Don't drag if the actual target is an interactive element
+    const interactive = e.target.closest('a, button, input, select, textarea, [contenteditable], [role="button"], summary')
+    if (interactive) return
+    window.__TAURI_INTERNALS__.invoke('plugin:window|start_dragging').catch(() => {})
+  })
+}
+
+// Tauri file drop forwarding lives in the DragUpload hook (hooks/drag_upload.js)
+// — hooks are the only public API for pushing events to a LiveView.
+// The phx:pick_folder and tauri:session-action bridges live in the RailState
+// hook (hooks/rail_state.js) for the same reason: the previous app.js relays
+// called view.pushEventTo, which does not exist on LiveView's View class, so
+// every event was dropped silently (project creation via the native folder
+// picker was a no-op through v0.3.9).
+
+// --- Tauri command bridges ---------------------------------------------------
+// LiveView pushes these events via push_event/3 when it needs a native dialog
+// or a new window — the server can't open a dialog or window directly.
+if (window.__TAURI_INTERNALS__) {
+  const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args ?? {})
+
+  // phx:open_in_window — opens path in a new app window.
+  // Payload: { path: "/projects/3" }
+  window.addEventListener('phx:open_in_window', (e) => {
+    const path = e.detail?.path ?? '/'
+    invoke('open_window', { path })
+  })
+
+  // --- Session flyout context menu -------------------------------------------
+  // Right-click on a .flyout-session-row triggers a native Tauri popup menu.
+  // The Rust command builds the menu and handles Tauri-native actions
+  // (open window, clipboard, Finder). For LiveView actions (archive, rename),
+  // Rust evals a CustomEvent back; we catch it here and pushEvent to the Rail.
+  document.addEventListener('contextmenu', (e) => {
+    const row = e.target.closest('.flyout-session-row')
+    if (!row) return
+    e.preventDefault()
+
+    const sessionId   = row.dataset.sessionId   ?? ''
+    const sessionUuid = row.dataset.sessionUuid  ?? ''
+    const sessionName = row.dataset.sessionName  ?? ''
+    const worktree    = row.dataset.sessionWorktree ?? ''
+
+    invoke('show_session_context_menu', {
+      session_id:    parseInt(sessionId, 10) || 0,
+      uuid:          sessionUuid,
+      name:          sessionName,
+      worktree_path: worktree || null,
+    }).catch((err) => console.error('[tauri] context menu error:', err))
+  })
+
+  // tauri:session-action handling lives in the RailState hook — see note above.
+}
+
 // The lines below enable quality of life phoenix_live_reload
 // development features:
 //

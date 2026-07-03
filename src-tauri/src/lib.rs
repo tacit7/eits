@@ -1,19 +1,260 @@
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::collections::HashMap;
+use std::io::Write;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
-use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+
+/// File handle for /tmp/eits.log — written at startup, shared across threads.
+static LOG_FILE: OnceLock<Mutex<std::fs::File>> = OnceLock::new();
+
+/// Log to both stderr and /tmp/eits.log. Works from any launch method (Finder, Alfred, terminal).
+macro_rules! log {
+    ($($arg:tt)*) => {{
+        let msg = format!($($arg)*);
+        eprintln!("{}", msg);
+        if let Some(lock) = LOG_FILE.get() {
+            if let Ok(mut f) = lock.lock() {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let ts = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let _ = writeln!(f, "[{ts}] {msg}");
+                let _ = f.flush();
+            }
+        }
+    }};
+}
+use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_opener::OpenerExt;
 
 /// Monotonic counter for generating unique secondary window labels.
 static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(2);
 
+/// Always-on-top state — persisted in memory, toggled via menu/tray.
+static ALWAYS_ON_TOP: AtomicBool = AtomicBool::new(false);
+
+/// Session context stored when a context menu is shown — looked up in on_menu_event.
+#[derive(Clone)]
+struct SessionCtx {
+    id: i64,
+    uuid: String,
+    name: String,
+    worktree_path: Option<String>,
+}
+
+/// Per-session context map, keyed by session integer id.
+/// Written by show_session_context_menu, read by on_menu_event.
+type SessionCtxMap = Mutex<HashMap<i64, SessionCtx>>;
+
+/// Pending navigation path set when a notification fires while the app is in the
+/// background. Drained on the next window-focus event so that clicking a
+/// notification navigates to the right session.
+static PENDING_NAV: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+fn set_pending_nav(path: String) {
+    let lock = PENDING_NAV.get_or_init(|| Mutex::new(None));
+    if let Ok(mut guard) = lock.lock() {
+        *guard = Some(path);
+    }
+}
+
+fn take_pending_nav() -> Option<String> {
+    let lock = PENDING_NAV.get_or_init(|| Mutex::new(None));
+    lock.lock().ok().and_then(|mut g| g.take())
+}
+
+/// Default HTTP port for the embedded Phoenix server. Uncommon registered-range
+/// port ("EITS" on a phone keypad → 3487, plus a digit) chosen to avoid the
+/// crowded dev-port space (3000/4000/5000/5050/8080) and the OS ephemeral range.
+const DEFAULT_PORT: u16 = 34877;
+
+/// Resolve the port for the embedded Phoenix server. Resolution order:
+///   1. `PORT` env var — explicit override, used as-is (no availability scan)
+///   2. `port` field in `$XDG_CONFIG_HOME/eits/desktop.json` (default
+///      `~/.config/eits/desktop.json`) — written by the in-app Settings →
+///      Desktop tab; takes effect on next launch
+///   3. `DEFAULT_PORT`
+/// For cases 2–3, if the port is busy the next 9 ports are scanned and the
+/// first free one is used, so a collision never prevents launch. The result is
+/// computed once and cached — every caller sees the same port.
+fn resolved_port() -> &'static str {
+    static PORT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    PORT.get_or_init(|| {
+        if let Ok(p) = std::env::var("PORT") {
+            return p;
+        }
+        let base = desktop_config_port().unwrap_or(DEFAULT_PORT);
+        for offset in 0..10u16 {
+            let candidate = match base.checked_add(offset) {
+                Some(c) => c,
+                None => break,
+            };
+            if std::net::TcpListener::bind(("127.0.0.1", candidate)).is_ok() {
+                if offset > 0 {
+                    eprintln!(
+                        "[eits-tauri] port {base} busy; falling back to {candidate}"
+                    );
+                }
+                return candidate.to_string();
+            }
+        }
+        eprintln!(
+            "[eits-tauri] ports {base}..{} all busy; proceeding with {base} anyway",
+            base.saturating_add(9)
+        );
+        base.to_string()
+    })
+}
+
+/// Read the `port` field from the desktop config file, if present and valid.
+fn desktop_config_port() -> Option<u16> {
+    let config_base = std::env::var("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .ok()
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|h| std::path::PathBuf::from(h).join(".config"))
+        })?;
+    let raw = std::fs::read_to_string(config_base.join("eits/desktop.json")).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let port = v.get("port")?.as_u64().and_then(|p| u16::try_from(p).ok())?;
+    // Reject privileged and ephemeral-range ports.
+    if (1024..=49151).contains(&port) {
+        Some(port)
+    } else {
+        eprintln!("[eits-tauri] desktop.json port {port} out of range 1024-49151; ignoring");
+        None
+    }
+}
+
+/// Path to `desktop.json`, honoring `XDG_CONFIG_HOME` — mirrors
+/// `EyeInTheSky.Desktop.Config.config_path/0` on the Elixir side. Both sides
+/// must agree on this path since they read/write the same file.
+fn desktop_config_path() -> Option<std::path::PathBuf> {
+    let config_base = std::env::var("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .ok()
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|h| std::path::PathBuf::from(h).join(".config"))
+        })?;
+    Some(config_base.join("eits").join("desktop.json"))
+}
+
+fn read_desktop_config() -> serde_json::Value {
+    desktop_config_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .filter(serde_json::Value::is_object)
+        .unwrap_or_else(|| serde_json::json!({}))
+}
+
+/// Merge-write a single key into `desktop.json`, preserving other keys —
+/// same semantics as `EyeInTheSky.Desktop.Config.write_port/1`.
+fn write_desktop_config_key(key: &str, value: serde_json::Value) {
+    let Some(path) = desktop_config_path() else {
+        log!("[eits-tauri] desktop.json: HOME/XDG_CONFIG_HOME not set; could not persist {key}");
+        return;
+    };
+    let mut config = read_desktop_config();
+    if let Some(obj) = config.as_object_mut() {
+        obj.insert(key.to_string(), value);
+    }
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            log!("[eits-tauri] desktop.json: could not create {}: {e}", parent.display());
+            return;
+        }
+    }
+    match serde_json::to_string_pretty(&config) {
+        Ok(s) => {
+            if let Err(e) = std::fs::write(&path, s) {
+                log!("[eits-tauri] desktop.json: could not write {}: {e}", path.display());
+            }
+        }
+        Err(e) => log!("[eits-tauri] desktop.json: could not serialize: {e}"),
+    }
+}
+
+/// Whether the user has granted global Claude Code hooks + skills install.
+/// `None` = never asked yet (first launch); `Some(bool)` = a prior answer.
+fn hooks_consent() -> Option<bool> {
+    match read_desktop_config().get("hooks_consent").and_then(|v| v.as_str()) {
+        Some("granted") => Some(true),
+        Some("denied") => Some(false),
+        _ => None,
+    }
+}
+
+fn set_hooks_consent(granted: bool) {
+    let value = if granted { "granted" } else { "denied" };
+    write_desktop_config_key("hooks_consent", serde_json::json!(value));
+}
+
+/// Ask the user, once, whether EITS may install its Claude Code integration
+/// globally. This writes into `~/.claude/settings.json` (hook entries) and
+/// `~/.claude/skills/` — files shared by EVERY Claude Code session on the
+/// machine, not just EITS, so it is not something to do silently.
+///
+/// Uses `blocking_show()`, which the dialog plugin documents as unsafe to
+/// call on the main thread (it needs the platform event loop pumping to
+/// actually display/dismiss the native dialog — calling it inside `setup()`
+/// deadlocks before the event loop starts). MUST be invoked from a spawned
+/// thread, never directly from `setup()`. The answer is persisted to
+/// `desktop.json` so this never asks again unless the user changes their
+/// mind in Settings → Desktop.
+fn ask_hooks_consent(app: &tauri::AppHandle) -> bool {
+    if let Some(answer) = hooks_consent() {
+        return answer;
+    }
+
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+
+    let granted = app
+        .dialog()
+        .message(
+            "EITS can install Claude Code hooks and skills so any Claude Code \
+             session on this Mac reports tool activity to EITS and can use \
+             the /eits-* skills — not just sessions started from this app.\n\n\
+             This writes to ~/.claude/settings.json and ~/.claude/skills/. \
+             You can change this later in Settings → Desktop.",
+        )
+        .title("Install EITS Claude Code integration?")
+        .kind(MessageDialogKind::Info)
+        .buttons(MessageDialogButtons::YesNo)
+        .blocking_show();
+
+    set_hooks_consent(granted);
+    log!("[eits-tauri] hooks/skills consent: {}", if granted { "granted" } else { "denied" });
+    granted
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize file logging first — before anything else so even early panics are captured.
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/eits.log")
+    {
+        Ok(file) => { let _ = LOG_FILE.set(Mutex::new(file)); }
+        Err(e) => eprintln!("[eits-tauri] WARNING: could not open /tmp/eits.log: {e}"),
+    }
+    log!("[eits-tauri] ===== startup pid={} =====", std::process::id());
+    log!("[eits-tauri] version={}", env!("CARGO_PKG_VERSION"));
+
     let pubsub = elixirkit::PubSub::listen("tcp://127.0.0.1:0").expect("failed to listen");
+    log!("[eits-tauri] pubsub listening on {}", pubsub.url());
 
     tauri::Builder::default()
+        .manage(SessionCtxMap::default())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             show_window(app);
             for arg in argv.iter().skip(1) {
@@ -30,8 +271,9 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
-            // --- System tray with navigation ---
+            // --- System tray ---
             let show_item = MenuItem::with_id(app, "show", "Show EITS", true, None::<&str>)?;
+            let always_on_top_item = CheckMenuItem::with_id(app, "always_on_top", "Always on Top", true, false, None::<&str>)?;
             let sep1 = PredefinedMenuItem::separator(app)?;
             let nav_dashboard = MenuItem::with_id(app, "nav_dashboard", "Dashboard", true, None::<&str>)?;
             let nav_sessions = MenuItem::with_id(app, "nav_sessions", "Sessions", true, None::<&str>)?;
@@ -39,8 +281,9 @@ pub fn run() {
             let nav_teams = MenuItem::with_id(app, "nav_teams", "Teams", true, None::<&str>)?;
             let sep2 = PredefinedMenuItem::separator(app)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[
+            let tray_menu = Menu::with_items(app, &[
                 &show_item,
+                &always_on_top_item,
                 &sep1,
                 &nav_dashboard,
                 &nav_sessions,
@@ -53,10 +296,11 @@ pub fn run() {
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().cloned().unwrap())
                 .tooltip("Eye in the Sky")
-                .menu(&menu)
+                .menu(&tray_menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => show_window(app),
+                    "always_on_top" => toggle_always_on_top(app),
                     "nav_dashboard" => navigate_to(app, "/"),
                     "nav_sessions" => navigate_to(app, "/sessions"),
                     "nav_tasks" => navigate_to(app, "/tasks"),
@@ -104,6 +348,10 @@ pub fn run() {
                 &PredefinedMenuItem::paste(app, None)?,
                 &PredefinedMenuItem::select_all(app, None)?,
             ])?;
+            let always_on_top_menu_item = CheckMenuItem::with_id(
+                app, "menu_always_on_top", "Always on Top", true, false,
+                Some("CmdOrCtrl+Shift+T"),
+            )?;
             let view_menu = Submenu::with_items(app, "View", true, &[
                 &MenuItem::with_id(app, "menu_dashboard", "Dashboard", true, Some("CmdOrCtrl+1"))?,
                 &MenuItem::with_id(app, "menu_sessions", "Sessions", true, Some("CmdOrCtrl+2"))?,
@@ -118,6 +366,8 @@ pub fn run() {
                 &PredefinedMenuItem::minimize(app, None)?,
                 &PredefinedMenuItem::maximize(app, None)?,
                 &PredefinedMenuItem::separator(app)?,
+                &always_on_top_menu_item,
+                &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::close_window(app, None)?,
             ])?;
             let menubar = Menu::with_items(app, &[
@@ -131,34 +381,35 @@ pub fn run() {
                 "menu_sessions" => navigate_to(app, "/sessions"),
                 "menu_tasks" => navigate_to(app, "/tasks"),
                 "menu_teams" => navigate_to(app, "/teams"),
+                "menu_always_on_top" => toggle_always_on_top(app),
                 "menu_reload" => {
                     if let Some(window) = app.get_webview_window("main") {
-                        let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+                        let port = resolved_port().to_string();
                         let url = format!("http://127.0.0.1:{}", port);
                         if let Ok(parsed) = url.parse::<tauri::Url>() {
                             let _ = window.navigate(parsed);
                         }
                     }
                 }
-                _ => {}
+                id => {
+                    // Context menu items are prefixed "ctx_<action>::<session_id>".
+                    if id.starts_with("ctx_") {
+                        handle_session_ctx_menu(app, id);
+                    }
+                }
             });
 
-            // --- Global shortcut: Cmd+Shift+E to show/focus window ---
-            let shortcut = "CmdOrCtrl+Shift+E".parse::<Shortcut>()?;
-            let app_handle_shortcut = app.handle().clone();
-            app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    show_window(&app_handle_shortcut);
-                }
-            })?;
 
             // --- Global shortcut: Cmd+Option+I to open Web Inspector ---
+            // Focus-gated: only fires when the main window is the active window.
             let devtools_shortcut = "CmdOrCtrl+Alt+I".parse::<Shortcut>()?;
             let app_handle_devtools = app.handle().clone();
             app.global_shortcut().on_shortcut(devtools_shortcut, move |_app, _shortcut, event| {
                 if event.state == ShortcutState::Pressed {
                     if let Some(window) = app_handle_devtools.get_webview_window("main") {
-                        window.open_devtools();
+                        if window.is_focused().unwrap_or(false) {
+                            window.open_devtools();
+                        }
                     }
                 }
             })?;
@@ -176,78 +427,213 @@ pub fn run() {
                 }
             }
 
-            // --- IAM hook installer ---
-            // Write ~/.claude/settings.json hooks on every startup so agents
-            // automatically POST tool events to the local IAM endpoint.
-            // Idempotent: skips events that already have the hook present.
-            let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
-            install_iam_hooks(&port);
+            // --- IAM hooks + skills installer (consent-gated) ---
+            // Both write into files SHARED by every Claude Code session on
+            // this machine (~/.claude/settings.json, ~/.claude/skills/), not
+            // just EITS — so ask once on first launch rather than doing it
+            // silently. The answer is persisted in desktop.json; revisit it
+            // any time via Settings → Desktop.
+            //
+            // Spawned on its own thread: ask_hooks_consent's blocking_show()
+            // must not run on the main thread — Tauri's event loop, which
+            // actually pumps the native dialog, hasn't started yet inside
+            // setup(). Running here (main thread, pre-event-loop) would hang
+            // the app forever on first launch before the window even shows.
+            let app_handle_consent = app.handle().clone();
+            std::thread::spawn(move || {
+                if ask_hooks_consent(&app_handle_consent) {
+                    // Write ~/.claude/settings.json hooks on every startup so
+                    // agents automatically POST tool events to the local IAM
+                    // endpoint. Idempotent: refreshes entries whose port went
+                    // stale.
+                    let port = resolved_port().to_string();
+                    install_iam_hooks(&port);
 
-            // --- ElixirKit PubSub: message dispatch ---
-            let app_handle = app.handle().clone();
-
-            // Wait for Phoenix to broadcast "ready" before opening the webview.
-            // Avoids the WebView loading before the endpoint is accepting
-            // connections, which would otherwise cause refresh/reconnect loops.
-            pubsub.subscribe("messages", move |msg| {
-                if msg == b"ready" {
-                    create_window(&app_handle);
-                } else if msg.starts_with(b"notify:") {
-                    // Format: notify:<title>|<body>
-                    let payload = String::from_utf8_lossy(&msg[7..]);
-                    let parts: Vec<&str> = payload.splitn(2, '|').collect();
-                    let title = parts.first().unwrap_or(&"EITS").to_string();
-                    let body = parts.get(1).unwrap_or(&"").to_string();
-                    send_notification(&title, &body);
-                    // Bounce dock icon once to attract attention.
-                    if let Some(w) = app_handle.get_webview_window("main") {
-                        let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
-                    }
-                } else if msg.starts_with(b"badge:") {
-                    // Format: badge:<count> (0 to clear)
-                    let count_str = String::from_utf8_lossy(&msg[6..]);
-                    if let Ok(count) = count_str.trim().parse::<i64>() {
-                        if let Some(window) = app_handle.get_webview_window("main") {
-                            let badge = if count == 0 { None } else { Some(count) };
-                            let _ = window.set_badge_count(badge);
-                        }
-                    }
-                } else if msg.starts_with(b"clipboard:") {
-                    // Format: clipboard:<text>
-                    let text = String::from_utf8_lossy(&msg[10..]).to_string();
-                    let _ = app_handle.clipboard().write_text(text);
-                } else if msg.starts_with(b"save-file:") {
-                    // Format: save-file:<filename>|<content>
-                    let payload = String::from_utf8_lossy(&msg[10..]).to_string();
-                    let parts: Vec<&str> = payload.splitn(2, '|').collect();
-                    let filename = parts.first().unwrap_or(&"export.txt").to_string();
-                    let content = parts.get(1).unwrap_or(&"").to_string();
-                    let app_clone = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        save_file_dialog(&app_clone, &filename, &content).await;
-                    });
-                } else if msg.starts_with(b"navigate:") {
-                    // Format: navigate:<path>
-                    let path = String::from_utf8_lossy(&msg[9..]).to_string();
-                    navigate_to(&app_handle, &path);
-                } else {
-                    println!("[eits-tauri] {}", String::from_utf8_lossy(msg));
+                    // Copy priv/skills/eits-* into ~/.claude/skills/ on every
+                    // startup so agents running under this app can see the
+                    // /eits-* skills without a manual `eits skills install`.
+                    // Idempotent (install always overwrites with the bundled
+                    // copy) and fail-open: a missing bundle dir or copy error
+                    // is logged, never fatal.
+                    install_skills(&app_handle_consent);
                 }
             });
 
-            let app_handle = app.handle().clone();
+            // --- Notification permission (macOS requires explicit grant) ---
+            // Without this, show() silently succeeds but no notification appears.
+            {
+                use tauri_plugin_notification::NotificationExt;
+                let state = app.notification().permission_state();
+                log!("[eits-tauri] notification permission state: {:?}", state);
+                match state {
+                    Ok(tauri_plugin_notification::PermissionState::Granted) => {
+                        log!("[eits-tauri] notifications: already granted");
+                    }
+                    Ok(_) => {
+                        match app.notification().request_permission() {
+                            Ok(s) => log!("[eits-tauri] notifications: requested, state={:?}", s),
+                            Err(e) => log!("[eits-tauri] notifications: request failed: {e}"),
+                        }
+                    }
+                    Err(e) => log!("[eits-tauri] notifications: permission_state() error: {e}"),
+                }
+            }
 
-            tauri::async_runtime::spawn_blocking(move || {
-                let rel_dir = app_handle
-                    .path()
-                    .resource_dir()
-                    .unwrap()
-                    .join("rel");
-                let mut command = elixir_command(&rel_dir);
-                command.env("ELIXIRKIT_PUBSUB", pubsub.url());
-                let status = command.status().expect("failed to start Elixir");
-                app_handle.exit(status.code().unwrap_or(1));
-            });
+            // --- ElixirKit PubSub ---
+            #[cfg(debug_assertions)]
+            {
+                println!("[eits-tauri] dev mode — skipping ElixirKit spawn, connecting to external Phoenix server");
+                let app_handle_dev = app.handle().clone();
+                drop(pubsub);
+                create_window(&app_handle_dev);
+            }
+
+            #[cfg(not(debug_assertions))]
+            {
+                let app_handle = app.handle().clone();
+
+                pubsub.subscribe("messages", move |msg| {
+                    log!("[eits-tauri] pubsub message: {} bytes, preview={:?}", msg.len(), String::from_utf8_lossy(&msg[..msg.len().min(80)]));
+                    if msg == b"ready" {
+                        // Window creation requires the main thread on macOS (Cocoa).
+                        // The ElixirKit PubSub callback runs on a background thread,
+                        // so we must dispatch back to the main thread here.
+                        log!("[eits-tauri] received ready, dispatching window creation to main thread");
+                        let app_clone = app_handle.clone();
+                        match app_handle.run_on_main_thread(move || {
+                            log!("[eits-tauri] main thread: creating window");
+                            create_window(&app_clone);
+                            log!("[eits-tauri] main thread: window creation returned");
+                        }) {
+                            Ok(_) => log!("[eits-tauri] run_on_main_thread dispatched ok"),
+                            Err(e) => log!("[eits-tauri] run_on_main_thread failed: {e}"),
+                        };
+                    } else if msg.starts_with(b"notify:") {
+                        // Format: notify:<title>|<body>  or  notify:<title>|<body>|<path>
+                        let payload = String::from_utf8_lossy(&msg[7..]);
+                        let parts: Vec<&str> = payload.splitn(3, '|').collect();
+                        let title = parts.first().unwrap_or(&"EITS").to_string();
+                        let body = parts.get(1).unwrap_or(&"").to_string();
+                        let nav_path = parts.get(2).map(|s| s.to_string());
+
+                        log!("[eits-tauri] notify: title={title:?} body={body:?} nav_path={nav_path:?}");
+
+                        // macOS UNUserNotificationCenter requires main-thread dispatch.
+                        // Calling show() from the elixirkit-pubsub background thread
+                        // silently fails on some macOS versions.
+                        let app_clone = app_handle.clone();
+                        let title_c = title.clone();
+                        let body_c = body.clone();
+                        let nav_path_c = nav_path.clone();
+                        match app_handle.run_on_main_thread(move || {
+                            send_notification(&title_c, &body_c, nav_path_c, &app_clone);
+                        }) {
+                            Ok(_) => {}
+                            Err(e) => log!("[eits-tauri] notify run_on_main_thread failed: {e}"),
+                        };
+
+                        if let Some(w) = app_handle.get_webview_window("main") {
+                            let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
+                        }
+                    } else if msg.starts_with(b"badge:") {
+                        let count_str = String::from_utf8_lossy(&msg[6..]);
+                        if let Ok(count) = count_str.trim().parse::<i64>() {
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let badge = if count == 0 { None } else { Some(count) };
+                                let _ = window.set_badge_count(badge);
+                            }
+                        }
+                    } else if msg.starts_with(b"clipboard:") {
+                        let text = String::from_utf8_lossy(&msg[10..]).to_string();
+                        let _ = app_handle.clipboard().write_text(text);
+                    } else if msg.starts_with(b"save-file:") {
+                        let payload = String::from_utf8_lossy(&msg[10..]).to_string();
+                        let parts: Vec<&str> = payload.splitn(2, '|').collect();
+                        let filename = parts.first().unwrap_or(&"export.txt").to_string();
+                        let content = parts.get(1).unwrap_or(&"").to_string();
+                        let app_clone = app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            save_file_dialog(&app_clone, &filename, &content).await;
+                        });
+                    } else if msg.starts_with(b"navigate:") {
+                        let path = String::from_utf8_lossy(&msg[9..]).to_string();
+                        navigate_to(&app_handle, &path);
+                    } else {
+                        println!("[eits-tauri] {}", String::from_utf8_lossy(msg));
+                    }
+                });
+
+                let app_handle = app.handle().clone();
+
+                tauri::async_runtime::spawn_blocking(move || {
+                    use std::io::BufRead;
+                    use std::process::Stdio;
+
+                    let rel_dir = match app_handle.path().resource_dir() {
+                        Ok(d) => d.join("rel"),
+                        Err(e) => {
+                            log!("[eits-tauri] elixir: resource_dir() failed: {e}");
+                            app_handle.exit(1);
+                            return;
+                        }
+                    };
+                    log!("[eits-tauri] elixir: rel_dir={}", rel_dir.display());
+                    log!("[eits-tauri] elixir: rel_dir exists={}", rel_dir.exists());
+
+                    let mut command = elixir_command(&rel_dir);
+                    command.env("ELIXIRKIT_PUBSUB", pubsub.url());
+                    // Capture stderr so we can log Elixir startup errors.
+                    command.stderr(Stdio::piped());
+                    command.stdout(Stdio::piped());
+
+                    log!("[eits-tauri] elixir: spawning release");
+                    let mut child = match command.spawn() {
+                        Ok(c) => c,
+                        Err(e) => {
+                            log!("[eits-tauri] elixir: spawn() FAILED: {e}");
+                            app_handle.exit(1);
+                            return;
+                        }
+                    };
+                    log!("[eits-tauri] elixir: spawned pid={:?}", child.id());
+
+                    // Stream stderr to log in a separate thread.
+                    if let Some(stderr) = child.stderr.take() {
+                        std::thread::spawn(move || {
+                            let reader = std::io::BufReader::new(stderr);
+                            for line in reader.lines() {
+                                match line {
+                                    Ok(l) => log!("[elixir] {}", l),
+                                    Err(_) => break,
+                                }
+                            }
+                        });
+                    }
+                    // Stream stdout too.
+                    if let Some(stdout) = child.stdout.take() {
+                        std::thread::spawn(move || {
+                            let reader = std::io::BufReader::new(stdout);
+                            for line in reader.lines() {
+                                match line {
+                                    Ok(l) => log!("[elixir-out] {}", l),
+                                    Err(_) => break,
+                                }
+                            }
+                        });
+                    }
+
+                    let status = match child.wait() {
+                        Ok(s) => s,
+                        Err(e) => {
+                            log!("[eits-tauri] elixir: wait() failed: {e}");
+                            app_handle.exit(1);
+                            return;
+                        }
+                    };
+                    log!("[eits-tauri] elixir: exited with status={}", status);
+                    app_handle.exit(status.code().unwrap_or(1));
+                });
+            }
 
             Ok(())
         })
@@ -255,15 +641,11 @@ pub fn run() {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     if window.label() == "main" {
-                        // Main window: hide instead of close so the app stays alive in the tray.
                         let _ = window.hide();
                         api.prevent_close();
                     }
-                    // Secondary windows: allow normal close (do nothing, default behaviour).
                 }
                 tauri::WindowEvent::ThemeChanged(theme) => {
-                    // macOS switched dark/light mode — push the change into the webview
-                    // so Phoenix can update the theme if the user's setting is "system".
                     let theme_name = match theme {
                         tauri::Theme::Dark => "dark",
                         _ => "light",
@@ -277,7 +659,22 @@ pub fn run() {
                         let _ = wv.eval(&js);
                     }
                 }
+                tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Enter { .. }) => {
+                    let js = "window.dispatchEvent(new CustomEvent('tauri:file-drag-enter'))";
+                    if let Some(wv) = window.app_handle().get_webview_window("main") {
+                        let _ = wv.eval(js);
+                    }
+                }
+                tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Leave) => {
+                    let js = "window.dispatchEvent(new CustomEvent('tauri:file-drag-leave'))";
+                    if let Some(wv) = window.app_handle().get_webview_window("main") {
+                        let _ = wv.eval(js);
+                    }
+                }
                 tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                    // Forward dropped file paths into the webview as a CustomEvent.
+                    // A JS listener in app.js picks this up and pushes the paths to
+                    // the active LiveView session via pushEvent.
                     let paths_json: Vec<String> = paths.iter()
                         .filter_map(|p| p.to_str().map(|s| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))))
                         .collect();
@@ -289,13 +686,25 @@ pub fn run() {
                         let _ = wv.eval(&js);
                     }
                 }
+                tauri::WindowEvent::Focused(true) => {
+                    // When the main window gains focus (e.g. user clicked a notification),
+                    // drain any pending navigation stored by send_notification.
+                    // on_window_event already runs on the main thread — call navigate_to
+                    // directly; run_on_main_thread from main thread deadlocks.
+                    if window.label() == "main" {
+                        if let Some(path) = take_pending_nav() {
+                            let app = window.app_handle().clone();
+                            navigate_to(&app, &path);
+                        }
+                    }
+                }
                 _ => {}
             }
         })
+        .invoke_handler(tauri::generate_handler![pick_folder, open_window, show_session_context_menu])
         .build(tauri::generate_context!())
         .expect("error building tauri application")
         .run(|app_handle, event| {
-            // macOS: dock icon clicked with no visible windows → show the hidden window.
             if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
                 if !has_visible_windows {
                     show_window(app_handle);
@@ -311,15 +720,30 @@ fn show_window(app_handle: &tauri::AppHandle) {
     }
 }
 
+fn toggle_always_on_top(app_handle: &tauri::AppHandle) {
+    let current = ALWAYS_ON_TOP.load(Ordering::Relaxed);
+    let next = !current;
+    ALWAYS_ON_TOP.store(next, Ordering::Relaxed);
+
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = window.set_always_on_top(next);
+    }
+
+    // Sync checkmark on the menu-bar item.
+    if let Some(menu) = app_handle.menu() {
+        if let Some(tauri::menu::MenuItemKind::Check(item)) = menu.get("menu_always_on_top") {
+            let _ = item.set_checked(next);
+        }
+    }
+}
+
 fn create_window(app_handle: &tauri::AppHandle) {
-    let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+    let port = resolved_port().to_string();
     let url = format!("http://127.0.0.1:{}", port);
     let parsed_url: tauri::Url = url.parse().unwrap();
 
-    // Start hidden, let window-state plugin restore position before showing.
-    // title_bar_style::Overlay: native traffic lights float over the webview.
-    // JS marks the document so CSS can add the matching top padding.
-    let window = tauri::WebviewWindowBuilder::new(
+    log!("[eits-tauri] create_window: building WebviewWindow url={url}");
+    let window = match tauri::WebviewWindowBuilder::new(
         app_handle,
         "main",
         tauri::WebviewUrl::External(parsed_url),
@@ -331,46 +755,78 @@ fn create_window(app_handle: &tauri::AppHandle) {
     .visible(false)
     .devtools(true)
     .build()
-    .unwrap();
+    {
+        Ok(w) => {
+            log!("[eits-tauri] create_window: WebviewWindow built ok");
+            w
+        }
+        Err(e) => {
+            log!("[eits-tauri] create_window: FAILED to build window: {e}");
+            return;
+        }
+    };
 
-    // Mark the root element so CSS can add padding-top for the traffic lights.
+    // Sidebar vibrancy — frosted-glass effect over the entire window.
+    #[cfg(target_os = "macos")]
+    {
+        use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+        if let Err(e) = apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None) {
+            log!("[eits-tauri] create_window: vibrancy failed (non-fatal): {e}");
+        }
+    }
+
     let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
-
-    let _ = window.show();
+    if let Err(e) = window.show() {
+        log!("[eits-tauri] create_window: window.show() FAILED: {e}");
+    } else {
+        log!("[eits-tauri] create_window: window.show() ok — window should be visible");
+    }
 }
 
-/// Open a new secondary window at the given path.
-/// Each call gets a unique label ("window-2", "window-3", …) so Tauri
-/// treats them as independent windows. Secondary windows close normally
-/// (unlike "main" which hides to keep the app alive in the tray).
 fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
     let n = WINDOW_COUNTER.fetch_add(1, Ordering::Relaxed);
     let label = format!("window-{}", n);
-    let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+    let port = resolved_port().to_string();
     let url = format!("http://127.0.0.1:{}{}", port, path);
     let parsed_url: tauri::Url = match url.parse() {
         Ok(u) => u,
         Err(e) => {
-            eprintln!("[eits-tauri] open_new_window: bad url {url}: {e}");
+            log!("[eits-tauri] open_new_window: bad url {url}: {e}");
             return;
         }
     };
-    match tauri::WebviewWindowBuilder::new(
+    let window = match tauri::WebviewWindowBuilder::new(
         app_handle,
         &label,
         tauri::WebviewUrl::External(parsed_url),
     )
     .title("Eye in the Sky")
+    .title_bar_style(tauri::TitleBarStyle::Overlay)
+    .hidden_title(true)
     .inner_size(1280.0, 800.0)
     .devtools(true)
     .build()
     {
-        Ok(_) => {}
-        Err(e) => eprintln!("[eits-tauri] open_new_window: failed to create {label}: {e}"),
+        Ok(w) => w,
+        Err(e) => {
+            log!("[eits-tauri] open_new_window: failed to create {label}: {e}");
+            return;
+        }
+    };
+
+    // Match main window vibrancy — frosted-glass sidebar effect.
+    #[cfg(target_os = "macos")]
+    {
+        use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+        if let Err(e) = apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None) {
+            log!("[eits-tauri] open_new_window: vibrancy failed (non-fatal): {e}");
+        }
     }
+
+    // Mark the document so CSS rules gated on data-tauri-overlay apply.
+    let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
 }
 
-/// Map an `eits://...` deep-link URL to a Phoenix route and navigate.
 fn route_deep_link(app_handle: &tauri::AppHandle, url_str: &str) {
     let url = match url_str.parse::<tauri::Url>() {
         Ok(u) => u,
@@ -385,7 +841,10 @@ fn route_deep_link(app_handle: &tauri::AppHandle, url_str: &str) {
         ("sessions", false) => format!("/dm/{}", tail),
         ("dm", false) => format!("/dm/{}", tail),
         ("sessions", true) => "/sessions".to_string(),
-        ("tasks", _) => "/tasks".to_string(),
+        ("tasks", false) => format!("/workspace/tasks?uuid={}", tail),
+        ("tasks", true) => "/workspace/tasks".to_string(),
+        ("notes", false) => format!("/workspace/notes?uuid={}", tail),
+        ("notes", true) => "/workspace/notes".to_string(),
         ("projects", false) => format!("/projects/{}", tail),
         ("", false) => format!("/{}", tail),
         _ => "/".to_string(),
@@ -393,12 +852,11 @@ fn route_deep_link(app_handle: &tauri::AppHandle, url_str: &str) {
     navigate_to(app_handle, &path);
 }
 
-/// Navigate the main webview to a path (e.g., "/sessions", "/tasks")
 fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
     if let Some(window) = app_handle.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
-        let port = std::env::var("PORT").unwrap_or_else(|_| "5050".to_string());
+        let port = resolved_port().to_string();
         let url = format!("http://127.0.0.1:{}{}", port, path);
         if let Ok(parsed) = url.parse::<tauri::Url>() {
             let _ = window.navigate(parsed);
@@ -406,7 +864,46 @@ fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
     }
 }
 
-/// Show a native save file dialog and write content to the chosen path
+/// Send a native notification with optional click-to-navigate support.
+///
+/// If `nav_path` is provided:
+/// - Window already visible → navigate immediately.
+/// - Window in background → store in PENDING_NAV; the Focused(true) window event
+///   drains it when the user clicks the notification and the app comes to front.
+#[cfg(not(debug_assertions))]
+fn send_notification(title: &str, body: &str, nav_path: Option<String>, app_handle: &tauri::AppHandle) {
+    use tauri_plugin_notification::NotificationExt;
+
+    log!("[eits-tauri] send_notification (main thread): title={title:?} body={body:?} nav={nav_path:?}");
+
+    let builder = app_handle
+        .notification()
+        .builder()
+        .title(title)
+        .body(body);
+
+    match builder.show() {
+        Ok(_) => log!("[eits-tauri] send_notification: show() ok"),
+        Err(e) => log!("[eits-tauri] notification error: {e}"),
+    }
+
+    if let Some(path) = nav_path {
+        if let Some(window) = app_handle.get_webview_window("main") {
+            if window.is_visible().unwrap_or(false) {
+                // App is in the foreground — navigate right away.
+                navigate_to(app_handle, &path);
+            } else {
+                // App is in the background. Store the path; the Focused(true)
+                // window event fires when the user clicks the notification and
+                // macOS brings the app to the front.
+                log!("[eits-tauri] send_notification: storing pending_nav={path:?}");
+                set_pending_nav(path);
+            }
+        }
+    }
+}
+
+#[cfg(not(debug_assertions))]
 async fn save_file_dialog(app_handle: &tauri::AppHandle, filename: &str, content: &str) {
     use tauri_plugin_dialog::DialogExt;
     let file_path = app_handle.dialog()
@@ -419,97 +916,55 @@ async fn save_file_dialog(app_handle: &tauri::AppHandle, filename: &str, content
     }
 }
 
-/// Send a native macOS notification. In dev mode the app binary lacks a proper
-/// .app bundle so macOS Notification Center silently drops Tauri plugin
-/// notifications. Fall back to osascript which always works.
-fn send_notification(title: &str, body: &str) {
-    if cfg!(debug_assertions) {
-        let script = format!(
-            "display notification \"{}\" with title \"{}\"",
-            body.replace('\\', "\\\\").replace('"', "\\\""),
-            title.replace('\\', "\\\\").replace('"', "\\\""),
-        );
-        match std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
-            .output()
-        {
-            Ok(out) if out.status.success() => {}
-            Ok(out) => eprintln!("[eits-tauri] osascript failed: {}", String::from_utf8_lossy(&out.stderr)),
-            Err(e) => eprintln!("[eits-tauri] osascript spawn failed: {}", e),
-        }
-    } else {
-        // Prod builds have a proper .app bundle; Tauri plugin works.
-        // This branch can't use app_handle — notifications go through osascript too for simplicity.
-        let script = format!(
-            "display notification \"{}\" with title \"{}\"",
-            body.replace('\\', "\\\\").replace('"', "\\\""),
-            title.replace('\\', "\\\\").replace('"', "\\\""),
-        );
-        let _ = std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
-            .output();
-    }
-}
-
+#[cfg(not(debug_assertions))]
 fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
     if cfg!(debug_assertions) {
-        // Dev mode: run mix phx.server from the project root (one dir up from src-tauri)
         let mut command = elixirkit::mix("phx.server", &[]);
         command.current_dir("..");
-        command.env("PORT", "5050");
+        command.env("PORT", resolved_port());
         command.env("DISABLE_AUTH", "true");
-        // Skip Vite/Tailwind watchers — Vite's config loader picks up main's
-        // node_modules across the worktree boundary and fails. Phoenix serves
-        // pre-built assets from priv/static instead.
         command.env("SKIP_WATCHERS", "1");
         command
     } else {
-        // Prod mode: run the bundled release
         let mut command = elixirkit::release(rel_dir, "eye_in_the_sky");
         command.env("PHX_SERVER", "true");
         command.env("PHX_HOST", "127.0.0.1");
-        command.env("PORT", "5050");
+        command.env("PORT", resolved_port());
         command.env("DISABLE_AUTH", "true");
         command.env("BYPASS_AUTH", "true");
-        // Disable SSL for local Postgres — bundled ERTS has no OpenSSL.
         command.env("DATABASE_SSL_VERIFY", "false");
-        // Prevent Phoenix from redirecting http://localhost:5050 → https://
+        // Prevent Phoenix from redirecting http://localhost:<port> → https://
         // WKWebView would get a redirect loop if force_ssl is active.
         command.env("PHX_DISABLE_FORCE_SSL", "1");
+        // Disable Erlang distribution — the desktop app is standalone and does
+        // not need distributed Erlang. Without this, if a dev server (mix phx.server)
+        // is running on the same machine, both processes try to register the same
+        // node name and the release refuses to start.
+        command.env("RELEASE_DISTRIBUTION", "none");
 
-        // Required by runtime.exs in prod — raises if absent.
-        // For the desktop app: DATABASE_URL points to local Postgres,
-        // SECRET_KEY_BASE is a stable desktop-only secret (not web-facing).
-        if std::env::var("DATABASE_URL").is_err() {
-            command.env("DATABASE_URL", "postgres://postgres:postgres@localhost/eits_dev?sslmode=disable");
+        // Bind loopback only: the embedded server runs with DISABLE_AUTH=true,
+        // so it must not be reachable from the LAN. Remote access goes through
+        // a local proxy (e.g. `tailscale serve localhost:<port>`) — see
+        // docs/TAURI_SETUP.md. Launch with EITS_BIND=all to opt into LAN exposure.
+        if std::env::var("EITS_BIND").is_err() {
+            command.env("EITS_BIND", "loopback");
         }
-        if std::env::var("SECRET_KEY_BASE").is_err() {
-            command.env(
-                "SECRET_KEY_BASE",
-                "bnsVqob9r8+zpVEcTxUEWHIamQVlRwx2xBgVP56XZAWIUJDTGAiG/WxzD7twxmPN7c2aaaaf50e1f72b3653c8f33bc1b3239e318214ceed08588536f5e62526b9dc405154507082f8caa48786531104ba0a8b66a9ffd7b3148e36649db0c28a1e3e",
-            );
-        }
+
+        // DATABASE_URL and SECRET_KEY_BASE are intentionally NOT set here.
+        // They are read from ~/.config/eits/.env by runtime.exs at startup.
+        // setup.command creates that file with the correct OS-user credentials.
+        // Injecting them here would override the .env file values (System.get_env()
+        // is the last/highest-priority source in runtime.exs's source!() call).
 
         command
     }
 }
 
-/// Install EITS IAM hooks into ~/.claude/settings.json.
-///
-/// Idempotent — checks each event type independently and only adds a hook
-/// group when none of the existing entries reference "iam/hook". Safe to
-/// call on every startup.
-///
-/// Fail-open design: any I/O or parse error is logged and silently skipped.
-/// The generated hook command uses `|| true` so Claude Code always sees
-/// exit 0 even when Phoenix is not yet reachable (connection refused / timeout).
 fn install_iam_hooks(port: &str) {
     let home = match std::env::var("HOME") {
         Ok(h) => std::path::PathBuf::from(h),
         Err(_) => {
-            eprintln!("[eits-tauri] HOME not set; IAM hooks not installed");
+            log!("[eits-tauri] HOME not set; IAM hooks not installed");
             return;
         }
     };
@@ -517,18 +972,17 @@ fn install_iam_hooks(port: &str) {
     let claude_dir = home.join(".claude");
     let settings_path = claude_dir.join("settings.json");
 
-    // Read existing file or start with an empty object.
     let mut root: serde_json::Value = if settings_path.exists() {
         match std::fs::read_to_string(&settings_path) {
             Ok(raw) => match serde_json::from_str(&raw) {
                 Ok(v) => v,
                 Err(e) => {
-                    eprintln!("[eits-tauri] settings.json parse error: {e}; IAM hooks not installed");
+                    log!("[eits-tauri] settings.json parse error: {e}; IAM hooks not installed");
                     return;
                 }
             },
             Err(e) => {
-                eprintln!("[eits-tauri] Could not read settings.json: {e}; IAM hooks not installed");
+                log!("[eits-tauri] Could not read settings.json: {e}; IAM hooks not installed");
                 return;
             }
         }
@@ -536,13 +990,11 @@ fn install_iam_hooks(port: &str) {
         serde_json::json!({})
     };
 
-    // Ensure root is an object (guard against malformed files).
     if !root.is_object() {
-        eprintln!("[eits-tauri] settings.json root is not an object; IAM hooks not installed");
+        log!("[eits-tauri] settings.json root is not an object; IAM hooks not installed");
         return;
     }
 
-    // Build the hook group to inject.
     let cmd = format!(
         "curl -sf --max-time 5 -X POST http://127.0.0.1:{port}/api/v1/iam/hook \
          -H 'Content-Type: application/json' -d @- || true"
@@ -558,9 +1010,8 @@ fn install_iam_hooks(port: &str) {
         .entry("hooks")
         .or_insert_with(|| serde_json::json!({}));
 
-    // Guard: if "hooks" is somehow not an object, bail.
     if !hooks_obj.is_object() {
-        eprintln!("[eits-tauri] settings.json hooks field is not an object; IAM hooks not installed");
+        log!("[eits-tauri] settings.json hooks field is not an object; IAM hooks not installed");
         return;
     }
 
@@ -573,31 +1024,34 @@ fn install_iam_hooks(port: &str) {
             .entry(*event)
             .or_insert_with(|| serde_json::json!([]));
 
-        // Ensure the event value is an array.
         if !event_hooks.is_array() {
-            eprintln!("[eits-tauri] hooks.{event} is not an array; skipping");
+            log!("[eits-tauri] hooks.{event} is not an array; skipping");
             continue;
         }
 
-        // Check whether any existing entry already references our endpoint.
-        let already = event_hooks
-            .as_array()
-            .map(|groups| {
-                groups.iter().any(|g| {
-                    g.get("hooks")
-                        .and_then(|h| h.as_array())
-                        .map(|entries| {
-                            entries.iter().any(|e| {
-                                e.get("command")
-                                    .and_then(|c| c.as_str())
-                                    .map(|s| s.contains("iam/hook"))
-                                    .unwrap_or(false)
-                            })
-                        })
-                        .unwrap_or(false)
-                })
-            })
-            .unwrap_or(false);
+        // Walk existing entries: refresh any iam/hook command whose port is
+        // stale (the resolved port can change across launches — config edits
+        // or busy-port fallback). Track whether any entry references us at all.
+        let mut already = false;
+        for group in event_hooks.as_array_mut().unwrap().iter_mut() {
+            let Some(entries) = group.get_mut("hooks").and_then(|h| h.as_array_mut()) else {
+                continue;
+            };
+            for entry in entries.iter_mut() {
+                let is_ours = entry
+                    .get("command")
+                    .and_then(|c| c.as_str())
+                    .map(|s| s.contains("iam/hook"))
+                    .unwrap_or(false);
+                if is_ours {
+                    already = true;
+                    if entry.get("command").and_then(|c| c.as_str()) != Some(cmd.as_str()) {
+                        entry["command"] = serde_json::json!(cmd);
+                        installed_any = true;
+                    }
+                }
+            }
+        }
 
         if !already {
             event_hooks.as_array_mut().unwrap().push(group_entry.clone());
@@ -606,24 +1060,308 @@ fn install_iam_hooks(port: &str) {
     }
 
     if !installed_any {
-        println!("[eits-tauri] IAM hooks already present in settings.json; nothing to do");
+        log!("[eits-tauri] IAM hooks already present and current in settings.json; nothing to do");
         return;
     }
 
-    // Ensure ~/.claude/ directory exists before writing.
     if let Err(e) = std::fs::create_dir_all(&claude_dir) {
-        eprintln!("[eits-tauri] Could not create ~/.claude/: {e}");
+        log!("[eits-tauri] Could not create ~/.claude/: {e}");
         return;
     }
 
     match serde_json::to_string_pretty(&root) {
         Ok(json_str) => match std::fs::write(&settings_path, json_str) {
-            Ok(()) => println!(
+            Ok(()) => log!(
                 "[eits-tauri] IAM hooks written to {}",
                 settings_path.display()
             ),
-            Err(e) => eprintln!("[eits-tauri] Could not write settings.json: {e}"),
+            Err(e) => log!("[eits-tauri] Could not write settings.json: {e}"),
         },
-        Err(e) => eprintln!("[eits-tauri] Could not serialize settings.json: {e}"),
+        Err(e) => log!("[eits-tauri] Could not serialize settings.json: {e}"),
+    }
+}
+
+/// Copies every `priv/skills/eits-*` directory from the app bundle into
+/// `~/.claude/skills/`, replacing existing copies — same operation as
+/// `eits skills install`, run automatically so a fresh desktop install has
+/// working `/eits-*` skills without a manual CLI step.
+///
+/// Fail-open: any missing resource dir, missing HOME, or I/O error is logged
+/// and skipped. Runs synchronously in `setup()` — this is a handful of small
+/// directory copies, not worth a background thread.
+fn install_skills(app: &tauri::AppHandle) {
+    let skills_src = match app.path().resource_dir() {
+        Ok(d) => d.join("priv").join("skills"),
+        Err(e) => {
+            log!("[eits-tauri] skills: resource_dir() failed: {e}");
+            return;
+        }
+    };
+    if !skills_src.is_dir() {
+        log!(
+            "[eits-tauri] skills: bundle has no priv/skills at {} — skipping",
+            skills_src.display()
+        );
+        return;
+    }
+
+    let home = match std::env::var("HOME") {
+        Ok(h) => std::path::PathBuf::from(h),
+        Err(_) => {
+            log!("[eits-tauri] skills: HOME not set; skills not installed");
+            return;
+        }
+    };
+    let dest_root = home.join(".claude").join("skills");
+    if let Err(e) = std::fs::create_dir_all(&dest_root) {
+        log!("[eits-tauri] skills: could not create {}: {e}", dest_root.display());
+        return;
+    }
+
+    let entries = match std::fs::read_dir(&skills_src) {
+        Ok(e) => e,
+        Err(e) => {
+            log!("[eits-tauri] skills: could not read {}: {e}", skills_src.display());
+            return;
+        }
+    };
+
+    let mut installed = 0usize;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !name.starts_with("eits-") {
+            continue;
+        }
+
+        let dest = dest_root.join(name);
+        // Overwrite: remove any existing copy (dir or stale symlink) first,
+        // same semantics as `eits skills install`.
+        let _ = std::fs::remove_dir_all(&dest);
+        let _ = std::fs::remove_file(&dest);
+
+        if let Err(e) = copy_dir_recursive(&path, &dest) {
+            log!("[eits-tauri] skills: failed to install {name}: {e}");
+        } else {
+            installed += 1;
+        }
+    }
+
+    log!("[eits-tauri] skills: installed {installed} skill(s) to {}", dest_root.display());
+}
+
+/// Recursive directory copy — std::fs has no built-in for this.
+fn copy_dir_recursive(src: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dest)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let dest_path = dest.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&entry.path(), &dest_path)?;
+        } else if file_type.is_file() {
+            std::fs::copy(entry.path(), &dest_path)?;
+        }
+        // Symlinks in the source tree are skipped — the bundle should not
+        // contain any (Tauri resource copying resolves them at build time).
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Tauri commands (invoked from the frontend via invoke('command_name', ...))
+// ---------------------------------------------------------------------------
+
+/// Opens a native folder picker dialog and returns the selected path, or null
+/// if the user cancelled.  Uses a oneshot channel so the tokio thread never
+/// blocks — the dialog callback fires on the main thread, sends the result,
+/// and the async command awaits it.
+#[tauri::command]
+async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |result| {
+        let _ = tx.send(result);
+    });
+    rx.await
+        .ok()
+        .flatten()
+        .and_then(|p| p.into_path().ok())
+        .and_then(|p| p.to_str().map(|s| s.to_string()))
+}
+
+/// Opens a new app window navigated to the given path (e.g. "/projects/3").
+/// Wraps the internal open_new_window helper so JS can trigger it.
+#[tauri::command]
+fn open_window(app: tauri::AppHandle, path: String) {
+    open_new_window(&app, &path);
+}
+
+/// Shows a native context menu for a session row in the flyout.
+///
+/// Builds the menu dynamically, stores the session context in app state so
+/// on_menu_event can look it up, then calls popup() on the focused window.
+#[tauri::command]
+fn show_session_context_menu(
+    app: tauri::AppHandle,
+    session_id: i64,
+    uuid: String,
+    name: String,
+    worktree_path: Option<String>,
+) -> Result<(), String> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+
+    // Store context so on_menu_event can retrieve it by session_id.
+    {
+        let state = app.state::<SessionCtxMap>();
+        let mut map = state.lock().map_err(|e| e.to_string())?;
+        map.insert(session_id, SessionCtx {
+            id: session_id,
+            uuid: uuid.clone(),
+            name: name.clone(),
+            worktree_path: worktree_path.clone(),
+        });
+    }
+
+    let sid = session_id.to_string();
+    let has_worktree = worktree_path.is_some();
+
+    // Group 1 — chat management
+    let pin    = MenuItem::with_id(&app, format!("ctx_pin::{sid}"),    "Pin chat",        true,  None::<&str>).map_err(|e| e.to_string())?;
+    let rename = MenuItem::with_id(&app, format!("ctx_rename::{sid}"), "Rename chat",     true,  None::<&str>).map_err(|e| e.to_string())?;
+    let archive= MenuItem::with_id(&app, format!("ctx_archive::{sid}"),"Archive chat",    true,  None::<&str>).map_err(|e| e.to_string())?;
+    let unread = MenuItem::with_id(&app, format!("ctx_unread::{sid}"), "Mark as unread",  true,  None::<&str>).map_err(|e| e.to_string())?;
+    let sep1   = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+
+    // Group 2 — Finder / clipboard
+    let open_finder  = MenuItem::with_id(&app, format!("ctx_finder::{sid}"),   "Open in Finder",        has_worktree, None::<&str>).map_err(|e| e.to_string())?;
+    let copy_wd      = MenuItem::with_id(&app, format!("ctx_copy_wd::{sid}"),  "Copy working directory", has_worktree, None::<&str>).map_err(|e| e.to_string())?;
+    let copy_id      = MenuItem::with_id(&app, format!("ctx_copy_id::{sid}"),  "Copy session ID",        true,         None::<&str>).map_err(|e| e.to_string())?;
+    let copy_link    = MenuItem::with_id(&app, format!("ctx_copy_link::{sid}"),"Copy deeplink",           true,         None::<&str>).map_err(|e| e.to_string())?;
+    let sep2         = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+
+    // Group 3 — window
+    let open_window  = MenuItem::with_id(&app, format!("ctx_open_window::{sid}"), "Open in New Window", true, None::<&str>).map_err(|e| e.to_string())?;
+
+    let menu = Menu::with_items(&app, &[
+        &pin, &rename, &archive, &unread,
+        &sep1,
+        &open_finder, &copy_wd, &copy_id, &copy_link,
+        &sep2,
+        &open_window,
+    ]).map_err(|e| e.to_string())?;
+
+    // Popup on the main window. WebviewWindow::popup_menu is the correct API
+    // in Tauri 2.x — calling it on the window (not on the menu) avoids the
+    // Window<R> vs WebviewWindow<R> type mismatch.
+    let window = app.get_webview_window("main").ok_or("no main window")?;
+    window.popup_menu(&menu).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Handles context menu item selections for session rows (ctx_ prefixed IDs).
+///
+/// ID format: "ctx_<action>::<session_id>"
+///
+/// Tauri-native actions (window, clipboard, Finder) are handled inline.
+/// LiveView actions (archive, rename) eval a CustomEvent into the webview so
+/// the JS listener can pushEvent to the Rail LiveComponent.
+fn handle_session_ctx_menu(app: &tauri::AppHandle, id: &str) {
+    // Parse "ctx_<action>::<session_id>"
+    let parts: Vec<&str> = id.splitn(2, "::").collect();
+    let action = match parts.first() { Some(a) => *a, None => return };
+    let session_id: i64 = match parts.get(1).and_then(|s| s.parse().ok()) {
+        Some(n) => n,
+        None => return,
+    };
+
+    // Retrieve stored session context.
+    let ctx = {
+        let state = app.state::<SessionCtxMap>();
+        let map = match state.lock() {
+            Ok(m) => m,
+            Err(_) => return,
+        };
+        match map.get(&session_id).cloned() {
+            Some(c) => c,
+            None => return,
+        }
+    };
+
+    let window = match app.get_webview_window("main") {
+        Some(w) => w,
+        None => return,
+    };
+
+    match action {
+        // --- Open in New Window -------------------------------------------------
+        "ctx_open_window" => {
+            open_new_window(app, &format!("/dm/{}", ctx.id));
+        }
+
+        // --- Open in Finder -----------------------------------------------------
+        "ctx_finder" => {
+            if let Some(path) = &ctx.worktree_path {
+                let _ = app.opener().open_path(path, None::<&str>);
+            }
+        }
+
+        // --- Clipboard ----------------------------------------------------------
+        "ctx_copy_wd" => {
+            if let Some(path) = &ctx.worktree_path {
+                let _ = app.clipboard().write_text(path.clone());
+            }
+        }
+        "ctx_copy_id" => {
+            let _ = app.clipboard().write_text(ctx.uuid.clone());
+        }
+        "ctx_copy_link" => {
+            let link = format!("eits://sessions/{}", ctx.uuid);
+            let _ = app.clipboard().write_text(link);
+        }
+
+        // --- LiveView round-trips (emit CustomEvent into the webview) -----------
+        "ctx_archive" => {
+            let js = format!(
+                "window.dispatchEvent(new CustomEvent('tauri:session-action', \
+                 {{ detail: {{ action: 'archive_session', session_id: {} }} }}))",
+                ctx.id
+            );
+            let _ = window.eval(&js);
+        }
+        "ctx_rename" => {
+            // Prompt the user for a new name using a native dialog, then fire the action.
+            // We eval a browser prompt as a fallback since tauri-plugin-dialog has no
+            // text-input dialog in v2. The JS listener handles the pushEvent.
+            let js = format!(
+                r#"(function() {{
+                  var name = window.prompt('Rename session', {name_json});
+                  if (name && name.trim()) {{
+                    window.dispatchEvent(new CustomEvent('tauri:session-action', {{
+                      detail: {{ action: 'rename_session', session_id: {id}, extra: {{ name: name.trim() }} }}
+                    }}));
+                  }}
+                }})();"#,
+                name_json = serde_json::to_string(&ctx.name).unwrap_or_else(|_| "\"\"".to_string()),
+                id = ctx.id,
+            );
+            let _ = window.eval(&js);
+        }
+
+        // --- Stubs for unimplemented features -----------------------------------
+        "ctx_pin" | "ctx_unread" => {
+            let _ = window.eval(
+                "window.dispatchEvent(new CustomEvent('phx:flash', \
+                 { detail: { kind: 'info', msg: 'Coming soon' } }))"
+            );
+        }
+
+        _ => {}
     }
 }

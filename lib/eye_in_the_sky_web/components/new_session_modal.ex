@@ -48,7 +48,14 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       available_agents =
         Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
 
-      {:ok, assign(socket, Map.put(assigns, :available_agents, available_agents))}
+      # Load projects fresh from the DB instead of trusting the host's assign —
+      # hosts load projects once at mount, so a project created after mount
+      # (e.g. via the rail's folder picker) never appears in the dropdown
+      # until the page reloads.
+      {:ok,
+       socket
+       |> assign(Map.put(assigns, :available_agents, available_agents))
+       |> assign(:projects, Projects.list_projects_for_sidebar())}
     end
   end
 

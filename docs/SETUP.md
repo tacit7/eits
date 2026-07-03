@@ -4,8 +4,8 @@
 
 | Dependency | Version | Notes |
 |-----------|---------|-------|
-| Elixir | 1.15+ | OTP 26+ included |
-| Node.js | 22 LTS | Svelte 5 + Vite require 18+ |
+| Elixir | 1.19 (OTP 28) | See `.tool-versions` for exact pins |
+| Node.js | 20 LTS | See `.tool-versions` for exact pins |
 | PostgreSQL | 12+ | `eits_dev` database |
 | Caddy | any | HTTPS proxy for WebAuthn |
 | NATS | optional | Port 4222, currently disabled in code |
@@ -13,8 +13,22 @@
 ```bash
 brew install elixir node postgresql caddy
 brew services start postgresql
-createuser -P postgres   # password: postgres
+createuser -s -P postgres   # password: postgres — NOT optional, see below
 ```
+
+> **The `createuser` step is mandatory on Homebrew Postgres.** Homebrew
+> initializes Postgres with a superuser named after your **macOS user**, not
+> `postgres` — but `config/dev.exs` connects as `postgres`/`postgres`. Skipping
+> this step fails later at `mix ecto.create` with:
+>
+> ```
+> FATAL 28000 (invalid_authorization_specification) role "postgres" does not exist
+> ```
+>
+> Fix: run `createuser -s -P postgres` (enter `postgres` as the password). The
+> `-s` (superuser) flag lets the role create the `eits_dev` database. If the
+> role already exists without a password, set one with:
+> `psql -d postgres -c "ALTER ROLE postgres WITH PASSWORD 'postgres';"`
 
 ## 1. Clone & Deps
 
@@ -533,7 +547,7 @@ Open that URL on the device you want to register (e.g., iPhone). The passkey wil
 - Caddy `tls internal` auto-generates and manages the local cert; run `caddy trust` once to install the CA
 - Phoenix serves plain HTTP on port 5001; Caddy handles all TLS on port 443
 - `.env` is loaded automatically at startup via `dotenvy`; copy `.env.example` to get started
-- No `.tool-versions` or `.nvmrc` — use Node 22 LTS
+- `.tool-versions` at repo root pins Elixir, Erlang/OTP, and Node versions (asdf/mise format) — this is the canonical version reference
 - Oban background jobs require the DB to be up before server starts
 - `mix precommit` runs compile + deps.unlock + format + test in one shot; run before committing
 

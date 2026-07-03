@@ -3,8 +3,29 @@ import Dotenvy
 
 # Load env files with local overrides:
 # .env.local > .env, and explicit shell env overrides both.
-runtime_env = source!([".env", ".env.local", System.get_env()])
+# Check both the user config dir (used by the Tauri desktop bundle) and
+# the CWD (used in dev/server deployments). User config dir takes precedence.
+config_dir = Path.expand("~/.config/eits")
+dot_env_files =
+  Enum.filter(
+    [Path.join(config_dir, ".env"), ".env", ".env.local"],
+    &File.exists?/1
+  )
+
+runtime_env = source!(dot_env_files ++ [System.get_env()])
 get_env = fn key -> runtime_env[key] end
+
+# Desktop app (ElixirKit): the release's stdout is the Rust<->BEAM protocol
+# channel, so Logger writes to stdout fail and every message double-prints as
+# "Failed to write log message to stdout, trying stderr". Send logs straight
+# to stderr when running under ElixirKit (env set by src-tauri/src/lib.rs).
+if get_env.("ELIXIRKIT_PUBSUB") do
+  config :logger, :default_handler, config: %{type: :standard_error}
+end
+
+# Tauri desktop branch: DISABLE_AUTH defaults to "1" — this app is local-only,
+# never network-reachable. Overridden by the .env file if present.
+disable_auth = get_env.("DISABLE_AUTH") || "1"
 
 # Push selected keys from the Dotenvy runtime env into the actual OS process
 # env so code paths that read via `System.get_env/1` see them. Without this,
@@ -14,7 +35,7 @@ get_env = fn key -> runtime_env[key] end
 #
 # We intentionally scope the push to explicitly-listed keys rather than dumping
 # every .env entry into the OS env.
-for key <- ~w[ANTHROPIC_API_KEY EITS_API_KEY] do
+for key <- ~w[ANTHROPIC_API_KEY EITS_API_KEY DATABASE_URL DATABASE_SSL_VERIFY] do
   case runtime_env[key] do
     val when is_binary(val) and val != "" -> System.put_env(key, val)
     _ -> :ok
@@ -48,7 +69,7 @@ if vapid_private = get_env.("VAPID_PRIVATE_KEY") do
     public_key: get_env.("VAPID_PUBLIC_KEY"),
     private_key: vapid_private
 else
-  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
+  if config_env() == :prod && disable_auth not in ~w(true 1) do
     raise "VAPID_PRIVATE_KEY environment variable is required in production"
   end
 end
@@ -64,7 +85,7 @@ end
 # NOTE: Tauri POC — prod guard removed so the bundled desktop app can bypass
 # auth. DO NOT set DISABLE_AUTH=true in any deployment where the app is
 # network-reachable.
-config :eye_in_the_sky, :disable_auth, get_env.("DISABLE_AUTH") in ~w(true 1)
+config :eye_in_the_sky, :disable_auth, disable_auth in ~w(true 1)
 
 # Max concurrent AgentWorker processes under EyeInTheSky.Claude.AgentSupervisor.
 # Each active session holds one worker (kept alive 30 min past last activity),
@@ -105,7 +126,7 @@ end
 if webauthn_origin = get_env.("WEBAUTHN_ORIGIN") do
   config :wax_, origin: webauthn_origin
 else
-  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
+  if config_env() == :prod && disable_auth not in ~w(true 1) do
     raise """
     environment variable WEBAUTHN_ORIGIN is missing.
     Set it to your app's origin, e.g.: https://eits.dev
@@ -118,7 +139,7 @@ end
 if webauthn_rp_id = get_env.("WEBAUTHN_RP_ID") do
   config :wax_, rp_id: webauthn_rp_id
 else
-  if config_env() == :prod && get_env.("DISABLE_AUTH") not in ~w(true 1) do
+  if config_env() == :prod && disable_auth not in ~w(true 1) do
     raise """
     environment variable WEBAUTHN_RP_ID is missing.
     Set it to your app's RP ID (the registrable domain), e.g.: eits.dev
@@ -163,14 +184,11 @@ if config_env() == :prod do
   maybe_ipv6 = if get_env.("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   ssl_opts =
-    case System.get_env("DATABASE_SSL_VERIFY") do
+    case get_env.("DATABASE_SSL_VERIFY") do
       "none" ->
         [verify: :verify_none]
 
-      "false" ->
-        false
-
-      _ ->
+      "true" ->
         [
           verify: :verify_peer,
           cacerts: :public_key.cacerts_get(),
@@ -178,6 +196,11 @@ if config_env() == :prod do
             match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
           ]
         ]
+
+      _ ->
+        # Default to no SSL — local/desktop connections don't need it.
+        # Set DATABASE_SSL_VERIFY=true to enable peer verification (e.g. Supabase).
+        false
     end
 
   config :eye_in_the_sky, EyeInTheSky.Repo,
@@ -218,17 +241,29 @@ if config_env() == :prod do
   # Tauri desktop (DISABLE_AUTH=true): WKWebView may omit the Origin header on
   # WebSocket upgrades. Disable origin checking so LiveView socket connects.
   check_origin =
-    if get_env.("DISABLE_AUTH") in ~w(true 1), do: false, else: allowed_origins
+    if disable_auth in ~w(true 1), do: false, else: allowed_origins
+
+  # EITS_BIND controls the listen address:
+  #   "loopback" — bind 127.0.0.1 only. Set by the Tauri desktop app
+  #                (src-tauri/src/lib.rs) so the embedded server (which runs with
+  #                DISABLE_AUTH=true) is not reachable from the LAN. IPv4 loopback
+  #                specifically: the WKWebView and IAM hook curl commands connect
+  #                to http://127.0.0.1:<port>, which an IPv6-only ::1 bind would
+  #                refuse. Remote access still works via a local proxy such as
+  #                `tailscale serve` — see docs/TAURI_SETUP.md.
+  #   "all" / unset — bind all interfaces (IPv6 + IPv4). Default for server deploys.
+  # See https://hexdocs.pm/bandit/Bandit.html#t:options/0 for address details.
+  bind_ip =
+    case get_env.("EITS_BIND") do
+      "loopback" -> {127, 0, 0, 1}
+      _ -> {0, 0, 0, 0, 0, 0, 0, 0}
+    end
 
   config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     check_origin: check_origin,
     http: [
-      # Enable IPv6 and bind on all interfaces.
-      # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
-      # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
-      # for details about using IPv6 vs IPv4 and loopback vs public addresses.
-      ip: {0, 0, 0, 0, 0, 0, 0, 0},
+      ip: bind_ip,
       port: port
     ],
     secret_key_base: secret_key_base,

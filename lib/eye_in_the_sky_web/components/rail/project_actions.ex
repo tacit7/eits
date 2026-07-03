@@ -112,6 +112,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # In Tauri: JS invokes the native folder picker (Rust pick_folder command) and
   # pushes folder_picked back. In the browser: JS immediately pushes folder_picked
   # with an empty payload to show the inline text-input fallback.
+  # NOTE: Creating a project does NOT auto-select it.
   def handle_show_new_project(socket) do
     {:noreply, push_event(socket, "pick_folder", %{})}
   end
@@ -165,21 +166,73 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  # Handles the folder_picked event pushed back from the JS pick_folder listener.
-  # path present → create project directly.
-  # path absent or empty → show inline text-input fallback.
+  # Called by handle_event("folder_picked") in rail.ex — payload comes from the
+  # Tauri pick_folder JS bridge after the user selects a folder.
+  # If the path already exists as a project, switch to it rather than failing silently.
+  # path absent or empty → falls through to the inline text-input fallback clause below.
   def handle_folder_picked(%{"path" => path}, socket) when is_binary(path) and path != "" do
     path = String.trim(path)
     name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
 
     case Projects.create_project(%{name: name, path: path}) do
-      {:ok, _} -> {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
-      {:error, _} -> {:noreply, assign(socket, :new_project_path, "")}
+      {:ok, _} ->
+        {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+
+      {:error, changeset} ->
+        if path_taken?(changeset) do
+          # Path already exists — select the existing project and tell the user.
+          case Projects.get_project_by_path(path) do
+            {:ok, project} ->
+              {:noreply,
+               socket
+               |> put_flash(:info, "\"#{project.name}\" is already in your projects")
+               |> assign(:projects, Projects.list_projects_for_sidebar())
+               |> assign(:sidebar_project, project)}
+
+            {:error, _} ->
+              {:noreply, put_flash(socket, :error, "Could not add project at #{path}")}
+          end
+        else
+          # Surface the failure — a silent {:noreply, socket} here cost multiple
+          # debugging rounds (nothing appears in the UI and nothing is logged).
+          errors =
+            changeset.errors
+            |> Enum.map(fn {field, {msg, _}} -> "#{field} #{msg}" end)
+            |> Enum.join(", ")
+
+          {:noreply, put_flash(socket, :error, "Could not add project: #{errors}")}
+        end
     end
   end
 
+  # Empty payload = cancelled or no Tauri; show the inline text-input fallback.
   def handle_folder_picked(_params, socket),
     do: {:noreply, assign(socket, :new_project_path, "")}
+
+  defp path_taken?(%Ecto.Changeset{errors: errors}) do
+    Enum.any?(errors, fn
+      {:path, {_, opts}} -> opts[:constraint] == :unique
+      _ -> false
+    end)
+  end
+
+  # Opens the given project in a new Tauri window. No-op in browser context
+  # (the JS bridge guard prevents the invoke call from running).
+  def handle_open_in_window(%{"project_id" => id_str}, socket) do
+    case EyeInTheSkyWeb.ControllerHelpers.parse_int(id_str) do
+      nil ->
+        {:noreply, socket}
+
+      id ->
+        case Projects.get_project(id) do
+          {:ok, _project} ->
+            {:noreply, push_event(socket, "open_in_window", %{path: "/projects/#{id}"})}
+
+          {:error, _} ->
+            {:noreply, socket}
+        end
+    end
+  end
 
   # Only called when sidebar_project is nil (guarded in rail.ex handle_event clause).
   # Restores the project from a localStorage-persisted project_id after cross-LiveView nav.

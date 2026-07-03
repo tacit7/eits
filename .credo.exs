@@ -7,7 +7,7 @@
         excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/", ~r"/checks/"]
       },
       plugins: [{ExSlop, []}],
-      requires: ["lib/eye_in_the_sky/checks/heex_whitespace_pre_inline.ex"],
+      requires: ["dev_lib/eye_in_the_sky/checks/heex_whitespace_pre_inline.ex"],
       strict: false,
       parse_timeout: 5000,
       color: true,

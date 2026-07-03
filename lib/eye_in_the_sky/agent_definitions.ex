@@ -19,7 +19,8 @@ defmodule EyeInTheSky.AgentDefinitions do
   alias EyeInTheSky.AgentDefinitions.FrontmatterParser
   alias EyeInTheSky.Repo
 
-  @global_agents_dir Path.expand("~/.claude/agents")
+  # Function, not attribute: compile-time ~ expansion bakes the build-machine home dir.
+  defp global_agents_dir, do: Path.expand("~/.claude/agents")
 
   # ── Queries ──────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ defmodule EyeInTheSky.AgentDefinitions do
   Syncs global agent definitions from `~/.claude/agents/`.
   """
   def sync_global do
-    sync_directory(@global_agents_dir, "global", nil)
+    sync_directory(global_agents_dir(), "global", nil)
   end
 
   @doc """

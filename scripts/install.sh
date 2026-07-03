@@ -15,7 +15,7 @@ echo "Hook scripts location: $HOOKS_DIR"
 echo ""
 
 # Verify hooks exist and are executable
-for hook in eits-session-init.sh eits-agent-working.sh eits-session-end.sh eits-session-stop.sh eits-session-compact.sh eits-pre-tool-use.sh eits-post-tool-use.sh eits-nats-tool-pre.sh eits-prompt-submit.sh eits-pre-compact.sh; do
+for hook in eits-session-startup.sh eits-session-resume.sh eits-session-compact.sh eits-session-end.sh eits-session-stop.sh eits-pre-tool-use.sh eits-post-tool-commit.sh eits-prompt-submit.sh eits-pre-compact.sh; do
     if [ -f "$HOOKS_DIR/$hook" ]; then
         chmod +x "$HOOKS_DIR/$hook"
         echo "  ✓ $hook"
@@ -34,30 +34,25 @@ cat <<EOF
       {
         "matcher": "startup",
         "hooks": [
-          {"type": "command", "command": "$HOOKS_DIR/eits-session-init.sh"},
-          {"type": "command", "command": "$HOOKS_DIR/eits-agent-working.sh"}
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-startup.sh"}
         ]
       },
       {
         "matcher": "resume",
         "hooks": [
-          {"type": "command", "command": "$HOOKS_DIR/eits-session-init.sh"},
-          {"type": "command", "command": "$HOOKS_DIR/eits-agent-working.sh"}
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-resume.sh"}
         ]
       },
       {
         "matcher": "compact",
         "hooks": [
-          {"type": "command", "command": "$HOOKS_DIR/eits-session-compact.sh"},
-          {"type": "command", "command": "$HOOKS_DIR/eits-session-init.sh"},
-          {"type": "command", "command": "$HOOKS_DIR/eits-agent-working.sh"}
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-compact.sh"}
         ]
       },
       {
         "matcher": "clear",
         "hooks": [
-          {"type": "command", "command": "$HOOKS_DIR/eits-session-init.sh"},
-          {"type": "command", "command": "$HOOKS_DIR/eits-agent-working.sh"}
+          {"type": "command", "command": "$HOOKS_DIR/eits-session-startup.sh"}
         ]
       }
     ],
@@ -67,17 +62,13 @@ cat <<EOF
         "hooks": [
           {"type": "command", "command": "$HOOKS_DIR/eits-pre-tool-use.sh"}
         ]
-      },
-      {
-        "hooks": [
-          {"type": "command", "command": "$HOOKS_DIR/eits-nats-tool-pre.sh", "async": true}
-        ]
       }
     ],
     "PostToolUse": [
       {
+        "matcher": "Bash",
         "hooks": [
-          {"type": "command", "command": "$HOOKS_DIR/eits-post-tool-use.sh"}
+          {"type": "command", "command": "$HOOKS_DIR/eits-post-tool-commit.sh"}
         ]
       }
     ],
@@ -113,7 +104,4 @@ cat <<EOF
 }
 EOF
 
-echo ""
-echo "Database: ~/.config/eye-in-the-sky/eits.db"
-echo "Mapping file: ~/.claude/hooks/session_agent_map.json"
 echo ""

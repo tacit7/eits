@@ -234,6 +234,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("show_new_project", _params, socket),
     do: ProjectActions.handle_show_new_project(socket)
 
+  # Tauri JS bridge pushes this after the user picks a folder in the native dialog.
+  def handle_event("folder_picked", params, socket),
+    do: ProjectActions.handle_folder_picked(params, socket)
+
+  # Tauri JS bridge: open a project in its own window.
+  def handle_event("open_in_window", params, socket),
+    do: ProjectActions.handle_open_in_window(params, socket)
+
   def handle_event("cancel_new_project", _params, socket),
     do: ProjectActions.handle_cancel_new_project(socket)
 
@@ -242,9 +250,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("create_project", params, socket),
     do: ProjectActions.handle_create_project(params, socket)
-
-  def handle_event("folder_picked", params, socket),
-    do: ProjectActions.handle_folder_picked(params, socket)
 
   def handle_event("new_session", params, socket),
     do: ProjectActions.handle_new_session(params, socket)
@@ -272,6 +277,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("not_implemented", params, socket),
     do: RailStateActions.handle_not_implemented(params, socket)
+
+  def handle_event("archive_session", params, socket),
+    do: RailSessionActions.handle_archive_session(params, socket)
+
+  def handle_event("rename_session", params, socket),
+    do: RailSessionActions.handle_rename_session(params, socket)
 
   def handle_event("toggle_new_session_drawer", params, socket),
     do: RailSessionActions.handle_toggle_new_session_drawer(params, socket)
@@ -459,9 +470,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         class="md:hidden fixed inset-0 z-40 bg-black/40"
       />
 
-      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-[var(--surface-rail)] z-20">
-        <%!-- Tauri overlay titlebar: spacer clears traffic lights + is the window drag region --%>
-        <div data-tauri-drag-region aria-hidden="true" class="w-full flex-shrink-0 hidden" />
+      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center pb-2 pt-10 gap-1 border-r border-base-content/8 bg-base-100 z-20">
         <button
           phx-click="toggle_proj_picker"
           phx-target={@myself}

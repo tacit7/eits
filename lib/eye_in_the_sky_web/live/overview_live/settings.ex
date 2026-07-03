@@ -8,8 +8,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
+  alias EyeInTheSky.Desktop
+  alias EyeInTheSky.Desktop.Config, as: DesktopConfig
+
   alias EyeInTheSkyWeb.OverviewLive.Settings.{
     AuthTab,
+    DesktopTab,
     EditorTab,
     GeneralTab,
     PricingTab,
@@ -27,11 +31,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     {"autumn", "Autumn"}
   ]
 
-  @valid_tabs ~w(general editor auth workflow pricing system)
+  @valid_tabs ~w(general editor auth workflow pricing system desktop)
 
   @known_editors ~w(code cursor vim nano zed)
 
-  @allowed_editor_roots [Path.expand("~/.claude")]
+  # Function, not attribute: compile-time ~ expansion bakes the build-machine home dir.
+  defp allowed_editor_roots, do: [Path.expand("~/.claude")]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -66,6 +71,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:flash_key, nil)
       |> assign(:active_tab, :general)
       |> assign(:generated_api_key, nil)
+      |> assign(:desktop_mode?, Desktop.desktop_mode?())
+      |> assign(:desktop_port, DesktopConfig.configured_port())
+      |> assign(:hooks_consent, DesktopConfig.hooks_consent())
 
     {:ok, socket}
   end
@@ -87,6 +95,46 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   end
 
   @impl true
+  def handle_event("save_desktop_port", %{"port" => port_str}, socket) do
+    with {port, ""} <- Integer.parse(to_string(port_str)),
+         :ok <- DesktopConfig.write_port(port) do
+      {:noreply,
+       socket
+       |> assign(:desktop_port, port)
+       |> put_flash(:info, "Port saved — restart the desktop app to apply")}
+    else
+      {:error, :out_of_range} ->
+        {:noreply, put_flash(socket, :error, "Port must be between 1024 and 49151")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not save port")}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_hooks_consent", %{"granted" => granted_str}, socket) do
+    granted? = granted_str == "true"
+
+    case DesktopConfig.write_hooks_consent(granted?) do
+      :ok ->
+        message =
+          if granted? do
+            "Hooks/skills will be installed next launch"
+          else
+            "Hooks/skills will not be installed next launch (existing ones are not removed — use eits uninstall)"
+          end
+
+        {:noreply,
+         socket
+         |> assign(:hooks_consent, granted?)
+         |> put_flash(:info, message)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not save preference")}
+    end
+  end
+
+  @impl true
   def handle_event("set_notify_on_stop", params, socket),
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
@@ -100,7 +148,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("open_in_editor", %{"path" => path}, socket) when byte_size(path) > 0 do
     editor = Settings.get("preferred_editor") || "code"
 
-    allowed? = Enum.any?(@allowed_editor_roots, &path_within?(path, &1))
+    allowed? = Enum.any?(allowed_editor_roots(), &path_within?(path, &1))
 
     cond do
       editor not in @known_editors ->
@@ -269,7 +317,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         <div class="tabs tabs-bordered overflow-x-auto flex-nowrap whitespace-nowrap">
           <%= for {label, key} <- [
             {"General", "general"}, {"Editor", "editor"}, {"Auth & Keys", "auth"},
-            {"Workflow", "workflow"}, {"Pricing", "pricing"}, {"System", "system"}
+            {"Workflow", "workflow"}, {"Pricing", "pricing"}, {"System", "system"},
+            {"Desktop", "desktop"}
           ] do %>
             <button
               class={"tab #{if @active_tab == String.to_existing_atom(key), do: "tab-active", else: ""}"}
@@ -292,6 +341,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   defp render_tab(%{active_tab: :workflow} = assigns), do: WorkflowTab.render(assigns)
   defp render_tab(%{active_tab: :pricing} = assigns), do: PricingTab.render(assigns)
   defp render_tab(%{active_tab: :system} = assigns), do: SystemTab.render(assigns)
+  defp render_tab(%{active_tab: :desktop} = assigns), do: DesktopTab.render(assigns)
 
   defp render_tab(%{active_tab: _} = assigns) do
     ~H[<p class="text-sm text-base-content/50 px-2 py-4">Coming soon</p>]

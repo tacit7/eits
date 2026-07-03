@@ -40,7 +40,9 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
       "DM send_message received for session=#{socket.assigns.session_id} model=#{model} effort=#{effort_level} body_length=#{String.length(body)}"
     )
 
-    uploaded_files = UploadHelpers.consume_uploaded_files(socket)
+    browser_files = UploadHelpers.consume_uploaded_files(socket)
+    tauri_files = UploadHelpers.consume_tauri_files(socket)
+    uploaded_files = browser_files ++ tauri_files
     full_body = UploadHelpers.build_message_body(body, uploaded_files)
     session_id = socket.assigns.session_id
     provider = socket.assigns.session.provider
@@ -67,6 +69,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
             {:noreply,
              socket
              |> assign(:processing, true)
+             |> assign(:tauri_dropped_files, [])
              |> push_event("clear-input", %{})}
 
           {:error, :queue_full} ->

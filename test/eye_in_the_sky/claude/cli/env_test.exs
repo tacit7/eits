@@ -110,25 +110,40 @@ defmodule EyeInTheSky.Claude.CLI.EnvTest do
   end
 
   describe "PATH sanitization" do
+    # Standard bin dirs are appended when missing so agents spawned from a
+    # Finder-launched app (minimal PATH) can find eits/claude/homebrew tools.
+    # Tests assert on the prefix (original entries, order preserved) and
+    # membership of the appended dirs, not exact string equality.
+    defp path_entries(env), do: String.split(path_value(env), ":")
+
+    defp assert_standard_dirs_appended(env) do
+      entries = path_entries(env)
+      assert "/usr/local/bin" in entries
+      assert "/opt/homebrew/bin" in entries
+      assert Path.expand("~/.local/bin") in entries
+      # No duplicates introduced.
+      assert entries == Enum.uniq(entries)
+    end
+
     test "removes release bin entry" do
       rel_bin = "/app/_build/prod/rel/eye_in_the_sky/bin"
-      clean = "/usr/local/bin"
-      env = Env.build_from_map(%{"PATH" => "#{rel_bin}:#{clean}"}, [])
-      assert path_value(env) == clean
+      env = Env.build_from_map(%{"PATH" => "#{rel_bin}:/usr/local/bin"}, [])
+      refute rel_bin in path_entries(env)
+      assert List.first(path_entries(env)) == "/usr/local/bin"
     end
 
     test "removes release ERTS bin entry" do
       erts_bin = "/app/_build/prod/rel/eye_in_the_sky/erts-16.1.2/bin"
-      clean = "/usr/local/bin:/usr/bin"
-      env = Env.build_from_map(%{"PATH" => "#{erts_bin}:#{clean}"}, [])
-      assert path_value(env) == clean
+      env = Env.build_from_map(%{"PATH" => "#{erts_bin}:/usr/local/bin:/usr/bin"}, [])
+      refute erts_bin in path_entries(env)
+      assert Enum.take(path_entries(env), 2) == ["/usr/local/bin", "/usr/bin"]
     end
 
     test "removes any entry containing /erts-" do
       erts_entry = "/some/other/place/erts-27.0/bin"
-      clean = "/usr/bin"
-      env = Env.build_from_map(%{"PATH" => "#{erts_entry}:#{clean}"}, [])
-      assert path_value(env) == clean
+      env = Env.build_from_map(%{"PATH" => "#{erts_entry}:/usr/bin"}, [])
+      refute erts_entry in path_entries(env)
+      assert List.first(path_entries(env)) == "/usr/bin"
     end
 
     test "removes empty PATH segments" do
@@ -141,16 +156,32 @@ defmodule EyeInTheSky.Claude.CLI.EnvTest do
         "/app/_build/prod/rel/eits/bin:/app/_build/prod/rel/eits/erts-16.1.2/bin:/usr/local/bin"
 
       env = Env.build_from_map(%{"PATH" => path}, [])
-      assert path_value(env) == "/usr/local/bin"
+      assert List.first(path_entries(env)) == "/usr/local/bin"
+      refute Enum.any?(path_entries(env), &String.contains?(&1, "_build/prod/rel"))
     end
 
-    test "clean PATH is not modified" do
+    test "clean PATH keeps original entries first, appends missing standard dirs" do
       clean = "/usr/local/bin:/usr/bin:/home/user/.local/bin"
       env = Env.build_from_map(%{"PATH" => clean}, [])
-      assert path_value(env) == clean
+      assert Enum.take(path_entries(env), 3) == String.split(clean, ":")
+      assert_standard_dirs_appended(env)
+    end
+
+    test "already-present standard dirs are not duplicated" do
+      path = "/opt/homebrew/bin:/usr/local/bin:#{Path.expand("~/.local/bin")}"
+      env = Env.build_from_map(%{"PATH" => path}, [])
+      assert path_entries(env) == String.split(path, ":")
+    end
+
+    test "minimal Finder-launch PATH gains the standard dirs" do
+      env = Env.build_from_map(%{"PATH" => "/usr/bin:/bin:/usr/sbin:/sbin"}, [])
+      assert Enum.take(path_entries(env), 4) == ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+      assert_standard_dirs_appended(env)
     end
 
     test "empty PATH string is excluded from env" do
+      # Empty values are dropped before sanitization ever runs, so no
+      # standard-dir injection happens for a missing/empty PATH.
       env = Env.build_from_map(%{"PATH" => ""}, [])
       assert Enum.find(env, fn {k, _} -> to_string(k) == "PATH" end) == nil
     end

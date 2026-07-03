@@ -31,7 +31,11 @@ defmodule EyeInTheSky.IAM.Policy do
   alias EyeInTheSky.Projects.Project
 
   @effects ~w(allow deny instruct)
-  @supported_condition_predicates ~w(time_between env_equals session_state_equals)
+  # Keep in sync with what the evaluator + builtin matchers actually implement.
+  # protectedBranches: consumed by block_push_master / block_work_on_main.
+  # A missing entry here silently rejects seeds on FRESH installs only — dev
+  # DBs keep pre-existing rows, so the create path never runs there.
+  @supported_condition_predicates ~w(time_between env_equals session_state_equals protectedBranches)
 
   @type t :: %__MODULE__{
           id: integer() | nil,
@@ -73,7 +77,9 @@ defmodule EyeInTheSky.IAM.Policy do
     timestamps(type: :utc_datetime_usec)
   end
 
-  @supported_events ~w(PreToolUse PostToolUse Stop)
+  # Keep in sync with IAM.Normalizer.coerce_event_key/1 — the evaluator and
+  # hook pipeline fully support UserPromptSubmit (prompt sanitization).
+  @supported_events ~w(PreToolUse PostToolUse Stop UserPromptSubmit)
 
   @create_fields ~w(
     system_key name effect agent_type project_id project_path action
@@ -183,6 +189,13 @@ defmodule EyeInTheSky.IAM.Policy do
 
       key == "session_state_equals" ->
         validate_string(cs, :condition, value, "session_state_equals expects a string")
+
+      key == "protectedBranches" ->
+        if is_list(value) and value != [] and Enum.all?(value, &is_binary/1) do
+          cs
+        else
+          add_error(cs, :condition, "protectedBranches expects a non-empty list of branch names")
+        end
     end
   end
 

@@ -1,8 +1,10 @@
 mod commands;
 mod config;
+mod duration;
 mod error;
 mod extras;
 mod http;
+mod lock;
 mod output;
 
 use clap::Parser;
@@ -34,6 +36,8 @@ enum Cmd {
         #[command(subcommand)]
         cmd: TasksCmd,
     },
+    /// Print identity env vars as JSON (no API call)
+    Whoami,
     /// Anything not Rust-owned falls through to the bash extras script
     #[command(external_subcommand)]
     External(Vec<OsString>),
@@ -56,6 +60,13 @@ fn main() {
                 Ok(v) => output::print_json(&v, pretty),
                 Err(err) => error::exit_with(err, pretty),
             }
+        }
+        Cmd::Whoami => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            output::print_json(&commands::whoami::run(&cfg), pretty);
         }
         Cmd::External(args) => {
             let had_global_flags = raw.len() > args.len();

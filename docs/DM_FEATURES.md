@@ -433,22 +433,70 @@ end
 
 ## File Upload & Attachments
 
-**Feature:** Drag-and-drop file upload in chat input.
+**Feature:** Drag-and-drop file upload in chat input, with support for both browser and Tauri native file drops.
 
-**Supported:**
+**Supported file types:**
 - Text files (markdown, code, logs)
 - Images (PNG, JPG, for analysis)
 - PDFs (for document review)
 
-**Flow:**
-1. User drags file into chat input zone
-2. File uploaded to temp storage
-3. URL injected into message context (not sent as attachment, embedded in prompt)
-4. Agent receives file content in message body
+**Upload flow (commits e9747de7, df34880a):**
+
+1. **Browser drag-drop:** User drags file into composer; Phoenix LiveView file upload consumes entry
+2. **Tauri native drop:** Tauri window receives native file paths via drag event; `consume_tauri_files/1` handles OS paths
+3. **File processing:** Both paths call `UploadHelpers.consume_uploaded_files/1` and `UploadHelpers.consume_tauri_files/1`
+4. **Message body construction:** `UploadHelpers.build_message_body/2` appends file list to message text
+5. **Attachment persistence:** `UploadHelpers.persist_upload_attachments/2` saves file metadata to `FileAttachments` table after message creation
+
+**UploadHelpers module:**
+
+New module (`lib/eye_in_the_sky_web/live/dm_live/upload_helpers.ex`) centralizes file handling logic:
+
+- `consume_uploaded_files/1` — Processes browser file uploads from Phoenix LiveView's `:files` channel
+  - Copies temp files to persistent upload directory
+  - Returns file metadata: storage_path, filename, content_type, size_bytes
+  
+- `consume_tauri_files/1` — Processes native file drops from Tauri
+  - Reads file stats from absolute OS paths (socket.assigns[:tauri_dropped_files])
+  - Copies files to same upload destination as browser uploads
+  - Returns identical file metadata shape for downstream consistency
+  - Logs warnings for stat/copy failures without crashing the message send
+  
+- `build_message_body/2` — Appends file list to message text
+  - Format: "Original message\n\nAttached files:\n- <path> (<filename>)"
+  - Enables agent to reference uploaded files by path
+  
+- `persist_upload_attachments/2` — Saves file metadata to database
+  - Creates `FileAttachments` records linked to message_id
+  - Stores storage_path, original_filename, content_type, size_bytes
+
+**Upload destination:**
+- Base path: `priv/static/uploads/dm/`
+- Organized by date: `priv/static/uploads/dm/YYYY-MM-DD/`
+- Filename: UUID + original extension (e.g., `a3f8c1e2-b4d7.pdf`)
+
+**Message send flow (updated in message_handlers.ex):**
+
+```elixir
+# Consume both browser and Tauri uploads
+browser_files = UploadHelpers.consume_uploaded_files(socket)
+tauri_files = UploadHelpers.consume_tauri_files(socket)
+uploaded_files = browser_files ++ tauri_files
+
+# Build full message body with attachments
+full_body = UploadHelpers.build_message_body(body, uploaded_files)
+
+# On success, persist attachment metadata
+UploadHelpers.persist_upload_attachments(uploaded_files, message.id)
+
+# Clear Tauri dropped files after processing
+assign(:tauri_dropped_files, [])
+```
 
 **Limitations:**
 - File size capped at 20 MB
 - Only types listed above supported
+- Tauri drops require active Tauri window (desktop only)
 
 ---
 
@@ -880,6 +928,12 @@ DM from:<agent_name> (session:<uuid>) <message body>
 **Component:** `lib/eye_in_the_sky_web/components/dm_page/composer.ex`
 
 The DM composer is the message input area at the bottom of the DM page, with context display, context meter, format toolbar, and inline autocomplete.
+
+**Cleanup (commit e9747de7):** The @ file picker was removed from DmComposer JS hook (158 lines) because `SlashCommandPopup` now handles all autocomplete popups, including @ file suggestions. The DmComposer hook now focuses solely on:
+- Keyboard layout and visualViewport handling
+- Format toolbar (markdown button)
+- Draft persistence
+- Clipboard paste for images
 
 ### Composer Layout and Context (commit 81ca01cf)
 

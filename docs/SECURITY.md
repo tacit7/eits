@@ -3,7 +3,7 @@
 Security architecture and controls for the Eye in the Sky web application.
 
 Last audited: 2026-05-01
-Last updated: 2026-06-28 (Channel membership authorization, FileEditor path traversal fix + optimistic concurrency via hash, npm CVE fixes: dompurify XSS, svelte SSR XSS, vite, devalue DoS, undici)
+Last updated: 2026-07-03 (Tauri desktop security: secure_cookies over HTTP, database TLS verification logic, IPC CSP, local-only DISABLE_AUTH, address binding control)
 
 ## Authentication
 
@@ -153,10 +153,16 @@ The session token is stored in a signed Phoenix session cookie configured with:
 | `signing_salt` | Configured in endpoint | Salt for HMAC key derivation |
 | `same_site` | `"Lax"` | CSRF protection |
 | `http_only` | `true` | Prevents JavaScript access (XSS protection) |
-| `secure` | `true` in prod, `false` in dev | HTTPS-only in production |
+| `secure` | `true` in prod, `false` in dev, `false` in Tauri | HTTPS-only in production; Tauri desktop serves over plain HTTP |
 | `max_age` | Not set (browser session cookie) | Browser deletes on close; TTL is enforced server-side via `expires_at` |
 
 The browser deletes the session cookie on close (no persistent storage), and the server enforces the 7-day TTL via the `expires_at` column.
+
+**Tauri Desktop Exception** (`config/prod.exs`):
+- The embedded Tauri desktop app (`src-tauri/`) bundles this Phoenix app as a local-only backend serving over `http://localhost`.
+- WKWebView (macOS WebKit) drops `Secure` cookies over plain HTTP, causing LiveView reconnects to lose the session cookie and fail authentication.
+- Solution: Set `secure_cookies: false` unconditionally in `config/prod.exs` when the Tauri branch is in use. This is safe because Tauri deployment is always local (never network-reachable) and `DISABLE_AUTH=1` by default.
+- Network deployments (server/cloud) must use a different config branch and enforce `secure_cookies: true`.
 
 ### Webhook — HMAC Signature
 
@@ -195,6 +201,34 @@ Defined in `endpoint.ex` `@session_options`:
 - HTTP requests are redirected to HTTPS. HSTS header tells browsers to always use HTTPS.
 - `rewrite_on: [:x_forwarded_proto]` supports TLS-terminating reverse proxies (nginx, Tailscale Funnel, ngrok).
 
+### Address Binding Control (EITS_BIND)
+
+The `EITS_BIND` environment variable controls which network interface the HTTP server binds to in production (`config/runtime.exs`):
+
+**Binding modes**:
+- `EITS_BIND=loopback`: Bind to `127.0.0.1` (IPv4 loopback only). Reachable only on localhost. Used by Tauri desktop (`src-tauri/src/lib.rs` sets this automatically) to prevent LAN access to the embedded server (which runs with `DISABLE_AUTH=true`).
+- `EITS_BIND=all` or unset: Bind to `[::]` (IPv6 all interfaces, dual-stack IPv4/IPv6). Default for server deployments. Reachable on all network interfaces.
+
+**Implementation**:
+```elixir
+bind_ip =
+  case get_env.("EITS_BIND") do
+    "loopback" -> {127, 0, 0, 1}
+    _ -> {0, 0, 0, 0, 0, 0, 0, 0}
+  end
+
+config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
+  http: [
+    ip: bind_ip,
+    port: port
+  ]
+```
+
+**Security implications**:
+- Tauri uses IPv4 loopback specifically (not IPv6 `::1`) because WKWebView HTTP client connects to `http://127.0.0.1:<port>`. IPv6-only loopback would refuse these connections.
+- Loopback binding prevents LAN access even if `DISABLE_AUTH=true` is accidentally enabled in a network deployment.
+- For remote access in loopback mode (Tauri + Tailscale), use a local proxy like `tailscale serve` — see `docs/TAURI_SETUP.md`.
+
 ### Proxy Support
 
 - `RemoteIp` plug in `endpoint.ex` rewrites `conn.remote_ip` from `X-Forwarded-For` headers.
@@ -205,24 +239,41 @@ Defined in `endpoint.ex` `@session_options`:
 
 ### Database TLS Verification
 
-PostgreSQL connections use TLS with certificate verification in production to prevent MITM attacks.
+PostgreSQL connections use TLS with certificate verification configurable via environment variables to prevent MITM attacks in network deployments.
 
 **Configuration** (in `config/runtime.exs`):
-- **Production**: Defaults to `verify_peer` with OTP system CA bundle and hostname verification
-- **Development/Self-hosted**: Can override via `DATABASE_SSL_VERIFY=none` environment variable to disable verification if proper CAs are not available
+- **DATABASE_SSL_VERIFY** controls TLS behavior. Recognized values:
+  - `"none"`: Disable certificate verification (`[verify: :verify_none]`). Use only for development with self-signed certs.
+  - `"true"`: Enable peer verification with system CAs and hostname check. Rejects invalid/self-signed certificates.
+  - Default (unset or other values): Disable SSL entirely (`false`). Suitable for local/desktop connections that don't need transport security.
 
-**Implementation**:
+**Implementation** (in `config/runtime.exs`):
 ```elixir
-ssl_opts = case System.get_env("DATABASE_SSL_VERIFY") do
-  "none" -> [verify: :verify_none]
-  _ -> [verify: :verify_peer, cacerts: :public_key.cacerts_get(), customize_hostname_check: [...]]
-end
+ssl_opts =
+  case get_env.("DATABASE_SSL_VERIFY") do
+    "none" ->
+      [verify: :verify_none]
+
+    "true" ->
+      [
+        verify: :verify_peer,
+        cacerts: :public_key.cacerts_get(),
+        customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]
+      ]
+
+    _ ->
+      # Default to no SSL — local/desktop connections don't need it.
+      # Set DATABASE_SSL_VERIFY=true to enable peer verification (e.g. Supabase).
+      false
+  end
 ```
 
-**Verification details**:
+**Verification details** (when enabled):
 - Uses OTP's `:public_key.cacerts_get()` to load system CA certificates
 - Performs hostname verification via `:public_key.pkix_verify_hostname_match_fun(:https)`
-- Rejects connections with invalid or self-signed certificates (unless explicitly disabled)
+- Rejects connections with invalid or self-signed certificates unless `DATABASE_SSL_VERIFY=none`
+
+**Tauri Desktop & Development**: Local deployments default to `false` (no SSL) since connections are localhost-only. For cloud deployments (e.g., Supabase), set `DATABASE_SSL_VERIFY=true` at startup.
 
 ## Rate Limiting
 
@@ -519,8 +570,13 @@ CSP is enforced via per-request nonce to allow inline scripts while maintaining 
 
 **CSP Header (Production)**:
 ```
-default-src 'self'; script-src 'self' 'nonce-<unique>'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'
+default-src 'self'; script-src 'self' 'nonce-<unique>'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ipc://localhost; frame-ancestors 'none'; object-src 'none'
 ```
+
+**Tauri IPC** (`ipc://localhost`):
+- The Tauri desktop app communicates with the Rust backend via IPC using custom protocol `ipc://localhost`.
+- CSP `connect-src` must include `ipc://localhost` to allow this communication.
+- This exception is production-safe because Tauri is local-only and does not expose the HTTP server on the network.
 
 **Benefits**: Inline scripts execute only if they carry the correct nonce. Any XSS-injected script without the nonce is blocked, protecting against inline script injection attacks.
 
@@ -872,6 +928,39 @@ The project uses [archdo](https://github.com/archdo/archdo) (pinned ref `1e651d5
 **Baseline**: `.archdo_baseline.exs` records 1402 fingerprints (1963 original diagnostics) captured 2026-05-02. Baseline violations are accepted as pre-existing; only new violations added after the baseline was captured are flagged as regressions. Fingerprints are line-number independent so formatting changes do not churn them.
 
 **Relevant rules**: Archdo rule `6.50` (quadratic list concatenation via `acc++`) was the trigger for the sanitize module fix above. New violations against the baseline fail CI.
+
+## Tauri Desktop Security
+
+The Tauri desktop application (`src-tauri/`) bundles this Phoenix backend as a local-only server. Additional security controls apply:
+
+### Authentication Bypass
+
+- **DISABLE_AUTH=1 by default** in Tauri builds (`config/runtime.exs`). The embedded server is never network-reachable, so authentication is not needed.
+- **Guard at compile time**: `config_env() != :prod` prevents `DISABLE_AUTH` in production server builds (only Tauri branch uses prod config with the override).
+- **Guard at runtime**: `env != :prod` double-checks that the process environment is not a network deployment before allowing bypass.
+- **Rationale**: A local-only app (no network listeners) does not expose the unauthenticated API to external clients.
+
+### Endpoint Security
+
+- **Address binding**: `EITS_BIND=loopback` (set by Tauri startup script) binds to `127.0.0.1` only. See "Address Binding Control" section under Transport Security.
+- **Logger configuration**: ElixirKit (Tauri runtime) sets `ELIXIRKIT_PUBSUB` env var. Logger is reconfigured to write to stderr (not stdout) to avoid double-printing on the IPC protocol channel.
+- **Configuration directory**: `.env` files are loaded from `~/.config/eits/` in addition to the current directory. User config takes precedence.
+
+### Certificate & TLS
+
+- Tauri serves over plain HTTP (`http://localhost:<port>`). SSL is not used because connections are always local.
+- Database connections default to `DATABASE_SSL_VERIFY` unset (no SSL), suitable for local Postgres. Override with `DATABASE_SSL_VERIFY=true` if connecting to remote databases.
+- **Secure cookies exception**: WKWebView drops `Secure` cookies over HTTP, so `secure_cookies: false` is set unconditionally in Tauri's `config/prod.exs`.
+
+### IPC Communication
+
+- Tauri ↔ Rust backend uses custom protocol `ipc://localhost`, allowed in CSP `connect-src` directive.
+- WebSocket connections from WKWebView may omit the `Origin` header, so `check_origin` is disabled when `DISABLE_AUTH=true`.
+
+### Known Limitations
+
+- **No HTTPS/TLS**: Tauri bundles do not use HTTPS. This is acceptable because the server is not network-exposed and only WKWebView (local process) connects to it.
+- **No separate identity/auth layer**: Tauri shares the same `DISABLE_AUTH=true` codepath as development mode. Production-server deployments must use a different config.
 
 ## Known Gaps
 

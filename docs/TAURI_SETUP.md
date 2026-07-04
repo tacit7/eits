@@ -89,7 +89,7 @@ Output:
 
 ```
 src-tauri/target/release/bundle/macos/Eye in the Sky.app
-src-tauri/target/release/bundle/dmg/Eye in the Sky_0.2.0_aarch64.dmg
+src-tauri/target/release/bundle/dmg/Eye in the Sky_0.3.15_aarch64.dmg
 ```
 
 ### macOS code-signing / entitlements
@@ -190,43 +190,34 @@ with the actual port on every launch, so hooks keep working after a port
 change or fallback. If you use `tailscale serve`, re-point it after
 changing the port.
 
-### Manual first-run setup
+### Automated first-run setup
 
-There is no automated provisioner bundled with this build. Before first launch:
+The bundled app includes `setup.command`, a shell provisioner that automates all
+first-run steps. **Run it once after installing the app:**
 
-1. **Ensure PostgreSQL is running:**
-   ```bash
-   brew install postgresql@17
-   brew services start postgresql@17
-   ```
+```bash
+bash "/Applications/Eye in the Sky.app/Contents/Resources/setup.command"
+```
 
-2. **Create the database:**
-   ```bash
-   createdb eits_dev
-   ```
+This script:
 
-3. **Run migrations** (using the bundled release binary):
-   ```bash
-   REL="/Applications/Eye in the Sky.app/Contents/Resources/rel"
-   DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" \
-   DATABASE_SSL_VERIFY=false \
-   PHX_SERVER=false \
-   DISABLE_AUTH=1 \
-   SECRET_KEY_BASE="$(openssl rand -hex 64)" \
-   "$REL/bin/eye_in_the_sky" eval "EyeInTheSky.Release.migrate()"
-   ```
+1. **Installs Homebrew** if not present
+2. **Installs PostgreSQL 17** and starts the service
+3. **Creates the `eits_dev` database**
+4. **Generates and persists `SECRET_KEY_BASE`** to `~/.config/eits/.env`
+   - Uses your current OS login name as the database user (Homebrew Postgres
+     compatibility)
+   - If an older `.env` exists with a hardcoded `postgres` user, updates it
+     automatically
+5. **Symlinks `.env` into the release directory** so the app finds it at startup
+6. **Runs database migrations** using the bundled release binary
+7. **Prompts to install Claude Code hooks** — writes entries to
+   `~/.claude/settings.json` and installs the bundled `eits` CLI to
+   `~/.local/bin/eits`
 
-4. **Override the DATABASE_URL fallback** if you are on Homebrew PostgreSQL (the
-   default fallback uses `postgres` user which doesn't exist on Homebrew installs):
-   ```bash
-   # Launch directly with the correct user
-   DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" \
-     "/Applications/Eye in the Sky.app/Contents/MacOS/eye-in-the-sky"
-   ```
-
-> **Note:** A shell script provisioner (`setup.command`) that automates steps
-> 1–4, generates a unique `SECRET_KEY_BASE`, and installs Claude Code hooks is
-> under development in the `tauri` branch but is not yet bundled in this build.
+> **Note:** Setup is optional — you can still do these steps manually if needed.
+> If you run the app without setup, it will use hardcoded fallback values for
+> `DATABASE_URL` and `SECRET_KEY_BASE` (see "Runtime environment" below).
 
 ### `WEBAUTHN_EXTRA_ORIGINS`
 
@@ -368,18 +359,41 @@ runs a bare binary with no Info.plist to register the scheme).
 
 ---
 
-## IAM hook auto-install
+## Hooks and skills auto-install
 
-Every time the bundled app starts, `lib.rs` calls `install_iam_hooks()`. This
-writes Claude Code hooks into `~/.claude/settings.json` that POST tool events
-to `http://127.0.0.1:<resolved port>/api/v1/iam/hook` (see "Port resolution").
-The installation is idempotent — existing `iam/hook` entries are left alone
-when their port is current, and rewritten in place when the resolved port has
-changed (config edit or busy-port fallback). No duplicates are ever added.
+Every time the bundled app starts, it performs two idempotent installations (if
+consent is granted):
 
-If you do not want IAM hooks installed automatically, remove the existing
-entries from `~/.claude/settings.json` after quitting the app (the installer
-runs on every startup).
+### IAM hooks installation
+
+The Rust layer calls `install_iam_hooks()`, which writes Claude Code hooks into
+`~/.claude/settings.json` that POST tool events to
+`http://127.0.0.1:<resolved port>/api/v1/iam/hook` (see "Port resolution"). 
+Existing `iam/hook` entries are left alone when their port is current, and
+rewritten in place when the resolved port has changed (config edit or busy-port
+fallback). No duplicates are ever added.
+
+### EITS skills auto-install
+
+The app also automatically copies all bundled `/eits-*` skills from
+`priv/skills/` into `~/.claude/skills/`, so agents running under the desktop
+app can access `/eits-init`, `/eits-dm`, and other EITS CLI skills without a
+manual `eits skills install` step. Each startup replaces the skills with the
+bundled versions.
+
+### Consent and opt-out
+
+On first launch, a dialog asks for permission to install hooks and skills —
+these modifications affect **every Claude Code session on your machine**, not
+just ones started from the EITS app, so explicit consent is required. The
+decision is remembered in `~/.config/eits/desktop.json` (`hooks_consent` key).
+
+To revisit the decision later, use **Settings → Desktop → Global Claude Code
+Integration** (appears only in the bundled app). Toggling the setting takes
+effect on next launch.
+
+To manually remove installed hooks/skills after deciding to opt out, use
+`eits uninstall`.
 
 ---
 

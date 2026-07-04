@@ -160,6 +160,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
   attr :message, :map, required: true
   attr :compact, :boolean, default: false
+  attr :flat, :boolean, default: false
   attr :extra_id, :any, default: nil
   attr :search_query, :string, default: ""
 
@@ -283,12 +284,12 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         </div>
       </details>
       <%= if @stream_type == "tool_result" do %>
-        <.tool_result_body body={@message.body} compact={@compact} />
+        <.tool_result_body body={@message.body} compact={@compact} flat={@flat} />
       <% else %>
         <%= for {segment, idx} <- Enum.with_index(@segments) do %>
           <%= case segment do %>
             <% {:tool_call, name, rest} -> %>
-              <.tool_widget name={name} rest={rest} compact={@compact} />
+              <.tool_widget name={name} rest={rest} compact={@compact} flat={@flat} />
             <% {:text, text} when text != "" -> %>
               <div
                 id={"msg-body-#{@id_prefix}#{@message.id}-#{idx}"}

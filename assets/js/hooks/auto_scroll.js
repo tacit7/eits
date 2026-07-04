@@ -35,9 +35,32 @@ export const AutoScroll = {
 
       const { scrollHeight, scrollTop, clientHeight } = this.el
       this.shouldAutoScroll = scrollHeight - scrollTop - clientHeight <= 50
+      this._updatePill()
     }
 
     this.el.addEventListener("scroll", this._onScroll, { passive: true })
+
+    // Scroll-to-bottom pill: floating button that appears once the user has
+    // scrolled away from the bottom (e.g. reading back through a long stream)
+    // and disappears once they're back near the bottom. Pure client-side —
+    // no LiveView round-trip.
+    //
+    // AutoScroll is mounted on more than one element on this page (the DM
+    // messages list AND the collapsible "raw stream" panel below it — see
+    // messages_tab.ex). The pill belongs only to the messages list; scope
+    // it to that instance so the raw-stream panel's scroll state can't
+    // steal control of it or double-register the click listener.
+    this._pill = this.el.id === "messages-container"
+      ? document.getElementById("scroll-to-bottom-pill")
+      : null
+    if (this._pill) {
+      this._onPillClick = () => {
+        this.shouldAutoScroll = true
+        this.scrollToBottom()
+        this._updatePill()
+      }
+      this._pill.addEventListener("click", this._onPillClick)
+    }
     // Scroll synchronously so scrollTop is correct before any beforeUpdate()
     // fires. The RAF below catches late-expanding content (images, transitions).
     this.el.scrollTop = this.el.scrollHeight
@@ -131,6 +154,7 @@ export const AutoScroll = {
     if (this._resizeObserver) {
       this._lastScrollHeight = this.el.scrollHeight
     }
+    this._updatePill()
     // Release the scroll listener after the browser has settled the swap
     requestAnimationFrame(() => { this._updating = false })
   },
@@ -143,6 +167,9 @@ export const AutoScroll = {
     }
     this.el.removeEventListener("scroll", this._onScroll)
     this.el.removeEventListener("load-more-intent", this._onLoadMoreIntent)
+    if (this._pill && this._onPillClick) {
+      this._pill.removeEventListener("click", this._onPillClick)
+    }
     if (this._mutationObserver) {
       this._mutationObserver.disconnect()
       this._mutationObserver = null
@@ -158,5 +185,13 @@ export const AutoScroll = {
     requestAnimationFrame(() => {
       this.el.scrollTop = this.el.scrollHeight
     })
+  },
+
+  // Shows the pill once content overflows the container and the user isn't
+  // near the bottom; hides it otherwise.
+  _updatePill() {
+    if (!this._pill) return
+    const scrollable = this.el.scrollHeight > this.el.clientHeight + 4
+    this._pill.classList.toggle("hidden", this.shouldAutoScroll || !scrollable)
   }
 }

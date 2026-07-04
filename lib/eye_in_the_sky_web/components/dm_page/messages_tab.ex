@@ -44,7 +44,63 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   def messages_tab(assigns) do
     ~H"""
-    <div class="flex flex-1 min-h-0 flex-col" id="dm-messages-tab">
+    <div
+      class="flex flex-1 min-h-0 flex-col relative"
+      id="dm-messages-tab"
+      phx-hook="SearchHighlight"
+      data-query={@message_search_query}
+    >
+      <%!-- Search match counter overlay — driven entirely by the SearchHighlight JS hook.
+           Stable element IDs let the hook write counts / active index directly without
+           a LiveView round-trip. Hidden when no search query is active. --%>
+      <div
+        id="search-counter-overlay"
+        class={[
+          "absolute top-2 right-3 z-20 flex items-center gap-1 rounded-md",
+          "bg-base-200/90 border border-base-content/10 shadow-sm px-1.5 py-0.5",
+          "text-[11px] text-base-content/60 select-none",
+          @message_search_query == "" && "hidden"
+        ]}
+      >
+        <button
+          id="search-counter-prev"
+          class="p-0.5 rounded hover:bg-base-content/10 transition-colors"
+          title="Previous match"
+          aria-label="Previous match"
+        >
+          <.icon name="hero-chevron-up-mini" class="size-3" />
+        </button>
+        <span id="search-counter-label" class="min-w-[4rem] text-center tabular-nums">
+          &nbsp;
+        </span>
+        <button
+          id="search-counter-next"
+          class="p-0.5 rounded hover:bg-base-content/10 transition-colors"
+          title="Next match"
+          aria-label="Next match"
+        >
+          <.icon name="hero-chevron-down-mini" class="size-3" />
+        </button>
+        <button
+          id="search-counter-close"
+          class="p-0.5 rounded hover:bg-base-content/10 transition-colors ml-0.5"
+          title="Clear search"
+          aria-label="Clear search"
+        >
+          <.icon name="hero-x-mark-mini" class="size-3" />
+        </button>
+      </div>
+      <%!-- Scroll-to-bottom pill — shown/hidden entirely by the AutoScroll hook
+           based on scroll position; no LiveView round-trip. --%>
+      <button
+        type="button"
+        id="scroll-to-bottom-pill"
+        class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center size-8 rounded-full bg-base-100 border border-base-content/10 shadow-md text-base-content/50 hover:text-primary hover:bg-base-200 transition-colors"
+        title="Scroll to bottom"
+        aria-label="Scroll to bottom"
+      >
+        <.icon name="hero-arrow-down" class="size-4" />
+      </button>
       <div
         class="overflow-y-auto flex-1 min-h-0"
         id="messages-container"
@@ -113,7 +169,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
              no prior messages. Positioned inside messages-container so it scrolls
              with the message list and the scroll anchor stays below it. --%>
         <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
-          <div id="live-stream-bubble" class="max-w-[860px] w-full mx-auto px-5 pb-3">
+          <div
+            id="live-stream-bubble"
+            class="max-w-[860px] w-full mx-auto px-5 pb-3"
+            aria-live="polite"
+            aria-busy="true"
+          >
             <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5">
               <div class="flex items-center gap-2 mb-2">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -124,7 +185,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 </span>
               </div>
               <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5">
-                <%= if @stream.thinking do %>
+                <%= if @stream.thinking && @stream.content in [nil, ""] do %>
+                  <div class="text-xs text-base-content/40 italic font-mono animate-pulse flex items-center gap-1.5">
+                    <span>Thinking</span>
+                    <span class="flex items-center gap-0.5 text-base-content/50">
+                      <span class="stream-dot"></span>
+                      <span class="stream-dot"></span>
+                      <span class="stream-dot"></span>
+                    </span>
+                  </div>
+                <% end %>
+                <%= if @stream.thinking && @stream.content not in [nil, ""] do %>
                   <div class="text-xs text-base-content/30 italic font-mono line-clamp-3">
                     {String.slice(@stream.thinking, -200, 200)}
                   </div>
@@ -135,7 +206,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   </div>
                 <% end %>
                 <%= if @stream.content not in [nil, ""] do %>
-                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">{String.trim_leading(@stream.content)}</div>
+                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap stream-content-appear stream-cursor">
+                    {String.trim_leading(@stream.content)}
+                  </div>
                 <% end %>
               </div>
             </div>
@@ -271,6 +344,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     data-utc={to_utc_string(@message.inserted_at)}
                     phx-hook="LocalTime"
                   />
+                  <div class="ml-auto opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 flex items-center gap-0.5">
+                    <button
+                      data-copy-btn
+                      data-copy-text={@message.body}
+                      class="p-1 rounded text-base-content/25 hover:text-base-content/55 hover:bg-base-content/8 transition-colors"
+                      title="Copy message"
+                      aria-label="Copy message"
+                    >
+                      <.icon name="hero-clipboard-document-mini" class="size-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <%!-- Body --%>
                 <div class={[
@@ -413,49 +497,42 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   end
 
   defp tool_cluster(assigns) do
+    # Flatten all tool events into chronological order (groups partition by tool
+    # type; sort by message id to restore insertion order).
+    flat_events =
+      assigns.meta.tool_groups
+      |> Enum.flat_map(& &1.events)
+      |> Enum.sort_by(& &1.id)
+
+    assigns = assign(assigns, :flat_events, flat_events)
+
     ~H"""
     <details
       id={"cluster-#{List.first(@events).id}"}
       phx-hook="PreserveDetails"
-      class="group my-1 w-full pl-[33px]"
+      class="group my-1.5 w-full rounded-lg border border-base-content/[0.08] bg-base-content/[0.02] overflow-hidden"
     >
-      <summary class="flex items-center gap-2 px-1 py-0.5 cursor-pointer list-none text-[var(--text-muted)] hover:text-[var(--text-secondary)] select-none">
-        <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px]">
+      <summary class="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer list-none select-none hover:bg-base-content/[0.03] transition-colors">
+        <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px] shrink-0">
           &#9658;
         </span>
-        <span class="text-nano font-mono">{@meta.count} tool events</span>
-        <%= for group <- @meta.tool_groups do %>
-          <span class="rounded-sm px-1 py-px bg-base-content/[0.05] text-nano font-mono text-[var(--text-disabled)]">
-            {group.name} &times;{group.count}
-          </span>
-        <% end %>
-        <%= if @meta.duration_ms do %>
-          <span class="text-nano font-mono text-[var(--text-disabled)] ml-1">
-            ~{div(@meta.duration_ms, 1000)}s
+        <span class="text-nano font-mono text-[var(--text-disabled)]">
+          {@meta.count} tool {if @meta.count == 1, do: "call", else: "calls"}
+        </span>
+        <%= if @meta.duration_ms && @meta.duration_ms >= 1000 do %>
+          <span class="text-nano font-mono text-[var(--text-disabled)]">
+            &middot; ~{div(@meta.duration_ms, 1000)}s
           </span>
         <% end %>
         <span class="ml-auto text-nano text-[var(--text-disabled)]">
           {relative_time(@meta.first_at)}
         </span>
       </summary>
-      <div class="pl-2 mt-0.5 space-y-0.5">
-        <%= for group <- @meta.tool_groups do %>
-          <details class="group/tool">
-            <summary class="flex items-center gap-1.5 px-1 py-0.5 cursor-pointer list-none text-[var(--text-disabled)] hover:text-[var(--text-muted)] select-none">
-              <span class="group-open/tool:rotate-90 transition-transform duration-100 text-[9px]">
-                &#9658;
-              </span>
-              <span class="text-nano font-mono">{group.name}</span>
-              <span class="text-nano font-mono opacity-60">&times;{group.count}</span>
-            </summary>
-            <div class="pl-4 mt-0.5 space-y-px">
-              <%= for event <- group.events do %>
-                <div class="max-w-full px-1">
-                  <.message_body message={event} compact={true} />
-                </div>
-              <% end %>
-            </div>
-          </details>
+      <div class="border-t border-base-content/[0.06] divide-y divide-base-content/[0.04]">
+        <%= for event <- @flat_events do %>
+          <div class="px-3 py-0.5">
+            <.message_body message={event} compact={true} flat={true} />
+          </div>
         <% end %>
       </div>
     </details>
@@ -474,7 +551,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   defp cluster_summary(assigns) do
     ~H"""
-    <div class="pl-[33px] pb-1">
+    <div class="pb-1">
       <span class="text-nano font-mono text-[var(--text-disabled)]">
         <%= if @data.files != [] do %>
           <span>{length(@data.files)} {if length(@data.files) == 1, do: "file", else: "files"} &middot; </span>

@@ -114,7 +114,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       nil,
       fn {msg, prev_role}, acc ->
         stream_type = get_in(msg.metadata || %{}, ["stream_type"]) || ""
-        is_tool = stream_type in @tool_types
+        is_tool = stream_type in @tool_types or body_is_tool_message?(msg.body)
 
         cond do
           is_tool and is_nil(acc) ->
@@ -182,6 +182,17 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       extract_tool_name_from_body(msg.body) ||
       get_in(msg.metadata || %{}, ["stream_type"]) ||
       "event"
+  end
+
+  # Returns true when the message body contains a tool call in either body format:
+  #   > `ToolName` args...   (session_reader format)
+  #   Tool: ToolName\n{json} (Tool: format)
+  # These messages have no stream_type metadata but should still be clustered.
+  defp body_is_tool_message?(nil), do: false
+
+  defp body_is_tool_message?(body) do
+    trimmed = String.trim(body)
+    Regex.match?(~r/^> `[^`]+`/, trimmed) or Regex.match?(~r/^Tool: [^\n]+/, trimmed)
   end
 
   defp extract_tool_name_from_body(nil), do: nil

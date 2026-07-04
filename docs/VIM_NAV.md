@@ -150,6 +150,8 @@ Active on any page with `data-vim-list`.
 
 **Recent session cycling (`Ctrl-o`/`Ctrl-i`)**: Navigates through sessions YOU personally visited in this browser tab, in visit order (most-recently-visited first). `Ctrl-o` jumps to the session you visited before the current one. `Ctrl-i` jumps to the session you visited more recently (reverse direction). The cursor re-anchors to your current session URL on every page navigation. `Ctrl-i` is a no-op when you are already at the most recently visited session. History resets on page reload.
 
+Session UUID resolution for the ring buffer reads `[data-session-uuid]` from the DOM first (rendered by the DM message composer) rather than parsing it from the URL. This means flyout navigation via `/dm/<integer>` URLs (used by the sessions flyout) correctly records visits — previously only `/dm/<uuid>` URLs matched. Falls back to URL regex for UUID-form URLs where no DOM attribute is present.
+
 **Half-page scroll (`Ctrl-d`/`Ctrl-u`)**: Moves focus by approximately half the visible list height. The step size is calculated from the list container's `clientHeight` divided by the first item's `offsetHeight`. Falls back to 1 if items have zero height (e.g., in jsdom). These bindings work in normal mode only and are ignored in insert mode or when the cursor is in an editable field.
 
 **Group jump (`{`/`}`)**: Navigates between `data-vim-list-group` separator elements when present. Falls back to `gg`/`G` behavior when no separators exist in the DOM. Currently active on kanban column headers (via `data-vim-list-group` attribute on `.kanban-column`).

@@ -604,6 +604,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         </.link>
 
         <.link
+          navigate="/iam/policies"
+          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+          aria-label="IAM Policies"
+        >
+          <.icon name="hero-shield-check-mini" class="size-4" />
+        </.link>
+
+        <.link
           navigate="/settings"
           class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
           aria-label="Settings"

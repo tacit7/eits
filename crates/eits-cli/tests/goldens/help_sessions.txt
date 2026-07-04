@@ -1,0 +1,23 @@
+Session queries and mutations
+
+Usage: eitsr sessions [OPTIONS] <COMMAND>
+
+Commands:
+  list        List sessions (project-scoped by default; see mutual-exclusion rules below)
+  get         Fetch a single session by uuid or id ('self' resolves to EITS_SESSION_UUID)
+  create      Create a session
+  update      Patch session fields ('self' resolves to EITS_SESSION_UUID)
+  end         End a session (defaults uuid to the current session identity)
+  complete    Mark the current (or given) session complete
+  waiting     Mark the current (or given) session waiting
+  reopen      Reopen an ended session
+  archive     Archive a session (single by uuid), or bulk-archive by --status
+  unarchive   Unarchive a session
+  set-intent  Declare read-only intent (review) or work mode
+  context     Get or set session context
+  help        Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty  Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet   Print only the created/affected ID on success (mutations)
+  -h, --help    Print help

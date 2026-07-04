@@ -7,6 +7,7 @@ mod http;
 mod lock;
 mod output;
 
+use clap::error::ErrorKind;
 use clap::Parser;
 use commands::commits::CommitsCmd;
 use commands::dm::DmCmd;
@@ -81,7 +82,23 @@ fn main() {
     // Global flags before an external subcommand are a usage error per spec:
     // detect them by comparing raw argv length against the parsed external args.
     let raw: Vec<OsString> = std::env::args_os().skip(1).collect();
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(e) => match e.kind() {
+            // Human-readable text on stdout, exit 0 — these are not errors.
+            ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => e.exit(),
+            // Everything else (missing required arg, unknown flag, bare
+            // invocation, etc.) is a usage error per the JSON-stdout contract.
+            _ => {
+                let msg = e.to_string();
+                let first_line = msg.lines().next().unwrap_or("invalid arguments");
+                error::exit_with(
+                    EitsError::usage(first_line).with_hint("run `eitsr <cmd> --help`"),
+                    false,
+                );
+            }
+        },
+    };
     let pretty = output::pretty_enabled(cli.pretty);
     match cli.cmd {
         Cmd::Tasks { cmd } => {

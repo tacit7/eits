@@ -2,6 +2,73 @@ mod common;
 use assert_cmd::Command;
 
 #[test]
+fn usage_error_is_json_envelope_exit_2() {
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .args(["tasks", "get"]) // missing required id
+        .assert()
+        .code(2);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "usage");
+}
+
+#[test]
+fn help_is_human_text_exit_0() {
+    Command::cargo_bin("eitsr")
+        .unwrap()
+        .args(["--help"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("EITS CLI"));
+}
+
+#[test]
+fn bare_invocation_is_json_usage_envelope_exit_2() {
+    let out = Command::cargo_bin("eitsr").unwrap().assert().code(2);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "usage");
+}
+
+#[test]
+fn unknown_global_flag_before_known_subcommand_is_usage_exit_2() {
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .args(["--bogus", "tasks", "list"])
+        .assert()
+        .code(2);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "usage");
+}
+
+// Intentional clap upgrades that change help text should update these golden
+// files in the same commit as the upgrade.
+#[test]
+fn help_output_matches_goldens() {
+    let cases: &[(&[&str], &str)] = &[
+        (&["--help"], "help_root.txt"),
+        (&["tasks", "--help"], "help_tasks.txt"),
+        (&["dm", "--help"], "help_dm.txt"),
+        (&["sessions", "--help"], "help_sessions.txt"),
+        (&["commits", "--help"], "help_commits.txt"),
+        (&["notes", "--help"], "help_notes.txt"),
+        (&["whoami", "--help"], "help_whoami.txt"),
+    ];
+    for (args, golden) in cases {
+        let out = Command::cargo_bin("eitsr")
+            .unwrap()
+            .args(*args)
+            .assert()
+            .success();
+        let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+        let expected = std::fs::read_to_string(format!("tests/goldens/{golden}")).unwrap();
+        assert_eq!(stdout, expected, "help output drifted for {golden}");
+    }
+}
+
+#[test]
 fn get_maps_404_to_envelope_on_stdout_exit_1() {
     let srv = common::serve(vec![(404, r#"{"error":"Task not found"}"#)]);
     let out = Command::cargo_bin("eitsr")

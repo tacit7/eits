@@ -1,0 +1,18 @@
+Send or read direct messages (root form: `eitsr dm --to <id> --message <text>`)
+
+Usage: eitsr dm [OPTIONS] [COMMAND]
+
+Commands:
+  inbox  Show inbound DMs for a session (alias: list)
+  read   Fetch one DM by id (full body)
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty               Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet                Print only the created/affected ID on success (mutations)
+      --to <TO>              
+      --message <MESSAGE>    
+      --from <FROM>          
+      --metadata <METADATA>  
+      --response-required    
+  -h, --help                 Print help

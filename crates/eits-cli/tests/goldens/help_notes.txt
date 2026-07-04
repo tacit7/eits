@@ -1,0 +1,17 @@
+Note queries and mutations
+
+Usage: eitsr notes [OPTIONS] <COMMAND>
+
+Commands:
+  list    List notes (session-scoped by default; pass --task/--project/--mine to override)
+  get     Fetch a single note by id
+  add     Add a note attached to the current session
+  create  Create a note attached to an arbitrary parent
+  update  Patch note fields
+  search  Full-text note search
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty  Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet   Print only the created/affected ID on success (mutations)
+  -h, --help    Print help

@@ -1,0 +1,18 @@
+EITS CLI (Rust core; bash fallback for extras)
+
+Usage: eitsr [OPTIONS] <COMMAND>
+
+Commands:
+  tasks     Task queries and mutations
+  notes     Note queries and mutations
+  commits   Commit tracking queries and mutations
+  sessions  Session queries and mutations
+  dm        Send or read direct messages (root form: `eitsr dm --to <id> --message <text>`)
+  whoami    Resolve and print session/agent identity (mirrors bash `eits whoami`)
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty   Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet    Print only the created/affected ID on success (mutations)
+  -h, --help     Print help
+  -V, --version  Print version

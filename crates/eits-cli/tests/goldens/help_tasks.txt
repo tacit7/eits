@@ -1,0 +1,25 @@
+Task queries and mutations
+
+Usage: eitsr tasks [OPTIONS] <COMMAND>
+
+Commands:
+  list          List tasks (session-scoped by default; pass --all to see everything)
+  get           Fetch a single task by id
+  begin         Claim an existing task (--id) or create + claim a new one (-t/--title)
+  complete      Atomic annotate + close (Done)
+  annotate      Add an annotation to a task
+  update        Patch task fields
+  search        Full-text task search
+  states        Show workflow state ids, names, and accepted aliases
+  create        Create a task without claiming it
+  claim         Claim an existing task (link session + set In Progress)
+  delete        Delete a task
+  active        In Progress + In Review tasks for the current session
+  bulk-update   Apply the same update to multiple tasks at once
+  link-session  Link a session to a task
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty  Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet   Print only the created/affected ID on success (mutations)
+  -h, --help    Print help

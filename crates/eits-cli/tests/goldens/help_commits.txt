@@ -1,0 +1,13 @@
+Commit tracking queries and mutations
+
+Usage: eitsr commits [OPTIONS] <COMMAND>
+
+Commands:
+  list    List tracked commits (session-scoped by default)
+  create  Track one or more git commits
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty  Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet   Print only the created/affected ID on success (mutations)
+  -h, --help    Print help

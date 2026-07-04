@@ -196,51 +196,64 @@ pub fn run(
                 .cloned()
                 .unwrap_or_default();
 
-            if let Some(first) = errors.first() {
+            let has_commits = !commits.is_empty();
+            let has_duplicates = !duplicates.is_empty();
+            let has_errors = !errors.is_empty();
+
+            // Pure failure: the batch produced errors and nothing was created
+            // or already tracked — nothing was persisted, so this is the only
+            // case that's a hard error (exit 1, validation envelope).
+            if has_errors && !has_commits && !has_duplicates {
                 return Err(EitsError::api(
-                    first_error_message(first),
+                    first_error_message(&errors[0]),
                     Code::Validation,
                     None,
                 ));
             }
 
-            if !commits.is_empty() {
-                if quiet {
-                    let id = commits[0]
-                        .get("id")
-                        .map(|v| match v {
-                            Value::String(s) => s.clone(),
-                            other => other.to_string(),
-                        })
-                        .ok_or_else(|| {
-                            EitsError::api("response has no commit id", Code::ServerError, None)
-                        })?;
-                    println!("{id}");
-                } else {
-                    output::print_json(&json!({ "status": "created", "commits": commits }), pretty);
-                }
-                return Ok(());
-            }
-
-            if !duplicates.is_empty() {
-                if quiet {
-                    return Err(EitsError::usage(
-                        "commits create --quiet: already-tracked commits have no id to print",
-                    ));
-                }
-                output::print_json(
-                    &json!({ "status": "already_tracked", "duplicates": duplicates }),
-                    pretty,
-                );
-                return Ok(());
-            }
+            // Any other combination means at least one hash was persisted
+            // (created or already-tracked) — surface everything the batch
+            // did rather than silently dropping data, exit 0.
+            let status = if has_errors || (has_commits && has_duplicates) {
+                "partial"
+            } else if has_commits {
+                "created"
+            } else {
+                "already_tracked"
+            };
 
             if quiet {
+                if has_commits {
+                    for c in &commits {
+                        let id = c
+                            .get("id")
+                            .map(|v| match v {
+                                Value::String(s) => s.clone(),
+                                other => other.to_string(),
+                            })
+                            .ok_or_else(|| {
+                                EitsError::api("response has no commit id", Code::ServerError, None)
+                            })?;
+                        println!("{id}");
+                    }
+                    return Ok(());
+                }
                 return Err(EitsError::usage(
-                    "commits create --quiet: response had no commit id",
+                    "commits create --quiet: no created commit id to print",
                 ));
             }
-            output::print_json(&resp, pretty);
+
+            let mut out = json!({ "status": status });
+            if has_commits {
+                out["commits"] = json!(commits);
+            }
+            if has_duplicates {
+                out["duplicates"] = json!(duplicates);
+            }
+            if has_errors {
+                out["errors"] = json!(errors);
+            }
+            output::print_json(&out, pretty);
             Ok(())
         }
     }

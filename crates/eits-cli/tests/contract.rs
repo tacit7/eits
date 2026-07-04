@@ -260,6 +260,67 @@ fn commits_create_duplicate_reports_already_tracked_exit_0() {
 }
 
 #[test]
+fn commits_create_mixed_batch_reports_partial_with_both_arrays_exit_0() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"commits":[{"id":9,"commit_hash":"new1","commit_message":null}],"duplicates":[{"commit_hash":"old1","status":"duplicate"}],"errors":[]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args([
+            "commits", "create", "--agent", "agent-1", "--hash", "new1", "--hash", "old1",
+        ])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["status"], "partial");
+    assert_eq!(v["commits"][0]["commit_hash"], "new1");
+    assert_eq!(v["duplicates"][0]["commit_hash"], "old1");
+    assert!(v.get("errors").is_none());
+}
+
+#[test]
+fn commits_create_created_plus_errors_reports_partial_with_all_three_exit_0() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"commits":[{"id":9,"commit_hash":"new1","commit_message":null}],"duplicates":[],"errors":[{"hash":["is invalid"]}]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args([
+            "commits", "create", "--agent", "agent-1", "--hash", "new1", "--hash", "bad",
+        ])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["status"], "partial");
+    assert_eq!(v["commits"][0]["commit_hash"], "new1");
+    assert!(v["duplicates"].is_null());
+    assert!(v["errors"].as_array().unwrap().len() == 1);
+}
+
+#[test]
+fn commits_create_pure_errors_still_exits_1_validation() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"commits":[],"duplicates":[],"errors":[{"hash":["is invalid"]}]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["commits", "create", "--agent", "agent-1", "--hash", "bad"])
+        .assert()
+        .code(1);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "validation");
+}
+
+#[test]
 fn notes_add_quiet_prints_bare_id() {
     let srv = common::serve(vec![(
         200,

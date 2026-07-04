@@ -119,33 +119,7 @@ pub enum TasksCmd {
     LinkSession { id: String, session: Option<String> },
 }
 
-fn is_numeric(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())
-}
-
-/// Percent-encode a query component (mirrors bash's `jq -Rr @uri`).
-fn uri_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char)
-            }
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
-
-fn items_and_count(resp: &Value) -> Value {
-    let items = resp
-        .get("tasks")
-        .or_else(|| resp.get("results"))
-        .cloned()
-        .unwrap_or_else(|| json!([]));
-    let count = items.as_array().map(|a| a.len()).unwrap_or(0);
-    json!({ "items": items, "count": count })
-}
+use super::{is_numeric, items_and_count, uri_encode};
 
 /// Single source of truth for workflow-state names and their accepted alias
 /// strings. `aliases[0]` is the canonical value sent to the server. Both
@@ -297,7 +271,7 @@ pub fn run(
                 .collect::<Vec<_>>()
                 .join("&");
             let resp = client.get(&format!("/tasks?{query_string}"))?;
-            output::print_json(&items_and_count(&resp), pretty);
+            output::print_json(&items_and_count(&resp, &["tasks", "results"]), pretty);
             Ok(())
         }
 
@@ -536,7 +510,7 @@ pub fn run(
                 qs.push_str(&format!("&state_id={s}"));
             }
             let resp = client.get(&format!("/tasks?{qs}"))?;
-            output::print_json(&items_and_count(&resp), pretty);
+            output::print_json(&items_and_count(&resp, &["tasks", "results"]), pretty);
             Ok(())
         }
 

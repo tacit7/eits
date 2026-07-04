@@ -167,3 +167,77 @@ fn connection_refused_exits_3() {
         .code(3)
         .stdout(predicates::str::contains("\"code\":\"connection_failed\""));
 }
+
+#[test]
+fn notes_list_normalizes_results_key() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"success":true,"results":[{"id":1,"title":"a"},{"id":2,"title":"b"}]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env_remove("EITS_SESSION_UUID")
+        .env_remove("EITS_SESSION_ID")
+        .args(["notes", "list"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 2);
+    assert_eq!(v["items"].as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn commits_list_since_time_sends_iso_query_param() {
+    let srv = common::serve(vec![(200, r#"{"commits":[]}"#)]);
+    Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["commits", "list", "--since-time", "24h"])
+        .assert()
+        .success();
+    let reqs = srv.finish();
+    assert!(
+        reqs[0].path.contains("since_time="),
+        "expected since_time param in path: {}",
+        reqs[0].path
+    );
+}
+
+#[test]
+fn commits_create_duplicate_reports_already_tracked_exit_0() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"commits":[],"duplicates":[{"commit_hash":"abc123","status":"duplicate"}],"errors":[],"already_tracked":true}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args([
+            "commits", "create", "--agent", "agent-1", "--hash", "abc123",
+        ])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["status"], "already_tracked");
+    assert_eq!(v["duplicates"][0]["commit_hash"], "abc123");
+}
+
+#[test]
+fn notes_add_quiet_prints_bare_id() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"id":7,"parent_type":"session","parent_id":"s-1","title":"","body":"hi","starred":false}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "s-1")
+        .args(["--quiet", "notes", "add", "--body", "hi"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert_eq!(stdout.trim(), "7");
+}

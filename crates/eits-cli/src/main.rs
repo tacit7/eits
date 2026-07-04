@@ -8,6 +8,8 @@ mod lock;
 mod output;
 
 use clap::Parser;
+use commands::commits::CommitsCmd;
+use commands::notes::NotesCmd;
 use commands::tasks::TasksCmd;
 use error::{Code, EitsError};
 use std::ffi::OsString;
@@ -36,6 +38,16 @@ enum Cmd {
         #[command(subcommand)]
         cmd: TasksCmd,
     },
+    /// Note queries and mutations
+    Notes {
+        #[command(subcommand)]
+        cmd: NotesCmd,
+    },
+    /// Commit tracking queries and mutations
+    Commits {
+        #[command(subcommand)]
+        cmd: CommitsCmd,
+    },
     /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
     /// Anything not Rust-owned falls through to the bash extras script
@@ -57,6 +69,26 @@ fn main() {
             };
             let client = http::Client::new(cfg.clone());
             if let Err(err) = commands::tasks::run(&client, &cfg, cmd, pretty, cli.quiet) {
+                error::exit_with(err, pretty);
+            }
+        }
+        Cmd::Notes { cmd } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::notes::run(&client, &cfg, cmd, pretty, cli.quiet) {
+                error::exit_with(err, pretty);
+            }
+        }
+        Cmd::Commits { cmd } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::commits::run(&client, &cfg, cmd, pretty, cli.quiet) {
                 error::exit_with(err, pretty);
             }
         }

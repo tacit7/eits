@@ -1,5 +1,3 @@
-// consumed by Task 7
-#[allow(dead_code)]
 pub fn to_iso8601_utc(
     spec: &str,
     now: std::time::SystemTime,

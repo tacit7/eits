@@ -15,10 +15,16 @@ pub fn run(client: &Client, cfg: &Config, pretty: bool) -> Result<(), EitsError>
     let session_resp = client.get(&format!("/sessions/{session_id}"))?;
     let session_uuid = session_resp.get("uuid").cloned().unwrap_or(json!(null));
     let resolved_session_id = session_resp
-        .get("session_id")
-        .or_else(|| session_resp.get("id"))
+        .get("id")
+        .filter(|v| v.is_i64() || v.is_u64())
         .cloned()
-        .unwrap_or(json!(null));
+        .ok_or_else(|| {
+            EitsError::api(
+                "whoami: session_id not found in session response",
+                Code::ServerError,
+                None,
+            )
+        })?;
     let agent_uuid = session_resp
         .get("agent_id")
         .and_then(|v| v.as_str())
@@ -35,14 +41,29 @@ pub fn run(client: &Client, cfg: &Config, pretty: bool) -> Result<(), EitsError>
         .cloned()
         .unwrap_or(json!(null));
 
-    let agent_resp = client.get(&format!("/agents/{agent_uuid}"))?;
-    let agent_id = agent_resp.get("id").cloned().ok_or_else(|| {
-        EitsError::api(
-            "whoami: agent id not found in agent response",
-            Code::ServerError,
-            None,
-        )
-    })?;
+    // The session response may already carry the agent's integer id, saving
+    // the second round-trip; otherwise resolve it via GET /agents/{uuid}.
+    let agent_id = match session_resp
+        .get("agent_int_id")
+        .filter(|v| v.is_i64() || v.is_u64())
+    {
+        Some(v) => v.clone(),
+        None => {
+            let agent_resp = client.get(&format!("/agents/{agent_uuid}"))?;
+            agent_resp
+                .get("agent")
+                .and_then(|a| a.get("id"))
+                .or_else(|| agent_resp.get("id"))
+                .cloned()
+                .ok_or_else(|| {
+                    EitsError::api(
+                        "whoami: agent id not found in agent response",
+                        Code::ServerError,
+                        None,
+                    )
+                })?
+        }
+    };
 
     crate::output::print_json(
         &json!({
@@ -66,13 +87,41 @@ mod tests {
     }
 
     #[test]
-    fn whoami_resolves_session_then_agent_and_prints_ids() {
+    fn whoami_uses_agent_int_id_from_session_response_no_second_call() {
+        let srv = common::serve(vec![(
+            200,
+            r#"{"uuid":"u-123","id":7,"agent_id":"a-456","agent_int_id":9,"project_id":1}"#,
+        )]);
+        let out = Command::cargo_bin("eitsr")
+            .unwrap()
+            .env("EITS_URL", &srv.url)
+            .env("EITS_SESSION_UUID", "u-123")
+            .args(["whoami"])
+            .assert()
+            .success();
+        let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+        assert_eq!(v["session_uuid"], "u-123");
+        assert_eq!(v["session_id"], 7);
+        assert_eq!(v["agent_uuid"], "a-456");
+        assert_eq!(v["agent_id"], 9);
+        assert_eq!(v["project_id"], 1);
+        let reqs = srv.finish();
+        assert_eq!(
+            reqs.len(),
+            1,
+            "agent_int_id present should skip /agents call"
+        );
+    }
+
+    #[test]
+    fn whoami_falls_back_to_agents_lookup_with_nested_shape() {
         let srv = common::serve(vec![
             (
                 200,
-                r#"{"uuid":"u-123","session_id":7,"agent_id":"a-456","project_id":1}"#,
+                r#"{"uuid":"u-123","id":7,"agent_id":"a-456","project_id":1}"#,
             ),
-            (200, r#"{"id":9}"#),
+            (200, r#"{"success":true,"agent":{"id":9}}"#),
         ]);
         let out = Command::cargo_bin("eitsr")
             .unwrap()
@@ -88,7 +137,12 @@ mod tests {
         assert_eq!(v["agent_uuid"], "a-456");
         assert_eq!(v["agent_id"], 9);
         assert_eq!(v["project_id"], 1);
-        srv.finish();
+        let reqs = srv.finish();
+        assert_eq!(
+            reqs.len(),
+            2,
+            "missing agent_int_id requires the /agents call"
+        );
     }
 
     #[test]

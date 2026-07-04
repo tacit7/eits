@@ -1,12 +1,9 @@
-// consumed by Task 9
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct DmLock {
     path: std::path::PathBuf,
 }
 
 impl DmLock {
-    #[allow(dead_code)]
     pub fn acquire(identity: &str) -> Result<Self, crate::error::EitsError> {
         Self::acquire_with(identity, 60, 500)
     }

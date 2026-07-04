@@ -7,8 +7,6 @@ pub struct Config {
     pub api_key: Option<String>,
     pub session_uuid: Option<String>,
     pub session_id: Option<String>,
-    // Consumed once commands need project scoping (later task).
-    #[allow(dead_code)]
     pub project_id: Option<String>,
 }
 
@@ -57,7 +55,6 @@ impl Config {
         })
     }
 
-    #[allow(dead_code)]
     pub fn session_identity(&self) -> Option<&str> {
         self.session_uuid.as_deref().or(self.session_id.as_deref())
     }

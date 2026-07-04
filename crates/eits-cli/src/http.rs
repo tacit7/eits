@@ -22,17 +22,12 @@ impl Client {
     pub fn get(&self, pq: &str) -> Result<Value, EitsError> {
         self.send(reqwest::Method::GET, pq, None)
     }
-    // post/patch/delete are wired up by the fuller `tasks`/other command
-    // families arriving in Task 6+.
-    #[allow(dead_code)]
     pub fn post(&self, p: &str, b: Value) -> Result<Value, EitsError> {
         self.send(reqwest::Method::POST, p, Some(b))
     }
-    #[allow(dead_code)]
     pub fn patch(&self, p: &str, b: Value) -> Result<Value, EitsError> {
         self.send(reqwest::Method::PATCH, p, Some(b))
     }
-    #[allow(dead_code)]
     pub fn delete(&self, p: &str) -> Result<Value, EitsError> {
         self.send(reqwest::Method::DELETE, p, None)
     }

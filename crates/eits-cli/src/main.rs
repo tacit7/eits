@@ -55,10 +55,9 @@ fn main() {
                 Ok(cfg) => cfg,
                 Err(err) => error::exit_with(err, pretty),
             };
-            let client = http::Client::new(cfg);
-            match commands::tasks::run(cmd, &client) {
-                Ok(v) => output::print_json(&v, pretty),
-                Err(err) => error::exit_with(err, pretty),
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::tasks::run(&client, &cfg, cmd, pretty, cli.quiet) {
+                error::exit_with(err, pretty);
             }
         }
         Cmd::Whoami => {

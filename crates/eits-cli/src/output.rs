@@ -13,8 +13,6 @@ pub fn print_json(v: &serde_json::Value, pretty: bool) {
     }
 }
 
-// Wired up once `--quiet` mutation commands land (later tasks).
-#[allow(dead_code)]
 pub fn quiet_id(v: &serde_json::Value, pointer: &str) -> Result<String, crate::error::EitsError> {
     v.pointer(pointer)
         .map(|id| match id {
@@ -30,7 +28,6 @@ pub fn quiet_id(v: &serde_json::Value, pointer: &str) -> Result<String, crate::e
         })
 }
 
-#[allow(dead_code)]
 pub fn print_quiet_id(v: &serde_json::Value, pointer: &str) -> Result<(), crate::error::EitsError> {
     println!("{}", quiet_id(v, pointer)?);
     Ok(())

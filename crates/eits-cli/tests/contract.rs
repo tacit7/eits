@@ -78,6 +78,85 @@ fn headers_sent_only_when_env_set() {
 }
 
 #[test]
+fn get_normalizes_bash_style_duplicated_envelope_to_single_task_key() {
+    // Bash-style response duplicates task fields at the top level alongside
+    // the nested "task" object; our normalization keeps only the nested one.
+    let srv = common::serve(vec![(
+        200,
+        r#"{"task":{"id":5,"title":"x"},"id":5,"title":"x"}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["tasks", "get", "5"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let obj = v.as_object().unwrap();
+    assert_eq!(obj.len(), 1, "expected exactly one top-level key: {v}");
+    assert!(obj.contains_key("task"));
+    assert!(v.get("id").is_none(), "no top-level id: {v}");
+}
+
+#[test]
+fn begin_quiet_prints_bare_task_id() {
+    let srv = common::serve(vec![
+        (200, r#"{"task_id":42}"#),
+        (200, r#"{"task":{"id":42,"state":"In Progress"}}"#),
+    ]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env_remove("EITS_SESSION_UUID")
+        .env_remove("EITS_SESSION_ID")
+        .args(["--quiet", "tasks", "begin", "--title", "Do the thing"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert_eq!(stdout.trim(), "42");
+}
+
+#[test]
+fn complete_already_done_short_circuits_with_single_request() {
+    let srv = common::serve(vec![(200, r#"{"task":{"state_id":3}}"#)]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["tasks", "complete", "5", "--message", "done"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["status"], "already_closed");
+    assert_eq!(v["task_id"], 5);
+    let reqs = srv.finish();
+    assert_eq!(reqs.len(), 1, "must not POST /complete once already Done");
+    assert_eq!(reqs[0].method, "GET");
+}
+
+#[test]
+fn annotate_failure_after_retries_queues_pending_annotation() {
+    let home = tempfile::tempdir().unwrap();
+    let srv = common::serve(vec![(500, "{}")]);
+    Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_RETRY_BASE_MS", "10")
+        .env("HOME", home.path())
+        .args(["tasks", "annotate", "9", "--body", "hello"])
+        .assert()
+        .code(1)
+        .stderr(predicates::str::contains("queued"));
+    let log_path = home.path().join(".eits").join("pending-annotations.log");
+    let content = std::fs::read_to_string(&log_path).unwrap();
+    let line: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+    assert_eq!(line["task_id"], "9");
+    assert_eq!(line["body"], "hello");
+    assert_eq!(line["title"], "");
+}
+
+#[test]
 fn connection_refused_exits_3() {
     Command::cargo_bin("eitsr")
         .unwrap()

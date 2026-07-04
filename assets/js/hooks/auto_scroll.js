@@ -44,7 +44,15 @@ export const AutoScroll = {
     // scrolled away from the bottom (e.g. reading back through a long stream)
     // and disappears once they're back near the bottom. Pure client-side —
     // no LiveView round-trip.
-    this._pill = document.getElementById("scroll-to-bottom-pill")
+    //
+    // AutoScroll is mounted on more than one element on this page (the DM
+    // messages list AND the collapsible "raw stream" panel below it — see
+    // messages_tab.ex). The pill belongs only to the messages list; scope
+    // it to that instance so the raw-stream panel's scroll state can't
+    // steal control of it or double-register the click listener.
+    this._pill = this.el.id === "messages-container"
+      ? document.getElementById("scroll-to-bottom-pill")
+      : null
     if (this._pill) {
       this._onPillClick = () => {
         this.shouldAutoScroll = true

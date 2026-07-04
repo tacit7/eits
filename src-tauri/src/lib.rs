@@ -4,10 +4,10 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
 
-/// File handle for /tmp/eits.log — written at startup, shared across threads.
+/// File handle for `eits.log` in the OS temp dir — written at startup, shared across threads.
 static LOG_FILE: OnceLock<Mutex<std::fs::File>> = OnceLock::new();
 
-/// Log to both stderr and /tmp/eits.log. Works from any launch method (Finder, Alfred, terminal).
+/// Log to both stderr and `eits.log` in the OS temp dir. Works from any launch method (Finder, Alfred, terminal).
 macro_rules! log {
     ($($arg:tt)*) => {{
         let msg = format!($($arg)*);
@@ -25,12 +25,22 @@ macro_rules! log {
         }
     }};
 }
-use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
+#[cfg(target_os = "macos")]
+use tauri::menu::AboutMetadata;
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_opener::OpenerExt;
+
+/// Home directory, cross-platform: HOME (Unix) falling back to USERPROFILE (Windows).
+fn home_dir() -> Option<std::path::PathBuf> {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok()
+        .map(std::path::PathBuf::from)
+}
 
 /// Monotonic counter for generating unique secondary window labels.
 static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(2);
@@ -116,11 +126,7 @@ fn desktop_config_port() -> Option<u16> {
     let config_base = std::env::var("XDG_CONFIG_HOME")
         .map(std::path::PathBuf::from)
         .ok()
-        .or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .map(|h| std::path::PathBuf::from(h).join(".config"))
-        })?;
+        .or_else(|| home_dir().map(|h| h.join(".config")))?;
     let raw = std::fs::read_to_string(config_base.join("eits/desktop.json")).ok()?;
     let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
     let port = v.get("port")?.as_u64().and_then(|p| u16::try_from(p).ok())?;
@@ -140,11 +146,7 @@ fn desktop_config_path() -> Option<std::path::PathBuf> {
     let config_base = std::env::var("XDG_CONFIG_HOME")
         .map(std::path::PathBuf::from)
         .ok()
-        .or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .map(|h| std::path::PathBuf::from(h).join(".config"))
-        })?;
+        .or_else(|| home_dir().map(|h| h.join(".config")))?;
     Some(config_base.join("eits").join("desktop.json"))
 }
 
@@ -239,13 +241,14 @@ fn ask_hooks_consent(app: &tauri::AppHandle) -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize file logging first — before anything else so even early panics are captured.
+    let log_path = std::env::temp_dir().join("eits.log");
     match std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/tmp/eits.log")
+        .open(&log_path)
     {
         Ok(file) => { let _ = LOG_FILE.set(Mutex::new(file)); }
-        Err(e) => eprintln!("[eits-tauri] WARNING: could not open /tmp/eits.log: {e}"),
+        Err(e) => eprintln!("[eits-tauri] WARNING: could not open {}: {e}", log_path.display()),
     }
     log!("[eits-tauri] ===== startup pid={} =====", std::process::id());
     log!("[eits-tauri] version={}", env!("CARGO_PKG_VERSION"));
@@ -320,7 +323,11 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // --- App menu bar (macOS) ---
+            // --- App menu bar (macOS only) ---
+            // The app menu uses hide/hide_others/show_all — macOS conventions.
+            // On other platforms there is no app menu, so Settings is folded into
+            // the Edit menu below to keep it reachable.
+            #[cfg(target_os = "macos")]
             let app_menu = Submenu::with_items(app, "Eye in the Sky", true, &[
                 &PredefinedMenuItem::about(app, Some("About Eye in the Sky"), Some(AboutMetadata {
                     version: Some(env!("CARGO_PKG_VERSION").to_string()),
@@ -339,7 +346,21 @@ pub fn run() {
                 &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::quit(app, None)?,
             ])?;
+            #[cfg(target_os = "macos")]
             let edit_menu = Submenu::with_items(app, "Edit", true, &[
+                &PredefinedMenuItem::undo(app, None)?,
+                &PredefinedMenuItem::redo(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::cut(app, None)?,
+                &PredefinedMenuItem::copy(app, None)?,
+                &PredefinedMenuItem::paste(app, None)?,
+                &PredefinedMenuItem::select_all(app, None)?,
+            ])?;
+            // Non-macOS: no app menu, so prepend Settings (+ separator) to Edit.
+            #[cfg(not(target_os = "macos"))]
+            let edit_menu = Submenu::with_items(app, "Edit", true, &[
+                &MenuItem::with_id(app, "menu_settings", "Settings...", true, Some("CmdOrCtrl+,"))?,
+                &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::undo(app, None)?,
                 &PredefinedMenuItem::redo(app, None)?,
                 &PredefinedMenuItem::separator(app)?,
@@ -370,8 +391,13 @@ pub fn run() {
                 &PredefinedMenuItem::separator(app)?,
                 &PredefinedMenuItem::close_window(app, None)?,
             ])?;
+            #[cfg(target_os = "macos")]
             let menubar = Menu::with_items(app, &[
                 &app_menu, &edit_menu, &view_menu, &window_menu,
+            ])?;
+            #[cfg(not(target_os = "macos"))]
+            let menubar = Menu::with_items(app, &[
+                &edit_menu, &view_menu, &window_menu,
             ])?;
             app.set_menu(menubar)?;
             app.on_menu_event(|app, event| match event.id.as_ref() {
@@ -775,7 +801,10 @@ fn create_window(app_handle: &tauri::AppHandle) {
         }
     }
 
-    let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
+    // Only macOS reserves traffic-light space via the CSS gated on this attribute.
+    if cfg!(target_os = "macos") {
+        let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
+    }
     if let Err(e) = window.show() {
         log!("[eits-tauri] create_window: window.show() FAILED: {e}");
     } else {
@@ -824,7 +853,10 @@ fn open_new_window(app_handle: &tauri::AppHandle, path: &str) {
     }
 
     // Mark the document so CSS rules gated on data-tauri-overlay apply.
-    let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
+    // Only macOS reserves traffic-light space via that CSS.
+    if cfg!(target_os = "macos") {
+        let _ = window.eval("document.documentElement.setAttribute('data-tauri-overlay', '1')");
+    }
 }
 
 fn route_deep_link(app_handle: &tauri::AppHandle, url_str: &str) {
@@ -961,10 +993,10 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
 }
 
 fn install_iam_hooks(port: &str) {
-    let home = match std::env::var("HOME") {
-        Ok(h) => std::path::PathBuf::from(h),
-        Err(_) => {
-            log!("[eits-tauri] HOME not set; IAM hooks not installed");
+    let home = match home_dir() {
+        Some(h) => h,
+        None => {
+            log!("[eits-tauri] home dir not found; IAM hooks not installed");
             return;
         }
     };
@@ -995,10 +1027,17 @@ fn install_iam_hooks(port: &str) {
         return;
     }
 
-    let cmd = format!(
-        "curl -sf --max-time 5 -X POST http://127.0.0.1:{port}/api/v1/iam/hook \
-         -H 'Content-Type: application/json' -d @- || true"
-    );
+    let cmd = if cfg!(target_os = "windows") {
+        format!(
+            "curl -sf --max-time 5 -X POST http://127.0.0.1:{port}/api/v1/iam/hook \
+             -H \"Content-Type: application/json\" -d @- & exit 0"
+        )
+    } else {
+        format!(
+            "curl -sf --max-time 5 -X POST http://127.0.0.1:{port}/api/v1/iam/hook \
+             -H 'Content-Type: application/json' -d @- || true"
+        )
+    };
     let group_entry = serde_json::json!({
         "matcher": "",
         "hooks": [{ "type": "command", "command": cmd }]
@@ -1038,6 +1077,9 @@ fn install_iam_hooks(port: &str) {
                 continue;
             };
             for entry in entries.iter_mut() {
+                // Intentionally platform-agnostic substring match: any iam/hook
+                // entry (written by either the POSIX or Windows cmd variant) is
+                // ours and gets rewritten to THIS platform's command string.
                 let is_ours = entry
                     .get("command")
                     .and_then(|c| c.as_str())
@@ -1105,10 +1147,10 @@ fn install_skills(app: &tauri::AppHandle) {
         return;
     }
 
-    let home = match std::env::var("HOME") {
-        Ok(h) => std::path::PathBuf::from(h),
-        Err(_) => {
-            log!("[eits-tauri] skills: HOME not set; skills not installed");
+    let home = match home_dir() {
+        Some(h) => h,
+        None => {
+            log!("[eits-tauri] skills: home dir not found; skills not installed");
             return;
         }
     };
@@ -1239,7 +1281,10 @@ fn show_session_context_menu(
     let sep1   = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
 
     // Group 2 — Finder / clipboard
-    let open_finder  = MenuItem::with_id(&app, format!("ctx_finder::{sid}"),   "Open in Finder",        has_worktree, None::<&str>).map_err(|e| e.to_string())?;
+    let reveal_label = if cfg!(target_os = "macos") { "Open in Finder" }
+        else if cfg!(target_os = "windows") { "Open in File Explorer" }
+        else { "Open in File Manager" };
+    let open_finder  = MenuItem::with_id(&app, format!("ctx_finder::{sid}"),   reveal_label,            has_worktree, None::<&str>).map_err(|e| e.to_string())?;
     let copy_wd      = MenuItem::with_id(&app, format!("ctx_copy_wd::{sid}"),  "Copy working directory", has_worktree, None::<&str>).map_err(|e| e.to_string())?;
     let copy_id      = MenuItem::with_id(&app, format!("ctx_copy_id::{sid}"),  "Copy session ID",        true,         None::<&str>).map_err(|e| e.to_string())?;
     let copy_link    = MenuItem::with_id(&app, format!("ctx_copy_link::{sid}"),"Copy deeplink",           true,         None::<&str>).map_err(|e| e.to_string())?;

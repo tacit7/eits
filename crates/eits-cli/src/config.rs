@@ -1,19 +1,18 @@
 use crate::error::EitsError;
 use std::path::Path;
 
-// Consumed by Task 4 (http client).
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Config {
     pub base_url: String,
     pub api_key: Option<String>,
     pub session_uuid: Option<String>,
     pub session_id: Option<String>,
+    // Consumed once commands need project scoping (later task).
+    #[allow(dead_code)]
     pub project_id: Option<String>,
 }
 
 impl Config {
-    #[allow(dead_code)]
     pub fn resolve() -> Result<Self, EitsError> {
         let cfg_dir = std::env::var("XDG_CONFIG_HOME")
             .map(std::path::PathBuf::from)
@@ -24,7 +23,6 @@ impl Config {
         Self::resolve_from(&|k| std::env::var(k).ok(), &cfg_dir)
     }
 
-    #[allow(dead_code)]
     pub fn resolve_from(
         env: &dyn Fn(&str) -> Option<String>,
         config_dir: &Path,

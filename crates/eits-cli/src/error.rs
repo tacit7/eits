@@ -1,7 +1,6 @@
 use serde_json::json;
 
-// Some variants and helpers below aren't constructed yet outside tests —
-// they're the shared vocabulary Task 4's http.rs wires up next.
+// LockTimeout isn't constructed yet outside tests — reserved for a later task.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -20,8 +19,7 @@ pub enum Code {
     LockTimeout,
 }
 
-/// Maps an HTTP status code to a `Code` variant. Used by http.rs (Task 4).
-#[allow(dead_code)]
+/// Maps an HTTP status code to a `Code` variant. Used by http.rs.
 pub fn code_for_status(status: u16) -> Code {
     match status {
         400 => Code::Validation,
@@ -55,7 +53,6 @@ impl EitsError {
         Self::api(msg, Code::Usage, None)
     }
 
-    #[allow(dead_code)]
     pub fn config(msg: impl Into<String>) -> Self {
         Self::api(msg, Code::ConfigInvalid, None)
     }

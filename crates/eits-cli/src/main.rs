@@ -1,9 +1,12 @@
+mod commands;
 mod config;
 mod error;
 mod extras;
+mod http;
 mod output;
 
 use clap::Parser;
+use commands::tasks::TasksCmd;
 use error::{Code, EitsError};
 use std::ffi::OsString;
 
@@ -26,6 +29,11 @@ struct Cli {
 
 #[derive(clap::Subcommand)]
 enum Cmd {
+    /// Task queries and mutations
+    Tasks {
+        #[command(subcommand)]
+        cmd: TasksCmd,
+    },
     /// Anything not Rust-owned falls through to the bash extras script
     #[command(external_subcommand)]
     External(Vec<OsString>),
@@ -38,6 +46,17 @@ fn main() {
     let cli = Cli::parse();
     let pretty = output::pretty_enabled(cli.pretty);
     match cli.cmd {
+        Cmd::Tasks { cmd } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg);
+            match commands::tasks::run(cmd, &client) {
+                Ok(v) => output::print_json(&v, pretty),
+                Err(err) => error::exit_with(err, pretty),
+            }
+        }
         Cmd::External(args) => {
             let had_global_flags = raw.len() > args.len();
             if had_global_flags {

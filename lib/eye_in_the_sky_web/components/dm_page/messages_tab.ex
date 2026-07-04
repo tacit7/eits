@@ -90,6 +90,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           <.icon name="hero-x-mark-mini" class="size-3" />
         </button>
       </div>
+      <%!-- Scroll-to-bottom pill — shown/hidden entirely by the AutoScroll hook
+           based on scroll position; no LiveView round-trip. --%>
+      <button
+        type="button"
+        id="scroll-to-bottom-pill"
+        class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center size-8 rounded-full bg-base-100 border border-base-content/10 shadow-md text-base-content/50 hover:text-primary hover:bg-base-200 transition-colors"
+        title="Scroll to bottom"
+        aria-label="Scroll to bottom"
+      >
+        <.icon name="hero-arrow-down" class="size-4" />
+      </button>
       <div
         class="overflow-y-auto flex-1 min-h-0"
         id="messages-container"
@@ -333,6 +344,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     data-utc={to_utc_string(@message.inserted_at)}
                     phx-hook="LocalTime"
                   />
+                  <div class="ml-auto opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 flex items-center gap-0.5">
+                    <button
+                      data-copy-btn
+                      data-copy-text={@message.body}
+                      class="p-1 rounded text-base-content/25 hover:text-base-content/55 hover:bg-base-content/8 transition-colors"
+                      title="Copy message"
+                      aria-label="Copy message"
+                    >
+                      <.icon name="hero-clipboard-document-mini" class="size-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <%!-- Body --%>
                 <div class={[

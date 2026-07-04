@@ -173,6 +173,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
             <.icon name="hero-book-open" class="size-4" />
           </button>
           <.live_file_input upload={@uploads.files} class="hidden" />
+          <%!-- Active CLI flags indicator — surfaces session-level flags set via
+               slash command (/sandbox, /add-dir, /mcp, /max-turns, etc.) that
+               have no other dedicated toolbar control. --%>
+          <.flags_badge session_cli_opts={@session_cli_opts} />
           <%!-- Budget cap input --%>
           <div class="flex items-center gap-0.5 text-xs text-base-content/40">
             <span class="font-mono">$</span>
@@ -308,6 +312,34 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
     </form>
     """
   end
+
+  # ─── Active flags badge ─────────────────────────────────────────────────────
+  # Shows a small flag icon + hover tooltip listing session-level CLI opts
+  # (sandbox, add-dir, mcp, plugin, config, agents, max-turns, permissions)
+  # that were set via slash command and have no dedicated toolbar control.
+  # Model/effort/plan-mode are handled by their own pills and intentionally
+  # excluded here (they never appear in session_cli_opts — see
+  # SlashCommands.opt_key_to_slug/0).
+
+  attr :session_cli_opts, :list, default: []
+
+  defp flags_badge(assigns) do
+    flags = serialize_cli_opts(assigns.session_cli_opts)
+    assigns = assign(assigns, :flags, flags)
+
+    ~H"""
+    <div
+      :if={@flags != []}
+      class="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg text-primary/60 hover:bg-base-content/5 transition-colors cursor-default"
+      title={Enum.map_join(@flags, "\n", &flag_display/1)}
+    >
+      <.icon name="hero-flag" class="size-4" />
+    </div>
+    """
+  end
+
+  defp flag_display(%{slug: slug, value: true}), do: "/#{slug}"
+  defp flag_display(%{slug: slug, value: value}), do: "/#{slug} #{value}"
 
   # ─── ReasoningPill ───────────────────────────────────────────────────────────
 

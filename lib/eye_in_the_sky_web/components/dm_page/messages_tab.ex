@@ -113,7 +113,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
              no prior messages. Positioned inside messages-container so it scrolls
              with the message list and the scroll anchor stays below it. --%>
         <%= if @stream.show && (@stream.content != "" || @stream.tool || @stream.thinking) do %>
-          <div id="live-stream-bubble" class="max-w-[860px] w-full mx-auto px-5 pb-3">
+          <div
+            id="live-stream-bubble"
+            class="max-w-[860px] w-full mx-auto px-5 pb-3"
+            aria-live="polite"
+            aria-busy="true"
+          >
             <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5">
               <div class="flex items-center gap-2 mb-2">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -124,7 +129,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 </span>
               </div>
               <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5">
-                <%= if @stream.thinking do %>
+                <%= if @stream.thinking && @stream.content in [nil, ""] do %>
+                  <div class="text-xs text-base-content/40 italic font-mono animate-pulse flex items-center gap-1.5">
+                    <span>Thinking</span>
+                    <span class="flex items-center gap-0.5 text-base-content/50">
+                      <span class="stream-dot"></span>
+                      <span class="stream-dot"></span>
+                      <span class="stream-dot"></span>
+                    </span>
+                  </div>
+                <% end %>
+                <%= if @stream.thinking && @stream.content not in [nil, ""] do %>
                   <div class="text-xs text-base-content/30 italic font-mono line-clamp-3">
                     {String.slice(@stream.thinking, -200, 200)}
                   </div>
@@ -135,7 +150,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   </div>
                 <% end %>
                 <%= if @stream.content not in [nil, ""] do %>
-                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap">{String.trim_leading(@stream.content)}</div>
+                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap stream-content-appear stream-cursor">
+                    {String.trim_leading(@stream.content)}
+                  </div>
                 <% end %>
               </div>
             </div>

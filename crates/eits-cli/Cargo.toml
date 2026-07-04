@@ -1,0 +1,21 @@
+[package]
+name = "eits-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "eitsr"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", features = ["blocking", "json", "native-tls"], default-features = false, package = "reqwest" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+rand = "0.8"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"

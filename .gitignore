@@ -82,6 +82,9 @@ test_*.js
 # Git worktrees managed by Claude Code
 .claude/worktrees/
 /.claude/
+
+# Rust workspace build output (eitsr / eits-cli)
+/target/
 /priv/static/uploads/
 priv/cert/
 

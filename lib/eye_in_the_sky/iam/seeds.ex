@@ -411,6 +411,17 @@ defmodule EyeInTheSky.IAM.Seeds do
       enabled: false,
       message:
         "Direct database CLI access detected (psql, sqlite3, mysql, etc.). Prefer application-layer queries unless you have an explicit reason to connect directly."
+    },
+    %{
+      system_key: "block_interpreter_file_write",
+      name: "Block interpreter inline-code file writes",
+      effect: "deny",
+      action: "Bash",
+      builtin_matcher: "block_interpreter_file_write",
+      priority: 90,
+      enabled: false,
+      message:
+        "Writing/editing files via interpreter inline code (python -c, node -e, etc.) is blocked. Use the Edit/Write tool instead."
     }
   ]
 

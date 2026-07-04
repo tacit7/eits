@@ -19,7 +19,10 @@ pub enum CommitsCmd {
         /// Only commits after this hash (server-side, via since_hash)
         #[arg(long)]
         since: Option<String>,
-        /// Only commits since this duration ago, e.g. 24h / 7d / 30m
+        /// Only commits since this duration ago, e.g. 24h / 7d / 30m.
+        /// Filtered client-side (bash parity): the server doesn't implement
+        /// this filter server-side, so results missing a timestamp field are
+        /// excluded entirely, same as bash.
         #[arg(long = "since-time")]
         since_time: Option<String>,
     },
@@ -74,6 +77,27 @@ fn first_error_message(v: &Value) -> String {
     }
 }
 
+/// Client-side `--since-time` filter, ported from bash's fallback (the server
+/// doesn't implement `created_at_since` — confirmed in commit_controller.ex —
+/// so bash always applies this filter after the fact, and so do we).
+///
+/// Compares the first 19 chars (`YYYY-MM-DDTHH:MM:SS`) of `inserted_at` /
+/// `created_at` against the same prefix of `cutoff_iso`: fixed-width ISO8601
+/// UTC timestamps order identically as strings and as instants, so no date
+/// parsing is needed. An item with neither timestamp field is excluded, same
+/// as bash's `select` (`. == "" then false`).
+fn passes_since_time(item: &Value, cutoff_iso: &str) -> bool {
+    let ts = item
+        .get("inserted_at")
+        .and_then(Value::as_str)
+        .or_else(|| item.get("created_at").and_then(Value::as_str))
+        .unwrap_or("");
+    match (ts.get(..19), cutoff_iso.get(..19)) {
+        (Some(item_prefix), Some(cutoff_prefix)) => item_prefix >= cutoff_prefix,
+        _ => false,
+    }
+}
+
 pub fn run(
     client: &Client,
     cfg: &Config,
@@ -107,16 +131,33 @@ pub fn run(
             if let Some(l) = &limit {
                 qs.push(("limit".into(), l.clone()));
             }
-            if let Some(spec) = &since_time {
-                let iso = duration::to_iso8601_utc(spec, std::time::SystemTime::now())?;
-                qs.push(("since_time".into(), uri_encode(&iso)));
+            let cutoff = match &since_time {
+                Some(spec) => Some(duration::to_iso8601_utc(
+                    spec,
+                    std::time::SystemTime::now(),
+                )?),
+                None => None,
+            };
+            if let Some(iso) = &cutoff {
+                // Sent for forward-compatibility only: the server doesn't
+                // implement this filter (confirmed in commit_controller.ex),
+                // so we always re-filter client-side below, same as bash.
+                qs.push(("created_at_since".into(), uri_encode(iso)));
             }
             let query_string = qs
                 .iter()
                 .map(|(k, v)| format!("{k}={v}"))
                 .collect::<Vec<_>>()
                 .join("&");
-            let resp = client.get(&format!("/commits?{query_string}"))?;
+            let mut resp = client.get(&format!("/commits?{query_string}"))?;
+            if let Some(cutoff_iso) = &cutoff {
+                for key in ["commits", "results"] {
+                    if let Some(arr) = resp.get_mut(key).and_then(Value::as_array_mut) {
+                        arr.retain(|item| passes_since_time(item, cutoff_iso));
+                        break;
+                    }
+                }
+            }
             output::print_json(&items_and_count(&resp, &["commits", "results"]), pretty);
             Ok(())
         }

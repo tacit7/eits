@@ -189,20 +189,54 @@ fn notes_list_normalizes_results_key() {
 }
 
 #[test]
-fn commits_list_since_time_sends_iso_query_param() {
-    let srv = common::serve(vec![(200, r#"{"commits":[]}"#)]);
-    Command::cargo_bin("eitsr")
+fn commits_list_since_time_sends_created_at_since_param_and_filters_client_side() {
+    // Server doesn't implement time filtering (confirmed in commit_controller.ex),
+    // so we send the bash-parity param name for forward-compatibility but always
+    // re-filter client-side, same as bash's jq fallback. "old" predates any
+    // real --since-time cutoff; "new" postdates any real one, so this is
+    // deterministic regardless of when the test runs.
+    let srv = common::serve(vec![(
+        200,
+        r#"{"commits":[
+            {"id":1,"commit_hash":"old","inserted_at":"2000-01-01T00:00:00Z"},
+            {"id":2,"commit_hash":"new","inserted_at":"2099-01-01T00:00:00Z"}
+        ]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
         .unwrap()
         .env("EITS_URL", &srv.url)
-        .args(["commits", "list", "--since-time", "24h"])
+        .args(["commits", "list", "--since-time", "1h"])
         .assert()
         .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 1);
+    assert_eq!(v["items"][0]["commit_hash"], "new");
     let reqs = srv.finish();
     assert!(
-        reqs[0].path.contains("since_time="),
-        "expected since_time param in path: {}",
+        reqs[0].path.contains("created_at_since="),
+        "expected created_at_since param in path: {}",
         reqs[0].path
     );
+}
+
+#[test]
+fn commits_list_since_time_excludes_items_missing_a_timestamp() {
+    // Matches bash's `select(. == "" then false)`: no inserted_at/created_at
+    // at all means excluded, not included by default.
+    let srv = common::serve(vec![(
+        200,
+        r#"{"commits":[{"id":1,"commit_hash":"no-ts"}]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["commits", "list", "--since-time", "1h"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 0);
 }
 
 #[test]

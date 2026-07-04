@@ -143,28 +143,25 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
   defp rate_pct(util) when is_float(util), do: round(util)
   defp rate_pct(util) when is_integer(util), do: util
 
-  # used_credits is in dollars (float), monthly_limit is in cents (integer).
-  # Convert limit to dollars before computing the percentage.
+  # Both used_credits and monthly_limit are in cents (e.g. 500 = $5.00, 3000 = $30.00).
   defp monthly_pct(%{used_credits: used, monthly_limit: limit})
        when is_number(used) and is_number(limit) and limit > 0 do
-    limit_dollars = limit / 100.0
-    min(100, round(used / limit_dollars * 100))
+    min(100, round(used / limit * 100))
   end
 
   defp monthly_pct(_), do: 0
 
-  # The API returns used_credits as a float in dollars (e.g. 0.0),
-  # and monthly_limit as cents (e.g. 3000 = $30.00).
+  # Both used_credits and monthly_limit are in cents (e.g. 500 = $5.00, 3000 = $30.00).
   defp spend_label(%{used_credits: used, monthly_limit: limit})
        when is_number(used) and is_number(limit) do
+    used_dollars = used / 100.0
     limit_dollars = limit / 100.0
-    "$#{format_dollars(used)} / $#{format_dollars(limit_dollars)}"
+    "$#{format_dollars(used_dollars)} / $#{format_dollars(limit_dollars)}"
   end
 
   defp spend_label(_), do: "—"
 
   defp format_dollars(n) when is_float(n), do: :erlang.float_to_binary(n, decimals: 2)
-  defp format_dollars(n) when is_integer(n), do: :erlang.float_to_binary(n * 1.0, decimals: 2)
 
   # Converts ISO8601 resets_at to "57m" / "1d 19h" / "3h 20m" style string.
   # Called only when resets_at is non-nil (guarded by :if at the call site).

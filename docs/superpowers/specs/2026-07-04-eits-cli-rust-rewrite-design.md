@@ -15,7 +15,7 @@ Replace the agent-facing core of `scripts/eits` (5,132-line bash wrapping the EI
 |---|---|
 | Migration | Rust core + bash extras forever — installer/setup/human flows never ported |
 | Output contract | New contract in Rust (JSON-by-default, error envelope); bash keeps old behavior |
-| Dispatch | Rust binary owns the `eits` name; unknown root subcommands exec through to the bash script |
+| Dispatch | Rust binary ships as **`eitsr` during migration**; unknown root subcommands exec through to the bash script. At cutover it takes the `eits` name |
 | Layout | Cargo workspace member alongside `src-tauri` |
 
 ## Architecture
@@ -34,19 +34,29 @@ libexec/eits-extras       # today's scripts/eits, relocated
 
 ### Installed layout
 
-The installed `eits` entrypoint is always the Rust binary.
+**During migration:** the Rust binary is installed as **`eitsr`**, coexisting with the untouched bash `eits`:
 
 ```
-bin/eits                  # Rust binary, on PATH
+bin/eitsr                 # Rust binary, on PATH
+scripts/eits              # bash script, unchanged, still the `eits` on PATH
+```
+
+`eitsr` is a full drop-in — its bash fallback execs `scripts/eits` for unported subcommands, so `eitsr <anything>` always works. Agents opt in per-session/per-doc; nothing breaks for consumers still calling `eits`.
+
+**After cutover** (all phases ported, consumers migrated): the binary is renamed/installed as `eits` and the bash script relocates in the same commit:
+
+```
+bin/eits                  # Rust binary (was eitsr), on PATH
 libexec/eits-extras       # relocated legacy bash script
 ```
 
-The Rust binary discovers `eits-extras` in this order:
+The Rust binary discovers the extras script in this order:
 
 1. `EITS_EXTRAS` env override
 2. `../libexec/eits-extras` relative to the resolved (symlink-followed) binary path
 3. sibling `eits-extras` next to the binary
-4. bundled app path (see Packaging)
+4. the bash `eits` on `PATH` (migration period — but only if it is not the Rust binary itself; guard against self-exec loops)
+5. bundled app path (see Packaging)
 
 If the discovered extras path is missing, not a regular file, or not executable → JSON error envelope `code: "extras_not_found"`, exit 1. If `exec` fails after discovery → `code: "extras_exec_failed"`, exit 1.
 
@@ -239,4 +249,8 @@ Rust must match the existing bash lock exactly (`_dm_post`, scripts/eits):
 
 ## Rollout
 
-Phase 1 binary takes the `eits` name only after its six commands pass parity checks against the dev server. The bash script relocates to `libexec/eits-extras` in the same commit — there is never a window with two `eits` entrypoints on PATH.
+1. **Phase 1 ships as `eitsr`.** The bash `eits` is untouched; agents and docs opt in to `eitsr` incrementally. Parity checks run against the dev server with both binaries side by side.
+2. **Phase 2 lands in `eitsr`** the same way.
+3. **Cutover** (separate, deliberate step once consumers are migrated): the Rust binary takes the `eits` name and the bash script relocates to `libexec/eits-extras` in the same commit. `eitsr` remains as an alias for one release, then retires.
+
+The DM lock protocol makes `eitsr` and bash `eits` safe to run concurrently during the migration window.

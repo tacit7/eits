@@ -1,7 +1,5 @@
 use serde_json::json;
 
-// LockTimeout isn't constructed yet outside tests — reserved for a later task.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Code {

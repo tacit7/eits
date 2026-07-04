@@ -5,7 +5,13 @@ pub struct DmLock {
 
 impl DmLock {
     pub fn acquire(identity: &str) -> Result<Self, crate::error::EitsError> {
-        Self::acquire_with(identity, 60, 500)
+        // Test-only override so contract tests can force a fast timeout
+        // instead of waiting out the full 60 * 500ms = 30s production budget.
+        let attempts = std::env::var("EITS_DM_LOCK_ATTEMPTS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(60);
+        Self::acquire_with(identity, attempts, 500)
     }
 
     // Literal /tmp for parity with bash _dm_post — see spec "DM serialization lock".

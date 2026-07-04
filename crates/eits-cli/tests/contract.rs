@@ -495,6 +495,111 @@ fn sessions_create_omits_absent_optional_fields() {
 }
 
 #[test]
+fn dm_send_holds_lock_and_times_out_when_already_locked() {
+    let identity = "test-dm-lock-1";
+    let lock_path = std::path::PathBuf::from(format!("/tmp/eits_dm_{identity}.lock"));
+    let _ = std::fs::remove_dir(&lock_path); // clean slate in case of a prior crash
+    std::fs::create_dir(&lock_path).unwrap();
+
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", "http://127.0.0.1:1/api/v1")
+        .env("EITS_SESSION_UUID", identity)
+        .env("EITS_DM_LOCK_ATTEMPTS", "1")
+        .args(["dm", "--to", "9", "--message", "hi"])
+        .assert()
+        .code(1);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "lock_timeout");
+
+    std::fs::remove_dir(&lock_path).unwrap();
+}
+
+#[test]
+fn dm_inbox_normalizes_messages_key_and_sends_from_and_limit_params() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"session_id":1,"count":1,"messages":[{"id":5,"from_session_id":2,"body":"hi"}]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "s-1")
+        .args(["dm", "inbox", "--from", "2", "--limit", "5"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 1);
+    assert_eq!(v["items"][0]["id"], 5);
+
+    let reqs = srv.finish();
+    assert!(
+        reqs[0].path.contains("from=2"),
+        "expected from=2 in path: {}",
+        reqs[0].path
+    );
+    assert!(
+        reqs[0].path.contains("limit=5"),
+        "expected limit=5 in path: {}",
+        reqs[0].path
+    );
+}
+
+#[test]
+fn dm_send_bad_metadata_is_usage_error_exit_2() {
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", "http://127.0.0.1:1/api/v1")
+        .env("EITS_SESSION_UUID", "s-1")
+        .args([
+            "dm",
+            "--to",
+            "9",
+            "--message",
+            "hi",
+            "--metadata",
+            "not-json",
+        ])
+        .assert()
+        .code(2);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "usage");
+}
+
+#[test]
+fn dm_send_posts_exact_payload_keys_and_releases_lock_after() {
+    let srv = common::serve(vec![(200, r#"{"success":true,"message_id":"77"}"#)]);
+    let identity = "test-dm-lock-2";
+    let lock_path = std::path::PathBuf::from(format!("/tmp/eits_dm_{identity}.lock"));
+    let _ = std::fs::remove_dir(&lock_path);
+
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", identity)
+        .args(["--quiet", "dm", "--to", "9", "--message", "hi"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert_eq!(stdout.trim(), "77");
+    assert!(
+        !lock_path.exists(),
+        "lock dir must be released after send completes"
+    );
+
+    let reqs = srv.finish();
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(body["from_session_id"], identity);
+    assert_eq!(body["to_session_id"], "9");
+    assert_eq!(body["message"], "hi");
+    assert_eq!(body["response_required"], false);
+    assert!(body.get("metadata").is_none());
+}
+
+#[test]
 fn sessions_archive_dry_run_lists_without_posting() {
     let srv = common::serve(vec![(
         200,

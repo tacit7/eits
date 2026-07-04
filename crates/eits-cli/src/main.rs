@@ -9,6 +9,7 @@ mod output;
 
 use clap::Parser;
 use commands::commits::CommitsCmd;
+use commands::dm::DmCmd;
 use commands::notes::NotesCmd;
 use commands::sessions::SessionsCmd;
 use commands::tasks::TasksCmd;
@@ -53,6 +54,21 @@ enum Cmd {
     Sessions {
         #[command(subcommand)]
         cmd: SessionsCmd,
+    },
+    /// Send or read direct messages (root form: `eitsr dm --to <id> --message <text>`)
+    Dm {
+        #[command(subcommand)]
+        cmd: Option<DmCmd>,
+        #[arg(long)]
+        to: Option<String>,
+        #[arg(long)]
+        message: Option<String>,
+        #[arg(long)]
+        from: Option<String>,
+        #[arg(long)]
+        metadata: Option<String>,
+        #[arg(long = "response-required")]
+        response_required: bool,
     },
     /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
@@ -105,6 +121,34 @@ fn main() {
             };
             let client = http::Client::new(cfg.clone());
             if let Err(err) = commands::sessions::run(&client, &cfg, cmd, pretty, cli.quiet) {
+                error::exit_with(err, pretty);
+            }
+        }
+        Cmd::Dm {
+            cmd,
+            to,
+            message,
+            from,
+            metadata,
+            response_required,
+        } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::dm::run(
+                &client,
+                &cfg,
+                cmd,
+                to,
+                message,
+                from,
+                metadata,
+                response_required,
+                pretty,
+                cli.quiet,
+            ) {
                 error::exit_with(err, pretty);
             }
         }

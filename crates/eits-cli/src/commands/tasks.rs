@@ -407,22 +407,11 @@ pub fn run(
             }
 
             if let Some(to) = &notify {
-                let lock_identity = cfg.session_identity().unwrap_or("default");
-                match crate::lock::DmLock::acquire(lock_identity) {
-                    Ok(_guard) => {
-                        let dm_body = json!({
-                            "from_session_id": identity,
-                            "to_session_id": to,
-                            "message": format!("Task {id} completed"),
-                            "response_required": false,
-                        });
-                        if let Err(e) = client.post("/dm", dm_body) {
-                            eprintln!("warning: task closed but DM to {to} failed: {}", e.message);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("warning: task closed but DM to {to} failed: {}", e.message)
-                    }
+                let dm_message = format!("Task {id} completed");
+                if let Err(e) =
+                    super::dm::send_dm(client, cfg, to, &dm_message, Some(&identity), None, false)
+                {
+                    eprintln!("warning: task closed but DM to {to} failed: {}", e.message);
                 }
             }
 

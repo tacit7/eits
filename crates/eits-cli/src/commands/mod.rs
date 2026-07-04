@@ -1,4 +1,5 @@
 pub mod commits;
+pub mod dm;
 pub mod notes;
 pub mod sessions;
 pub mod tasks;

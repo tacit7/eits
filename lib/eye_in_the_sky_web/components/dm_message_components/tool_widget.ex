@@ -204,18 +204,38 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
     <%= case @body_type do %>
       <% :bash -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
-          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed">{(@input && @input["command"]) || @detail}</pre>
+          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{(@input && @input["command"]) || @detail}</pre>
         </div>
       <% :edit -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-1.5">
           <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-red-950/30 text-red-400/70 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["old_string"] || "", 0..500)}</pre>
-          <pre class="bg-green-950/30 text-green-400/70 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{String.slice(@input["new_string"] || "", 0..500)}</pre>
+          <pre class="bg-error/10 text-error/80 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{prefix_lines(String.slice(@input["old_string"] || "", 0..800), "─")}</pre>
+          <pre class="bg-success/10 text-success/80 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{prefix_lines(String.slice(@input["new_string"] || "", 0..800), "+")}</pre>
+        </div>
+      <% :multi_edit -> %>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-2">
+          <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <%= for {edit, idx} <- Enum.with_index(@input["edits"] || []) do %>
+            <div class="space-y-1">
+              <div
+                :if={length(@input["edits"] || []) > 1}
+                class="text-micro font-mono text-base-content/25 uppercase tracking-wide"
+              >
+                edit {idx + 1}
+              </div>
+              <pre class="bg-error/10 text-error/80 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-24 overflow-y-auto">{prefix_lines(String.slice(edit["old_string"] || "", 0..400), "─")}</pre>
+              <pre class="bg-success/10 text-success/80 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-24 overflow-y-auto">{prefix_lines(String.slice(edit["new_string"] || "", 0..400), "+")}</pre>
+            </div>
+          <% end %>
         </div>
       <% :write -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-1">
           <div class="font-mono text-xs text-[var(--text-ghost)] pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..500)}{if String.length(@input["content"] || "") > 500, do: "\n…", else: ""}</pre>
+          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..800)}{if String.length(@input["content"] || "") > 800, do: "\n…", else: ""}</pre>
+        </div>
+      <% :read_glob -> %>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
+          <pre class="font-mono text-xs text-[var(--code-text)] bg-[var(--surface-code)] rounded px-2 py-1.5 whitespace-pre-wrap break-all">{@input["file_path"] || @input["pattern"] || @detail}</pre>
         </div>
       <% :speak -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
@@ -242,7 +262,9 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
     cond do
       bash_body?(assigns) -> :bash
       edit_body?(assigns) -> :edit
+      multi_edit_body?(assigns) -> :multi_edit
       write_body?(assigns) -> :write
+      read_glob_body?(assigns) -> :read_glob
       speak_body?(assigns) -> :speak
       json_body?(assigns) -> :json
       text_body?(assigns) -> :text
@@ -257,9 +279,19 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
       Map.has_key?(assigns.input, "old_string")
   end
 
+  defp multi_edit_body?(assigns) do
+    assigns.name == "MultiEdit" and is_map(assigns.input) and
+      Map.has_key?(assigns.input, "edits")
+  end
+
   defp write_body?(assigns) do
     assigns.name == "Write" and is_map(assigns.input) and
       Map.has_key?(assigns.input, "content")
+  end
+
+  defp read_glob_body?(assigns) do
+    assigns.name in ["Read", "Glob"] and is_map(assigns.input) and
+      (Map.has_key?(assigns.input, "file_path") or Map.has_key?(assigns.input, "pattern"))
   end
 
   defp speak_body?(assigns),
@@ -271,4 +303,13 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
   end
 
   defp text_body?(assigns), do: assigns.rest != "" and assigns.rest != assigns.detail
+
+  # Prefix every line in text with the given marker and a space.
+  defp prefix_lines("", _prefix), do: ""
+
+  defp prefix_lines(text, prefix) do
+    text
+    |> String.split("\n")
+    |> Enum.map_join("\n", fn line -> prefix <> " " <> line end)
+  end
 end

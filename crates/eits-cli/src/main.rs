@@ -10,6 +10,7 @@ mod output;
 use clap::Parser;
 use commands::commits::CommitsCmd;
 use commands::notes::NotesCmd;
+use commands::sessions::SessionsCmd;
 use commands::tasks::TasksCmd;
 use error::{Code, EitsError};
 use std::ffi::OsString;
@@ -47,6 +48,11 @@ enum Cmd {
     Commits {
         #[command(subcommand)]
         cmd: CommitsCmd,
+    },
+    /// Session queries and mutations
+    Sessions {
+        #[command(subcommand)]
+        cmd: SessionsCmd,
     },
     /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
@@ -89,6 +95,16 @@ fn main() {
             };
             let client = http::Client::new(cfg.clone());
             if let Err(err) = commands::commits::run(&client, &cfg, cmd, pretty, cli.quiet) {
+                error::exit_with(err, pretty);
+            }
+        }
+        Cmd::Sessions { cmd } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::sessions::run(&client, &cfg, cmd, pretty, cli.quiet) {
                 error::exit_with(err, pretty);
             }
         }

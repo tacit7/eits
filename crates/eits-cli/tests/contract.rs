@@ -336,3 +336,86 @@ fn notes_add_quiet_prints_bare_id() {
     let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
     assert_eq!(stdout.trim(), "7");
 }
+
+#[test]
+fn sessions_list_normalizes_from_results_key() {
+    let srv = common::serve(vec![(200, r#"{"results":[{"uuid":"a-1","name":"one"}]}"#)]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_PROJECT_ID", "1")
+        .args(["sessions", "list"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 1);
+    assert_eq!(v["items"][0]["uuid"], "a-1");
+}
+
+#[test]
+fn sessions_list_normalizes_from_sessions_key() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"sessions":[{"uuid":"b-2","name":"two"},{"uuid":"b-3","name":"three"}]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_PROJECT_ID", "1")
+        .args(["sessions", "list"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 2);
+    assert_eq!(v["items"][1]["uuid"], "b-3");
+}
+
+#[test]
+fn sessions_create_quiet_prints_bare_uuid() {
+    let srv = common::serve(vec![(200, r#"{"session":{"uuid":"new-uuid-1"}}"#)]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args([
+            "--quiet",
+            "sessions",
+            "create",
+            "--session-id",
+            "new-uuid-1",
+        ])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert_eq!(stdout.trim(), "new-uuid-1");
+}
+
+#[test]
+fn sessions_list_mine_and_search_is_usage_error_exit_2() {
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", "http://127.0.0.1:1")
+        .env("EITS_SESSION_UUID", "s-1")
+        .args(["sessions", "list", "--mine", "--search", "foo"])
+        .assert()
+        .code(2);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "usage");
+}
+
+#[test]
+fn sessions_end_defaults_uuid_to_session_identity() {
+    let srv = common::serve(vec![(200, r#"{"status":"ended"}"#)]);
+    Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "self-uuid-9")
+        .args(["sessions", "end"])
+        .assert()
+        .success();
+    let reqs = srv.finish();
+    assert_eq!(reqs[0].method, "POST");
+    assert_eq!(reqs[0].path, "/api/v1/sessions/self-uuid-9/end");
+}

@@ -320,9 +320,14 @@ pub fn run(
                 "session_id": identity,
             });
             let create_resp = client.post("/tasks", body)?;
+            // The server sends `task_id` as a JSON number in some responses
+            // and as a numeric string in others (confirmed live) — accept both.
             let task_id = create_resp
                 .get("task_id")
-                .and_then(|v| v.as_i64())
+                .and_then(|v| {
+                    v.as_i64()
+                        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+                })
                 .ok_or_else(|| EitsError::api("task creation failed", Code::ServerError, None))?;
             client.patch(
                 &format!("/tasks/{task_id}"),

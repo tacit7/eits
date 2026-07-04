@@ -184,6 +184,22 @@ Phase 1 quiet identifiers:
 
 Each phase includes a grep of hooks, skills, and CLAUDE.md examples for consumers of that phase's commands, with updates landing in the same change.
 
+#### Parity sweep findings (2026-07-04, live dev server)
+
+Read-only commands compared bash `scripts/eits <cmd> --json` vs `cargo run -p eits-cli -- <cmd>` for the same data; shapes intentionally differ (normalized vs raw), only the underlying field values were diffed.
+
+| Command | Parity | Note |
+|---|---|---|
+| `tasks get <id>` | match | same `id`/`title`/`state`/`state_id` values under `eitsr`'s single `task` key vs bash's duplicated top-level+nested fields |
+| `tasks list --all` | match | same row count (200) once bash's `.tasks` array is compared against `eitsr`'s `count` |
+| `notes list --mine` | match | identical note fields; `eitsr` normalizes bash's `results` key to `items`/`count` |
+| `commits list --limit 3` | match | identical `id`/`commit_hash`/`commit_message` values and ordering |
+| `sessions get self` | match | identical field values; `eitsr` nests under `session`, bash returns flat |
+| `dm inbox --limit 3` | match | identical message `id`/`body`/`from_session_id`/`to_session_id` values |
+| `whoami` | **bash broken** | bash `cmd_whoami` 404s resolving `/agents/:agent_id` because the session response's `agent_id` field is actually the session's own uuid, not an agent uuid — confirmed live (`error: whoami: agent id not found in agent response`). `eitsr` avoids the bug by preferring `agent_int_id` off the session response when present, only falling back to the `/agents` lookup otherwise. `tests/live.rs::whoami_matches_sessions_get_self_fields` cross-checks `eitsr whoami` against `eits sessions get self` instead of against bash `whoami`. |
+
+**Bug found and fixed during the live sweep:** `tasks begin` (`crates/eits-cli/src/commands/tasks.rs`) parsed the create response's `task_id` with `.as_i64()` only, which silently rejected the live server's numeric-string form (`"task_id":"8070"`) and failed every real `tasks begin` call with `{"code":"server_error","error":"task creation failed"}` — this never showed up against the mock server because the fixtures always used a bare JSON number. Fixed to accept both a JSON number and a numeric string; regression test `begin_accepts_string_task_id_from_server` added to `tests/contract.rs`, and `tests/live.rs::tasks_begin_quiet_then_complete_round_trip` exercises the real create+complete round trip.
+
 ## Behavior parity with bash
 
 ### Base URL resolution

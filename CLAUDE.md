@@ -166,6 +166,10 @@ eits commits create --hash <hash>
 
 **DM targets support both UUID and numeric session ID.** Pass either format to `dm --to`.
 
+### eitsr (Rust CLI, opt-in)
+
+`eitsr` is a Rust rewrite of `eits` covering Phase 1 families: `tasks`, `dm`, `sessions`, `whoami`, `commits`, `notes`. Output is JSON by default (compact; `EITS_PRETTY=1` or `--pretty` for readable), errors are a `{"error","code","status","hint"}` JSON envelope on stdout with exit codes `0`/`1`/`2`/`3` (success/API-error/usage-error/connection-failure), and mutating commands (`begin`, `complete`, `dm`, `notes add`, `sessions create`) accept `--quiet` to print just the bare id/uuid. Any subcommand outside Phase 1 falls through automatically to bash `scripts/eits`, so `eitsr` is a drop-in superset. Agents may opt into `eitsr` per-session; bash `eits` remains the default until cutover.
+
 ## eits CLI Gotchas
 
 **`EITS_PROJECT_ID` is NOT injected into spawned agent environments.** Claude sessions do not receive it as an OS env var (Codex sessions do). Always include it explicitly in the `--instructions` string:

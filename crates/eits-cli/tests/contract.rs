@@ -185,6 +185,26 @@ fn begin_quiet_prints_bare_task_id() {
 }
 
 #[test]
+fn begin_accepts_string_task_id_from_server() {
+    // The server has been observed returning task_id as a numeric string
+    // (e.g. `"task_id":"42"`) rather than a JSON number — must not blow up.
+    let srv = common::serve(vec![
+        (200, r#"{"task_id":"42"}"#),
+        (200, r#"{"task":{"id":42,"state":"In Progress"}}"#),
+    ]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env_remove("EITS_SESSION_UUID")
+        .env_remove("EITS_SESSION_ID")
+        .args(["--quiet", "tasks", "begin", "--title", "Do the thing"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert_eq!(stdout.trim(), "42");
+}
+
+#[test]
 fn complete_already_done_short_circuits_with_single_request() {
     let srv = common::serve(vec![(200, r#"{"task":{"state_id":3}}"#)]);
     let out = Command::cargo_bin("eitsr")

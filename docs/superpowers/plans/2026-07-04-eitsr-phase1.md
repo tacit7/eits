@@ -77,7 +77,7 @@ crates/eits-cli/
 | dm inbox/list | GET `/dm?{qs}` |
 | dm read | GET `/dm/{id}{qs}` |
 | dm send | POST `/dm` under DM lock |
-| whoami | no API call — prints env-derived identity JSON |
+| whoami | GET `/sessions/{uuid-or-id}` then GET `/agents/{agent_uuid}` — server-resolved identity, integers coerced |
 
 For flag-by-flag query-string parity, port from these bash regions: tasks 780–1290, notes 1440–1560, commits 2190–2360, sessions 340–730, dm 2460–2660. When in doubt, replicate bash behavior exactly — parity beats elegance.
 

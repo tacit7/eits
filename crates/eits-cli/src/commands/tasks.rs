@@ -147,10 +147,25 @@ fn items_and_count(resp: &Value) -> Value {
     json!({ "items": items, "count": count })
 }
 
+/// Single source of truth for workflow-state names and their accepted alias
+/// strings. `aliases[0]` is the canonical value sent to the server. Both
+/// `apply_update_state` (the `update`/`begin`/`claim` alias resolver) and the
+/// `states` command derive from this table so they cannot drift apart.
+const STATE_ALIAS_TABLE: &[(i64, &str, &[&str])] = &[
+    (1, "To Do", &["todo", "to-do", "to do"]),
+    (
+        2,
+        "In Progress",
+        &["start", "in-progress", "progress", "in progress"],
+    ),
+    (3, "Done", &["done", "complete", "completed"]),
+    (4, "In Review", &["in-review", "review", "in review"]),
+];
+
 /// Port of bash `update`'s `_resolve_state`: numeric input remaps workflow
 /// position (1-4) to the actual DB state_id (3 and 4 are swapped); named
-/// input maps common aliases to the server's alias strings, passing through
-/// anything unrecognized unchanged.
+/// input maps aliases from `STATE_ALIAS_TABLE` to their canonical string,
+/// passing through anything unrecognized unchanged.
 fn apply_update_state(updates: &mut serde_json::Map<String, Value>, v: &str) {
     if is_numeric(v) {
         let n: i64 = v.parse().unwrap_or(0);
@@ -164,15 +179,22 @@ fn apply_update_state(updates: &mut serde_json::Map<String, Value>, v: &str) {
         updates.insert("state_id".into(), json!(sid));
     } else {
         let lower = v.to_lowercase();
-        let normalized = match lower.as_str() {
-            "todo" | "to do" | "to-do" => "todo",
-            "in progress" | "in-progress" | "progress" | "start" => "start",
-            "done" | "complete" | "completed" => "done",
-            "in review" | "in-review" | "review" => "in-review",
-            _ => v,
-        };
+        let normalized = STATE_ALIAS_TABLE
+            .iter()
+            .find(|(_, _, aliases)| aliases.contains(&lower.as_str()))
+            .map(|(_, _, aliases)| aliases[0])
+            .unwrap_or(v);
         updates.insert("state".into(), json!(normalized));
     }
+}
+
+fn states_payload() -> Value {
+    let items: Vec<Value> = STATE_ALIAS_TABLE
+        .iter()
+        .map(|(id, name, aliases)| json!({ "id": id, "name": name, "aliases": aliases }))
+        .collect();
+    let count = items.len();
+    json!({ "items": items, "count": count })
 }
 
 pub fn run(
@@ -519,18 +541,7 @@ pub fn run(
         }
 
         TasksCmd::States => {
-            output::print_json(
-                &json!({
-                    "items": [
-                        {"id": 1, "name": "To Do", "aliases": ["todo"]},
-                        {"id": 2, "name": "In Progress", "aliases": ["start", "begin"]},
-                        {"id": 3, "name": "Done", "aliases": ["done", "complete"]},
-                        {"id": 4, "name": "In Review", "aliases": ["review"]},
-                    ],
-                    "count": 4,
-                }),
-                pretty,
-            );
+            output::print_json(&states_payload(), pretty);
             Ok(())
         }
 
@@ -691,6 +702,34 @@ pub fn run(
                 output::print_json(&resp, pretty);
             }
             Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Guards against `states` and `apply_update_state` drifting apart again:
+    /// every alias the `states` command advertises must actually normalize to
+    /// that state's canonical value via the same resolver `update`/`begin`
+    /// use.
+    #[test]
+    fn every_states_alias_is_accepted_by_update_resolver() {
+        let payload = states_payload();
+        let items = payload["items"].as_array().unwrap();
+        assert_eq!(items.len(), STATE_ALIAS_TABLE.len());
+        for (_, _, aliases) in STATE_ALIAS_TABLE {
+            let canonical = aliases[0];
+            for alias in *aliases {
+                let mut updates = serde_json::Map::new();
+                apply_update_state(&mut updates, alias);
+                assert_eq!(
+                    updates.get("state").and_then(|v| v.as_str()),
+                    Some(canonical),
+                    "alias {alias:?} did not normalize to canonical {canonical:?}"
+                );
+            }
         }
     }
 }

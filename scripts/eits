@@ -47,6 +47,12 @@ command -v jq   &>/dev/null || { echo "error: jq is required" >&2; exit 1; }
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+# JSON output formatter. Pretty-prints by default; EITS_COMPACT=1 emits
+# single-line compact JSON (jq -c) — cheaper for agents to consume.
+_jq() {
+  if [[ "${EITS_COMPACT:-0}" == "1" ]]; then jq -c "$@"; else jq "$@"; fi
+}
+
 _backoff() {
   local _delay=$1
   local _jitter=$(( (RANDOM % 41) - 20 ))
@@ -101,9 +107,14 @@ _curl() {
       echo "[eits] permanent error ${_status}: ${_display_body}" >&2
       return 1
     fi
-    # 5xx other than 503: no retries
+    # 5xx other than 503: no retries. Pass the body through — the server's
+    # error message is the most useful thing an agent can see here.
     if [[ "$_status" -ge 500 ]]; then
-      echo "[eits] server error ${_status}" >&2
+      local _display_body="$_body"
+      if echo "$_body" | grep -qi '<!DOCTYPE\|<html'; then
+        _display_body="{\"error\":\"server_error\",\"status\":$_status,\"hint\":\"server returned HTML — check server logs\"}"
+      fi
+      echo "[eits] server error ${_status}: ${_display_body}" >&2
       return 1
     fi
     break
@@ -111,10 +122,10 @@ _curl() {
   printf '%s\n' "$_body"
 }
 
-_get()    { _curl "$BASE_URL$1" | jq .; }
-_post()   { _curl -X POST  -H "Content-Type: application/json" -d "$2" "$BASE_URL$1" | jq .; }
-_patch()  { _curl -X PATCH -H "Content-Type: application/json" -d "$2" "$BASE_URL$1" | jq .; }
-_delete() { _curl -X DELETE "$BASE_URL$1" | jq .; }
+_get()    { _curl "$BASE_URL$1" | _jq .; }
+_post()   { _curl -X POST  -H "Content-Type: application/json" -d "$2" "$BASE_URL$1" | _jq .; }
+_patch()  { _curl -X PATCH -H "Content-Type: application/json" -d "$2" "$BASE_URL$1" | _jq .; }
+_delete() { _curl -X DELETE "$BASE_URL$1" | _jq .; }
 
 # _dm_post <endpoint> <payload> — POST with file-based lock to prevent parallel DM drops
 # Serializes DM calls to avoid connection pool conflicts when called concurrently.
@@ -302,10 +313,10 @@ _tbl_tasks() {
 
 _tbl_notes() {
   local data="${1:-$(cat)}"
-  local count; count=$(echo "$data" | jq '[.notes[]?] | length')
+  local count; count=$(echo "$data" | jq '[(.results // .notes)[]?] | length')
   printf '%-2s  %-32s  %-40s  %s\n' "★" "TITLE" "PREVIEW" "ID"
   printf '%-2s  %-32s  %-40s  %s\n' "--" "--------------------------------" "----------------------------------------" "------"
-  echo "$data" | jq -r '.notes[]? | [
+  echo "$data" | jq -r '(.results // .notes)[]? | [
     (if .starred then "★" else " " end),
     (.title // "(untitled)"),
     ((.body // "") | gsub("\n";" ") | .[0:40]),
@@ -379,12 +390,12 @@ cmd_sessions() {
         fi
       fi
       local _resp; _resp=$(_curl "$BASE_URL/sessions?${qs#&}")
-      if [[ $_json -eq 1 ]]; then echo "$_resp" | jq .; else _tbl_sessions "$_resp"; fi
+      if [[ $_json -eq 1 ]]; then echo "$_resp" | _jq .; else _tbl_sessions "$_resp"; fi
       ;;
     tasks)
       # eits sessions tasks <uuid>
       local uuid="${1:-}"; need uuid
-      _curl "$BASE_URL/tasks?session_id=$uuid" | jq .
+      _curl "$BASE_URL/tasks?session_id=$uuid" | _jq .
       ;;
     notes)
       # eits sessions notes <uuid> [<note_id>] [--full] [--starred] [--add <body>] [--title <t>]
@@ -425,7 +436,7 @@ cmd_sessions() {
         return 0
       fi
       if [[ $full -eq 1 ]]; then
-        echo "$_notes_resp" | jq .
+        echo "$_notes_resp" | _jq .
       else
         echo "$_notes_resp" | jq -r '
           .results[] |
@@ -845,7 +856,7 @@ TASKS_HELP
               )]
            | .count = (.tasks | length)')
       fi
-      if [[ $_json -eq 1 ]]; then echo "$_resp" | jq .; else _tbl_tasks "$_resp"; fi
+      if [[ $_json -eq 1 ]]; then echo "$_resp" | _jq .; else _tbl_tasks "$_resp"; fi
       [[ $_silent_scope -ne 1 ]] || echo "(scoped to current session — pass --all to see all tasks)" >&2
       ;;
     get)
@@ -961,7 +972,7 @@ TASKS_HELP
       # removes all existing task_sessions links, adds claimer's session, transitions to In Progress
       _curl -X POST -H "Content-Type: application/json" \
         -d "$(json session_id "$_sess")" \
-        "$BASE_URL/tasks/$id/claim" | jq .
+        "$BASE_URL/tasks/$id/claim" | _jq .
       ;;
     start)
       echo "Warning: eits tasks start is deprecated. Use eits tasks claim instead." >&2
@@ -1014,7 +1025,7 @@ TASKS_HELP
           continue
         fi
         if [[ "$_ann_status" -lt 400 ]]; then
-          printf '%s\n' "$_ann_body" | jq .
+          printf '%s\n' "$_ann_body" | _jq .
           _ann_ok=1
         fi
         break
@@ -1071,7 +1082,7 @@ TASKS_HELP
         local _current_state
         _current_state=$(echo "$_check_body" | jq -r '.task.state_id // .state_id // empty' 2>/dev/null)
         if [[ "$_current_state" == "3" ]]; then
-          echo '{"status":"already_closed","message":"task is already Done — no change made","task_id":'"$id"'}' | jq .
+          echo '{"status":"already_closed","message":"task is already Done — no change made","task_id":'"$id"'}' | _jq .
           return 0
         fi
       fi
@@ -1097,7 +1108,7 @@ TASKS_HELP
           continue
         fi
         if [[ "$_comp_status" -lt 400 ]]; then
-          printf '%s\n' "$_comp_body" | jq .
+          printf '%s\n' "$_comp_body" | _jq .
           _comp_ok=1
         else
           printf 'HTTP %s: %s\n' "$_comp_status" "$_comp_body" >&2
@@ -1181,7 +1192,7 @@ HELP
             || echo "warning: failed to apply tag $_tag_id to task $task_id_flag" >&2
         done
         if [[ $quiet -eq 0 ]]; then
-          echo "$_claim_resp" | jq .
+          echo "$_claim_resp" | _jq .
         else
           echo "$task_id_flag"
         fi
@@ -1365,7 +1376,7 @@ HELP
         '{tasks: (($a.tasks // []) + ($b.tasks // []))}')
       local _count; _count=$(printf '%s' "$_merged" | jq '[.tasks[]?] | length')
       if [[ $_json_mode -eq 1 ]]; then
-        printf '%s\n' "$_merged" | jq .
+        printf '%s\n' "$_merged" | _jq .
       elif [[ "${_count:-0}" -eq 0 ]]; then
         printf 'No active tasks for this session.\n'
       else
@@ -1414,7 +1425,7 @@ HELP
       return 0
     fi
     if [[ "$full" -eq 1 ]]; then
-      echo "$resp" | jq .
+      echo "$resp" | _jq .
     else
       echo "$resp" | jq -r '
         .results[] |
@@ -1462,7 +1473,7 @@ HELP
         [[ -n "$_self" ]] && qs="${qs}&session_id=$_self"
       fi
       local _notes_resp; _notes_resp=$(_curl "$BASE_URL/notes?${qs#&}")
-      if [[ $_json -eq 1 ]]; then echo "$_notes_resp" | jq .
+      if [[ $_json -eq 1 ]]; then echo "$_notes_resp" | _jq .
       elif [[ $full -eq 1 ]]; then _notes_preview "$_notes_resp" "$full"
       else _tbl_notes "$_notes_resp"; fi
       ;;
@@ -1555,7 +1566,7 @@ cmd_projects() {
           *) die "unknown flag: $1" ;;
         esac
       done
-      _curl "$BASE_URL/projects?${qs#&}" | jq .
+      _curl "$BASE_URL/projects?${qs#&}" | _jq .
       ;;
     get)
       local id="${1:-}"; need id
@@ -1610,7 +1621,7 @@ cmd_agents() {
       if [[ "$_json" -eq 1 ]]; then
         printf '%s\n' "$_resp"
       else
-        printf '%s\n' "$_resp" | jq .
+        printf '%s\n' "$_resp" | _jq .
       fi
       ;;
     get)
@@ -1863,7 +1874,7 @@ USAGE
         echo "  '$BASE_URL/agents'"
         echo ""
         echo "Request payload:"
-        echo "$payload" | jq .
+        echo "$payload" | _jq .
         return 0
       fi
 
@@ -1899,7 +1910,7 @@ USAGE
         printf 'spawn failed (HTTP %s): %s\n' "$_sp_status" "$_sp_resp_body" >&2
         return 1
       fi
-      printf '%s\n' "$_sp_resp_body" | jq .
+      printf '%s\n' "$_sp_resp_body" | _jq .
       # Final compact summary line — allows: eits agents spawn ... | tail -1 | jq .session_uuid
       printf '%s\n' "$_sp_resp_body" | jq -c '{session_id, session_uuid, agent_id, worktree_path, branch_name} | with_entries(select(.value != null))'
       ;;
@@ -2019,7 +2030,7 @@ BATCH_HELP
       # Lists agent definition files from ~/.claude/agents/ and .claude/agents/
       # Parses name + first sentence of description from YAML frontmatter
       [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
-        echo "usage: eits agents defs [--q <name>] [--json]"
+        echo "usage: eits agents defs [--q <name>] [--json] [--full]"
         echo ""
         echo "List agent definitions from ~/.claude/agents/ and .claude/agents/"
         echo "Parses name and description from YAML frontmatter."
@@ -2027,13 +2038,15 @@ BATCH_HELP
         echo "Options:"
         echo "  --q <name>   Filter by name (case-insensitive substring)"
         echo "  --json       Output JSON array"
+        echo "  --full       Full description (no first-sentence/500-char truncation)"
         return 0
       }
-      local _query="" _json=0
+      local _query="" _json=0 _full=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --q|-q)    _query="$2"; shift 2 ;;
           --json|-j) _json=1; shift ;;
+          --full)    _full=1; shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -2072,8 +2085,13 @@ BATCH_HELP
               if (length($0)>0) {print; exit}
             }
           ' "$_file")
-          # Strip surrounding quotes, take first sentence only (up to first period or 500 chars)
-          _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-500 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          # Strip surrounding quotes; unless --full, take first sentence only
+          # (up to first period or 500 chars)
+          if [[ $_full -eq 1 ]]; then
+            _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          else
+            _desc=$(printf '%s' "$_desc" | tr -d '"' | sed 's/\. .*/\./' | cut -c1-500 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          fi
           [[ -z "$_name" ]] && _name=$(basename "$_file" .md)
           # Filter
           if [[ -n "$_query" ]] && ! echo "$_name" | grep -qi "$_query"; then continue; fi
@@ -2113,7 +2131,7 @@ BATCH_HELP
       if [[ "$_json" -eq 1 ]]; then
         printf '%s\n' "$_resp"
       else
-        printf '%s\n' "$_resp" | jq .
+        printf '%s\n' "$_resp" | _jq .
       fi
       ;;
     update)
@@ -2154,7 +2172,7 @@ cmd_tags() {
       done
       local _resp; _resp=$(_curl "${BASE_URL}/tags?${qs#&}") || return 1
       if [[ $json_mode -eq 1 ]]; then
-        printf '%s\n' "$_resp" | jq .
+        printf '%s\n' "$_resp" | _jq .
       else
         printf '%s\n' "$_resp" | jq -r '.tags[] | "\(.id)\t\(.name)"' | column -t -s $'\t'
       fi
@@ -2184,7 +2202,7 @@ cmd_commits() {
       local qs; qs="q=$(printf '%s' "$query" | jq -Rr @uri)&limit=${limit}"
       local _resp; _resp=$(_curl "${BASE_URL}/commits?${qs}") || return 1
       if [[ $json_mode -eq 1 ]]; then
-        printf '%s\n' "$_resp" | jq .
+        printf '%s\n' "$_resp" | _jq .
       else
         local count; count=$(printf '%s\n' "$_resp" | jq -r '.count // 0')
         printf "(%s results)\n" "$count"
@@ -2249,7 +2267,7 @@ cmd_commits() {
             end
           ))')
       fi
-      if [[ $_json -eq 1 ]]; then echo "$_resp" | jq .; else _tbl_commits "$_resp"; fi
+      if [[ $_json -eq 1 ]]; then echo "$_resp" | _jq .; else _tbl_commits "$_resp"; fi
       ;;
     create)
       # eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] [--quiet|-q]
@@ -2312,7 +2330,7 @@ cmd_commits() {
         elif [[ $_dup_count -gt 0 ]]; then
           echo "already tracked: $_dup_count commit(s) (no change)" >&2
         fi
-        echo "$_commit_resp" | jq .
+        echo "$_commit_resp" | _jq .
       fi
       ;;
     *)
@@ -2337,7 +2355,7 @@ cmd_jobs() {
           *) die "unknown flag: $1" ;;
         esac
       done
-      _curl "$BASE_URL/jobs?${qs#&}" | jq .
+      _curl "$BASE_URL/jobs?${qs#&}" | _jq .
       ;;
     get)
       local id="${1:-}"; need id
@@ -2519,7 +2537,7 @@ EOF
     fi
 
     if [[ $json_mode -eq 1 ]]; then
-      printf '%s\n' "$_resp" | jq .
+      printf '%s\n' "$_resp" | _jq .
     else
       _tbl_dm "$_resp"
     fi
@@ -2542,7 +2560,7 @@ EOF
     local _qs=""; [[ -n "$_session" ]] && _qs="?session=$_session"
     local _resp; _resp=$(_curl "${BASE_URL}/dm/${_dm_id}${_qs}") || return 1
     if [[ $_json -eq 1 ]]; then
-      printf '%s\n' "$_resp" | jq .
+      printf '%s\n' "$_resp" | _jq .
     else
       local _from _body _ts
       _from=$(printf '%s' "$_resp" | jq -r '.from_session_id // "-"')
@@ -2621,7 +2639,7 @@ EOF
   if [[ -n "$_to_name" ]]; then
     printf '%s\n' "$_dm_resp" | jq --arg n "$_to_name" '. + {to_name: $n}'
   else
-    printf '%s\n' "$_dm_resp" | jq .
+    printf '%s\n' "$_dm_resp" | _jq .
   fi
 }
 
@@ -2726,7 +2744,7 @@ cmd_channels() {
         esac
       done
       if [[ -n "$project_id" ]]; then
-        _curl "$BASE_URL/channels?project_id=$project_id" | jq .
+        _curl "$BASE_URL/channels?project_id=$project_id" | _jq .
       else
         _get "/channels"
       fi
@@ -2763,7 +2781,7 @@ cmd_channels() {
       local qs="limit=$limit"
       [[ -n "$since" ]]  && qs="${qs}&since=${since}"
       [[ -n "$before" ]] && qs="${qs}&before=${before}"
-      _curl "$BASE_URL/channels/$channel_id/messages?${qs}" | jq .
+      _curl "$BASE_URL/channels/$channel_id/messages?${qs}" | _jq .
       ;;
     join)
       # eits channels join <channel_id> [--session <uuid|id>] [--role <member|admin>]
@@ -2907,7 +2925,7 @@ HELP
       need session_id
       local _resp; _resp=$(_curl "$BASE_URL/channels/mine?session_id=$session_id")
       if [[ $_json -eq 1 ]]; then
-        echo "$_resp" | jq .
+        echo "$_resp" | _jq .
       else
         local count; count=$(echo "$_resp" | jq '[.channels[]?] | length')
         printf '%-6s  %-28s  %-8s  %s\n' "ID" "NAME" "ROLE" "TYPE"
@@ -2940,7 +2958,7 @@ HELP
       done
       local _resp; _resp=$(_curl "$BASE_URL/channels/$channel_id/members")
       if [[ $_json -eq 1 ]]; then
-        echo "$_resp" | jq .
+        echo "$_resp" | _jq .
       else
         local count; count=$(echo "$_resp" | jq '[.members[]?] | length')
         printf '%-36s  %-8s  %s\n' "SESSION NAME" "ROLE" "JOINED"
@@ -3046,7 +3064,7 @@ cmd_prompts() {
           *) die "unknown flag: $1" ;;
         esac
       done
-      _curl "$BASE_URL/prompts?${qs#&}" | jq .
+      _curl "$BASE_URL/prompts?${qs#&}" | _jq .
       ;;
     get)
       # eits prompts get <id> [--project <id>] [--no-text]
@@ -3059,7 +3077,7 @@ cmd_prompts() {
           *) die "unknown flag: $1" ;;
         esac
       done
-      _curl "$BASE_URL/prompts/$id?${qs#&}" | jq .
+      _curl "$BASE_URL/prompts/$id?${qs#&}" | _jq .
       ;;
     create)
       # eits prompts create --name <n> --slug <s> --prompt-text <t> [--description <d>] [--project <id>] [--tags <json>] [--created-by <name>]
@@ -3239,7 +3257,7 @@ HELP
                         else
                           shift
                         fi ;;
-          --json|--raw) json=1;    shift ;;  # raw JSON output for scripting
+          --json|--raw|-j) json=1; shift ;;  # raw JSON output for scripting
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -3287,7 +3305,7 @@ HELP
       }
 
       if [[ $json -eq 1 ]]; then
-        _curl "$BASE_URL/teams/$id" | jq .
+        _curl "$BASE_URL/teams/$id" | _jq .
       elif [[ $watch -eq 1 ]]; then
         # Continuous refresh mode — clears screen each tick until Ctrl+C
         while true; do
@@ -3435,7 +3453,7 @@ HELP
       # List teams where the current agent is a member (by EITS_AGENT_UUID).
       # Uses ?member_agent_uuid= server filter — single request, no N+1.
       local agent_uuid="${EITS_AGENT_UUID:-}"; need agent_uuid
-      _curl "$BASE_URL/teams?member_agent_uuid=$(printf '%s' "$agent_uuid" | jq -Rr @uri)" | jq .
+      _curl "$BASE_URL/teams?member_agent_uuid=$(printf '%s' "$agent_uuid" | jq -Rr @uri)" | _jq .
       ;;
     *)
       echo "usage: eits teams <list|get|create|update|delete|members|join|status|update-member|done-self|leave|broadcast|my-teams>"
@@ -4335,7 +4353,7 @@ EOF
       [[ -n "$_archived" ]] && _qs="${_qs}&include_archived=true"
       local _resp; _resp=$(_curl "${BASE_URL}/messages/search?${_qs}") || return 1
       if [[ $_json -eq 1 ]]; then
-        printf '%s\n' "$_resp" | jq .
+        printf '%s\n' "$_resp" | _jq .
       else
         local _count; _count=$(printf '%s\n' "$_resp" | jq -r '.count')
         printf '%s\n' "$_resp" | jq -r \
@@ -4366,7 +4384,7 @@ EOF
       local _qs; _qs="q=$(printf '%s' "$_query" | jq -Rr @uri)&limit=${_limit}"
       local _resp; _resp=$(_curl "${BASE_URL}/commits?${_qs}") || return 1
       if [[ $_json -eq 1 ]]; then
-        printf '%s\n' "$_resp" | jq .
+        printf '%s\n' "$_resp" | _jq .
       else
         local _count; _count=$(printf '%s\n' "$_resp" | jq -r '.count // 0')
         printf '%s\n' "$_resp" | jq -r \
@@ -4580,7 +4598,7 @@ SEARCH_HELP
       [[ $include_archived -eq 1 ]] && qs="${qs}&include_archived=true"
       local _resp; _resp=$(_curl "${BASE_URL}/messages/search?${qs}") || return 1
       if [[ $json_mode -eq 1 ]]; then
-        printf '%s\n' "$_resp" | jq .
+        printf '%s\n' "$_resp" | _jq .
       else
         local count; count=$(printf '%s\n' "$_resp" | jq -r '.count')
         printf '%s\n' "$_resp" | jq -r \
@@ -4860,7 +4878,7 @@ USAGE
 
       # 3. Emit raw JSON if requested
       if [[ $emit_json -eq 1 ]]; then
-        echo "$all_activity" | jq .
+        echo "$all_activity" | _jq .
         return 0
       fi
 
@@ -4987,7 +5005,7 @@ WEBHOOKS_HELP
       _status=$(echo "$_result" | jq -r '.id // empty' 2>/dev/null)
 
       # 409 already-subscribed is treated as success (idempotent)
-      echo "$_result" | jq .
+      echo "$_result" | _jq .
       echo "subscribed to PR #${pr} in ${repo}" >&2
       ;;
 
@@ -5086,6 +5104,7 @@ Env vars (injected by EITS hooks):
   EITS_AGENT_UUID    current agent UUID   (default --agent)
   EITS_PROJECT_ID    current project ID   (default --project / tasks begin / agents spawn)
   EITS_URL           API base URL         (default: http://localhost:5001/api/v1)
+  EITS_COMPACT=1     compact single-line JSON output (jq -c) — cheaper for agents to parse
 
 Fallback order for session identity:
   UUID preferred; integer ID used when UUID is empty (tasks, teams join, --mine, dm --from)

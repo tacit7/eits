@@ -1010,13 +1010,14 @@ html[data-env="tauri"] #app-topbar summary {
 .stream-dot:nth-child(3) { animation-delay: 0.4s; }
 
 /* ── DM in-page search highlighting ──────────────────────────────────────── */
+/* Uses --color-warning (DaisyUI v4+ hex token); falls back to amber-400.    */
 mark.search-match {
-  background: oklch(var(--wa) / 0.3);
+  background: color-mix(in srgb, var(--color-warning, #fbbf24) 35%, transparent);
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
 }
 mark.search-match-active {
-  background: oklch(var(--wa) / 0.7);
-  outline: 1px solid oklch(var(--wa) / 0.9);
+  background: color-mix(in srgb, var(--color-warning, #fbbf24) 70%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--color-warning, #fbbf24) 90%, transparent);
 }

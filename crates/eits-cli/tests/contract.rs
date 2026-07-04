@@ -419,3 +419,99 @@ fn sessions_end_defaults_uuid_to_session_identity() {
     assert_eq!(reqs[0].method, "POST");
     assert_eq!(reqs[0].path, "/api/v1/sessions/self-uuid-9/end");
 }
+
+#[test]
+fn sessions_create_project_flag_sends_project_name_key() {
+    let srv = common::serve(vec![(200, r#"{"session":{"uuid":"s-1"}}"#)]);
+    Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args([
+            "sessions",
+            "create",
+            "--session-id",
+            "s-1",
+            "--project",
+            "my-project",
+        ])
+        .assert()
+        .success();
+    let reqs = srv.finish();
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(body["project_name"], "my-project");
+    assert!(body.get("project").is_none());
+}
+
+#[test]
+fn sessions_update_project_id_flag_sends_project_id_key() {
+    let srv = common::serve(vec![(200, r#"{"status":"ok"}"#)]);
+    Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["sessions", "update", "s-1", "--project-id", "42"])
+        .assert()
+        .success();
+    let reqs = srv.finish();
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(body["project_id"], 42); // all-digit *_id coerced to a JSON number
+    assert!(body.get("project").is_none());
+}
+
+#[test]
+fn sessions_get_self_resolves_to_session_uuid() {
+    let srv = common::serve(vec![(200, r#"{"uuid":"resolved-uuid"}"#)]);
+    Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "resolved-uuid")
+        .args(["sessions", "get", "self"])
+        .assert()
+        .success();
+    let reqs = srv.finish();
+    assert_eq!(reqs[0].path, "/api/v1/sessions/resolved-uuid");
+}
+
+#[test]
+fn sessions_create_omits_absent_optional_fields() {
+    let srv = common::serve(vec![(200, r#"{"session":{"uuid":"s-1"}}"#)]);
+    Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["sessions", "create", "--session-id", "s-1"])
+        .assert()
+        .success();
+    let reqs = srv.finish();
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    let obj = body.as_object().unwrap();
+    assert_eq!(
+        obj.keys()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>(),
+        ["session_id", "read_only"]
+            .into_iter()
+            .map(String::from)
+            .collect::<std::collections::BTreeSet<_>>()
+    );
+}
+
+#[test]
+fn sessions_archive_dry_run_lists_without_posting() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"sessions":[{"uuid":"a-1","name":"one","status":"waiting"},{"uuid":"a-2","name":"two","status":"waiting"}]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["sessions", "archive", "--status", "waiting", "--dry-run"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["dry_run"], true);
+    assert_eq!(v["count"], 2);
+    // Only the list request should have been made — no archive POSTs.
+    let reqs = srv.finish();
+    assert_eq!(reqs.len(), 1);
+    assert_eq!(reqs[0].method, "GET");
+}

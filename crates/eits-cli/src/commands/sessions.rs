@@ -1,4 +1,4 @@
-use super::{items_and_count, uri_encode};
+use super::{is_numeric, items_and_count, uri_encode};
 use crate::config::Config;
 use crate::error::EitsError;
 use crate::http::Client;
@@ -36,7 +36,7 @@ pub enum SessionsCmd {
         #[arg(short = 'j', long = "json")]
         json_flag: bool,
     },
-    /// Fetch a single session by uuid or id
+    /// Fetch a single session by uuid or id ('self' resolves to EITS_SESSION_UUID)
     Get { id: String },
     /// Create a session
     Create {
@@ -46,7 +46,8 @@ pub enum SessionsCmd {
         name: Option<String>,
         #[arg(long)]
         description: Option<String>,
-        #[arg(long = "project-name")]
+        /// Sent as `project_name` in the payload (bash: `--project`).
+        #[arg(long = "project")]
         project_name: Option<String>,
         #[arg(long = "project-path")]
         project_path: Option<String>,
@@ -57,7 +58,7 @@ pub enum SessionsCmd {
         #[arg(long = "read-only")]
         read_only: bool,
     },
-    /// Patch session fields
+    /// Patch session fields ('self' resolves to EITS_SESSION_UUID)
     Update {
         uuid: String,
         #[arg(long)]
@@ -77,7 +78,7 @@ pub enum SessionsCmd {
         #[arg(long = "ended-at")]
         ended_at: Option<String>,
         #[arg(long)]
-        project: Option<String>,
+        project_id: Option<String>,
         #[arg(long = "worktree-path")]
         worktree_path: Option<String>,
     },
@@ -93,8 +94,16 @@ pub enum SessionsCmd {
     Waiting { uuid: Option<String> },
     /// Reopen an ended session
     Reopen { uuid: Option<String> },
-    /// Archive a session
-    Archive { uuid: String },
+    /// Archive a session (single by uuid), or bulk-archive by --status
+    Archive {
+        uuid: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(short = 'p', long)]
+        project: Option<String>,
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+    },
     /// Unarchive a session
     Unarchive { uuid: String },
     /// Declare read-only intent (review) or work mode
@@ -109,21 +118,27 @@ pub enum SessionsCmd {
     },
 }
 
+/// Resolve the literal `self` to `EITS_SESSION_UUID` (bash: only ever the
+/// UUID, never falls back to `EITS_SESSION_ID` — the sessions API path takes
+/// a uuid, not an integer id). Any other value passes through unchanged.
+fn resolve_self(cfg: &Config, id: &str) -> Result<String, EitsError> {
+    if id == "self" {
+        cfg.session_uuid
+            .clone()
+            .ok_or_else(|| EitsError::usage("EITS_SESSION_UUID is not set"))
+    } else {
+        Ok(id.to_string())
+    }
+}
+
+/// Same UUID-only resolution as `resolve_self`, but also supplies the
+/// default when no argument was given at all (bash: `${1:-$EITS_SESSION_UUID}`).
 fn resolve_uuid(cfg: &Config, uuid: Option<String>) -> Result<String, EitsError> {
     match uuid {
-        Some(u) if u == "self" => cfg
-            .session_identity()
-            .map(|s| s.to_string())
-            .ok_or_else(|| EitsError::usage("'self' requires EITS_SESSION_UUID to be set")),
-        Some(u) => Ok(u),
-        None => cfg
-            .session_identity()
-            .map(|s| s.to_string())
-            .ok_or_else(|| {
-                EitsError::usage(
-                    "session UUID required (pass as argument or set EITS_SESSION_UUID)",
-                )
-            }),
+        Some(u) => resolve_self(cfg, &u),
+        None => cfg.session_uuid.clone().ok_or_else(|| {
+            EitsError::usage("session UUID required (pass as argument or set EITS_SESSION_UUID)")
+        }),
     }
 }
 
@@ -229,6 +244,7 @@ pub fn run(
         }
 
         SessionsCmd::Get { id } => {
+            let id = resolve_self(cfg, &id)?;
             let v = client.get(&format!("/sessions/{id}"))?;
             let session = v.get("session").cloned().unwrap_or(v);
             output::print_json(&json!({ "session": session }), pretty);
@@ -245,17 +261,33 @@ pub fn run(
             entrypoint,
             read_only,
         } => {
-            let body = json!({
-                "session_id": session_id,
-                "name": name.unwrap_or_default(),
-                "description": description.unwrap_or_default(),
-                "project_name": project_name.unwrap_or_default(),
-                "project_path": project_path.unwrap_or_default(),
-                "model": model.unwrap_or_default(),
-                "entrypoint": entrypoint.unwrap_or_default(),
-                "read_only": read_only,
-            });
-            let resp = client.post("/sessions", body)?;
+            // Bash's json() helper skips absent/empty values entirely rather
+            // than sending them as empty strings — mirror that here.
+            let mut body = serde_json::Map::new();
+            body.insert("session_id".into(), json!(session_id));
+            if let Some(n) = &name {
+                body.insert("name".into(), json!(n));
+            }
+            if let Some(d) = &description {
+                body.insert("description".into(), json!(d));
+            }
+            if let Some(p) = &project_name {
+                body.insert("project_name".into(), json!(p));
+            }
+            if let Some(p) = &project_path {
+                body.insert("project_path".into(), json!(p));
+            }
+            if let Some(m) = &model {
+                body.insert("model".into(), json!(m));
+            }
+            if let Some(e) = &entrypoint {
+                body.insert("entrypoint".into(), json!(e));
+            }
+            // Bash always sends read_only (its default "false" is non-empty).
+            // The controller's maybe_put_read_only/2 casts booleans and the
+            // strings "true"/"false" equally, so a real JSON boolean is fine.
+            body.insert("read_only".into(), json!(read_only));
+            let resp = client.post("/sessions", Value::Object(body))?;
             if quiet {
                 output::print_quiet_id(&resp, "/session/uuid")
                     .or_else(|_| output::print_quiet_id(&resp, "/uuid"))?;
@@ -275,9 +307,10 @@ pub fn run(
             description,
             clear_entrypoint,
             ended_at,
-            project,
+            project_id,
             worktree_path,
         } => {
+            let uuid = resolve_self(cfg, &uuid)?;
             let mut updates = serde_json::Map::new();
             if let Some(s) = &status {
                 updates.insert("status".into(), json!(s));
@@ -303,8 +336,14 @@ pub fn run(
             if let Some(e) = &ended_at {
                 updates.insert("ended_at".into(), json!(e));
             }
-            if let Some(p) = &project {
-                updates.insert("project_id".into(), json!(p));
+            if let Some(p) = &project_id {
+                // Bash's json() coerces all-digit `*_id` values to a JSON
+                // number rather than a string.
+                if is_numeric(p) {
+                    updates.insert("project_id".into(), json!(p.parse::<i64>().unwrap_or(0)));
+                } else {
+                    updates.insert("project_id".into(), json!(p));
+                }
             }
             if let Some(w) = &worktree_path {
                 updates.insert("worktree_path".into(), json!(w));
@@ -366,14 +405,66 @@ pub fn run(
             Ok(())
         }
 
-        SessionsCmd::Archive { uuid } => {
-            let resp = client.post(&format!("/sessions/{uuid}/archive"), json!({}))?;
-            if quiet {
-                println!("{uuid}");
+        SessionsCmd::Archive {
+            uuid,
+            status,
+            project,
+            dry_run,
+        } => {
+            if let Some(status) = &status {
+                let mut qs = format!("status={status}&limit=500");
+                if let Some(p) = &project {
+                    qs.push_str(&format!("&project_id={p}"));
+                }
+                let list_resp = client.get(&format!("/sessions?{qs}"))?;
+                let sessions: Vec<Value> = list_resp
+                    .get("sessions")
+                    .and_then(|v| v.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+                if dry_run {
+                    let items: Vec<Value> = sessions
+                        .iter()
+                        .map(|s| {
+                            json!({
+                                "uuid": s.get("uuid"),
+                                "name": s.get("name"),
+                                "status": s.get("status"),
+                            })
+                        })
+                        .collect();
+                    let count = items.len();
+                    output::print_json(
+                        &json!({ "dry_run": true, "items": items, "count": count }),
+                        pretty,
+                    );
+                    return Ok(());
+                }
+                let mut results = Vec::new();
+                for s in &sessions {
+                    let Some(su) = s.get("uuid").and_then(|u| u.as_str()) else {
+                        continue;
+                    };
+                    let ok = client
+                        .post(&format!("/sessions/{su}/archive"), json!({}))
+                        .is_ok();
+                    results.push(json!({ "uuid": su, "ok": ok }));
+                }
+                let count = results.len();
+                output::print_json(&json!({ "items": results, "count": count }), pretty);
+                Ok(())
             } else {
-                output::print_json(&resp, pretty);
+                let uuid = uuid.ok_or_else(|| {
+                    EitsError::usage("archive: uuid is required (or use --status for bulk mode)")
+                })?;
+                let resp = client.post(&format!("/sessions/{uuid}/archive"), json!({}))?;
+                if quiet {
+                    println!("{uuid}");
+                } else {
+                    output::print_json(&resp, pretty);
+                }
+                Ok(())
             }
-            Ok(())
         }
 
         SessionsCmd::Unarchive { uuid } => {

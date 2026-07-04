@@ -509,7 +509,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <div class="border-t border-base-content/[0.06] divide-y divide-base-content/[0.04]">
         <%= for event <- @flat_events do %>
           <div class="px-3 py-0.5">
-            <.message_body message={event} compact={true} />
+            <.message_body message={event} compact={true} flat={true} />
           </div>
         <% end %>
       </div>

@@ -9,12 +9,14 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
   # tool_card_shell — shared outer chrome for tool_widget + tool_result_body
   #
   # Owns the <details> wrapper, <summary> wrapper, optional copy button, and
-  # trailing chevron. Two modes:
-  #   compact = true  → strip-row styling, body slot is wrapped in an indent rule
-  #   compact = false → bordered card styling, body slot rendered raw
+  # trailing chevron. Three modes:
+  #   compact = true            → strip-row styling inside a <details>
+  #   compact = false           → bordered card styling inside a <details>
+  #   flat = true (compact req) → no <details>, body always visible (cluster use)
   # ---------------------------------------------------------------------------
 
   attr :compact, :boolean, default: false
+  attr :flat, :boolean, default: false
   attr :copy_text, :string, default: nil
   attr :copy_title, :string, default: "Copy"
   slot :summary, required: true
@@ -22,47 +24,59 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
 
   defp tool_card_shell(assigns) do
     ~H"""
-    <details class={
-      if @compact,
-        do: "group my-px",
-        else:
-          "group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
-    }>
-      <summary class={
-        if @compact,
-          do:
-            "flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors",
-          else:
-            "flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-[var(--border-subtle)] transition-colors"
-      }>
-        {render_slot(@summary)}
-        <button
-          :if={!@compact && @copy_text}
-          class="tool-copy-btn ml-auto mr-1 shrink-0"
-          data-copy-btn
-          data-copy-text={@copy_text}
-          title={@copy_title}
-        >
-          <.icon name="hero-clipboard-document" class="size-3.5" />
-        </button>
-        <.icon
-          name="hero-chevron-right"
-          class={
-            if @compact,
-              do:
-                "w-2.5 h-2.5 text-base-content/15 flex-shrink-0 ml-auto transition-transform group-open:rotate-90",
-              else: "size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
-          }
-        />
-      </summary>
-      <%= if @compact do %>
-        <div class="pl-3 mt-0.5 border-l border-[var(--border-subtle)]">
+    <%= if @flat do %>
+      <%!-- Flat mode: no toggle, body always visible. Used inside tool clusters. --%>
+      <div class="my-px">
+        <div class="flex items-center gap-1.5 py-0.5 px-1">
+          {render_slot(@summary)}
+        </div>
+        <div class="pl-3 border-l border-[var(--border-subtle)]">
           {render_slot(@inner_block)}
         </div>
-      <% else %>
-        {render_slot(@inner_block)}
-      <% end %>
-    </details>
+      </div>
+    <% else %>
+      <details class={
+        if @compact,
+          do: "group my-px",
+          else:
+            "group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
+      }>
+        <summary class={
+          if @compact,
+            do:
+              "flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors",
+            else:
+              "flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-[var(--border-subtle)] transition-colors"
+        }>
+          {render_slot(@summary)}
+          <button
+            :if={!@compact && @copy_text}
+            class="tool-copy-btn ml-auto mr-1 shrink-0"
+            data-copy-btn
+            data-copy-text={@copy_text}
+            title={@copy_title}
+          >
+            <.icon name="hero-clipboard-document" class="size-3.5" />
+          </button>
+          <.icon
+            name="hero-chevron-right"
+            class={
+              if @compact,
+                do:
+                  "w-2.5 h-2.5 text-base-content/15 flex-shrink-0 ml-auto transition-transform group-open:rotate-90",
+                else: "size-3 text-base-content/20 shrink-0 transition-transform group-open:rotate-90"
+            }
+          />
+        </summary>
+        <%= if @compact do %>
+          <div class="pl-3 mt-0.5 border-l border-[var(--border-subtle)]">
+            {render_slot(@inner_block)}
+          </div>
+        <% else %>
+          {render_slot(@inner_block)}
+        <% end %>
+      </details>
+    <% end %>
     """
   end
 
@@ -72,6 +86,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
 
   attr :body, :string, default: ""
   attr :compact, :boolean, default: false
+  attr :flat, :boolean, default: false
 
   def tool_result_body(assigns) do
     trimmed = String.trim(assigns.body || "")
@@ -86,6 +101,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
     <.tool_card_shell
       :if={!@body_blank}
       compact={@compact}
+      flat={@flat}
       copy_text={@body}
       copy_title="Copy output"
     >
@@ -132,6 +148,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
   attr :name, :string, required: true
   attr :rest, :string, required: true
   attr :compact, :boolean, default: false
+  attr :flat, :boolean, default: false
 
   def tool_widget(assigns) do
     {icon, label, detail} = tool_widget_meta(assigns.name, assigns.rest)
@@ -153,7 +170,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
       |> assign(:wrap_detail, wrap_detail)
 
     ~H"""
-    <.tool_card_shell compact={@compact} copy_text={@rest} copy_title="Copy input">
+    <.tool_card_shell compact={@compact} flat={@flat} copy_text={@rest} copy_title="Copy input">
       <:summary>
         <%= if @compact do %>
           <%!-- Claudette-style compact: colored text badge + inline detail --%>

@@ -5,9 +5,9 @@
 
 ## Goal
 
-Replace the agent-facing core of `scripts/eits` (5,132-line bash wrapping the EITS REST API) with a Rust binary. Bash remains permanently for installer, setup, and human-oriented commands ("Rust core + bash extras"). The rewrite ships the new agent-friendly output contract — this is the one breaking change, not two.
+Replace the agent-facing core of `scripts/eits` (5,132-line bash wrapping the EITS REST API) with a Rust binary. Bash remains permanently for installer, setup, and human-oriented commands ("Rust core + bash extras"). The rewrite ships the new agent-friendly output contract. Treat this as one coordinated breaking change.
 
-> **Consumers get mixed behavior during migration.** The breaking change lands per-command as each is ported: Rust-backed commands speak the new contract, bash-backed commands keep the old one. This is deliberate and must be called out in CLAUDE.md and skill docs at each phase.
+> **Consumers get mixed behavior during migration.** The breaking change lands per-command as each is ported: **Rust-backed commands use the new JSON contract; bash-backed commands do not.** This is deliberate and must be called out in CLAUDE.md and skill docs at each phase.
 
 ## Decisions (settled in brainstorm)
 
@@ -48,7 +48,7 @@ The Rust binary discovers `eits-extras` in this order:
 3. sibling `eits-extras` next to the binary
 4. bundled app path (see Packaging)
 
-Missing extras script → JSON error envelope (`code: "extras_not_found"`), exit 1.
+If the discovered extras path is missing, not a regular file, or not executable → JSON error envelope `code: "extras_not_found"`, exit 1. If `exec` fails after discovery → `code: "extras_exec_failed"`, exit 1.
 
 ### Packaging (Tauri)
 
@@ -56,9 +56,26 @@ The Rust CLI ships as a Tauri **external binary / sidecar** (`bundle.externalBin
 
 ### Command surface
 
-- **Phase 1 (Rust):** `tasks`, `dm`, `sessions`, `whoami`, `commits`, `notes` — ~90% of agent traffic per the documented workflow.
+- **Phase 1 (Rust):** `tasks`, `dm`, `sessions`, `whoami`, `commits`, `notes` — approximately 90% of agent traffic in the documented workflow.
 - **Phase 2 (Rust):** `teams`, `channels`, `agents` (list/get/spawn), `projects`, `search`, `timer`, `queue`.
 - **Bash forever:** `install`/`uninstall`, `hooks`, `skills`, `worktree`, `codex`, `webhooks`, `standup`, `me` (human-oriented report), setup flows.
+
+### Phase 1 command coverage
+
+A root command is ported **whole-family**: once Rust owns the root, every nested subcommand is Rust's, and invalid nested commands are usage errors — never a fallback.
+
+| Family | Subcommands owned by Rust in Phase 1 |
+|---|---|
+| `tasks` | `list`, `get`, `begin`, `complete`, `annotate`, `update`, `search`, `states`, `create`, `claim`, `delete`, `active`, `bulk-update` |
+| `dm` | `inbox`/`list`, `read`, send (`--to --message`, incl. `--from`, `--metadata`, `--response-required`) |
+| `sessions` | `list`, `get`, `create`, `update`, `end`, `context` |
+| `whoami` | root command |
+| `commits` | `list` (incl. `--since-time`), `create` |
+| `notes` | `list`, `get`, `add`, `create`, `update`, `search` |
+
+### Duration arguments
+
+`commits list --since-time` accepts `<N>m`, `<N>h`, `<N>d` (minutes/hours/days), converted to ISO8601 UTC — same grammar as bash `_parse_duration`.
 
 ### Fallback boundary
 
@@ -71,8 +88,10 @@ Fallback happens **only when the first positional subcommand is unknown to Rust*
 
 ## Output contract (new)
 
-- **JSON to stdout by default.** Compact single-line (agents are the primary consumer); `--pretty` / `EITS_PRETTY=1` pretty-prints for humans. No tables in the Rust core; human-readable tables remain in bash extras only.
-- **Stderr carries only retry/progress chatter.** Stdout is never contaminated by non-JSON text (except successful `--quiet`, below).
+- **JSON to stdout by default.** Compact single-line (agents are the primary consumer). No tables in the Rust core; human-readable tables remain in bash extras only.
+- **Errors go to stdout too, deliberately:** agents parse one structured stream for every command outcome. Stderr is reserved for retry/progress chatter only. Do not "fix" this by moving errors to stderr — it is the contract.
+- **Exceptions to JSON stdout:** `--help` and `--version` are human-readable text; successful `--quiet` prints a raw identifier (below).
+- **Pretty precedence:** `--pretty` pretty-prints for that invocation; `EITS_PRETTY=1` makes pretty the default. `--quiet` wins over both for successful mutation output.
 
 ### Normalized shapes
 
@@ -96,7 +115,7 @@ Errors use this canonical shape, printed to **stdout**, with a non-zero exit:
 ```
 
 - `error` — human-readable message; may change between versions.
-- `code` — stable machine-readable identifier; automation branches on this, never on `error` text. Initial set: `not_found`, `validation`, `unauthorized`, `forbidden`, `conflict`, `server_error`, `connection_failed`, `config_invalid`, `usage`, `extras_not_found`, `lock_timeout`.
+- `code` — stable machine-readable identifier; automation branches on this, never on `error` text. Initial set: `not_found`, `validation`, `unauthorized`, `forbidden`, `conflict`, `server_error`, `connection_failed`, `config_invalid`, `usage`, `extras_not_found`, `extras_exec_failed`, `lock_timeout`.
 - `status` — HTTP status; omitted or `null` for non-HTTP failures.
 - `hint` — optional recovery hint, for humans.
 
@@ -106,9 +125,24 @@ Errors use this canonical shape, printed to **stdout**, with a non-zero exit:
 
 Exit codes are intentionally coarse. Automation that needs specific failure causes must inspect the JSON `code` and/or `status`.
 
+### Usage errors
+
+Rust must override clap's default error renderer: usage errors print the JSON error envelope to stdout with `code: "usage"` and exit 2 — clap's default human text on stderr would violate the contract. `--help` remains human-readable text (see exceptions above).
+
 ### Quiet mode
 
 `--quiet` affects **successful mutation output only**: it prints the created/affected identifier as raw text with a trailing newline (enables `ID=$(eits tasks begin -t X --quiet)` without jq). Errors still print the JSON error envelope.
+
+Phase 1 quiet identifiers:
+
+| Command | Quiet output |
+|---|---|
+| `tasks begin` / `create` / `claim` | task ID (integer) |
+| `tasks complete` / `update` / `annotate` | task ID (integer) |
+| `notes add` / `create` / `update` | note ID (integer) |
+| `commits create` | commit record ID (integer; the input hash would be redundant) |
+| `sessions create` | session UUID |
+| `dm` send | message ID if the API returns one; otherwise `--quiet` is a usage error for this command |
 
 ### Idempotency envelopes
 
@@ -146,7 +180,7 @@ Each phase includes a grep of hooks, skills, and CLAUDE.md examples for consumer
 
 `EITS_URL` → `~/.config/eits/desktop.json` `port` field → `~/.config/eits/.env` `EITS_URL=` line → `http://localhost:5001/api/v1`.
 
-- `EITS_URL` (env or `.env`) must be the **full base including `/api/v1`** — same as bash; the client does not append path segments.
+- `EITS_URL` (env or `.env`) must be the **full base including `/api/v1`** — same as bash; Rust treats the value as authoritative and does not append `/api/v1`.
 - Resolution skips missing files and missing keys, but errors on malformed values from an explicitly provided source:
   - Invalid/unparseable `EITS_URL` → config error, exit 2
   - Invalid JSON in `desktop.json` → config error, exit 2 (bash silently skips; Rust is stricter on purpose — silent fallback to the wrong server is worse)
@@ -161,11 +195,15 @@ Each phase includes a grep of hooks, skills, and CLAUDE.md examples for consumer
 
 ### Identity
 
-`EITS_SESSION_UUID` preferred, `EITS_SESSION_ID` integer fallback; `EITS_PROJECT_ID` defaulting for `--project`/`tasks begin`.
+Three distinct uses — do not blend them:
+
+- **HTTP headers:** `x-eits-role` and `x-eits-session` are sent **only when `EITS_SESSION_UUID` is set** (verified: bash line 40–42 gates both on the UUID). If only `EITS_SESSION_ID` exists, **no session headers are sent** — do not invent a header from the integer ID.
+- **CLI argument defaults:** `EITS_SESSION_UUID` preferred, `EITS_SESSION_ID` integer fallback for `--session`/`--from`/`--mine`; `EITS_PROJECT_ID` defaulting for `--project`/`tasks begin`. Endpoints accept either form in the request body/query — that is server contract, unchanged.
+- **DM lock identity (local only):** `EITS_SESSION_UUID`, else `EITS_SESSION_ID`, else the literal `default` — used solely to build the lock path.
 
 ### Retry & timeouts
 
-Each request has a 10s timeout (connect + read). Retryable failures — jittered exponential backoff, 4 attempts, base 2s doubling, cap 30s, chatter on stderr:
+Each request has a 10s overall timeout; the client also sets a connect timeout no greater than 10s. Retryable failures — jittered exponential backoff, 4 attempts, base 2s doubling, cap 30s, chatter on stderr:
 
 - connection refused / connection timeout / request timeout
 - HTTP 429, 502, 503, 504

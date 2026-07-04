@@ -44,7 +44,52 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   def messages_tab(assigns) do
     ~H"""
-    <div class="flex flex-1 min-h-0 flex-col" id="dm-messages-tab">
+    <div
+      class="flex flex-1 min-h-0 flex-col relative"
+      id="dm-messages-tab"
+      phx-hook="SearchHighlight"
+      data-query={@message_search_query}
+    >
+      <%!-- Search match counter overlay — driven entirely by the SearchHighlight JS hook.
+           Stable element IDs let the hook write counts / active index directly without
+           a LiveView round-trip. Hidden when no search query is active. --%>
+      <div
+        id="search-counter-overlay"
+        class={[
+          "absolute top-2 right-3 z-20 flex items-center gap-1 rounded-md",
+          "bg-base-200/90 border border-base-content/10 shadow-sm px-1.5 py-0.5",
+          "text-[11px] text-base-content/60 select-none",
+          @message_search_query == "" && "hidden"
+        ]}
+      >
+        <button
+          id="search-counter-prev"
+          class="p-0.5 rounded hover:bg-base-content/10 transition-colors"
+          title="Previous match"
+          aria-label="Previous match"
+        >
+          <.icon name="hero-chevron-up-mini" class="size-3" />
+        </button>
+        <span id="search-counter-label" class="min-w-[4rem] text-center tabular-nums">
+          &nbsp;
+        </span>
+        <button
+          id="search-counter-next"
+          class="p-0.5 rounded hover:bg-base-content/10 transition-colors"
+          title="Next match"
+          aria-label="Next match"
+        >
+          <.icon name="hero-chevron-down-mini" class="size-3" />
+        </button>
+        <button
+          id="search-counter-close"
+          class="p-0.5 rounded hover:bg-base-content/10 transition-colors ml-0.5"
+          title="Clear search"
+          aria-label="Clear search"
+        >
+          <.icon name="hero-x-mark-mini" class="size-3" />
+        </button>
+      </div>
       <div
         class="overflow-y-auto flex-1 min-h-0"
         id="messages-container"

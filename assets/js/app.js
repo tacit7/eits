@@ -89,6 +89,7 @@ import {GlobalKeydown} from "./hooks/global_keydown"
 import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
 import {PreserveDetails} from "./hooks/preserve_details"
 import {ExpandOnSearch} from "./hooks/expand_on_search"
+import {SearchHighlight} from "./hooks/search_highlight"
 import {VimNav} from "./hooks/vim_nav"
 import {TaskListSelection} from "./hooks/task_list_selection"
 import {DrawerDirtyForm} from "./hooks/drawer_dirty_form"
@@ -167,6 +168,7 @@ Hooks.GlobalKeydown = GlobalKeydown
 Hooks.DmHistoryCleanup = DmHistoryCleanup
 Hooks.PreserveDetails = PreserveDetails
 Hooks.ExpandOnSearch = ExpandOnSearch
+Hooks.SearchHighlight = SearchHighlight
 Hooks.SortDropdown = SortDropdown
 Hooks.TaskListSelection = TaskListSelection
 Hooks.DrawerDirtyForm = DrawerDirtyForm

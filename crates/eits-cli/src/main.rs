@@ -36,7 +36,7 @@ enum Cmd {
         #[command(subcommand)]
         cmd: TasksCmd,
     },
-    /// Print identity env vars as JSON (no API call)
+    /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
     /// Anything not Rust-owned falls through to the bash extras script
     #[command(external_subcommand)]
@@ -66,7 +66,10 @@ fn main() {
                 Ok(cfg) => cfg,
                 Err(err) => error::exit_with(err, pretty),
             };
-            output::print_json(&commands::whoami::run(&cfg), pretty);
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::whoami::run(&client, &cfg, pretty) {
+                error::exit_with(err, pretty);
+            }
         }
         Cmd::External(args) => {
             let had_global_flags = raw.len() > args.len();

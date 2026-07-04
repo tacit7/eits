@@ -1,7 +1,7 @@
 use crate::error::EitsError;
 use std::path::Path;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     pub base_url: String,
     pub api_key: Option<String>,

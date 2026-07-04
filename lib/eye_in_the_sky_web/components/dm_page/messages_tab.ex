@@ -475,49 +475,42 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   end
 
   defp tool_cluster(assigns) do
+    # Flatten all tool events into chronological order (groups partition by tool
+    # type; sort by message id to restore insertion order).
+    flat_events =
+      assigns.meta.tool_groups
+      |> Enum.flat_map(& &1.events)
+      |> Enum.sort_by(& &1.id)
+
+    assigns = assign(assigns, :flat_events, flat_events)
+
     ~H"""
     <details
       id={"cluster-#{List.first(@events).id}"}
       phx-hook="PreserveDetails"
       class="group my-1 w-full pl-[33px]"
     >
-      <summary class="flex items-center gap-2 px-1 py-0.5 cursor-pointer list-none text-[var(--text-muted)] hover:text-[var(--text-secondary)] select-none">
+      <summary class="flex items-center gap-1.5 px-1 py-0.5 cursor-pointer list-none text-[var(--text-muted)] hover:text-[var(--text-secondary)] select-none">
         <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px]">
           &#9658;
         </span>
-        <span class="text-nano font-mono">{@meta.count} tool events</span>
-        <%= for group <- @meta.tool_groups do %>
-          <span class="rounded-sm px-1 py-px bg-base-content/[0.05] text-nano font-mono text-[var(--text-disabled)]">
-            {group.name} &times;{group.count}
-          </span>
-        <% end %>
-        <%= if @meta.duration_ms do %>
-          <span class="text-nano font-mono text-[var(--text-disabled)] ml-1">
-            ~{div(@meta.duration_ms, 1000)}s
+        <span class="text-nano font-mono text-[var(--text-disabled)]">
+          {@meta.count} tool {if @meta.count == 1, do: "call", else: "calls"}
+        </span>
+        <%= if @meta.duration_ms && @meta.duration_ms >= 1000 do %>
+          <span class="text-nano font-mono text-[var(--text-disabled)]">
+            &middot; ~{div(@meta.duration_ms, 1000)}s
           </span>
         <% end %>
         <span class="ml-auto text-nano text-[var(--text-disabled)]">
           {relative_time(@meta.first_at)}
         </span>
       </summary>
-      <div class="pl-2 mt-0.5 space-y-0.5">
-        <%= for group <- @meta.tool_groups do %>
-          <details class="group/tool">
-            <summary class="flex items-center gap-1.5 px-1 py-0.5 cursor-pointer list-none text-[var(--text-disabled)] hover:text-[var(--text-muted)] select-none">
-              <span class="group-open/tool:rotate-90 transition-transform duration-100 text-[9px]">
-                &#9658;
-              </span>
-              <span class="text-nano font-mono">{group.name}</span>
-              <span class="text-nano font-mono opacity-60">&times;{group.count}</span>
-            </summary>
-            <div class="pl-4 mt-0.5 space-y-px">
-              <%= for event <- group.events do %>
-                <div class="max-w-full px-1">
-                  <.message_body message={event} compact={true} />
-                </div>
-              <% end %>
-            </div>
-          </details>
+      <div class="pl-2 mt-0.5 space-y-px">
+        <%= for event <- @flat_events do %>
+          <div class="max-w-full px-1">
+            <.message_body message={event} compact={true} />
+          </div>
         <% end %>
       </div>
     </details>

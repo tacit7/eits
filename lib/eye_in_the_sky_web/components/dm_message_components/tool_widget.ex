@@ -155,33 +155,33 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
     ~H"""
     <.tool_card_shell compact={@compact} copy_text={@rest} copy_title="Copy input">
       <:summary>
-        <.icon
-          name={@icon}
-          class={
-            if @compact,
-              do: "size-2.5 flex-shrink-0 text-base-content/20",
-              else: "size-3.5 flex-shrink-0 text-base-content/35"
-          }
-        />
-        <span class={
-          if @compact,
-            do:
-              "text-micro font-mono font-semibold text-base-content/30 flex-shrink-0 uppercase tracking-wide",
-            else:
-              "text-mini font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0"
-        }>
-          {@label}
-        </span>
-        <span
-          :if={@detail != "" && !@wrap_detail}
-          class={
-            if @compact,
-              do: "text-micro font-mono text-base-content/25 truncate flex-1 min-w-0",
-              else: "text-mini font-mono text-base-content/35 truncate flex-1 min-w-0"
-          }
-        >
-          {@detail}
-        </span>
+        <%= if @compact do %>
+          <%!-- Claudette-style compact: colored text badge + inline detail --%>
+          <span class={[
+            "text-[11px] font-mono font-semibold px-1.5 py-px rounded shrink-0 leading-none",
+            tool_badge_class(@name)
+          ]}>
+            {@label}
+          </span>
+          <span
+            :if={@detail != "" && !@wrap_detail}
+            class="text-[11px] font-mono text-base-content/30 truncate flex-1 min-w-0"
+          >
+            {@detail}
+          </span>
+        <% else %>
+          <%!-- Expanded card: keep icon + uppercase label --%>
+          <.icon name={@icon} class="size-3.5 flex-shrink-0 text-base-content/35" />
+          <span class="text-mini font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
+            {@label}
+          </span>
+          <span
+            :if={@detail != "" && !@wrap_detail}
+            class="text-mini font-mono text-base-content/35 truncate flex-1 min-w-0"
+          >
+            {@detail}
+          </span>
+        <% end %>
       </:summary>
       <.tool_widget_body name={@name} rest={@rest} detail={@detail} input={@input} />
     </.tool_card_shell>

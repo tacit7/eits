@@ -375,11 +375,16 @@ pub fn run(
             notify,
         } => {
             let check = client.get(&format!("/tasks/{id}"))?;
+            // Same class of bug as tasks begin's task_id: the server can send
+            // state_id as a numeric string, which .as_i64() alone would miss.
             let state_id = check
                 .get("task")
                 .and_then(|t| t.get("state_id"))
                 .or_else(|| check.get("state_id"))
-                .and_then(|v| v.as_i64());
+                .and_then(|v| {
+                    v.as_i64()
+                        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+                });
             if state_id == Some(3) {
                 let task_id_val = id
                     .parse::<i64>()

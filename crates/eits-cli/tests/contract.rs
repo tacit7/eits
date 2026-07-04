@@ -223,6 +223,26 @@ fn complete_already_done_short_circuits_with_single_request() {
 }
 
 #[test]
+fn complete_already_done_short_circuits_when_state_id_is_a_string() {
+    // Same class of bug as begin_accepts_string_task_id_from_server: the
+    // server has been observed sending state_id as a numeric string.
+    let srv = common::serve(vec![(200, r#"{"task":{"state_id":"3"}}"#)]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["tasks", "complete", "5", "--message", "done"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["status"], "already_closed");
+    assert_eq!(v["task_id"], 5);
+    let reqs = srv.finish();
+    assert_eq!(reqs.len(), 1, "must not POST /complete once already Done");
+    assert_eq!(reqs[0].method, "GET");
+}
+
+#[test]
 fn annotate_failure_after_retries_queues_pending_annotation() {
     let home = tempfile::tempdir().unwrap();
     let srv = common::serve(vec![(500, "{}")]);

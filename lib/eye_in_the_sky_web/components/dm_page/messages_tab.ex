@@ -488,10 +488,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     <details
       id={"cluster-#{List.first(@events).id}"}
       phx-hook="PreserveDetails"
-      class="group my-1 w-full pl-[33px]"
+      class="group my-1.5 w-full pl-[33px] rounded-lg border border-base-content/[0.08] bg-base-content/[0.02] overflow-hidden"
     >
-      <summary class="flex items-center gap-1.5 px-1 py-0.5 cursor-pointer list-none text-[var(--text-muted)] hover:text-[var(--text-secondary)] select-none">
-        <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px]">
+      <summary class="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer list-none select-none hover:bg-base-content/[0.03] transition-colors">
+        <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px] shrink-0">
           &#9658;
         </span>
         <span class="text-nano font-mono text-[var(--text-disabled)]">
@@ -506,9 +506,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           {relative_time(@meta.first_at)}
         </span>
       </summary>
-      <div class="pl-2 mt-0.5 space-y-px">
+      <div class="border-t border-base-content/[0.06] divide-y divide-base-content/[0.04]">
         <%= for event <- @flat_events do %>
-          <div class="max-w-full px-1">
+          <div class="px-3 py-0.5">
             <.message_body message={event} compact={true} />
           </div>
         <% end %>

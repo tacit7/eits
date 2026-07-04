@@ -1,6 +1,9 @@
+mod error;
 mod extras;
+mod output;
 
 use clap::Parser;
+use error::{Code, EitsError};
 use std::ffi::OsString;
 
 #[derive(Parser)]
@@ -32,41 +35,32 @@ fn main() {
     // detect them by comparing raw argv length against the parsed external args.
     let raw: Vec<OsString> = std::env::args_os().skip(1).collect();
     let cli = Cli::parse();
+    let pretty = output::pretty_enabled(cli.pretty);
     match cli.cmd {
         Cmd::External(args) => {
             let had_global_flags = raw.len() > args.len();
             if had_global_flags {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "error": "global flags are not supported for bash-extras subcommands",
-                        "code": "usage",
-                        "hint": "drop --pretty/--quiet or use a Rust-owned command"
-                    })
+                // Global flags are rejected before extras run, so there's no
+                // pretty-print preference to honor here.
+                error::exit_with(
+                    EitsError::usage("global flags are not supported for bash-extras subcommands")
+                        .with_hint("drop --pretty/--quiet or use a Rust-owned command"),
+                    false,
                 );
-                std::process::exit(2);
             }
             match extras::find_extras() {
                 Ok(path) => {
                     let e = extras::exec_extras(&path, &args);
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "error": format!("failed to exec extras: {e}"),
-                            "code": "extras_exec_failed"
-                        })
+                    error::exit_with(
+                        EitsError::api(
+                            format!("failed to exec extras: {e}"),
+                            Code::ExtrasExecFailed,
+                            None,
+                        ),
+                        pretty,
                     );
-                    std::process::exit(1);
                 }
-                Err(msg) => {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "error": msg, "code": "extras_not_found"
-                        })
-                    );
-                    std::process::exit(1);
-                }
+                Err(err) => error::exit_with(err, pretty),
             }
         }
     }

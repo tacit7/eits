@@ -1,18 +1,21 @@
+use crate::error::{Code, EitsError};
 use std::ffi::OsString;
 use std::path::PathBuf;
 
 /// Spec: discovery order — EITS_EXTRAS, ../libexec/eits-extras, sibling,
 /// bash `eits` on PATH (guarding self-exec), bundled app path (later).
-pub fn find_extras() -> Result<PathBuf, String> {
+pub fn find_extras() -> Result<PathBuf, EitsError> {
     if let Ok(p) = std::env::var("EITS_EXTRAS") {
         let p = PathBuf::from(p);
         return if is_executable_file(&p) {
             Ok(p)
         } else {
-            Err(format!(
-                "EITS_EXTRAS={} is not an executable file",
-                p.display()
-            ))
+            Err(EitsError::api(
+                format!("EITS_EXTRAS={} is not an executable file", p.display()),
+                Code::ExtrasNotFound,
+                None,
+            )
+            .with_hint("Point EITS_EXTRAS at an executable eits-extras script"))
         };
     }
 
@@ -40,7 +43,12 @@ pub fn find_extras() -> Result<PathBuf, String> {
         }
     }
 
-    Err("no extras script found (set EITS_EXTRAS or install scripts/eits on PATH)".into())
+    Err(EitsError::api(
+        "no extras script found (set EITS_EXTRAS or install scripts/eits on PATH)",
+        Code::ExtrasNotFound,
+        None,
+    )
+    .with_hint("set EITS_EXTRAS or install scripts/eits on PATH"))
 }
 
 fn is_executable_file(p: &std::path::Path) -> bool {

@@ -488,7 +488,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     <details
       id={"cluster-#{List.first(@events).id}"}
       phx-hook="PreserveDetails"
-      class="group my-1.5 w-full pl-[33px] rounded-lg border border-base-content/[0.08] bg-base-content/[0.02] overflow-hidden"
+      class="group my-1.5 w-full rounded-lg border border-base-content/[0.08] bg-base-content/[0.02] overflow-hidden"
     >
       <summary class="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer list-none select-none hover:bg-base-content/[0.03] transition-colors">
         <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px] shrink-0">
@@ -529,7 +529,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
   defp cluster_summary(assigns) do
     ~H"""
-    <div class="pl-[33px] pb-1">
+    <div class="pb-1">
       <span class="text-nano font-mono text-[var(--text-disabled)]">
         <%= if @data.files != [] do %>
           <span>{length(@data.files)} {if length(@data.files) == 1, do: "file", else: "files"} &middot; </span>

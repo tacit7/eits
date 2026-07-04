@@ -222,6 +222,10 @@ Non-retryable: all other 4xx, malformed responses, TLS errors, auth failures.
 
 > Note: this **expands** bash's retry set (bash retries only curl exit 7 and 429/503). 502/504/timeouts are added deliberately — they are transient in this deployment (Phoenix restarts behind the desktop app).
 
+### Annotation offline queue
+
+`tasks annotate` (and the annotate step inside failure paths) must keep bash's offline queue: if the POST to `/tasks/:id/annotations` fails after retries, append `{"task_id":N,"body":"...","title":"..."}` as one JSON line to `~/.eits/pending-annotations.log` (creating `~/.eits/` if needed), warn on stderr, exit 1. The queue is drained by `eits queue flush` (bash in Phase 1) — the line format must stay byte-compatible.
+
 ### DM serialization lock
 
 Rust must match the existing bash lock exactly (`_dm_post`, scripts/eits):

@@ -817,6 +817,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         notify_on_stop={@notify_on_stop}
         dm_settings_scope={@dm_settings_scope}
         dm_settings_subtab={@dm_settings_subtab}
+        dm_settings_effective={@dm_settings_effective}
         syncing={@syncing}
         session_cli_opts={@session_cli_opts}
       />

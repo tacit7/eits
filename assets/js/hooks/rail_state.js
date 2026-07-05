@@ -58,6 +58,55 @@ export const RailState = {
     this._openHandler = () => this.pushEventTo(this.el, 'open_mobile', {})
     this.el.addEventListener('rail:open', this._openHandler)
 
+    // --- Drag-right on the icon strip opens the flyout -----------------------
+    // Click = navigate (server-side toggle_section); a horizontal pull ≥24px
+    // (and more horizontal than vertical) = open the flyout panel instead.
+    // The click that follows a drag's mouseup is swallowed in capture phase so
+    // a drag never also navigates.
+    {
+      const strip = this.el.querySelector('#rail-icon-strip')
+      if (strip) {
+        let start = null
+        let dragged = false
+        this._dragDown = (e) => {
+          if (e.button !== 0) return
+          start = { x: e.clientX, y: e.clientY }
+          dragged = false
+        }
+        this._dragMove = (e) => {
+          if (!start || dragged) return
+          const dx = e.clientX - start.x
+          const dy = Math.abs(e.clientY - start.y)
+          if (dx >= 24 && dx > dy) {
+            dragged = true
+            this.pushEventTo(this.el, 'open_flyout', {})
+          }
+        }
+        this._dragUp = () => {
+          if (dragged) {
+            this._suppressNextClick = true
+            // The browser's click (if any) fires synchronously after mouseup,
+            // before timers run — so this only clears a flag no click consumed
+            // (e.g. release outside the strip). Prevents eating the NEXT
+            // legitimate click.
+            setTimeout(() => { this._suppressNextClick = false }, 0)
+          }
+          start = null
+        }
+        this._dragClickGuard = (e) => {
+          if (this._suppressNextClick) {
+            e.stopPropagation()
+            e.preventDefault()
+            this._suppressNextClick = false
+          }
+        }
+        strip.addEventListener('mousedown', this._dragDown)
+        window.addEventListener('mousemove', this._dragMove)
+        window.addEventListener('mouseup', this._dragUp)
+        strip.addEventListener('click', this._dragClickGuard, true)
+      }
+    }
+
     // --- Tauri bridges -------------------------------------------------------
     // These MUST live in a hook: hooks are the only public API that can push
     // events to a LiveComponent (view.pushEventTo does not exist on the View
@@ -122,6 +171,11 @@ export const RailState = {
   destroyed() {
     if (this._openHandler) {
       this.el.removeEventListener('rail:open', this._openHandler)
+    }
+    if (this._dragMove) {
+      window.removeEventListener('mousemove', this._dragMove)
+      window.removeEventListener('mouseup', this._dragUp)
+      // strip listeners die with this.el; window listeners are the leak risk
     }
     if (this._pickFolderHandler) {
       window.removeEventListener('phx:pick_folder', this._pickFolderHandler)

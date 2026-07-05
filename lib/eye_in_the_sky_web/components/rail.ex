@@ -213,6 +213,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("toggle_collapsed", _params, socket),
     do: RailStateActions.handle_toggle_collapsed(socket)
 
+  def handle_event("open_flyout", _params, socket),
+    do: SectionActions.handle_open_flyout(socket)
+
   def handle_event("refresh_usage", params, socket),
     do: RailStateActions.handle_refresh_usage(params, socket)
 
@@ -506,7 +509,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         aria-hidden="true"
       />
 
-      <nav class="w-[52px] flex-shrink-0 flex flex-col items-center pb-2 pt-10 gap-1 border-r border-base-content/8 bg-base-100 z-20">
+      <nav
+        id="rail-icon-strip"
+        class="w-[52px] flex-shrink-0 flex flex-col items-center pb-2 pt-10 gap-1 border-r border-base-content/8 bg-base-100 z-20"
+      >
         <button
           phx-click="toggle_proj_picker"
           phx-target={@myself}

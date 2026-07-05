@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   alias EyeInTheSkyWeb.Components.DmPage.TasksTab
 
   @tabs [
-    {"messages", "hero-chat-bubble-left-right", "Messages"},
+    {"messages", "hero-chat-bubble-left-right", "Chat"},
     {"tasks", "hero-clipboard-document-list", "Tasks"},
     {"commits", "hero-code-bracket", "Commits"},
     {"notes", "hero-document-text", "Notes"},

@@ -727,3 +727,24 @@ fn sessions_archive_dry_run_lists_without_posting() {
     assert_eq!(reqs.len(), 1);
     assert_eq!(reqs[0].method, "GET");
 }
+
+#[test]
+fn tasks_get_grafts_envelope_siblings_into_task() {
+    // Server envelope carries project_id/annotations OUTSIDE .task (bash
+    // parity); normalization must not lose them. Regression: ticket 8108.
+    let srv = common::serve(vec![(
+        200,
+        r#"{"success":true,"task":{"id":8108,"title":"t","state_id":1},"project_id":1,"annotations":[{"id":1,"body":"x"}]}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["tasks", "get", "8108"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["task"]["project_id"], 1);
+    assert_eq!(v["task"]["annotations"][0]["body"], "x");
+    assert!(v.get("project_id").is_none(), "no top-level duplication");
+}

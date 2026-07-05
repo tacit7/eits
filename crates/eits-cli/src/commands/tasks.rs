@@ -30,6 +30,8 @@ pub enum TasksCmd {
     },
     /// Fetch a single task by id
     Get { id: String },
+    /// Attach an existing tag to a task (tag ids: `eits tags list`)
+    Tag { task_id: String, tag_id: String },
     /// Claim an existing task (--id) or create + claim a new one (-t/--title)
     Begin {
         #[arg(long)]
@@ -181,8 +183,32 @@ pub fn run(
     match cmd {
         TasksCmd::Get { id } => {
             let v = client.get(&format!("/tasks/{id}"))?;
-            let task = v.get("task").cloned().unwrap_or(v);
+            // The server's envelope carries project_id / annotations / state_id
+            // as SIBLINGS of .task, not inside it — graft them into the task
+            // object so normalization is lossless (found via ticket 8108: a
+            // task's project_id read as null through eitsr but 1 through bash).
+            let mut task = v.get("task").cloned().unwrap_or_else(|| v.clone());
+            if let Some(obj) = task.as_object_mut() {
+                for key in ["project_id", "annotations", "state_id"] {
+                    if !obj.contains_key(key) || obj[key].is_null() {
+                        if let Some(side) = v.get(key) {
+                            if !side.is_null() {
+                                obj.insert(key.to_string(), side.clone());
+                            }
+                        }
+                    }
+                }
+            }
             output::print_json(&json!({ "task": task }), pretty);
+            Ok(())
+        }
+
+        TasksCmd::Tag { task_id, tag_id } => {
+            let v = client.post(
+                &format!("/tasks/{task_id}/tags"),
+                json!({ "tag_id": tag_id }),
+            )?;
+            output::print_json(&v, pretty);
             Ok(())
         }
 

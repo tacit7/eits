@@ -5,6 +5,7 @@ Usage: eitsr tasks [OPTIONS] <COMMAND>
 Commands:
   list          List tasks (session-scoped by default; pass --all to see everything)
   get           Fetch a single task by id
+  tag           Attach an existing tag to a task (tag ids: `eits tags list`)
   begin         Claim an existing task (--id) or create + claim a new one (-t/--title)
   complete      Atomic annotate + close (Done)
   annotate      Add an annotation to a task

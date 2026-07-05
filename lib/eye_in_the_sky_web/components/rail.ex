@@ -506,7 +506,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           section={:tasks}
           active_section={@active_section}
           flyout_open={@flyout_open}
-          icon="hero-check-circle"
+          icon="hero-view-columns"
           label="Tasks"
           myself={@myself}
         />

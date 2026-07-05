@@ -29,8 +29,24 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
       |> maybe_restore_task_state_filter(params)
       |> maybe_restore_team_status(params)
       |> maybe_restore_file_expanded(params)
+      |> maybe_restore_flyout_open(params)
 
     {:noreply, socket}
+  end
+
+  @doc """
+  Toggles the flyout panel (rail collapse). Fired by the vsbar toggle button,
+  the hover chevron on the rail divider, and double-click on the divider —
+  one state, three affordances. Persisted via the RailState hook's
+  save_rail_state localStorage patch.
+  """
+  def handle_toggle_collapsed(socket) do
+    open = !socket.assigns.flyout_open
+
+    {:noreply,
+     socket
+     |> assign(:flyout_open, open)
+     |> Phoenix.LiveView.push_event("save_rail_state", %{flyout_open: open})}
   end
 
   def handle_toggle_proj_picker(params, socket) do
@@ -286,4 +302,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
   end
 
   defp maybe_restore_file_expanded(socket, _), do: socket
+
+  defp maybe_restore_flyout_open(socket, %{"flyout_open" => open}) when is_boolean(open) do
+    assign(socket, :flyout_open, open)
+  end
+
+  defp maybe_restore_flyout_open(socket, _), do: socket
 end

@@ -256,16 +256,12 @@ document.addEventListener("click", (e) => {
   })
 }, true)
 
-// Persist sidebar collapse state on toggle
-window.addEventListener("click", (e) => {
-  const btn = e.target.closest("[phx-click='toggle_collapsed']")
-  if (btn) {
-    const sidebar = document.getElementById("app-rail")
-    if (sidebar) {
-      // Toggle: if currently expanded on desktop, it's about to collapse
-      const isCurrentlyExpanded = sidebar.classList.contains("md:w-60")
-      localStorage.setItem("sidebar_collapsed", isCurrentlyExpanded ? "true" : "false")
-    }
+// Rail divider double-click = collapse/expand (bonus gesture; the hover
+// chevron #rail-collapse-toggle is the discoverable affordance). Persistence
+// happens server-side via the RailState hook's save_rail_state patch.
+window.addEventListener("dblclick", (e) => {
+  if (e.target.closest("#rail-divider")) {
+    document.getElementById("rail-collapse-toggle")?.click()
   }
 })
 

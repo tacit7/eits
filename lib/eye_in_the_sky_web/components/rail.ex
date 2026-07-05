@@ -210,6 +210,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("close_flyout", _params, socket),
     do: SectionActions.handle_close_flyout(socket)
 
+  def handle_event("toggle_collapsed", _params, socket),
+    do: RailStateActions.handle_toggle_collapsed(socket)
+
   def handle_event("refresh_usage", params, socket),
     do: RailStateActions.handle_refresh_usage(params, socket)
 
@@ -461,13 +464,46 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       phx-hook="RailState"
       phx-target={@myself}
       data-project-id={@sidebar_project && @sidebar_project.id}
-      class="flex flex-row h-full min-w-0 relative"
+      class="flex flex-row h-full min-w-0 relative group/rail"
     >
       <div
         :if={@mobile_open && @flyout_open}
         phx-click="close_flyout"
         phx-target={@myself}
         class="md:hidden fixed inset-0 z-40 bg-black/40"
+      />
+
+      <%!-- Collapse chevron: pill attached to the rail's right edge, revealed on
+           rail hover or keyboard focus. Same toggle as the vsbar button and the
+           divider double-click (see #rail-divider + app.js). --%>
+      <button
+        id="rail-collapse-toggle"
+        phx-click="toggle_collapsed"
+        phx-target={@myself}
+        aria-expanded={to_string(@flyout_open)}
+        aria-label={if @flyout_open, do: "Collapse sidebar", else: "Expand sidebar"}
+        title={if @flyout_open, do: "Collapse sidebar", else: "Expand sidebar"}
+        class={[
+          "hidden md:grid place-items-center absolute -right-[13px] top-11 w-[26px] h-11 z-30",
+          "rounded-full border border-base-content/15 bg-base-200 shadow-sm",
+          "text-base-content/60 hover:text-base-content hover:border-primary/60",
+          "opacity-0 group-hover/rail:opacity-100 focus-visible:opacity-100",
+          "transition-opacity duration-150"
+        ]}
+      >
+        <.icon
+          name={if @flyout_open, do: "hero-chevron-left", else: "hero-chevron-right"}
+          class="size-3.5"
+        />
+      </button>
+
+      <%!-- Divider strip: invisible 6px double-click target on the rail's right
+           edge (bonus gesture — the chevron is the discoverable affordance).
+           dblclick wiring in app.js clicks #rail-collapse-toggle. --%>
+      <div
+        id="rail-divider"
+        class="hidden md:block absolute right-0 inset-y-0 w-[6px] z-20 select-none"
+        aria-hidden="true"
       />
 
       <nav class="w-[52px] flex-shrink-0 flex flex-col items-center pb-2 pt-10 gap-1 border-r border-base-content/8 bg-base-100 z-20">

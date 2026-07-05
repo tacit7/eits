@@ -58,6 +58,29 @@ export const RailState = {
     this._openHandler = () => this.pushEventTo(this.el, 'open_mobile', {})
     this.el.addEventListener('rail:open', this._openHandler)
 
+    // --- Mobile: icon taps open the drawer, never navigate -------------------
+    // The strip is tappable on mobile even with the drawer closed, and the
+    // server can't tell viewports apart. Intercept in capture phase and send
+    // a dedicated event that opens drawer + section flyout (pre-navigate-era
+    // behavior). If this hook ever fails to mount, taps degrade to the desktop
+    // path (full-page navigation) — functional, just less slick.
+    {
+      const strip = this.el.querySelector('#rail-icon-strip')
+      if (strip) {
+        this._mobileTapGuard = (e) => {
+          if (!window.matchMedia('(max-width: 767px)').matches) return
+          const btn = e.target.closest('button[phx-value-section]')
+          if (!btn) return
+          e.preventDefault()
+          e.stopPropagation()
+          this.pushEventTo(this.el, 'open_mobile_section', {
+            section: btn.getAttribute('phx-value-section'),
+          })
+        }
+        strip.addEventListener('click', this._mobileTapGuard, true)
+      }
+    }
+
     // --- Drag-right on the icon strip opens the flyout -----------------------
     // Click = navigate (server-side toggle_section); a horizontal pull ≥24px
     // (and more horizontal than vertical) = open the flyout panel instead.

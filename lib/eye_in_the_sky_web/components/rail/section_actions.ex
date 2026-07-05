@@ -28,13 +28,26 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
     section = Loader.parse_section(section_str)
     route = section_route(section, socket.assigns.sidebar_project)
 
-    # Desktop click = navigate. Mobile (drawer already open) keeps the
-    # tap-to-browse-flyout behavior; routeless sections keep it everywhere.
-    if route && !socket.assigns.mobile_open do
+    # Desktop click = navigate; routeless sections open the flyout. Mobile
+    # taps never reach this event — the RailState hook intercepts them in
+    # capture phase and sends open_mobile_section instead (the server cannot
+    # distinguish viewports; the client can).
+    if route do
       {:noreply, push_navigate(socket, to: route)}
     else
       toggle_flyout_for(section, socket)
     end
+  end
+
+  @doc """
+  Mobile icon tap: open the drawer AND the section's flyout (the pre-existing
+  mobile browse behavior). Sent by the RailState hook's capture-phase tap
+  guard, which fires only under the md breakpoint.
+  """
+  def handle_open_mobile_section(%{"section" => section_str}, socket) do
+    section = Loader.parse_section(section_str)
+    {:noreply, socket} = open_section(section, socket)
+    {:noreply, assign(socket, :mobile_open, true)}
   end
 
   @doc """

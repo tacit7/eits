@@ -216,6 +216,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("open_flyout", _params, socket),
     do: SectionActions.handle_open_flyout(socket)
 
+  def handle_event("open_mobile_section", params, socket),
+    do: SectionActions.handle_open_mobile_section(params, socket)
+
   def handle_event("refresh_usage", params, socket),
     do: RailStateActions.handle_refresh_usage(params, socket)
 

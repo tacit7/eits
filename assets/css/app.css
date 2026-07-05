@@ -930,32 +930,44 @@ html[data-env="tauri"] [data-tauri-hide] { display: none !important; }
    were passing through the window entirely. Everything below is gated on
    html[data-env="tauri"] so the browser build renders unchanged. */
 
-/* Traffic lights float at roughly (x: 12-68px, y: 10-28px). Push the sidebar
-   titlebar strip right so anything inside it clears them, and give a touch
-   more vertical room so the row matches the titlebar height. */
-html[data-env="tauri"] .app-titlebar {
+/* Traffic lights float at roughly (x: 12-68px, y: 10-28px). The VS Code-style
+   title bar (#app-vsbar) is the topmost row now, so IT clears them; the rail's
+   .app-titlebar strip no longer needs the offset. */
+html[data-env="tauri"] #app-vsbar {
   padding-left: 72px;
-  padding-top: 10px;
-  padding-bottom: 10px;
 }
 
-/* Tauri window drag: show a grab cursor over the top bar drag region.
+/* Tauri window drag: show a grab cursor over the vsbar drag region.
    The actual drag is triggered by the JS mousedown handler in app.js — no
    CSS -webkit-app-region needed (WKWebView ignores it). */
-html[data-env="tauri"] #app-topbar {
+html[data-env="tauri"] #app-vsbar {
   cursor: grab;
 }
-html[data-env="tauri"] #app-topbar:active {
+html[data-env="tauri"] #app-vsbar:active {
   cursor: grabbing;
 }
 /* Interactive children revert to their normal cursor. */
-html[data-env="tauri"] #app-topbar a,
-html[data-env="tauri"] #app-topbar button,
-html[data-env="tauri"] #app-topbar input,
-html[data-env="tauri"] #app-topbar select,
-html[data-env="tauri"] #app-topbar [role="button"],
-html[data-env="tauri"] #app-topbar summary {
+html[data-env="tauri"] #app-vsbar a,
+html[data-env="tauri"] #app-vsbar button,
+html[data-env="tauri"] #app-vsbar input,
+html[data-env="tauri"] #app-vsbar select,
+html[data-env="tauri"] #app-vsbar [role="button"],
+html[data-env="tauri"] #app-vsbar summary {
   cursor: default;
+}
+
+/* Always-on-top pin: desktop-app only (hidden class on the element keeps it
+   out of the browser build; this override reveals it under Tauri). */
+html[data-env="tauri"] #vsbar-pin {
+  display: inline-flex;
+}
+#vsbar-pin[aria-pressed="true"] {
+  color: var(--color-primary);
+}
+
+/* Socket status dot driven by data-socket on <html> (set in app.js). */
+html[data-socket="disconnected"] #vsbar-status-dot {
+  background-color: var(--color-error);
 }
 
 /* ---------------------------------------------------------------------------

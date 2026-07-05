@@ -280,6 +280,22 @@ if (!window.liveSocket) {
   window.liveSocket = liveSocket
 }
 
+// --- vsbar: socket status dot + server port ---------------------------------
+// data-socket on <html> drives the #vsbar-status-dot color (see app.css).
+const applySocketState = (state) => {
+  document.documentElement.dataset.socket = state
+}
+liveSocket.socket.onOpen(() => applySocketState("connected"))
+liveSocket.socket.onClose(() => applySocketState("disconnected"))
+liveSocket.socket.onError(() => applySocketState("disconnected"))
+{
+  const portEl = document.getElementById("vsbar-status-port")
+  if (portEl) {
+    const port = location.port || (location.protocol === "https:" ? "443" : "80")
+    portEl.textContent = `:${port}`
+  }
+}
+
 // VimNav is mounted directly (not via phx-hook) because Phoenix doesn't
 // call mounted() for hooks on live layout elements.
 // Keep the instance alive across LiveView navigations — destroying + re-creating
@@ -386,6 +402,22 @@ if (window.__TAURI_INTERNALS__) {
     const path = e.detail?.path ?? '/'
     invoke('open_window', { path })
   })
+
+  // --- vsbar: always-on-top pin ---------------------------------------------
+  // Revealed by CSS only under data-env="tauri". State lives in the Rust
+  // shell's ALWAYS_ON_TOP static (shared with the menu/tray toggles).
+  const pin = document.getElementById('vsbar-pin')
+  if (pin) {
+    invoke('get_always_on_top')
+      .then((on) => pin.setAttribute('aria-pressed', String(!!on)))
+      .catch(() => {})
+    pin.addEventListener('click', () => {
+      const next = pin.getAttribute('aria-pressed') !== 'true'
+      invoke('set_always_on_top', { on: next })
+        .then((actual) => pin.setAttribute('aria-pressed', String(!!actual)))
+        .catch(() => {})
+    })
+  }
 
   // --- Session flyout context menu -------------------------------------------
   // Right-click on a .flyout-session-row triggers a native Tauri popup menu.

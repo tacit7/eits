@@ -1,6 +1,6 @@
 <div
   id="app-shell"
-  class="flex h-[var(--app-viewport-height)] bg-base-100"
+  class="flex flex-col h-[var(--app-viewport-height)] bg-base-100"
   data-palette-shortcut={@palette_shortcut}
   data-allow-split={if assigns[:allow_split], do: "true", else: "false"}
 >
@@ -19,6 +19,80 @@
     Skip to main content
   </a>
 
+  <%!-- VS Code-style title bar — full-width, above rail + topbar. Desktop only.
+       Drag region for the Tauri window (handler in app.js excludes interactive
+       children). Traffic-light clearance via CSS gated on data-env="tauri". --%>
+  <div
+    id="app-vsbar"
+    data-tauri-drag-region
+    class="hidden md:flex h-[38px] flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-200/60 px-3 relative"
+  >
+    <span class="text-xs text-base-content/50 truncate select-none">
+      <span class="font-medium text-base-content/80">
+        {(assigns[:sidebar_project] && assigns[:sidebar_project].name) || "Eye in the Sky"}
+      </span>
+      <span :if={assigns[:sidebar_tab]} class="mx-1">›</span>
+      <span :if={assigns[:sidebar_tab]}>
+        {Phoenix.Naming.humanize(assigns[:sidebar_tab] || :sessions)}
+      </span>
+    </span>
+
+    <%!-- Command center — absolute-centered so left/right content never shifts it --%>
+    <button
+      id="vsbar-cmdcenter"
+      phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
+      class="absolute left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 w-[380px] max-w-[40vw] h-[26px] rounded-md border border-base-content/10 bg-base-100 text-xs text-base-content/50 hover:border-primary/60 hover:text-base-content/80 focus-ring"
+      title="Open command palette"
+      aria-label="Open command palette"
+    >
+      <.icon name="hero-magnifying-glass" class="size-3.5" />
+      <span class="truncate">Search sessions, tasks, commands…</span>
+      <kbd class="kbd kbd-xs">⌘K</kbd>
+    </button>
+
+    <span class="ml-auto flex items-center gap-1">
+      <span
+        id="vsbar-status"
+        class="hidden lg:flex items-center gap-1.5 px-2 text-[11px] text-base-content/50 select-none"
+        title="Server connection"
+      >
+        <span id="vsbar-status-dot" class="size-[7px] rounded-full bg-success"></span>
+        <span id="vsbar-status-port" phx-update="ignore"></span>
+      </span>
+      <button
+        id="push-setup-btn-vsbar"
+        phx-hook="PushSetup"
+        phx-update="ignore"
+        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        data-push-state="disabled"
+        title="Enable push notifications"
+        aria-label="Enable push notifications"
+      >
+        <.icon name="hero-bell" class="size-4" />
+      </button>
+      <button
+        phx-click="toggle_collapsed"
+        phx-target="#app-rail"
+        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        title="Toggle sidebar"
+        aria-label="Toggle sidebar"
+      >
+        <.icon name="hero-view-columns" class="size-4" />
+      </button>
+      <button
+        id="vsbar-pin"
+        phx-update="ignore"
+        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring hidden"
+        aria-pressed="false"
+        title="Always on top"
+        aria-label="Toggle always on top"
+      >
+        <.icon name="hero-map-pin" class="size-4" />
+      </button>
+    </span>
+  </div>
+
+  <div id="app-body" class="flex flex-1 min-h-0">
   <.live_component
     module={EyeInTheSkyWeb.Components.Rail}
     id="app-rail"
@@ -74,12 +148,10 @@
       </button>
     </header>
 
-    <%!-- Desktop top bar — hidden on mobile --%>
+    <%!-- Desktop top bar — hidden on mobile. Window drag + traffic-light
+         clearance moved up to #app-vsbar. --%>
     <% sidebar_tab = assigns[:sidebar_tab] || :sessions %>
-    <%!-- data-tauri-drag-region on the container itself — the JS handler in app.js
-         excludes interactive descendants (a/button/input/etc) so clicks on toolbar
-         controls still work; clicks on empty space start window drag. --%>
-    <div id="app-topbar" data-tauri-drag-region class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 pr-3 pl-20">
+    <div id="app-topbar" class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 pr-3 pl-3">
       <.top_bar_breadcrumb
         sidebar_tab={sidebar_tab}
         dm_session_name={assigns[:page_title]}
@@ -323,6 +395,8 @@
       </form>
     </dialog>
   </div>
+  </div>
+  <%!-- /#app-body --%>
 
   <.live_component
     module={EyeInTheSkyWeb.Components.FloatingChatComponent}

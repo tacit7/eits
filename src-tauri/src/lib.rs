@@ -727,7 +727,13 @@ pub fn run() {
                 _ => {}
             }
         })
-        .invoke_handler(tauri::generate_handler![pick_folder, open_window, show_session_context_menu])
+        .invoke_handler(tauri::generate_handler![
+            pick_folder,
+            open_window,
+            show_session_context_menu,
+            get_always_on_top,
+            set_always_on_top
+        ])
         .build(tauri::generate_context!())
         .expect("error building tauri application")
         .run(|app_handle, event| {
@@ -1242,6 +1248,29 @@ async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
 #[tauri::command]
 fn open_window(app: tauri::AppHandle, path: String) {
     open_new_window(&app, &path);
+}
+
+/// Current always-on-top state — read by the vsbar pin on page load.
+#[tauri::command]
+fn get_always_on_top() -> bool {
+    ALWAYS_ON_TOP.load(Ordering::Relaxed)
+}
+
+/// Sets always-on-top explicitly (vsbar pin). Returns the applied state.
+/// Shares the ALWAYS_ON_TOP static with the menu/tray toggles and syncs the
+/// menu-bar checkmark, matching toggle_always_on_top's behavior.
+#[tauri::command]
+fn set_always_on_top(app: tauri::AppHandle, on: bool) -> bool {
+    ALWAYS_ON_TOP.store(on, Ordering::Relaxed);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_always_on_top(on);
+    }
+    if let Some(menu) = app.menu() {
+        if let Some(tauri::menu::MenuItemKind::Check(item)) = menu.get("menu_always_on_top") {
+            let _ = item.set_checked(on);
+        }
+    }
+    on
 }
 
 /// Shows a native context menu for a session row in the flyout.

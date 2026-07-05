@@ -1161,7 +1161,7 @@ dependencies = [
 
 [[package]]
 name = "eye-in-the-sky"
-version = "0.3.16"
+version = "0.3.17"
 dependencies = [
  "elixirkit",
  "serde",

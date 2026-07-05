@@ -166,9 +166,11 @@ eits commits create --hash <hash>
 
 **DM targets support both UUID and numeric session ID.** Pass either format to `dm --to`.
 
-### eitsr (Rust CLI, opt-in)
+### eitsr (Rust CLI — PREFERRED)
 
-`eitsr` is a Rust rewrite of `eits` covering Phase 1 families: `tasks`, `dm`, `sessions`, `whoami`, `commits`, `notes`. Output is JSON by default (compact; `EITS_PRETTY=1` or `--pretty` for readable), errors are a `{"error","code","status","hint"}` JSON envelope on stdout with exit codes `0`/`1`/`2`/`3` (success/API-error/usage-error/connection-failure), and mutating commands (`begin`, `complete`, `dm`, `notes add`, `sessions create`) accept `--quiet` to print just the bare id/uuid. Any subcommand outside Phase 1 falls through automatically to bash `scripts/eits`, so `eitsr` is a drop-in superset. Agents may opt into `eitsr` per-session; bash `eits` remains the default until cutover.
+**Use `eitsr` instead of `eits` for all commands it covers.** `eitsr` is the Rust rewrite of `eits`, covering Phase 1 families: `tasks`, `dm`, `sessions`, `whoami`, `commits`, `notes`. Output is JSON by default (compact; `EITS_PRETTY=1` or `--pretty` for readable), errors are a `{"error","code","status","hint"}` JSON envelope on stdout with exit codes `0`/`1`/`2`/`3` (success/API-error/usage-error/connection-failure), and mutating commands (`begin`, `complete`, `dm`, `notes add`, `sessions create`) accept `--quiet` to print just the bare id/uuid. Any subcommand outside Phase 1 falls through automatically to bash `scripts/eits`, so `eitsr` is a drop-in superset.
+
+**Fallback rule:** if an `eitsr` command misbehaves (wrong output, missing flag, unexpected error), retry the same command with bash `eits` to unblock yourself — then report the discrepancy on the standing **eitsr** ticket: `eits tasks annotate 8108` (task #8108, tagged `eitsr`). Do not silently work around eitsr bugs; the ticket is how they get fixed.
 
 ## eits CLI Gotchas
 

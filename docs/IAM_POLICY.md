@@ -440,6 +440,24 @@ Web UI: `/iam/simulator` — lets you construct a context and see which policies
 
 ---
 
+## UI Access
+
+The IAM policies page is accessible via a security icon (hero-shield-check-mini) in the rail's bottom navigation strip, positioned between notifications and settings. Clicking the icon navigates to `/iam/policies`.
+
+---
+
+## Usage Display & API Cents Convention
+
+**Important**: The Anthropic API returns `used_credits` in **cents** (not dollars). For example, `500` means $5.00, and `3000` means $30.00. This is consistent with `monthly_limit`, which is also in cents.
+
+The usage display in `Rail.Flyout.UsageSection` handles this conversion:
+- `spend_label/1` displays the formatted string: `"$X.XX / $Y.YY"` by dividing both `used_credits` and `monthly_limit` by 100.0
+- `monthly_pct/1` calculates percentage utilization by dividing `used_credits` by `monthly_limit` (both in cents) and multiplying by 100 — no unit conversion needed since both are in the same unit.
+
+The `format_dollars/1` function formats floats to 2 decimal places. A prior integer clause was removed since all call sites now consistently produce floats after the cents division.
+
+---
+
 ## Related
 
 - [IAM_HOOK_INSTALL.md](IAM_HOOK_INSTALL.md) — How to wire Claude Code hooks to the IAM endpoint

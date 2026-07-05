@@ -177,6 +177,7 @@ EITS ships a set of skills that live in `~/.claude/skills/`. These are loaded au
 | `eits-dm` | `DM from:` prefix | Receive and reply to inter-agent DMs |
 | `eits-chat` | `eits-chat:` prefix | Handle @mentions from the web UI chat |
 | `eits-teams` | `eits-teams` | Create teams, spawn agents, monitor coordinated work |
+| `team-worker` | Spawned as team member | Worker side of team work: claim task first, work, compile, complete, DM back |
 | `eits-superpowers` | `eits-superpowers` | EITS-native dev workflow: task tracking, team spawning, mockup-first UI |
 | `i-end-session` | `i-end-session` | Clean session close: update tracking → commit → mark completed (commits auto-logged by hook) |
 | `task-workable` | `task-workable` | Create tasks for the auto-worker (haiku or sonnet model) |
@@ -194,6 +195,7 @@ Skills are version-controlled in `priv/skills/`. Install them by copying to `~/.
 cp -r priv/skills/eits-* ~/.claude/skills/
 cp -r priv/skills/i-end-session ~/.claude/skills/
 cp -r priv/skills/task-workable ~/.claude/skills/
+cp -r priv/skills/team-worker ~/.claude/skills/
 ```
 
 Re-run this any time a skill is updated in the repo.

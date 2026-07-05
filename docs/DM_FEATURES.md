@@ -411,6 +411,32 @@ The DM page streams the *output* of `MessageGrouper.group_events/1` (clusters + 
 - `MessagesTab` LC drops `@messages` attr; template uses `phx-update="stream"` container with `@streams.grouped_messages`
 - Empty state keyed on boolean `@empty` attr computed inline
 
+**MessageGrouper: Body-Format Tool Message Detection (commit 11a8d715):**
+
+Tool calls are normally identified by `stream_type` metadata (`"tool_use"`, `"tool_result"`). However, older or certain provider formats embed tool calls directly in the message body as plain text:
+- **Session reader format:** `> \`ToolName\` args...` (backtick-wrapped, leading `>`)
+- **Tool: format:** `Tool: ToolName\n{json}` (literal "Tool:" prefix)
+
+Messages with body-format tool calls were falling through as individual message items instead of being clustered alongside stream_type tool events.
+
+**Fix:** Added `body_is_tool_message?/1` predicate to detect these patterns via regex:
+
+```elixir
+defp body_is_tool_message?(body) do
+  trimmed = String.trim(body)
+  Regex.match?(~r/^> `[^`]+`/, trimmed) or Regex.match?(~r/^Tool: [^\n]+/, trimmed)
+end
+```
+
+Updated clustering logic to use both checks:
+```elixir
+is_tool = stream_type in @tool_types or body_is_tool_message?(msg.body)
+```
+
+**Result:** Body-format tool calls are now clustered with stream_type tools, producing consistent grouping regardless of how the tool call was serialized.
+
+**File:** `lib/eye_in_the_sky_web/live/dm_live/message_grouper.ex`
+
 **Last stream tail cache (commit 010cc8df):**
 
 To avoid re-grouping the full tail on every PubSub append:
@@ -860,6 +886,98 @@ Tool result messages in the DM chat have special UI treatment to reduce visual c
 
 ---
 
+## Tool Cluster Rendering: Flat Mode & HTML Structure
+
+**Commits:** `14c0c6fa`, `b3cbddc7`, `035bc79d`
+
+Tool clusters (groups of consecutive tool calls and results) support a flat rendering mode where all content is immediately visible without nested toggle controls.
+
+### Flat Rendering Mode (commit 14c0c6fa)
+
+**Problem:** Tool clusters wrap individual tool widgets inside collapsible `<details>` elements. When a user clicks the cluster `<details>` to expand, each tool widget remains collapsed, requiring a second click on each tool to see its output. This creates friction.
+
+**Solution:** Add `flat=true` attribute to tool rendering components. When flat:
+- No `<details>` wrapper on individual tools
+- Tool body content always visible (no toggle)
+- Single click on cluster header reveals all tool calls and outputs at once
+
+**Affected components:**
+- `tool_card_shell/1` — When `flat=true`, renders as a plain div instead of `<details>`; body is always visible in a bordered section
+- `tool_widget/1` — Passes `flat={@flat}` to `tool_card_shell`
+- `tool_result_body/1` — Passes `flat={@flat}` to `tool_card_shell`
+- `message_body/1` — Accepts `flat` attr and passes to nested tool components
+
+**Cluster usage:**
+```heex
+<.message_body message={event} compact={true} flat={true} />
+```
+
+When rendering tool events inside a cluster, `flat=true` is set so expanding the cluster header immediately reveals all tools without additional clicking.
+
+### Tool Cluster HTML Structure Fix (commit b3cbddc7)
+
+**Problem:** The `<summary>` element must be a direct child of `<details>` per HTML spec. The cluster code was wrapping the summary inside an intermediate `<div>`, causing the browser to render a fallback "Details" toggle alongside the custom summary — producing a double header.
+
+**Before:**
+```heex
+<details>
+  <div class="border rounded">
+    <summary>Custom header</summary>
+    <div>Content</div>
+  </div>
+</details>
+```
+This triggers browser fallback rendering.
+
+**After:**
+```heex
+<details class="border rounded">
+  <summary>Custom header</summary>
+  <div>Content</div>
+</details>
+```
+The border/bg/rounded styles moved from the inner div to the `<details>` element itself. `<summary>` is now a direct child.
+
+**Result:** Only one header renders; no fallback "Details" toggle.
+
+**File:** `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex`
+
+### Colored Badges for Tool Calls (commit 035bc79d)
+
+**Display:** Tool calls now render with Claudette-style colored status badges in compact mode (used inside clusters).
+
+**Colors:** Each tool type (Read, Write, Edit, Bash, etc.) gets a semantic color badge:
+- **Read**: Blue (information)
+- **Write**: Green (success)
+- **Edit**: Orange (warning)
+- **Bash**: Red (error)
+- **Browse**: Purple (custom)
+
+**Rendering:**
+- **Compact mode** (inside clusters): Colored text badge + inline detail
+- **Expanded mode** (standalone): Full tool widget header with icon and label
+
+**Implementation:** Commit 035bc79d refactors `tool_widget.ex` to apply color via `DmHelpers.provider_icon/1` and tool-specific badge logic.
+
+### Tool Cluster Indent Removal (commit 25ba3689)
+
+**Problem:** Tool cluster headers and summaries had a hardcoded left padding of `pl-[33px]`, adding extra whitespace to both the cluster card and the cluster summary line inside the expandable `<details>` element.
+
+**Fix:** Removed `pl-[33px]` from:
+- Tool cluster header element
+- Tool cluster summary element
+
+**Result:** Tool clusters render without the extra left indent, creating a more compact and aligned appearance with the surrounding message layout.
+
+**File:** `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex`
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex` — cluster rendering with `flat=true`
+- `lib/eye_in_the_sky_web/components/dm_message_components/tool_widget.ex` — tool card shell, flat mode, colored badges
+- `lib/eye_in_the_sky_web/components/dm_helpers.ex` — badge color helpers
+
+---
+
 ## DM Message Bubble Format with Sender Chip
 
 **Commits:** `4e0b0f12`, `677a0c78`, `16b3a213`, `6edecd7e`
@@ -1073,6 +1191,30 @@ The selected effort level is now passed to Claude CLI via `--effort <level>` fla
 - First segment (thinking): `rounded-l-lg`
 - Last segment (effort): `rounded-r-lg`
 - Divider: `w-px h-4 bg-base-content/[0.10] flex-shrink-0`
+
+### Active CLI Flags Badge (commit 7447546e)
+
+**Display:** Small flag icon button in the composer toolbar with a hover tooltip listing active session-level CLI flags.
+
+**Purpose:** Surfaces CLI flags set via slash command (`/sandbox`, `/add-dir`, `/mcp`, `/plugin`, `/config`, `/agents`, `/max-turns`, `/permissions`, etc.) that have no dedicated toolbar control. These flags were already being serialized into the form's data attribute but had no UI surface.
+
+**Excluded from badge:** Model, effort, and plan-mode are handled by their own dedicated pills and controls, so they never appear in the active flags list (see `SlashCommands.opt_key_to_slug/0`).
+
+**Behavior:**
+- Icon: flag emoji or `hero-flag` icon
+- Hover tooltip shows comma-separated list of active flags
+- Click does nothing (read-only indicator)
+- Appears/disappears dynamically based on which flags are active
+- No visual distinction between flags; all flags treated equally
+
+**Implementation:**
+- `flags_badge/1` component in `message_composer.ex` (commit 7447546e)
+- Receives `session_cli_opts` list from parent assigns
+- Filters opts via `serialize_cli_opts/1` to extract displayable flag names
+- Renders tooltip with flag list; empty list means badge is hidden
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/dm_page/message_composer.ex` — `flags_badge/1` component
 
 ### Prompt Queue Accordion (commit cb354c03)
 
@@ -1428,19 +1570,30 @@ The DM endpoint rejects messages from sessions in terminal states (completed or 
 
 ## Copy-to-Clipboard
 
-**Commits:** `d04b7f63`, `10d75ff3`
+**Commits:** `d04b7f63`, `10d75ff3`, `7447546e`
 
 DM messages and tool call/output blocks expose a clipboard icon on hover for one-click copy.
 
 **Coverage:**
-- DM message bodies (rendered markdown)
+- DM message bodies (rendered markdown) — both agent and user messages
 - Tool call widgets: BASH, Edit, Write
 - Tool output blocks
 
+**User Message Copy Button (commit 7447546e):**
+
+User messages now get a hover copy button matching the existing agent message one. When clicked, the button:
+1. Copies the full message text to clipboard
+2. Swaps the icon to a checkmark (✓) for 1.5 seconds to provide visual feedback
+3. Restores the original icon after the feedback period
+
+Previously, user messages had no copy affordance even though the copy data was being serialized into the form's data attribute. This brings feature parity with agent message copy.
+
 **Implementation:**
-- `MarkdownMessage` hook injects the clipboard icon after markdown renders
-- A global capture-phase click listener intercepts the icon click before it reaches the surrounding `<details>` element, preventing accidental expand/collapse toggling
-- Copy uses the Clipboard API with a transient "copied" state on the icon
+- `MarkdownMessage` hook injects the clipboard icon after markdown renders (agent messages)
+- New copy button on user message bubbles in `messages_tab.ex`
+- A global capture-phase click listener intercepts icon clicks before they reach surrounding `<details>` elements, preventing accidental expand/collapse toggling
+- Copy uses the Clipboard API with a transient checkmark icon swap (1.5s) for feedback
+- SVG checkmark icon defined in `assets/js/app.js` for reuse across copy buttons
 
 ---
 
@@ -1495,6 +1648,68 @@ The `AutoScroll` hook preserves the auto-scroll behavior when the DM message lis
 
 **Files:**
 - `assets/js/hooks/auto_scroll.js` — `beforeUpdate`, `updated`, scroll listener, MutationObserver logic
+
+---
+
+## Scroll-to-Bottom Pill in Messages Container
+
+**Commits:** `2f8b2fb6`, `7447546e`
+
+A floating action pill appears in the bottom-right of the messages container once the user scrolls away from the bottom (e.g., reading back through a long conversation), and disappears when scrolling back near the bottom.
+
+**Purpose:** Gives users a quick way to jump back to the latest messages without scrolling all the way down, especially useful for long or frequently-updated conversations.
+
+**Behavior:**
+
+- **Appears when:**
+  - Container has overflowing content (`scrollHeight > clientHeight + 4px`)
+  - User has scrolled away from bottom (not within 50px of the end)
+- **Disappears when:**
+  - User is within 50px of the bottom
+  - User clicks the pill to scroll to bottom
+- **No LiveView interaction:** Fully client-side via the AutoScroll hook — no round-trip to server
+
+**Implementation (commit 7447546e):**
+
+The `AutoScroll` hook manages pill visibility:
+1. On mount: snapshots the pill element (`#scroll-to-bottom-pill`) via `getElementById`
+2. On every scroll event: calls `_updatePill()` to check geometry and toggle visibility
+3. On pill click: sets `shouldAutoScroll = true`, scrolls to bottom, and hides pill
+4. On `updated()` (after LiveView patch): calls `_updatePill()` to recalculate visibility based on new content height
+5. On destroy: removes pill click listener and cleans up references
+
+**Pill visibility logic:**
+
+```javascript
+_updatePill() {
+  if (!this._pill) return
+  const scrollable = this.el.scrollHeight > this.el.clientHeight + 4
+  this._pill.classList.toggle("hidden", this.shouldAutoScroll || !scrollable)
+}
+```
+
+The pill is hidden if `shouldAutoScroll` is true OR the container doesn't have overflow.
+
+**Scope Fix (commit 2f8b2fb6):**
+
+The AutoScroll hook is mounted twice on the DM page:
+1. On `#messages-container` (actual message list)
+2. On `#codex-raw-lines` panel (collapsible raw JSONL view)
+
+The pill lookup used a bare `getElementById`, so whichever hook instance mounted last controlled the shared pill — meaning the raw JSONL panel's scroll position could drive pill visibility instead of the message list. 
+
+Fixed by scoping pill wiring to the `#messages-container` instance only. The hook now checks if its element ID matches `#messages-container` before claiming the pill:
+
+```javascript
+mounted() {
+  // Only #messages-container's AutoScroll manages the pill
+  this._pill = this.el.id === "messages-container" ? document.getElementById("scroll-to-bottom-pill") : null
+}
+```
+
+**Files:**
+- `assets/js/hooks/auto_scroll.js` — `_updatePill()`, pill click handler, cleanup
+- `lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex` — `#scroll-to-bottom-pill` element rendering
 
 ---
 

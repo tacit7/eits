@@ -103,3 +103,10 @@ pr-*.md
 /priv/static/mockups/
 /priv/static/mockups-*.html
 /docs/.obsidian/
+
+# Pi harness
+/pi-harness/node_modules/
+/pi-harness/dist/
+/priv/bin/eits-pi-harness
+/priv/bin/pi/
+/var/pi-sessions/

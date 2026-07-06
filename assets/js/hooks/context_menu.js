@@ -211,9 +211,13 @@ export const CtxMenu = {
       el.className = 'ctx-menu-item' + (item.danger ? ' ctx-menu-danger' : '')
       el.setAttribute('role', 'menuitem')
       el.dataset.idx = String(i)
+      // hero-* icons render as a CSS-masked span (heroicons vendor plugin);
+      // anything else (dot color, legacy glyph) renders as before.
       const iconHtml = item.dot
         ? `<span class="ctx-menu-dot" style="background:${item.dot}"></span>`
-        : `<span class="ctx-menu-ic">${item.icon || ''}</span>`
+        : item.icon && item.icon.startsWith('hero-')
+          ? `<span class="ctx-menu-ic ${item.icon}"></span>`
+          : `<span class="ctx-menu-ic">${item.icon || ''}</span>`
       el.innerHTML = `${iconHtml}<span class="ctx-menu-label"></span>${item.children ? '<span class="ctx-menu-sub-arrow">▸</span>' : ''}`
       el.querySelector('.ctx-menu-label').textContent = item.label
       if (item.children) {

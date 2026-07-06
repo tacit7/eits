@@ -30,17 +30,17 @@ const TASK_STATES = [
 
 export const REGISTRY = {
   session: (d) => [
-    { label: 'Open', icon: '↗', run: (c) => c.navigate(`/dm/${d.ctxId}`) },
+    { label: 'Open', icon: 'hero-arrow-up-right', run: (c) => c.navigate(`/dm/${d.ctxId}`) },
     {
       label: 'Open in New Window',
-      icon: '⧉',
+      icon: 'hero-arrow-top-right-on-square',
       tauri: true,
       run: (c) => c.invoke('open_window', { path: `/dm/${d.ctxId}` }),
     },
     { sep: true },
     {
       label: 'Rename…',
-      icon: '✎',
+      icon: 'hero-pencil-square',
       run: async (c) => {
         const name = await c.prompt({
           title: 'Rename session',
@@ -54,15 +54,15 @@ export const REGISTRY = {
     },
     {
       label: 'Archive',
-      icon: '🗄',
+      icon: 'hero-archive-box',
       run: (c) => c.push('archive_session', { session_id: Number(d.ctxId) }),
     },
-    { label: 'Mark as unread', icon: '●', run: (c) => c.flash('Coming soon') },
+    { label: 'Mark as unread', icon: 'hero-envelope', run: (c) => c.flash('Coming soon') },
     { sep: true },
-    { label: 'Copy session ID', icon: '⧈', run: (c) => c.copy(d.ctxUuid || d.ctxId) },
+    { label: 'Copy session ID', icon: 'hero-document-duplicate', run: (c) => c.copy(d.ctxUuid || d.ctxId) },
     {
       label: 'Copy deeplink',
-      icon: '🔗',
+      icon: 'hero-link',
       run: (c) => c.copy(`eits://sessions/${d.ctxUuid || d.ctxId}`),
     },
     ...(d.ctxWorktree
@@ -72,13 +72,13 @@ export const REGISTRY = {
             // Phoenix server always runs on the user's machine, so this works
             // in the browser too, not just the desktop app.
             label: 'Open worktree in Finder',
-            icon: '📁',
+            icon: 'hero-folder-open',
             run: (c) => c.push('open_worktree', { session_id: Number(d.ctxId) }),
           },
         ]
       : []),
     { sep: true },
-    { label: 'DM this session', icon: '💬', run: (c) => c.navigate(`/dm/${d.ctxId}`) },
+    { label: 'DM this session', icon: 'hero-chat-bubble-left-right', run: (c) => c.navigate(`/dm/${d.ctxId}`) },
   ],
 
   // Task items push the pages' EXISTING events (open_task_detail/move_task/
@@ -86,11 +86,11 @@ export const REGISTRY = {
   // page with task cards works with zero new server code. data-ctx-id carries
   // the task uuid.
   task: (d) => [
-    { label: 'Open', icon: '↗', run: (c) => c.push('open_task_detail', { task_id: d.ctxId }) },
+    { label: 'Open', icon: 'hero-arrow-up-right', run: (c) => c.push('open_task_detail', { task_id: d.ctxId }) },
     { sep: true },
     {
       label: 'Move to',
-      icon: '→',
+      icon: 'hero-arrow-right',
       children: TASK_STATES.map((s) => ({
         label: s.name,
         dot: s.color,
@@ -98,29 +98,29 @@ export const REGISTRY = {
       })),
     },
     { sep: true },
-    { label: 'Copy task ID', icon: '⧈', run: (c) => c.copy(d.ctxIntId || d.ctxId) },
+    { label: 'Copy task ID', icon: 'hero-document-duplicate', run: (c) => c.copy(d.ctxIntId || d.ctxId) },
     { sep: true },
     {
       label: 'Delete task',
-      icon: '🗑',
+      icon: 'hero-trash',
       danger: true,
       run: (c) => c.push('delete_task', { task_id: d.ctxId }),
     },
   ],
 
   note: (d) => [
-    { label: 'Open', icon: '↗', run: (c) => c.navigate(`/notes/${d.ctxId}/edit`) },
+    { label: 'Open', icon: 'hero-arrow-up-right', run: (c) => c.navigate(`/notes/${d.ctxId}/edit`) },
     {
       label: d.ctxStarred === 'true' ? 'Unstar' : 'Star',
-      icon: '★',
+      icon: 'hero-star',
       run: (c) => c.push('ctx_toggle_star_note', { note_id: Number(d.ctxId) }),
     },
     { sep: true },
-    { label: 'Copy note ID', icon: '⧈', run: (c) => c.copy(String(d.ctxId)) },
+    { label: 'Copy note ID', icon: 'hero-document-duplicate', run: (c) => c.copy(String(d.ctxId)) },
     { sep: true },
     {
       label: 'Delete note',
-      icon: '🗑',
+      icon: 'hero-trash',
       danger: true,
       run: (c) => c.push('ctx_delete_note', { note_id: Number(d.ctxId) }),
     },

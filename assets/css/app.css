@@ -1010,6 +1010,7 @@ html[data-socket="disconnected"] #vsbar-status-dot {
 }
 .ctx-menu-ic {
   width: 15px;
+  height: 15px;
   text-align: center;
   opacity: 0.75;
   flex: none;

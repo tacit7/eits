@@ -360,7 +360,7 @@ defmodule EyeInTheSky.Pi.SDKTest do
     :ok = SDK.cancel(ref)
     feed_exit(h, 0)
 
-    assert_receive {:claude_error, ^ref, :canceled}, 500
+    assert_receive {:claude_error, ^ref, :user_canceled}, 500
   end
 
   test "cancel then nonzero exit -> terminal :canceled (not exit_code)", ctx do
@@ -370,7 +370,7 @@ defmodule EyeInTheSky.Pi.SDKTest do
     :ok = SDK.cancel(ref)
     feed_exit(h, 143)
 
-    assert_receive {:claude_error, ^ref, :canceled}, 500
+    assert_receive {:claude_error, ^ref, :user_canceled}, 500
   end
 
   test "cancel then turn_end -> terminal :canceled, never claude_complete", ctx do
@@ -380,7 +380,7 @@ defmodule EyeInTheSky.Pi.SDKTest do
     :ok = SDK.cancel(ref)
     feed(h, encode(%{"type" => "turn_end", "aggregate" => %{}}))
 
-    assert_receive {:claude_error, ^ref, :canceled}, 500
+    assert_receive {:claude_error, ^ref, :user_canceled}, 500
     refute_receive {:claude_complete, ^ref, _}, 100
   end
 end

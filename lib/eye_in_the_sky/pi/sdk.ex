@@ -18,6 +18,10 @@ defmodule EyeInTheSky.Pi.SDK do
   `state.terminal` (nil | :completed | :failed | :canceled) guards every path
   that would emit `{:claude_complete, ...}` or `{:claude_error, ...}` from
   a terminal event so exactly one terminal message reaches the caller.
+
+  Cancel emits `{:claude_error, ref, :user_canceled}` on the terminal path.
+  `ErrorClassifier.classify(:user_canceled)` returns `:user_canceled`
+  (systemic → no retry) so a user cancel is never re-run.
   """
 
   use EyeInTheSky.SDK.MessageHandler
@@ -63,7 +67,7 @@ defmodule EyeInTheSky.Pi.SDK do
   Cancel a running Pi session (protocol abort → 3 s grace → transport kill).
 
   Marks the ref as canceled (Registry marker entry) so the handler reports the
-  terminal outcome as `:canceled` — never a retryable-looking exit error —
+  terminal outcome as `:user_canceled` — never a retryable-looking exit error —
   regardless of whether the harness ends the turn via `turn_end`, a clean
   exit, or the grace-timeout kill.
   """
@@ -315,7 +319,7 @@ defmodule EyeInTheSky.Pi.SDK do
   def on_clean_exit(state) do
     cond do
       state.terminal == :canceled or consume_cancel_marker(state.sdk_ref) ->
-        {:error, :canceled}
+        {:error, :user_canceled}
 
       state.terminal == :completed ->
         {:complete, state.eits_session_id}
@@ -337,7 +341,7 @@ defmodule EyeInTheSky.Pi.SDK do
   @impl MessageHandler
   def on_abnormal_exit(status, state) do
     if state.terminal == :canceled or consume_cancel_marker(state.sdk_ref) do
-      {:error, :canceled}
+      {:error, :user_canceled}
     else
       {:error, MessageHandler.default_exit_reason(status)}
     end
@@ -395,7 +399,7 @@ defmodule EyeInTheSky.Pi.SDK do
         # terminal :canceled — never completed, never a retryable error shape.
         state = %{state | terminal: :canceled}
         log_usage("pi.sdk.canceled", eits_session_id, data)
-        send(caller_pid, {:claude_error, sdk_ref, :canceled})
+        send(caller_pid, {:claude_error, sdk_ref, :user_canceled})
         after_terminal(state, data)
 
       true ->

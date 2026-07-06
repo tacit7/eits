@@ -64,7 +64,12 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
     <%= if @notes != [] do %>
       <div data-vim-list class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
-          <div class="py-1 relative group/row flex items-start">
+          <div
+            class="py-1 relative group/row flex items-start"
+            data-ctx="note"
+            data-ctx-id={note.id}
+            data-ctx-starred={to_string(starred?(note))}
+          >
             <%!-- Select checkbox: absolute, outside row flow, hover-reveal --%>
             <div
               class={[

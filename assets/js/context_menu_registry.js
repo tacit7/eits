@@ -108,12 +108,16 @@ export const REGISTRY = {
     },
   ],
 
+  // Note items push the notes page's EXISTING events (toggle_star / delete_note,
+  // both keyed on note_id — see live/shared/notes_helpers.ex), so no new server
+  // code. The menu only opens where notes_list.ex renders data-ctx="note" rows,
+  // i.e. the notes page, which is exactly where those handlers live.
   note: (d) => [
     { label: 'Open', icon: 'hero-arrow-up-right', run: (c) => c.navigate(`/notes/${d.ctxId}/edit`) },
     {
       label: d.ctxStarred === 'true' ? 'Unstar' : 'Star',
       icon: 'hero-star',
-      run: (c) => c.push('ctx_toggle_star_note', { note_id: Number(d.ctxId) }),
+      run: (c) => c.push('toggle_star', { note_id: d.ctxId }),
     },
     { sep: true },
     { label: 'Copy note ID', icon: 'hero-document-duplicate', run: (c) => c.copy(String(d.ctxId)) },
@@ -122,7 +126,7 @@ export const REGISTRY = {
       label: 'Delete note',
       icon: 'hero-trash',
       danger: true,
-      run: (c) => c.push('ctx_delete_note', { note_id: Number(d.ctxId) }),
+      run: (c) => c.push('delete_note', { note_id: d.ctxId }),
     },
   ],
 }

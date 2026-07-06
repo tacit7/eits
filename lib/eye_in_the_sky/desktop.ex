@@ -20,6 +20,23 @@ defmodule EyeInTheSky.Desktop do
     broadcast(msg)
   end
 
+  @doc """
+  Send a high-urgency native notification for events that need attention now
+  (session failed, agent waiting for input).
+
+  Same shape as `notify/3`, but the desktop shell escalates: it plays a sound
+  and bounces the dock icon persistently (Critical attention) until the app is
+  focused, rather than the one-shot bounce a normal notification gets.
+  """
+  def alert(title, body, path \\ nil) do
+    msg =
+      if path,
+        do: "alert:#{title}|#{body}|#{path}",
+        else: "alert:#{title}|#{body}"
+
+    broadcast(msg)
+  end
+
   @doc "Set the dock badge count. Pass 0 to clear."
   def set_badge(count) when is_integer(count) and count >= 0 do
     broadcast("badge:#{count}")

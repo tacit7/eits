@@ -515,33 +515,31 @@ pub fn run() {
                             Ok(_) => log!("[eits-tauri] run_on_main_thread dispatched ok"),
                             Err(e) => log!("[eits-tauri] run_on_main_thread failed: {e}"),
                         };
-                    } else if msg.starts_with(b"notify:") {
-                        // Format: notify:<title>|<body>  or  notify:<title>|<body>|<path>
-                        let payload = String::from_utf8_lossy(&msg[7..]);
+                    } else if msg.starts_with(b"notify:") || msg.starts_with(b"alert:") {
+                        // notify:<title>|<body>[|<path>]  — normal, one-shot dock bounce
+                        // alert:<title>|<body>[|<path>]   — urgent: sound + persistent
+                        //                                    (Critical) bounce until focused
+                        let critical = msg.starts_with(b"alert:");
+                        let offset = if critical { 6 } else { 7 };
+                        let payload = String::from_utf8_lossy(&msg[offset..]);
                         let parts: Vec<&str> = payload.splitn(3, '|').collect();
                         let title = parts.first().unwrap_or(&"EITS").to_string();
                         let body = parts.get(1).unwrap_or(&"").to_string();
                         let nav_path = parts.get(2).map(|s| s.to_string());
 
-                        log!("[eits-tauri] notify: title={title:?} body={body:?} nav_path={nav_path:?}");
+                        log!("[eits-tauri] notify(critical={critical}): title={title:?} body={body:?} nav_path={nav_path:?}");
 
                         // macOS UNUserNotificationCenter requires main-thread dispatch.
                         // Calling show() from the elixirkit-pubsub background thread
-                        // silently fails on some macOS versions.
+                        // silently fails on some macOS versions. send_notification
+                        // also owns the dock-attention request (Critical vs one-shot).
                         let app_clone = app_handle.clone();
-                        let title_c = title.clone();
-                        let body_c = body.clone();
-                        let nav_path_c = nav_path.clone();
                         match app_handle.run_on_main_thread(move || {
-                            send_notification(&title_c, &body_c, nav_path_c, &app_clone);
+                            send_notification(&title, &body, nav_path, critical, &app_clone);
                         }) {
                             Ok(_) => {}
                             Err(e) => log!("[eits-tauri] notify run_on_main_thread failed: {e}"),
                         };
-
-                        if let Some(w) = app_handle.get_webview_window("main") {
-                            let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
-                        }
                     } else if msg.starts_with(b"badge:") {
                         let count_str = String::from_utf8_lossy(&msg[6..]);
                         if let Ok(count) = count_str.trim().parse::<i64>() {
@@ -889,20 +887,42 @@ fn navigate_to(app_handle: &tauri::AppHandle, path: &str) {
 /// - Window in background → store in PENDING_NAV; the Focused(true) window event
 ///   drains it when the user clicks the notification and the app comes to front.
 #[cfg(not(debug_assertions))]
-fn send_notification(title: &str, body: &str, nav_path: Option<String>, app_handle: &tauri::AppHandle) {
+fn send_notification(
+    title: &str,
+    body: &str,
+    nav_path: Option<String>,
+    critical: bool,
+    app_handle: &tauri::AppHandle,
+) {
     use tauri_plugin_notification::NotificationExt;
 
-    log!("[eits-tauri] send_notification (main thread): title={title:?} body={body:?} nav={nav_path:?}");
+    log!("[eits-tauri] send_notification (main thread): title={title:?} body={body:?} nav={nav_path:?} critical={critical}");
 
-    let builder = app_handle
+    let mut builder = app_handle
         .notification()
         .builder()
         .title(title)
         .body(body);
 
+    // Urgent alerts play a sound; normal notifications stay silent.
+    if critical {
+        builder = builder.sound("default");
+    }
+
     match builder.show() {
         Ok(_) => log!("[eits-tauri] send_notification: show() ok"),
         Err(e) => log!("[eits-tauri] notification error: {e}"),
+    }
+
+    // Dock attention: Critical bounces persistently until the app is focused
+    // (for failed/waiting escalation); Informational is a single bounce.
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let level = if critical {
+            tauri::UserAttentionType::Critical
+        } else {
+            tauri::UserAttentionType::Informational
+        };
+        let _ = window.request_user_attention(Some(level));
     }
 
     if let Some(path) = nav_path {

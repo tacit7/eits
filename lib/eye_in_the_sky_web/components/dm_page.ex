@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   alias EyeInTheSkyWeb.Components.DmPage.TasksTab
 
   @tabs [
-    {"messages", "hero-chat-bubble-left-right", "Messages"},
+    {"messages", "hero-chat-bubble-left-right", "Chat"},
     {"tasks", "hero-clipboard-document-list", "Tasks"},
     {"commits", "hero-code-bracket", "Commits"},
     {"notes", "hero-document-text", "Notes"},
@@ -40,6 +40,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :notify_on_stop, :boolean, default: false
   attr :dm_settings_scope, :string, default: "session"
   attr :dm_settings_subtab, :string, default: "general"
+  attr :dm_settings_effective, :map, default: %{}
   # LiveView streams — passed through to MessagesTab so it can render the
   # phx-update="stream" container without holding @messages itself.
   attr :streams, :map, required: true
@@ -477,6 +478,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 agent={@agent_record}
                 session_state={@session_state}
                 notify_on_stop={@notify_on_stop}
+                effective={@dm_settings_effective}
               />
             <% _ -> %>
               <.messages_tab_content

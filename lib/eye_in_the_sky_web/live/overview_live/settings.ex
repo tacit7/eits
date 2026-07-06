@@ -17,9 +17,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     EditorTab,
     GeneralTab,
     PricingTab,
+    ProvidersTab,
     SystemTab,
     WorkflowTab
   }
+
+  alias EyeInTheSky.Pi.ModelDiscoveryCache
+  alias EyeInTheSky.Redaction
 
   @voices ["Ava", "Isha", "Lee", "Jamie", "Serena"]
 
@@ -31,7 +35,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     {"autumn", "Autumn"}
   ]
 
-  @valid_tabs ~w(general editor auth workflow pricing system desktop)
+  @valid_tabs ~w(general editor auth workflow pricing system desktop providers)
 
   @known_editors ~w(code cursor vim nano zed)
 
@@ -42,6 +46,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def mount(_params, _session, socket) do
     if connected?(socket) do
       EyeInTheSky.Events.subscribe_settings()
+      EyeInTheSky.Events.subscribe_pi_models()
     end
 
     {settings, db_info} =
@@ -74,6 +79,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:desktop_mode?, Desktop.desktop_mode?())
       |> assign(:desktop_port, DesktopConfig.configured_port())
       |> assign(:hooks_consent, DesktopConfig.hooks_consent())
+      |> assign(:pi_providers, :loading)
+      |> assign(:pi_model_status, current_model_status())
+      |> assign(:pi_key_op_in_flight, false)
 
     {:ok, socket}
   end
@@ -81,12 +89,40 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   @impl true
   def handle_params(%{"tab" => tab}, _uri, socket) do
     active = if tab in @valid_tabs, do: String.to_existing_atom(tab), else: :general
-    {:noreply, assign(socket, :active_tab, active)}
+    {:noreply, socket |> assign(:active_tab, active) |> maybe_load_providers(active)}
   end
 
   @impl true
   def handle_params(_params, _uri, socket) do
     {:noreply, assign(socket, :active_tab, :general)}
+  end
+
+  defp maybe_load_providers(socket, :providers) do
+    start_provider_load(self())
+    socket
+  end
+
+  defp maybe_load_providers(socket, _), do: socket
+
+  defp start_provider_load(pid) do
+    control = control_module()
+
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      result = control.list_providers()
+      send(pid, {:pi_providers_loaded, result})
+    end)
+
+    :ok
+  end
+
+  defp control_module,
+    do: Application.get_env(:eye_in_the_sky, :pi_control_module, EyeInTheSky.Pi.Control)
+
+  defp current_model_status do
+    case ModelDiscoveryCache.get_cached() do
+      {:ok, models, freshness} -> {length(models), freshness}
+      :empty -> :empty
+    end
   end
 
   @impl true
@@ -285,6 +321,64 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   end
 
   @impl true
+  def handle_event("pi_set_key", %{"provider_id" => pid, "key" => key}, socket)
+      when is_binary(pid) and is_binary(key) and key != "" do
+    start_key_op(self(), :set, pid, key)
+    {:noreply, assign(socket, :pi_key_op_in_flight, true)}
+  end
+
+  @impl true
+  def handle_event("pi_set_key", _params, socket) do
+    {:noreply, put_flash(socket, :error, "Missing key")}
+  end
+
+  @impl true
+  def handle_event("pi_clear_key", %{"provider_id" => pid}, socket) when is_binary(pid) do
+    start_key_op(self(), :clear, pid, nil)
+    {:noreply, assign(socket, :pi_key_op_in_flight, true)}
+  end
+
+  @impl true
+  def handle_event("pi_refresh_models", _params, socket) do
+    ModelDiscoveryCache.refresh_async()
+    {:noreply, assign(socket, :pi_model_status, :loading)}
+  end
+
+  # Runs the blocking harness IPC in a supervised Task so the LiveView socket
+  # is not held for the length of the Pi.Control timeout (up to 30s). Result is
+  # sent back as a :pi_key_op_result message. The closure captures only the
+  # LiveView pid — never `socket` — to keep the assign copy out of task memory.
+  defp start_key_op(pid, op, provider_id, key) do
+    control = control_module()
+
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      result =
+        case op do
+          :set -> control.set_api_key(provider_id, key)
+          :clear -> control.clear_api_key(provider_id)
+        end
+
+      send(pid, {:pi_key_op_result, op, result})
+    end)
+
+    :ok
+  end
+
+  # Redact any provider-echoed key material out of the flash text before it
+  # reaches the DOM. Never inspect/1 a raw crash term unfiltered — it may
+  # contain the submitted key inside a Task exit report.
+  defp key_op_error_flash(:set, reason),
+    do: "Key save failed: #{redact_reason(reason)}"
+
+  defp key_op_error_flash(:clear, reason),
+    do: "Key clear failed: #{redact_reason(reason)}"
+
+  defp redact_reason({:pi_control, msg}) when is_binary(msg),
+    do: msg |> Redaction.redact() |> String.slice(0, 200)
+
+  defp redact_reason(other), do: Redaction.redact_inspect(other, limit: 200)
+
+  @impl true
   def handle_info(:set_default_theme, socket) do
     if Settings.get("theme") == "" do
       Settings.put("theme", "dark")
@@ -297,6 +391,47 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_info({:settings_changed, _key, _value}, socket) do
     settings = Settings.all()
     {:noreply, assign(socket, :settings, settings)}
+  end
+
+  @impl true
+  def handle_info({:pi_providers_loaded, result}, socket) do
+    {:noreply, assign(socket, :pi_providers, result)}
+  end
+
+  @impl true
+  def handle_info({:pi_key_op_result, op, :ok}, socket) do
+    ModelDiscoveryCache.invalidate()
+    ModelDiscoveryCache.refresh_async()
+    start_provider_load(self())
+
+    flash =
+      case op do
+        :set -> "Key saved to ~/.pi/agent/auth.json"
+        :clear -> "Key cleared"
+      end
+
+    {:noreply,
+     socket
+     |> assign(:pi_key_op_in_flight, false)
+     |> put_flash(:info, flash)}
+  end
+
+  @impl true
+  def handle_info({:pi_key_op_result, op, {:error, reason}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:pi_key_op_in_flight, false)
+     |> put_flash(:error, key_op_error_flash(op, reason))}
+  end
+
+  @impl true
+  def handle_info({:pi_models_refreshed, {:ok, models}}, socket) do
+    {:noreply, assign(socket, :pi_model_status, {length(models), :fresh})}
+  end
+
+  @impl true
+  def handle_info({:pi_models_refreshed, {:error, reason}}, socket) do
+    {:noreply, assign(socket, :pi_model_status, {:error, reason})}
   end
 
   def handle_info(_, socket), do: {:noreply, socket}
@@ -317,6 +452,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         <div class="tabs tabs-bordered overflow-x-auto flex-nowrap whitespace-nowrap">
           <%= for {label, key} <- [
             {"General", "general"}, {"Editor", "editor"}, {"Auth & Keys", "auth"},
+            {"Providers", "providers"},
             {"Workflow", "workflow"}, {"Pricing", "pricing"}, {"System", "system"},
             {"Desktop", "desktop"}
           ] do %>
@@ -342,6 +478,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   defp render_tab(%{active_tab: :pricing} = assigns), do: PricingTab.render(assigns)
   defp render_tab(%{active_tab: :system} = assigns), do: SystemTab.render(assigns)
   defp render_tab(%{active_tab: :desktop} = assigns), do: DesktopTab.render(assigns)
+  defp render_tab(%{active_tab: :providers} = assigns), do: ProvidersTab.render(assigns)
 
   defp render_tab(%{active_tab: _} = assigns) do
     ~H[<p class="text-sm text-base-content/50 px-2 py-4">Coming soon</p>]

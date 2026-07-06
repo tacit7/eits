@@ -52,6 +52,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   def failed_tier("rate_limit_error"), do: "failed_rate_limit"
   def failed_tier("watchdog_timeout"), do: "failed_timeout"
   def failed_tier("retry_exhausted"), do: "failed_retry_exhausted"
+  def failed_tier("model_not_found"), do: "failed_model"
   def failed_tier(_), do: "failed"
 
   @doc """
@@ -130,6 +131,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   defp status_label("failed_rate_limit"), do: "Rate limited"
   defp status_label("failed_timeout"), do: "Timed out"
   defp status_label("failed_retry_exhausted"), do: "Failed"
+  defp status_label("failed_model"), do: "Model not found"
   defp status_label(s), do: s
 
   def status_to_badge("working"), do: "badge-success"
@@ -146,6 +148,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   def status_to_badge("failed_rate_limit"), do: "badge-error badge-outline"
   def status_to_badge("failed_timeout"), do: "badge-error"
   def status_to_badge("failed_retry_exhausted"), do: "badge-error"
+  def status_to_badge("failed_model"), do: "badge-error"
   def status_to_badge(_), do: "badge-ghost"
 
   defp render_no_project do

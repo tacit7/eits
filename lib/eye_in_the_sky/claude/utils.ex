@@ -55,4 +55,12 @@ defmodule EyeInTheSky.Claude.Utils do
   def codex_cli_module do
     Application.get_env(:eye_in_the_sky, :codex_cli_module, EyeInTheSky.Codex.CLI)
   end
+
+  @doc """
+  Returns the configured Pi CLI module (real or mock for tests).
+  """
+  @spec pi_cli_module() :: module()
+  def pi_cli_module do
+    Application.get_env(:eye_in_the_sky, :pi_cli_module, EyeInTheSky.Pi.CLI)
+  end
 end

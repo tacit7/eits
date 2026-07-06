@@ -700,6 +700,27 @@ The DM composer supports inline autocomplete for file paths and agent names, ena
 
 ---
 
+## DM Page Tab Naming
+
+**Commit:** `e8f5fef3`
+
+The primary tab on the DM page was renamed from "Messages" to "Chat" for improved UX clarity.
+
+**Tabs:**
+- **Chat** (formerly "Messages") — Main conversation view with streamed messages, tool calls, and inline formatting
+- **Tasks** — Task management and status tracking
+- **Commits** — Git commit history and summaries
+- **Notes** — Agent-created notes and documentation
+- **Agents** — Active agent list and queue status
+- **Settings** — Session configuration and preferences (Claude/OpenAI flags, auth, defaults)
+- **Info** — Session metadata and session controls
+
+**Change rationale:** "Chat" better describes the conversation interface and aligns with common terminology for messaging/conversation UI across platforms.
+
+**File:** `lib/eye_in_the_sky_web/components/dm_page.ex` (@tabs definition)
+
+---
+
 ## Message Queue Bug Fixes
 
 **Commits:** `1a09115`, `9e8d312`
@@ -980,7 +1001,7 @@ The border/bg/rounded styles moved from the inner div to the `<details>` element
 
 ## DM Message Bubble Format with Sender Chip
 
-**Commits:** `4e0b0f12`, `677a0c78`, `16b3a213`, `6edecd7e`
+**Commits:** `4e0b0f12`, `677a0c78`, `16b3a213`, `6edecd7e`, `0c999311`
 
 Agent DMs now use a structured format with a sender chip that shows agent name and session ID.
 
@@ -1011,15 +1032,17 @@ DM from:<agent_name> (session:<uuid>) <message body>
   - Extracts HTTP(S) URLs from message body
 
 **UI rendering:**
-- DM messages show a sender chip with hero-cpu-chip icon
+- DM messages show a sender chip with `lucide-robot` icon (commit 0c999311, changed from `hero-cpu-chip`)
 - Chip displays agent name and `#session_id` (integer ID when available)
+- **Sender chip is clickable when session_id is present:** Links to the session via `/dm/{session_id}` with hover effects (commit 0c999311)
+- **Fallback when no session_id:** Renders as a static span badge (no link)
 - Status pill shows done/failed state if present
 - Clickable URL chip if a status URL is detected
 - User DM bubbles have primary/20 border for visual distinction
 
 **Implementation files:**
 - `lib/eye_in_the_sky_web/components/dm_helpers.ex` — parsing functions and shared component helpers
-- `lib/eye_in_the_sky_web/components/dm_message_components.ex` — chip rendering
+- `lib/eye_in_the_sky_web/components/dm_message_components.ex` — chip rendering and linking
 - `lib/eye_in_the_sky/agents/cmd_dispatcher/dm_handler.ex` — DM body construction
 
 ---
@@ -2831,3 +2854,54 @@ When user presses Cmd+S or clicks the Save button, the hook:
 | `Tab` (in title) | Focus editor |
 | `Cmd/Ctrl + Z` | Undo |
 | `Cmd/Ctrl + Shift + Z` | Redo |
+
+---
+
+## Settings Tab: Input Population from Effective Settings
+
+**Commit:** `efe62f68`
+
+The DM page settings tab now populates all input fields from saved effective settings on load, ensuring users see their current configuration values instead of blank/default states.
+
+**Problem solved:**
+Previously, settings inputs were blank on load. Users had to manually re-enter values when editing, making it unclear what the current setting actually was. The effective settings (merged from session, project, and global scopes) were stored but not reflected in the UI.
+
+**Solution:**
+
+Added a new `dm_settings_effective` assign that passes the effective settings map through the component hierarchy:
+
+1. **DmLive.mount** — Loads effective settings and assigns to socket as `dm_settings_effective`
+2. **DmPage component** — Accepts `:dm_settings_effective` attr and passes to SettingsTab
+3. **SettingsTab component** — Accepts `:effective` attr and passes to subsections (anthropic_section, openai_section)
+4. **Individual setting components** — Uses `setting_val(@effective, "key")` helper to populate input values from the map
+
+**Helper function:**
+
+```elixir
+defp setting_val(effective_map, key) when is_map(effective_map) do
+  Map.get(effective_map, key) || Map.get(effective_map, String.to_atom(key))
+end
+```
+
+Returns the value from the effective settings map, or nil if not present. Fallback to `nil` allows inputs to show their placeholder text when no value is set.
+
+**Updated inputs:**
+
+All Anthropic/OpenAI settings inputs now use `setting_val`:
+- `anthropic.permission_mode` — populated from effective settings (defaults to "acceptEdits" if nil)
+- `anthropic.max_turns` — populated from effective settings (shows placeholder "No limit" if nil)
+- `anthropic.fallback_model` — populated from effective settings (defaults to "" if nil)
+- `anthropic.from_pr` — populated from effective settings (shows placeholder if nil)
+- `anthropic.json_schema` — populated from effective settings (shows placeholder if nil)
+- All OpenAI settings follow the same pattern
+
+**User experience:**
+
+- On settings tab open, all inputs show their current value (or placeholder if not set)
+- Users immediately see what the effective setting is before making changes
+- No ambiguity between "not set" (placeholder) vs "set to value" (displayed value)
+- Scope selector still allows switching between session/project/global views
+
+**Files:**
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — DmPage component passes `dm_settings_effective`
+- `lib/eye_in_the_sky_web/components/dm_page/settings_tab.ex` — SettingsTab receives `effective` attr, all subsections and inputs use `setting_val` helper

@@ -1,5 +1,94 @@
 # eits CLI
 
+The eits CLI is available in two implementations: **eitsr** (Rust, Phase 1 families) and **bash eits** (comprehensive). `eitsr` is installed on PATH as the default and provides better performance, JSON-native output, and strict error handling. Bash `eits` remains available as a fallback for all other subcommands.
+
+## eitsr — Rust Implementation (Phase 1)
+
+`eitsr` is a Rust rewrite of the eits CLI covering the **Phase 1 command families**:
+
+- `tasks` — task queries and mutations (CRUD, state transitions, tagging)
+- `dm` — direct messages (send, read, list, inbox)
+- `sessions` — session queries and state (list, get, create, update, end, context, notes, tasks)
+- `commits` — commit tracking (list, create)
+- `notes` — note queries and mutations (list, get, create, update, add)
+- `whoami` — identity resolution (session/agent UUIDs and IDs)
+
+Any subcommand outside Phase 1 (e.g., `agents`, `projects`, `channels`, `teams`, `jobs`, `search`, `hooks`, `skills`, `worktree`) automatically falls through to bash `scripts/eits`, so `eitsr` is a drop-in superset of bash eits.
+
+### Output Format
+
+**JSON by default** — all output is machine-readable JSON. Override with environment variables or flags:
+
+- `EITS_PRETTY=1` or `--pretty` flag — pretty-print JSON (readable)
+- `EITS_COMPACT=1` or `EITS_PRETTY=` — single-line JSON (compact, default)
+- `--quiet` / `-q` flag on mutations — print only the bare ID/UUID (no JSON wrapper)
+
+**Success responses** (exit 0) are a compact JSON object with the resource or result array:
+
+```json
+{"task":{"id":42,"title":"Implement X","state":2,...}}
+{"items":[...],"count":3}
+{"session_id":"123e4567-e89b-12d3-a456-426614174000"}
+```
+
+With `--quiet`, only the ID:
+```
+42
+123e4567-e89b-12d3-a456-426614174000
+```
+
+**Error responses** (exit 1/2/3) emit a JSON error envelope with exit code:
+
+```json
+{"error":"<message>","code":"<code>","status":"<http-status>","hint":"<helpful-text>"}
+```
+
+### Exit Codes
+
+| Code | Meaning | Recovery |
+|------|---------|----------|
+| `0` | Success — command completed normally | — |
+| `1` | API error — HTTP error (4xx/5xx from server) | Retry if 429/503 (retryable); 4xx usually unrecoverable |
+| `2` | Usage error — invalid arguments, missing required flag, bad config | Fix the command syntax or env vars |
+| `3` | Connection failure — cannot reach server (host/port/DNS) | Check EITS_URL and server availability |
+
+### Key Differences from Bash eits
+
+1. **JSON-only stdout** — all responses are JSON (even errors); never plain text tables or shell-friendly output. Use bash eits for human-readable table output.
+
+2. **Strict config validation** — missing or malformed `EITS_URL` exits immediately with a usage error (exit 2) instead of defaulting silently.
+
+3. **Compact JSON default** — responses are one-line JSON unless `--pretty` or `EITS_PRETTY=1`. Bash eits pretty-prints by default.
+
+4. **Retries built-in** — HTTP client retries 429/503 with exponential backoff (same logic as bash eits). No separate `queue` commands needed — annotations that fail are queued locally like bash eits.
+
+5. **No fallback for unknown flags** — `eitsr --unknown-flag` is a usage error (exit 2), not silently ignored. Bash eits may accept or ignore unknown flags depending on context.
+
+6. **Numeric string coercion** — eitsr does NOT coerce numeric-looking strings the way bash eits does (only ID-suffixed fields are integers). This prevents ambiguity in responses.
+
+### Environment Variables
+
+Same as bash eits. eitsr respects:
+
+```bash
+EITS_URL                 # API endpoint (default: http://localhost:5001/api/v1)
+EITS_API_KEY             # Optional API key for authentication
+EITS_SESSION_UUID        # Session UUID
+EITS_SESSION_ID          # Numeric session ID
+EITS_AGENT_UUID          # Agent UUID
+EITS_PROJECT_ID          # Project context
+EITS_PRETTY=1            # Pretty-print JSON (same as --pretty flag)
+EITS_COMPACT=1           # Single-line JSON (default)
+```
+
+### Opt-In / Cutover Strategy
+
+Agents and users may opt into `eitsr` per-session while bash eits remains the default CLI for all sessions. Internally, CLAUDE.md and example scripts are documented for eitsr; Codex and other orchestrators will migrate gradually to avoid breaking existing workflows.
+
+---
+
+## bash eits
+
 Bash script at `scripts/eits`. Talks to the Eye in the Sky REST API.
 
 ## Setup
@@ -64,6 +153,8 @@ Each rate-limit evaluation emits a `[:eits, :rate_limit, :check]` telemetry even
 
 ## sessions
 
+**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+
 ```bash
 eits sessions list [--search <q>] [--name <partial>] [--status <s>] \
   [--project <id>] [--agent <uuid>] [--agent-slug <slug>] \
@@ -123,6 +214,8 @@ eits sessions reopen [<uuid|self>]
 ---
 
 ## tasks
+
+**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
 
 ```bash
 # List / filter
@@ -308,6 +401,8 @@ Default output groups results by entity type with headers and counts. Use `--jso
 
 ## notes
 
+**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+
 ```bash
 eits notes list [--session <uuid>] [--task <id>] [--project <id>] \
   [--mine] [--starred] [--q <query>|--search <query>] \
@@ -438,6 +533,8 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 ## commits
 
+**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+
 ```bash
 eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] \
   [--since <hash>] [--limit <n>]
@@ -480,6 +577,8 @@ eits jobs delete <id>
 ---
 
 ## dm
+
+**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
 
 ```bash
 eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json]
@@ -677,6 +776,8 @@ Each team member has two status fields:
 ---
 
 ## me
+
+**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
 
 ```bash
 eits me

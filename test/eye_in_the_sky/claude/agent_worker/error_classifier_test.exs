@@ -171,11 +171,57 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
       assert ErrorClassifier.classify(nil) == :transient
     end
 
+    test ":user_canceled classifies as :user_canceled (systemic — no retry)" do
+      # Spec invariant: user-initiated cancels are terminal and MUST NOT be
+      # re-run. Emitted by Pi.SDK on every terminal path (turn_end after cancel,
+      # clean exit after cancel, abnormal exit after cancel).
+      assert ErrorClassifier.classify(:user_canceled) == :user_canceled
+      assert ErrorClassifier.systemic?(:user_canceled)
+      assert ErrorClassifier.status_reason(:user_canceled) == "user_canceled"
+    end
+
     test "rate_limit_error is NOT systemic — retries with backoff are preserved" do
       # 429s are transient by protocol (burst throttling clears in seconds).
       # Categorized so the UI can distinguish but NOT systemic so RetryPolicy
       # keeps its exponential-backoff retry loop.
       refute ErrorClassifier.systemic?({:rate_limit_error, "429"})
+    end
+  end
+
+  describe "pi_turn_error content mapping" do
+    test "usage/quota/billing -> :billing_error (systemic)" do
+      for msg <- [
+            "**Error · HTTP 400**\n\nYou're out of extra usage. Add more at claude.ai/settings/usage.\n\n_invalid_request_error_",
+            "insufficient quota for this request",
+            "credit balance is too low"
+          ] do
+        assert ErrorClassifier.classify({:pi_turn_error, msg}) == :billing_error
+        assert ErrorClassifier.systemic?({:pi_turn_error, msg})
+      end
+    end
+
+    test "auth -> :authentication_error" do
+      for msg <- ["HTTP 401 authentication_error", "invalid api key provided", "HTTP 403 forbidden"] do
+        assert ErrorClassifier.classify({:pi_turn_error, msg}) == :authentication_error
+      end
+    end
+
+    test "rate limit -> :rate_limit_error (retryable)" do
+      for msg <- ["HTTP 429 rate_limit_error", "Rate limit exceeded", "overloaded_error"] do
+        assert ErrorClassifier.classify({:pi_turn_error, msg}) == :rate_limit_error
+        refute ErrorClassifier.systemic?({:pi_turn_error, msg})
+      end
+    end
+
+    test "model 404 -> :model_not_found (systemic, no retry)" do
+      msg = "**Error · HTTP 404**\n\nmodel: claude-3-5-haiku-20241022\n\n_not_found_error_"
+      assert ErrorClassifier.classify({:pi_turn_error, msg}) == :model_not_found
+      assert ErrorClassifier.systemic?({:pi_turn_error, msg})
+      assert ErrorClassifier.status_reason({:pi_turn_error, msg}) == "model_not_found"
+    end
+
+    test "unrecognized pi error -> :transient" do
+      assert ErrorClassifier.classify({:pi_turn_error, "connection reset by peer"}) == :transient
     end
   end
 

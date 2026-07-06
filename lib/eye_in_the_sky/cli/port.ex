@@ -311,4 +311,28 @@ defmodule EyeInTheSky.CLI.Port do
   def maybe_add_env(env, key, value) do
     env ++ [{String.to_charlist(key), String.to_charlist(to_string(value))}]
   end
+
+  @doc """
+  Converts a desired env list into one that REPLACES the child environment
+  instead of extending it.
+
+  `Port.open/2`'s `{:env, list}` option only EXTENDS the inherited BEAM
+  environment — omitting a var from the list does NOT remove it from the
+  child. Every inherited var absent from `wanted` is explicitly unset by
+  appending `{key, false}`, which is the documented erlang mechanism for
+  removal. Without this, "stripped" secrets (ANTHROPIC_API_KEY, provider
+  keys) silently leak into every spawned CLI process.
+  """
+  @spec replace_env([{charlist(), charlist()}]) :: [{charlist(), charlist() | false}]
+  def replace_env(wanted) do
+    wanted_keys = MapSet.new(wanted, fn {k, _v} -> k end)
+
+    unsets =
+      for {key, _value} <- System.get_env(),
+          ckey = String.to_charlist(key),
+          not MapSet.member?(wanted_keys, ckey),
+          do: {ckey, false}
+
+    wanted ++ unsets
+  end
 end

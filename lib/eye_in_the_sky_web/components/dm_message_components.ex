@@ -200,13 +200,21 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     ]}>
       <%= if @dm_info do %>
         <div class="flex items-center gap-1.5 flex-wrap mb-1">
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 text-micro font-mono font-semibold">
-            <.icon name="hero-cpu-chip" class="size-3" />
-            {@dm_info.sender}
-            <%= if @dm_info[:session_id] && @dm_info[:session_id] != "" do %>
+          <%= if @dm_info[:session_id] && @dm_info[:session_id] != "" do %>
+            <a
+              href={"/dm/#{@dm_info[:session_id]}"}
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 text-micro font-mono font-semibold hover:bg-primary/20 transition-colors"
+            >
+              <.custom_icon name="lucide-robot" class="size-3" />
+              {@dm_info.sender}
               <span class="text-primary/40 font-normal">#{@dm_info[:session_id]}</span>
-            <% end %>
-          </span>
+            </a>
+          <% else %>
+            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 text-micro font-mono font-semibold">
+              <.custom_icon name="lucide-robot" class="size-3" />
+              {@dm_info.sender}
+            </span>
+          <% end %>
           <%= if @dm_info.status do %>
             <span class={[
               "inline-flex items-center px-1.5 py-0.5 rounded text-micro font-mono font-semibold",

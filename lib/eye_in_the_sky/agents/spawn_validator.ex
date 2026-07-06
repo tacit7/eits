@@ -37,6 +37,7 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   end
 
   defp default_model_for_provider("codex"), do: ModelConfig.default_model("codex")
+  defp default_model_for_provider("pi"), do: nil
   defp default_model_for_provider(_), do: "haiku"
 
   defp coerce_int_id(nil, _field), do: {:ok, nil}
@@ -97,21 +98,29 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   defp validate_provider_model(provider, model) do
     combos = ModelConfig.valid_model_combos()
 
-    case Map.get(combos, provider) do
-      nil ->
+    cond do
+      not Map.has_key?(combos, provider) ->
         valid_providers = combos |> Map.keys() |> Enum.join(", ")
+        {:error, "invalid_provider", "invalid provider '#{provider}'; must be one of: #{valid_providers}"}
 
-        {:error, "invalid_provider",
-         "invalid provider '#{provider}'; must be one of: #{valid_providers}"}
+      provider == "pi" and is_nil(model) ->
+        {:error, "invalid_model",
+         "provider 'pi' requires an explicit model (format '<pi-provider>/<model-id>'); configure providers in ~/.pi/agent/auth.json"}
 
-      valid_models ->
-        if model in valid_models do
-          {:ok, {provider, model}}
-        else
-          {:error, "invalid_model",
-           "invalid model '#{model}' for provider '#{provider}'; valid models: #{Enum.join(valid_models, ", ")}"}
-        end
+      ModelConfig.valid_model?(provider, model) ->
+        {:ok, {provider, model}}
+
+      true ->
+        {:error, "invalid_model", invalid_model_message(provider, model)}
     end
+  end
+
+  defp invalid_model_message("pi", model),
+    do: "invalid pi model '#{model}'; expected format '<pi-provider>/<model-id>' (e.g. google/gemini-2.5-pro)"
+
+  defp invalid_model_message(provider, model) do
+    valid = ModelConfig.valid_model_slugs(provider) |> Enum.join(", ")
+    "invalid model '#{model}' for provider '#{provider}'; must be one of: #{valid}"
   end
 
   defp validate_parent_agent(nil), do: {:ok, nil}

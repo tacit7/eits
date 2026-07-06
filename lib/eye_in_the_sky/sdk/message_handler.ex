@@ -108,7 +108,60 @@ defmodule EyeInTheSky.SDK.MessageHandler do
   """
   @callback resolve_exit_session_id(state :: state()) :: String.t() | nil
 
-  @optional_callbacks [on_session_id: 2, resolve_exit_session_id: 1]
+  @doc """
+  Called when the parser emits `{:protocol, data}` (provider protocol
+  bookkeeping such as request/response envelopes). Default: continue,
+  ignoring the event — existing providers never emit it.
+  """
+  @callback handle_protocol_event(data :: map(), state :: state()) ::
+              {:continue, state()} | {:halt, term()}
+
+  @doc """
+  Called on clean process exit (exit code 0). Default preserves legacy
+  behavior: complete with `resolve_exit_session_id/1`. Providers whose
+  success requires an explicit terminal event (Pi: `turn_end`) override
+  this to return `{:error, reason}` when the event was never seen.
+  """
+  @callback on_clean_exit(state :: state()) ::
+              {:complete, String.t() | nil} | {:error, term()}
+
+  @doc """
+  Called on abnormal process exit (nonzero exit code, :timeout, or other
+  status). Returns the error reason delivered as `{:claude_error, ref, reason}`.
+  Default preserves legacy behavior via `default_exit_reason/1`. Pi overrides
+  this to map exits after a user cancel to `:canceled`.
+  """
+  @callback on_abnormal_exit(status :: term(), state :: state()) :: {:error, term()}
+
+  @doc """
+  Called when the parser returns `{:error, reason}` from a stream line OR when
+  `handle_protocol_event/2` returns `{:halt, reason}`. Returns the reason
+  actually delivered as `{:claude_error, ref, reason}`.
+
+  Default preserves legacy behavior (`{:error, reason}` unchanged — Claude and
+  Codex are untouched). Pi overrides this to map post-cancel errors to
+  `:user_canceled`, which also guarantees the cancel-marker Registry entry is
+  consumed on every terminal path (no leak).
+  """
+  @callback on_stream_error(reason :: term(), state :: state()) :: {:error, term()}
+
+  @optional_callbacks [
+    on_session_id: 2,
+    resolve_exit_session_id: 1,
+    handle_protocol_event: 2,
+    on_clean_exit: 1,
+    on_abnormal_exit: 2,
+    on_stream_error: 2
+  ]
+
+  @doc """
+  Legacy mapping of an abnormal port-exit status to an error reason.
+  Public so overriding modules can fall back to it.
+  """
+  @spec default_exit_reason(term()) :: term()
+  def default_exit_reason(:timeout), do: :timeout
+  def default_exit_reason(code) when is_integer(code), do: {:exit_code, code}
+  def default_exit_reason(other), do: other
 
   # ---------------------------------------------------------------------------
   # __using__ — inject default implementations
@@ -124,7 +177,25 @@ defmodule EyeInTheSky.SDK.MessageHandler do
       @impl EyeInTheSky.SDK.MessageHandler
       def resolve_exit_session_id(state), do: state[:session_id]
 
-      defoverridable on_session_id: 2, resolve_exit_session_id: 1
+      @impl EyeInTheSky.SDK.MessageHandler
+      def handle_protocol_event(_data, state), do: {:continue, state}
+
+      @impl EyeInTheSky.SDK.MessageHandler
+      def on_clean_exit(state), do: {:complete, resolve_exit_session_id(state)}
+
+      @impl EyeInTheSky.SDK.MessageHandler
+      def on_abnormal_exit(status, _state),
+        do: {:error, EyeInTheSky.SDK.MessageHandler.default_exit_reason(status)}
+
+      @impl EyeInTheSky.SDK.MessageHandler
+      def on_stream_error(reason, _state), do: {:error, reason}
+
+      defoverridable on_session_id: 2,
+                     resolve_exit_session_id: 1,
+                     handle_protocol_event: 2,
+                     on_clean_exit: 1,
+                     on_abnormal_exit: 2,
+                     on_stream_error: 2
     end
   end
 
@@ -181,20 +252,33 @@ defmodule EyeInTheSky.SDK.MessageHandler do
             module.handle_result(data, state)
 
           {:error, reason} ->
-            send(caller_pid, {:claude_error, sdk_ref, reason})
+            {:error, mapped} = module.on_stream_error(reason, state)
+            send(caller_pid, {:claude_error, sdk_ref, mapped})
 
             :telemetry.execute(
               tel_prefix ++ [:error],
               %{system_time: System.system_time()},
-              %{session_id: session_id, reason: reason}
+              %{session_id: session_id, reason: mapped}
             )
 
             Logger.error(
-              "[telemetry] #{tel_label(tel_prefix)}.error session_id=#{session_id} reason=#{inspect(reason)}"
+              "[telemetry] #{tel_label(tel_prefix)}.error session_id=#{session_id} reason=#{inspect(mapped)}"
             )
 
             stop_and_unregister(sdk_ref)
             :ok
+
+          {:protocol, data} ->
+            case module.handle_protocol_event(data, state) do
+              {:continue, new_state} ->
+                run_loop(module, new_state, opts)
+
+              {:halt, reason} ->
+                {:error, mapped} = module.on_stream_error(reason, state)
+                send(caller_pid, {:claude_error, sdk_ref, mapped})
+                stop_and_unregister(sdk_ref)
+                :ok
+            end
 
           :tool_block_stop ->
             send(caller_pid, {:tool_block_stop, sdk_ref})
@@ -205,21 +289,23 @@ defmodule EyeInTheSky.SDK.MessageHandler do
         end
 
       {:claude_exit, _cli_ref, 0} ->
-        final_session_id = module.resolve_exit_session_id(state)
-        send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
-        log_sdk_exit(final_session_id, 0, tel_prefix)
+        case module.on_clean_exit(state) do
+          {:complete, final_session_id} ->
+            send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
+            log_sdk_exit(final_session_id, 0, tel_prefix)
+
+          {:error, reason} ->
+            send(caller_pid, {:claude_error, sdk_ref, reason})
+            log_sdk_exit(session_id, {:clean_exit_rejected, reason}, tel_prefix)
+        end
+
         stop_and_unregister(sdk_ref)
         :ok
 
       {:claude_exit, _cli_ref, status} ->
         log_sdk_exit(session_id, status, tel_prefix)
 
-        reason =
-          case status do
-            :timeout -> :timeout
-            code when is_integer(code) -> {:exit_code, code}
-            other -> other
-          end
+        {:error, reason} = module.on_abnormal_exit(status, state)
 
         send(caller_pid, {:claude_error, sdk_ref, reason})
         stop_and_unregister(sdk_ref)

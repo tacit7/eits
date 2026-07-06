@@ -72,10 +72,30 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
     ]
   end
 
+  @doc "Discovered Pi model slugs from the cache. Never calls the harness."
+  @spec pi_models() :: {[String.t()], :fresh | :stale | :empty}
+  def pi_models do
+    case EyeInTheSky.Pi.ModelDiscoveryCache.get_cached() do
+      {:ok, models, freshness} -> {Enum.map(models, & &1["id"]), freshness}
+      :empty -> {[], :empty}
+    end
+  end
+
   @doc """
   Returns {value, label} tuples for the given provider.
+
+  Pi returns `{slug, slug}` for every discovered model — the slug doubles as
+  the human label because harness-discovered ids have no separate display
+  name. This matches the documented shape so destructuring consumers (see
+  `new_session_modal.ex:436`) don't crash on the Pi optgroup.
   """
   def models_for_provider("codex"), do: codex_models()
+
+  def models_for_provider("pi") do
+    {slugs, _freshness} = pi_models()
+    Enum.map(slugs, &{&1, &1})
+  end
+
   def models_for_provider(_), do: claude_models()
 
   @doc """
@@ -104,6 +124,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   Returns the default model slug for a provider.
   """
   def default_model_for("codex"), do: "gpt-5.5"
+  def default_model_for("pi"), do: nil
   def default_model_for(_), do: "claude-opus-4-7"
 
   @doc """

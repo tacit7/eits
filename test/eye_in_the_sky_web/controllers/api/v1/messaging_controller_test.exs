@@ -53,6 +53,24 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
     channel
   end
 
+  defp insert_dm(to_session, from_session, body) do
+    {:ok, msg} =
+      Messages.create_message(%{
+        uuid: Ecto.UUID.generate(),
+        session_id: to_session.id,
+        to_session_id: to_session.id,
+        from_session_id: from_session.id,
+        sender_role: "agent",
+        recipient_role: "agent",
+        direction: "inbound",
+        body: body,
+        status: "delivered",
+        provider: "claude"
+      })
+
+    msg
+  end
+
   # ---- POST /api/v1/dm ----
 
   describe "POST /api/v1/dm" do
@@ -384,6 +402,63 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
     test "returns 400 when session param is missing", %{conn: conn} do
       conn = get(conn, ~p"/api/v1/dm/wait")
       assert json_response(conn, 400)["error"] == "session is required"
+    end
+  end
+
+  # ---- GET /api/v1/dm ----
+
+  describe "GET /api/v1/dm" do
+    test "lists DMs when caller session is the recipient", %{conn: conn} do
+      sender = create_session(create_agent())
+      recipient = create_session(create_agent())
+      insert_dm(recipient, sender, "for recipient")
+
+      conn =
+        conn
+        |> Plug.Conn.put_req_header("x-eits-session", recipient.uuid)
+        |> get(~p"/api/v1/dm", %{"session" => recipient.uuid})
+
+      resp = json_response(conn, 200)
+      assert resp["session_uuid"] == recipient.uuid
+      assert [%{"body" => "for recipient"}] = resp["messages"]
+    end
+
+    test "rejects DMs list when caller session is not the recipient", %{conn: conn} do
+      sender = create_session(create_agent())
+      recipient = create_session(create_agent())
+      attacker = create_session(create_agent())
+      insert_dm(recipient, sender, "not for attacker")
+
+      conn =
+        conn
+        |> Plug.Conn.put_req_header("x-eits-session", attacker.uuid)
+        |> get(~p"/api/v1/dm", %{"session" => recipient.uuid})
+
+      assert json_response(conn, 403)["error"] == "You are not the recipient of this message"
+    end
+
+    test "rejects DMs list when caller session is missing", %{conn: conn} do
+      sender = create_session(create_agent())
+      recipient = create_session(create_agent())
+      insert_dm(recipient, sender, "requires identity")
+
+      conn = get(conn, ~p"/api/v1/dm", %{"session" => recipient.uuid})
+
+      assert json_response(conn, 403)["error"] == "You are not the recipient of this message"
+    end
+  end
+
+  # ---- GET /api/v1/dm/:id ----
+
+  describe "GET /api/v1/dm/:id" do
+    test "rejects single DM read when caller session is missing", %{conn: conn} do
+      sender = create_session(create_agent())
+      recipient = create_session(create_agent())
+      msg = insert_dm(recipient, sender, "requires recipient identity")
+
+      conn = get(conn, ~p"/api/v1/dm/#{msg.id}")
+
+      assert json_response(conn, 403)["error"] == "You are not the recipient of this message"
     end
   end
 

@@ -344,6 +344,17 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
       assert resp["ended_at"] != nil
     end
 
+    test "does not broadcast agent_stopped for duplicate critical status updates", %{conn: conn} do
+      EyeInTheSky.Events.subscribe_agent_working()
+      agent = create_agent()
+      session = create_session(agent, %{status: "failed"})
+      session_id = session.id
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"status" => "failed"})
+
+      refute_receive {:agent_stopped, %{id: ^session_id}}, 100
+    end
+
     test "returns 404 for unknown uuid", %{conn: conn} do
       conn = patch(conn, ~p"/api/v1/sessions/#{Ecto.UUID.generate()}", %{"status" => "idle"})
       assert json_response(conn, 404)["error"] == "Session not found"

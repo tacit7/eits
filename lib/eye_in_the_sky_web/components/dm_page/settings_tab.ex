@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   attr :session_state, :map, required: true
   attr :notify_on_stop, :boolean, default: false
   attr :overrides, :list, default: []
+  attr :effective, :map, default: %{}
 
   def settings_tab(assigns) do
     ~H"""
@@ -40,9 +41,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
               overrides={@overrides}
             />
           <% "anthropic" -> %>
-            <.anthropic_section scope={@scope} />
+            <.anthropic_section scope={@scope} effective={@effective} />
           <% "openai" -> %>
-            <.openai_section scope={@scope} />
+            <.openai_section scope={@scope} effective={@effective} />
         <% end %>
       </div>
 
@@ -237,26 +238,28 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   # -- CLAUDE / ANTHROPIC FLAGS ---------------------------------------------
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp anthropic_section(assigns) do
     ~H"""
-    <.anthropic_execution scope={@scope} />
+    <.anthropic_execution scope={@scope} effective={@effective} />
     <.divider />
-    <.anthropic_output scope={@scope} />
+    <.anthropic_output scope={@scope} effective={@effective} />
     <.divider />
-    <.anthropic_scripting scope={@scope} />
+    <.anthropic_scripting scope={@scope} effective={@effective} />
     <.divider />
-    <.anthropic_paths scope={@scope} />
+    <.anthropic_paths scope={@scope} effective={@effective} />
     <.divider />
-    <.anthropic_prompt scope={@scope} />
+    <.anthropic_prompt scope={@scope} effective={@effective} />
     <.divider />
-    <.anthropic_debug scope={@scope} />
+    <.anthropic_debug scope={@scope} effective={@effective} />
     <.divider />
-    <.anthropic_safety scope={@scope} />
+    <.anthropic_safety scope={@scope} effective={@effective} />
     """
   end
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp anthropic_execution(assigns) do
     ~H"""
@@ -269,7 +272,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.select_input
           key="anthropic.permission_mode"
           scope={@scope}
-          value="acceptEdits"
+          value={setting_val(@effective, "anthropic.permission_mode") || "acceptEdits"}
           options={["default", "acceptEdits", "plan", "bypassPermissions"]}
         />
       </.row>
@@ -278,7 +281,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--max-turns"
         description="Non-interactive mode (-p) only. Limits how many back-and-forth steps Claude can take before the process stops with an error. No limit by default."
       >
-        <.num_input key="anthropic.max_turns" scope={@scope} value={nil} placeholder="No limit" />
+        <.num_input
+          key="anthropic.max_turns"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.max_turns")}
+          placeholder="No limit"
+        />
       </.row>
       <.row
         label="Fallback model"
@@ -288,7 +296,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.select_input
           key="anthropic.fallback_model"
           scope={@scope}
-          value=""
+          value={setting_val(@effective, "anthropic.fallback_model") || ""}
           options={["", "opus", "sonnet", "haiku"]}
         />
       </.row>
@@ -297,13 +305,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--from-pr"
         description="Resumes a conversation linked to a GitHub pull request. Sessions are auto-linked when you use gh pr create while Claude is working."
       >
-        <.text_input key="anthropic.from_pr" scope={@scope} value="" placeholder="owner/repo#123" />
+        <.text_input
+          key="anthropic.from_pr"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.from_pr") || ""}
+          placeholder="owner/repo#123"
+        />
       </.row>
     </.section>
     """
   end
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp anthropic_output(assigns) do
     ~H"""
@@ -313,13 +327,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--json-schema"
         description="Forces Claude to return a response that validates against a specific JSON structure. Useful when scripts need to parse output programmatically."
       >
-        <.text_input key="anthropic.json_schema" scope={@scope} value="" placeholder="path or inline" />
+        <.text_input
+          key="anthropic.json_schema"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.json_schema") || ""}
+          placeholder="path or inline"
+        />
       </.row>
     </.section>
     """
   end
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp anthropic_scripting(assigns) do
     ~H"""
@@ -332,7 +352,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.text_input
           key="anthropic.allowed_tools"
           scope={@scope}
-          value=""
+          value={setting_val(@effective, "anthropic.allowed_tools") || ""}
           placeholder="Read, Edit, Bash"
         />
       </.row>
@@ -341,13 +361,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--permission-prompt-tool"
         description="MCP tool that handles permission requests automatically during non-interactive sessions."
       >
-        <.text_input key="anthropic.permission_prompt_tool" scope={@scope} value="" />
+        <.text_input
+          key="anthropic.permission_prompt_tool"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.permission_prompt_tool") || ""}
+        />
       </.row>
     </.section>
     """
   end
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp anthropic_paths(assigns) do
     ~H"""
@@ -357,41 +382,63 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--add-dir"
         description="Grants Claude access to folders outside the current project directory."
       >
-        <.text_input key="anthropic.add_dir" scope={@scope} value="" placeholder="/path/to/dir" />
+        <.text_input
+          key="anthropic.add_dir"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.add_dir") || ""}
+          placeholder="/path/to/dir"
+        />
       </.row>
       <.row
         label="MCP config file"
         help="--mcp-config"
         description="Loads MCP servers from a JSON file or string — Jira, Google Drive, other external data sources."
       >
-        <.text_input key="anthropic.mcp_config" scope={@scope} value="" />
+        <.text_input
+          key="anthropic.mcp_config"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.mcp_config") || ""}
+        />
       </.row>
       <.row
         label="Plugin directory"
         help="--plugin-dir"
         description="Loads local plugins from a folder for this session. Useful for testing custom skills and agents before sharing."
       >
-        <.text_input key="anthropic.plugin_dir" scope={@scope} value="" />
+        <.text_input
+          key="anthropic.plugin_dir"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.plugin_dir") || ""}
+        />
       </.row>
       <.row
         label="Settings file"
         help="--settings"
         description="Loads additional configuration rules from a JSON file or string for this session."
       >
-        <.text_input key="anthropic.settings_file" scope={@scope} value="" />
+        <.text_input
+          key="anthropic.settings_file"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.settings_file") || ""}
+        />
       </.row>
       <.row
         label="Agents JSON"
         help="--agents"
         description="Define and configure custom subagents (with their own prompts and tools) inline via a JSON string."
       >
-        <.text_input key="anthropic.agents_json" scope={@scope} value="" />
+        <.text_input
+          key="anthropic.agents_json"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.agents_json") || ""}
+        />
       </.row>
     </.section>
     """
   end
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp anthropic_prompt(assigns) do
     ~H"""
@@ -404,7 +451,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.text_input
           key="anthropic.agent_persona"
           scope={@scope}
-          value=""
+          value={setting_val(@effective, "anthropic.agent_persona") || ""}
           placeholder="Agent Type"
         />
       </.row>
@@ -413,34 +460,51 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--system-prompt"
         description="Completely replaces Claude Code's built-in instructions with your own text. Warning: removes tool knowledge unless you re-include it."
       >
-        <.text_area key="anthropic.system_prompt" scope={@scope} value="" />
+        <.text_area
+          key="anthropic.system_prompt"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.system_prompt") || ""}
+        />
       </.row>
       <.row
         label="System prompt file"
         help="--system-prompt-file"
         description="Same as System prompt, but loaded from a file."
       >
-        <.text_input key="anthropic.system_prompt_file" scope={@scope} value="" />
+        <.text_input
+          key="anthropic.system_prompt_file"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.system_prompt_file") || ""}
+        />
       </.row>
       <.row
         label="Append system prompt"
         help="--append-system-prompt"
         description="Adds your rules to the end of Claude's default instructions. Recommended for project rules (e.g. 'Always use TypeScript') — keeps tool abilities intact."
       >
-        <.text_area key="anthropic.append_system_prompt" scope={@scope} value="" />
+        <.text_area
+          key="anthropic.append_system_prompt"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.append_system_prompt") || ""}
+        />
       </.row>
       <.row
         label="Append system prompt file"
         help="--append-system-prompt-file"
         description="Same as Append system prompt, but loaded from a file."
       >
-        <.text_input key="anthropic.append_system_prompt_file" scope={@scope} value="" />
+        <.text_input
+          key="anthropic.append_system_prompt_file"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.append_system_prompt_file") || ""}
+        />
       </.row>
     </.section>
     """
   end
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp anthropic_debug(assigns) do
     ~H"""
@@ -450,34 +514,40 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--debug"
         description="Enables detailed logs for specific areas (api, mcp, hooks) to help troubleshoot."
       >
-        <.text_input key="anthropic.debug_categories" scope={@scope} value="" placeholder="api,hooks" />
+        <.text_input
+          key="anthropic.debug_categories"
+          scope={@scope}
+          value={setting_val(@effective, "anthropic.debug_categories") || ""}
+          placeholder="api,hooks"
+        />
       </.row>
       <.row
         label="Bare mode"
         help="--bare"
         description="Starts Claude minimally — skips CLAUDE.md discovery, plugins, and skills. Recommended for fast-starting automated scripts."
       >
-        <.toggle key="anthropic.bare" scope={@scope} checked={false} />
+        <.toggle key="anthropic.bare" scope={@scope} checked={setting_val(@effective, "anthropic.bare") == true} />
       </.row>
       <.row
         label="Verbose"
         help="--verbose"
         description="Shows every step Claude takes — internal reasoning and exactly which tools it calls with what data."
       >
-        <.toggle key="anthropic.verbose" scope={@scope} checked={false} />
+        <.toggle key="anthropic.verbose" scope={@scope} checked={setting_val(@effective, "anthropic.verbose") == true} />
       </.row>
       <.row
         label="Include partial messages"
         help="--include-partial-messages"
         description="With streaming output, includes in-progress fragments of Claude's response as they are generated."
       >
-        <.toggle key="anthropic.include_partial_messages" scope={@scope} checked={false} />
+        <.toggle key="anthropic.include_partial_messages" scope={@scope} checked={setting_val(@effective, "anthropic.include_partial_messages") == true} />
       </.row>
     </.section>
     """
   end
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp anthropic_safety(assigns) do
     ~H"""
@@ -487,7 +557,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--no-session-persistence"
         description="Prevents the session from being saved to local history — cannot be resumed or rewound later."
       >
-        <.toggle key="anthropic.no_session_persistence" scope={@scope} checked={false} />
+        <.toggle key="anthropic.no_session_persistence" scope={@scope} checked={setting_val(@effective, "anthropic.no_session_persistence") == true} />
       </.row>
       <.row
         label="Chrome integration"
@@ -497,7 +567,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.select_input
           key="anthropic.chrome"
           scope={@scope}
-          value=""
+          value={setting_val(@effective, "anthropic.chrome") || ""}
           options={["", "on", "off"]}
         />
       </.row>
@@ -506,14 +576,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--sandbox"
         description="Enforces strict OS-level boundaries on the Bash tool — limits which files Claude can read/write and which sites it can visit."
       >
-        <.toggle key="anthropic.sandbox" scope={@scope} checked={false} />
+        <.toggle key="anthropic.sandbox" scope={@scope} checked={setting_val(@effective, "anthropic.sandbox") == true} />
       </.row>
       <.row
         label="Dangerously skip permissions"
         help="--dangerously-skip-permissions"
         description="Bypasses all permission prompts so Claude works autonomously. Use only in isolated environments (Docker, VMs) — Claude could delete files or run dangerous commands."
       >
-        <.toggle key="anthropic.dangerously_skip_permissions" scope={@scope} checked={false} />
+        <.toggle key="anthropic.dangerously_skip_permissions" scope={@scope} checked={setting_val(@effective, "anthropic.dangerously_skip_permissions") == true} />
       </.row>
     </.section>
     """
@@ -522,6 +592,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   # -- CODEX / OPENAI FLAGS --------------------------------------------------
 
   attr :scope, :string, required: true
+  attr :effective, :map, default: %{}
 
   defp openai_section(assigns) do
     ~H"""
@@ -530,7 +601,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.select_input
           key="openai.ask_for_approval"
           scope={@scope}
-          value="never"
+          value={setting_val(@effective, "openai.ask_for_approval") || "never"}
           options={["never", "on-failure", "on-request", "untrusted"]}
         />
       </.row>
@@ -538,12 +609,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.select_input
           key="openai.sandbox"
           scope={@scope}
-          value="workspace-write"
+          value={setting_val(@effective, "openai.sandbox") || "workspace-write"}
           options={["read-only", "workspace-write", "danger-full-access"]}
         />
       </.row>
       <.row label="Full auto" help="--full-auto (local automation shortcut)">
-        <.toggle key="openai.full_auto" scope={@scope} checked={false} />
+        <.toggle key="openai.full_auto" scope={@scope} checked={setting_val(@effective, "openai.full_auto") == true} />
       </.row>
       <.row
         label="Dangerously bypass approvals & sandbox"
@@ -552,7 +623,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.toggle
           key="openai.dangerously_bypass_approvals_and_sandbox"
           scope={@scope}
-          checked={false}
+          checked={setting_val(@effective, "openai.dangerously_bypass_approvals_and_sandbox") == true}
         />
       </.row>
     </.section>
@@ -703,5 +774,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       </option>
     </select>
     """
+  end
+
+  defp setting_val(effective, dotted_key) do
+    [section, key] = String.split(dotted_key, ".", parts: 2)
+    get_in(effective, [section, key])
   end
 end

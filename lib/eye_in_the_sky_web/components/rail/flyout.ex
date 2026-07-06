@@ -100,23 +100,26 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 icon="hero-users"
                 label="Teams"
               />
+            <% @active_section == :tasks && not is_nil(@sidebar_project) -> %>
+              <div class="flex-1 min-w-0 flex gap-0.5">
+                <Helpers.section_header_link
+                  route={"/projects/#{@sidebar_project.id}/kanban"}
+                  icon="lucide-kanban"
+                  label="Kanban"
+                  custom={true}
+                />
+                <Helpers.section_header_link
+                  route={"/projects/#{@sidebar_project.id}/tasks"}
+                  icon="hero-check-circle"
+                  label="List"
+                />
+              </div>
             <% Helpers.dual_page_section?(@active_section) && Helpers.project_route_for(@active_section, @sidebar_project) -> %>
-              <.link
-                navigate={Helpers.project_route_for(@active_section, @sidebar_project)}
-                title={"#{@sidebar_project.name} #{Helpers.section_label(@active_section)}"}
-                class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
-              >
-                <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
-                  <%= if @active_section == :tasks do %>
-                    <.custom_icon name="lucide-kanban" class="size-3.5" />
-                  <% else %>
-                    <.icon name="hero-list-bullet" class="size-3.5" />
-                  <% end %>
-                </span>
-                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
-                  {Helpers.section_label(@active_section)}
-                </span>
-              </.link>
+              <Helpers.section_header_link
+                route={Helpers.project_route_for(@active_section, @sidebar_project)}
+                icon="hero-list-bullet"
+                label={Helpers.section_label(@active_section)}
+              />
             <% @active_section == :usage -> %>
               <Helpers.section_header_link route="/usage" icon="hero-chart-bar" label="Usage" />
               <button

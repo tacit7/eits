@@ -189,6 +189,7 @@ defmodule EyeInTheSky.Pi.SDK do
       ready_seen: false,
       start_session_acked: false,
       terminal: nil,
+      accumulated_text: "",
       prompt: opts[:prompt],
       start_session_payload: start_session_payload(opts)
     }
@@ -222,6 +223,11 @@ defmodule EyeInTheSky.Pi.SDK do
   # -- MessageHandler callbacks ------------------------------------------------
 
   @impl MessageHandler
+  def handle_message(%Message{type: :text, content: text} = msg, state) when is_binary(text) do
+    send(state.caller_pid, {:claude_message, state.sdk_ref, msg})
+    {:continue, %{state | accumulated_text: state.accumulated_text <> text}}
+  end
+
   def handle_message(%Message{} = msg, state) do
     send(state.caller_pid, {:claude_message, state.sdk_ref, msg})
     {:continue, state}
@@ -441,7 +447,16 @@ defmodule EyeInTheSky.Pi.SDK do
         duration_ms: data[:duration_ms]
       }
 
-      result_msg = Message.result(nil, metadata)
+      # turn_end carries usage only — the persisted result text comes from the
+      # deltas accumulated during the turn (Codex.SDK does the same for its
+      # text-less turn.completed). nil text would persist an empty message.
+      result_text =
+        case String.trim(state.accumulated_text) do
+          "" -> nil
+          text -> text
+        end
+
+      result_msg = Message.result(result_text, metadata)
       send(caller_pid, {:claude_message, sdk_ref, result_msg})
       send(caller_pid, {:claude_complete, sdk_ref, eits_session_id})
 

@@ -217,6 +217,45 @@ defmodule EyeInTheSky.Pi.SDKTest do
     feed_exit(h, 0)
   end
 
+  test "result message carries text accumulated from assistant deltas", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-acc")
+
+    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
+                     "data" => %{"protocolVersion" => 1}}))
+    feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-acc"}))
+    Process.sleep(30)
+
+    feed(h, encode(%{"type" => "assistant_delta", "delta" => "Hello "}))
+    feed(h, encode(%{"type" => "assistant_delta", "delta" => "world."}))
+    feed(h, encode(%{"type" => "turn_end", "aggregate" => %{"inputTokens" => 1, "outputTokens" => 2}}))
+
+    assert_receive {:claude_message, ^ref, %Message{type: :text, delta: true}}, 500
+    assert_receive {:claude_message, ^ref, %Message{type: :text, delta: true}}, 500
+    assert_receive {:claude_message, ^ref, %Message{type: :result, content: content}}, 500
+    assert content =~ "Hello world."
+    assert_receive {:claude_complete, ^ref, "sess-acc"}, 500
+
+    feed_exit(h, 0)
+  end
+
+  test "result message text is nil when no deltas streamed", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-empty")
+
+    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
+                     "data" => %{"protocolVersion" => 1}}))
+    feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-empty"}))
+    Process.sleep(30)
+
+    feed(h, encode(%{"type" => "turn_end", "aggregate" => %{}}))
+
+    assert_receive {:claude_message, ^ref, %Message{type: :result, content: nil}}, 500
+    assert_receive {:claude_complete, ^ref, "sess-empty"}, 500
+
+    feed_exit(h, 0)
+  end
+
   test "turn_error then turn_end -> claude_error {:pi_turn_error, msg} (sticky)", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx)
 

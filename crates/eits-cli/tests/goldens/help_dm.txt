@@ -5,6 +5,7 @@ Usage: eitsr dm [OPTIONS] [COMMAND]
 Commands:
   inbox  Show inbound DMs for a session (alias: list)
   read   Fetch one DM by id (full body)
+  wait   Block until the next inbound DM arrives (or timeout), then print and exit
   help   Print this message or the help of the given subcommand(s)
 
 Options:

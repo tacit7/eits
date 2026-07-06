@@ -252,6 +252,7 @@ defmodule EyeInTheSkyWeb.Router do
 
     # Direct messages
     get "/dm", MessagingController, :list_dms
+    get "/dm/wait", MessagingController, :wait_dm
     get "/dm/:id", MessagingController, :show_dm
     post "/dm", MessagingController, :dm
 

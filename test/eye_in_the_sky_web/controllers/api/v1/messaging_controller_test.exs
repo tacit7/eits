@@ -298,6 +298,95 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
     end
   end
 
+  # ---- GET /api/v1/dm/wait ----
+
+  describe "GET /api/v1/dm/wait" do
+    setup do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockSucceedingAgentManager
+      )
+
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      :ok
+    end
+
+    test "returns immediately when a matching DM already exists", %{conn: conn} do
+      agent = create_agent()
+      sender_agent = create_agent()
+      session = create_session(agent)
+      sender_session = create_session(sender_agent)
+
+      {:ok, msg} =
+        EyeInTheSky.Messaging.DMDelivery.deliver_and_persist(
+          session.id,
+          sender_session.id,
+          "already here"
+        )
+
+      conn = get(conn, ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+      resp = json_response(conn, 200)
+
+      assert resp["count"] == 1
+      assert hd(resp["items"])["id"] == msg.id
+    end
+
+    test "returns immediately when a DM arrives while waiting", %{conn: _conn} do
+      agent = create_agent()
+      sender_agent = create_agent()
+      session = create_session(agent)
+      sender_session = create_session(sender_agent)
+
+      test_pid = self()
+
+      spawn(fn ->
+        conn = get(api_conn(), ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=5")
+        send(test_pid, {:wait_result, json_response(conn, 200)})
+      end)
+
+      # Give the waiter time to subscribe before the DM is delivered.
+      Process.sleep(100)
+
+      {:ok, msg} =
+        EyeInTheSky.Messaging.DMDelivery.deliver_and_persist(
+          session.id,
+          sender_session.id,
+          "arrived while waiting"
+        )
+
+      assert_receive {:wait_result, resp}, 5_000
+      assert resp["count"] == 1
+      assert hd(resp["items"])["id"] == msg.id
+    end
+
+    test "returns empty after the timeout when no DM arrives", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn = get(conn, ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+      resp = json_response(conn, 200)
+
+      assert resp["count"] == 0
+      assert resp["items"] == []
+    end
+
+    test "returns 404 when session is not found", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/dm/wait?session=#{Ecto.UUID.generate()}&timeout=1")
+      assert json_response(conn, 404)["error"] == "session not found"
+    end
+
+    test "returns 400 when session param is missing", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/dm/wait")
+      assert json_response(conn, 400)["error"] == "session is required"
+    end
+  end
+
   # ---- POST /api/v1/channels ----
 
   describe "POST /api/v1/channels" do

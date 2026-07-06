@@ -707,6 +707,74 @@ fn dm_send_posts_exact_payload_keys_and_releases_lock_after() {
 }
 
 #[test]
+fn dm_wait_requires_session() {
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", "http://127.0.0.1:1/api/v1")
+        .env_remove("EITS_SESSION_UUID")
+        .env_remove("EITS_SESSION_ID")
+        .args(["dm", "wait"])
+        .assert()
+        .code(2);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "usage");
+}
+
+#[test]
+fn dm_wait_sends_session_timeout_and_since_params() {
+    let srv = common::serve(vec![(200, r#"{"items":[],"count":0}"#)]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args([
+            "dm",
+            "wait",
+            "--session",
+            "s-1",
+            "--timeout",
+            "3",
+            "--since",
+            "2026-01-01T00:00:00Z",
+        ])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 0);
+    assert_eq!(v["items"].as_array().unwrap().len(), 0);
+
+    let reqs = srv.finish();
+    assert!(reqs[0].path.starts_with("/api/v1/dm/wait?"));
+    assert!(reqs[0].path.contains("session=s-1"));
+    assert!(reqs[0].path.contains("timeout=3"));
+    assert!(reqs[0].path.contains("since=2026-01-01"));
+}
+
+#[test]
+fn dm_wait_defaults_session_from_identity_and_prints_arrived_dm() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"items":[{"id":9,"body":"hi","from_session_id":2,"to_session_id":1}],"count":1}"#,
+    )]);
+    let out = Command::cargo_bin("eitsr")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "s-1")
+        .args(["dm", "wait"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 1);
+    assert_eq!(v["items"][0]["id"], 9);
+
+    let reqs = srv.finish();
+    assert!(reqs[0].path.contains("session=s-1"));
+    assert!(reqs[0].path.contains("timeout=25"), "default timeout: {}", reqs[0].path);
+}
+
+#[test]
 fn sessions_archive_dry_run_lists_without_posting() {
     let srv = common::serve(vec![(
         200,

@@ -68,6 +68,75 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   end
 
   @doc """
+  GET /api/v1/dm/wait - Long-poll for the next inbound DM for a session.
+
+  Blocks (event-driven, no busy-polling) until a matching DM arrives or the
+  timeout elapses, then returns. Lets a caller replace interval-polling
+  `dm inbox` with a single blocking call. Query params:
+    - session (required): integer session ID or UUID
+    - since (optional): ISO8601 timestamp; only DMs after this count as new
+    - timeout (optional): seconds to wait, default 25, capped at 55 (keep
+      comfortably under typical HTTP client/proxy read timeouts)
+
+  Returns `{"items":[...],"count":1}` on arrival, `{"items":[],"count":0}`
+  (still HTTP 200) on timeout so the caller can distinguish "nothing yet"
+  from an error and loop.
+  """
+  def wait_dm(conn, params) do
+    session_raw = params["session"] || params["session_id"]
+    timeout_ms = min(parse_int(params["timeout"], 25), 55) * 1000
+
+    if is_nil(session_raw) or session_raw == "" do
+      {:error, :bad_request, "session is required"}
+    else
+      with {:ok, session} <- SessionResolver.resolve(session_raw),
+           {:ok, since_dt} <- parse_since(params["since"]) do
+        # Subscribe before the initial DB check so a DM delivered in the gap
+        # between the check and subscribing is still caught by the broadcast.
+        EyeInTheSky.Events.subscribe_session(session.id)
+
+        case Messages.list_inbound_dms(session.id, 1, since: since_dt) do
+          [msg | _] -> json(conn, wait_dm_result(msg))
+          [] -> wait_for_dm(conn, session, System.monotonic_time(:millisecond) + timeout_ms)
+        end
+      else
+        {:error, :not_found} -> {:error, :not_found, "session not found"}
+        {:error, :bad_request, reason} -> {:error, :bad_request, reason}
+      end
+    end
+  end
+
+  defp wait_for_dm(conn, session, deadline) do
+    remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
+    receive do
+      {:new_dm, msg} when msg.to_session_id == session.id ->
+        json(conn, wait_dm_result(msg))
+
+      _other ->
+        wait_for_dm(conn, session, deadline)
+    after
+      remaining -> json(conn, %{items: [], count: 0})
+    end
+  end
+
+  defp wait_dm_result(msg) do
+    %{
+      items: [
+        %{
+          id: msg.id,
+          uuid: msg.uuid,
+          body: msg.body,
+          from_session_id: msg.from_session_id,
+          to_session_id: msg.to_session_id,
+          inserted_at: msg.inserted_at
+        }
+      ],
+      count: 1
+    }
+  end
+
+  @doc """
   GET /api/v1/dm/:id - Fetch a single DM by integer ID.
   The caller must be the recipient (to_session_id matches the session param or current session).
   Query params:

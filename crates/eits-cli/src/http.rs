@@ -22,6 +22,12 @@ impl Client {
     pub fn get(&self, pq: &str) -> Result<Value, EitsError> {
         self.send(reqwest::Method::GET, pq, None)
     }
+    /// GET with a per-request timeout override, no retries. Used for long-poll
+    /// endpoints (e.g. `/dm/wait`) where the server intentionally holds the
+    /// connection open past the default 10s client timeout.
+    pub fn get_long_poll(&self, pq: &str, timeout: Duration) -> Result<Value, EitsError> {
+        self.send_once(reqwest::Method::GET, pq, None, timeout)
+    }
     pub fn post(&self, p: &str, b: Value) -> Result<Value, EitsError> {
         self.send(reqwest::Method::POST, p, Some(b))
     }
@@ -105,6 +111,56 @@ impl Client {
             None,
         )
         .with_hint("is the EITS server running? (mix phx.server, or set EITS_URL)"))
+    }
+
+    /// Single attempt, no retry-with-backoff loop — the caller (a long-poll)
+    /// is already blocking for `timeout`, so retrying on top would just stack
+    /// waits. Still maps connect/timeout errors the same way `send` does.
+    fn send_once(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        body: Option<Value>,
+        timeout: Duration,
+    ) -> Result<Value, EitsError> {
+        let url = format!("{}{}", self.cfg.base_url, path);
+        let mut req = self.http.request(method, &url).timeout(timeout);
+        if let Some(k) = &self.cfg.api_key {
+            req = req.bearer_auth(k);
+        }
+        if let Some(u) = &self.cfg.session_uuid {
+            req = req
+                .header("x-eits-role", "orchestrator")
+                .header("x-eits-session", u);
+        }
+        if let Some(b) = &body {
+            req = req.json(b);
+        }
+        match req.send() {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let text = resp.text().unwrap_or_default();
+                if status >= 400 {
+                    return Err(status_error(status, &text));
+                }
+                serde_json::from_str(&text).map_err(|_| {
+                    EitsError::api(
+                        format!(
+                            "non-JSON response: {}",
+                            text.chars().take(200).collect::<String>()
+                        ),
+                        crate::error::Code::ServerError,
+                        Some(status),
+                    )
+                })
+            }
+            Err(e) => Err(EitsError::api(
+                format!("cannot reach {url}: {e}"),
+                crate::error::Code::ConnectionFailed,
+                None,
+            )
+            .with_hint("is the EITS server running? (mix phx.server, or set EITS_URL)")),
+        }
     }
 }
 

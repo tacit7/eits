@@ -34,6 +34,22 @@ pub enum DmCmd {
         #[arg(short = 'j', long = "json")]
         json_flag: bool,
     },
+    /// Block until the next inbound DM arrives (or timeout), then print and exit.
+    ///
+    /// Meant for a background process that wants to be woken by a DM rather
+    /// than interval-polling `dm inbox`: launch `eitsr dm wait` detached, and
+    /// let its exit re-trigger whatever's watching for it. Exits 0 on arrival
+    /// (with the DM as `items`) and 0 on timeout (`{"items":[],"count":0}`)
+    /// so a shell `until` loop can re-invoke it freely.
+    Wait {
+        #[arg(short = 's', long)]
+        session: Option<String>,
+        #[arg(long)]
+        since: Option<String>,
+        /// Seconds to block for; passed straight to the server, which caps it.
+        #[arg(short = 't', long, default_value = "25")]
+        timeout: u64,
+    },
 }
 
 /// Bash `_dm_post` payload shape: `{from_session_id, to_session_id, message,
@@ -198,6 +214,38 @@ pub fn run(
                 .map(|s| format!("?session={s}"))
                 .unwrap_or_default();
             let resp = client.get(&format!("/dm/{id}{qs}"))?;
+            output::print_json(&resp, pretty);
+            Ok(())
+        }
+
+        Some(DmCmd::Wait {
+            session,
+            since,
+            timeout,
+        }) => {
+            let session = session
+                .or_else(|| cfg.session_identity().map(|s| s.to_string()))
+                .ok_or_else(|| {
+                    EitsError::usage(
+                        "dm wait: session is required (pass --session or set EITS_SESSION_UUID/EITS_SESSION_ID)",
+                    )
+                })?;
+
+            let mut qs: Vec<(String, String)> =
+                vec![("session".into(), session), ("timeout".into(), timeout.to_string())];
+            if let Some(s) = &since {
+                qs.push(("since".into(), uri_encode(s)));
+            }
+            let query_string = qs
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect::<Vec<_>>()
+                .join("&");
+
+            // Give the client generous headroom over the server-side wait so
+            // the long-poll itself never gets cut short by our own timeout.
+            let client_timeout = std::time::Duration::from_secs(timeout + 15);
+            let resp = client.get_long_poll(&format!("/dm/wait?{query_string}"), client_timeout)?;
             output::print_json(&resp, pretty);
             Ok(())
         }

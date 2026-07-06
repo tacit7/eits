@@ -37,18 +37,39 @@
       </span>
     </span>
 
-    <%!-- Command center — absolute-centered so left/right content never shifts it --%>
-    <button
-      id="vsbar-cmdcenter"
-      phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
-      class="absolute left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 w-[380px] max-w-[40vw] h-[26px] rounded-md border border-base-content/10 bg-base-100 text-xs text-base-content/50 hover:border-primary/60 hover:text-base-content/80 focus-ring"
-      title="Open command palette"
-      aria-label="Open command palette"
-    >
-      <.icon name="hero-magnifying-glass" class="size-3.5" />
-      <span class="truncate">Search sessions, tasks, commands…</span>
-      <kbd class="kbd kbd-xs">⌘K</kbd>
-    </button>
+    <%!-- Center group: history arrows + command center, absolute-centered so
+         left/right content never shifts it (VS Code layout). Arrows drive
+         browser history — LiveView live navs pushState, so back/forward work
+         across them; no-ops harmlessly at history ends. --%>
+    <span class="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
+      <button
+        onclick="history.back()"
+        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        title="Go back"
+        aria-label="Go back"
+      >
+        <.icon name="hero-chevron-left" class="size-4" />
+      </button>
+      <button
+        onclick="history.forward()"
+        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        title="Go forward"
+        aria-label="Go forward"
+      >
+        <.icon name="hero-chevron-right" class="size-4" />
+      </button>
+      <button
+        id="vsbar-cmdcenter"
+        phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
+        class="flex items-center justify-center gap-2 w-[380px] max-w-[40vw] h-[26px] rounded-md border border-base-content/10 bg-base-100 text-xs text-base-content/50 hover:border-primary/60 hover:text-base-content/80 focus-ring"
+        title="Open command palette"
+        aria-label="Open command palette"
+      >
+        <.icon name="hero-magnifying-glass" class="size-3.5" />
+        <span class="truncate">Search sessions, tasks, commands…</span>
+        <kbd class="kbd kbd-xs">⌘K</kbd>
+      </button>
+    </span>
 
     <span class="ml-auto flex items-center gap-1">
       <span

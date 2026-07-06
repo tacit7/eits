@@ -133,12 +133,25 @@ defmodule EyeInTheSky.SDK.MessageHandler do
   """
   @callback on_abnormal_exit(status :: term(), state :: state()) :: {:error, term()}
 
+  @doc """
+  Called when the parser returns `{:error, reason}` from a stream line OR when
+  `handle_protocol_event/2` returns `{:halt, reason}`. Returns the reason
+  actually delivered as `{:claude_error, ref, reason}`.
+
+  Default preserves legacy behavior (`{:error, reason}` unchanged — Claude and
+  Codex are untouched). Pi overrides this to map post-cancel errors to
+  `:user_canceled`, which also guarantees the cancel-marker Registry entry is
+  consumed on every terminal path (no leak).
+  """
+  @callback on_stream_error(reason :: term(), state :: state()) :: {:error, term()}
+
   @optional_callbacks [
     on_session_id: 2,
     resolve_exit_session_id: 1,
     handle_protocol_event: 2,
     on_clean_exit: 1,
-    on_abnormal_exit: 2
+    on_abnormal_exit: 2,
+    on_stream_error: 2
   ]
 
   @doc """
@@ -174,11 +187,15 @@ defmodule EyeInTheSky.SDK.MessageHandler do
       def on_abnormal_exit(status, _state),
         do: {:error, EyeInTheSky.SDK.MessageHandler.default_exit_reason(status)}
 
+      @impl EyeInTheSky.SDK.MessageHandler
+      def on_stream_error(reason, _state), do: {:error, reason}
+
       defoverridable on_session_id: 2,
                      resolve_exit_session_id: 1,
                      handle_protocol_event: 2,
                      on_clean_exit: 1,
-                     on_abnormal_exit: 2
+                     on_abnormal_exit: 2,
+                     on_stream_error: 2
     end
   end
 
@@ -235,16 +252,17 @@ defmodule EyeInTheSky.SDK.MessageHandler do
             module.handle_result(data, state)
 
           {:error, reason} ->
-            send(caller_pid, {:claude_error, sdk_ref, reason})
+            {:error, mapped} = module.on_stream_error(reason, state)
+            send(caller_pid, {:claude_error, sdk_ref, mapped})
 
             :telemetry.execute(
               tel_prefix ++ [:error],
               %{system_time: System.system_time()},
-              %{session_id: session_id, reason: reason}
+              %{session_id: session_id, reason: mapped}
             )
 
             Logger.error(
-              "[telemetry] #{tel_label(tel_prefix)}.error session_id=#{session_id} reason=#{inspect(reason)}"
+              "[telemetry] #{tel_label(tel_prefix)}.error session_id=#{session_id} reason=#{inspect(mapped)}"
             )
 
             stop_and_unregister(sdk_ref)
@@ -256,7 +274,8 @@ defmodule EyeInTheSky.SDK.MessageHandler do
                 run_loop(module, new_state, opts)
 
               {:halt, reason} ->
-                send(caller_pid, {:claude_error, sdk_ref, reason})
+                {:error, mapped} = module.on_stream_error(reason, state)
+                send(caller_pid, {:claude_error, sdk_ref, mapped})
                 stop_and_unregister(sdk_ref)
                 :ok
             end

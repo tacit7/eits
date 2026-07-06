@@ -6,6 +6,7 @@ defmodule EyeInTheSky.SDK.MessageHandlerExtensionTest do
   defmodule FakeParser do
     # line IS the instruction, keeps tests declarative
     def parse_stream_line("protocol:" <> rest), do: {:protocol, %{"raw" => rest}}
+    def parse_stream_line("error:" <> reason), do: {:error, {:fake_parse_error, reason}}
     def parse_stream_line("skip"), do: :skip
     def parse_stream_line(_), do: :skip
   end
@@ -87,5 +88,38 @@ defmodule EyeInTheSky.SDK.MessageHandlerExtensionTest do
     {sdk_ref, pid} = run_handler(PiLikeSDK, %{turn_end_seen: true})
     send(pid, {:claude_exit, :cli_ref, 0})
     assert_receive {:claude_complete, ^sdk_ref, "s1"}, 1_000
+  end
+
+  test "default on_stream_error preserves parser {:error, reason} unchanged (Claude/Codex)" do
+    {sdk_ref, pid} = run_handler(DefaultSDK)
+    send(pid, {:claude_output, :cli_ref, "error:bad_json"})
+    assert_receive {:claude_error, ^sdk_ref, {:fake_parse_error, "bad_json"}}, 1_000
+    # Loop exits after sending claude_error; wait briefly for stop_and_unregister.
+    wait_for_death(pid, 500)
+    refute Process.alive?(pid)
+  end
+
+  defp wait_for_death(pid, timeout_ms) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+
+    Stream.repeatedly(fn ->
+      if Process.alive?(pid) do
+        Process.sleep(10)
+        :alive
+      else
+        :dead
+      end
+    end)
+    |> Enum.find(fn s ->
+      s == :dead or System.monotonic_time(:millisecond) >= deadline
+    end)
+  end
+
+  test "default on_stream_error preserves handle_protocol_event {:halt, reason} unchanged" do
+    {sdk_ref, pid} = run_handler(PiLikeSDK, %{turn_end_seen: false})
+    send(pid, {:claude_output, :cli_ref, "protocol:boom"})
+    # PiLikeSDK.on_stream_error is the default (returns reason unchanged), so
+    # :preamble_failed reaches the caller as-is.
+    assert_receive {:claude_error, ^sdk_ref, :preamble_failed}, 1_000
   end
 end

@@ -11,6 +11,7 @@ bun install --frozen-lockfile
 if [[ "${1:-}" != "--skip-typecheck" ]]; then
   bun run typecheck
 fi
+bun test
 popd >/dev/null
 
 mkdir -p priv/bin/pi

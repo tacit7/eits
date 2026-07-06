@@ -119,21 +119,21 @@ function asStringArray(value: unknown): string[] {
     .filter((item) => item.length > 0);
 }
 
-function safePath(cwd: string, value: string): string {
+export function safePath(cwd: string, value: string): string {
   const root = resolve(cwd);
   const target = isAbsolute(value) ? resolve(value) : resolve(root, value);
   assertInsideWorkspace(root, target, value);
   return target;
 }
 
-async function safeExistingPath(cwd: string, value: string): Promise<string> {
+export async function safeExistingPath(cwd: string, value: string): Promise<string> {
   const root = await realpath(cwd);
   const target = await realpath(safePath(cwd, value));
   assertInsideWorkspace(root, target, value);
   return target;
 }
 
-async function assertWritableTarget(cwd: string, path: string): Promise<void> {
+export async function assertWritableTarget(cwd: string, path: string): Promise<void> {
   const root = await realpath(cwd);
   try {
     const current = await lstat(path);
@@ -1551,7 +1551,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  send({ type: "exit", error: String(error) });
-  process.exitCode = 1;
-});
+if (import.meta.main) {
+  main().catch((error) => {
+    send({ type: "exit", error: String(error) });
+    process.exitCode = 1;
+  });
+}

@@ -43,6 +43,7 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
     case opts[:agent_type] do
       "codex" -> "codex"
       "gemini" -> "gemini"
+      "pi" -> "pi"
       _ -> "claude"
     end
   end
@@ -51,7 +52,8 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
     # For codex and gemini sessions, leave uuid null — the provider's native session_id
     # arrives via InitEvent / thread.started and gets synced later via
     # maybe_sync_provider_conversation_id.
-    # For claude sessions, pre-generate so the worker can reference it immediately.
+    # For claude AND pi sessions, pre-generate: Claude passes it as --session-id;
+    # Pi uses it to name the persistent sessionDir (we own the id).
     if provider in ["codex", "gemini"],
       do: nil,
       else: opts[:provider_conversation_id] || Ecto.UUID.generate()

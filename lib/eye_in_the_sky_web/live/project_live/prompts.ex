@@ -117,20 +117,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
         ]}
         style="scrollbar-width: none;"
       >
-        <div class="mb-3 flex items-center gap-3">
+        <div class="mb-3">
           <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
             {length(@prompts)} prompts
           </span>
-          <form phx-change="search" class="ml-auto">
-            <input
-              type="text"
-              name="query"
-              value={@search_query}
-              placeholder="Search prompts..."
-              data-vim-search
-              class="input input-xs bg-base-200/50 border-base-content/8 text-base-content/70 placeholder:text-base-content/30 min-h-[28px] text-xs w-40 focus:w-56 transition-all hidden md:block"
-            />
-          </form>
         </div>
 
         <%= if @prompts != [] do %>

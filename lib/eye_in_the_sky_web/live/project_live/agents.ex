@@ -24,6 +24,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       |> assign(:show_new_agent_form, false)
       |> assign(:new_agent_name, "")
       |> assign(:new_agent_description, "")
+      |> assign(:top_bar_cta, %{label: "New", event: "toggle_new_agent_form"})
 
     socket = if connected?(socket), do: load_agents(socket), else: socket
 
@@ -164,27 +165,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
         ]}
         style="scrollbar-width: none;"
       >
-        <div class="mb-3 flex items-center gap-3">
+        <div class="mb-3">
           <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
             {length(@filtered_agents)} agents
           </span>
-          <form phx-change="search" class="ml-auto">
-            <input
-              type="text"
-              name="query"
-              value={@search_query}
-              placeholder="Search agents..."
-              data-vim-search
-              class="input input-xs bg-base-200/50 border-base-content/8 text-base-content/70 placeholder:text-base-content/30 min-h-[28px] text-xs w-40 focus:w-56 transition-all"
-            />
-          </form>
-          <button
-            phx-click="toggle_new_agent_form"
-            title="Create new agent"
-            class="btn btn-ghost btn-xs gap-1.5 min-h-[28px] h-7 text-xs text-base-content/60 hover:text-primary hover:bg-primary/5"
-          >
-            <.icon name="hero-plus-mini" class="size-3.5" /> New
-          </button>
         </div>
 
         <%= if @filtered_agents != [] do %>

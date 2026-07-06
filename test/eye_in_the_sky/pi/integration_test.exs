@@ -238,9 +238,10 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
 
     :ok = SDK.cancel(ref)
 
-    # A cancel results in the terminal :canceled outcome — never a
-    # retryable-looking exit error, never a completion (spec invariant).
-    assert_receive {:claude_error, ^ref, :canceled}, 10_000
+    # A cancel results in the terminal :user_canceled outcome — a systemic
+    # (non-retryable) error category, never a retryable exit error, never a
+    # completion (spec invariant: canceled turns are not retried).
+    assert_receive {:claude_error, ^ref, :user_canceled}, 10_000
     refute_receive {:claude_complete, ^ref, _}, 200
   end
 

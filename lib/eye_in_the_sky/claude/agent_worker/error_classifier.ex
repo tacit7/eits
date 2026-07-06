@@ -25,6 +25,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
           | :rate_limit_error
           | :watchdog_timeout
           | :retry_exhausted
+          | :user_canceled
           | :transient
 
   # Rate-limit (429) is CATEGORIZED so the UI can surface a distinct badge, but
@@ -47,6 +48,10 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   def classify({:authentication_error, _}), do: :authentication_error
   def classify({:rate_limit_error, _}), do: :rate_limit_error
   def classify(:retry_exhausted), do: :retry_exhausted
+  # User-initiated cancel — terminal, MUST NOT be retried (spec invariant:
+  # canceled turns are never re-run). Emitted by Pi.SDK when a cancel is
+  # observed on any terminal path (turn_end, clean exit, abnormal exit).
+  def classify(:user_canceled), do: :user_canceled
 
   # errors is a list of strings — scan each entry
   def classify({:claude_result_error, %{errors: errors}}) when is_list(errors) do

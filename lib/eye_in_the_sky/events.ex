@@ -390,6 +390,13 @@ defmodule EyeInTheSky.Events do
   def pull_request_updated(pr),
     do: broadcast("pull_requests:updated", {:pull_request_updated, pr})
 
+  @doc "Subscribe to Pi model discovery refresh events."
+  def subscribe_pi_models, do: sub("pi:models")
+
+  @doc "Broadcast a Pi model discovery refresh result."
+  def pi_models_refreshed(result),
+    do: broadcast("pi:models", {:pi_models_refreshed, result})
+
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)
   defp unsub(topic), do: Phoenix.PubSub.unsubscribe(@pubsub, topic)

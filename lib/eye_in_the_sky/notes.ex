@@ -208,23 +208,48 @@ defmodule EyeInTheSky.Notes do
   Toggles the starred status of a note.
   """
   def toggle_starred(note_id) do
-    # Single UPDATE … SET starred = NOT starred RETURNING * avoids the
+    # Single UPDATE … SET starred = NOT starred RETURNING avoids the
     # SELECT-then-UPDATE two-query race (prior pattern: get_note/update_note).
-    case Repo.query(
-           "UPDATE notes SET starred = NOT starred WHERE id = $1 RETURNING *",
-           [note_id]
-         ) do
-      {:ok, %{rows: []}} ->
+    # RETURNING only id + starred — NOT `*` — because the notes table has an
+    # `embedding` pgvector column and the Repo has no pgvector Postgrex types
+    # module, so `RETURNING *` fails to decode `vector` and errors the whole
+    # toggle. Both callers ignore the returned struct anyway.
+    #
+    # note_id must be coerced to an integer: this is a raw parameterized query,
+    # and Postgrex (unlike Ecto's Repo.get) will not cast the string ids that
+    # arrive from phx-value / the context menu against the bigint `id` column.
+    case normalize_id(note_id) do
+      nil ->
         {:error, :not_found}
 
-      {:ok, %{rows: [row], columns: cols}} ->
-        note = Repo.load(Note, Enum.zip(cols, row))
-        {:ok, note}
+      id ->
+        case Repo.query(
+               "UPDATE notes SET starred = NOT starred WHERE id = $1 RETURNING id, starred",
+               [id]
+             ) do
+          {:ok, %{rows: []}} ->
+            {:error, :not_found}
 
-      {:error, reason} ->
-        {:error, reason}
+          {:ok, %{rows: [row], columns: cols}} ->
+            note = Repo.load(Note, Enum.zip(cols, row))
+            {:ok, note}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
+
+  defp normalize_id(id) when is_integer(id), do: id
+
+  defp normalize_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+
+  defp normalize_id(_), do: nil
 
   @doc """
   Search notes using PostgreSQL full-text search.

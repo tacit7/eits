@@ -63,8 +63,21 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
     default_model =
       case provider do
-        "codex" -> ModelConfig.default_model("codex")
-        _ -> default_claude_model()
+        "codex" ->
+          ModelConfig.default_model("codex")
+
+        "pi" ->
+          # Warm the discovery cache for the next render; default to the
+          # first discovered model (nil when none configured yet).
+          EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+
+          case models_for_provider("pi") do
+            [{slug, _label} | _] -> slug
+            [] -> nil
+          end
+
+        _ ->
+          default_claude_model()
       end
 
     {:noreply, assign(socket, selected_provider: provider, selected_model: default_model)}
@@ -208,6 +221,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       >
         <option value="claude" selected={@selected_provider == "claude"}>Claude</option>
         <option value="codex" selected={@selected_provider == "codex"}>Codex</option>
+        <option value="pi" selected={@selected_provider == "pi"}>Pi (multi-provider)</option>
       </select>
     </div>
     """
@@ -435,6 +449,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       >
         <%= for {value, label} <- models_for_provider(@selected_provider) do %>
           <option value={value} selected={@selected_model == value}>{label}</option>
+        <% end %>
+        <%= if @selected_provider == "pi" and models_for_provider("pi") == [] do %>
+          <option disabled selected>No Pi models discovered — Settings → Providers</option>
         <% end %>
       </select>
     </div>

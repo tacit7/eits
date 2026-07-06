@@ -228,21 +228,36 @@ Each column header displays the current task count for that column. Task counts 
 
 ## Navigation Between Views
 
+### Rail Tasks Item Icon
+
+The tasks rail item uses the **lucide-kanban** icon, indicating that the primary task view is the kanban board. The icon appears in the rail menu when hovering over or clicking the Tasks section.
+
+**File**: `lib/eye_in_the_sky_web/components/rail.ex` — icon set to `"lucide-kanban"`
+
+### Flyout Dual-Link Header
+
+When the tasks section is active (`:tasks`), the rail flyout header displays two navigation links side-by-side:
+
+- **Kanban** (lucide-kanban icon): Navigate to `/projects/:id/kanban`
+- **List** (hero-check-circle icon): Navigate to `/projects/:id/tasks`
+
+This dual-link pattern allows quick switching between kanban and list views from the flyout header. Both links are styled identically and sit in a flex container with gap spacing.
+
+**Implementation**: The flyout header uses a conditional block that checks `@active_section == :tasks` and renders `Helpers.section_header_link` components for both routes.
+
+**File**: `lib/eye_in_the_sky_web/components/rail/flyout.ex`
+
 ### Sidebar Task Links
 
 The sidebar "Tasks" nav item links directly to the kanban board (`/projects/:id/kanban`) instead of the list view. The kanban tab highlights as active for both `:tasks` and `:kanban` routes.
 
 **File**: `lib/eye_in_the_sky_web/components/sidebar/projects_section.ex` — `panel_nav_item` href changed from `/projects/:id/tasks` to `/projects/:id/kanban`.
 
-### Kanban Toolbar List View Link
-
-The kanban toolbar includes a "List" button that navigates to the task list view (`/projects/:id/tasks`), allowing users to switch between kanban and list layouts. The toolbar receives `project_id` as a required attr.
-
-**File**: `lib/eye_in_the_sky_web/components/kanban_toolbar.ex`
-
 ### Related commits
 
 - `a5824f3` — sidebar tasks links to kanban; kanban toolbar has list view link
+- `ee1ad283` — Use kanban (view-columns) icon for tasks rail item
+- `55d0beb0` — Tasks rail icon → lucide-kanban; flyout header shows Kanban + List dual links
 
 ## Component Improvements
 

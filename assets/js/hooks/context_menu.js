@@ -78,11 +78,11 @@ export const CtxMenu = {
     return {
       navigate(path) {
         hook._close()
-        window.liveSocket.pushHistoryPatch // presence check only
-        // Full live navigation regardless of current view:
-        window.liveSocket.historyRedirect
-          ? window.liveSocket.historyRedirect(path, 'push', null)
-          : (window.location.href = path)
+        // Full navigation — matches how vim_nav / note editor navigate. The
+        // old liveSocket.historyRedirect(path, 'push', null) call was wrong:
+        // its real signature is (event, href, linkState, flash, targetEl), so
+        // 'push' landed in the href slot and Open went to /push (404).
+        window.location.href = path
       },
       invoke(cmd, args) {
         hook._close()

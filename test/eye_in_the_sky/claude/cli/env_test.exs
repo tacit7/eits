@@ -183,7 +183,13 @@ defmodule EyeInTheSky.Claude.CLI.EnvTest do
       # Empty values are dropped before sanitization ever runs, so no
       # standard-dir injection happens for a missing/empty PATH.
       env = Env.build_from_map(%{"PATH" => ""}, [])
-      assert Enum.find(env, fn {k, _} -> to_string(k) == "PATH" end) == nil
+
+      # PATH may appear as an explicit {~c"PATH", false} unset directive
+      # (replace_env), but must never be SET to a value.
+      case Enum.find(env, fn {k, _} -> to_string(k) == "PATH" end) do
+        nil -> :ok
+        {_k, value} -> assert value == false
+      end
     end
   end
 
@@ -220,7 +226,12 @@ defmodule EyeInTheSky.Claude.CLI.EnvTest do
     end
   end
 
-  defp env_keys(env), do: Enum.map(env, fn {k, _} -> to_string(k) end)
+  # A "stripped" var is now an explicit {key, false} unset entry —
+  # Port.open's {:env, list} only EXTENDS the inherited env, so absence from
+  # the list would leak the inherited value. env_keys/1 returns only vars
+  # that will actually be SET in the child; unset directives are excluded.
+  defp env_keys(env),
+    do: for({k, v} <- env, v != false, do: to_string(k))
 
   defp path_value(env) do
     case Enum.find(env, fn {k, _} -> to_string(k) == "PATH" end) do

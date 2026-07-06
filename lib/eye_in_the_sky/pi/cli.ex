@@ -133,5 +133,9 @@ defmodule EyeInTheSky.Pi.CLI do
     Enum.reduce(eits_pairs, base, fn {k, v}, acc ->
       EyeInTheSky.CLI.Port.maybe_add_env(acc, k, v)
     end)
+    # {:env, list} only EXTENDS the inherited env — every var not on the
+    # allowlist must be explicitly unset ({key, false}) or provider
+    # credentials leak into the harness from inheritance anyway.
+    |> EyeInTheSky.CLI.Port.replace_env()
   end
 end

@@ -299,6 +299,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("rename_session", params, socket),
     do: RailSessionActions.handle_rename_session(params, socket)
 
+  def handle_event("open_worktree", params, socket),
+    do: RailSessionActions.handle_open_worktree(params, socket)
+
   def handle_event("toggle_new_session_drawer", params, socket),
     do: RailSessionActions.handle_toggle_new_session_drawer(params, socket)
 

@@ -64,10 +64,12 @@ export const REGISTRY = {
     ...(d.ctxWorktree
       ? [
           {
+            // Server-side reveal (System.cmd open/explorer/xdg-open) — the
+            // Phoenix server always runs on the user's machine, so this works
+            // in the browser too, not just the desktop app.
             label: 'Open worktree in Finder',
             icon: '📁',
-            tauri: true,
-            run: (c) => c.push('open_worktree', { session_id: Number(d.ctxId), path: d.ctxWorktree }),
+            run: (c) => c.push('open_worktree', { session_id: Number(d.ctxId) }),
           },
         ]
       : []),

@@ -45,6 +45,11 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
     --%>
     <div
       id={"session-row-#{@session.id}"}
+      data-ctx="session"
+      data-ctx-id={@session.id}
+      data-ctx-uuid={@session.uuid}
+      data-ctx-name={@session.name}
+      data-ctx-worktree={Map.get(@session, :git_worktree_path)}
       class={[
         "relative group/row",
         if(@selected,

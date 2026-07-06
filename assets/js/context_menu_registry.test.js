@@ -10,7 +10,8 @@ describe('itemsFor', () => {
     const app = itemsFor('session', { ctxId: '1', ctxUuid: 'u', ctxWorktree: '/x' }, true)
     expect(web.some((i) => i.label === 'Open in New Window')).toBe(false)
     expect(app.some((i) => i.label === 'Open in New Window')).toBe(true)
-    expect(web.some((i) => i.label === 'Open worktree in Finder')).toBe(false)
+    // server-side reveal works in the browser too — present in BOTH
+    expect(web.some((i) => i.label === 'Open worktree in Finder')).toBe(true)
     // no doubled separators after filtering
     web.forEach((it, ix) => { if (it.sep) expect(web[ix + 1]?.sep).not.toBe(true) })
     expect(web[0].sep).not.toBe(true)

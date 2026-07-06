@@ -108,9 +108,12 @@ export const CtxMenu = {
         // native menu. Everything else goes to the page LiveView.
         const railEvents = ['archive_session', 'rename_session', 'open_worktree']
         if (railEvents.includes(event)) {
+          // extra spreads AFTER the stringified session_id in the bridge —
+          // never default it to the whole payload or its integer session_id
+          // clobbers the string one and Integer.parse/1 raises server-side.
           window.dispatchEvent(
             new CustomEvent('tauri:session-action', {
-              detail: { action: event, session_id: payload.session_id, extra: payload.extra || payload },
+              detail: { action: event, session_id: payload.session_id, extra: payload.extra ?? {} },
             })
           )
         } else {

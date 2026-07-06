@@ -139,6 +139,33 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
     end
   end
 
+  @doc """
+  Reveals a session's worktree in the OS file manager. The Phoenix server
+  always runs on the user's machine in this architecture (dev server or the
+  desktop app's embedded release), so a server-side `open` works for BOTH
+  web and desktop — no Tauri command needed. Path comes from the DB, never
+  from the client.
+  """
+  def handle_open_worktree(%{"session_id" => session_id_str}, socket) do
+    with {session_id, ""} <- Integer.parse(to_string(session_id_str)),
+         {:ok, session} <- EyeInTheSky.Sessions.get_session(session_id),
+         path when is_binary(path) and path != "" <- session.git_worktree_path,
+         true <- File.dir?(path) do
+      System.cmd(reveal_cmd(), [path])
+      {:noreply, socket}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "No worktree to open for this session")}
+    end
+  end
+
+  defp reveal_cmd do
+    case :os.type() do
+      {:unix, :darwin} -> "open"
+      {:win32, _} -> "explorer"
+      _ -> "xdg-open"
+    end
+  end
+
   def handle_rename_session(%{"session_id" => session_id_str, "name" => name}, socket)
       when is_binary(name) and name != "" do
     case Integer.parse(session_id_str) do

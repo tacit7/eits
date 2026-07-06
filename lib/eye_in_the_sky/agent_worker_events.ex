@@ -100,7 +100,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   (no default) to prevent silent nil-writes from future callers.
   """
   def on_session_failed(session_id, provider_conversation_id, reason) do
-    Events.stream_error(session_id, provider_conversation_id, "Systemic error — session failed")
+    error_text = provider_error_text(reason)
+    Messages.record_incoming_reply(session_id, "system", "[provider error] " <> error_text)
+    Events.stream_error(session_id, provider_conversation_id, error_text)
 
     case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
       {:ok, session} -> update_agent_status(session, "failed")
@@ -161,6 +163,16 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     do: "watchdog_timeout: #{timeout_ms}ms"
 
   defp failure_message(reason), do: inspect(reason) |> String.slice(0, 120)
+
+  defp provider_error_text({:pi_turn_error, msg}) when is_binary(msg), do: redact(msg)
+
+  defp provider_error_text({:claude_result_error, %{result: result}}) when is_binary(result),
+    do: redact(result)
+
+  defp provider_error_text(reason), do: reason |> inspect() |> redact() |> String.slice(0, 500)
+
+  @key_pattern ~r/\b(sk|key|token)[-_][A-Za-z0-9_\-]{8,}\b/i
+  defp redact(text), do: Regex.replace(@key_pattern, text, "[redacted]")
 
   # --- Data Events ---
 

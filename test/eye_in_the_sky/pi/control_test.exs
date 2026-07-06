@@ -93,6 +93,27 @@ defmodule EyeInTheSky.Pi.ControlTest do
              Enum.find(StubCLI.sends(), &(&1.type == "set_api_key"))
   end
 
+  test "harness error strings that echo key material are redacted at the boundary" do
+    submitted_key = "sk-or-abc123def456ghi789xyz"
+
+    responder = fn %{id: id, type: type} ->
+      case type do
+        "initialize" ->
+          ~s({"id":"#{id}","type":"response","command":"initialize","success":true,"data":{"protocolVersion":1}})
+
+        "set_api_key" ->
+          ~s({"id":"#{id}","type":"response","command":"set_api_key","success":false,"error":"invalid key #{submitted_key}"})
+      end
+    end
+
+    assert {:error, {:pi_control, msg}} =
+             Control.set_api_key("echo", submitted_key, responder: responder)
+
+    refute msg =~ submitted_key
+    refute msg =~ "sk-or-abc123"
+    assert msg =~ "[redacted]"
+  end
+
   test "timeout returns error" do
     responder = fn
       %{type: "initialize", id: id} ->

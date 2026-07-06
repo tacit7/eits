@@ -11,6 +11,7 @@ defmodule EyeInTheSky.Pi.Control do
   """
 
   alias EyeInTheSky.Claude.Utils
+  alias EyeInTheSky.Redaction
 
   @default_timeout 30_000
 
@@ -93,7 +94,11 @@ defmodule EyeInTheSky.Pi.Control do
             {:ok, r["data"]}
 
           {:ok, %{"type" => "response", "id" => ^id, "success" => false} = r} ->
-            {:error, {:pi_control, r["error"]}}
+            # Central redaction at the harness IPC boundary: the error string
+            # may transitively echo the submitted key (some providers return
+            # "invalid key sk-…"). Every downstream consumer — flashes, logs,
+            # system chat messages — inherits this scrubbing for free.
+            {:error, {:pi_control, Redaction.redact(r["error"])}}
 
           _other ->
             await_response(ref, id, timeout)

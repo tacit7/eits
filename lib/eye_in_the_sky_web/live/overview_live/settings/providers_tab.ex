@@ -2,6 +2,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
   @moduledoc false
   use Phoenix.Component
 
+  alias EyeInTheSky.Redaction
+
   def render(assigns) do
     ~H"""
     <div class="space-y-4">
@@ -47,11 +49,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
   end
 
   defp render_providers(%{pi_providers: {:error, reason}} = assigns) do
-    assigns = assign(assigns, :reason, reason)
+    assigns = assign(assigns, :reason, format_reason(reason))
 
     ~H"""
     <div class="px-5 py-4 text-sm text-error">
-      Could not load providers: {inspect(@reason)}
+      Could not load providers: {@reason}
     </div>
     """
   end
@@ -149,7 +151,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
   defp model_status_line(:empty), do: "Model discovery: no cached models yet"
 
   defp model_status_line({:error, reason}),
-    do: "Model discovery failed: #{inspect(reason)}"
+    do: "Model discovery failed: #{format_reason(reason)}"
 
   defp model_status_line(_), do: ""
+
+  # Render {:error, reason} tuples as short human-safe text. Prefer the string
+  # payload when the harness returned one; otherwise fall back to a redacted
+  # inspect that will scrub any transitively-echoed key material.
+  defp format_reason(:pi_control_timeout), do: "harness timed out"
+  defp format_reason({:harness_exit, code}), do: "harness exited (#{code})"
+  defp format_reason({:pi_control_crashed, _}), do: "harness crashed"
+  defp format_reason({:pi_control, msg}) when is_binary(msg), do: Redaction.redact(msg)
+  defp format_reason(msg) when is_binary(msg), do: Redaction.redact(msg)
+  defp format_reason(other), do: Redaction.redact_inspect(other, limit: 200)
 end

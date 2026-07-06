@@ -1639,7 +1639,7 @@ Required (one of):
 Options:
   --interpolate-env            Substitute $VAR and ${VAR} in instructions using current environment
   --model <m>                  Model name (default: server default)
-  --provider <p>               Provider (default: claude)
+  --provider <p>               Provider: claude (default), codex, gemini, pi
   --project-id <n>             Project ID (default: $EITS_PROJECT_ID)
   --project-path <path>        Project path (default: current dir)
   --worktree <branch>          Git worktree branch to create for the agent
@@ -1665,6 +1665,10 @@ Valid models (--provider codex):
 
 Valid models (--provider gemini):
   gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+
+Valid models (--provider pi):
+  any '<pi-provider>/<model-id>' (format-validated; requires --model)
+  Examples: google/gemini-2.5-pro, openrouter/qwen/qwen3-coder
 
 NOTES:
   - --worktree requires a clean git tree. If the working directory has uncommitted
@@ -1745,7 +1749,18 @@ USAGE
                 *) die "invalid model '$model' for provider 'gemini'. Valid: gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite" ;;
               esac
             fi ;;
-          *) die "unknown provider '$provider'. Valid: claude, codex, gemini" ;;
+          pi)
+            # Format-validated: <pi-provider>/<model-id> (model id may contain '/')
+            if [[ -z "$model" ]]; then
+              echo '{"error":"provider pi requires --model <pi-provider>/<model-id>","code":"invalid_model"}' >&2
+              exit 2
+            fi
+            if [[ ! "$model" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/@+-]+$ ]]; then
+              echo "{\"error\":\"invalid pi model '$model'; expected <pi-provider>/<model-id>\",\"code\":\"invalid_model\"}" >&2
+              exit 2
+            fi
+            ;;
+          *) die "unknown provider '$provider'. Valid: claude, codex, gemini, pi" ;;
         esac
       fi
       # Load from file if provided

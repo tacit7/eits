@@ -68,7 +68,12 @@ defmodule EyeInTheSky.Claude.CLI.Env do
     env = maybe_add_env(env, "EITS_CHANNEL_ID", opts[:eits_channel_id])
     env = maybe_add_env(env, "EITS_WORKFLOW", opts[:eits_workflow] || "1")
     env = put_default_eits_url(env)
-    maybe_add_env(env, "CLAUDE_CODE_EFFORT_LEVEL", opts[:effort_level])
+    env = maybe_add_env(env, "CLAUDE_CODE_EFFORT_LEVEL", opts[:effort_level])
+
+    # {:env, list} only EXTENDS the inherited env — blocked vars (including
+    # ANTHROPIC_API_KEY when not allowed) must be explicitly unset or they
+    # leak into the child from inheritance despite being omitted above.
+    EyeInTheSky.CLI.Port.replace_env(env)
   end
 
   # Point spawned agents (and the eits CLI they invoke) at THIS server's API.

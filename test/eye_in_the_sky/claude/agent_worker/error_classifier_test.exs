@@ -171,6 +171,15 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
       assert ErrorClassifier.classify(nil) == :transient
     end
 
+    test ":user_canceled classifies as :user_canceled (systemic — no retry)" do
+      # Spec invariant: user-initiated cancels are terminal and MUST NOT be
+      # re-run. Emitted by Pi.SDK on every terminal path (turn_end after cancel,
+      # clean exit after cancel, abnormal exit after cancel).
+      assert ErrorClassifier.classify(:user_canceled) == :user_canceled
+      assert ErrorClassifier.systemic?(:user_canceled)
+      assert ErrorClassifier.status_reason(:user_canceled) == "user_canceled"
+    end
+
     test "rate_limit_error is NOT systemic — retries with backoff are preserved" do
       # 429s are transient by protocol (burst throttling clears in seconds).
       # Categorized so the UI can distinguish but NOT systemic so RetryPolicy

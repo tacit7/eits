@@ -319,6 +319,9 @@ defmodule EyeInTheSky.Codex.CLI do
       "EITS_URL",
       opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")
     )
+    # {:env, list} only EXTENDS the inherited env — blocked vars must be
+    # explicitly unset or they leak into the child despite being omitted above.
+    |> EyeInTheSky.CLI.Port.replace_env()
   end
 
   # ---------------------------------------------------------------------------

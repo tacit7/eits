@@ -213,11 +213,17 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("toggle_collapsed", _params, socket),
     do: RailStateActions.handle_toggle_collapsed(socket)
 
-  def handle_event("open_flyout", _params, socket),
-    do: SectionActions.handle_open_flyout(socket)
+  def handle_event("open_flyout", _params, socket) do
+    # Wrap like toggle_section: opening on the :usage section must kick off
+    # the async usage fetch or the flyout spins forever (Codex bug hunt).
+    {:noreply, new_socket} = SectionActions.handle_open_flyout(socket)
+    {:noreply, maybe_start_usage_async(new_socket, new_socket.assigns.active_section)}
+  end
 
-  def handle_event("open_mobile_section", params, socket),
-    do: SectionActions.handle_open_mobile_section(params, socket)
+  def handle_event("open_mobile_section", params, socket) do
+    {:noreply, new_socket} = SectionActions.handle_open_mobile_section(params, socket)
+    {:noreply, maybe_start_usage_async(new_socket, new_socket.assigns.active_section)}
+  end
 
   def handle_event("refresh_usage", params, socket),
     do: RailStateActions.handle_refresh_usage(params, socket)

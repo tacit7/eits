@@ -108,11 +108,12 @@ export const RailState = {
         this._dragUp = () => {
           if (dragged) {
             this._suppressNextClick = true
-            // The browser's click (if any) fires synchronously after mouseup,
-            // before timers run — so this only clears a flag no click consumed
-            // (e.g. release outside the strip). Prevents eating the NEXT
-            // legitimate click.
-            setTimeout(() => { this._suppressNextClick = false }, 0)
+            // Mainstream engines dispatch the post-mouseup click before timers,
+            // but that ordering is not spec-guaranteed (WKWebView is our
+            // runtime). 300ms comfortably outlives any click dispatch while
+            // still clearing a flag no click consumed (release outside the
+            // strip), so it can't eat the NEXT legitimate click.
+            setTimeout(() => { this._suppressNextClick = false }, 300)
           }
           start = null
         }

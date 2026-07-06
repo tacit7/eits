@@ -520,7 +520,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
       <nav
         id="rail-icon-strip"
-        class="w-[52px] flex-shrink-0 flex flex-col items-center pb-2 pt-10 gap-1 border-r border-base-content/8 bg-base-100 z-20"
+        class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-base-100 z-20"
       >
         <button
           phx-click="toggle_proj_picker"

@@ -26,6 +26,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
           | :watchdog_timeout
           | :retry_exhausted
           | :user_canceled
+          | :model_not_found
           | :transient
 
   # Rate-limit (429) is CATEGORIZED so the UI can surface a distinct badge, but
@@ -52,6 +53,20 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   # canceled turns are never re-run). Emitted by Pi.SDK when a cancel is
   # observed on any terminal path (turn_end, clean exit, abnormal exit).
   def classify(:user_canceled), do: :user_canceled
+
+  # Pi harness renders provider errors as markdown text — classify by content.
+  # Order matters: billing before auth (a 400 usage error must not read as generic).
+  def classify({:pi_turn_error, msg}) when is_binary(msg) do
+    cond do
+      msg =~ ~r/out of .*usage|quota|credit|billing/iu -> :billing_error
+      msg =~ ~r/HTTP 429|rate.?limit|overloaded/iu -> :rate_limit_error
+      msg =~ ~r/HTTP 40[13]|authentication|invalid[ _]?(api[ _-]?key|x-api-key|token)/iu -> :authentication_error
+      msg =~ ~r/HTTP 404|not_found_error|unknown model/iu -> :model_not_found
+      true -> :transient
+    end
+  end
+
+  def classify({:pi_turn_error, _}), do: :transient
 
   # errors is a list of strings — scan each entry
   def classify({:claude_result_error, %{errors: errors}}) when is_list(errors) do

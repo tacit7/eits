@@ -71,6 +71,7 @@ import {Highlight} from "./hooks/highlight"
 import {LocalTime} from "./hooks/local_time"
 import {DragUpload} from "./hooks/drag_upload"
 import {RailState} from "./hooks/rail_state"
+import {CtxMenu} from "./hooks/context_menu"
 import {DrawerSwipeClose} from "./hooks/drawer_swipe_close"
 import {QuickCreateNote, QuickCreateAgent, QuickUpdateAgent, QuickGetAgent, QuickDeleteAgent, QuickResumeAgent, QuickCreateChat, QuickCreateTask} from "./hooks/quick_create"
 import {CommandPalette} from "./hooks/command_palette"
@@ -142,6 +143,7 @@ Hooks.Highlight = Highlight
 Hooks.LocalTime = LocalTime
 Hooks.DragUpload = DragUpload
 Hooks.RailState = RailState
+Hooks.CtxMenu = CtxMenu
 Hooks.DrawerSwipeClose = DrawerSwipeClose
 Hooks.QuickCreateNote = QuickCreateNote
 Hooks.QuickCreateAgent = QuickCreateAgent

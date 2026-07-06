@@ -428,4 +428,8 @@
 
   <div id="session-failure-toast" class="toast toast-bottom toast-end z-50" phx-update="ignore">
   </div>
+
+  <%!-- Context menu mount point. Must be a live-layout element (root-layout
+       phx-hooks are silently ignored); the hook itself renders into body. --%>
+  <div id="ctx-menu-root" phx-hook="CtxMenu" phx-update="ignore" style="display:none"></div>
 </div>

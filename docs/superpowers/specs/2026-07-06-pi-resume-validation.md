@@ -3,7 +3,7 @@
 **Date:** 2026-07-06
 **Environment:** real harness (`priv/bin/eits-pi-harness`, pi-coding-agent 0.74.0), real provider
 (`anthropic/claude-haiku-4-5` via `~/.pi/agent/auth.json` OAuth), driven through `Pi.SDK.start/2`
-with `EITS_PI_SESSION_ROOT=/tmp/pi-task14-root`. Driver script: `validate_resume.exs` (committed
+with `EITS_PI_SESSION_ROOT=/tmp/pi-task14-root`. Driver script: `scripts/validate_pi_resume.exs` (committed
 alongside this doc).
 
 ## Verdict

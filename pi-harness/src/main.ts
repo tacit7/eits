@@ -1518,6 +1518,10 @@ async function handle(message: RequestMessage): Promise<void> {
       state.session?.dispose();
       state.session = undefined;
       respond(message.id, message.type, true);
+      // Exit once the response has flushed — the host is done with this
+      // process, and lingering keeps the readline loop (and the port) open,
+      // forcing the Elixir side to reap us with a timeout kill every turn.
+      process.stdout.write("", () => process.exit(0));
       break;
     default:
       throw new Error(`Unknown request type ${message.type}`);

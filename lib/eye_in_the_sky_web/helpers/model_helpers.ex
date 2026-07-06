@@ -83,9 +83,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
 
   @doc """
   Returns {value, label} tuples for the given provider.
+
+  Pi returns `{slug, slug}` for every discovered model — the slug doubles as
+  the human label because harness-discovered ids have no separate display
+  name. This matches the documented shape so destructuring consumers (see
+  `new_session_modal.ex:436`) don't crash on the Pi optgroup.
   """
   def models_for_provider("codex"), do: codex_models()
-  def models_for_provider("pi"), do: pi_models() |> elem(0)
+
+  def models_for_provider("pi") do
+    {slugs, _freshness} = pi_models()
+    Enum.map(slugs, &{&1, &1})
+  end
+
   def models_for_provider(_), do: claude_models()
 
   @doc """

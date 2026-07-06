@@ -41,10 +41,14 @@ export const REGISTRY = {
     {
       label: 'Rename…',
       icon: '✎',
-      run: (c) => {
-        const name = window.prompt('Rename session', d.ctxName || '')
-        if (name && name.trim()) {
-          c.push('rename_session', { session_id: Number(d.ctxId), extra: { name: name.trim() } })
+      run: async (c) => {
+        const name = await c.prompt({
+          title: 'Rename session',
+          value: d.ctxName || '',
+          placeholder: 'Session name',
+        })
+        if (name) {
+          c.push('rename_session', { session_id: Number(d.ctxId), extra: { name } })
         }
       },
     },

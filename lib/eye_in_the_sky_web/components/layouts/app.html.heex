@@ -432,4 +432,34 @@
   <%!-- Context menu mount point. Must be a live-layout element (root-layout
        phx-hooks are silently ignored); the hook itself renders into body. --%>
   <div id="ctx-menu-root" phx-hook="CtxMenu" phx-update="ignore" style="display:none"></div>
+
+  <%!-- Rename dialog driven by the CtxMenu hook's ctx.prompt(). DaisyUI modal,
+       same pattern as #command-palette. Native <dialog> so Esc/backdrop close
+       for free; the hook fills title/value and resolves on the `close` event. --%>
+  <dialog id="ctx-rename-dialog" phx-update="ignore" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-sm">
+      <h3 class="text-base font-semibold mb-3" data-rename-title>Rename</h3>
+      <form method="dialog" data-rename-form>
+        <label for="ctx-rename-input" class="sr-only">New name</label>
+        <input
+          id="ctx-rename-input"
+          type="text"
+          data-rename-input
+          autocomplete="off"
+          class="input input-bordered w-full focus:border-primary/40"
+        />
+        <div class="modal-action mt-4">
+          <button type="button" value="cancel" data-rename-cancel class="btn btn-ghost btn-sm">
+            Cancel
+          </button>
+          <button type="submit" value="save" data-rename-save class="btn btn-primary btn-sm">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button>close</button>
+    </form>
+  </dialog>
 </div>

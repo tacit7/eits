@@ -126,7 +126,50 @@ export const CtxMenu = {
           new CustomEvent('phx:flash', { detail: { kind: 'info', msg } })
         )
       },
+      // DaisyUI text prompt (replaces window.prompt). Closes the menu, opens
+      // #ctx-rename-dialog, resolves the trimmed value on Save or null on
+      // Cancel/backdrop/Esc. Falls back to window.prompt if <dialog> is
+      // unsupported (older webviews).
+      prompt(opts) {
+        hook._close()
+        return hook._promptDialog(opts)
+      },
     }
+  },
+
+  // --- DaisyUI text prompt ----------------------------------------------------
+  _promptDialog({ title = 'Rename', value = '', placeholder = '' } = {}) {
+    return new Promise((resolve) => {
+      const dlg = document.getElementById('ctx-rename-dialog')
+      if (!dlg || typeof dlg.showModal !== 'function') {
+        const v = window.prompt(title, value)
+        resolve(v && v.trim() ? v.trim() : null)
+        return
+      }
+      const input = dlg.querySelector('[data-rename-input]')
+      const titleEl = dlg.querySelector('[data-rename-title]')
+      const cancelBtn = dlg.querySelector('[data-rename-cancel]')
+      if (titleEl) titleEl.textContent = title
+      input.value = value
+      input.placeholder = placeholder || ''
+
+      const onCancel = () => {
+        dlg.returnValue = 'cancel'
+        dlg.close()
+      }
+      const onClose = () => {
+        cancelBtn?.removeEventListener('click', onCancel)
+        const v = dlg.returnValue === 'save' ? input.value.trim() : ''
+        resolve(v || null)
+      }
+      cancelBtn?.addEventListener('click', onCancel)
+      dlg.addEventListener('close', onClose, { once: true })
+
+      dlg.returnValue = ''
+      dlg.showModal()
+      input.focus()
+      input.select()
+    })
   },
 
   _isTauri() {

@@ -970,6 +970,17 @@ html[data-socket="disconnected"] #vsbar-status-dot {
   background-color: var(--color-error);
 }
 
+/* Anti-flash: hide the flyout before first paint when localStorage says
+   collapsed (inline script in root.html.heex). The RailState hook removes
+   the attribute once the server-side restore round-trip completes, after
+   which LiveView state is authoritative. md+ only — the mobile drawer
+   manages its own visibility. */
+@media (min-width: 768px) {
+  html[data-rail-collapsed="1"] [data-flyout-panel] {
+    display: none;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Streaming bubble animations
    --------------------------------------------------------------------------- */

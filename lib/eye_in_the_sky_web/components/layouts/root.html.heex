@@ -68,6 +68,16 @@
         document.documentElement.setAttribute("data-env", "tauri");
         document.documentElement.setAttribute("data-tauri-overlay", "1");
       }
+      // Anti-flash for the rail flyout: LiveView mounts with flyout_open=true
+      // and the RailState hook's restore only closes it AFTER first paint.
+      // Apply the persisted collapsed state before paint; the hook removes
+      // this attribute once the restore round-trip lands (rail_state.js).
+      try {
+        const railState = JSON.parse(localStorage.getItem("rail_state") || "{}");
+        if (railState.flyout_open === false) {
+          document.documentElement.setAttribute("data-rail-collapsed", "1");
+        }
+      } catch (_e) {}
     </script>
   </head>
   <body class="bg-base-100 min-h-[100dvh] overflow-hidden">

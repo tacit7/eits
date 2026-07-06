@@ -417,29 +417,8 @@ if (window.__TAURI_INTERNALS__) {
     })
   }
 
-  // --- Session flyout context menu -------------------------------------------
-  // Right-click on a .flyout-session-row triggers a native Tauri popup menu.
-  // The Rust command builds the menu and handles Tauri-native actions
-  // (open window, clipboard, Finder). For LiveView actions (archive, rename),
-  // Rust evals a CustomEvent back; we catch it here and pushEvent to the Rail.
-  document.addEventListener('contextmenu', (e) => {
-    const row = e.target.closest('.flyout-session-row')
-    if (!row) return
-    e.preventDefault()
-
-    const sessionId   = row.dataset.sessionId   ?? ''
-    const sessionUuid = row.dataset.sessionUuid  ?? ''
-    const sessionName = row.dataset.sessionName  ?? ''
-    const worktree    = row.dataset.sessionWorktree ?? ''
-
-    invoke('show_session_context_menu', {
-      session_id:    parseInt(sessionId, 10) || 0,
-      uuid:          sessionUuid,
-      name:          sessionName,
-      worktree_path: worktree || null,
-    }).catch((err) => console.error('[tauri] context menu error:', err))
-  })
-
+  // Session context menus are the web-rendered CtxMenu hook now (browser +
+  // desktop parity) — the native show_session_context_menu path is retired.
   // tauri:session-action handling lives in the RailState hook — see note above.
 }
 

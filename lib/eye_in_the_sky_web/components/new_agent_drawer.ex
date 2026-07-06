@@ -14,6 +14,14 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
     only: [claude_models: 0, codex_models: 0]
 
+  import EyeInTheSkyWeb.Helpers.ModelHelpers, only: [pi_models: 0]
+
+  @impl true
+  def mount(socket) do
+    EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+    {:ok, socket}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -41,6 +49,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
               <select name="agent_type" class="select select-bordered" required>
                 <option value="claude">Claude</option>
                 <option value="codex">Codex</option>
+                <option value="pi">Pi (multi-provider)</option>
               </select>
             </.form_field>
             
@@ -56,6 +65,13 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
                   <%= for {value, label} <- codex_models() do %>
                     <option value={value}>{label}</option>
                   <% end %>
+                </optgroup>
+                <% {pi_slugs, pi_freshness} = pi_models() %>
+                <optgroup label={pi_optgroup_label(pi_freshness)}>
+                  <option :for={slug <- pi_slugs} value={slug}>{slug}</option>
+                  <option :if={pi_slugs == []} disabled>
+                    No Pi providers configured — Settings → Providers
+                  </option>
                 </optgroup>
               </select>
             </.form_field>
@@ -130,6 +146,9 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
     </div>
     """
   end
+
+  defp pi_optgroup_label(:stale), do: "Pi (discovered — stale)"
+  defp pi_optgroup_label(_), do: "Pi (discovered)"
 
   defp advanced_section(assigns) do
     ~H"""

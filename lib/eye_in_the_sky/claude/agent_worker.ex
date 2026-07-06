@@ -562,5 +562,6 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   # Provider-polymorphic stream assembler factory
   defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
+  # "pi" intentionally uses the default (delta-based) assembler.
   defp stream_assembler_for(_provider), do: StreamAssembler.new()
 end

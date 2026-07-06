@@ -43,5 +43,6 @@ defmodule EyeInTheSky.Claude.ProviderStrategy do
   @doc "Return the strategy module for a given provider string."
   @spec for_provider(String.t()) :: module()
   def for_provider("codex"), do: EyeInTheSky.Claude.ProviderStrategy.Codex
+  def for_provider("pi"), do: EyeInTheSky.Claude.ProviderStrategy.Pi
   def for_provider(_), do: EyeInTheSky.Claude.ProviderStrategy.Claude
 end

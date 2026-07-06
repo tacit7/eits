@@ -40,14 +40,8 @@ defmodule EyeInTheSky.Pi.SDK do
   @doc false
   def loop_opts, do: @loop_opts
 
-  @doc """
-  Returns the configured Pi CLI transport module (real or mock for tests).
-
-  Overridden in Task 8 to delegate to `EyeInTheSky.Claude.Utils.pi_cli_module/0`.
-  """
-  def cli_module do
-    Application.get_env(:eye_in_the_sky, :pi_cli_module, EyeInTheSky.Pi.CLI)
-  end
+  @doc "Returns the configured Pi CLI transport module (real or mock for tests)."
+  def cli_module, do: EyeInTheSky.Claude.Utils.pi_cli_module()
 
   # -- Public API (same contract as Codex.SDK) ---------------------------------
 

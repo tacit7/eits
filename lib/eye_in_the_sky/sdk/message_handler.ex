@@ -108,7 +108,29 @@ defmodule EyeInTheSky.SDK.MessageHandler do
   """
   @callback resolve_exit_session_id(state :: state()) :: String.t() | nil
 
-  @optional_callbacks [on_session_id: 2, resolve_exit_session_id: 1]
+  @doc """
+  Called when the parser emits `{:protocol, data}` (provider protocol
+  bookkeeping such as request/response envelopes). Default: continue,
+  ignoring the event — existing providers never emit it.
+  """
+  @callback handle_protocol_event(data :: map(), state :: state()) ::
+              {:continue, state()} | {:halt, term()}
+
+  @doc """
+  Called on clean process exit (exit code 0). Default preserves legacy
+  behavior: complete with `resolve_exit_session_id/1`. Providers whose
+  success requires an explicit terminal event (Pi: `turn_end`) override
+  this to return `{:error, reason}` when the event was never seen.
+  """
+  @callback on_clean_exit(state :: state()) ::
+              {:complete, String.t() | nil} | {:error, term()}
+
+  @optional_callbacks [
+    on_session_id: 2,
+    resolve_exit_session_id: 1,
+    handle_protocol_event: 2,
+    on_clean_exit: 1
+  ]
 
   # ---------------------------------------------------------------------------
   # __using__ — inject default implementations
@@ -124,7 +146,16 @@ defmodule EyeInTheSky.SDK.MessageHandler do
       @impl EyeInTheSky.SDK.MessageHandler
       def resolve_exit_session_id(state), do: state[:session_id]
 
-      defoverridable on_session_id: 2, resolve_exit_session_id: 1
+      @impl EyeInTheSky.SDK.MessageHandler
+      def handle_protocol_event(_data, state), do: {:continue, state}
+
+      @impl EyeInTheSky.SDK.MessageHandler
+      def on_clean_exit(state), do: {:complete, resolve_exit_session_id(state)}
+
+      defoverridable on_session_id: 2,
+                     resolve_exit_session_id: 1,
+                     handle_protocol_event: 2,
+                     on_clean_exit: 1
     end
   end
 
@@ -196,6 +227,17 @@ defmodule EyeInTheSky.SDK.MessageHandler do
             stop_and_unregister(sdk_ref)
             :ok
 
+          {:protocol, data} ->
+            case module.handle_protocol_event(data, state) do
+              {:continue, new_state} ->
+                run_loop(module, new_state, opts)
+
+              {:halt, reason} ->
+                send(caller_pid, {:claude_error, sdk_ref, reason})
+                stop_and_unregister(sdk_ref)
+                :ok
+            end
+
           :tool_block_stop ->
             send(caller_pid, {:tool_block_stop, sdk_ref})
             run_loop(module, state, opts)
@@ -205,9 +247,16 @@ defmodule EyeInTheSky.SDK.MessageHandler do
         end
 
       {:claude_exit, _cli_ref, 0} ->
-        final_session_id = module.resolve_exit_session_id(state)
-        send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
-        log_sdk_exit(final_session_id, 0, tel_prefix)
+        case module.on_clean_exit(state) do
+          {:complete, final_session_id} ->
+            send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
+            log_sdk_exit(final_session_id, 0, tel_prefix)
+
+          {:error, reason} ->
+            send(caller_pid, {:claude_error, sdk_ref, reason})
+            log_sdk_exit(session_id, {:clean_exit_rejected, reason}, tel_prefix)
+        end
+
         stop_and_unregister(sdk_ref)
         :ok
 

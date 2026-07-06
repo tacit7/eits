@@ -1243,6 +1243,74 @@ eits dm read 123 --json   # machine-readable
 
 ---
 
+### GET /api/v1/dm/wait
+
+Blocking long-poll for the next inbound DM to a session. Lets a caller (or a
+background process) wait for a DM to arrive instead of interval-polling
+`GET /api/v1/dm`. Event-driven — the request subscribes to the session's
+PubSub topic (`session:<id>`) and blocks in `receive` until a `{:new_dm, _}`
+broadcast lands or the timeout elapses; no DB polling loop.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session` or `session_id` | string or integer | yes | Recipient session ID (UUID or integer) |
+| `since` | string | no | ISO 8601 datetime; only a DM with `inserted_at` after this counts as new. Omit to also match any DM already sitting unread in the inbox. |
+| `timeout` | integer | no | Seconds to block for (default 25, capped at 55 — keep comfortably under typical HTTP client/proxy read timeouts) |
+
+**Response:** `200 OK` in both cases — the caller distinguishes "arrived" from
+"nothing yet" by `count`, not by status code.
+
+On arrival (or if a matching DM was already in the inbox when the request
+came in):
+
+```json
+{
+  "items": [
+    {
+      "id": 123,
+      "uuid": "msg-uuid",
+      "body": "Looking at the error logs...",
+      "from_session_id": 40,
+      "to_session_id": 42,
+      "inserted_at": "2026-03-17T10:30:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+On timeout with no matching DM:
+
+```json
+{
+  "items": [],
+  "count": 0
+}
+```
+
+**Errors:**
+
+| Status | When |
+|--------|------|
+| `400 Bad Request` | `session` is missing, or `since` is not a valid ISO 8601 timestamp |
+| `404 Not Found` | no session with that ID/UUID |
+
+**Fan-out:** this is a broadcast subscription, not a queue — if multiple
+callers are waiting on the same session at once, each one gets its own copy
+of the same DM. It's not a competing-consumers pattern.
+
+**Example:**
+
+```bash
+curl "localhost:5001/api/v1/dm/wait?session=42&timeout=30"
+curl "localhost:5001/api/v1/dm/wait?session=42&since=2026-03-17T10:00:00Z&timeout=10"
+eitsr dm wait --session 42 --timeout 30   # eitsr only; bash `eits dm` has no `wait`
+```
+
+---
+
 ### POST /api/v1/dm
 
 Send a message to an agent session. Rate-limited to protect against message injection flooding.

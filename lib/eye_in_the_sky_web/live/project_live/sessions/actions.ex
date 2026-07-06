@@ -28,7 +28,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
   # ---------------------------------------------------------------------------
 
   def create_new_session(params, socket) do
-    project = socket.assigns.project
+    # On the global sessions page @project is nil — resolve from the form's
+    # project_id select instead of crashing on project.path (BadMapError).
+    case resolve_project(params, socket) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a project before launching a session")}
+
+      project ->
+        do_create_new_session(params, socket, project)
+    end
+  end
+
+  defp resolve_project(params, socket) do
+    socket.assigns[:project] ||
+      with id when not is_nil(id) <- ControllerHelpers.parse_int(params["project_id"] || ""),
+           {:ok, project} <- EyeInTheSky.Projects.get_project(id) do
+        project
+      else
+        _ -> nil
+      end
+  end
+
+  defp do_create_new_session(params, socket, project) do
     description = params["description"]
     agent_name = params["agent_name"] || String.slice(description || "", 0, 60)
 

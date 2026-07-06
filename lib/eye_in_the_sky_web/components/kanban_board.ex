@@ -111,6 +111,9 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                       "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
                   ]}
                   data-task-id={task.uuid}
+                  data-ctx="task"
+                  data-ctx-id={task.uuid || to_string(task.id)}
+                  data-ctx-int-id={task.id}
                   {if col_idx == 0,
                     do: %{
                       "data-vim-list-item" => "",

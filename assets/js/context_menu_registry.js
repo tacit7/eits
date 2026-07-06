@@ -77,8 +77,12 @@ export const REGISTRY = {
     { label: 'DM this session', icon: '💬', run: (c) => c.navigate(`/dm/${d.ctxId}`) },
   ],
 
+  // Task items push the pages' EXISTING events (open_task_detail/move_task/
+  // delete_task — all uuid-or-id tolerant via get_task_by_uuid_or_id!), so any
+  // page with task cards works with zero new server code. data-ctx-id carries
+  // the task uuid.
   task: (d) => [
-    { label: 'Open', icon: '↗', run: (c) => c.push('open_task', { task_id: Number(d.ctxId) }) },
+    { label: 'Open', icon: '↗', run: (c) => c.push('open_task_detail', { task_id: d.ctxId }) },
     { sep: true },
     {
       label: 'Move to',
@@ -86,19 +90,17 @@ export const REGISTRY = {
       children: TASK_STATES.map((s) => ({
         label: s.name,
         dot: s.color,
-        run: (c) => c.push('ctx_move_task', { task_id: Number(d.ctxId), state_id: s.id }),
+        run: (c) => c.push('move_task', { task_id: d.ctxId, state_id: String(s.id) }),
       })),
     },
-    { label: 'Claim', icon: '✋', run: (c) => c.push('ctx_claim_task', { task_id: Number(d.ctxId) }) },
-    { label: 'Complete…', icon: '✔', run: (c) => c.push('ctx_complete_task', { task_id: Number(d.ctxId) }) },
     { sep: true },
-    { label: 'Copy task ID', icon: '⧈', run: (c) => c.copy(String(d.ctxId)) },
+    { label: 'Copy task ID', icon: '⧈', run: (c) => c.copy(d.ctxIntId || d.ctxId) },
     { sep: true },
     {
       label: 'Delete task',
       icon: '🗑',
       danger: true,
-      run: (c) => c.push('ctx_delete_task', { task_id: Number(d.ctxId) }),
+      run: (c) => c.push('delete_task', { task_id: d.ctxId }),
     },
   ],
 

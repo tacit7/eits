@@ -1,7 +1,7 @@
 # Pi Integration — Design Spec
 
 **Date:** 2026-07-06 (revised same day after design review)
-**Status:** Approved design, lifecycle/security revisions incorporated
+**Status:** Approved for Phase 1 implementation (second review's corrections incorporated)
 **Scope:** Full claudette parity, shipped in three phases
 **Prior art:** `~/projects/claudette` (Rust/Tauri host + Bun sidecar), whose Pi harness and ndjson protocol this design vendors and re-drives from Elixir.
 
@@ -22,7 +22,7 @@ End state:
 
 ## 2. Architecture Overview
 
-Pi plugs into the existing provider seam as a third `CLI` / `Parser` / `SDK` trio dispatched by `ProviderStrategy.for_provider/1`. No changes to AgentWorker, watchdog, retry, or cancel logic beyond the approval-pending state in Phase 3.
+Pi plugs into the existing provider seam as a third `CLI` / `Parser` / `SDK` trio dispatched by `ProviderStrategy.for_provider/1`. No structural changes to AgentWorker's lifecycle model are required — Phase 1 adds provider dispatch/seam support (`stream_assembler_for("pi")`, strategy dispatch, record_builder clauses); Phase 3 adds the approval-pending state and watchdog suspension.
 
 ```
 AgentWorker (unchanged)
@@ -40,6 +40,14 @@ Unlike claudette (long-lived process per session), EITS spawns the harness **per
 2. Stream events until `turn_end`.
 3. Send `dispose` (best-effort); process exits.
 
+**Startup ordering (SDK-enforced):**
+
+1. SDK sends `initialize`; waits for its successful response envelope and protocol-version match.
+2. SDK sends `start_session`; waits for **both** its successful response envelope and the `ready` event (either may arrive first; the `ready` event's sessionId must echo ours).
+3. SDK sends `prompt`; streaming begins.
+
+Pending-request tracking must tolerate unsolicited events interleaved with response envelopes at any point — streaming events are processed independently of request/response bookkeeping (no blocking wait-for-response loops in the GenServer).
+
 Everything that needs a live process — tool approvals, steering, compaction — happens *while a turn is in flight*, when the process is alive. Between turns nothing needs it.
 
 Auth and model discovery use **separate one-shot harness invocations** (claudette's `pi_control` pattern): spawn → request → response → exit. The OAuth device-code flow is the one longer-lived control process (alive for the duration of the flow).
@@ -49,8 +57,11 @@ Auth and model discovery use **separate one-shot harness invocations** (claudett
 - One Pi harness process is spawned per turn.
 - **Only one Pi turn may be active per EITS session UUID.** This is satisfied by existing architecture — AgentWorker is a single GenServer per session and its queue_manager queues incoming prompts while status is `:running` — but Phase 1 adds a test proving two concurrent prompts for one Pi session serialize (queue), never spawn two harnesses.
 - A turn is successful **only after `turn_end`**. Port exit before `turn_end` is a failed turn — even with exit code 0 — unless the user canceled it.
+- **Exactly one terminal outcome per ref.** The SDK guards terminal emission with a single terminal-state field (`nil | :completed | :failed | :canceled`); each ref completes exactly once. Later `exit` events, port closes, or errors for an already-terminal ref are logged and ignored.
+- **Harness `exit` event ≠ OS port exit.** The OS port exit is authoritative for process lifecycle. A harness `exit` event is diagnostic metadata — it contributes to the normalized failure only if it arrives before `turn_end`; it never produces a second terminal outcome.
+- **`turn_error` is sticky.** If a later `turn_end` arrives, its usage/duration data is folded into the normalized error, but the turn is still **failed** and enters AgentWorker retry classification — `turn_end` after `turn_error` never rescues a turn.
 - After `turn_end`, `dispose` is sent best-effort. Port closure before or after dispose is normal completion. If the port is still alive N seconds (default 5) after dispose, `cancel_port` kills it.
-- Cancel sequence: send `abort` if stdin is still open → wait briefly (default 3 s) for `turn_end`/`turn_error`/exit → fall back to `cancel_port` (SIGTERM → SIGKILL). Canceled turns are not retried.
+- Cancel sequence (SDK-driven): SDK sends the `abort` request if stdin is still open → waits briefly (default 3 s) for `turn_end`/`turn_error`/exit → falls back to CLI transport termination `cancel_port` (SIGTERM → SIGKILL). Canceled turns are not retried.
 - Failed `response` envelopes for `initialize`, `start_session`, or `prompt` fail the turn immediately, before any streaming.
 - Session resume depends entirely on the persisted `sessionDir`. Phase 1 explicitly validates Pi transcript semantics under: successful turn, canceled turn, crashed harness, repeated resume. If `continueRecent` can select an unintended transcript (more than one transcript per dir, or a half-written one becoming "most recent"), the harness must be adjusted to pin a stable per-session transcript file rather than "most recent".
 
@@ -90,10 +101,11 @@ Requests carry a host-assigned string `id`; responses echo it in an envelope `{i
 
 ### `EyeInTheSky.Pi.CLI` (new, `lib/eye_in_the_sky/pi/cli.ex`)
 
-- `spawn_harness/2` (opens the port; the SDK drives the preamble), `send_ndjson/2` (writes one encoded map + newline to the port), `cancel/1` (abort → wait → `cancel_port`, per the invariants above).
+- `spawn_harness/2` (opens the port; the SDK drives the preamble), `send_ndjson/2` (writes one encoded map + newline to the port), and transport-level termination (`cancel_port/1`, `kill_after_timeout/2`). Protocol-level `abort` and `dispose` requests are built and sent by `Pi.SDK` — the CLI never allocates request ids or interprets responses.
 - Reuses `EyeInTheSky.CLI.Port` helpers (`spawn_handler`, `handle_port_output`, `cancel_port`, `find_binary`, `maybe_add_env`).
 - **Compatibility shim, intentional:** emits the legacy wire tags `{:claude_output, ref, line}` / `{:claude_exit, ref, code}` required by the shared MessageHandler pipeline. These names are provider-neutral in practice; renaming them is out of scope for this integration.
 - Key difference from Claude/Codex: **stdin stays open** for the turn's lifetime. No `script` pseudo-TTY wrapper, no `sh -c 'exec … </dev/null'`.
+- Each harness invocation gets an EITS turn id (`EITS_PI_TURN_ID`, derived from the run ref) in env and log metadata — distinct from the persistent session UUID; correlates one spawned process with one AgentWorker run.
 - Env building: same EITS var injection as Claude/Codex (`EITS_SESSION_UUID/ID`, `EITS_PROJECT_ID`, `EITS_URL`, …), same secret stripping, plus `PI_PACKAGE_DIR`. `ANTHROPIC_API_KEY` stays stripped — see §5 Settings copy for the user-facing statement of this.
 - Harness path resolution: `EITS_PI_HARNESS` env override → `priv/bin/eits-pi-harness` → dev fallback `bun pi-harness/src/main.ts`. Missing binary produces an actionable error ("run scripts/build-pi-harness.sh").
 
@@ -108,7 +120,7 @@ Requests carry a host-assigned string `id`; responses echo it in an envelope `{i
 | `tool_update` / `tool_result` | tool-use / tool-result messages |
 | `tool_request` | approval-request message (Phase 3 surfaces it; before Phase 3 the SDK auto-denies — see §6) |
 | `turn_end` | result message with usage (`aggregate` tokens, `totalCostUsd`, `durationMs`) |
-| `turn_error` | stashed error, folded into the turn result |
+| `turn_error` | stashed sticky error — the turn is failed even if `turn_end` follows (§2 invariants) |
 | `compaction_start/end` | status messages |
 | `response` envelopes | passed to SDK bookkeeping: success envelopes for known requests are consumed silently; **failure envelopes become SDK errors** (preamble failures fail the turn) |
 | `error` / `exit` | error messages |
@@ -140,6 +152,8 @@ Before any failure reaches AgentWorker's retry classifier, the parser/SDK produc
 }
 ```
 
+Sanitization default: if a field cannot be proven safe, it is **dropped**, not logged or displayed.
+
 Category mapping is best-effort from Pi's error strings/codes; `:auth` and `:model_not_found` are non-retryable so the retry policy doesn't reincarnate a doomed request five times. Provider API failures mid-turn that Pi auto-retries internally surface as `thinking_delta` retry notices (harness behavior, kept).
 
 ### `EyeInTheSky.Claude.ProviderStrategy.Pi` (new) + seam edits
@@ -161,6 +175,8 @@ One-shot harness IPC for the non-chat verbs:
 
 **Discovery cache** (`EyeInTheSky.Pi.ModelDiscoveryCache`): TTL 60 s; invalidated on `set_api_key`, `clear_api_key`, `oauth_complete`; manual refresh button in the spawn UI and settings.
 
+**Discovery failure** (missing harness, corrupt auth storage, provider crash) never crashes the spawn UI: show the last cached successful discovery with a stale warning if one exists; otherwise show the error and still allow manual entry of a format-valid model id (credentials may already be configured).
+
 ### Auth store & security rules
 
 `~/.pi/agent/auth.json` is the **single** credential store, shared with the terminal `pi`. Claudette's keychain/env-injection path is dropped — single-user local app, one store, keys configured in the terminal Just Work in EITS and vice versa.
@@ -168,13 +184,14 @@ One-shot harness IPC for the non-chat verbs:
 Hard rules:
 
 - All writes go through the Pi SDK's `AuthStorage` inside the harness — Elixir never reads or writes auth.json directly, and never copies keys or OAuth/refresh tokens into the EITS DB or session records.
-- File 0600, parent dir 0700, writes atomic (temp file in same dir + rename) and file-locked. Claudette's `provider-auth.ts` already does 0600 + locking; atomic replace is verified/added when vendoring.
+- File 0600, parent dir 0700, writes atomic (temp file in same dir + rename) and file-locked. Claudette's `provider-auth.ts` already does 0600 + locking. Phase placement: Phase 1 vendors the auth module unchanged (except build/typecheck compatibility); Phase 2 verifies/adds atomic replace **before** enabling set/clear API key from EITS.
 - Logs must redact API keys, OAuth tokens, refresh tokens, and auth payloads; harness `error` payloads are sanitized before display.
 
 ## 5. Metadata, Validation, UI, CLI
 
 - **Model scheme:** `provider="pi"`, `model_name="<pi-provider>/<model-id>"`. The model-id segment may itself contain slashes (OpenRouter ids like `openrouter/qwen/qwen3-coder`). Sessions table unchanged.
 - **Format validation:** `~r{^[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/@+-]+$}` (no whitespace/control chars; `/`, `:`, `@` allowed in the model-id segment). A fixture test validates the regex against real ids returned by `discover_models` before freezing it.
+- **Splitting rule:** always split on the **first** slash only — `String.split(model_name, "/", parts: 2)`. The prefix is the Pi provider; the remainder is the full model id and may itself contain `/`. Never assume a two-element plain split.
 - **`ModelConfig`:** add `"pi"` to `valid_model_combos/0` with format-based validation. **`default_model("pi")` returns `nil`** — ModelConfig stays pure config, no I/O. The spawn UI and `SpawnValidator` resolve the default Pi model from the discovery cache; when discovery returns no configured models, spawn is blocked with "no Pi providers configured — add a key in /settings".
 - **`ModelCapabilities`:** Pi models default to text-only (no vision) in Phase 1; revisit if needed.
 - **`scripts/eits`:** add `pi` to `--provider` validation (~lines 1658–1748) with the same format-based model check, and forward it in `agents spawn`. **Phase 1** (CLI spawning is part of the normal workflow).
@@ -199,7 +216,7 @@ No approval timeout at the harness level (matches claudette); a human taking min
 ## 7. Error Handling
 
 - **Bad JSON / unknown event types:** ignorable unknown marker, logged at debug (mirrors claudette's `#[serde(other)]`).
-- **`turn_error` then `turn_end`:** error folded into the result; normalized error → AgentWorker retry classification.
+- **`turn_error` then `turn_end`:** sticky failure — `turn_end`'s usage/duration is folded into the normalized error, turn enters retry classification as failed.
 - **`turn_error` with no `turn_end` / exit before `turn_end` (any exit code) / `exit` event:** failed turn via the normalized-error path → `on_sdk_errored` → retry policy (auth/model errors non-retryable).
 - **Failed preamble response envelopes:** fail the turn immediately with the envelope's error (e.g. "no configured providers" → settings-directed message in chat).
 - **Protocol version mismatch:** startup failure with rebuild instruction.
@@ -219,17 +236,17 @@ No approval timeout at the harness level (matches claudette); a human taking min
   - cancel → `abort` written, then killed on timeout
   - `dispose` after `turn_end` with already-closed port → normal completion
   - failed `start_session` response → settings-directed error, no stream
-  - two concurrent prompts for one Pi session → serialized by AgentWorker queue, single harness at a time
+  - two concurrent prompts for one Pi session → serialized by AgentWorker queue, single harness at a time (serialization keyed by EITS session/AgentWorker, **not** provider ref — a new ref per turn must not bypass the queue)
 - **Resume (Phase 1 validation, scripted + one real-model manual pass):** resume after successful turn; resume after canceled turn; resume after crashed harness; repeated resume. Confirms `continueRecent` determinism or forces the pinned-transcript harness change (§2 invariants).
 - **Control:** unit tests with a fake harness for discover/list/set-key; cache invalidation on key changes; OAuth flow tested manually (device-code needs a real provider).
-- **Harness itself:** claudette's code treated as proven; `bun run typecheck` stays in the build script; its test suite is not ported.
+- **Harness sandbox smoke tests (Phase 1, required):** workspace sandboxing is a security invariant, so it gets its own tests rather than inherited trust — read outside workspace denied; write outside workspace denied; symlink-escape write denied. Beyond these, claudette's harness code is treated as proven (`bun run typecheck` stays in the build script; its full test suite is not ported).
 - **Manual E2E per phase:** spawn a Pi session against a cheap OpenRouter model; verify streaming, resume, cancel, cost/usage display.
 
 ## 9. Phases
 
 Each phase is its own worktree branch → Codex review → merge (per repo workflow).
 
-**Phase 1 — Chat E2E (bypass approval mode):** vendored harness + protocol version check + build script + `Pi.{CLI,Parser,SDK,StreamAssembler}` + `ProviderStrategy.Pi` + seam edits + record_builder + session-root resolver (`var/pi-sessions`, git-ignored) + format validation + provider icon + minimal `scripts/eits` `--provider pi` support + auto-deny of unexpected approvals + the full lifecycle/cancel/crash/resume test list above. Auth via pre-existing `~/.pi/agent/auth.json`. Exit criteria: spawn, stream, resume, cancel a Pi session from UI and CLI; resume-semantics validation complete.
+**Phase 1 — Chat E2E (bypass approval mode):** vendored harness + protocol version check + build script + `Pi.{CLI,Parser,SDK,StreamAssembler}` + `ProviderStrategy.Pi` + seam edits + record_builder + session-root resolver (`var/pi-sessions`, git-ignored) + format validation + provider icon + minimal `scripts/eits` `--provider pi` support + auto-deny of unexpected approvals + the full lifecycle/cancel/crash/resume test list above. Auth via pre-existing `~/.pi/agent/auth.json`. Exit criteria: spawn, stream, resume, cancel a Pi session from UI and CLI; resume-semantics validation complete. Internal milestones (one branch, reviewable in order): **1A** harness vendoring + parser + CLI port smoke test → **1B** SDK + provider strategy + UI streaming → **1C** resume/cancel/crash hardening + sandbox smoke tests.
 
 **Phase 2 — API-key auth + discovery:** `Pi.Control` one-shot verbs, `ModelDiscoveryCache` (TTL + invalidation + manual refresh), spawn-UI model picker fed by discovery, `/settings` Pi provider section with set/clear API key.
 

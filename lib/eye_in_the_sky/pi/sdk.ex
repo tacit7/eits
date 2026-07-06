@@ -347,6 +347,20 @@ defmodule EyeInTheSky.Pi.SDK do
     end
   end
 
+  # Every stream-error / halt terminal path routes through here so the cancel
+  # marker is consumed exactly once and post-cancel errors surface as the
+  # non-retryable :user_canceled reason. Without this, a harness `error` event
+  # after cancel produced a {:pi_error, ...} that ErrorClassifier mapped to
+  # :transient → retry, AND the Registry marker leaked (never consumed).
+  @impl MessageHandler
+  def on_stream_error(reason, state) do
+    if state.terminal == :canceled or consume_cancel_marker(state.sdk_ref) do
+      {:error, :user_canceled}
+    else
+      {:error, reason}
+    end
+  end
+
   # -- Phase transitions -------------------------------------------------------
 
   defp advance_phase("initialize", data, %{phase: :initializing} = state) do

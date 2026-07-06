@@ -30,10 +30,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
 
   setup do
     Application.put_env(:eye_in_the_sky, :pi_cli_module, StubCLI)
-    {:ok, _} = StubCLI.start_link()
+
+    stub_pid =
+      case StubCLI.start_link() do
+        {:ok, pid} -> pid
+        {:error, {:already_started, pid}} -> pid
+      end
 
     on_exit(fn ->
       Application.delete_env(:eye_in_the_sky, :pi_cli_module)
+      if Process.alive?(stub_pid), do: Agent.stop(stub_pid, :normal, 100)
     end)
 
     # Fake "port" — a pid that ignores messages.
@@ -382,5 +388,100 @@ defmodule EyeInTheSky.Pi.SDKTest do
 
     assert_receive {:claude_error, ^ref, :user_canceled}, 500
     refute_receive {:claude_complete, ^ref, _}, 100
+  end
+
+  # --- Codex review round 4 (2026-07-06) -------------------------------------
+  # After SDK.cancel, a harness `error` event -> Parser {:error, {:pi_error, _}}
+  # would reach ErrorClassifier as :transient -> RETRY, AND leak the cancel
+  # marker (never consumed). on_stream_error now maps it to :user_canceled and
+  # consumes the marker.
+
+  defp marker_present?(ref) do
+    Registry.lookup({ref, :pi_canceled}) != nil
+  end
+
+  test "cancel then parser error (harness error event) -> :user_canceled, marker consumed", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    :ok = SDK.cancel(ref)
+    assert marker_present?(ref), "cancel marker must be set immediately"
+
+    feed(h, encode(%{"type" => "error", "error" => "harness bailed"}))
+
+    assert_receive {:claude_error, ^ref, :user_canceled}, 500
+    refute marker_present?(ref), "cancel marker must be consumed on stream-error path"
+  end
+
+  test "cancel then halt (session mismatch) -> :user_canceled via on_stream_error", ctx do
+    # If a halt fires AFTER cancel, on_stream_error consumes the marker and
+    # remaps the halt reason.
+    %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-mine")
+
+    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
+                     "data" => %{"protocolVersion" => 1}}))
+    Process.sleep(20)
+
+    :ok = SDK.cancel(ref)
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-someone-elses"}))
+
+    assert_receive {:claude_error, ^ref, :user_canceled}, 500
+    refute marker_present?(ref)
+  end
+
+  test "no cancel: parser error still surfaces the original :pi_error reason", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    feed(h, encode(%{"type" => "error", "error" => "real failure"}))
+
+    assert_receive {:claude_error, ^ref, {:pi_error, "real failure"}}, 500
+    refute marker_present?(ref)
+  end
+
+  test "no cancel: halt still surfaces the original halt reason", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-mine")
+
+    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
+                     "data" => %{"protocolVersion" => 1}}))
+    feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-someone-elses"}))
+
+    assert_receive {:claude_error, ^ref,
+                    {:pi_session_mismatch, expected: "sess-mine", got: "sess-someone-elses"}},
+                   500
+
+    refute marker_present?(ref)
+  end
+
+  # Marker-leak audit across ALL terminal paths.
+  test "cancel + turn_end path consumes marker", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    :ok = SDK.cancel(ref)
+    feed(h, encode(%{"type" => "turn_end", "aggregate" => %{}}))
+    assert_receive {:claude_error, ^ref, :user_canceled}, 500
+    refute marker_present?(ref)
+  end
+
+  test "cancel + clean exit path consumes marker", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    :ok = SDK.cancel(ref)
+    feed_exit(h, 0)
+    assert_receive {:claude_error, ^ref, :user_canceled}, 500
+    refute marker_present?(ref)
+  end
+
+  test "cancel + abnormal exit path consumes marker", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    :ok = SDK.cancel(ref)
+    feed_exit(h, 143)
+    assert_receive {:claude_error, ^ref, :user_canceled}, 500
+    refute marker_present?(ref)
   end
 end

@@ -86,6 +86,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
       assigns
       |> assign(:provider_id, p["id"])
       |> assign(:configured?, configured?(p))
+      |> assign(:in_flight?, Map.get(assigns, :pi_key_op_in_flight, false))
 
     ~H"""
     <form
@@ -100,14 +101,18 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
         autocomplete="off"
         placeholder="API key"
         class="input input-bordered input-sm flex-1 font-mono min-w-[12rem]"
+        disabled={@in_flight?}
       />
-      <button type="submit" class="btn btn-sm btn-primary">Save</button>
+      <button type="submit" class="btn btn-sm btn-primary" disabled={@in_flight?}>
+        {if @in_flight?, do: "Saving…", else: "Save"}
+      </button>
       <button
         :if={@configured?}
         type="button"
         class="btn btn-sm btn-outline"
         phx-click="pi_clear_key"
         phx-value-provider_id={@provider_id}
+        disabled={@in_flight?}
       >
         Clear
       </button>

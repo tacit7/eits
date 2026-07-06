@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
 
       case Sessions.update_session(session, attrs) do
         {:ok, updated} ->
-          trigger_status_side_effects(updated, params["status"])
+          trigger_status_side_effects(session, updated, params["status"])
 
           json(conn, %{
             id: updated.id,
@@ -482,11 +482,17 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     end
   end
 
-  defp trigger_status_side_effects(updated, status) do
-    Sessions.broadcast_status_side_effects(updated, status)
+  defp trigger_status_side_effects(previous, updated, requested_status) do
+    status_changed? = requested_status && previous.status != updated.status
 
-    if status in Sessions.terminated_statuses() do
-      handle_terminal_status(updated, status)
+    if status_changed? do
+      Sessions.broadcast_status_side_effects(updated, updated.status)
+    else
+      Sessions.broadcast_session_updated(updated)
+    end
+
+    if status_changed? && updated.status in Sessions.terminated_statuses() do
+      handle_terminal_status(updated, updated.status)
     end
   end
 
@@ -505,5 +511,4 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     do: Map.put(attrs, :read_only, false)
 
   defp maybe_put_read_only(attrs, _), do: attrs
-
 end

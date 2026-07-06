@@ -20,6 +20,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   """
   def list_dms(conn, params) do
     session_raw = params["session"] || params["session_id"]
+    caller_session_raw = conn |> get_req_header("x-eits-session") |> List.first()
     from_raw = params["from"] || params["from_session_id"]
     limit = min(parse_int(params["limit"], 20), 100)
 
@@ -27,6 +28,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       {:error, :bad_request, "session is required"}
     else
       with {:ok, session} <- SessionResolver.resolve(session_raw),
+           :ok <- authorize_session_recipient(caller_session_raw, session.id),
            {:ok, from_id} <- SessionResolver.resolve_optional_int(from_raw),
            {:ok, since_dt} <- parse_since(params["since"]) do
         opts = [from_session_id: from_id, since: since_dt]
@@ -53,6 +55,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       else
         {:error, :not_found} -> {:error, :not_found, "session not found"}
         {:error, :bad_request, reason} -> {:error, :bad_request, reason}
+        {:error, :forbidden} -> {:error, :forbidden, "You are not the recipient of this message"}
       end
     end
   end
@@ -73,12 +76,12 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   Query params:
     - session (optional): integer session ID or UUID of the requesting session (default: resolved from auth)
   """
-  def show_dm(conn, %{"id" => id} = params) do
-    session_raw = params["session"] || get_req_header(conn, "x-eits-session") |> List.first()
+  def show_dm(conn, %{"id" => id}) do
+    session_raw = conn |> get_req_header("x-eits-session") |> List.first()
 
     with {:ok, msg_id} <- parse_dm_id(id),
          {:ok, msg} <- Messages.get_message(msg_id),
-         :ok <- authorize_dm_recipient(session_raw, msg) do
+         :ok <- authorize_session_recipient(session_raw, msg.to_session_id) do
       json(conn, %{
         id: msg.id,
         uuid: msg.uuid,
@@ -101,23 +104,14 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     end
   end
 
-  defp authorize_dm_recipient(session_raw, msg) do
-    case resolve_caller_session(session_raw, msg) do
-      {:ok, caller_id} when caller_id != nil and caller_id != msg.to_session_id ->
-        {:error, :forbidden}
+  defp authorize_session_recipient(nil, _recipient_session_id), do: {:error, :forbidden}
+  defp authorize_session_recipient("", _recipient_session_id), do: {:error, :forbidden}
 
-      {:ok, _} ->
-        :ok
-    end
-  end
-
-  defp resolve_caller_session(nil, _msg), do: {:ok, nil}
-  defp resolve_caller_session("", _msg), do: {:ok, nil}
-
-  defp resolve_caller_session(raw, _msg) do
+  defp authorize_session_recipient(raw, recipient_session_id) do
     case SessionResolver.resolve(raw) do
-      {:ok, session} -> {:ok, session.id}
-      {:error, _} -> {:ok, nil}
+      {:ok, %{id: ^recipient_session_id}} -> :ok
+      {:ok, _session} -> {:error, :forbidden}
+      {:error, _} -> {:error, :forbidden}
     end
   end
 

@@ -102,7 +102,9 @@ Use `sticky_section?/1` everywhere. Do not hardcode `[:chat, :canvas]` inline el
 **Lazy loader**: `load_flyout_tasks/3`
 
 **UI features**:
-- **Flyout header icons**: globe icon links to `/tasks` (all tasks globally); list-bullet icon links to `/projects/:id/tasks` when a project is selected
+- **Flyout header**: dual navigation links when project is selected:
+  - **Kanban link**: icon=`lucide-kanban`, label="Kanban", navigates to `/projects/:id/kanban`
+  - **List link**: icon=`hero-check-circle`, label="List", navigates to `/projects/:id/tasks`
 - **Filter zone** (always visible):
   - **Search input**: debounced filters task names in real-time
   - **State pills**: To Do / In Progress / In Review / Done (toggleable; clicking an active pill clears all filters)
@@ -344,7 +346,8 @@ defp dual_page_section?(section),
 - `:files` → `hero-folder`
 - `:notes` → `hero-pencil-square`
 - `:teams` → `hero-users`
-- `:sessions`, `:tasks`, `:agents` → `hero-list-bullet` (default fallback)
+- `:tasks` → `lucide-kanban`
+- `:sessions`, `:agents` → `hero-list-bullet` (default fallback)
 
 Route mappings:
 - Sessions: `/projects/:id/sessions`

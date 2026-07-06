@@ -89,7 +89,11 @@ defmodule EyeInTheSky.Pi.ModelDiscoveryCache do
         {:ok, models}
 
       {:error, reason} ->
-        Logger.warning("[Pi.ModelDiscoveryCache] refresh failed: #{inspect(reason)}")
+        Logger.warning(
+          "[Pi.ModelDiscoveryCache] refresh failed: " <>
+            EyeInTheSky.Redaction.redact_inspect(reason, limit: 200)
+        )
+
         {:error, reason}
     end
   end

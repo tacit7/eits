@@ -23,6 +23,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
   alias EyeInTheSky.Claude.{ChannelFanout, ChannelProtocol}
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Redaction
 
   # --- Lifecycle Events ---
 
@@ -164,15 +165,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   defp failure_message(reason), do: inspect(reason) |> String.slice(0, 120)
 
-  defp provider_error_text({:pi_turn_error, msg}) when is_binary(msg), do: redact(msg)
+  defp provider_error_text({:pi_turn_error, msg}) when is_binary(msg), do: Redaction.redact(msg)
 
   defp provider_error_text({:claude_result_error, %{result: result}}) when is_binary(result),
-    do: redact(result)
+    do: Redaction.redact(result)
 
-  defp provider_error_text(reason), do: reason |> inspect() |> redact() |> String.slice(0, 500)
-
-  @key_pattern ~r/\b(sk|key|token)[-_][A-Za-z0-9_\-]{8,}\b/i
-  defp redact(text), do: Regex.replace(@key_pattern, text, "[redacted]")
+  defp provider_error_text(reason), do: Redaction.redact_inspect(reason, limit: 500)
 
   # --- Data Events ---
 

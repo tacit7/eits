@@ -48,8 +48,25 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   Returns the default model slug for a provider (Codex).
   Claude defaults remain in the caller (SpawnValidator) to preserve backward-compat
   API behavior — spawning a Claude agent with no model still resolves to "haiku".
+  Pi has no default — model must be specified explicitly (resolved from discovery in Phase 2).
   """
   def default_model("codex"), do: "gpt-5.5"
+  def default_model("pi"), do: nil
+
+  # Pi models are format-validated ("<pi-provider>/<model-id>"); the true list
+  # comes from Pi model discovery (Phase 2). Model id may itself contain "/".
+  @pi_model_regex ~r{^[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/@+-]+$}
+
+  @doc "Validates a model for a provider: format-based for pi, list-based otherwise."
+  def valid_model?("pi", model) when is_binary(model), do: Regex.match?(@pi_model_regex, model)
+  def valid_model?("pi", _), do: false
+  def valid_model?(provider, model), do: model in valid_model_slugs(provider)
+
+  @doc "Splits a pi model into {pi_provider, model_id} on the FIRST slash only."
+  def pi_split_model!(model) when is_binary(model) do
+    [provider, model_id] = String.split(model, "/", parts: 2)
+    {provider, model_id}
+  end
 
   @doc """
   Returns a flat list of valid model slugs for the given provider.
@@ -59,12 +76,15 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   def valid_model_slugs(_), do: claude_models()
 
   @doc """
-  Returns a map of provider => list of valid model slugs.
+  Returns a map of provider => model validation spec.
+  For claude/codex: list of valid model slugs.
+  For pi: :format_validated (format-regex validated, not a list).
   """
   def valid_model_combos do
     %{
       "claude" => valid_model_slugs("claude"),
-      "codex" => valid_model_slugs("codex")
+      "codex" => valid_model_slugs("codex"),
+      "pi" => :format_validated
     }
   end
 end

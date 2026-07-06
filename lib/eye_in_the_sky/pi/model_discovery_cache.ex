@@ -31,7 +31,10 @@ defmodule EyeInTheSky.Pi.ModelDiscoveryCache do
   end
 
   @spec refresh() :: {:ok, [map()]} | {:error, term()}
-  def refresh, do: GenServer.call(__MODULE__, :refresh, 35_000)
+  # 45_000 must exceed Pi.Control @default_timeout (30_000) + its outer Task.await
+  # margin (5_000) so a control timeout surfaces as `{:error, :pi_control_timeout}`
+  # from do_refresh/0 rather than as a GenServer.call exit.
+  def refresh, do: GenServer.call(__MODULE__, :refresh, 45_000)
 
   @spec refresh_async() :: :ok
   def refresh_async, do: GenServer.cast(__MODULE__, :refresh)

@@ -54,6 +54,14 @@ defmodule EyeInTheSky.Pi.ModelDiscoveryCacheTest do
     assert :empty = Cache.get_cached()
   end
 
+  test "refresh returns {:error, :pi_control_timeout} instead of exiting when control times out" do
+    # The GenServer.call timeout (45_000) must exceed Pi.Control's worst-case
+    # await (30_000 + 5_000) so a control timeout surfaces as a normal error
+    # tuple rather than a caller exit.
+    Application.put_env(:eye_in_the_sky, :fake_discover, {:error, :pi_control_timeout})
+    assert {:error, :pi_control_timeout} = Cache.refresh()
+  end
+
   test "refresh_async broadcasts result to subscribers" do
     Application.put_env(:eye_in_the_sky, :fake_discover, {:ok, [%{"id" => "x/y"}]})
     :ok = EyeInTheSky.Events.subscribe_pi_models()

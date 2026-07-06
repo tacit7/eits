@@ -136,8 +136,8 @@ defmodule EyeInTheSky.Pi.SDKTest do
     Process.sleep(30)
     refute last_send_of("prompt"), "prompt should wait until ready arrives"
 
-    # ready arrives.
-    feed(h, encode(%{"type" => "ready"}))
+    # ready arrives (echoing our session id, as the harness contract requires).
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-uuid-1"}))
     Process.sleep(30)
     assert last_send_of("prompt")
   end
@@ -150,7 +150,7 @@ defmodule EyeInTheSky.Pi.SDKTest do
     Process.sleep(30)
 
     # ready arrives first
-    feed(h, encode(%{"type" => "ready"}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-uuid-1"}))
     Process.sleep(30)
     refute last_send_of("prompt")
 
@@ -199,7 +199,7 @@ defmodule EyeInTheSky.Pi.SDKTest do
     feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
                      "data" => %{"protocolVersion" => 1}}))
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
-    feed(h, encode(%{"type" => "ready"}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-happy"}))
     Process.sleep(30)
 
     feed(h, encode(%{"type" => "turn_end", "aggregate" => %{"inputTokens" => 10, "outputTokens" => 20},
@@ -217,7 +217,7 @@ defmodule EyeInTheSky.Pi.SDKTest do
     feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
                      "data" => %{"protocolVersion" => 1}}))
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
-    feed(h, encode(%{"type" => "ready"}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-uuid-1"}))
     Process.sleep(30)
 
     feed(h, encode(%{"type" => "turn_error", "error" => "boom"}))
@@ -264,7 +264,7 @@ defmodule EyeInTheSky.Pi.SDKTest do
     feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
                      "data" => %{"protocolVersion" => 1}}))
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
-    feed(h, encode(%{"type" => "ready"}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => "dup-sess"}))
     Process.sleep(30)
 
     feed(h, encode(%{"type" => "turn_end", "aggregate" => %{}}))
@@ -294,5 +294,93 @@ defmodule EyeInTheSky.Pi.SDKTest do
 
     feed(h, encode(%{"type" => "assistant_delta", "delta" => "after garbage"}))
     assert_receive {:claude_message, ^ref, %Message{content: "after garbage"}}, 500
+  end
+
+  # --- Codex review fixes (2026-07-06) ---------------------------------------
+
+  defp drive_preamble(h, session_id) do
+    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
+                     "data" => %{"protocolVersion" => 1}}))
+    feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => session_id}))
+    Process.sleep(30)
+  end
+
+  test "failed prompt envelope arriving after streaming noise halts the turn", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    feed(h, encode(%{"type" => "assistant_delta", "delta" => "some noise"}))
+    assert_receive {:claude_message, ^ref, %Message{content: "some noise"}}, 500
+
+    feed(h, encode(%{"type" => "response", "id" => "pi-3", "success" => false,
+                     "error" => "model rejected prompt"}))
+
+    assert_receive {:claude_error, ^ref, {:pi_preamble_failed, "prompt", "model rejected prompt"}}, 500
+    refute_receive {:claude_complete, ^ref, _}, 100
+  end
+
+  test "failed mid-turn envelope (deny_tool/dispose) does not kill the turn", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    # Trigger an auto-deny so a deny_tool request is pending (id pi-4).
+    feed(h, encode(%{"type" => "tool_request", "requestId" => "r1",
+                     "toolCallId" => "t1", "kind" => "commandExecution", "input" => %{}}))
+    Process.sleep(30)
+    assert last_send_of("deny_tool")
+
+    # Its failure response must be non-fatal.
+    feed(h, encode(%{"type" => "response", "id" => "pi-4", "success" => false,
+                     "error" => "already resolved"}))
+
+    feed(h, encode(%{"type" => "turn_end", "aggregate" => %{}}))
+    assert_receive {:claude_complete, ^ref, "sess-uuid-1"}, 500
+  end
+
+  test "ready echoing a different sessionId halts with pi_session_mismatch", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-mine")
+
+    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
+                     "data" => %{"protocolVersion" => 1}}))
+    feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
+    feed(h, encode(%{"type" => "ready", "sessionId" => "sess-someone-elses"}))
+
+    assert_receive {:claude_error, ^ref,
+                    {:pi_session_mismatch, expected: "sess-mine", got: "sess-someone-elses"}},
+                   500
+
+    refute last_send_of("prompt"), "prompt must not be sent to a mismatched session"
+  end
+
+  test "cancel then clean exit -> terminal :canceled (not exit_before_turn_end)", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    :ok = SDK.cancel(ref)
+    feed_exit(h, 0)
+
+    assert_receive {:claude_error, ^ref, :canceled}, 500
+  end
+
+  test "cancel then nonzero exit -> terminal :canceled (not exit_code)", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    :ok = SDK.cancel(ref)
+    feed_exit(h, 143)
+
+    assert_receive {:claude_error, ^ref, :canceled}, 500
+  end
+
+  test "cancel then turn_end -> terminal :canceled, never claude_complete", ctx do
+    %{handler: h, sdk_ref: ref} = start_handler(ctx)
+    drive_preamble(h, "sess-uuid-1")
+
+    :ok = SDK.cancel(ref)
+    feed(h, encode(%{"type" => "turn_end", "aggregate" => %{}}))
+
+    assert_receive {:claude_error, ^ref, :canceled}, 500
+    refute_receive {:claude_complete, ^ref, _}, 100
   end
 end

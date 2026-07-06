@@ -39,6 +39,16 @@ defmodule EyeInTheSky.SDK.MessageHandlerExtensionTest do
     {sdk_ref, pid}
   end
 
+  test "default modules keep legacy abnormal-exit reasons (Claude/Codex unchanged)" do
+    {sdk_ref, pid} = run_handler(DefaultSDK)
+    send(pid, {:claude_exit, :cli_ref, 137})
+    assert_receive {:claude_error, ^sdk_ref, {:exit_code, 137}}, 1_000
+
+    {sdk_ref2, pid2} = run_handler(DefaultSDK)
+    send(pid2, {:claude_exit, :cli_ref, :timeout})
+    assert_receive {:claude_error, ^sdk_ref2, :timeout}, 1_000
+  end
+
   test "default modules keep exit-0-is-success behavior (Claude/Codex unchanged)" do
     {sdk_ref, pid} = run_handler(DefaultSDK)
     send(pid, {:claude_exit, :cli_ref, 0})

@@ -125,12 +125,30 @@ defmodule EyeInTheSky.SDK.MessageHandler do
   @callback on_clean_exit(state :: state()) ::
               {:complete, String.t() | nil} | {:error, term()}
 
+  @doc """
+  Called on abnormal process exit (nonzero exit code, :timeout, or other
+  status). Returns the error reason delivered as `{:claude_error, ref, reason}`.
+  Default preserves legacy behavior via `default_exit_reason/1`. Pi overrides
+  this to map exits after a user cancel to `:canceled`.
+  """
+  @callback on_abnormal_exit(status :: term(), state :: state()) :: {:error, term()}
+
   @optional_callbacks [
     on_session_id: 2,
     resolve_exit_session_id: 1,
     handle_protocol_event: 2,
-    on_clean_exit: 1
+    on_clean_exit: 1,
+    on_abnormal_exit: 2
   ]
+
+  @doc """
+  Legacy mapping of an abnormal port-exit status to an error reason.
+  Public so overriding modules can fall back to it.
+  """
+  @spec default_exit_reason(term()) :: term()
+  def default_exit_reason(:timeout), do: :timeout
+  def default_exit_reason(code) when is_integer(code), do: {:exit_code, code}
+  def default_exit_reason(other), do: other
 
   # ---------------------------------------------------------------------------
   # __using__ — inject default implementations
@@ -152,10 +170,15 @@ defmodule EyeInTheSky.SDK.MessageHandler do
       @impl EyeInTheSky.SDK.MessageHandler
       def on_clean_exit(state), do: {:complete, resolve_exit_session_id(state)}
 
+      @impl EyeInTheSky.SDK.MessageHandler
+      def on_abnormal_exit(status, _state),
+        do: {:error, EyeInTheSky.SDK.MessageHandler.default_exit_reason(status)}
+
       defoverridable on_session_id: 2,
                      resolve_exit_session_id: 1,
                      handle_protocol_event: 2,
-                     on_clean_exit: 1
+                     on_clean_exit: 1,
+                     on_abnormal_exit: 2
     end
   end
 
@@ -263,12 +286,7 @@ defmodule EyeInTheSky.SDK.MessageHandler do
       {:claude_exit, _cli_ref, status} ->
         log_sdk_exit(session_id, status, tel_prefix)
 
-        reason =
-          case status do
-            :timeout -> :timeout
-            code when is_integer(code) -> {:exit_code, code}
-            other -> other
-          end
+        {:error, reason} = module.on_abnormal_exit(status, state)
 
         send(caller_pid, {:claude_error, sdk_ref, reason})
         stop_and_unregister(sdk_ref)

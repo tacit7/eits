@@ -10,7 +10,8 @@ defmodule EyeInTheSky.Pi.SDK do
       :initializing --init response ok (protocolVersion==1)--> send start_session --> :starting
       :starting     --start_session response ok AND ready seen (either order)--> send prompt --> :streaming
       :streaming    --{:result, data} (turn_end)--> handle_result: dispose, complete/fail
-      any phase     --failed response envelope--> {:halt, {:pi_preamble_failed, command, error}}
+      any phase     --failed initialize/start_session/prompt envelope--> {:halt, {:pi_preamble_failed, command, error}}
+      (failed mid-turn verbs — deny_tool/dispose/abort — are logged, never fatal)
 
   ## Terminal exactly-once
 
@@ -58,7 +59,14 @@ defmodule EyeInTheSky.Pi.SDK do
   @spec resume(String.t(), String.t(), keyword()) :: {:ok, reference(), pid()} | {:error, term()}
   def resume(_session_id, prompt, opts \\ []), do: run_session(prompt, opts)
 
-  @doc "Cancel a running Pi session (protocol abort → 3 s grace → transport kill)."
+  @doc """
+  Cancel a running Pi session (protocol abort → 3 s grace → transport kill).
+
+  Marks the ref as canceled (Registry marker entry) so the handler reports the
+  terminal outcome as `:canceled` — never a retryable-looking exit error —
+  regardless of whether the harness ends the turn via `turn_end`, a clean
+  exit, or the grace-timeout kill.
+  """
   @spec cancel(reference()) :: :ok | {:error, :not_found}
   def cancel(ref) do
     case Registry.lookup(ref) do
@@ -66,6 +74,7 @@ defmodule EyeInTheSky.Pi.SDK do
         {:error, :not_found}
 
       port when is_port(port) ->
+        mark_canceled(ref)
         cli_module().send_ndjson(port, %{id: "pi-cancel", type: "abort"})
 
         Task.start(fn ->
@@ -76,9 +85,23 @@ defmodule EyeInTheSky.Pi.SDK do
         :ok
 
       pid when is_pid(pid) ->
+        mark_canceled(ref)
         send(pid, :cancel)
         :ok
     end
+  end
+
+  # Cancel marker lives in the shared Registry ETS table under a derived key.
+  # Consumed (deleted) by every terminal path; a handler killed via :DOWN can
+  # leak one row, which is bounded and harmless.
+  defp mark_canceled(ref), do: Registry.register({ref, :pi_canceled}, true)
+
+  defp canceled?(ref), do: Registry.lookup({ref, :pi_canceled}) != nil
+
+  defp consume_cancel_marker(ref) do
+    canceled = canceled?(ref)
+    Registry.unregister({ref, :pi_canceled})
+    canceled
   end
 
   # -- Session bootstrap -------------------------------------------------------
@@ -210,19 +233,36 @@ defmodule EyeInTheSky.Pi.SDK do
         Logger.warning("[Pi.SDK] response for unknown id=#{id}, ignoring")
         {:continue, state}
 
-      event["success"] == false and state.phase != :streaming ->
+      # Failed initialize/start_session/prompt envelopes fail the turn
+      # immediately — in ANY phase. A failed prompt response can arrive after
+      # streaming noise and must still kill the turn (spec §2 invariants).
+      event["success"] == false and command in ~w(initialize start_session prompt) ->
         {:halt, {:pi_preamble_failed, command, event["error"]}}
 
+      # Failed mid-turn verbs (deny_tool, dispose, abort) must not kill a
+      # turn that is otherwise streaming fine.
       event["success"] == false ->
-        {:continue, %{state | sticky_error: event["error"] || "unknown protocol error"}}
+        Logger.warning("[Pi.SDK] #{command} request failed: #{inspect(event["error"])}")
+        {:continue, state}
 
       true ->
         advance_phase(command, event["data"] || %{}, state)
     end
   end
 
-  def handle_protocol_event(%{"type" => "ready"}, state) do
-    advance_phase("ready", nil, %{state | ready_seen: true})
+  def handle_protocol_event(%{"type" => "ready"} = event, state) do
+    expected = state.eits_session_id
+    got = event["sessionId"]
+
+    # The ready event must echo OUR session id (the harness persists the
+    # transcript under it). A mismatch means the wrong transcript lineage —
+    # fail before prompt is ever sent. Skipped when no session id was
+    # requested (in-memory session).
+    if is_binary(expected) and expected != "" and got != expected do
+      {:halt, {:pi_session_mismatch, expected: expected, got: got}}
+    else
+      advance_phase("ready", nil, %{state | ready_seen: true})
+    end
   end
 
   def handle_protocol_event(%{"type" => "turn_error"} = event, state) do
@@ -232,13 +272,8 @@ defmodule EyeInTheSky.Pi.SDK do
 
   def handle_protocol_event(%{"type" => "tool_request"} = event, state) do
     req_id = event["requestId"] || event["id"]
-    id = "pi-#{state.next_id}"
 
-    cli_module().send_ndjson(state.port, %{
-      id: id,
-      type: "deny_tool",
-      requestId: req_id
-    })
+    state = send_request(state, "deny_tool", %{type: "deny_tool", requestId: req_id})
 
     status_msg =
       Message.text(
@@ -248,7 +283,7 @@ defmodule EyeInTheSky.Pi.SDK do
 
     send(state.caller_pid, {:claude_message, state.sdk_ref, status_msg})
 
-    {:continue, %{state | next_id: state.next_id + 1}}
+    {:continue, state}
   end
 
   def handle_protocol_event(%{"type" => "exit"} = event, state) do
@@ -279,6 +314,9 @@ defmodule EyeInTheSky.Pi.SDK do
   @impl MessageHandler
   def on_clean_exit(state) do
     cond do
+      state.terminal == :canceled or consume_cancel_marker(state.sdk_ref) ->
+        {:error, :canceled}
+
       state.terminal == :completed ->
         {:complete, state.eits_session_id}
 
@@ -293,6 +331,15 @@ defmodule EyeInTheSky.Pi.SDK do
 
       true ->
         {:error, :exit_before_turn_end}
+    end
+  end
+
+  @impl MessageHandler
+  def on_abnormal_exit(status, state) do
+    if state.terminal == :canceled or consume_cancel_marker(state.sdk_ref) do
+      {:error, :canceled}
+    else
+      {:error, MessageHandler.default_exit_reason(status)}
     end
   end
 
@@ -339,6 +386,25 @@ defmodule EyeInTheSky.Pi.SDK do
   defp finalize_terminal(data, state) do
     %{sdk_ref: sdk_ref, caller_pid: caller_pid, eits_session_id: eits_session_id} = state
     sticky = state.sticky_error || data[:error]
+
+    canceled = consume_cancel_marker(sdk_ref)
+
+    cond do
+      canceled ->
+        # User cancel: the abort produced a turn_end, but the outcome is
+        # terminal :canceled — never completed, never a retryable error shape.
+        state = %{state | terminal: :canceled}
+        log_usage("pi.sdk.canceled", eits_session_id, data)
+        send(caller_pid, {:claude_error, sdk_ref, :canceled})
+        after_terminal(state, data)
+
+      true ->
+        finalize_uncanceled(data, state, sticky)
+    end
+  end
+
+  defp finalize_uncanceled(data, state, sticky) do
+    %{sdk_ref: sdk_ref, caller_pid: caller_pid, eits_session_id: eits_session_id} = state
 
     if sticky do
       state = %{state | terminal: :failed, sticky_error: sticky}

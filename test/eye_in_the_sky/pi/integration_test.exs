@@ -84,7 +84,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
   test "1. happy path: preamble → deltas → turn_end → clean complete", ctx do
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready", "sessionId" => "s", "sessionFile" => "/x", "model" => "m"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-happy", "sessionFile" => "/x", "model" => "m"}),
       "WAIT:prompt",
       encode(%{"type" => "assistant_delta", "delta" => "hel"}),
       encode(%{"type" => "assistant_delta", "delta" => "lo"}),
@@ -117,7 +117,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
     # accepting start_session.
     fake_harness!(ctx.tmp_dir, [
       "WAIT:initialize",
-      encode(%{"type" => "ready", "sessionId" => "s", "sessionFile" => "/x", "model" => "m"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-ready-first", "sessionFile" => "/x", "model" => "m"}),
       "WAIT:start_session",
       "WAIT:prompt",
       encode(%{"type" => "turn_end", "aggregate" => %{}}),
@@ -133,7 +133,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
   test "3. exit 0 before turn_end → claude_error :exit_before_turn_end", ctx do
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-early-exit"}),
       "WAIT:prompt",
       encode(%{"type" => "assistant_delta", "delta" => "partial"}),
       "EXIT:0"
@@ -148,7 +148,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
   test "4. exit 1 before turn_end → claude_error", ctx do
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-exit1"}),
       "WAIT:prompt",
       "EXIT:1"
     ])
@@ -163,7 +163,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
   test "5. turn_error then turn_end → sticky {:pi_turn_error, msg}, no complete", ctx do
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-sticky"}),
       "WAIT:prompt",
       encode(%{"type" => "turn_error", "error" => "rate limited"}),
       encode(%{"type" => "turn_end", "aggregate" => %{}}),
@@ -180,7 +180,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
   test "6. malformed line mid-stream is skipped, stream continues to complete", ctx do
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-malformed"}),
       "WAIT:prompt",
       encode(%{"type" => "assistant_delta", "delta" => "before"}),
       "this is not json {",
@@ -201,7 +201,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
        ctx do
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-toolreq"}),
       "WAIT:prompt",
       encode(%{"type" => "tool_request", "requestId" => "r-1", "toolName" => "bash"}),
       "WAIT:deny_tool",
@@ -225,7 +225,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
     # via the normal path — SDK.cancel writes an abort with id "pi-cancel".
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-cancel"}),
       "WAIT:prompt",
       encode(%{"type" => "assistant_delta", "delta" => "starting"}),
       "WAIT:abort",
@@ -238,8 +238,9 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
 
     :ok = SDK.cancel(ref)
 
-    # A cancel results in an error terminal (exit_before_turn_end or an exit_code).
-    assert_receive {:claude_error, ^ref, _reason}, 10_000
+    # A cancel results in the terminal :canceled outcome — never a
+    # retryable-looking exit error, never a completion (spec invariant).
+    assert_receive {:claude_error, ^ref, :canceled}, 10_000
     refute_receive {:claude_complete, ^ref, _}, 200
   end
 
@@ -249,7 +250,7 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
     # session ref maps to exactly one live port at any moment.
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready"}),
+      encode(%{"type" => "ready", "sessionId" => "sess-serial"}),
       "WAIT:prompt",
       encode(%{"type" => "turn_end", "aggregate" => %{}}),
       "WAIT:dispose",

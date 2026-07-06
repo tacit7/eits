@@ -93,7 +93,15 @@ export const RailState = {
         let dragged = false
         this._dragDown = (e) => {
           if (e.button !== 0) return
-          start = { x: e.clientX, y: e.clientY }
+          // Remember which section icon the drag started on — dragging from
+          // an icon opens THAT section's flyout; empty strip space falls back
+          // to the active section (server-side default).
+          const btn = e.target.closest('button[phx-value-section]')
+          start = {
+            x: e.clientX,
+            y: e.clientY,
+            section: btn ? btn.getAttribute('phx-value-section') : null,
+          }
           dragged = false
         }
         this._dragMove = (e) => {
@@ -102,7 +110,7 @@ export const RailState = {
           const dy = Math.abs(e.clientY - start.y)
           if (dx >= 24 && dx > dy) {
             dragged = true
-            this.pushEventTo(this.el, 'open_flyout', {})
+            this.pushEventTo(this.el, 'open_flyout', start.section ? { section: start.section } : {})
           }
         }
         this._dragUp = () => {

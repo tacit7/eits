@@ -51,12 +51,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
   end
 
   @doc """
-  Opens the flyout for the current active section — fired by drag-right on
-  the icon strip (RailState hook). Loads section content exactly like the
-  legacy icon-click did.
+  Opens the flyout — fired by drag-right on the icon strip (RailState hook).
+  Dragging from a specific icon opens THAT section's flyout (`section` param);
+  dragging from empty strip space opens the current active section's.
   """
-  def handle_open_flyout(socket) do
-    open_section(socket.assigns.active_section, socket)
+  def handle_open_flyout(params \\ %{}, socket) do
+    section =
+      case params do
+        %{"section" => s} when is_binary(s) -> Loader.parse_section(s)
+        _ -> socket.assigns.active_section
+      end
+
+    open_section(section, socket)
   end
 
   defp toggle_flyout_for(section, socket) do

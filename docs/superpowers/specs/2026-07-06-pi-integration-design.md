@@ -106,7 +106,7 @@ Requests carry a host-assigned string `id`; responses echo it in an envelope `{i
 - **Compatibility shim, intentional:** emits the legacy wire tags `{:claude_output, ref, line}` / `{:claude_exit, ref, code}` required by the shared MessageHandler pipeline. These names are provider-neutral in practice; renaming them is out of scope for this integration.
 - Key difference from Claude/Codex: **stdin stays open** for the turn's lifetime. No `script` pseudo-TTY wrapper, no `sh -c 'exec … </dev/null'`.
 - Each harness invocation gets an EITS turn id (`EITS_PI_TURN_ID`, derived from the run ref) in env and log metadata — distinct from the persistent session UUID; correlates one spawned process with one AgentWorker run.
-- Env building: same EITS var injection as Claude/Codex (`EITS_SESSION_UUID/ID`, `EITS_PROJECT_ID`, `EITS_URL`, …), same secret stripping, plus `PI_PACKAGE_DIR`. `ANTHROPIC_API_KEY` stays stripped — see §5 Settings copy for the user-facing statement of this.
+- **Env building is allowlist-based, not strip-based** (unlike Claude/Codex). Pi is multi-provider, so a strip list would leak whichever provider credentials it doesn't enumerate (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, …) into the harness, contradicting the auth.json-only invariant. The harness env is exactly: `PATH`, `HOME`, `LANG`/`LC_*`, `TMPDIR`, `PI_PACKAGE_DIR`, `EITS_PI_TURN_ID`, and the standard EITS vars (`EITS_SESSION_UUID/ID`, `EITS_PROJECT_ID`, `EITS_URL`, …). **No provider credential env var passes through, ever** — a test asserts a decoy `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` in the server env does not reach the harness. See §5 Settings copy for the user-facing statement.
 - Harness path resolution: `EITS_PI_HARNESS` env override → `priv/bin/eits-pi-harness` → dev fallback `bun pi-harness/src/main.ts`. Missing binary produces an actionable error ("run scripts/build-pi-harness.sh").
 
 ### `EyeInTheSky.Pi.Parser` (new)
@@ -130,7 +130,15 @@ Partial-line buffering is handled by `CLI.Port.handle_port_output` (existing); t
 
 ### `EyeInTheSky.Pi.SDK` (new)
 
-The EITS MessageHandler adapter — **not** the upstream Pi SDK. Mirrors `Codex.SDK`: `use EyeInTheSky.SDK.MessageHandler`, registers ref→port in the shared `EyeInTheSky.Claude.SDK.Registry`, implements `handle_message/2`, `handle_result/2`, `resolve_exit_session_id/1`.
+The EITS MessageHandler adapter — **not** the upstream Pi SDK. Mirrors `Codex.SDK` in structure (`use EyeInTheSky.SDK.MessageHandler`, shared `EyeInTheSky.Claude.SDK.Registry`, `handle_message/2`, `handle_result/2`), **but the shared run-loop cannot be used unchanged**. Two verified gaps (message_handler.ex):
+
+1. **Terminal policy:** the current loop treats `{:claude_exit, ref, 0}` as success unconditionally (`message_handler.ex:207`) — contradicting the exit-before-`turn_end`-is-failure invariant.
+2. **Protocol events:** the parser return contract (`{:ok, msg} | {:session_id, _} | {:result, _} | {:error, _} | :tool_block_stop | :skip`) has no path for response envelopes or pending-request bookkeeping interleaved with streaming.
+
+**Phase 1 extends MessageHandler with two optional callbacks (defaults preserve current Claude/Codex behavior):**
+
+- `handle_protocol_event/2` — dispatched for a new parser return `{:protocol, data}`; Pi uses it for response-envelope bookkeeping (pending-request map lives in handler state) and can fail the turn from a failed preamble envelope.
+- `on_clean_exit/1 :: {:complete, session_id} | {:error, reason}` — replaces the hardcoded exit-0-success branch; Pi returns `{:error, :exit_before_turn_end}` unless `turn_end` was observed (tracked in handler state); Claude/Codex default keeps today's semantics.
 
 - Owns request ids and the pending-request map; sends the preamble after spawn.
 - Tracks whether `turn_end` has been observed. Port exit before `turn_end` → failed turn (normalized error). Port exit after → normal; emit `{:claude_complete, ref, session_id}` (legacy tag, same shim note as above).
@@ -162,7 +170,7 @@ Namespace note: `EyeInTheSky.Claude.ProviderStrategy` is legacy naming (it hosts
 
 - Implements `start/2`, `resume/2` (identical internals — both start a turn against the sessionDir), `cancel/1`, `format_content/1`. `build_opts/2` maps job context → `{model, cwd, session_dir, allowed_tools, approval_mode, custom_instructions}`. EITS init prompt included as `customInstructions`.
 - **Tools vs approval policy are distinct concepts** mapped onto the harness's single `allowedTools` field: internally we carry `allowed_tools` (list) and `approval_mode` (`:bypass | :require_for_mutating_tools`). `approval_mode: :bypass` (the skip-permissions norm) sends `allowedTools: ["*"]`, which the harness maps to all tools + `bypassPermissions=true`. Otherwise the explicit tool list is sent and mutating tools (`bash`, `write`, `edit`) trigger approvals. Canonical kind mapping: `bash → "commandExecution"`, `write`/`edit → "fileChange"`; read-only tools (`read, ls, find, grep`) never require approval — a conscious policy, acceptable under the single-user-local assumption.
-- Edits: `ProviderStrategy.for_provider("pi")` (`provider_strategy.ex:44`), `pi_cli_module/0` in `utils.ex`, `stream_assembler_for("pi")` in `agent_worker.ex` (new `Pi.StreamAssembler` — delta-based like Claude's, not item-based like Codex's), `record_builder.resolve_provider/1` (`"pi" → "pi"`) and conversation-id pre-generation.
+- Edits: `ProviderStrategy.for_provider("pi")`, `pi_cli_module/0` in `utils.ex`, `stream_assembler_for("pi")` in `agent_worker.ex` (new `Pi.StreamAssembler` — delta-based like Claude's, not item-based like Codex's), `record_builder.resolve_provider/1` (`"pi" → "pi"`) and conversation-id pre-generation. Line references in this spec are indicative, not exact — provider UI/validation changes span more modules than listed here (spawn forms, model pickers, validators); the implementation plan greps for every `"codex"` provider-dispatch site and mirrors each.
 
 ### `EyeInTheSky.Pi.Control` (new, Phase 2/3)
 
@@ -203,7 +211,9 @@ Hard rules:
 Only `bash`, `write`, `edit` require approval, and only when `approval_mode != :bypass`:
 
 1. Harness emits `tool_request{requestId, toolCallId, kind, input}` mid-turn; the turn blocks on it.
-2. Parser → SDK → AgentWorker marks the run **`awaiting_approval`** in its state (in-memory; not persisted) and suspends idle/watchdog checks for that ref → `AgentWorkerEvents.on_tool_approval_requested/2` → PubSub → chat LiveView renders an approve/deny card (`"commandExecution"` shows `{command, cwd, reason}`; `"fileChange"` shows an `oldText`/`newText` diff).
+2. Parser → SDK → AgentWorker marks the run **`:awaiting_approval`** in its state (in-memory; not persisted) and suspends idle/watchdog checks for that ref → `AgentWorkerEvents.on_tool_approval_requested/2` → PubSub → chat LiveView renders an approve/deny card (`"commandExecution"` shows `{command, cwd, reason}`; `"fileChange"` shows an `oldText`/`newText` diff).
+
+   `:awaiting_approval` is a **new value in AgentWorker's status type** (today `:idle | :running | :retry_wait | :failed`), and every status consumer must handle it explicitly: `processing?/1` returns true for it (queued prompts stay queued; admission does not start a second turn), eviction treats it as active (never parked/evictable), watchdog rearming skips it, cancel from this state denies pending approvals then follows the normal cancel path, and status broadcasts carry it so UIs can label the session "waiting for approval". Phase 3's implementation plan enumerates each call site.
 3. Pending approvals live in AgentWorker state and are broadcast over PubSub — **not** tied to LiveView presence. A reconnecting LiveView reconstructs pending cards from worker state.
 4. Watchdog resumes on any of: `tool_update`, `tool_result`, `turn_error`, `turn_end`, `exit`, or user approve/deny/cancel.
 5. User decision → LiveView event → `Pi.SDK.approve_tool/2` / `deny_tool/2` with the matching `requestId`.
@@ -236,6 +246,13 @@ No approval timeout at the harness level (matches claudette); a human taking min
   - cancel → `abort` written, then killed on timeout
   - `dispose` after `turn_end` with already-closed port → normal completion
   - failed `start_session` response → settings-directed error, no stream
+- **Protocol-ordering tests (central to the SDK-owned request-id design):**
+  - `ready` arriving before vs after the `start_session` response envelope
+  - unsolicited events interleaved while `initialize`/`start_session`/`prompt` responses are pending
+  - failed `prompt` response arriving after earlier streaming noise
+  - duplicate/late terminal events for an already-terminal ref → ignored (exactly-once invariant)
+  - response envelope with unknown/mismatched id → logged, no crash, no pending-request corruption
+- **Live-Port transport smoke test (real port, real harness or scripted stand-in binary):** `Pi.CLI` can write `initialize`/`start_session`/`prompt`/`abort`/`dispose` to a live port while the connected output handler owns it (BEAM `Port.command` from a non-owner needs verification); dispose timeout genuinely kills the OS process.
   - two concurrent prompts for one Pi session → serialized by AgentWorker queue, single harness at a time (serialization keyed by EITS session/AgentWorker, **not** provider ref — a new ref per turn must not bypass the queue)
 - **Resume (Phase 1 validation, scripted + one real-model manual pass):** resume after successful turn; resume after canceled turn; resume after crashed harness; repeated resume. Confirms `continueRecent` determinism or forces the pinned-transcript harness change (§2 invariants).
 - **Control:** unit tests with a fake harness for discover/list/set-key; cache invalidation on key changes; OAuth flow tested manually (device-code needs a real provider).

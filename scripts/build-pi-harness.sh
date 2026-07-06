@@ -18,4 +18,6 @@ mkdir -p priv/bin/pi
 bun build pi-harness/src/main.ts --compile --outfile priv/bin/eits-pi-harness
 chmod +x priv/bin/eits-pi-harness
 cp pi-harness/node_modules/@earendil-works/pi-coding-agent/package.json priv/bin/pi/package.json
+# Also copy next to the binary so bun-compiled binary finds it without PI_PACKAGE_DIR
+cp pi-harness/node_modules/@earendil-works/pi-coding-agent/package.json priv/bin/package.json
 echo "built priv/bin/eits-pi-harness"

@@ -83,17 +83,25 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   @doc """
   POST /api/v1/notes - Add a note.
 
-  Accepts parent_id, parent_type, title (optional), body, starred (optional).
-  Normalizes parent_type plurals (e.g. "sessions" -> "session") to match schema validation.
-  Auto-stamps source_session_uuid from the x-eits-session header if present.
+  Accepts parent_id, parent_type, title (optional), body, starred (optional),
+  source_session_uuid (optional). Normalizes parent_type plurals (e.g. "sessions" ->
+  "session") to match schema validation.
+
+  source_session_uuid resolution order: explicit `source_session_uuid` param first,
+  then auto-stamped from the `x-eits-session` request header (sent by the eits CLI
+  whenever EITS_SESSION_UUID is set). Either may be absent — human/manual note
+  creation has no session context, and that's fine.
   """
   def create(conn, params) do
     # Normalize parent_type: the MCP tools send plural ("sessions", "agents", "tasks")
     # but the Note schema validates singular
     parent_type = normalize_parent_type(params["parent_type"])
 
-    # Auto-stamp source_session_uuid from request header
-    source_session_uuid = conn |> Plug.Conn.get_req_header("x-eits-session") |> List.first()
+    # Prefer an explicit source_session_uuid param; fall back to auto-stamping from
+    # the request header (session context) when the caller doesn't pass one.
+    source_session_uuid =
+      trim_param(params["source_session_uuid"]) ||
+        (conn |> Plug.Conn.get_req_header("x-eits-session") |> List.first())
 
     attrs = %{
       parent_type: parent_type,

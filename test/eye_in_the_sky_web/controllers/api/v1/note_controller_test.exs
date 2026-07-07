@@ -62,6 +62,20 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteControllerTest do
 
       assert length(resp["results"]) <= 2
     end
+
+    test "filters by source_session_uuid", %{conn: conn} do
+      author_uuid = Ecto.UUID.generate()
+      other_uuid = Ecto.UUID.generate()
+      create_note(%{source_session_uuid: author_uuid})
+      create_note(%{source_session_uuid: other_uuid})
+
+      conn = get(conn, ~p"/api/v1/notes?source_session_uuid=#{author_uuid}")
+      resp = json_response(conn, 200)
+
+      assert resp["success"] == true
+      assert length(resp["results"]) == 1
+      assert hd(resp["results"])["source_session_uuid"] == author_uuid
+    end
   end
 
   # ---- GET /api/v1/notes/:id ----
@@ -135,6 +149,52 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteControllerTest do
 
       resp = json_response(conn, 422)
       assert resp["error"] == "Failed to create note"
+    end
+
+    test "auto-stamps source_session_uuid from x-eits-session header", %{conn: conn} do
+      session_uuid = Ecto.UUID.generate()
+
+      conn =
+        conn
+        |> put_req_header("x-eits-session", session_uuid)
+        |> post(~p"/api/v1/notes", %{
+          "parent_type" => "session",
+          "parent_id" => "123",
+          "body" => "authored by agent"
+        })
+
+      resp = json_response(conn, 201)
+      assert resp["source_session_uuid"] == session_uuid
+    end
+
+    test "explicit source_session_uuid param wins over header", %{conn: conn} do
+      header_uuid = Ecto.UUID.generate()
+      explicit_uuid = Ecto.UUID.generate()
+
+      conn =
+        conn
+        |> put_req_header("x-eits-session", header_uuid)
+        |> post(~p"/api/v1/notes", %{
+          "parent_type" => "session",
+          "parent_id" => "123",
+          "body" => "explicit wins",
+          "source_session_uuid" => explicit_uuid
+        })
+
+      resp = json_response(conn, 201)
+      assert resp["source_session_uuid"] == explicit_uuid
+    end
+
+    test "source_session_uuid is nil when no header or param present", %{conn: conn} do
+      conn =
+        post(conn, ~p"/api/v1/notes", %{
+          "parent_type" => "session",
+          "parent_id" => "123",
+          "body" => "no attribution"
+        })
+
+      resp = json_response(conn, 201)
+      assert resp["source_session_uuid"] == nil
     end
   end
 

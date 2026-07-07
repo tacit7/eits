@@ -12,14 +12,23 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
 
   @doc """
   GET /api/v1/notes - Search notes.
-  Query params: q, limit (default 20)
+  Query params: q, limit (default 20), source_session_uuid (filter by author), session_id, task_id, project_id, starred
   """
   def index(conn, params) do
     limit = parse_int(params["limit"], 20)
     starred_only = params["starred"] in ["true", "1"]
+    source_session_uuid = params["source_session_uuid"]
 
     notes =
       cond do
+        source_session_uuid ->
+          Notes.list_notes_by_source_session(source_session_uuid,
+            starred: starred_only,
+            parent_type: params["parent_type"],
+            parent_id: params["parent_id"],
+            limit: limit
+          )
+
         params["session_id"] ->
           Notes.list_notes_for_session(params["session_id"], limit: limit, starred: starred_only)
 
@@ -65,6 +74,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
           title: note.title,
           body: note.body,
           starred: note.starred || false,
+          source_session_uuid: note.source_session_uuid,
           created_at: to_string(note.created_at)
         })
     end
@@ -75,18 +85,23 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
 
   Accepts parent_id, parent_type, title (optional), body, starred (optional).
   Normalizes parent_type plurals (e.g. "sessions" -> "session") to match schema validation.
+  Auto-stamps source_session_uuid from the x-eits-session header if present.
   """
   def create(conn, params) do
     # Normalize parent_type: the MCP tools send plural ("sessions", "agents", "tasks")
     # but the Note schema validates singular
     parent_type = normalize_parent_type(params["parent_type"])
 
+    # Auto-stamp source_session_uuid from request header
+    source_session_uuid = conn |> Plug.Conn.get_req_header("x-eits-session") |> List.first()
+
     attrs = %{
       parent_type: parent_type,
       parent_id: to_string(params["parent_id"]),
       title: trim_param(params["title"]),
       body: trim_param(params["body"]),
-      starred: params["starred"] || false
+      starred: params["starred"] || false,
+      source_session_uuid: source_session_uuid
     }
 
     case Notes.create_note(attrs) do
@@ -99,7 +114,8 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
           parent_id: note.parent_id,
           title: note.title,
           body: note.body,
-          starred: note.starred
+          starred: note.starred,
+          source_session_uuid: note.source_session_uuid
         })
 
       {:error, %Ecto.Changeset{} = changeset} ->

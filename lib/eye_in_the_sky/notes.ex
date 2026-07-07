@@ -101,11 +101,45 @@ defmodule EyeInTheSky.Notes do
   end
 
   @doc """
+  Returns notes authored by a specific session (source_session_uuid).
+  Supports filtering by parent type, parent ID, starred status.
+
+  Options:
+  - `:parent_type` - filter by parent type ("session" | "task" | "agent" | "project" | "system")
+  - `:parent_id` - filter by parent ID
+  - `:starred` - boolean, when true only return starred notes
+  - `:limit` - integer, default 200
+  - `:sort` - "newest" (default) | "oldest"
+  """
+  def list_notes_by_source_session(source_session_uuid, opts \\ []) when is_binary(source_session_uuid) do
+    parent_type = Keyword.get(opts, :parent_type)
+    parent_id = Keyword.get(opts, :parent_id)
+    starred_only = Keyword.get(opts, :starred, false)
+    limit_val = Keyword.get(opts, :limit, 200)
+    sort = Keyword.get(opts, :sort, "newest")
+
+    order = if sort == "oldest", do: [asc: :created_at], else: [desc: :created_at]
+
+    query =
+      Note
+      |> where([n], n.source_session_uuid == ^source_session_uuid)
+      |> order_by(^order)
+      |> limit(^limit_val)
+
+    query = if parent_type, do: where(query, [n], n.parent_type == ^parent_type), else: query
+    query = if parent_id, do: where(query, [n], n.parent_id == ^parent_id), else: query
+    query = if starred_only, do: where(query, [n], n.starred == true), else: query
+
+    Repo.all(query)
+  end
+
+  @doc """
   List notes with filtering options. Moves query logic out of LiveViews.
 
   Options:
   - `:project_id` - filter by project (and its agents/sessions)
   - `:agent_ids` - list of agent IDs; session IDs are resolved internally
+  - `:source_session_uuid` - filter by source session UUID (author)
   - `:starred` - boolean, default false
   - `:type_filter` - "all" | "project" | "agent" | "session" | "task"
   - `:sort` - "newest" (default) | "oldest"
@@ -118,6 +152,7 @@ defmodule EyeInTheSky.Notes do
     limit_val = Keyword.get(opts, :limit, 200)
     project_id = Keyword.get(opts, :project_id)
     agent_ids = Keyword.get(opts, :agent_ids, [])
+    source_session_uuid = Keyword.get(opts, :source_session_uuid)
 
     order = if sort == "oldest", do: [asc: :created_at], else: [desc: :created_at]
 
@@ -142,6 +177,8 @@ defmodule EyeInTheSky.Notes do
       else
         base
       end
+
+    base = if source_session_uuid, do: from(n in base, where: n.source_session_uuid == ^source_session_uuid), else: base
 
     Repo.all(base)
   end

@@ -1591,6 +1591,58 @@ The DM endpoint rejects messages from sessions in terminal states (completed or 
 
 ---
 
+## GET /api/v1/dm/wait — Long-Poll for Next DM
+
+**Commit:** `5836ef77`
+
+Event-driven endpoint that blocks until a new DM arrives for a session, eliminating busy-polling patterns.
+
+**Endpoint:** `GET /api/v1/dm/wait`
+
+**Query params:**
+| Param | Default | Max | Description |
+|-------|---------|-----|-------------|
+| `session` | current session | — | Session UUID to wait on |
+| `since` | now | — | ISO8601 timestamp; returns any DM already in inbox since this time |
+| `timeout` | 25s | 55s | How long to wait before returning empty |
+
+**Behavior:**
+- Subscribes to the existing `session:#{id}` PubSub topic and waits for `:new_dm` broadcast
+- If a DM arrives during the wait window, returns immediately with `{"items":[...],"count":1}`
+- After `timeout` with no DM, returns `{"items":[],"count":0}`
+- Client HTTP timeout is set to server timeout + 15s headroom to avoid cutting the long-poll short locally
+
+**CLI equivalent:** `eitsr dm wait [--session] [--since] [--timeout]` — prints the result and exits when a DM lands.
+
+**Use case:** Orchestrators and background scripts can block on this endpoint instead of interval-polling `GET /api/v1/dm`, reducing latency and server load.
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `wait/2` action
+- `lib/eye_in_the_sky_web/router.ex` — route registration
+- `crates/eits-cli/src/commands/dm.rs` — `eitsr dm wait` subcommand
+
+---
+
+## DM Authorization and Duplicate Alert Suppression
+
+**Commit:** `64b6b81d`
+
+DM reads are now authorized via IAM policy, and duplicate alert notifications are suppressed.
+
+**Authorization:**
+- `GET /api/v1/dm` (inbox) and `GET /api/v1/dm/wait` enforce policy checks so only authorized sessions can read another session's DM inbox
+- Previously, any authenticated request could fetch DMs for any session ID
+
+**Duplicate alert suppression:**
+- Native notification alerts for new DMs are deduplicated — if a DM arrives while the session already has a pending alert, a second alert is not fired
+- Prevents alert storms when a session is heavily messaged
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex`
+- `lib/eye_in_the_sky_web/controllers/api/v1/session_controller.ex`
+
+---
+
 ## Copy-to-Clipboard
 
 **Commits:** `d04b7f63`, `10d75ff3`, `7447546e`

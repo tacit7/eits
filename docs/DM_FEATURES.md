@@ -2909,6 +2909,62 @@ When user presses Cmd+S or clicks the Save button, the hook:
 
 ---
 
+## Blocking DM Wait Endpoint
+
+**Commit:** `5836ef77`
+
+`GET /api/v1/dm/wait` long-polls for the next inbound DM for the requesting session. Returns as soon as a DM arrives (via PubSub `session:#{id}` `:new_dm` broadcast) or after the timeout elapses.
+
+**Query params:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `session` | string | from `x-eits-session` header | Session UUID or integer ID to wait on |
+| `since` | ISO 8601 datetime | — | Only return DMs received after this timestamp |
+| `timeout` | integer (seconds) | 25 | Server-side wait cap; max 55 |
+
+**Responses:**
+
+- `200 OK` with `{"items":[...],"count":1}` — DM arrived before timeout
+- `200 OK` with `{"items":[],"count":0}` — Timeout elapsed with no DM
+
+No busy-polling: the connection is held open until a PubSub event fires or the timeout fires. The client HTTP timeout should be set to at least `timeout + 15` seconds to avoid cutting the long-poll short locally.
+
+**`eitsr dm wait` subcommand** wraps this endpoint. It blocks until a DM lands and prints the result, letting a background process exit immediately instead of interval-polling `dm inbox`.
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `wait_for_dm/2` action
+- `lib/eye_in_the_sky_web/router.ex` — `GET /api/v1/dm/wait`
+- `crates/eits-cli/src/commands/dm.rs` — `eitsr dm wait` subcommand
+
+---
+
+## DM Read Authorization
+
+**Commit:** `64b6b81d`
+
+`GET /api/v1/dm` (list) and `GET /api/v1/dm/:id` (show) now enforce that the caller is the intended recipient.
+
+**How it works:**
+
+- The caller is identified by the `x-eits-session` header (UUID or integer ID).
+- For `GET /api/v1/dm`: the header is resolved and compared against the queried session. A mismatch returns `403 Forbidden`.
+- For `GET /api/v1/dm/:id`: the `session` query param was removed; only the `x-eits-session` header is accepted. The resolved caller must match `msg.to_session_id`.
+- Missing or unresolvable header always returns `403 Forbidden` — no anonymous reads.
+
+**Error response:**
+```json
+HTTP 403 Forbidden
+{"error": "You are not the recipient of this message"}
+```
+
+**Duplicate alert suppression:** A companion fix suppresses duplicate flash alerts that could appear when authorization failures were retried by the LiveView reconnect logic.
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `authorize_session_recipient/2` replaces `authorize_dm_recipient/2`; `show_dm/2` no longer accepts `session` query param
+
+---
+
 ## Settings Tab: Input Population from Effective Settings
 
 **Commit:** `efe62f68`

@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSkyWeb.ControllerHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Live.Shared.PromptsHelpers
 
@@ -46,12 +47,18 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
 
   @impl true
   def handle_event("select_prompt", %{"id" => id}, socket) do
+    parsed_id = ControllerHelpers.parse_int(id)
+
     selected =
-      if socket.assigns.selected_prompt &&
-           socket.assigns.selected_prompt.id == String.to_integer(id) do
-        nil
-      else
-        Enum.find(socket.assigns.prompts, &(Integer.to_string(&1.id) == id))
+      cond do
+        is_nil(parsed_id) ->
+          socket.assigns.selected_prompt
+
+        socket.assigns.selected_prompt && socket.assigns.selected_prompt.id == parsed_id ->
+          nil
+
+        true ->
+          Enum.find(socket.assigns.prompts, &(Integer.to_string(&1.id) == id))
       end
 
     {:noreply, socket |> assign(:selected_prompt, selected) |> assign(:detail_tab, :preview)}

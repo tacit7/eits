@@ -294,7 +294,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     ids =
       socket.assigns.selected_ids
       |> MapSet.to_list()
-      |> Enum.map(&String.to_integer/1)
+      |> Enum.map(&EyeInTheSkyWeb.ControllerHelpers.parse_int/1)
+      |> Enum.reject(&is_nil/1)
 
     total = length(ids)
     {archived, _} = Teams.batch_delete_teams(ids)

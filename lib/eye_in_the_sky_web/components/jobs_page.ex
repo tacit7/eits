@@ -570,20 +570,16 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           >
             Recurring Agents
           </button>
-          <%= if @active_tab == :all_jobs do %>
-            <form phx-change="filter_jobs" phx-target={@myself} class="flex-1 mx-2">
-              <input
-                type="text"
-                name="search"
-                class="input input-bordered input-xs w-full bg-base-100 text-base-content placeholder-base-content/40 h-[36px]"
-                placeholder="Search…"
-                value={@search_query}
-                phx-debounce="200"
-              />
-            </form>
-          <% else %>
-            <div class="flex-1" />
-          <% end %>
+          <form phx-change="filter_jobs" phx-target={@myself} class="flex-1 mx-2">
+            <input
+              type="text"
+              name="search"
+              class="input input-bordered input-xs w-full bg-base-100 text-base-content placeholder-base-content/40 h-[36px]"
+              placeholder="Search…"
+              value={@search_query}
+              phx-debounce="200"
+            />
+          </form>
           <div class="flex items-center gap-2 flex-shrink-0">
             <%= if is_nil(@project_id) do %>
               <.link

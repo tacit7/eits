@@ -258,7 +258,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
               subtitle="Try adjusting your search or filters"
             />
           <% else %>
-            <div :for={agent <- @agents}>
+            <div :for={agent <- @agents} class="py-0.5">
               <.session_row
                 session={agent}
                 select_mode={@select_mode}

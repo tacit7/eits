@@ -552,10 +552,10 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           <h1 class="text-xl font-semibold mb-4">Scheduled Jobs</h1>
         <% end %>
 
-        <%!-- Tabs bar — action buttons pinned to the right --%>
-        <div class="flex items-center border-b border-base-300 mb-4">
+        <%!-- Tabs bar: tabs · search · action buttons all on one line --%>
+        <div class="flex items-center gap-2 border-b border-base-300 mb-4 pb-1">
           <button
-            class={"btn btn-sm min-h-[44px] #{if @active_tab == :all_jobs, do: "btn-active"}"}
+            class={"btn btn-sm min-h-[36px] #{if @active_tab == :all_jobs, do: "btn-active"}"}
             phx-click="switch_tab"
             phx-value-tab="all_jobs"
             phx-target={@myself}
@@ -563,32 +563,46 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
             All Jobs
           </button>
           <button
-            class={"btn btn-sm min-h-[44px] #{if @active_tab == :agent_schedules, do: "btn-active"}"}
+            class={"btn btn-sm min-h-[36px] #{if @active_tab == :agent_schedules, do: "btn-active"}"}
             phx-click="switch_tab"
             phx-value-tab="agent_schedules"
             phx-target={@myself}
           >
             Recurring Agents
           </button>
-          <div class="ml-auto flex items-center gap-2 pb-1">
+          <%= if @active_tab == :all_jobs do %>
+            <form phx-change="filter_jobs" phx-target={@myself} class="flex-1 mx-2">
+              <input
+                type="text"
+                name="search"
+                class="input input-bordered input-xs w-full bg-base-100 text-base-content placeholder-base-content/40 h-[36px]"
+                placeholder="Search…"
+                value={@search_query}
+                phx-debounce="200"
+              />
+            </form>
+          <% else %>
+            <div class="flex-1" />
+          <% end %>
+          <div class="flex items-center gap-2 flex-shrink-0">
             <%= if is_nil(@project_id) do %>
               <.link
                 navigate="/oban"
-                class="btn btn-ghost btn-sm text-base-content/50"
+                class="btn btn-ghost btn-sm btn-xs text-base-content/50"
                 title="Oban queue dashboard"
               >
-                <.icon name="hero-queue-list" class="size-3.5" /> Oban
+                <.icon name="hero-queue-list" class="size-3.5" />
               </.link>
             <% end %>
             <button
-              class="btn btn-outline btn-sm"
+              class="btn btn-outline btn-sm btn-xs"
               phx-click="toggle_claude_drawer"
               phx-target={@myself}
             >
               <.icon name="hero-sparkles" class="size-3.5" /> Create with Claude
             </button>
             <button
-              class="btn btn-primary btn-sm"
+              class="btn btn-primary btn-sm btn-xs"
               phx-click="new_job"
               phx-value-scope={if @project_id, do: "project", else: "global"}
               phx-target={@myself}
@@ -599,18 +613,6 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         </div>
 
         <%= if @active_tab == :all_jobs do %>
-          <%!-- Search — type/status/origin filter to "all" when absent from params --%>
-          <form phx-change="filter_jobs" phx-target={@myself} class="mb-4">
-            <input
-              type="text"
-              name="search"
-              class="input input-bordered input-sm w-full bg-base-100 text-base-content placeholder-base-content/40"
-              placeholder="Search by name or description…"
-              value={@search_query}
-              phx-debounce="200"
-            />
-          </form>
-
           <%= if @project_id do %>
             <%!-- Project view: merged list with "global" inline tag for global jobs --%>
             <.jobs_table

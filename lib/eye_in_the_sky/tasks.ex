@@ -307,6 +307,17 @@ defmodule EyeInTheSky.Tasks do
         repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
       end)
       |> Ecto.Multi.update(:update_task, Task.changeset(task, %{state_id: in_progress_id, updated_at: now}))
+      |> Ecto.Multi.run(:clear_session_intent, fn repo, _changes ->
+        # Clear intent on the claiming session in the same transaction.
+        # This prevents stale "done" intent from a prior task from appearing valid
+        # while new work has been assigned.
+        repo.update_all(
+          from(s in EyeInTheSky.Sessions.Session, where: s.id == ^session_int_id),
+          set: [intent: nil, intent_set_at: nil]
+        )
+
+        {:ok, :cleared}
+      end)
       |> Repo.transaction()
 
     case result do

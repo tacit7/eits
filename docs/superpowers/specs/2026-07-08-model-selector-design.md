@@ -1,0 +1,121 @@
+# Unified Model Selector — Design Spec
+
+**Date:** 2026-07-08
+**Status:** Approved design, pre-implementation
+**Scope:** Replace all three EITS model-picking surfaces with one shared component; refresh the Claude/Codex model catalog (display + validation) to the current lineup.
+
+## 1. Goal
+
+EITS has three separately-built model pickers today:
+
+1. **Composer mid-chat switcher** (`message_composer.ex:216-279`) — plain DaisyUI dropdown, Claude/Codex only (no Pi branch), no search, no grouping, no active-checkmark, no cost indicator.
+2. **New Agent drawer** (`new_agent_drawer.ex`) — flat triple-optgroup `<select>`, all providers rendered at once, no provider→model reactivity.
+3. **New Session modal** (`new_session_modal.ex`) — has `phx-change` provider→model cascading, but still a bare native `<select>`.
+
+All three get replaced by one shared `ModelSelector` component modeled on claudette's searchable, grouped, badge-annotated popover (reference screenshots: claudette's `ModelSelector` popover; two terminal screenshots of the actual current Claude/Codex model lineups available to this account).
+
+Separately, the screenshots reveal `model_helpers.ex` and `scripts/eits`'s Claude catalogs are stale (missing the current Claude 5 family — Opus 4.8, Fable 5, Sonnet 5, Haiku 4.5 — and still validating against `claude-opus-4-7`-era slugs). This refresh ships as part of the same work, since a new picker showing unusable models would be worse than the one it replaces.
+
+## 2. Reference Material
+
+- Claudette's `ComposerToolbar.tsx`/`ModelSelector.tsx` (design description supplied by user; screenshot `~/screen/1783513358.jpg` — live popover: search box, grouped sections with "via Pi" badges, active-row checkmark, `$` icon on a billed 1M variant, "More" disclosure, per-Pi-sub-provider "Show all N").
+- `~/screen/1783517089.jpg` — current Codex model list for this account: `gpt-5.5 (current)`, `gpt-5.4`, `gpt-5.4-mini` (display names only — full valid slug set per `scripts/eits agents spawn --help` also includes `gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.3-codex, gpt-5.2`, which become the "legacy" tier).
+- `~/screen/1783517112.jpg` — current Claude model list: `Default (Recommended)`, `Opus` (Opus 4.8, 1M context), `Fable` (Fable 5 — most capable), `Sonnet` (Sonnet 5), `Haiku` (Haiku 4.5), plus a `sonnet-4-6 ✓ Custom model` row showing the currently-active session's model, which isn't in the curated list at all.
+
+## 3. Explicitly Out of Scope
+
+- **Free-text custom model entry.** The Claude screenshot's `sonnet-4-6 Custom model` row proves the underlying CLI allows arbitrary slugs, but this selector does not add a text-entry affordance. If a session's current model isn't in any known list (curated or Pi-discovered), the selector still shows and checks it as the active row (existing "always show current selection" rule) — it just can't be typed in fresh.
+- Pi OAuth, editing model metadata from the UI.
+- Changes to server-side spawn validation *behavior* — `ModelConfig`/`SpawnValidator` keep the same validation logic, only their static slug lists are refreshed (§6).
+
+## 4. Data Layer
+
+### 4.1 New struct (additive — no existing function signatures change)
+
+```elixir
+defmodule EyeInTheSky.ModelEntry do
+  @moduledoc "Unified model metadata for the shared model selector."
+  defstruct [:slug, :label, :group, :sub_provider, billed?: false, legacy?: false, default?: false]
+
+  @type t :: %__MODULE__{
+          slug: String.t(),
+          label: String.t(),
+          group: String.t(),
+          sub_provider: String.t() | nil,
+          billed?: boolean(),
+          legacy?: boolean(),
+          default?: boolean()
+        }
+end
+```
+
+### 4.2 `ModelHelpers.entries_for_provider/1` (new function, additive)
+
+- `"claude"` → static list built from the refreshed catalog (§6.1). `group: "Claude Code"`, `sub_provider: nil`. `billed?` true only for `-1m`/`[1m]`-suffixed slugs. `legacy?` true for anything not in the current-generation set (Opus 4.7-and-older, Sonnet 4.6-and-older, etc.). `default?` true for the one recommended alias.
+- `"codex"` → static list, same shape. `group: "Codex"`. `billed?: false` always. `legacy?` true for `gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.3-codex, gpt-5.2`; primary/non-legacy = `gpt-5.5, gpt-5.4, gpt-5.4-mini`. `default?` on `gpt-5.5`.
+- `"pi"` → reads `Pi.ModelDiscoveryCache.get_cached/0` **directly** (not the lossy `pi_models/0`, which discards the `"provider"` sub-provider key). Each discovered model's `"provider"` field becomes `sub_provider` (e.g. `"ollama-lan"`); `group` is a display-cased version of it (e.g. `"Ollama-lan"` → could special-case `"ollama"`/`"ollama-lan"` to a friendlier "Ollama (LAN)" label, exact mapping left to the implementation plan). `billed?` true unless `sub_provider` starts with `"ollama"`. `legacy?: false` (no legacy concept for discovered models — they're either present or not). `default?: false`.
+- Existing `claude_models_with_meta/0`, `codex_models_with_meta/0`, `pi_models/0`, `models_for_provider/1`, `valid_model_slugs/1` are **untouched** — every existing caller keeps working exactly as today.
+
+### 4.3 Always-show-current-selection rule
+
+If a host component's current model slug isn't found in `entries_for_provider/1`'s output (the `sonnet-4-6`-style stale/custom case), the component synthesizes a one-off `%ModelEntry{slug: current, label: current, group: "Current", legacy?: false, default?: false}` and always renders it, checked, outside any disclosure — mirroring claudette's "selected model never vanishes" rule, extended to models absent from every list.
+
+## 5. Component Design
+
+### 5.1 Shape
+
+- **Trigger**: a pill (provider icon via `DmHelpers.provider_icon/1` + current model label via `ModelHelpers.model_display_name/1`). Composer variant is `disabled` while a turn is running (existing `@active_overlay`/turn-state assign gates this — reuse, don't reinvent). Drawer/modal variants are never turn-disabled.
+- **Popover**: opens near the trigger (composer: upward, matching `slash_command_popup.js`'s `absolute bottom-full` placement since the composer sits at the bottom of the page; drawer/modal: downward, standard dropdown placement since they're full-page forms, not bottom-anchored).
+- **Search box**: auto-focused on open. Client-side substring filter over `slug`/`label`/`group`/`sub_provider` (case-insensitive), reusing `agent_combobox.js`'s filter+highlight approach. While searching, all disclosures are bypassed — every match (primary + legacy + Pi overflow) renders inline, exactly like claudette.
+- **Grouping**: sections by `group`, in a fixed order (Claude Code, Codex, then one section per Pi `sub_provider` group, alphabetical). Section header shows a "via Pi" badge only for Pi-provider sections (Claude Code/Codex sections never show it — they *are* the direct provider).
+- **Disclosure**: 
+  - Claude Code and Codex each get **one shared "More" toggle** at the bottom of their section for `legacy?: true` entries.
+  - Each Pi sub-provider section gets its **own** "Show all N" toggle when it has more than a fixed primary-count (e.g. show first 3, collapse the rest) — matches claudette's per-bucket Pi disclosure.
+  - If the active selection lives behind a disclosure, that disclosure auto-expands on open (claudette behavior, carried over).
+- **Row**: bullet + label. Checkmark on the right for the active row. `$` icon (in place of the checkmark) for `billed?: true` rows that are *not* the active row — active+billed shows both (checkmark takes visual priority, `$` moves to a smaller adjacent badge) to avoid ambiguity about what's currently selected. Small "Recommended" tag next to `default?: true` rows. Provider badge (icon) on a row only when that row's actual provider differs from its section's implied provider (this basically never fires for Claude Code/Codex sections and never fires within a Pi section, since Pi sections are already sub-provider-scoped — kept for structural parity with claudette, expected to be a no-op in practice today).
+- **Keyboard/mouse**: ArrowUp/Down/Enter/Escape, click-outside-to-close, mouseover-highlight — lifted from `agent_combobox.js`.
+
+### 5.2 JS Hook (`assets/js/hooks/model_selector_popup.js`, new)
+
+- Sibling to `agent_combobox.js`, following its exact architecture: model list arrives via a `data-models` JSON attribute (array of `%ModelEntry{}`-shaped maps, serialized server-side), hook does all filtering/keyboard-nav/disclosure state client-side, writes the chosen `{slug, provider}` into a hidden input and/or directly dispatches one `phx-click`-equivalent (`this.pushEvent(...)` — the hook's own `pushEvent`, not a form submit) to the LiveView.
+- `updated()` lifecycle re-syncs `data-models` when the server pushes a refreshed Pi list (subscribing to `Events.pi_models_refreshed` server-side and re-rendering the assign — the hook doesn't subscribe to PubSub itself, the LiveView does and re-renders).
+
+### 5.3 Server wiring (per host — each keeps its own event name/persistence, the component only standardizes the picking UI)
+
+- **Composer** (`message_composer.ex` + `dm_model_helpers.ex`): replace the `cond`-based dropdown body with `<.model_selector entries={...} selected={@selected_model} />`; the emitted selection event still lands on the existing `"select_model"` handler (`dm_model_helpers.ex:36-59`), which already persists via `Sessions.update_session/2` — **add a Pi branch** there since today Pi sessions fall through to the Claude list.
+- **New Agent drawer**: swap the static triple-optgroup `<select>` for `<.model_selector entries={entries_for_provider(@agent_type)} .../>`; since the drawer has no `phx-change` today, this is also where provider→model reactivity gets added (selector's provider pill switch re-fetches entries).
+- **New Session modal**: swap `model_selector/1`'s native `<select>` (lines 435-459) for the shared component; existing `"model_changed"` handler (lines 86-88) keeps its shape, just receives its value from the new component's selection event instead of a native `<select>` change event.
+
+## 6. Catalog Refresh (Claude + Codex)
+
+**Both layers must move together** — display metadata (§4.2) and the validated slug lists, or the picker could offer models that fail spawn/switch validation.
+
+### 6.1 Sources of truth to update
+
+- `lib/eye_in_the_sky_web/helpers/model_helpers.ex` — `claude_models/0`, `claude_models_with_meta/0`, `codex_models/0`, `codex_models_with_meta/0`.
+- `lib/eye_in_the_sky/agents/model_config.ex` — `claude_models/0`, `codex_models/0` (the actually-validated lists spawn/switch check against).
+- `scripts/eits` — the bash-side `--provider claude`/`--provider codex` valid-model lists and help text (confirmed stale: still shows `claude-opus-4-7` as newest, no Fable 5 at all).
+
+### 6.2 Exact slugs — verify before writing, do not hardcode from marketing names alone
+
+The screenshots show **display names** ("Opus", "Fable", "Sonnet", "Haiku", "Default"), not API slugs. Known real slugs (from this session's own model reference): `claude-fable-5`, `claude-opus-4-8`, `claude-sonnet-5`, `claude-haiku-4-5-20251001`. The implementation plan must confirm these (and any `-1m` billed variants) against the authoritative current source before hardcoding — do not ship guessed slugs.
+
+Codex: `scripts/eits`'s existing list (`gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2`) already matches the full valid set — no new slugs needed here, only the primary/legacy split (§4.2) and confirming `gpt-5.5` is still `default?: true`.
+
+### 6.3 Migration note
+
+Existing sessions with an old-but-still-valid slug (e.g. `sonnet-4-6`) must keep working — §4.3's "always show current selection" rule covers display; `ModelConfig`'s validated list should **keep old-generation slugs valid for existing sessions** (don't remove them from the accepted set, only stop offering them as non-legacy/primary in the picker). This mirrors what the screenshot itself shows: `sonnet-4-6` still works and is still selectable, just outside the curated recommended list.
+
+## 7. Testing
+
+- **Data layer**: unit tests for `ModelEntry`/`entries_for_provider/1` per provider — correct `group`/`sub_provider`/`billed?`/`legacy?`/`default?` assignment; Pi entries preserve `sub_provider` from discovery; empty/stale Pi cache handled (existing `:empty`/`:stale` cases from `ModelDiscoveryCache`).
+- **Component**: LiveView tests per host (composer, drawer, modal) — popover opens, search filters, disclosure expands/collapses, selecting an entry fires the right event and updates the right assign/DB field, always-show-current-selection for an out-of-catalog slug.
+- **JS hook**: manual/browser verification (this codebase has no existing JS unit-test harness for hooks per the Phase-1 exploration — follow that precedent, don't introduce one here) — keyboard nav, click-outside, search, disclosure toggling, mid-turn disabled state in the composer.
+- **Catalog refresh**: a test asserting `ModelConfig.valid_model_combos()` still accepts every pre-refresh slug (no regressions for existing sessions) in addition to the new ones.
+
+## 8. Self-Review
+
+- **Placeholder scan**: none found — every field/behavior above has a concrete rule.
+- **Consistency**: `%ModelEntry{}` field names used identically in §4.2/§5.1/§7. Existing function names/behavior explicitly preserved in §4.2's closing paragraph.
+- **Scope check**: single component + one data struct + one catalog refresh — appropriately sized for one implementation plan; the three host-wiring changes (§5.3) are naturally sequential sub-tasks of the same plan, not separate specs.
+- **Ambiguity flagged, not hidden**: §6.2 explicitly says the exact new Claude slugs need verification rather than presenting screenshot-derived guesses as fact.

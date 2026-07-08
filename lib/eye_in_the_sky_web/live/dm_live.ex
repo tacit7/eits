@@ -76,6 +76,13 @@ defmodule EyeInTheSkyWeb.DmLive do
   defp mount_with_agent(socket, params, session) do
     case Agents.get_agent(session.agent_id) do
       {:ok, agent} ->
+        # Warm the Pi discovery cache for Pi sessions — the composer's model
+        # selector (entries_for_provider("pi")) only ever reads the cache,
+        # it never triggers a fetch itself (unlike the drawer/modal). Without
+        # this, a Pi session's composer shows an empty Pi group until some
+        # other page (drawer/modal/settings) happens to warm the cache first.
+        if session.provider == "pi", do: EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+
         MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
         socket = mount_session_assigns(socket, params, session, agent, connected?(socket))
 

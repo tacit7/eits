@@ -153,6 +153,22 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               id="new-session-submit-action"
               phx-update="ignore"
             />
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Model</label>
+              <.model_selector
+                id="new-session-model-selector"
+                entries={all_model_entries()}
+                selected_provider={@selected_provider}
+                selected_model={@selected_model}
+                allow_provider_switch?={true}
+                event="model_and_provider_selected"
+                myself={@myself}
+                placement={:up}
+              />
+              <input type="hidden" name="agent_type" value={@selected_provider} />
+              <input type="hidden" name="model" value={@selected_model} />
+            </div>
+            <.effort_selector selected_provider={@selected_provider} selected_model={@selected_model} />
             <.agent_combobox
               available_agents={@available_agents}
               prefill_agent_slug={assigns[:prefill_agent_slug]}
@@ -175,21 +191,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               projects={assigns[:projects]}
               myself={@myself}
             />
-            <div>
-              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Model</label>
-              <.model_selector
-                id="new-session-model-selector"
-                entries={all_model_entries()}
-                selected_provider={@selected_provider}
-                selected_model={@selected_model}
-                allow_provider_switch?={true}
-                event="model_and_provider_selected"
-                myself={@myself}
-              />
-              <input type="hidden" name="agent_type" value={@selected_provider} />
-              <input type="hidden" name="model" value={@selected_model} />
-            </div>
-            <.effort_selector selected_provider={@selected_provider} selected_model={@selected_model} />
             <.worktree_field />
             <.eits_workflow_field />
             <.cli_flags_section />

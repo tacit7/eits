@@ -43,13 +43,26 @@ export const ModelSelectorPopup = {
     this._onListMousedown = (e) => {
       const li = e.target.closest("li[data-slug]")
       if (li) {
+        // stopPropagation BEFORE _select()/_render() mutate the DOM: once a
+        // handler rebuilds this._list.innerHTML mid-event, e.target (the
+        // original <li>) is detached from the document, so a *later*
+        // ancestor listener's `el.contains(e.target)` check (our own
+        // document mousedown "click outside" handler, and potentially the
+        // drawer/modal's own close-on-outside-click behavior) sees a
+        // detached node and treats the click as "outside" — closing
+        // whatever ancestor container is listening, not just this popover.
+        // That was the reported "clicking More/a row closes the whole form"
+        // bug. Stopping propagation before mutating the DOM prevents any
+        // ancestor from ever evaluating that stale/detached target.
         e.preventDefault()
+        e.stopPropagation()
         this._select(li.dataset.provider, li.dataset.slug)
         return
       }
       const disclosure = e.target.closest("[data-disclosure-toggle]")
       if (disclosure) {
         e.preventDefault()
+        e.stopPropagation()
         this._expandedGroups.add(disclosure.dataset.disclosureToggle)
         this._render()
       }

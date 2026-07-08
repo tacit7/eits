@@ -103,10 +103,12 @@ export const CtxMenu = {
       },
       push(event, payload) {
         hook._close()
-        // Session actions reuse the Rail LC handlers (archive_session /
-        // rename_session / open_worktree) — same protocol as the retired
-        // native menu. Everything else goes to the page LiveView.
-        const railEvents = ['archive_session', 'rename_session', 'open_worktree']
+        // archive_session / open_worktree reuse the Rail LC handlers (always
+        // mounted) — same protocol as the retired native menu. rename_session
+        // deliberately goes to the PAGE LiveView instead, so it triggers the
+        // page's inline edit-in-place rename (matching the "…" menu) rather
+        // than the Rail's prompt+DB rename. Everything else → page LiveView.
+        const railEvents = ['archive_session', 'open_worktree']
         if (railEvents.includes(event)) {
           // extra spreads AFTER the stringified session_id in the bridge —
           // never default it to the whole payload or its integer session_id

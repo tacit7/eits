@@ -204,6 +204,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
       is_nil(refreshed) ->
         remove_agent_from_list(socket, session_id)
 
+      # Archived sessions broadcast session_updated (-> :agent_updated) but must
+      # DROP from the list, not upsert — get_session_with_agent/1 doesn't filter
+      # archived, so without this an archive shows only after a full refresh.
+      not is_nil(refreshed.archived_at) ->
+        remove_agent_from_list(socket, session_id)
+
       is_integer(scope) and refreshed.project_id != scope ->
         socket
 

@@ -39,27 +39,22 @@ export const REGISTRY = {
     },
     { sep: true },
     {
+      // Triggers the page's inline edit-in-place rename — the SAME flow as the
+      // "…" menu (project_live/sessions handle_event("rename_session") sets
+      // editing_session_id). Routed to the page LiveView, not the Rail LC, so
+      // it is NOT in context_menu.js's railEvents list. session_id stays a
+      // string so the page's ControllerHelpers.parse_int/1 handles it.
       label: 'Rename…',
       icon: 'hero-pencil-square',
-      run: async (c) => {
-        const name = await c.prompt({
-          title: 'Rename session',
-          value: d.ctxName || '',
-          placeholder: 'Session name',
-        })
-        if (name) {
-          c.push('rename_session', { session_id: Number(d.ctxId), extra: { name } })
-        }
-      },
+      run: (c) => c.push('rename_session', { session_id: d.ctxId }),
     },
     {
       label: 'Archive',
       icon: 'hero-archive-box',
       run: (c) => c.push('archive_session', { session_id: Number(d.ctxId) }),
     },
-    { label: 'Mark as unread', icon: 'hero-envelope', run: (c) => c.flash('Coming soon') },
     { sep: true },
-    { label: 'Copy session ID', icon: 'hero-document-duplicate', run: (c) => c.copy(d.ctxUuid || d.ctxId) },
+    { label: 'Copy session ID', icon: 'hero-document-duplicate', run: (c) => c.copy(String(d.ctxId)) },
     {
       label: 'Copy deeplink',
       icon: 'hero-link',

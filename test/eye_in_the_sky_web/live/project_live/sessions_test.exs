@@ -295,6 +295,55 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
     assert session.archived_at != nil
   end
 
+  describe "Context-menu session actions" do
+    test "rename_session starts the inline edit (same as the … menu), not a prompt", %{
+      conn: conn,
+      project: project
+    } do
+      agent = Factory.create_agent(%{project_id: project.id})
+      s = Factory.create_session(agent, %{name: "renameme", status: "idle", project_id: project.id})
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+      refute has_element?(view, "input[name='name']")
+
+      # This is exactly what the context menu now pushes (string session_id,
+      # routed to the page LiveView — not the Rail LC prompt+DB rename).
+      render_click(view, "rename_session", %{"session_id" => to_string(s.id)})
+
+      assert has_element?(view, "input[name='name']")
+    end
+
+    test "archiving a listed session removes its row live, no refresh", %{
+      conn: conn,
+      project: project
+    } do
+      agent = Factory.create_agent(%{project_id: project.id})
+
+      s =
+        Factory.create_session(agent, %{
+          name: "archiveme-xyz",
+          status: "idle",
+          project_id: project.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+      # The page's session-list stream row (dom_id "ps-<id>"). Scoped to the
+      # list, not the whole page (the rail flyout also lists the name).
+      assert has_element?(view, "#ps-#{s.id}")
+
+      # archive_session sets archived_at + broadcasts session_updated ->
+      # {:agent_updated, session}. Deliver that payload straight to the view pid
+      # (deterministic — avoids the PubSub proxy race) and assert the page DROPS
+      # the archived row (upsert_agent_in_list guard) instead of re-upserting it.
+      # get_session_with_agent/1 doesn't filter archived, so before the fix the
+      # row survived until a full refresh.
+      {:ok, archived} = EyeInTheSky.Sessions.archive_session(s)
+      send(view.pid, {:agent_updated, archived})
+
+      refute has_element?(view, "#ps-#{s.id}")
+    end
+  end
+
   describe "Bulk selection — archive" do
     @tag :bulk_select
     @tag :bulk_select_archive_basic

@@ -22,22 +22,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- DM: search always visible on messages tab --%>
-    <%= if @active_tab in ["messages", nil] do %>
-      <.search_bar
-        id="top-bar-dm-search"
-        size="xs"
-        label="Search messages"
-        placeholder="Search messages..."
-        value={@search_query || ""}
-        on_change="search_messages"
-        on_submit="search_messages"
-        class="w-48"
-      />
-    <% end %>
     <.tab_pills value_key="tab">
       <:item
-        label="Messages"
+        label="Chat"
         active={@active_tab in ["messages", nil]}
         on_click="change_tab"
         value="messages"
@@ -80,6 +67,16 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
       />
     </.tab_pills>
     <div class="flex-1" />
+    <.search_bar
+      id="top-bar-dm-search"
+      size="xs"
+      label="Search messages"
+      placeholder="Search messages..."
+      value={@search_query || ""}
+      on_change="search_messages"
+      on_submit="search_messages"
+      class="w-48"
+    />
     <%!-- ... menu --%>
     <div class="dropdown dropdown-end">
       <button

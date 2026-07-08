@@ -16,17 +16,6 @@ defmodule EyeInTheSkyWeb.TopBar.Skills do
 
   def toolbar(assigns) do
     ~H"""
-    <.search_bar
-      id="skills-top-bar-search"
-      size="xs"
-      label="Search skills"
-      placeholder="Search skills..."
-      value={@search_query || ""}
-      on_change="search"
-      class="w-44"
-      vim_search={true}
-    />
-    <div class="w-px h-4 bg-base-content/10 mx-0.5" />
     <details
       id="skills-type-dropdown"
       phx-update="ignore"
@@ -108,6 +97,17 @@ defmodule EyeInTheSkyWeb.TopBar.Skills do
         <% end %>
       </ul>
     </details>
+    <div class="flex-1" />
+    <.search_bar
+      id="skills-top-bar-search"
+      size="xs"
+      label="Search skills"
+      placeholder="Search skills..."
+      value={@search_query || ""}
+      on_change="search"
+      class="w-48"
+      vim_search={true}
+    />
     """
   end
 

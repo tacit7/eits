@@ -18,17 +18,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- Tasks: search + state filter pills + view toggle + sort --%>
-    <.search_bar
-      id="top-bar-tasks-search"
-      size="xs"
-      label="Search tasks"
-      placeholder="Search tasks..."
-      value={@search_query || ""}
-      on_change="search"
-      class="flex-1 max-w-xs"
-      vim_search={true}
-    />
+    <%!-- Tasks: state filter pills + view toggle + sort + search --%>
     <%!-- Status filter pills --%>
     <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
       <button
@@ -106,6 +96,17 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
         </.link>
       </div>
     <% end %>
+    <div class="flex-1" />
+    <.search_bar
+      id="top-bar-tasks-search"
+      size="xs"
+      label="Search tasks"
+      placeholder="Search tasks..."
+      value={@search_query || ""}
+      on_change="search"
+      class="w-48"
+      vim_search={true}
+    />
     <%!-- Sort dropdown --%>
     <details
       id="tasks-sort-dropdown"

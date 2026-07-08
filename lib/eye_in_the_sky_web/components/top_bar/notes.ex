@@ -17,25 +17,7 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- Notes: search + quick note + starred + type + sort --%>
-    <form id="notes-top-bar-search" phx-change="search" class="relative flex items-center w-44">
-      <label for="notes-top-bar-search-input" class="sr-only">Search notes</label>
-      <.icon
-        name="hero-magnifying-glass-mini"
-        class="absolute left-2.5 pointer-events-none size-3.5 text-base-content/30"
-      />
-      <input
-        type="text"
-        id="notes-top-bar-search-input"
-        name="query"
-        data-vim-search
-        value={@search_query || ""}
-        placeholder="Search notes..."
-        phx-debounce="300"
-        autocomplete="off"
-        class="input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors input-xs pl-8 h-7 text-xs"
-      />
-    </form>
+    <%!-- Notes: quick note + starred + type + sort + search --%>
     <button
       phx-click="open_quick_note_modal"
       class="flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium text-base-content/60 hover:text-base-content hover:bg-base-content/8 transition-colors"
@@ -95,10 +77,29 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
         <% end %>
       </ul>
     </details>
+    <div class="flex-1" />
+    <form id="notes-top-bar-search" phx-change="search" class="relative flex items-center w-48">
+      <label for="notes-top-bar-search-input" class="sr-only">Search notes</label>
+      <.icon
+        name="hero-magnifying-glass-mini"
+        class="absolute left-2.5 pointer-events-none size-3.5 text-base-content/30"
+      />
+      <input
+        type="text"
+        id="notes-top-bar-search-input"
+        name="query"
+        data-vim-search
+        value={@search_query || ""}
+        placeholder="Search notes..."
+        phx-debounce="300"
+        autocomplete="off"
+        class="input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors input-xs pl-8 h-7 text-xs"
+      />
+    </form>
     <%= if @new_href do %>
       <.link
         navigate={@new_href}
-        class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+        class="flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
       >
         <.icon name="hero-plus" class="size-3" /> New Note
       </.link>

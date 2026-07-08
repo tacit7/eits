@@ -15,17 +15,6 @@ defmodule EyeInTheSkyWeb.TopBar.Agents do
 
   def toolbar(assigns) do
     ~H"""
-    <.search_bar
-      id="agents-top-bar-search"
-      size="xs"
-      label="Search agents"
-      placeholder="Search agents..."
-      value={@search_query || ""}
-      on_change="search"
-      class="w-44"
-      vim_search={true}
-    />
-    <div class="w-px h-4 bg-base-content/10 mx-0.5" />
     <details
       id="agents-scope-dropdown"
       phx-update="ignore"
@@ -80,6 +69,17 @@ defmodule EyeInTheSkyWeb.TopBar.Agents do
         <% end %>
       </ul>
     </details>
+    <div class="flex-1" />
+    <.search_bar
+      id="agents-top-bar-search"
+      size="xs"
+      label="Search agents"
+      placeholder="Search agents..."
+      value={@search_query || ""}
+      on_change="search"
+      class="w-48"
+      vim_search={true}
+    />
     """
   end
 

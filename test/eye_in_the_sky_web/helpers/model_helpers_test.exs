@@ -412,4 +412,50 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert "claude-sonnet-4-6" in values
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # entries_with_current/3
+  # ---------------------------------------------------------------------------
+
+  describe "entries_with_current/3" do
+    test "returns entries unchanged when current slug is already present" do
+      entries = [
+        %EyeInTheSky.ModelEntry{provider: "codex", slug: "gpt-5.5", label: "GPT-5.5", group: "Codex", default?: true},
+        %EyeInTheSky.ModelEntry{provider: "codex", slug: "gpt-5.4", label: "GPT-5.4", group: "Codex"}
+      ]
+
+      result = ModelHelpers.entries_with_current(entries, "codex", "gpt-5.5")
+      assert result == entries
+    end
+
+    test "synthesizes and appends a Current entry when the slug is absent from every list" do
+      entries = [
+        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-opus-4-8", label: "Opus 4.8", group: "Claude Code", default?: true},
+        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-sonnet-5", label: "Sonnet 5", group: "Claude Code"}
+      ]
+
+      result = ModelHelpers.entries_with_current(entries, "claude", "sonnet-4-6")
+
+      assert length(result) == length(entries) + 1
+      synthetic = List.last(result)
+      assert synthetic.provider == "claude"
+      assert synthetic.slug == "sonnet-4-6"
+      assert synthetic.label == "sonnet-4-6"
+      assert synthetic.group == "Current"
+      assert synthetic.sub_provider == nil
+      assert synthetic.premium? == false
+      assert synthetic.legacy? == false
+      assert synthetic.default? == false
+    end
+
+    test "does not duplicate when called twice with the same missing slug" do
+      entries = [
+        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-opus-4-8", label: "Opus 4.8", group: "Claude Code", default?: true}
+      ]
+
+      once = ModelHelpers.entries_with_current(entries, "claude", "sonnet-4-6")
+      twice = ModelHelpers.entries_with_current(once, "claude", "sonnet-4-6")
+      assert length(twice) == length(once)
+    end
+  end
 end

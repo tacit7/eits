@@ -389,6 +389,35 @@ defp channel_member?(channel_id, session_id), do: Channels.member?(channel_id, s
 
 **Impact**: Prevents unauthorized sessions from sending or searching messages in channels they do not belong to.
 
+### User-Supplied ID Integer Parsing
+
+LiveView event handlers that parse user-supplied IDs must never crash on invalid input. IDs originate from untrusted sources: phx-value parameters, injected DOM attributes, or tampered WebSocket messages.
+
+**Crash risk**: `String.to_integer/1` raises `ArgumentError` on non-numeric input. Using it on user-supplied IDs crashes the LiveView connection:
+
+```elixir
+# UNSAFE: raises on invalid ID
+selected_ids |> Enum.map(&String.to_integer/1)
+
+# SAFE: returns nil on invalid ID
+selected_ids |> Enum.map(&ControllerHelpers.parse_int/1) |> Enum.reject(&is_nil/1)
+```
+
+**Established pattern**: Use `ControllerHelpers.parse_int/1` (returns nil on invalid input) and handle nil explicitly:
+
+- **Teams archive** (`project_live/teams.ex`, `archive_selected` handler):
+  - Changed from `Enum.map(&String.to_integer/1)` to `Enum.map(&ControllerHelpers.parse_int/1) |> Enum.reject(&is_nil/1)`
+  - Invalid IDs are silently filtered out; only valid integers proceed to the batch delete
+
+- **Prompts select** (`overview_live/prompts.ex`, `select_prompt` handler):
+  - Parse ID via `ControllerHelpers.parse_int(id)` and use explicit nil checks
+  - When nil, treat the input as invalid and return current state unchanged
+  - Prevents toggle logic from crashing on tampered phx-value parameters
+
+**Test coverage**: Unit tests for `ControllerHelpers.parse_int/1` verify that valid numeric strings return integers, invalid strings return nil, and edge cases (empty string, whitespace, floats) return nil.
+
+**Audit**: All LiveView event handlers that parse IDs should use this pattern. A grep for `String.to_integer` on LiveView code reveals any remaining unsafe sites.
+
 ### Optimistic Concurrency Control — File Editor Hash Matching
 
 File save operations use SHA-256 hash verification to detect concurrent writes and prevent lost updates.

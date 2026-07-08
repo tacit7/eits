@@ -1,7 +1,7 @@
 # Unified Model Selector — Design Spec
 
-**Date:** 2026-07-08
-**Status:** Approved design, pre-implementation
+**Date:** 2026-07-08 (revised same day after design review)
+**Status:** Approved design, revisions from review round incorporated
 **Scope:** Replace all three EITS model-picking surfaces with one shared component; refresh the Claude/Codex model catalog (display + validation) to the current lineup.
 
 ## 1. Goal
@@ -35,9 +35,11 @@ Separately, the screenshots reveal `model_helpers.ex` and `scripts/eits`'s Claud
 ```elixir
 defmodule EyeInTheSky.ModelEntry do
   @moduledoc "Unified model metadata for the shared model selector."
-  defstruct [:slug, :label, :group, :sub_provider, billed?: false, legacy?: false, default?: false]
+  defstruct [:provider, :slug, :label, :group, :sub_provider,
+             billed?: false, legacy?: false, default?: false]
 
   @type t :: %__MODULE__{
+          provider: String.t(),
           slug: String.t(),
           label: String.t(),
           group: String.t(),
@@ -49,11 +51,15 @@ defmodule EyeInTheSky.ModelEntry do
 end
 ```
 
+`provider` is carried explicitly on every entry rather than inferred from section context — the row-badge rule (§5.1) and the emitted selection payload (§5.4) both read it directly, so nothing downstream has to guess a row's actual provider from which section it's rendered under.
+
 ### 4.2 `ModelHelpers.entries_for_provider/1` (new function, additive)
 
-- `"claude"` → static list built from the refreshed catalog (§6.1). `group: "Claude Code"`, `sub_provider: nil`. `billed?` true only for `-1m`/`[1m]`-suffixed slugs. `legacy?` true for anything not in the current-generation set (Opus 4.7-and-older, Sonnet 4.6-and-older, etc.). `default?` true for the one recommended alias.
-- `"codex"` → static list, same shape. `group: "Codex"`. `billed?: false` always. `legacy?` true for `gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.3-codex, gpt-5.2`; primary/non-legacy = `gpt-5.5, gpt-5.4, gpt-5.4-mini`. `default?` on `gpt-5.5`.
-- `"pi"` → reads `Pi.ModelDiscoveryCache.get_cached/0` **directly** (not the lossy `pi_models/0`, which discards the `"provider"` sub-provider key). Each discovered model's `"provider"` field becomes `sub_provider` (e.g. `"ollama-lan"`); `group` is a display-cased version of it (e.g. `"Ollama-lan"` → could special-case `"ollama"`/`"ollama-lan"` to a friendlier "Ollama (LAN)" label, exact mapping left to the implementation plan). `billed?` true unless `sub_provider` starts with `"ollama"`. `legacy?: false` (no legacy concept for discovered models — they're either present or not). `default?: false`.
+- `"claude"` → static list built from the refreshed catalog (§6.1). `provider: "claude"`, `group: "Claude Code"`, `sub_provider: nil`. `billed?` true for an **explicitly enumerated alias set** (`opus[1m]`, `sonnet[1m]`, and their full-slug equivalents) — not fragile substring matching on `"1m"`, which risks false positives against unrelated slugs that happen to contain that text. `legacy?` true for anything not in the current-generation set (Opus 4.7-and-older, Sonnet 4.6-and-older, etc.). `default?` true for the `default` alias row — see the important nuance below.
+- `"codex"` → static list, same shape. `provider: "codex"`, `group: "Codex"`. `billed?: false` always. `legacy?` true for `gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.3-codex, gpt-5.2`; primary/non-legacy = `gpt-5.5, gpt-5.4, gpt-5.4-mini`. `default?` on `gpt-5.5`.
+- `"pi"` → reads `Pi.ModelDiscoveryCache.get_cached/0` **directly** (not the lossy `pi_models/0`, which discards the `"provider"` sub-provider key). Each discovered model's `"provider"` field becomes `sub_provider` (e.g. `"ollama-lan"`), and the entry's own `provider` field is `"pi"`; `group` is a display-cased version of `sub_provider` (e.g. could special-case `"ollama"`/`"ollama-lan"` to a friendlier "Ollama (LAN)" label, exact mapping left to the implementation plan). `billed?` true unless `sub_provider` starts with `"ollama"`. `legacy?: false` (no legacy concept for discovered models — they're either present or not). `default?: false`.
+
+**`default?`/"Default" nuance:** `default` is a *selectable alias*, not a stable concrete model. Anthropic's own Claude Code `default` value can resolve to different underlying models depending on account, organization policy, and provider — it is not guaranteed to always mean "Opus 4.8" or any other fixed slug. The picker must not imply otherwise: the `default?: true` row is labeled "Default" with a small "Recommended" badge and a short description ("uses account/org default"), never a specific model name baked into the label. Do not resolve `default` to a concrete slug at catalog-build time and call that the default entry — keep `default` as its own literal alias value in the entry list.
 - Existing `claude_models_with_meta/0`, `codex_models_with_meta/0`, `pi_models/0`, `models_for_provider/1`, `valid_model_slugs/1` are **untouched** — every existing caller keeps working exactly as today.
 
 ### 4.3 Always-show-current-selection rule
@@ -74,6 +80,39 @@ If a host component's current model slug isn't found in `entries_for_provider/1`
   - If the active selection lives behind a disclosure, that disclosure auto-expands on open (claudette behavior, carried over).
 - **Row**: bullet + label. Checkmark on the right for the active row. `$` icon (in place of the checkmark) for `billed?: true` rows that are *not* the active row — active+billed shows both (checkmark takes visual priority, `$` moves to a smaller adjacent badge) to avoid ambiguity about what's currently selected. Small "Recommended" tag next to `default?: true` rows. Provider badge (icon) on a row only when that row's actual provider differs from its section's implied provider (this basically never fires for Claude Code/Codex sections and never fires within a Pi section, since Pi sections are already sub-provider-scoped — kept for structural parity with claudette, expected to be a no-op in practice today).
 - **Keyboard/mouse**: ArrowUp/Down/Enter/Escape, click-outside-to-close, mouseover-highlight — lifted from `agent_combobox.js`.
+
+### 5.4 Component API and event contract (boundary — must be exact)
+
+**Assigns:**
+
+| Assign | Required | Type | Meaning |
+|---|---|---|---|
+| `id` | yes | string | DOM id, passed through to the hook root |
+| `entries` | yes | `[ModelEntry.t()]` | pre-computed by the host via `entries_for_provider/1` (§4.2), possibly concatenated across providers — see `allow_provider_switch?` below |
+| `selected_provider` | yes | string | the currently active provider |
+| `selected_model` | yes | string | the currently active slug |
+| `allow_provider_switch?` | yes | boolean | see below |
+| `event` | yes | string | the `phx-click`/hook-pushed event name the host's `handle_event/3` listens for |
+| `disabled?` | no, default `false` | boolean | composer passes `true` while a turn is running; drawer/modal never disable |
+| `placement` | no, default `:down` | `:up \| :down` | composer uses `:up` (bottom-anchored, matches `slash_command_popup.js`); drawer/modal use `:down` |
+
+**`allow_provider_switch?` resolves the provider-switching ambiguity directly against current server behavior** (verified: `DmModelHelpers.handle_select_model/2` today only ever receives `%{"model", "effort"}` and calls `Sessions.update_session(session, %{model: model})` — it never touches `session.provider`, because **mid-conversation provider switching is not implemented anywhere in the app today** and is explicitly out of scope for this spec, per §3):
+
+- **Composer**: `allow_provider_switch?: false`. The host pre-filters `entries` to the session's own `provider` before passing them in — the popover shows only that one provider's groups (e.g. a Pi session sees only its Pi sub-provider sections). This matches today's behavior exactly (the existing `cond` already picks one provider's list) while adding search/grouping/badges on top of it. Switching providers mid-chat would require also reassigning `provider_conversation_id`/session directory — a materially larger feature, not this one.
+- **Drawer / New Session modal**: `allow_provider_switch?: true`. `entries` is the **full cross-provider list** (Claude Code + Codex + Pi sections together, exactly like claudette's real popover). This is a deliberate simplification of the current UI: it **replaces the separate provider `<select>`/agent-type field entirely** — one popover now does what two controls (provider select + model select) did before. Flagging this explicitly since it changes the drawer/modal's control layout, not just its model list.
+
+**Emitted event payload (canonical, identical across all three hosts):**
+
+```elixir
+%{
+  "provider" => entry.provider,
+  "model" => entry.slug
+}
+```
+
+No host invents its own shape. Each host's `handle_event(event, %{"provider" => provider, "model" => model}, socket)` still owns its own persistence/downstream behavior (composer persists via `Sessions.update_session/2`; drawer/modal just update component assigns for the pending spawn form) — the component only guarantees the two keys above arrive consistently.
+
+**State authority:** the hook keeps *all* derived UI state (search text, open/closed, disclosure expansion, keyboard-highlighted row) client-side, but the actual selected provider/model is **server-authoritative** after the round trip. The hook does not optimistically "lock in" a visual selection independent of the server's response — if a selection is ever rejected (§7 validation-failure case), the LiveView re-renders with the previous `selected_provider`/`selected_model` assigns and the hook's `updated()` lifecycle re-syncs its `data-selected-model`/`data-selected-provider` attributes from that re-render, snapping the visible checkmark back.
 
 ### 5.2 JS Hook (`assets/js/hooks/model_selector_popup.js`, new)
 
@@ -102,6 +141,8 @@ The screenshots show **display names** ("Opus", "Fable", "Sonnet", "Haiku", "Def
 
 Codex: `scripts/eits`'s existing list (`gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2`) already matches the full valid set — no new slugs needed here, only the primary/legacy split (§4.2) and confirming `gpt-5.5` is still `default?: true`.
 
+**Source-of-truth rule:** the Codex (and Claude) catalog's source of truth is **this account's own** `scripts/eits agents spawn --help` output and/or in-app CLI-visible model listings — never public provider marketing docs. Model availability is account/subscription-specific; a future implementer "correcting" this catalog against a public docs page could silently break or mismatch what's actually spawnable here. If `scripts/eits`'s list and a public reference ever disagree, `scripts/eits` wins.
+
 ### 6.3 Migration note
 
 Existing sessions with an old-but-still-valid slug (e.g. `sonnet-4-6`) must keep working — §4.3's "always show current selection" rule covers display; `ModelConfig`'s validated list should **keep old-generation slugs valid for existing sessions** (don't remove them from the accepted set, only stop offering them as non-legacy/primary in the picker). This mirrors what the screenshot itself shows: `sonnet-4-6` still works and is still selectable, just outside the curated recommended list.
@@ -110,6 +151,7 @@ Existing sessions with an old-but-still-valid slug (e.g. `sonnet-4-6`) must keep
 
 - **Data layer**: unit tests for `ModelEntry`/`entries_for_provider/1` per provider — correct `group`/`sub_provider`/`billed?`/`legacy?`/`default?` assignment; Pi entries preserve `sub_provider` from discovery; empty/stale Pi cache handled (existing `:empty`/`:stale` cases from `ModelDiscoveryCache`).
 - **Component**: LiveView tests per host (composer, drawer, modal) — popover opens, search filters, disclosure expands/collapses, selecting an entry fires the right event and updates the right assign/DB field, always-show-current-selection for an out-of-catalog slug.
+- **Validation-failure path** (previously untested): selecting a model absent from `ModelConfig.valid_model_slugs(provider)` — or, in the composer, submitting a payload with a `provider` different from the session's own when `allow_provider_switch?: false` — must not update persisted session state; the LiveView re-renders with the previous `selected_model`/`selected_provider` assigns intact, and (composer only, matching the existing `handle_select_model/2` error path) a flash error is shown.
 - **JS hook**: manual/browser verification (this codebase has no existing JS unit-test harness for hooks per the Phase-1 exploration — follow that precedent, don't introduce one here) — keyboard nav, click-outside, search, disclosure toggling, mid-turn disabled state in the composer.
 - **Catalog refresh**: a test asserting `ModelConfig.valid_model_combos()` still accepts every pre-refresh slug (no regressions for existing sessions) in addition to the new ones.
 
@@ -119,3 +161,4 @@ Existing sessions with an old-but-still-valid slug (e.g. `sonnet-4-6`) must keep
 - **Consistency**: `%ModelEntry{}` field names used identically in §4.2/§5.1/§7. Existing function names/behavior explicitly preserved in §4.2's closing paragraph.
 - **Scope check**: single component + one data struct + one catalog refresh — appropriately sized for one implementation plan; the three host-wiring changes (§5.3) are naturally sequential sub-tasks of the same plan, not separate specs.
 - **Ambiguity flagged, not hidden**: §6.2 explicitly says the exact new Claude slugs need verification rather than presenting screenshot-derived guesses as fact.
+- **Review round corrections**: verified against the actual codebase (`DmModelHelpers.handle_select_model/2`) that mid-conversation provider switching has no server-side support today, which resolved the `allow_provider_switch?` boundary decisively rather than leaving it as a UI nuance; added the explicit component API/event contract (§5.4); added `provider` to `ModelEntry`; tightened `billed?` detection to an enumerated alias set instead of substring matching; added the `default`-is-an-alias-not-a-model nuance; added the Codex/Claude source-of-truth rule; added the validation-failure test case.

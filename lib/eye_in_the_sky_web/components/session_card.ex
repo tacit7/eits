@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
                 />
               </form>
             <% else %>
-              <span class="text-[13px] font-medium text-base-content/85 truncate">
+              <span class="text-sm font-semibold text-base-content/85 truncate">
                 {@session.name ||
                   truncate_text(session_agent_description(@session)) ||
                   "Unnamed session"}

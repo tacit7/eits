@@ -293,8 +293,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]" phx-hook="GlobalKeydown" id="project-tasks-page">
-      <div class="max-w-4xl mx-auto">
+    <div
+      class="flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]"
+      phx-hook="GlobalKeydown"
+      id="project-tasks-page"
+    >
+      <div class="w-full max-w-3xl mx-auto">
         <%!-- Mobile-only action bar --%>
         <div class="mb-4 flex md:hidden items-center justify-end gap-2">
           <button
@@ -357,7 +361,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
               phx-hook="TaskListSelection"
               data-vim-list
               data-selected-task-id={@selected_task && @selected_task.id}
-              class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
+              class="divide-y divide-base-content/5"
             >
               <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
                 <TaskCard.task_card

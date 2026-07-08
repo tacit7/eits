@@ -92,19 +92,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   @impl true
   def render(assigns) do
     ~H"""
-    <%!-- Mobile-only search --%>
-    <div class="md:hidden flex items-center gap-2 px-4 pt-3 pb-1">
-      <form phx-change="search" class="flex-1">
-        <input
-          type="text"
-          name="query"
-          value={@search_query}
-          placeholder="Search prompts..."
-          class="input input-xs bg-base-200/50 border-base-content/8 text-base-content/70 placeholder:text-base-content/30 min-h-[44px] text-xs w-full"
-        />
-      </form>
-    </div>
-
     <div class={["flex overflow-hidden", @selected_prompt && "flex-1"]}>
       <%!-- List panel --%>
       <div
@@ -117,12 +104,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
         ]}
         style="scrollbar-width: none;"
       >
-        <div class="mb-3">
-          <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-            {length(@prompts)} prompts
-          </span>
-        </div>
-
         <%= if @prompts != [] do %>
           <div class="divide-y divide-base-content/5" data-vim-list>
             <%= for prompt <- @prompts do %>

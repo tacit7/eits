@@ -217,10 +217,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
     ~H"""
     <div class="bg-base-100 min-h-full px-4 sm:px-6 lg:px-8">
       <div class="max-w-3xl mx-auto">
-        <div class="flex items-center justify-between py-5">
-          <span class="text-mini font-mono tabular-nums text-base-content/30 tracking-wider uppercase">
-            {length(@agents)} agents
-          </span>
+        <div class="flex items-center justify-end py-5">
           <div class="flex items-center gap-2">
             <button
               :if={!@select_mode && @agents != []}
@@ -250,7 +247,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           selected_ids={@selected_ids}
         />
 
-        <div class="mt-2 divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-4">
+        <div class="mt-2 divide-y divide-base-content/5">
           <%= if @agents == [] do %>
             <.empty_state
               id="agents-empty"
@@ -258,7 +255,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
               subtitle="Try adjusting your search or filters"
             />
           <% else %>
-            <div :for={agent <- @agents}>
+            <div :for={agent <- @agents} class="py-0.5">
               <.session_row
                 session={agent}
                 select_mode={@select_mode}

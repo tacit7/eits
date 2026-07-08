@@ -37,11 +37,9 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       id="sessions-page-root"
       phx-hook="DmHistoryCleanup"
     >
-      <div class="max-w-4xl mx-auto">
-        <%!-- Toolbar --%>
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-5">
-          <%!-- Mobile action bar (desktop uses top bar) --%>
-          <div class="flex md:hidden items-center gap-2">
+      <div class="w-full max-w-3xl mx-auto">
+        <%!-- Mobile-only action bar (desktop controls are in top bar) --%>
+        <div class="md:hidden flex items-center gap-2 mb-4">
             <button
               :if={!@select_mode && @agents != []}
               phx-click="enter_select_mode"
@@ -70,7 +68,6 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
             >
               <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
             </button>
-          </div>
         </div>
 
         <%= if @show_filter_sheet do %>

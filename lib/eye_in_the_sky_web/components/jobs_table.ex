@@ -1,30 +1,18 @@
 defmodule EyeInTheSkyWeb.Components.JobsTable do
   @moduledoc """
-  Shared jobs table component — renders both mobile cards and a desktop table.
-
-  Attributes:
-    - jobs: list of ScheduledJob structs (required)
-    - expanded_job_id: integer or nil (required)
-    - runs: list of JobRun structs (required)
-    - running_ids: MapSet of job IDs currently executing (required)
-    - last_run_map: %{job_id => status_string} (required)
-    - last_failed_runs: %{job_id => %JobRun{}} (required)
-    - show_origin: boolean — adds an Origin column to the desktop table (default false)
+  Jobs list component — renders a divide-y list of job rows matching the
+  sessions/notes/skills visual style, with a spinner or status dot on the
+  left, name + inline tags, schedule/run metadata, and hover-revealed
+  run-now / edit / delete actions.
   """
 
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
 
   import EyeInTheSkyWeb.Live.Shared.JobsFormatters,
-    only: [
-      job_row_state: 3,
-      row_border_class: 1,
-      format_schedule: 1,
-      type_label: 1
-    ]
+    only: [job_row_state: 3, format_schedule: 1, type_label: 1]
 
-  import EyeInTheSkyWeb.Helpers.ViewHelpers,
-    only: [format_relative_time: 1, format_datetime_short_time: 1]
+  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [format_relative_time: 1]
 
   attr :jobs, :list, required: true
   attr :expanded_job_id, :any, required: true
@@ -34,486 +22,149 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   attr :last_failed_runs, :map, required: true
   attr :show_origin, :boolean, default: false
   attr :target, :any, default: nil
-  attr :scope, :string, default: nil, doc: "Context scope: 'project', 'global', or 'overview'"
-  attr :project_name, :string, default: nil, doc: "Project name for project-scoped views"
-
-  attr :bulk_selected_jobs, :any,
-    default: nil,
-    doc: "MapSet of selected job IDs for bulk operations"
-
-  attr :last_n_runs_map, :map, default: %{}, doc: "Map of job_id to list of recent run structs"
+  attr :scope, :string, default: nil
+  attr :project_name, :string, default: nil
+  attr :bulk_selected_jobs, :any, default: nil
+  attr :last_n_runs_map, :map, default: %{}
 
   def jobs_table(assigns) do
-    assigns =
-      assign(
-        assigns,
-        :selected_count,
-        if assigns.bulk_selected_jobs do
-          MapSet.size(assigns.bulk_selected_jobs)
-        else
-          0
-        end
-      )
-
     ~H"""
     <%= if @jobs != [] do %>
-      <%!-- Bulk Action Bar --%>
-      <%= if @selected_count > 0 do %>
-        <div class="mb-4 flex flex-wrap items-center gap-3 bg-base-100 border border-base-300 rounded-lg p-3 sm:p-4">
-          <span class="text-sm font-medium">{@selected_count} selected</span>
-          <div class="flex flex-wrap gap-2 ml-auto">
-            <button
-              class="btn btn-sm btn-outline"
-              phx-click="bulk_enable"
-              phx-value-scope={@scope}
-              phx-target={@target}
-              title="Enable selected jobs"
-            >
-              <.icon name="hero-check" class="size-3.5" /> Enable
-            </button>
-            <button
-              class="btn btn-sm btn-outline"
-              phx-click="bulk_disable"
-              phx-value-scope={@scope}
-              phx-target={@target}
-              title="Disable selected jobs"
-            >
-              <.icon name="hero-x-mark" class="size-3.5" /> Disable
-            </button>
-            <button
-              class="btn btn-sm btn-ghost"
-              phx-click="clear_bulk_selection"
-              phx-target={@target}
-              title="Clear selection"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      <% end %>
-
-      <div class="md:hidden space-y-3">
+      <div class="divide-y divide-base-content/5">
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
-          <% is_selected = @bulk_selected_jobs && MapSet.member?(@bulk_selected_jobs, job.id) %>
-          <article class={"rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm #{row_border_class(job_state)} #{if is_selected, do: "ring-2 ring-primary"}"}>
-            <div class="flex items-start gap-3">
-              <input
-                type="checkbox"
-                class="checkbox checkbox-sm mt-1"
-                checked={is_selected}
-                phx-click="toggle_job_select"
-                phx-value-id={job.id}
-                phx-target={@target}
-              />
-              <button
-                class="w-full text-left"
-                phx-click="expand_job"
-                phx-value-id={job.id}
+          <% selected? = @expanded_job_id == job.id %>
+          <div class="py-0.5">
+            <div
+              id={"job-row-#{job.id}"}
+              class={[
+                "flex items-center gap-3 py-2.5 px-3 rounded-lg cursor-pointer relative group/row",
+                "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50",
+                if(selected?, do: "bg-primary/5", else: "hover:bg-base-200/40"),
+                if(job_state == :disabled, do: "opacity-50")
+              ]}
+              phx-click="expand_job"
+              phx-value-id={job.id}
+              phx-target={@target}
+              role="button"
+              tabindex="0"
+              aria-label={job.name}
+            >
+              <%!-- Status icon: spinner when running, coloured dot otherwise --%>
+              <%= if job_state == :running do %>
+                <span class="loading loading-spinner loading-xs text-primary flex-shrink-0" />
+              <% else %>
+                <span class={[
+                  "size-2 rounded-full flex-shrink-0",
+                  case job_state do
+                    :healthy -> "bg-success"
+                    :failed -> "bg-error"
+                    _ -> "bg-base-content/20"
+                  end
+                ]} />
+              <% end %>
+
+              <%!-- Main content --%>
+              <div class="flex-1 min-w-0">
+                <%!-- Line 1: name + inline tags --%>
+                <div class="flex items-baseline gap-2">
+                  <span class={[
+                    "text-sm font-semibold truncate",
+                    if(selected?, do: "text-primary", else: "text-base-content/85")
+                  ]}>
+                    {job.name}
+                  </span>
+                  <span class="text-mini text-base-content/40 flex-shrink-0">
+                    {type_label(job.job_type)}
+                  </span>
+                  <%= if is_nil(job.project_id) and @scope == "overview" do %>
+                    <span class="text-mini text-base-content/25 flex-shrink-0">global</span>
+                  <% end %>
+                  <%= if @show_origin and job.origin == "system" do %>
+                    <span class="text-mini text-base-content/25 flex-shrink-0">system</span>
+                  <% end %>
+                  <%= if job_state == :running do %>
+                    <span class="text-mini text-primary/60 font-medium flex-shrink-0">running</span>
+                  <% end %>
+                  <%= if job_state == :disabled do %>
+                    <span class="text-mini text-base-content/30 flex-shrink-0">disabled</span>
+                  <% end %>
+                </div>
+                <%!-- Line 2: schedule · last run · next run --%>
+                <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30 font-mono">
+                  <span>{format_schedule(job)}</span>
+                  <span class="text-base-content/15">·</span>
+                  <%= if job.last_run_at do %>
+                    <span class={if job_state == :failed, do: "text-error/60"}>
+                      Last run {format_relative_time(job.last_run_at)}
+                    </span>
+                  <% else %>
+                    <span class="text-base-content/20">Never run</span>
+                  <% end %>
+                  <%= if not is_nil(job.next_run_at) and job_state != :disabled do %>
+                    <span class="text-base-content/15">·</span>
+                    <span>Next {format_relative_time(job.next_run_at)}</span>
+                  <% end %>
+                </div>
+              </div>
+
+              <%!-- Hover-reveal actions.
+                   phx-click="noop" on wrapper intercepts click so the row's
+                   expand_job does not also fire when targeting an action button. --%>
+              <div
+                class="flex items-center gap-0 flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity duration-100"
+                phx-click="noop"
                 phx-target={@target}
               >
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <h3 class="font-medium text-sm truncate">{job.name}</h3>
-                      <.running_badge job_state={job_state} mobile={true} />
-                    </div>
-                    <%= if job.description do %>
-                      <p class="text-mini text-base-content/60 mt-0.5 truncate">{job.description}</p>
-                    <% end %>
-                    <p class="text-mini font-mono text-base-content/50 mt-1 truncate">
-                      {format_schedule(job)}
-                      <span class="text-base-content/30 not-italic ml-1">
-                        {job.timezone || "UTC"}
-                      </span>
-                    </p>
-                  </div>
-                  <span class="badge badge-xs badge-ghost">
-                    {type_label(job.job_type)}
-                  </span>
-                </div>
-              </button>
-            </div>
-
-            <% mobile_failed_run = Map.get(@last_failed_runs, job.id) %>
-            <.failed_run_banner failed_run={mobile_failed_run} target={@target} job_id={job.id} mobile={true} />
-
-            <div class="mt-3 flex items-center justify-between">
-              <span class="text-xs text-base-content/60">Enabled</span>
-              <span class={[
-                "badge badge-xs",
-                if(job.enabled, do: "badge-success", else: "badge-ghost")
-              ]}>
-                {if job.enabled, do: "Yes", else: "No"}
-              </span>
-            </div>
-
-            <div class="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-              <span class="text-base-content/50">Last Run</span>
-              <span class="text-right" title={format_datetime_short_time(job.last_run_at)}>
-                {format_relative_time(job.last_run_at)}
-              </span>
-              <span class="text-base-content/50">Next Run</span>
-              <span class="text-right" title={format_datetime_short_time(job.next_run_at)}>
-                {format_relative_time(job.next_run_at)}
-              </span>
-              <span class="text-base-content/50">Runs</span>
-              <span class="text-right">{job.run_count || 0}</span>
-            </div>
-
-            <.job_actions job={job} target={@target} mobile={true} />
-
-            <%= if @expanded_job_id == job.id do %>
-              <div class="mt-3 rounded-lg bg-base-200/50 p-2">
-                <p class="text-xs font-medium mb-2">Recent Runs</p>
-                <%= if @runs != [] do %>
-                  <div class="space-y-1.5">
-                    <%= for run <- @runs do %>
-                      <div class="rounded-md bg-base-100/70 p-2 text-xs">
-                        <div class="flex items-center justify-between gap-2">
-                          <.status_badge status={run.status} size="xs" />
-                          <span class="text-base-content/60 truncate">
-                            {format_datetime_short_time(run.started_at)}
-                          </span>
-                        </div>
-                        <p class="mt-1 text-base-content/60 truncate">{run.result || "-"}</p>
-                      </div>
-                    <% end %>
-                  </div>
-                <% else %>
-                  <p class="text-xs text-base-content/50">No runs yet</p>
-                <% end %>
-              </div>
-            <% end %>
-          </article>
-        <% end %>
-      </div>
-
-      <div class="hidden md:block -mx-4 sm:mx-0 overflow-x-auto px-4 sm:px-0">
-        <table class="table table-sm">
-          <thead>
-            <tr>
-              <th style="width: 32px;">
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-sm"
-                  checked={
-                    @bulk_selected_jobs && MapSet.size(@bulk_selected_jobs) > 0 &&
-                      Enum.all?(@jobs, &MapSet.member?(@bulk_selected_jobs, &1.id))
-                  }
-                  phx-click="select_all_jobs"
-                  phx-value-scope={@scope}
-                  phx-target={@target}
-                />
-              </th>
-              <th>Name</th>
-              <%= if @show_origin do %>
-                <th>Origin</th>
-              <% end %>
-              <th>Type</th>
-              <th>Schedule</th>
-              <th>Enabled</th>
-              <th>Last Run</th>
-              <th>Next Run</th>
-              <th>Runs</th>
-              <th>Trend</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <%= for job <- @jobs do %>
-              <% row_state = job_row_state(job, @running_ids, @last_run_map) %>
-              <% is_selected = @bulk_selected_jobs && MapSet.member?(@bulk_selected_jobs, job.id) %>
-              <tr class={"hover #{if @expanded_job_id == job.id, do: "bg-base-200"} #{if is_selected, do: "bg-primary/10"}"}>
-                <td style="width: 32px;">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    checked={is_selected}
-                    phx-click="toggle_job_select"
-                    phx-value-id={job.id}
-                    phx-target={@target}
-                  />
-                </td>
-                <td
-                  class={"cursor-pointer #{row_border_class(row_state)}"}
-                  phx-click="expand_job"
+                <button
+                  class="flex items-center justify-center size-8 rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-200/70 transition-colors"
+                  phx-click="run_now"
                   phx-value-id={job.id}
                   phx-target={@target}
+                  title="Run now"
+                  aria-label="Run job now"
                 >
-                  <div class="flex items-center gap-1.5">
-                    <div class="font-medium">{job.name}</div>
-                    <.running_badge job_state={row_state} mobile={false} />
-                  </div>
-                  <%= if job.description do %>
-                    <p class="text-xs text-base-content/50 mt-0.5">{job.description}</p>
-                  <% end %>
-                  <%= if job.origin == "system" do %>
-                    <span class="badge badge-xs badge-ghost">system</span>
-                  <% end %>
-                  <% failed_run = Map.get(@last_failed_runs, job.id) %>
-                  <.failed_run_banner failed_run={failed_run} target={@target} job_id={job.id} />
-                </td>
-                <%= if @show_origin do %>
-                  <td>
-                    <%= if job.origin == "system" do %>
-                      <span class="badge badge-xs badge-neutral">System</span>
-                    <% else %>
-                      <span class="badge badge-xs badge-ghost">User</span>
-                    <% end %>
-                  </td>
-                <% end %>
-                <td>
-                  <span class="badge badge-xs badge-ghost">
-                    {type_label(job.job_type)}
-                  </span>
-                </td>
-                <td class="text-xs">
-                  <span class="font-mono">{format_schedule(job)}</span>
-                  <span class="text-base-content/40 ml-1 text-xs">{job.timezone || "UTC"}</span>
-                </td>
-                <td>
-                  <input
-                    type="checkbox"
-                    class="toggle toggle-sm toggle-primary"
-                    checked={job.enabled}
-                    phx-click="toggle_job"
+                  <.icon name="hero-play" class="size-3.5" />
+                </button>
+                <%= if job.origin != "system" do %>
+                  <button
+                    class="flex items-center justify-center size-8 rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-200/70 transition-colors"
+                    phx-click="edit_job"
                     phx-value-id={job.id}
                     phx-target={@target}
-                  />
-                </td>
-                <td class="text-xs" title={format_datetime_short_time(job.last_run_at)}>
-                  {format_relative_time(job.last_run_at)}
-                </td>
-                <td class="text-xs" title={format_datetime_short_time(job.next_run_at)}>
-                  {format_relative_time(job.next_run_at)}
-                </td>
-                <td class="text-xs">{job.run_count || 0}</td>
-                <td class="text-xs">
-                  <div class="flex items-center gap-0.5 flex-wrap">
-                    <%= for run <- (Map.get(@last_n_runs_map, job.id) || []) |> Enum.reverse() do %>
-                      <% run_color =
-                        case run.status do
-                          "completed" -> "bg-success"
-                          "failed" -> "bg-error"
-                          "running" -> "bg-warning"
-                          _ -> "bg-base-300"
-                        end %>
-                      <span
-                        class={"inline-block w-2 h-2 rounded-full #{run_color}"}
-                        title={run.status}
-                      >
-                      </span>
-                    <% end %>
-                  </div>
-                </td>
-                <td>
-                  <.job_actions job={job} target={@target} mobile={false} />
-                </td>
-              </tr>
-              <%= if @expanded_job_id == job.id do %>
-                <tr>
-                  <td colspan={if @show_origin, do: "10", else: "9"} class="bg-base-200 p-4">
-                    <div class="text-sm font-medium mb-2">Recent Runs</div>
-                    <%= if @runs != [] do %>
-                      <table class="table table-xs">
-                        <thead>
-                          <tr>
-                            <th>Status</th>
-                            <th>Started</th>
-                            <th>Completed</th>
-                            <th>Result</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <%= for run <- @runs do %>
-                            <tr>
-                              <td>
-                                <.status_badge status={run.status} size="xs" />
-                              </td>
-                              <td class="text-xs">{format_datetime_short_time(run.started_at)}</td>
-                              <td class="text-xs">{format_datetime_short_time(run.completed_at)}</td>
-                              <td class="text-xs max-w-xs truncate" title={run.result || ""}>
-                                {String.slice(run.result || "-", 0, 120)}
-                              </td>
-                            </tr>
-                          <% end %>
-                        </tbody>
-                      </table>
-                    <% else %>
-                      <p class="text-xs text-base-content/50">No runs yet</p>
-                    <% end %>
-                  </td>
-                </tr>
-              <% end %>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
-    <% else %>
-      <div class="text-center py-12 rounded-lg border border-base-300 bg-base-50 flex flex-col items-center">
-        <.icon name="hero-clock" class="size-12 text-base-content/20 mb-4" />
-        <h3 class="text-lg font-semibold text-base-content mb-2">No scheduled jobs yet</h3>
-        <p class="text-sm text-base-content/60 max-w-md mb-4">
-          Scheduled jobs run Claude agents automatically on a cron schedule.
-          <%= if @scope == "project" do %>
-            This project has no jobs yet.
-          <% else %>
-            Use them for recurring tasks like daily reports, monitoring, or automated reviews.
-          <% end %>
-        </p>
-        <p class="text-xs text-base-content/50 max-w-md mb-6">
-          <%= case @scope do %>
-            <% "project" -> %>
-              These jobs will run only for <strong>{@project_name}</strong>.
-            <% "global" -> %>
-              Global jobs run across all projects.
-            <% _ -> %>
-              You can create project-scoped or global jobs.
-          <% end %>
-        </p>
-        <%= if @target do %>
-          <div class="flex flex-col gap-2 sm:flex-row items-center justify-center">
-            <button
-              class="btn btn-primary btn-sm min-h-[44px]"
-              phx-click="new_job"
-              phx-value-scope={@scope || ""}
-              phx-target={@target}
-            >
-              <.icon name="hero-plus" class="size-4" /> Create Job
-            </button>
+                    title="Edit"
+                    aria-label="Edit job"
+                  >
+                    <.icon name="hero-pencil-square" class="size-3.5" />
+                  </button>
+                  <button
+                    class="flex items-center justify-center size-8 rounded text-error/40 hover:text-error hover:bg-error/10 transition-colors"
+                    phx-click="delete_job"
+                    phx-value-id={job.id}
+                    phx-target={@target}
+                    data-confirm="Delete this job?"
+                    title="Delete"
+                    aria-label="Delete job"
+                  >
+                    <.icon name="hero-trash" class="size-3.5" />
+                  </button>
+                <% end %>
+              </div>
+            </div>
           </div>
         <% end %>
       </div>
-    <% end %>
-    """
-  end
-
-  attr :job_state, :atom, required: true
-  attr :mobile, :boolean, default: false
-
-  defp running_badge(assigns) do
-    ~H"""
-    <%= if @job_state == :running do %>
-      <span class={["badge badge-warning badge-xs animate-pulse", if(@mobile, do: "shrink-0", else: "")]}>
-        running
-      </span>
-    <% end %>
-    """
-  end
-
-  attr :failed_run, :any, required: true
-  attr :job_id, :any, required: true
-  attr :target, :any, required: true
-  attr :mobile, :boolean, default: false
-
-  defp failed_run_banner(assigns) do
-    ~H"""
-    <%= if @failed_run do %>
-      <div class={["flex items-center gap-1.5 flex-wrap", if(@mobile, do: "mt-2", else: "mt-1.5")]}>
-        <span class="badge badge-xs badge-error">failed</span>
-        <span class={["text-xs text-error/70", if(@mobile, do: "truncate flex-1", else: "")]}>
-          {format_relative_time(@failed_run.started_at)}{if @failed_run.result,
-            do: ": #{String.slice(@failed_run.result, 0, 60)}",
-            else: ""}
-        </span>
-        <button
-          class={["btn btn-ghost btn-sm min-h-[44px] text-error", if(@mobile, do: "shrink-0", else: "")]}
-          phx-click="run_now"
-          phx-value-id={@job_id}
-          phx-target={@target}
-          title="Retry"
-        >
-          <.icon name="hero-arrow-path" class="size-3" />
-        </button>
-      </div>
-    <% end %>
-    """
-  end
-
-  attr :job, :any, required: true
-  attr :target, :any, required: true
-  attr :mobile, :boolean, default: false
-
-  defp job_actions(assigns) do
-    ~H"""
-    <%= if @mobile do %>
-      <div class="mt-3 flex items-center justify-end gap-1 border-t border-base-content/10 pt-2">
-        <label class="flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer">
-          <input
-            type="checkbox"
-            class="toggle toggle-xs toggle-primary"
-            checked={@job.enabled}
-            phx-click="toggle_job"
-            phx-value-id={@job.id}
-            phx-target={@target}
-          />
-        </label>
-        <button
-          class="btn btn-ghost btn-sm min-h-[44px]"
-          phx-click="run_now"
-          phx-value-id={@job.id}
-          phx-target={@target}
-          title="Run Now"
-        >
-          <.icon name="hero-play" class="size-3" />
-        </button>
-        <button
-          class="btn btn-ghost btn-sm min-h-[44px]"
-          phx-click="edit_job"
-          phx-value-id={@job.id}
-          phx-target={@target}
-          title="Edit"
-        >
-          <.icon name="hero-pencil-square" class="size-3" />
-        </button>
-        <button
-          class="btn btn-ghost btn-sm min-h-[44px] text-error"
-          phx-click="delete_job"
-          phx-value-id={@job.id}
-          phx-target={@target}
-          data-confirm="Delete this job?"
-          title="Delete"
-        >
-          <.icon name="hero-trash" class="size-3" />
-        </button>
-      </div>
     <% else %>
-      <div class="flex items-center gap-1">
-        <button
-          class="btn btn-ghost btn-sm min-h-[44px]"
-          phx-click="run_now"
-          phx-value-id={@job.id}
-          phx-target={@target}
-          title="Run Now"
-          aria-label="Run job now"
-        >
-          <.icon name="hero-play" class="size-3.5" />
-        </button>
-        <%= if @job.origin != "system" do %>
-          <button
-            class="btn btn-ghost btn-sm min-h-[44px]"
-            phx-click="edit_job"
-            phx-value-id={@job.id}
-            phx-target={@target}
-            title="Edit"
-            aria-label="Edit job"
-          >
-            <.icon name="hero-pencil-square" class="size-3.5" />
-          </button>
-          <button
-            class="btn btn-ghost btn-sm min-h-[44px] text-error"
-            phx-click="delete_job"
-            phx-value-id={@job.id}
-            phx-target={@target}
-            data-confirm="Delete this job?"
-            title="Delete"
-            aria-label="Delete job"
-          >
-            <.icon name="hero-trash" class="size-3.5" />
-          </button>
-        <% end %>
-      </div>
+      <.empty_state
+        id={"jobs-empty-#{@scope || "all"}"}
+        icon="hero-clock"
+        title="No jobs yet"
+        subtitle={
+          if @scope == "project",
+            do: "Create a job to automate work in this project",
+            else: "Create jobs to automate recurring work on a schedule"
+        }
+      />
     <% end %>
     """
   end

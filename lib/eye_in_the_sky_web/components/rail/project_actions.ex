@@ -304,10 +304,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
     # Navigate to the equivalent route on the newly selected project, preserving
     # the current tab context (sessions, tasks, notes, etc.).
+    # Global tabs (:usage, :chat, :canvas, :notifications, :dm) return nil from
+    # project_path/2 — in that case skip navigation and stay on the current page.
     socket6 =
       if not is_nil(new_project) and new_project != previous_project do
         sidebar_tab = socket.assigns[:sidebar_tab] || :sessions
-        push_navigate(socket5, to: project_path(new_project.id, sidebar_tab))
+        case project_path(new_project.id, sidebar_tab) do
+          nil -> socket5
+          path -> push_navigate(socket5, to: path)
+        end
       else
         socket5
       end
@@ -316,10 +321,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   end
 
   # Maps the current sidebar_tab to the equivalent project-scoped route.
-  # Falls back to /sessions for tabs without a direct project route
-  # (e.g. :dm, :chat, :canvas, :notifications, :usage).
+  # Returns nil for global tabs (:usage, :chat, :canvas, :notifications, :dm)
+  # so the caller can skip navigation and leave the user on their current page.
   defp project_path(id, tab) do
     case tab do
+      :sessions -> "/projects/#{id}/sessions"
       :tasks -> "/projects/#{id}/tasks"
       :kanban -> "/projects/#{id}/kanban"
       :notes -> "/projects/#{id}/notes"
@@ -330,7 +336,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
       :files -> "/projects/#{id}/files"
       :jobs -> "/projects/#{id}/jobs"
       :config -> "/projects/#{id}/config"
-      _ -> "/projects/#{id}/sessions"
+      _ -> nil
     end
   end
 

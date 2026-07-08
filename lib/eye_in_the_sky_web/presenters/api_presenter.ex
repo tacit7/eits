@@ -135,6 +135,9 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       description: session.description,
       status: session.status,
       status_reason: session.status_reason,
+      intent: session.intent,
+      intent_set_at: session.intent_set_at,
+      turn_start_at: session.turn_start_at,
       read_only: session.read_only || false
     }
   end
@@ -159,6 +162,9 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       project_id: session.project_id,
       status: session.status,
       status_reason: session.status_reason,
+      intent: session.intent,
+      intent_set_at: session.intent_set_at,
+      turn_start_at: session.turn_start_at,
       name: session.name,
       description: session.description,
       is_spawned: Keyword.get(opts, :is_spawned, false),

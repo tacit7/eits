@@ -11,17 +11,27 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
   # instead. Sections with no page (:files; :tasks/:notes without a selected
   # project — their pages are project-scoped) keep the open-flyout behavior.
   # NOT /workspace/tasks|notes: those require workspace scope and 302 to /.
+  #
+  # When a project is selected, project-scoped sections route to /projects/:id/*
+  # and fall back to the global route when no project is selected.
+  # Global-only sections (:canvas, :chat, :usage) always route to their global page.
+  defp section_route(:sessions, %{id: id}), do: "/projects/#{id}/sessions"
   defp section_route(:sessions, _project), do: "/sessions"
+  defp section_route(:agents, %{id: id}), do: "/projects/#{id}/agents"
   defp section_route(:agents, _project), do: "/agents"
+  defp section_route(:skills, %{id: id}), do: "/projects/#{id}/skills"
   defp section_route(:skills, _project), do: "/skills"
+  defp section_route(:prompts, %{id: id}), do: "/projects/#{id}/prompts"
   defp section_route(:prompts, _project), do: "/prompts"
+  defp section_route(:teams, %{id: id}), do: "/projects/#{id}/teams"
   defp section_route(:teams, _project), do: "/teams"
+  defp section_route(:tasks, %{id: id}), do: "/projects/#{id}/tasks"
+  defp section_route(:notes, %{id: id}), do: "/projects/#{id}/notes"
+  defp section_route(:jobs, %{id: id}), do: "/projects/#{id}/jobs"
   defp section_route(:jobs, _project), do: "/jobs"
   defp section_route(:canvas, _project), do: "/canvases"
   defp section_route(:chat, _project), do: "/chat"
   defp section_route(:usage, _project), do: "/usage"
-  defp section_route(:tasks, %{id: id}), do: "/projects/#{id}/tasks"
-  defp section_route(:notes, %{id: id}), do: "/projects/#{id}/notes"
   defp section_route(_section, _project), do: nil
 
   def handle_toggle_section(%{"section" => section_str}, socket) do

@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       <%!-- Row body --%>
       <div
         class={[
-          "flex items-center gap-4 py-3 pr-2 pl-2 rounded-lg cursor-pointer",
+          "flex items-center gap-4 py-2.5 pr-2 pl-2 rounded-lg cursor-pointer",
           "hover:bg-base-200/40",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
           "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50",

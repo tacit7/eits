@@ -16,7 +16,16 @@ defmodule EyeInTheSky.Sessions.Session do
     field :name, :string
     field :description, :string
     field :status, :string, default: "idle"
+    # intent: turn-scoped outcome signal, server-owned.
+    # Only valid non-null value for MVP is "done".
+    # Cleared automatically when status transitions to "working".
+    # Set to "done" by TaskController.complete on the calling session.
+    # Never accepted from client input via PATCH /sessions/:uuid.
     field :intent, :string
+    # turn_start_at: set server-side when status → "working". Never client-supplied.
+    field :turn_start_at, :utc_datetime_usec
+    # intent_set_at: set server-side when intent is written. Never client-supplied.
+    field :intent_set_at, :utc_datetime_usec
     field :started_at, :utc_datetime_usec
     field :last_activity_at, :utc_datetime_usec
     field :ended_at, :utc_datetime_usec
@@ -111,6 +120,8 @@ defmodule EyeInTheSky.Sessions.Session do
       :description,
       :status,
       :intent,
+      :turn_start_at,
+      :intent_set_at,
       :started_at,
       :last_activity_at,
       :ended_at,
@@ -139,6 +150,7 @@ defmodule EyeInTheSky.Sessions.Session do
       "failed",
       "archived"
     ])
+    |> validate_inclusion(:intent, ["done"])
     |> validate_inclusion(:status_reason, [
       nil,
       "session_ended",

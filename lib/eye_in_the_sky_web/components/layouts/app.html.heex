@@ -65,8 +65,9 @@
         title="Open command palette"
         aria-label="Open command palette"
       >
-        <.icon name="hero-magnifying-glass" class="size-3.5" />
-        <span class="truncate">Search sessions, tasks, commands…</span>
+        <span class="truncate font-medium text-base-content/70">
+          {(assigns[:sidebar_project] && assigns[:sidebar_project].name) || "Eye in the Sky"}
+        </span>
         <kbd class="kbd kbd-xs">⌘K</kbd>
       </button>
     </span>

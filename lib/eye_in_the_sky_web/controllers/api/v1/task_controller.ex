@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Notes, Tasks, Teams}
+  alias EyeInTheSky.{Notes, Sessions, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
   alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
@@ -280,6 +280,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
          {:ok, task} <- Tasks.get_task(id),
          {:ok, %{task: updated}} <- Tasks.complete_task(task, message) do
       maybe_mark_member_done(params["session_id"])
+      # Set intent="done" on the calling session. Fire-and-forget — task is already
+      # committed. A failure here does not roll back the task completion.
+      set_session_intent(params["session_id"], "done")
 
       json(conn, %{
         success: true,
@@ -495,6 +498,24 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       {:ok, int_id} -> Teams.mark_member_done_by_session(int_id)
       _ -> :ok
     end
+  end
+
+  # Sets intent on the calling session after task completion.
+  # Fire-and-forget — task is already committed, a failure here is non-fatal.
+  defp set_session_intent(nil, _intent), do: :ok
+  defp set_session_intent("", _intent), do: :ok
+
+  defp set_session_intent(session_id, intent) do
+    case Helpers.resolve_session_int_id(session_id) do
+      {:ok, int_id} ->
+        session = Sessions.get_session!(int_id)
+        Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
+
+      _ ->
+        :ok
+    end
+  rescue
+    _ -> :ok
   end
 
   defp resolve_session_id(sid) do

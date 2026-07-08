@@ -18,6 +18,14 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def mount(socket) do
+    # Warm the Pi discovery cache on mount — Task 9's collapse of
+    # provider_changed/model_changed into one handler dropped the
+    # refresh_async() call the old "pi" branch used to make, leaving the
+    # cross-provider entry list (allow_provider_switch?: true) permanently
+    # missing Pi/Ollama rows for anyone who never separately opened the New
+    # Agent drawer (the only other host still warming the cache).
+    EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+
     {:ok,
      assign(socket,
        selected_model: default_claude_model(),

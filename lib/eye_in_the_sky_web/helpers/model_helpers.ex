@@ -149,6 +149,34 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
 
   def model_display_name(other), do: to_string(other)
 
+  @doc """
+  Ensures `current_slug` always appears in `entries`, synthesizing a
+  `group: "Current"` entry if it's absent from every known list (the
+  `sonnet-4-6`-style stale/custom case — spec §4.3). Idempotent.
+  """
+  @spec entries_with_current([EyeInTheSky.ModelEntry.t()], String.t(), String.t()) :: [
+          EyeInTheSky.ModelEntry.t()
+        ]
+  def entries_with_current(entries, provider, current_slug) do
+    if Enum.any?(entries, &(&1.slug == current_slug)) do
+      entries
+    else
+      entries ++
+        [
+          %EyeInTheSky.ModelEntry{
+            provider: provider,
+            slug: current_slug,
+            label: current_slug,
+            group: "Current",
+            sub_provider: nil,
+            premium?: false,
+            legacy?: false,
+            default?: false
+          }
+        ]
+    end
+  end
+
   defp short_alias_display("opus"), do: "Opus 4.8"
   defp short_alias_display("opus[1m]"), do: "Opus (1M)"
   defp short_alias_display("sonnet"), do: "Sonnet 5"

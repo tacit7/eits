@@ -67,10 +67,15 @@ config :eye_in_the_sky, EyeInTheSkyWeb.Endpoint,
      else
        [
          web_console_logger: true,
+         # Patterns are anchored with ^ so they match only the project's
+         # top-level priv/ and lib/ — NOT the copies a desktop build writes
+         # into target/**/priv/static, target/**/priv/scripts, etc. Without the
+         # anchor, `cargo tauri build` (which does `mix clean` + writes assets
+         # under target/) triggers a live-reload storm that wedges the dev server.
          patterns: [
-           ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-           ~r"priv/gettext/.*(po)$",
-           ~r"lib/eye_in_the_sky/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
+           ~r"^priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
+           ~r"^priv/gettext/.*(po)$",
+           ~r"^lib/eye_in_the_sky/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
          ]
        ]
      end)

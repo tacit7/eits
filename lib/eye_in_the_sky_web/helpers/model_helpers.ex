@@ -4,6 +4,14 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
 
   alias EyeInTheSky.Agents.ModelConfig
+  alias EyeInTheSky.ModelEntry
+
+  @claude_primary_slugs ~w(claude-opus-4-8 claude-fable-5 claude-sonnet-5 claude-haiku-4-5-20251001)
+  @claude_premium_aliases ["opus[1m]", "sonnet[1m]"]
+  @claude_default_slug "claude-opus-4-8"
+
+  @codex_primary_slugs ~w(gpt-5.5 gpt-5.4 gpt-5.4-mini)
+  @codex_default_slug "gpt-5.5"
 
   defdelegate valid_model_combos, to: ModelConfig
 
@@ -77,6 +85,90 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
       {"gpt-5.1-codex-max", "GPT-5.1 Codex Max", "Deep reasoning, large context", "text-success"},
       {"gpt-5.1-codex-mini", "GPT-5.1 Codex Mini", "Cheaper and faster", "text-success"}
     ]
+  end
+
+  @doc """
+  Unified `%ModelEntry{}` list for a provider — the data source for the
+  shared model selector (spec §4.2). Claude/Codex come from the static
+  catalog; Pi comes from `Pi.ModelDiscoveryCache.get_cached/0` directly,
+  preserving the discovery payload's `"provider"` sub-provider key that
+  `pi_models/0` discards.
+
+  `default?` is tagged on the current default slug (not a literal "default"
+  alias slug — `ModelConfig.claude_models/0` has no such entry and the CLI's
+  acceptance of `--model default` is unverified per spec §6.2).
+  """
+  @spec entries_for_provider(String.t()) :: [ModelEntry.t()]
+  def entries_for_provider("claude") do
+    base =
+      for {slug, label} <- claude_models() do
+        %ModelEntry{
+          provider: "claude",
+          slug: slug,
+          label: label,
+          group: "Claude Code",
+          legacy?: slug not in @claude_primary_slugs,
+          default?: slug == @claude_default_slug
+        }
+      end
+
+    premium =
+      for alias_slug <- @claude_premium_aliases do
+        %ModelEntry{
+          provider: "claude",
+          slug: alias_slug,
+          label: short_alias_display(alias_slug),
+          group: "Claude Code",
+          premium?: true
+        }
+      end
+
+    base ++ premium
+  end
+
+  def entries_for_provider("codex") do
+    for {slug, label} <- codex_models() do
+      %ModelEntry{
+        provider: "codex",
+        slug: slug,
+        label: label,
+        group: "Codex",
+        legacy?: slug not in @codex_primary_slugs,
+        default?: slug == @codex_default_slug
+      }
+    end
+  end
+
+  def entries_for_provider("pi") do
+    case EyeInTheSky.Pi.ModelDiscoveryCache.get_cached() do
+      {:ok, models, _freshness} -> Enum.map(models, &pi_entry/1)
+      :empty -> []
+    end
+  end
+
+  def entries_for_provider(_), do: []
+
+  # `premium?` heuristic (spec §4.2): local Ollama routes are free,
+  # everything else goes through a paid cloud API key.
+  defp pi_entry(%{"id" => slug, "provider" => sub_provider}) do
+    %ModelEntry{
+      provider: "pi",
+      slug: slug,
+      label: slug,
+      group: pi_group_label(sub_provider),
+      sub_provider: sub_provider,
+      premium?: not String.starts_with?(sub_provider, "ollama")
+    }
+  end
+
+  defp pi_group_label("ollama"), do: "Ollama"
+  defp pi_group_label("ollama-lan"), do: "Ollama (LAN)"
+  defp pi_group_label(sub_provider), do: String.capitalize(sub_provider)
+
+  @doc "Claude + Codex + Pi entries concatenated (for allow_provider_switch?: true hosts)."
+  @spec all_model_entries() :: [ModelEntry.t()]
+  def all_model_entries do
+    entries_for_provider("claude") ++ entries_for_provider("codex") ++ entries_for_provider("pi")
   end
 
   @doc "Discovered Pi model slugs from the cache. Never calls the harness."

@@ -281,6 +281,119 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
   end
 
   # ---------------------------------------------------------------------------
+  # entries_for_provider/1
+  # ---------------------------------------------------------------------------
+
+  defmodule FakeControl do
+    def discover_models do
+      {:ok,
+       [
+         %{"id" => "ollama-lan/qwen3.6:27b", "provider" => "ollama-lan"},
+         %{"id" => "openrouter/qwen/qwen3-coder", "provider" => "openrouter"}
+       ]}
+    end
+  end
+
+  describe "entries_for_provider/1 — claude" do
+    setup do
+      %{entries: ModelHelpers.entries_for_provider("claude")}
+    end
+
+    test "every entry has provider \"claude\" and group \"Claude Code\"", %{entries: entries} do
+      assert entries != []
+      assert Enum.all?(entries, &(&1.provider == "claude"))
+      assert Enum.all?(entries, &(&1.group == "Claude Code"))
+    end
+
+    test "primary current-gen models are not legacy", %{entries: entries} do
+      by_slug = Map.new(entries, &{&1.slug, &1})
+      assert by_slug["claude-opus-4-8"].legacy? == false
+      assert by_slug["claude-fable-5"].legacy? == false
+      assert by_slug["claude-sonnet-5"].legacy? == false
+      assert by_slug["claude-haiku-4-5-20251001"].legacy? == false
+    end
+
+    test "older generation models are legacy", %{entries: entries} do
+      by_slug = Map.new(entries, &{&1.slug, &1})
+      assert by_slug["claude-opus-4-7"].legacy? == true
+      assert by_slug["claude-sonnet-4-6"].legacy? == true
+    end
+
+    test "opus[1m] and sonnet[1m] are premium", %{entries: entries} do
+      by_slug = Map.new(entries, &{&1.slug, &1})
+      assert by_slug["opus[1m]"].premium? == true
+      assert by_slug["sonnet[1m]"].premium? == true
+    end
+
+    test "non-1m entries are not premium", %{entries: entries} do
+      refute Enum.any?(entries, &(&1.slug == "claude-opus-4-8" and &1.premium?))
+    end
+
+    test "exactly one default entry, on claude-opus-4-8", %{entries: entries} do
+      defaults = Enum.filter(entries, & &1.default?)
+      assert [%{slug: "claude-opus-4-8"}] = defaults
+    end
+  end
+
+  describe "entries_for_provider/1 — codex" do
+    setup do
+      %{entries: ModelHelpers.entries_for_provider("codex")}
+    end
+
+    test "every entry has provider \"codex\" and group \"Codex\", never premium", %{entries: entries} do
+      assert entries != []
+      assert Enum.all?(entries, &(&1.provider == "codex"))
+      assert Enum.all?(entries, &(&1.group == "Codex"))
+      refute Enum.any?(entries, & &1.premium?)
+    end
+
+    test "gpt-5.5, gpt-5.4, gpt-5.4-mini are primary; rest are legacy", %{entries: entries} do
+      by_slug = Map.new(entries, &{&1.slug, &1})
+      assert by_slug["gpt-5.5"].legacy? == false
+      assert by_slug["gpt-5.4"].legacy? == false
+      assert by_slug["gpt-5.4-mini"].legacy? == false
+      assert by_slug["gpt-5.3-codex"].legacy? == true
+      assert by_slug["gpt-5.1-codex-max"].legacy? == true
+    end
+
+    test "default is gpt-5.5", %{entries: entries} do
+      assert [%{slug: "gpt-5.5"}] = Enum.filter(entries, & &1.default?)
+    end
+  end
+
+  describe "entries_for_provider/1 — pi" do
+    test "preserves sub_provider from discovery and marks non-ollama as premium" do
+      Application.put_env(:eye_in_the_sky, :pi_control_module, __MODULE__.FakeControl)
+      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :pi_control_module) end)
+      {:ok, _} = EyeInTheSky.Pi.ModelDiscoveryCache.refresh()
+
+      entries = ModelHelpers.entries_for_provider("pi")
+      by_slug = Map.new(entries, &{&1.slug, &1})
+
+      assert by_slug["ollama-lan/qwen3.6:27b"].provider == "pi"
+      assert by_slug["ollama-lan/qwen3.6:27b"].sub_provider == "ollama-lan"
+      assert by_slug["ollama-lan/qwen3.6:27b"].premium? == false
+
+      assert by_slug["openrouter/qwen/qwen3-coder"].sub_provider == "openrouter"
+      assert by_slug["openrouter/qwen/qwen3-coder"].premium? == true
+    end
+
+    test "empty cache returns empty list, does not crash" do
+      EyeInTheSky.Pi.ModelDiscoveryCache.invalidate()
+      assert ModelHelpers.entries_for_provider("pi") == []
+    end
+  end
+
+  describe "all_model_entries/0" do
+    test "concatenates claude, codex, and pi entries" do
+      entries = ModelHelpers.all_model_entries()
+      providers = entries |> Enum.map(& &1.provider) |> Enum.uniq() |> Enum.sort()
+      assert "claude" in providers
+      assert "codex" in providers
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # catalog refresh (Task 1)
   # ---------------------------------------------------------------------------
 

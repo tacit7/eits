@@ -361,7 +361,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
               phx-hook="TaskListSelection"
               data-vim-list
               data-selected-task-id={@selected_task && @selected_task.id}
-              class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5"
+              class="divide-y divide-base-content/5"
             >
               <div :for={{dom_id, task} <- @streams.tasks} id={dom_id}>
                 <TaskCard.task_card

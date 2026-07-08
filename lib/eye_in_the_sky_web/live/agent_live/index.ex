@@ -250,7 +250,7 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
           selected_ids={@selected_ids}
         />
 
-        <div class="mt-2 divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-4">
+        <div class="mt-2 divide-y divide-base-content/5">
           <%= if @agents == [] do %>
             <.empty_state
               id="agents-empty"

@@ -28,6 +28,53 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
     )
   end
 
+  # Host LiveView for mounting NewSessionModal as a LiveComponent in isolated tests.
+  # Uses Phoenix.LiveView directly (no layout) to avoid the app layout's NavHook assigns.
+  defmodule HostLive do
+    use Phoenix.LiveView
+
+    def mount(_params, _session, socket) do
+      {:ok,
+       assign(socket,
+         show: true,
+         toggle_event: "toggle_new_session",
+         submit_event: "create_session",
+         prompts: [],
+         projects: [],
+         current_project: nil,
+         available_agents: [],
+         file_uploads: nil
+       )}
+    end
+
+    def render(assigns) do
+      ~H"""
+      <.live_component
+        module={EyeInTheSkyWeb.Components.NewSessionModal}
+        id="test-modal"
+        show={@show}
+        toggle_event={@toggle_event}
+        submit_event={@submit_event}
+        prompts={@prompts}
+        projects={@projects}
+        current_project={@current_project}
+        available_agents={@available_agents}
+        file_uploads={@file_uploads}
+      />
+      """
+    end
+
+    def handle_event(_, _, socket), do: {:noreply, socket}
+  end
+
+  defp mount_new_session_modal(conn) do
+    live_isolated(conn, __MODULE__.HostLive)
+  end
+
+  defp render_new_session_modal(overrides) do
+    render_component(NewSessionModal, base_assigns(overrides))
+  end
+
   # -------------------------------------------------------------------------
   # JS combobox rendering — verifies HTML structure and data-agents encoding
   # -------------------------------------------------------------------------
@@ -103,6 +150,37 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
     test "NewSessionModal is compiled and exports render/1" do
       assert Code.ensure_loaded?(NewSessionModal)
       assert function_exported?(NewSessionModal, :render, 1)
+    end
+  end
+
+  describe "shared model selector" do
+    test "renders with allow_provider_switch? true and the full cross-provider list" do
+      html = render_new_session_modal(%{})
+      assert html =~ ~s(data-allow-provider-switch="true")
+    end
+
+    test "selecting a model via the shared component's event updates both provider and model",
+         %{conn: conn} do
+      {:ok, view, _html} = mount_new_session_modal(conn)
+
+      view
+      |> element("#new-session-model-selector")
+      |> render_hook("model_and_provider_selected", %{"provider" => "codex", "model" => "gpt-5.5"})
+
+      assert render(view) =~ "GPT-5.5"
+    end
+
+    test "an invalid payload is rejected, previous selection is kept", %{conn: conn} do
+      {:ok, view, _html} = mount_new_session_modal(conn)
+
+      view
+      |> element("#new-session-model-selector")
+      |> render_hook("model_and_provider_selected", %{
+        "provider" => "codex",
+        "model" => "not-a-real-model"
+      })
+
+      refute render(view) =~ "not-a-real-model"
     end
   end
 end

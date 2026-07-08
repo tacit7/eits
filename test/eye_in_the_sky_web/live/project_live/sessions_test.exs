@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
       render_click(view, "toggle_new_session_drawer", %{})
 
       assert has_element?(view, "h2", "New Agent")
-      assert has_element?(view, "select[name='model']")
+      assert has_element?(view, "#new-session-model-selector")
       assert has_element?(view, "textarea[name='description']")
     end
 
@@ -39,9 +39,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
       render_click(view, "toggle_new_session_drawer", %{})
 
+      # No "model" override: the shared model selector is a read-only hidden
+      # input mirroring server-confirmed state (spec §5.2 state authority) —
+      # submitting picks up whatever the modal's own default already is.
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "claude-sonnet-4-6",
         "description" => "Test description"
       })
       |> render_submit()
@@ -62,7 +64,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
       # instead of crashing on nil.path (regression: BadMapError at actions.ex:37).
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "claude-sonnet-4-6",
         "description" => "Global page spawn",
         "project_id" => to_string(project.id)
       })
@@ -78,7 +79,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "claude-sonnet-4-6",
         "description" => "No project selected",
         "project_id" => ""
       })
@@ -95,9 +95,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
       render_click(view, "toggle_new_session_drawer", %{})
 
+      # Drive the real selection event (as the JS hook would) instead of
+      # overriding the hidden input's value directly — the hidden input is
+      # server-rendered read-only mirror state, not a freely-editable field.
+      view
+      |> element("#new-session-model-selector")
+      |> render_hook("model_and_provider_selected", %{
+        "provider" => "claude",
+        "model" => "claude-haiku-4-5-20251001"
+      })
+
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "claude-haiku-4-5-20251001",
         "description" => "Test work"
       })
       |> render_submit()
@@ -115,8 +124,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
       render_click(view, "toggle_new_session_drawer", %{})
 
       view
+      |> element("#new-session-model-selector")
+      |> render_hook("model_and_provider_selected", %{
+        "provider" => "claude",
+        "model" => "claude-opus-4-7"
+      })
+
+      view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "claude-opus-4-7",
         "description" => "Another test"
       })
       |> render_submit()
@@ -135,7 +150,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
 
       view
       |> form("form[phx-submit='create_new_session']", %{
-        "model" => "claude-sonnet-4-6",
         "description" => "Should stay on page"
       })
       |> render_submit()

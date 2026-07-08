@@ -547,55 +547,13 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           else: "w-full max-w-3xl mx-auto"
         )
       ]}>
-        <%!-- Overview: title + action buttons --%>
+        <%!-- Overview: title only --%>
         <%= if is_nil(@project_id) do %>
-          <div class="mb-4 flex items-center justify-between gap-3">
-            <h1 class="text-xl font-semibold">Scheduled Jobs</h1>
-            <div class="flex items-center gap-2">
-              <.link
-                navigate="/oban"
-                class="btn btn-ghost btn-sm text-base-content/50"
-                title="Oban queue dashboard"
-              >
-                <.icon name="hero-queue-list" class="size-3.5" /> Oban
-              </.link>
-              <button
-                class="btn btn-outline btn-sm"
-                phx-click="toggle_claude_drawer"
-                phx-target={@myself}
-              >
-                <.icon name="hero-sparkles" class="size-3.5" /> Create with Claude
-              </button>
-              <button class="btn btn-primary btn-sm" phx-click="new_job" phx-target={@myself}>
-                + New Job
-              </button>
-            </div>
-          </div>
+          <h1 class="text-xl font-semibold mb-4">Scheduled Jobs</h1>
         <% end %>
 
-        <%!-- Project: action buttons row (only visible when no detail panel is open) --%>
-        <%= if not is_nil(@project_id) and is_nil(@selected_job) do %>
-          <div class="mb-4 flex items-center justify-end gap-2">
-            <button
-              class="btn btn-outline btn-sm"
-              phx-click="toggle_claude_drawer"
-              phx-target={@myself}
-            >
-              <.icon name="hero-sparkles" class="size-3.5" /> Create with Claude
-            </button>
-            <button
-              class="btn btn-primary btn-sm"
-              phx-click="new_job"
-              phx-value-scope="project"
-              phx-target={@myself}
-            >
-              + New Job
-            </button>
-          </div>
-        <% end %>
-
-        <%!-- Tabs --%>
-        <div class="flex border-b border-base-300 mb-4">
+        <%!-- Tabs bar — action buttons pinned to the right --%>
+        <div class="flex items-center border-b border-base-300 mb-4">
           <button
             class={"btn btn-sm min-h-[44px] #{if @active_tab == :all_jobs, do: "btn-active"}"}
             phx-click="switch_tab"
@@ -612,6 +570,32 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           >
             Recurring Agents
           </button>
+          <div class="ml-auto flex items-center gap-2 pb-1">
+            <%= if is_nil(@project_id) do %>
+              <.link
+                navigate="/oban"
+                class="btn btn-ghost btn-sm text-base-content/50"
+                title="Oban queue dashboard"
+              >
+                <.icon name="hero-queue-list" class="size-3.5" /> Oban
+              </.link>
+            <% end %>
+            <button
+              class="btn btn-outline btn-sm"
+              phx-click="toggle_claude_drawer"
+              phx-target={@myself}
+            >
+              <.icon name="hero-sparkles" class="size-3.5" /> Create with Claude
+            </button>
+            <button
+              class="btn btn-primary btn-sm"
+              phx-click="new_job"
+              phx-value-scope={if @project_id, do: "project", else: "global"}
+              phx-target={@myself}
+            >
+              + New Job
+            </button>
+          </div>
         </div>
 
         <%= if @active_tab == :all_jobs do %>

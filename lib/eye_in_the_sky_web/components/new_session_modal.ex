@@ -163,7 +163,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
                 allow_provider_switch?={true}
                 event="model_and_provider_selected"
                 myself={@myself}
-                placement={:up}
               />
               <input type="hidden" name="agent_type" value={@selected_provider} />
               <input type="hidden" name="model" value={@selected_model} />

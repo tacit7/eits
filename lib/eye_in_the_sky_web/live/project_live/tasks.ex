@@ -298,7 +298,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       phx-hook="GlobalKeydown"
       id="project-tasks-page"
     >
-      <div class="max-w-3xl mx-auto">
+      <div class="w-full max-w-3xl mx-auto">
         <%!-- Mobile-only action bar --%>
         <div class="mb-4 flex md:hidden items-center justify-end gap-2">
           <button

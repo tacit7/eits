@@ -1,8 +1,15 @@
 # Unified Model Selector — Design Spec
 
 **Date:** 2026-07-08 (revised twice same day after two design review rounds)
-**Status:** Approved for implementation
+**Status:** Implemented — all 10 plan tasks merged to `features` (2026-07-08/09)
 **Scope:** Replace all three EITS model-picking surfaces with one shared component; refresh the Claude/Codex model catalog (display + validation) to the current lineup.
+
+## Implementation Notes
+
+- All 10 tasks from `docs/superpowers/plans/2026-07-08-model-selector-implementation.md` shipped via a team of parallel workers, merged sequentially into `features`.
+- **Confirmed deviation (Task 2):** `default?: true` marks the *current default slug* (`claude-opus-4-8`) rather than a literal, separately-validated `"default"` alias — nothing confirms the underlying `claude` CLI accepts `--model default`, so shipping a selectable-but-unverified slug would have violated the spec's own §5.4 revalidation requirement.
+- **Confirmed deviation (Tasks 8/9):** hidden `<input>` mirroring for the New Agent drawer and New Session modal — a necessary consequence of discovering the drawer is read via raw form params by five separate downstream LiveViews, not a spec requirement.
+- **Unrelated fix bundled in during the final integration pass:** `Ecto.Multi.run(:add_new_session, ...)` in `lib/eye_in_the_sky/tasks.ex` was returning `insert_all/2`'s raw `{count, nil}` tuple instead of `{:ok, count}`, crashing every task claim (`Tasks.claim_task/2`, `POST /api/v1/tasks/:id/claim`). Pre-existing bug, unrelated to this plan, discovered because it blocked closing out the tracking tickets for this work — fixed in its own commit (`ac0679d7`).
 
 ## 1. Goal
 

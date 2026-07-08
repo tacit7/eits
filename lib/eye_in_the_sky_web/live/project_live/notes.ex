@@ -339,7 +339,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     </div>
 
     <div class="flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]">
-      <div class="max-w-4xl mx-auto">
+      <div class="max-w-3xl mx-auto">
         <.notes_list
           notes={@notes}
           starred_filter={@starred_filter}

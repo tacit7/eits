@@ -373,6 +373,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       class="flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]"
       style="scrollbar-width: none;"
     >
+      <div class="max-w-3xl mx-auto w-full">
       <div class="mb-3 flex items-center justify-between">
         <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
           {length(@all_teams)} teams
@@ -561,6 +562,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           <button phx-click="cancel_archive_selected">close</button>
         </form>
       </dialog>
+      </div>
     </div>
     """
   end

@@ -1330,13 +1330,134 @@ Replace inline submit/cancel button pairs with the canonical `<.form_actions>` c
 
 ### Provider Strategy
 
-**ProviderStrategy** (`lib/eye_in_the_sky/claude/provider_strategy.ex`): Handles provider-polymorphic dispatch for Claude vs Codex. Extracted to allow clean separation of provider logic.
+**ProviderStrategy** (`lib/eye_in_the_sky/claude/provider_strategy.ex`): Handles provider-polymorphic dispatch across providers (Claude, Codex, Pi). Extracted to allow clean separation of provider logic.
 
 Provider implementations:
 - `ProviderStrategy.Claude` — Claude SDK stream dispatch and avatar/label rendering
 - `ProviderStrategy.Codex` — Codex streaming pipeline via `CodexStreamAssembler`
+- `ProviderStrategy.Pi` — Pi harness dispatch via `Pi.SDK` (commit 5d0fa791)
 
-Use `ProviderStrategy` when branching on `provider` field. Do not inline `if provider == "claude"` checks in LiveViews.
+**Pattern:** Each provider implements the `ProviderStrategy` behaviour with four callbacks:
+- `format_content/1` — Adapts content blocks to provider format (default: no-op for text-only providers)
+- `start/2` — Spawns a new session with the provider SDK
+- `resume/2` — Resumes an existing session
+- `cancel/1` — Terminates a running session
+
+When registering a new provider:
+```elixir
+# In ProviderStrategy.for_provider/1
+def for_provider("pi"), do: EyeInTheSky.Claude.ProviderStrategy.Pi
+def for_provider(_), do: EyeInTheSky.Claude.ProviderStrategy.Claude
+```
+
+**Rule:** Never inline `if provider == "..."` checks in LiveViews or contexts. Use `ProviderStrategy.for_provider/1` to dispatch to the provider implementation.
+
+---
+
+### Error Classification and Recovery
+
+**ErrorClassifier** (`lib/eye_in_the_sky/claude/agent_worker/error_classifier.ex`): Categorizes agent errors into systemic (terminal, no retry) and transient (retriable) classes. Used by `ErrorRecovery` to decide whether to retry or fail a turn.
+
+**Error categories:**
+
+| Category | Retry? | Use case | Example |
+|----------|--------|----------|---------|
+| `:billing_error` | No | Provider billing limit reached | "out of usage quota" |
+| `:authentication_error` | No | Auth/API key invalid | "HTTP 401 invalid key" |
+| `:rate_limit_error` | Yes (429 backoff) | Provider rate limit | "HTTP 429 overloaded" |
+| `:model_not_found` | No | Model doesn't exist in provider | "HTTP 404 unknown model" |
+| `:user_canceled` | No | User explicitly canceled | `:user_canceled` from Pi.SDK |
+| `:transient` | Yes | Temporary network/server issue | "connection timeout" |
+
+**Pattern for adding a new provider error type (commit 9f31fcaa):**
+
+When a new provider harness (like Pi) returns provider-specific error messages, classify them by content pattern:
+
+```elixir
+# Pi harness renders provider errors as markdown text — classify by content
+def classify({:pi_turn_error, msg}) when is_binary(msg) do
+  cond do
+    msg =~ ~r/out of .*usage|quota|credit|billing/iu -> :billing_error
+    msg =~ ~r/HTTP 429|rate.?limit|overloaded/iu -> :rate_limit_error
+    msg =~ ~r/HTTP 40[13]|authentication|invalid[ _]?(api[ _-]?key|token)/iu -> :authentication_error
+    msg =~ ~r/HTTP 404|not_found_error|unknown model/iu -> :model_not_found
+    true -> :transient
+  end
+end
+
+def classify({:pi_turn_error, _}), do: :transient
+```
+
+**Order matters:** Pattern-match broad categories first (billing), then specific (auth), then fallback to transient. Patterns are case-insensitive where needed (`~r/.../iu`).
+
+**User-Canceled Terminal State (commit 47a8a65d):**
+
+When a user cancels an agent session, the provider SDK must emit `:user_canceled` (not `:canceled`) on all three terminal paths:
+- Normal turn end via `turn_end`
+- Clean process exit
+- Abnormal exit after grace-timeout kill
+
+```elixir
+# Pi.SDK enforces this invariant:
+def on_clean_exit(state) do
+  if state.terminal == :canceled or consume_cancel_marker(state.sdk_ref) do
+    {:error, :user_canceled}  # MUST be :user_canceled, not :canceled
+  else
+    {:complete, state.eits_session_id}
+  end
+end
+
+# ErrorClassifier then handles it:
+def classify(:user_canceled), do: :user_canceled
+```
+
+**Why this matters:** `:user_canceled` is a systemic error (no retry). If the SDK emitted `:canceled` instead, `ErrorClassifier` would map it to `:transient`, triggering an unwanted retry of a turn the user explicitly stopped.
+
+**Rule:** All provider SDKs must emit `:user_canceled` on cancel. ErrorRecovery will route it to `handle_systemic_error`, which marks the session `:failed` without scheduling a retry.
+
+---
+
+### Secret Material Redaction (Logging & Display)
+
+**Redaction** (`lib/eye_in_the_sky/redaction.ex`): Scrubs provider credentials and secret tokens from user-visible text before logging or displaying error messages. Used in flash messages, provider error text, and system chat entries to prevent accidental credential leaks.
+
+**Pattern (commit 0445252a):** Apply redaction before exposing any string that may transitively contain submitted key material:
+
+```elixir
+# Before flashing an error message:
+error_msg = provider_response.error_text
+{:noreply, put_flash(socket, :error, Redaction.redact(error_msg))}
+
+# Before logging a turn result:
+Logger.info("Turn completed: #{Redaction.redact(result_text)}")
+
+# Before storing in system chat:
+ChatLive.add_system_message(channel, %{text: Redaction.redact(response_body)})
+```
+
+**Covered patterns (provider-specific patterns run first):**
+- OpenRouter: `sk-or-[A-Za-z0-9\-]{20,}`
+- GitHub PATs: `gh[pousr]_[A-Za-z0-9]{20,}` and `github_pat_[A-Za-z0-9_]{20,}`
+- Groq: `gsk_[A-Za-z0-9]{20,}`
+- Google API keys: `AIza[A-Za-z0-9_\-]{30,}`
+- Generic prefixes: `(sk|key|token)[-_][A-Za-z0-9_\-]{8,}` (case-insensitive)
+- Long bearer-like blobs: 32+ base64url chars following `:`, `=`, or whitespace
+
+**Design tradeoff:** Errs on the side of **over-redaction**. Legitimate long identifiers (git SHAs, base64 nonces, request IDs) may be replaced with `[redacted]`. Under-redaction is not acceptable — leaking API key material into a flash message or persisted chat entry is a security regression.
+
+**Order matters:** Provider-specific patterns run first so distinctive prefixes (`sk-or-`, `gh[pousr]_`, etc.) are consumed whole, preventing partial matches by generic rules.
+
+**For error tuples:** Use `Redaction.inspect_and_redact/1`:
+
+```elixir
+# Don't expose raw error tuple:
+msg = inspect(error)  # ❌ May contain credentials
+
+# Redact first:
+msg = Redaction.inspect_and_redact(error)  # ✅ Safe
+```
+
+**Rule:** Any string from an external source (provider, user input, system message) that gets displayed to a user or logged must be passed through `Redaction.redact/1` first.
 
 ---
 

@@ -1591,6 +1591,58 @@ The DM endpoint rejects messages from sessions in terminal states (completed or 
 
 ---
 
+## GET /api/v1/dm/wait — Long-Poll for Next DM
+
+**Commit:** `5836ef77`
+
+Event-driven endpoint that blocks until a new DM arrives for a session, eliminating busy-polling patterns.
+
+**Endpoint:** `GET /api/v1/dm/wait`
+
+**Query params:**
+| Param | Default | Max | Description |
+|-------|---------|-----|-------------|
+| `session` | current session | — | Session UUID to wait on |
+| `since` | now | — | ISO8601 timestamp; returns any DM already in inbox since this time |
+| `timeout` | 25s | 55s | How long to wait before returning empty |
+
+**Behavior:**
+- Subscribes to the existing `session:#{id}` PubSub topic and waits for `:new_dm` broadcast
+- If a DM arrives during the wait window, returns immediately with `{"items":[...],"count":1}`
+- After `timeout` with no DM, returns `{"items":[],"count":0}`
+- Client HTTP timeout is set to server timeout + 15s headroom to avoid cutting the long-poll short locally
+
+**CLI equivalent:** `eitsr dm wait [--session] [--since] [--timeout]` — prints the result and exits when a DM lands.
+
+**Use case:** Orchestrators and background scripts can block on this endpoint instead of interval-polling `GET /api/v1/dm`, reducing latency and server load.
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `wait/2` action
+- `lib/eye_in_the_sky_web/router.ex` — route registration
+- `crates/eits-cli/src/commands/dm.rs` — `eitsr dm wait` subcommand
+
+---
+
+## DM Authorization and Duplicate Alert Suppression
+
+**Commit:** `64b6b81d`
+
+DM reads are now authorized via IAM policy, and duplicate alert notifications are suppressed.
+
+**Authorization:**
+- `GET /api/v1/dm` (inbox) and `GET /api/v1/dm/wait` enforce policy checks so only authorized sessions can read another session's DM inbox
+- Previously, any authenticated request could fetch DMs for any session ID
+
+**Duplicate alert suppression:**
+- Native notification alerts for new DMs are deduplicated — if a DM arrives while the session already has a pending alert, a second alert is not fired
+- Prevents alert storms when a session is heavily messaged
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex`
+- `lib/eye_in_the_sky_web/controllers/api/v1/session_controller.ex`
+
+---
+
 ## Copy-to-Clipboard
 
 **Commits:** `d04b7f63`, `10d75ff3`, `7447546e`
@@ -2854,6 +2906,62 @@ When user presses Cmd+S or clicks the Save button, the hook:
 | `Tab` (in title) | Focus editor |
 | `Cmd/Ctrl + Z` | Undo |
 | `Cmd/Ctrl + Shift + Z` | Redo |
+
+---
+
+## Blocking DM Wait Endpoint
+
+**Commit:** `5836ef77`
+
+`GET /api/v1/dm/wait` long-polls for the next inbound DM for the requesting session. Returns as soon as a DM arrives (via PubSub `session:#{id}` `:new_dm` broadcast) or after the timeout elapses.
+
+**Query params:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `session` | string | from `x-eits-session` header | Session UUID or integer ID to wait on |
+| `since` | ISO 8601 datetime | — | Only return DMs received after this timestamp |
+| `timeout` | integer (seconds) | 25 | Server-side wait cap; max 55 |
+
+**Responses:**
+
+- `200 OK` with `{"items":[...],"count":1}` — DM arrived before timeout
+- `200 OK` with `{"items":[],"count":0}` — Timeout elapsed with no DM
+
+No busy-polling: the connection is held open until a PubSub event fires or the timeout fires. The client HTTP timeout should be set to at least `timeout + 15` seconds to avoid cutting the long-poll short locally.
+
+**`eitsr dm wait` subcommand** wraps this endpoint. It blocks until a DM lands and prints the result, letting a background process exit immediately instead of interval-polling `dm inbox`.
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `wait_for_dm/2` action
+- `lib/eye_in_the_sky_web/router.ex` — `GET /api/v1/dm/wait`
+- `crates/eits-cli/src/commands/dm.rs` — `eitsr dm wait` subcommand
+
+---
+
+## DM Read Authorization
+
+**Commit:** `64b6b81d`
+
+`GET /api/v1/dm` (list) and `GET /api/v1/dm/:id` (show) now enforce that the caller is the intended recipient.
+
+**How it works:**
+
+- The caller is identified by the `x-eits-session` header (UUID or integer ID).
+- For `GET /api/v1/dm`: the header is resolved and compared against the queried session. A mismatch returns `403 Forbidden`.
+- For `GET /api/v1/dm/:id`: the `session` query param was removed; only the `x-eits-session` header is accepted. The resolved caller must match `msg.to_session_id`.
+- Missing or unresolvable header always returns `403 Forbidden` — no anonymous reads.
+
+**Error response:**
+```json
+HTTP 403 Forbidden
+{"error": "You are not the recipient of this message"}
+```
+
+**Duplicate alert suppression:** A companion fix suppresses duplicate flash alerts that could appear when authorization failures were retried by the LiveView reconnect logic.
+
+**Files:**
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `authorize_session_recipient/2` replaces `authorize_dm_recipient/2`; `show_dm/2` no longer accepts `session` query param
 
 ---
 

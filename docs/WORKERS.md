@@ -1117,3 +1117,385 @@ children = [
 ```
 
 If a worker crashes, the supervisor restarts it (after a configurable delay). One-off jobs (like WorkableTaskWorker per task) are spawned dynamically, not supervised by default.
+
+---
+
+## Pi Provider Integration
+
+Pi is a new provider alongside Claude and Codex, with a modular architecture that separates concerns into focused components: transport (CLI + Port), protocol parsing (ndjson), SDK lifecycle, and model discovery.
+
+### Pi Provider Strategy
+
+**Location:** `lib/eye_in_the_sky/claude/provider_strategy/pi.ex`
+
+ProviderStrategy implementation for the Pi harness provider (Phase 1: text-only, bypass approval mode with `allowedTools: ["*"]`).
+
+**Key differences from Claude/Codex:**
+- Session ID is pre-generated (like Claude) and used to name the persistent `sessionDir` on disk — Pi sessions are stateful and resumable
+- Content blocks (images, files) are stripped with a warning; Phase 1 is text-only
+- Uses the default (delta-based) `StreamAssembler`, not the Codex `CodexStreamAssembler`
+- Custom instructions are built from `Codex.SDK.eits_init_prompt`, with `--provider codex` replaced by `--provider pi`
+
+**Responsibilities:**
+- `start/2` — spawns new Pi session via `Pi.SDK.start`
+- `resume/2` — resumes existing Pi session via `Pi.SDK.resume`
+- `cancel/1` — cancels running turn via `Pi.SDK.cancel`
+- `format_content/1` — delegates to default handler
+- `build_opts/2` — constructs spawn options including:
+  - `model`, `session_id`, `project_path`, `allowed_tools: ["*"]`
+  - EITS context: session UUID/ID, agent UUID, project ID, channel ID, EITS_URL
+  - Turn ID (random 12-char hex per turn) for log correlation
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/provider_strategy/pi.ex`
+- `lib/eye_in_the_sky/claude/provider_strategy.ex` — `for_provider/1` dispatch
+- `lib/eye_in_the_sky/agents/agent_manager/record_builder.ex` — provider record detection
+
+**Commits:** 5d0fa791 (provider strategy seam), 625fa619 (provider integration)
+
+---
+
+### Pi CLI Transport Module
+
+**Location:** `lib/eye_in_the_sky/pi/cli.ex`
+
+Spawns the Pi harness sidecar via `Port.open/2` and manages ndjson request/response communication.
+
+**Workflow:**
+1. `run/2` accepts `message` and `opts` (model, session_id, project_path, allowed_tools, custom_instructions, etc.)
+2. Resolves session root directory via `Pi.session_root/0` (env `$PI_SESSIONS_DIR` > config > `var/pi-sessions`)
+3. Builds port command: `pi harness run --session-id=<id> --ndjson --output-json`
+4. Opens port with **allowlist environment** (not full inheritance):
+   - Allowed: `EITS_*`, `PATH`, `HOME`, `SHELL`, `USER`, `TERM`, `LANG`, `LC_*`, `COLORTERM`
+   - Blocked: `ANTHROPIC_API_KEY`, `Claude*`, `CODEX*`
+   - Only whitelisted vars are passed to the harness
+5. Sends initial preamble message (turn ID, model, allowed_tools, custom_instructions) as ndjson line
+6. Returns `:ok` immediately; result handling is async via `MessageHandler`
+
+**Port Command Example:**
+```bash
+pi harness run --session-id=550e8400-e29b-41d4-a716-446655440000 --ndjson --output-json
+```
+
+**Environment Allowlist:** Prevents ANTHROPIC_API_KEY from leaking to the subprocess; Pi uses its own authentication via auth.json managed in settings.
+
+**Code locations:**
+- `lib/eye_in_the_sky/pi/cli.ex` — `run/2`, allowlist env construction
+- `lib/eye_in_the_sky/pi.ex` — `session_root/0` resolution
+- Tests: `test/eye_in_the_sky/pi/cli_test.exs`
+
+**Commits:** f8c693fa (CLI transport, allowlist env), 6f4460c2 (session root resolver)
+
+---
+
+### Pi Parser: ndjson Event Mapping
+
+**Location:** `lib/eye_in_the_sky/pi/parser.ex`
+
+Parses ndjson lines from the Pi harness sidecar, mapping protocol and streaming events.
+
+**Event Types:**
+
+| Harness Event | Mapped Type | Details |
+|---------------|-------------|---------|
+| `assistant_delta` | `Message.text(delta, true)` | Streaming text, `partial=true` for DOM updates |
+| `thinking_delta` | `Message.thinking(delta, true)` | Thinking stream (Claude 3.5+) |
+| `tool_update` | `Message.tool_use(...)` | Tool invocation in progress, `partial=true` |
+| `tool_result` | `Message.tool_use(...)` | Tool result from harness |
+| `compaction_start` / `compaction_end` | `Message.text([compacting...])` | Context compaction notifications |
+| `response`, `ready`, `tool_request`, `turn_error`, `exit` | `{:protocol, event}` | Protocol control events (SDK bookkeeping) |
+| `turn_end` | `{:result, %{...}}` | Aggregated turn metadata: tokens, cost, duration |
+
+**Usage:**
+- Called per ndjson line from the harness by `MessageHandler.run_loop/3`
+- Returns `{:ok, Message}` for streaming, `{:protocol, map}` for control, `{:result, map}` for finalization
+- Silently skips empty lines and invalid JSON
+
+**Code locations:**
+- `lib/eye_in_the_sky/pi/parser.ex` — `parse_stream_line/1`, per-event handlers
+- Tests: `test/eye_in_the_sky/pi/parser_test.exs`
+
+**Commits:** 71448b28 (ndjson parser)
+
+---
+
+### Pi SDK: Protocol Layer & Session Lifecycle
+
+**Location:** `lib/eye_in_the_sky/pi/sdk.ex`
+
+Core SDK managing Pi session lifecycle, protocol sequencing, and exactly-once terminal semantics.
+
+**Protocol Phases:**
+
+1. **Initialization** — preamble exchange:
+   - Server sends: `{type: "request", turn: 0, messages: [], model, allowed_tools, custom_instructions}`
+   - Harness responds: `{type: "ready"}` when sessionDir is ready
+   - Transitions to `:initialized` state
+
+2. **Active Turn** — message exchange:
+   - `start/2` or `resume/2` writes user message and transitions to `:active`
+   - Harness streams `assistant_delta`, `thinking_delta`, `tool_*` events
+   - Server publishes to `Message` stream for UI rendering
+
+3. **Terminal Paths** (exactly-once guarantee):
+   - **`turn_end`** (success) — harness emits turn metadata and waits for next request
+   - **`turn_error`** (streaming) — harness error during turn (classified as billing/auth/rate-limit/model_not_found)
+   - **`exit`** (abnormal) — harness crashed or hung
+   - **User `cancel/1`** — server sends cancel signal, Registry marker set; `on_stream_error` consumes marker
+
+4. **Resume** — for stateful sessions:
+   - `resume/2` prepends prior turn to message context
+   - Harness loads sessionDir and continues conversation
+   - Used for reconnect-safe agent loops
+
+**State Machine:**
+```
+:ready → :initializing → :initialized → :active → (:turn_end | :turn_error | :exit | :canceled)
+```
+
+**Cancel & Marker Leak Prevention:**
+- On user `cancel/1`, a Registry marker `{sdk_ref, :pi_canceled}` is set
+- Five terminal paths all route through `on_stream_error/2`:
+  1. Parser `{:error, reason}` → check cancel marker
+  2. Protocol halt (e.g., session mismatch) → check cancel marker
+  3. `turn_end` finalization → consume marker on cleanup
+  4. `on_clean_exit` (graceful shutdown) → consume marker
+  5. `on_abnormal_exit` (crash/hang) → consume marker
+- Exactly-once consumption ensures no "marker leak" (leftover registry entries)
+- Post-cancel errors surface as `:user_canceled` (non-retryable), preventing retry loops after user stops the agent
+
+**Code locations:**
+- `lib/eye_in_the_sky/pi/sdk.ex` — `start/2`, `resume/2`, `cancel/1`, protocol phase handlers, `on_stream_error/2`, `on_clean_exit/1`
+- `lib/eye_in_the_sky/sdk/message_handler.ex` — `MessageHandler` extension callbacks
+- Tests: `test/eye_in_the_sky/pi/sdk_test.exs` (298 test cases covering protocol, resume, cancel, terminal paths)
+
+**Commits:** 5a11e8a4 (SDK protocol layer), 34f25a5b (MessageHandler extension), 5ba72d39 (cancel + on_stream_error), 2bf2f88c (redaction)
+
+---
+
+### MessageHandler Extension Callbacks
+
+**Location:** `lib/eye_in_the_sky/sdk/message_handler.ex`
+
+Behavior callbacks allow provider-specific handling of protocol events and lifecycle transitions.
+
+**New Callbacks (all optional):**
+
+**`handle_protocol_event(event, state)`**
+- Called when parser returns `{:protocol, map}` (e.g., Pi's `response`, `ready`, `tool_request`, `turn_error`, `exit`)
+- Returns `{:ok, state}` to continue or `{:halt, reason}` to terminate
+- Default: no-op (unused for Claude/Codex)
+- Pi implementation: processes `ready`, `turn_error`, `exit` events to advance protocol state machine
+
+**`on_clean_exit(status, state)`**
+- Called when the harness exits with status 0 (graceful shutdown)
+- Must return `{:error, term()}` in the form of `{:claude_error, ref, error_reason}`
+- Default: `{:error, :process_exited}`
+- Pi implementation: consumes cancel marker if set, returns `{:error, :user_canceled}`
+
+**`on_stream_error(reason, state)`**
+- Called when parser returns `{:error, reason}` from a stream line OR `handle_protocol_event/2` returns `{:halt, reason}`
+- Returns `{:error, mapped_reason}` for delivery as `{:claude_error, ref, mapped_reason}`
+- Default: preserves legacy behavior (reason unchanged — Claude/Codex unaffected)
+- Pi implementation: checks cancel marker and terminal state; if canceled, returns `{:error, :user_canceled}` and consumes marker; else passes reason through
+
+**Why on_stream_error matters:**
+- Post-cancel errors (harness errors after user `cancel/1`) must map to `:user_canceled` (non-retryable)
+- Without this callback, a harness `turn_error` after cancel would be classified as `:transient` → trigger retry
+- Callback ensures exactly-once marker consumption across all terminal paths, preventing registry leaks
+
+**Code locations:**
+- `lib/eye_in_the_sky/sdk/message_handler.ex` — callback definitions and defaults
+- `lib/eye_in_the_sky/pi/sdk.ex` — Pi implementations
+- Tests: `test/eye_in_the_sky/sdk/message_handler_extension_test.exs` (Claude/Codex behavior preservation + Pi cancel tests)
+
+**Commits:** 34f25a5b (MessageHandler extension callbacks)
+
+---
+
+### Pi.Control: One-Shot IPC Harness
+
+**Location:** `lib/eye_in_the_sky/pi/control.ex`
+
+One-shot harness for administrative operations (model discovery, auth, key management) without starting a full session.
+
+**Operations (all spawn and await result):**
+
+| Operation | Command | Returns |
+|-----------|---------|---------|
+| `discover/0` | `pi control discover` | `{:ok, [model_ids]}` or error |
+| `list/0` | `pi control list` | `{:ok, [%{id, name, provider, ...}]}` or error |
+| `get_auth_key/0` | `pi control get-auth-key` | `{:ok, key_str}` or `{:error, reason}` |
+| `set_auth_key/1` | `pi control set-auth-key` (stdin) | `:ok` or `{:error, reason}` |
+| `clear_auth_key/0` | `pi control clear-auth-key` | `:ok` or `{:error, reason}` |
+
+**Error Handling:**
+- Spawn failures (e.g., Pi CLI not installed) → `{:error, :spawn_failed}`
+- Non-zero exit → `{:error, status_or_output}`
+- Timeout after 5 seconds → `{:error, :timeout}`
+
+**Usage in Settings:**
+- `ProvidersTab` uses `Pi.Control` to:
+  - Refresh model list (populated into dropdown for spawn drawer)
+  - Validate key before setting
+  - Clear key on user request
+
+**Code locations:**
+- `lib/eye_in_the_sky/pi/control.ex` — all operations
+- `lib/eye_in_the_sky_web/live/overview_live/settings/providers_tab.ex` — integration with settings UI
+- Tests: `test/eye_in_the_sky/pi/control_test.exs`
+
+**Commits:** 26adc85b (Pi.Control one-shot harness)
+
+---
+
+### Pi Model Discovery Cache
+
+**Location:** `lib/eye_in_the_sky/pi/model_discovery_cache.ex`
+
+ETS-backed cache for Pi model list with 60-second TTL and stale-serving fallback.
+
+**Architecture:**
+
+1. **Cache Table:** `:pi_model_discovery_cache` (ETS set, `:public`)
+2. **Record Format:** `{:models, [model_ids], cached_at_unix_ms}`
+3. **TTL:** 60 seconds (hard-coded, pre-cache models before TTL expires)
+
+**Behavior:**
+
+**`list_models/0`**
+- Check cache: if entry exists AND `now() - cached_at <= 60s`, return cached list (cache hit)
+- Stale cache: if entry exists AND `now() - cached_at > 60s`, return stale list but trigger async refresh in background via `PubSub.refresh_event`
+- Miss: no entry, call `Pi.Control.discover/0`, store result in cache with current timestamp, return
+
+**`refresh_async/0`**
+- Called when cache is stale (age > 60s)
+- Publishes `:pi_model_cache_refresh` PubSub event (consumed by scheduled task or manual trigger)
+- Non-blocking; does not block agent spawn
+
+**PubSub Integration:**
+- Event: `:pi_model_cache_refresh` on topic `"pi_discovery"`
+- Subscriber: periodic handler (e.g., every 2 minutes) or manual `/settings` button
+- Handler calls `Pi.Control.discover/0` and updates cache atomically
+
+**Example Timeline:**
+1. **t=0s:** User opens spawn drawer
+   - Call `list_models/0` → cache miss
+   - Hit `Pi.Control.discover/0` → 2 second API call
+   - Cache result with timestamp, return models
+2. **t=50s:** Another spawn drawer open
+   - Call `list_models/0` → cache hit (50s < 60s TTL)
+   - Return instantly from ETS
+3. **t=65s:** User opens spawn drawer again
+   - Call `list_models/0` → cache stale (65s > 60s)
+   - Return stale list (smooth UX, no wait)
+   - Trigger async refresh via PubSub
+   - Handler discovers fresh models, updates cache in background
+
+**Motivation:** Pi models can change (new providers installed). 60-second TTL balances freshness (picks up new models quickly) with latency (stale-serve prevents spawn drawer freezes).
+
+**Code locations:**
+- `lib/eye_in_the_sky/pi/model_discovery_cache.ex` — `list_models/0`, `refresh_async/0`, cache check/update logic
+- `lib/eye_in_the_sky/events.ex` — `:pi_model_cache_refresh` event registration
+- `lib/eye_in_the_sky/application.ex` — ETS table startup
+- Tests: `test/eye_in_the_sky/pi/model_discovery_cache_test.exs`
+
+**Commits:** bd7c0f7f (model discovery cache with stale-serving)
+
+---
+
+### Pi Error Classification
+
+**Location:** `lib/eye_in_the_sky/claude/agent_worker/error_classifier.ex`
+
+Extended error classifier for Pi `turn_error` events, mapping harness errors to systemic vs. transient categories.
+
+**Classification:**
+
+| Harness Error Content | Category | Action |
+|----------------------|----------|--------|
+| `billing` | `:billing` | Mark session failed (systemic) |
+| `auth` | `:auth` | Mark session failed (systemic) |
+| `rate_limit` | `:rate_limit` | Mark session failed (systemic) |
+| `model_not_found` | `:model_not_found` | Mark session failed (systemic) |
+| Other (connection, timeout, parsing) | `:transient` | Drop job, process next (worker survives) |
+
+**Integration with AgentWorker:**
+- `handle_info({:pi_error, ...})` calls `ErrorClassifier.classify/1`
+- Systemic errors → `on_session_failed/2` (database write, PubSub event, Teams cleanup)
+- Transient errors → standard recovery loop (next job in queue)
+
+**Code locations:**
+- `lib/eye_in_the_sky/claude/agent_worker/error_classifier.ex` — classification logic
+- `lib/eye_in_the_sky_web/helpers/status_helpers.ex` — human-readable error labels for UI
+- Tests: `test/eye_in_the_sky/claude/agent_worker/error_classifier_test.exs`
+
+**Commits:** 9f31fcaa (error classification for Pi)
+
+---
+
+### Pi Settings Providers Tab
+
+**Location:** `lib/eye_in_the_sky_web/live/overview_live/settings/providers_tab.ex`
+
+UI for managing Pi provider configuration: API key set/clear and model refresh.
+
+**Features:**
+
+**Model Refresh:**
+- Button to manually trigger `Pi.ModelDiscoveryCache.refresh_async/0`
+- Spawns background task (fire-and-forget)
+- User sees "Refreshing models..." toast; drawer updates when cache refreshes
+
+**API Key Management:**
+- Input field for Pi API key (masked, not stored in database)
+- "Set Key" button → calls `Pi.Control.set_auth_key/1` → writes to `~/.pi/auth.json` on harness
+- "Clear Key" button → calls `Pi.Control.clear_auth_key/0` → removes key from auth.json
+- Errors from key operations are redacted before flashing (no credential leakage in UI)
+
+**Async Operations:**
+- All key operations run async via `handle_async/3`
+- Errors are logged; user sees `"Key update failed"` without details
+- Non-blocking UI updates
+
+**Integration:**
+- Route: `/settings#providers` (tab anchor)
+- Loaded on mount if user is admin
+- Pi provider options visible in spawn drawer after models are discovered
+
+**Code locations:**
+- `lib/eye_in_the_sky_web/live/overview_live/settings/providers_tab.ex` — UI and event handlers
+- `lib/eye_in_the_sky_web/live/overview_live/settings.ex` — router integration
+- Tests: `test/eye_in_the_sky_web/live/settings_providers_tab_test.exs`
+
+**Commits:** c51959a3 (settings Providers tab), 868425df (async + redaction)
+
+---
+
+### Pi Fixes: Delta Accumulation & Redaction
+
+**Fix: Accumulate assistant deltas into turn result text**
+- **Problem:** Empty assistant response persisted nothing; UI showed a vanishing bubble (message appeared, then was deleted when saved)
+- **Solution:** `Pi.SDK.finalize_turn_result/2` now accumulates all `assistant_delta` events into `result.text` before persisting
+- **Code:** `lib/eye_in_the_sky/pi/sdk.ex` — `accumulate_assistant_deltas/2` helper
+- **Commit:** fa8f9a74
+
+**Fix: Redact key material at IPC boundary**
+- **Problem:** Provider error strings containing API keys were logged at harness shutdown
+- **Solution:** `Pi.Control` redacts reason strings via regex (`AUTH_KEY_PATTERN`) before raising exceptions
+- **Code:** `lib/eye_in_the_sky_web/helpers/status_helpers.ex` — `maybe_redact_provider_error/1` for UI display
+- **Commit:** 2bf2f88c (redact in render), cdb03c37 (redact at harness error boundary)
+
+---
+
+## Pi Integration Completion
+
+Pi provider Phase 1 is now complete with full E2E support:
+- Agent spawn via Pi in UI and CLI
+- Stateful, resumable sessions
+- Model discovery and key management
+- Error classification and recovery
+- Message streaming and tool invocation support
+- Cancel safety with exactly-once marker semantics
+
+**Commits involved:** 5d0fa791, 5a11e8a4, 71448b28, 34f25a5b, f8c693fa, 6f4460c2, 26adc85b, bd7c0f7f, 9f31fcaa, c51959a3, 5ba72d39, fa8f9a74, 868425df, cdb03c37, 2bf2f88c

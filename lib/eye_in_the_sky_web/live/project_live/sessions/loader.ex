@@ -16,8 +16,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
   @telemetry_prefix [:eye_in_the_sky, :project_sessions]
 
-  @doc "Reload sessions from the database and rebuild the view."
-  def load_agents(socket) do
+  @doc """
+  Reload sessions from the database and rebuild the view.
+
+  `reset_page` controls whether pagination/stream state resets to the first
+  page (used by filter changes and the initial mount, which must also
+  establish the stream via `stream/4`) or preserves the caller's current
+  `visible_count` and does a targeted stream diff (used by PubSub-driven
+  reloads, so an in-progress scroll position isn't blown away). Defaults to
+  `false` — callers that need a hard reset must opt in explicitly.
+  """
+  def load_agents(socket, reset_page \\ false) do
     scope = Map.get(socket.assigns, :scope, socket.assigns.project_id)
     include_archived = socket.assigns.session_filter == "archived"
 
@@ -34,7 +43,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
     socket
     |> assign(:all_agents, all_agents)
-    |> apply_agent_view(true)
+    |> apply_agent_view(reset_page)
   end
 
   defp load_sessions_for_scope(:all, include_archived) do

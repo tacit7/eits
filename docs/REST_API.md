@@ -809,6 +809,12 @@ Parent type plurals are normalized automatically: `"sessions"` -> `"session"`, `
 | `body` | string | yes | Note content (markdown) |
 | `title` | string | no | Note title |
 | `starred` | integer | no | `0` or `1`. Defaults to `0` |
+| `source_session_uuid` | string | no | Explicit author (session UUID). Overrides `x-eits-session` header if both present. Auto-stamped from header if neither provided. Can be `null` if neither source is available |
+
+**Note on source attribution:**
+- If `source_session_uuid` is explicitly provided in the request body, it is used.
+- If not provided, the `x-eits-session` request header is checked and used as a fallback.
+- If neither is present, the note's `source_session_uuid` is `null`.
 
 **Response:** `201 Created`
 
@@ -819,7 +825,8 @@ Parent type plurals are normalized automatically: `"sessions"` -> `"session"`, `
   "parent_id": "42",
   "title": null,
   "body": "interesting finding here",
-  "starred": 0
+  "starred": 0,
+  "source_session_uuid": "abc-123"
 }
 ```
 
@@ -835,7 +842,7 @@ curl -X POST localhost:5001/api/v1/notes \
 
 ### PATCH /api/v1/notes/:id
 
-Update an existing note (body, title, starred, parent_type, parent_id).
+Update an existing note (body, title, starred, parent_type, parent_id, source_session_uuid).
 
 **URL params:**
 
@@ -852,6 +859,7 @@ Update an existing note (body, title, starred, parent_type, parent_id).
 | `starred` | integer | no | `0` or `1` |
 | `parent_type` | string | no | `session`, `agent`, or `task` (plurals normalized) |
 | `parent_id` | string | no | ID of the parent entity |
+| `source_session_uuid` | string | no | Author session UUID. Can be set to `null` to clear attribution |
 
 **Response:** `200 OK`
 
@@ -862,7 +870,8 @@ Update an existing note (body, title, starred, parent_type, parent_id).
   "parent_id": "42",
   "title": "Updated title",
   "body": "updated content",
-  "starred": 1
+  "starred": 1,
+  "source_session_uuid": "abc-123"
 }
 ```
 
@@ -883,7 +892,7 @@ curl -X PATCH localhost:5001/api/v1/notes/10 \
 
 ### GET /api/v1/notes
 
-List notes attached to a session or task with optional starred filtering. Starred filtering is pushed to the database query for efficient filtering.
+List notes attached to a session or task with optional starred filtering and source attribution filtering. Starred and source filtering are pushed to the database query for efficient filtering.
 
 **Query params:**
 
@@ -892,6 +901,7 @@ List notes attached to a session or task with optional starred filtering. Starre
 | `session_id` | string | no | Filter to notes attached to a specific session (UUID or integer ID) |
 | `task_id` | integer | no | Filter to notes attached to a specific task |
 | `starred` | integer | no | Filter by starred status; pass `1` to return only starred notes, `0` for unstarred (filtering pushed to DB query) |
+| `source_session_uuid` | string | no | Filter to notes authored by a specific session (UUID). Filtering pushed to DB query |
 | `q` | string | no | Full-text search query (searches note title and body) |
 | `limit` | integer | no | Max results (default 50) |
 
@@ -908,6 +918,7 @@ List notes attached to a session or task with optional starred filtering. Starre
       "title": "Key finding",
       "body": "Found the root cause in session_controller.ex...",
       "starred": 1,
+      "source_session_uuid": "abc-123",
       "created_at": "2026-03-15T10:30:00Z"
     }
   ]
@@ -920,6 +931,8 @@ List notes attached to a session or task with optional starred filtering. Starre
 curl 'localhost:5001/api/v1/notes?session_id=42&starred=1'
 curl 'localhost:5001/api/v1/notes?task_id=1'
 curl 'localhost:5001/api/v1/notes?session_id=42&q=authentication'
+curl 'localhost:5001/api/v1/notes?source_session_uuid=abc-123'
+curl 'localhost:5001/api/v1/notes?session_id=42&source_session_uuid=abc-123'
 ```
 
 ---
@@ -1133,7 +1146,7 @@ eits messages search "migration" --include-archived
 
 ### GET /api/v1/dm
 
-List inbound messages (DMs) to a session with optional sender and time filtering.
+List inbound messages (DMs) to a session with optional sender and time filtering. Requires authorization via the `x-eits-session` header — the caller must be the recipient.
 
 **Query params:**
 
@@ -1143,6 +1156,12 @@ List inbound messages (DMs) to a session with optional sender and time filtering
 | `from` or `from_session_id` | string or integer | no | Filter by sender session ID (UUID or integer) |
 | `since` | string | no | ISO 8601 datetime; returns only messages with `inserted_at` after this time |
 | `limit` | integer | no | Max results (default 20, max 100) |
+
+**Headers:**
+
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| `x-eits-session` | string | yes | Caller session ID (UUID or integer). Used to authorize that the caller is the recipient. |
 
 **Response:** `200 OK`
 
@@ -1177,13 +1196,19 @@ With `from` filter:
 }
 ```
 
+**Errors:**
+
+| Status | When |
+|--------|------|
+| `403 Forbidden` | `x-eits-session` header provided but does not match the recipient session |
+
 **Example:**
 
 ```bash
-curl localhost:5001/api/v1/dm?session=42&limit=10
-curl localhost:5001/api/v1/dm?session=abc-123&from=40
-curl localhost:5001/api/v1/dm?session_id=42&from_session_id=sender-uuid
-curl localhost:5001/api/v1/dm?session=42&since=2026-03-17T10:00:00Z
+curl -H "x-eits-session: 42" localhost:5001/api/v1/dm?session=42&limit=10
+curl -H "x-eits-session: abc-123" localhost:5001/api/v1/dm?session=abc-123&from=40
+curl -H "x-eits-session: 42" localhost:5001/api/v1/dm?session_id=42&from_session_id=sender-uuid
+curl -H "x-eits-session: 42" localhost:5001/api/v1/dm?session=42&since=2026-03-17T10:00:00Z
 eits dm inbox --session 42 --since 2026-03-17T10:00:00Z
 ```
 
@@ -1200,15 +1225,15 @@ truncates bodies for table display; use this to read a message in full).
 |-------|------|----------|-------------|
 | `id` | integer | yes | Message ID (from the `id` field of `GET /api/v1/dm`) |
 
-**Query params:**
+**Headers:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `session` | string or integer | no | Caller session (UUID or integer). May also be supplied via the `x-eits-session` request header. When present, the caller is verified to be the message's recipient. |
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| `x-eits-session` | string | no | Caller session ID (UUID or integer). When provided, the caller is verified to be the message's recipient. If not provided or empty, access is denied. |
 
-**Recipient scoping:** if `session` (or the `x-eits-session` header) is provided
+**Recipient scoping:** The `x-eits-session` header is required. If provided
 and the caller is **not** the recipient (`to_session_id`), the request returns
-`403 Forbidden`. If no caller session is supplied, no recipient check is applied.
+`403 Forbidden`.
 
 **Response:** `200 OK`
 
@@ -1234,9 +1259,8 @@ and the caller is **not** the recipient (`to_session_id`), the request returns
 **Example:**
 
 ```bash
-curl localhost:5001/api/v1/dm/123
-curl "localhost:5001/api/v1/dm/123?session=42"
 curl -H "x-eits-session: 42" localhost:5001/api/v1/dm/123
+curl -H "x-eits-session: abc-123" localhost:5001/api/v1/dm/123
 eits dm read 123          # human-readable
 eits dm read 123 --json   # machine-readable
 ```

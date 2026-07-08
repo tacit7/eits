@@ -1678,3 +1678,11 @@ EyeInTheSkyWeb.Claude.SessionWorker.get_info(pid)
 # Kill a worker to test isolation
 Process.exit(pid, :kill)
 ```
+
+### Status Update Duplicate Alert Prevention (64b6b81d)
+
+PATCH /api/v1/sessions/:uuid now checks if status actually changed via trigger_status_side_effects(). Only broadcasts broadcast_status_side_effects() if status changed; prevents duplicate alerts on redundant updates.
+
+### Global Sessions Page Project Resolution Fix (aa4a088d)
+
+ProjectLive.Sessions.Actions.create_new_session() now resolves project from form project_id field on global page (where @project is nil) instead of crashing on nil.path. Gracefully shows flash error if no project selected.

@@ -25,7 +25,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.FilterHandlers do
     socket =
       socket
       |> assign(:session_filter, filter)
-      |> Loader.load_agents()
+      |> Loader.load_agents(true)
 
     {:noreply, socket}
   end

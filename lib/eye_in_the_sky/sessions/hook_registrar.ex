@@ -33,6 +33,7 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
           description: params["description"],
           status: "working",
           started_at: DateTime.utc_now(),
+          last_activity_at: DateTime.utc_now(),
           provider: params["provider"] || "claude",
           model: params["model"],
           model_provider: model_provider,

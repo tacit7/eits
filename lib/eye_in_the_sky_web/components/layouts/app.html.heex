@@ -238,6 +238,10 @@
             sort_by={assigns[:sort_by] || "name_asc"}
             scope_filter={assigns[:scope_filter] || "all"}
           />
+        <% :prompts -> %>
+          <EyeInTheSkyWeb.TopBar.Prompts.toolbar
+            search_query={assigns[:search_query] || ""}
+          />
         <% :teams -> %>
           <EyeInTheSkyWeb.TopBar.Teams.toolbar
             search_query={assigns[:search_query] || ""}

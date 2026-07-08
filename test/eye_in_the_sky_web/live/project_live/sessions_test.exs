@@ -50,6 +50,43 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
       assert render(view) =~ "test-project"
     end
 
+    test "global sessions page: submit with a project_id in the form does not crash", %{
+      conn: conn,
+      project: project
+    } do
+      {:ok, view, _html} = live(conn, ~p"/sessions")
+
+      render_click(view, "toggle_new_session_drawer", %{})
+
+      # @project is nil on the global page — the form's project_id must be used
+      # instead of crashing on nil.path (regression: BadMapError at actions.ex:37).
+      view
+      |> form("form[phx-submit='create_new_session']", %{
+        "model" => "claude-sonnet-4-6",
+        "description" => "Global page spawn",
+        "project_id" => to_string(project.id)
+      })
+      |> render_submit()
+
+      assert Process.alive?(view.pid)
+    end
+
+    test "global sessions page: submit without a project shows an error, no crash", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/sessions")
+
+      render_click(view, "toggle_new_session_drawer", %{})
+
+      view
+      |> form("form[phx-submit='create_new_session']", %{
+        "model" => "claude-sonnet-4-6",
+        "description" => "No project selected",
+        "project_id" => ""
+      })
+      |> render_submit()
+
+      assert Process.alive?(view.pid)
+    end
+
     test "new agent appears in filtered agents list after creation", %{
       conn: conn,
       project: project

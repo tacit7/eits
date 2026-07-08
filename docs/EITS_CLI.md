@@ -7,7 +7,7 @@ The eits CLI is available in two implementations: **eitsr** (Rust, Phase 1 famil
 `eitsr` is a Rust rewrite of the eits CLI covering the **Phase 1 command families**:
 
 - `tasks` — task queries and mutations (CRUD, state transitions, tagging)
-- `dm` — direct messages (send, read, list, inbox)
+- `dm` — direct messages (send, read, list, inbox, wait)
 - `sessions` — session queries and state (list, get, create, update, end, context, notes, tasks)
 - `commits` — commit tracking (list, create)
 - `notes` — note queries and mutations (list, get, create, update, add)
@@ -242,6 +242,10 @@ eits tasks mine [--json]
 
 # Get
 eits tasks get <id>
+# Fetches a single task. eitsr now correctly includes server-envelope siblings
+# (project_id, annotations, state_id) grafted into the task object for lossless
+# normalization. Previously, these fields could read as null via eitsr but
+# correctly via bash eits (regression fix for ticket 8108).
 
 # Create
 eits tasks create --title <t> [--description <d>] [--project <id>] \
@@ -303,6 +307,8 @@ eits tasks sessions <id>
 
 # Tag a task
 eits tasks tag <task_id> <tag_id>
+# Attach an existing tag to a task. Tag IDs can be listed with `eits tags list`.
+# Available in: eitsr (Rust, JSON output) and bash eits (Phase 1 port, previously missing in eitsr)
 
 # List workflow states
 eits tasks states
@@ -405,12 +411,18 @@ Default output groups results by entity type with headers and counts. Use `--jso
 
 ```bash
 eits notes list [--session <uuid>] [--task <id>] [--project <id>] \
-  [--mine] [--starred] [--q <query>|--search <query>] \
+  [--mine] [--by-agent <uuid>] [--starred] [--q <query>|--search <query>] \
   [--all] [--limit <n>] [--full]
 # Default: lists only current session's notes when EITS_SESSION_UUID is set
 # --all: override to list across all sessions
 # --full: dump full body for all notes (default: preview listing)
 # Preview listing shows: title + first 100 chars + size + created date
+# --by-agent <uuid>: filter notes authored by a specific agent session UUID
+
+eits notes mine [--parent-type <type>] [--parent-id <id>] [--starred] \
+  [--q <query>|--search <query>] [--limit <n>] [--full]
+# Lists notes authored by the current session. Requires EITS_SESSION_UUID to be set.
+# Same filters as 'eits notes list', but scoped to the current session only.
 
 eits notes search <query> [--project <id>] [--starred] [--limit <n>] [--full]
 
@@ -427,7 +439,7 @@ eits notes add --body <text> [--title <t>] [--starred]
 # Auto-attach to current session (requires EITS_SESSION_UUID or EITS_SESSION_ID as fallback)
 ```
 
-`--mine` is mutually exclusive with `--session`.
+`--session`, `--mine`, and `--by-agent` are mutually exclusive on `eits notes list`.
 
 ### --help short-circuit
 
@@ -529,6 +541,10 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 `--provider gemini`:
 - gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 
+`--provider pi`:
+- Format: `<pi-provider>/<model-id>` (format-validated; requires `--model`)
+- Examples: `google/gemini-2.5-pro`, `openrouter/qwen/qwen3-coder`
+
 ---
 
 ## commits
@@ -594,6 +610,14 @@ eits dm read <id> [--json]
 # Print a single DM's FULL body by message ID (the inbox table truncates bodies).
 # Recipient-scoped: 403 if the caller session is not the message recipient.
 # --json: machine-readable {id, uuid, body, from_session_id, to_session_id, inserted_at}
+
+eits dm wait [--session <uuid|id>] [--since <iso8601>] [--timeout <seconds>]
+# Block until a new DM arrives (long-poll via GET /api/v1/dm/wait)
+# Returns {"items":[...],"count":N} on arrival or {"items":[],"count":0} after timeout
+# --session: target session (defaults to $EITS_SESSION_UUID or $EITS_SESSION_ID)
+# --since: return any DM already in inbox after this ISO8601 timestamp (useful for catching up)
+# --timeout: max seconds to wait (default 25s, max 55s); CLI client uses timeout + 15s headroom
+# Useful in background processes to exit instantly when a reply arrives instead of interval-polling
 
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
 # Send a direct message to an agent session

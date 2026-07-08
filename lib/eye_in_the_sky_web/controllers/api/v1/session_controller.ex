@@ -117,7 +117,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     %{}
     |> Helpers.maybe_put(:status, status)
     |> Helpers.maybe_put(:status_reason, params["status_reason"])
-    |> Helpers.maybe_put(:intent, params["intent"])
+    # intent is server-owned — not accepted from client input.
+    # It is set by TaskController.complete and cleared here on working transition.
     |> maybe_put_read_only(params["read_only"])
     |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
     |> Helpers.maybe_put(:name, params["name"])
@@ -137,6 +138,16 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       if status in Sessions.terminated_statuses(),
         do: Map.put(a, :ended_at, params["ended_at"] || DateTime.utc_now()),
         else: a
+    end)
+    |> then(fn a ->
+      # When a new turn starts, clear intent and record the turn boundary.
+      # This is the staleness fence: intent is only valid for the current turn.
+      if status == "working" do
+        now = DateTime.utc_now()
+        a |> Map.put(:intent, nil) |> Map.put(:intent_set_at, nil) |> Map.put(:turn_start_at, now)
+      else
+        a
+      end
     end)
   end
 

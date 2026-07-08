@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                   <% else %>
                     <span class="text-base-content/20">Never run</span>
                   <% end %>
-                  <%= if job.next_run_at and job_state != :disabled do %>
+                  <%= if not is_nil(job.next_run_at) and job_state != :disabled do %>
                     <span class="text-base-content/15">·</span>
                     <span>Next {format_relative_time(job.next_run_at)}</span>
                   <% end %>

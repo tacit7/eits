@@ -278,7 +278,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   def handle_filter_jobs(params, socket, job_sets) do
     socket =
       socket
-      |> assign(:search_query, params["search"] || "")
+      |> assign(:search_query, params["query"] || params["search"] || "")
       |> assign(:filter_type, params["type"] || "all")
       |> assign(:filter_status, params["status"] || "all")
       |> assign(:filter_origin, params["origin"] || "all")

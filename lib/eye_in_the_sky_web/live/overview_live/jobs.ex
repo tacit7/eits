@@ -20,6 +20,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Jobs do
       socket
       |> assign(:page_title, "Jobs")
       |> assign(:sidebar_tab, :jobs)
+      |> assign(:project_id, nil)
+      |> assign(:active_tab, :all_jobs)
+      |> assign(:search_query, "")
 
     {:ok, socket}
   end
@@ -44,6 +47,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Jobs do
 
   def handle_event("edit_schedule", %{"job_id" => job_id} = params, socket) do
     JobsLiveHandlers.handle_guarded_event("edit_schedule", job_id, params, socket, nil)
+  end
+
+  def handle_event("switch_tab", params, socket) do
+    JobsLiveHandlers.handle_top_bar_switch_tab(params, socket)
+  end
+
+  def handle_event("filter_jobs", params, socket) do
+    JobsLiveHandlers.handle_top_bar_filter_jobs(params, socket)
   end
 
   def handle_event(event, params, socket) do

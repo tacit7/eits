@@ -14,6 +14,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
       socket
       |> mount_project(params, sidebar_tab: :jobs, page_title_prefix: "Jobs")
       |> assign(:show_all, false)
+      |> assign(:active_tab, :all_jobs)
+      |> assign(:search_query, "")
 
     if is_nil(socket.assigns.project) do
       {:ok, redirect(socket, to: "/projects")}
@@ -48,6 +50,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
 
   def handle_event("edit_schedule", %{"job_id" => job_id} = params, socket) do
     JobsLiveHandlers.handle_guarded_event("edit_schedule", job_id, params, socket, socket.assigns.project_id)
+  end
+
+  def handle_event("switch_tab", params, socket) do
+    JobsLiveHandlers.handle_top_bar_switch_tab(params, socket)
+  end
+
+  def handle_event("filter_jobs", params, socket) do
+    JobsLiveHandlers.handle_top_bar_filter_jobs(params, socket)
   end
 
   def handle_event(event, params, socket) do

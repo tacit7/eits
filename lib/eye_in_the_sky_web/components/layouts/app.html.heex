@@ -243,6 +243,12 @@
           <EyeInTheSkyWeb.TopBar.Prompts.toolbar
             search_query={assigns[:search_query] || ""}
           />
+        <% :jobs -> %>
+          <EyeInTheSkyWeb.TopBar.Jobs.toolbar
+            active_tab={assigns[:active_tab] || :all_jobs}
+            search_query={assigns[:search_query] || ""}
+            project_id={assigns[:project_id]}
+          />
         <% :teams -> %>
           <EyeInTheSkyWeb.TopBar.Teams.toolbar
             search_query={assigns[:search_query] || ""}

@@ -52,17 +52,10 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           <.icon name="hero-x-mark" class="size-4" />
         </button>
       </div>
-    <% else %>
-      <%!-- Notes count --%>
-      <div class="mb-3">
-        <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-          {length(@notes)} notes
-        </span>
-      </div>
     <% end %>
 
     <%= if @notes != [] do %>
-      <div data-vim-list class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
+      <div data-vim-list class="divide-y divide-base-content/5">
         <%= for note <- @notes do %>
           <div
             class="py-0.5 relative group/row flex items-start"

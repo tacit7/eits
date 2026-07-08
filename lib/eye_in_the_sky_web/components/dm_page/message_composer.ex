@@ -3,12 +3,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
 
   use EyeInTheSkyWeb, :html
 
+  import EyeInTheSkyWeb.Components.ModelSelector, only: [model_selector: 1]
+
   alias EyeInTheSkyWeb.Components.DmHelpers
   alias EyeInTheSkyWeb.DmLive.SlashCommands
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
-  alias EyeInTheSkyWeb.Helpers.ViewHelpers
-
   attr :uploads, :map, required: true
   attr :selected_model, :string, default: "claude-opus-4-7"
   attr :selected_effort, :string, default: "medium"
@@ -214,69 +214,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
 
         <%!-- Right: model selector + send/stop --%>
         <div class="flex items-center gap-2 ml-auto">
-          <div
-            class="dropdown dropdown-top dropdown-end"
-            phx-click="toggle_model_menu"
-            id="model-selector-dropdown"
-          >
-            <button
-              type="button"
-              tabindex="0"
-              class="flex items-center gap-1.5 px-2 h-6 rounded-md text-[11px] font-medium text-base-content/55 bg-base-content/[0.05] border border-[var(--border-subtle)] hover:text-base-content/75 hover:bg-base-content/[0.08] transition-colors"
-              id="model-selector-button"
-            >
-              <span class="w-[5px] h-[5px] rounded-full bg-primary/60 flex-shrink-0"></span>
-              <span>{ViewHelpers.model_display_name(@selected_model)}</span>
-              <.icon name="hero-chevron-down-mini" class="size-3 flex-shrink-0" />
-            </button>
-
-            <%= if @active_overlay == :model_menu do %>
-              <ul
-                tabindex="0"
-                class="dropdown-content menu z-[1] w-72 rounded-xl border border-base-content/8 bg-base-100 p-1.5 shadow-lg"
-                id="model-selector-menu"
-              >
-                <%= cond do %>
-                  <% @provider == "codex" -> %>
-                    <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Codex</li>
-                    <%= for {model, label, desc, color} <- ModelHelpers.codex_models_with_meta() do %>
-                      <li>
-                        <a
-                          phx-click="select_model"
-                          phx-value-model={model}
-                          phx-value-effort=""
-                          class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                        >
-                          <.icon name="hero-bolt" class={"size-4 #{color}"} />
-                          <div>
-                            <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                            <div class="text-mini text-base-content/40">{desc}</div>
-                          </div>
-                        </a>
-                      </li>
-                    <% end %>
-                  <% true -> %>
-                    <li class="menu-title text-xs px-3 pt-1 pb-0.5 text-base-content/40">Claude</li>
-                    <%= for {model, label, desc, color} <- ModelHelpers.claude_models_with_meta() do %>
-                      <li>
-                        <a
-                          phx-click="select_model"
-                          phx-value-model={model}
-                          phx-value-effort=""
-                          class="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-base-content/[0.04]"
-                        >
-                          <.icon name="hero-bolt" class={"size-4 #{color}"} />
-                          <div>
-                            <div class="text-sm font-semibold text-base-content/80">{label}</div>
-                            <div class="text-mini text-base-content/40">{desc}</div>
-                          </div>
-                        </a>
-                      </li>
-                    <% end %>
-                <% end %>
-              </ul>
-            <% end %>
-          </div>
+          <.model_selector
+            id="composer-model-selector"
+            entries={ModelHelpers.entries_for_provider(@provider)}
+            selected_provider={@provider}
+            selected_model={@selected_model}
+            allow_provider_switch?={false}
+            event="select_model"
+            disabled?={@processing}
+            placement={:up}
+          />
 
           <%!-- Send / Stop --%>
           <div class="flex items-center gap-1.5">

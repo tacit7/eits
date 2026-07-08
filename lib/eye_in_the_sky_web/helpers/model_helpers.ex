@@ -12,13 +12,16 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models do
     [
+      {"claude-opus-4-8", "Opus 4.8"},
+      {"claude-fable-5", "Fable 5"},
+      {"claude-sonnet-5", "Sonnet 5"},
+      {"claude-haiku-4-5-20251001", "Haiku 4.5"},
       {"claude-opus-4-7", "Opus 4.7"},
       {"claude-opus-4-6", "Opus 4.6"},
       {"claude-opus-4-5-20251101", "Opus 4.5"},
       {"claude-opus-4-1-20250805", "Opus 4.1"},
       {"claude-sonnet-4-6", "Sonnet 4.6"},
-      {"claude-sonnet-4-5-20250929", "Sonnet 4.5"},
-      {"claude-haiku-4-5-20251001", "Haiku 4.5"}
+      {"claude-sonnet-4-5-20250929", "Sonnet 4.5"}
     ]
   end
 
@@ -27,15 +30,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models_with_meta do
     [
-      {"claude-opus-4-7", "Opus 4.7", "Most capable for complex work · 1M context",
+      {"claude-opus-4-8", "Opus 4.8", "Best for everyday, complex tasks · 1M context",
        "text-warning"},
+      {"claude-fable-5", "Fable 5", "Most capable for your hardest and longest-running tasks",
+       "text-warning"},
+      {"claude-sonnet-5", "Sonnet 5", "Efficient for routine tasks", "text-info"},
+      {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fastest for quick answers", "text-success"},
+      {"claude-opus-4-7", "Opus 4.7", "Previous generation · 1M context", "text-warning"},
       {"claude-opus-4-6", "Opus 4.6", "Previous generation · 1M context · extended thinking",
        "text-warning"},
       {"claude-opus-4-5-20251101", "Opus 4.5", "api", "text-warning"},
       {"claude-opus-4-1-20250805", "Opus 4.1", "api", "text-warning"},
-      {"claude-sonnet-4-6", "Sonnet 4.6", "Best for everyday tasks", "text-info"},
-      {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "api", "text-info"},
-      {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fastest for quick answers", "text-success"}
+      {"claude-sonnet-4-6", "Sonnet 4.6", "Previous generation", "text-info"},
+      {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "api", "text-info"}
     ]
   end
 
@@ -112,20 +119,20 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   def normalize_model_alias(model) when is_binary(model) do
     case String.downcase(model) do
       "haiku" -> "claude-haiku-4-5-20251001"
-      "sonnet" -> "claude-sonnet-4-6"
-      "opus" -> "claude-opus-4-7"
+      "sonnet" -> "claude-sonnet-5"
+      "opus" -> "claude-opus-4-8"
       _ -> model
     end
   end
 
-  def normalize_model_alias(nil), do: "claude-sonnet-4-6"
+  def normalize_model_alias(nil), do: "claude-sonnet-5"
 
   @doc """
   Returns the default model slug for a provider.
   """
   def default_model_for("codex"), do: "gpt-5.5"
   def default_model_for("pi"), do: nil
-  def default_model_for(_), do: "claude-opus-4-7"
+  def default_model_for(_), do: "claude-opus-4-8"
 
   @doc """
   Returns a human-readable display name for any supported model slug,
@@ -142,10 +149,10 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
 
   def model_display_name(other), do: to_string(other)
 
-  defp short_alias_display("opus"), do: "Opus 4.7"
-  defp short_alias_display("opus[1m]"), do: "Opus 4.6 (1M)"
-  defp short_alias_display("sonnet"), do: "Sonnet 4.6"
-  defp short_alias_display("sonnet[1m]"), do: "Sonnet 4.5 (1M)"
+  defp short_alias_display("opus"), do: "Opus 4.8"
+  defp short_alias_display("opus[1m]"), do: "Opus (1M)"
+  defp short_alias_display("sonnet"), do: "Sonnet 5"
+  defp short_alias_display("sonnet[1m]"), do: "Sonnet (1M)"
   defp short_alias_display("haiku"), do: "Haiku 4.5"
   defp short_alias_display("claude-opus-4-6"), do: "Opus 4.6"
   defp short_alias_display(other), do: other

@@ -9,13 +9,16 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   """
   def claude_models do
     [
+      "claude-opus-4-8",
+      "claude-fable-5",
+      "claude-sonnet-5",
+      "claude-haiku-4-5-20251001",
       "claude-opus-4-7",
       "claude-opus-4-6",
       "claude-opus-4-5-20251101",
       "claude-opus-4-1-20250805",
       "claude-sonnet-4-6",
       "claude-sonnet-4-5-20250929",
-      "claude-haiku-4-5-20251001",
       # short aliases and [1m] variants kept for backward compat with stored sessions
       "opus",
       "opus[1m]",

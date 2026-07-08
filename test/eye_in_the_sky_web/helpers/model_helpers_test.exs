@@ -178,22 +178,22 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     end
 
     test "\"sonnet\" normalizes to sonnet slug" do
-      assert ModelHelpers.normalize_model_alias("sonnet") == "claude-sonnet-4-6"
+      assert ModelHelpers.normalize_model_alias("sonnet") == "claude-sonnet-5"
     end
 
     test "\"opus\" normalizes to opus slug" do
-      assert ModelHelpers.normalize_model_alias("opus") == "claude-opus-4-7"
+      assert ModelHelpers.normalize_model_alias("opus") == "claude-opus-4-8"
     end
 
     test "uppercase aliases are case-insensitive" do
-      assert ModelHelpers.normalize_model_alias("OPUS") == "claude-opus-4-7"
-      assert ModelHelpers.normalize_model_alias("SONNET") == "claude-sonnet-4-6"
+      assert ModelHelpers.normalize_model_alias("OPUS") == "claude-opus-4-8"
+      assert ModelHelpers.normalize_model_alias("SONNET") == "claude-sonnet-5"
       assert ModelHelpers.normalize_model_alias("HAIKU") == "claude-haiku-4-5-20251001"
     end
 
     test "mixed-case aliases are case-insensitive" do
-      assert ModelHelpers.normalize_model_alias("Opus") == "claude-opus-4-7"
-      assert ModelHelpers.normalize_model_alias("Sonnet") == "claude-sonnet-4-6"
+      assert ModelHelpers.normalize_model_alias("Opus") == "claude-opus-4-8"
+      assert ModelHelpers.normalize_model_alias("Sonnet") == "claude-sonnet-5"
     end
 
     test "already-full slug passes through unchanged" do
@@ -203,7 +203,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     end
 
     test "nil returns default sonnet slug" do
-      assert ModelHelpers.normalize_model_alias(nil) == "claude-sonnet-4-6"
+      assert ModelHelpers.normalize_model_alias(nil) == "claude-sonnet-5"
     end
 
     test "unknown string passes through unchanged" do
@@ -220,17 +220,17 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.default_model_for("codex") == "gpt-5.5"
     end
 
-    test "\"claude\" returns claude-opus-4-7" do
-      assert ModelHelpers.default_model_for("claude") == "claude-opus-4-7"
+    test "\"claude\" returns claude-opus-4-8" do
+      assert ModelHelpers.default_model_for("claude") == "claude-opus-4-8"
     end
 
     test "nil falls back to claude default" do
-      assert ModelHelpers.default_model_for(nil) == "claude-opus-4-7"
+      assert ModelHelpers.default_model_for(nil) == "claude-opus-4-8"
     end
 
     test "unknown provider falls back to claude default" do
-      assert ModelHelpers.default_model_for("openai") == "claude-opus-4-7"
-      assert ModelHelpers.default_model_for("") == "claude-opus-4-7"
+      assert ModelHelpers.default_model_for("openai") == "claude-opus-4-8"
+      assert ModelHelpers.default_model_for("") == "claude-opus-4-8"
     end
 
     test "default for codex is in valid_model_slugs" do
@@ -247,7 +247,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     test "known claude slug returns its label" do
       assert ModelHelpers.model_display_name("claude-sonnet-4-6") == "Sonnet 4.6"
       assert ModelHelpers.model_display_name("claude-haiku-4-5-20251001") == "Haiku 4.5"
-      assert ModelHelpers.model_display_name("claude-opus-4-7") == "Opus 4.7"
+      assert ModelHelpers.model_display_name("claude-opus-4-8") == "Opus 4.8"
     end
 
     test "known codex slug returns its label" do
@@ -255,12 +255,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.model_display_name("gpt-5.4-mini") == "GPT-5.4 Mini"
     end
 
-    test "short alias \"opus\" returns \"Opus 4.7\"" do
-      assert ModelHelpers.model_display_name("opus") == "Opus 4.7"
+    test "short alias \"opus\" returns \"Opus 4.8\"" do
+      assert ModelHelpers.model_display_name("opus") == "Opus 4.8"
     end
 
-    test "short alias \"sonnet\" returns \"Sonnet 4.6\"" do
-      assert ModelHelpers.model_display_name("sonnet") == "Sonnet 4.6"
+    test "short alias \"sonnet\" returns \"Sonnet 5\"" do
+      assert ModelHelpers.model_display_name("sonnet") == "Sonnet 5"
     end
 
     test "short alias \"haiku\" returns \"Haiku 4.5\"" do
@@ -277,6 +277,26 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "integer input is converted to string" do
       assert ModelHelpers.model_display_name(42) == "42"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # catalog refresh (Task 1)
+  # ---------------------------------------------------------------------------
+
+  describe "claude_models/0 — refreshed catalog" do
+    test "includes the refreshed Claude 5 family slugs" do
+      values = ModelHelpers.claude_models() |> Enum.map(&elem(&1, 0))
+      assert "claude-opus-4-8" in values
+      assert "claude-fable-5" in values
+      assert "claude-sonnet-5" in values
+      assert "claude-haiku-4-5-20251001" in values
+    end
+
+    test "keeps old-generation slugs for existing sessions (spec §6.3 migration note)" do
+      values = ModelHelpers.claude_models() |> Enum.map(&elem(&1, 0))
+      assert "claude-opus-4-7" in values
+      assert "claude-sonnet-4-6" in values
     end
   end
 end

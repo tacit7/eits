@@ -574,7 +574,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         <% end %>
 
         <%!-- Project: action buttons row (only visible when no detail panel is open) --%>
-        <%= if @project_id and is_nil(@selected_job) do %>
+        <%= if not is_nil(@project_id) and is_nil(@selected_job) do %>
           <div class="mb-4 flex items-center justify-end gap-2">
             <button
               class="btn btn-outline btn-sm"
@@ -794,7 +794,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                   </p>
                 </div>
               <% end %>
-              <%= if job.next_run_at and job.enabled do %>
+              <%= if not is_nil(job.next_run_at) and job.enabled do %>
                 <div>
                   <p class="text-xs font-medium text-base-content/50 mb-0.5">Next run</p>
                   <p class="text-sm font-mono text-base-content/80">

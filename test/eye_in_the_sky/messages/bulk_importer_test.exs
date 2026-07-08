@@ -560,6 +560,25 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       assert Enum.all?(db_messages, &(&1.sender_role == "user"))
     end
 
+    test "regression: assigns ids in chronological order so same-second batches sort correctly (tool call before tool result)",
+         %{session: session} do
+      # All three messages share the same fallback `now` timestamp (no explicit
+      # timestamp), simulating a tool call and its result landing in the same
+      # second — the scenario that exposed reversed id assignment.
+      messages = [
+        %{uuid: Ecto.UUID.generate(), role: "assistant", content: "call", timestamp: nil, usage: nil},
+        %{uuid: Ecto.UUID.generate(), role: "user", content: "result", timestamp: nil, usage: nil},
+        %{uuid: Ecto.UUID.generate(), role: "assistant", content: "reply", timestamp: nil, usage: nil}
+      ]
+
+      count = BulkImporter.import_messages(messages, session.id, provider: "claude")
+      assert total_count(count) == 3
+
+      db_messages = Messages.list_messages_for_session(session.id)
+      assert Enum.map(db_messages, & &1.body) == ["call", "result", "reply"]
+      assert Enum.map(db_messages, & &1.id) == Enum.sort(Enum.map(db_messages, & &1.id))
+    end
+
     test "regression: record_incoming_reply + BulkImporter with importing_from_file?: true yields one row",
          %{session: session} do
       sdk_uuid = Ecto.UUID.generate()

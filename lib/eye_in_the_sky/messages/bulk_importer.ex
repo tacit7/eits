@@ -78,7 +78,14 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     # Execute writes WITHOUT an enclosing transaction so one bad row does not
     # roll back other successful writes. Idempotency is guaranteed by the unique
     # index on source_uuid combined with on_conflict: :nothing.
-    insert_count = run_inserts(inserts, session_id)
+    #
+    # `inserts` was built by prepending during the reduce above, so it is in
+    # reverse-chronological order. Repo.insert_all assigns auto-increment ids
+    # (and physical row order) following list order — passing it unreversed
+    # would give the last message in the batch the smallest id, inverting
+    # relative order for any messages inserted in the same batch (most visibly
+    # a tool call and its result landing in the same second).
+    insert_count = inserts |> Enum.reverse() |> run_inserts(session_id)
     update_count = run_updates(updates, session_id)
 
     %{inserted: insert_count, updated: update_count, skipped: skip_count}

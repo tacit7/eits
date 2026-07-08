@@ -809,6 +809,12 @@ Parent type plurals are normalized automatically: `"sessions"` -> `"session"`, `
 | `body` | string | yes | Note content (markdown) |
 | `title` | string | no | Note title |
 | `starred` | integer | no | `0` or `1`. Defaults to `0` |
+| `source_session_uuid` | string | no | Explicit author (session UUID). Overrides `x-eits-session` header if both present. Auto-stamped from header if neither provided. Can be `null` if neither source is available |
+
+**Note on source attribution:**
+- If `source_session_uuid` is explicitly provided in the request body, it is used.
+- If not provided, the `x-eits-session` request header is checked and used as a fallback.
+- If neither is present, the note's `source_session_uuid` is `null`.
 
 **Response:** `201 Created`
 
@@ -819,7 +825,8 @@ Parent type plurals are normalized automatically: `"sessions"` -> `"session"`, `
   "parent_id": "42",
   "title": null,
   "body": "interesting finding here",
-  "starred": 0
+  "starred": 0,
+  "source_session_uuid": "abc-123"
 }
 ```
 
@@ -835,7 +842,7 @@ curl -X POST localhost:5001/api/v1/notes \
 
 ### PATCH /api/v1/notes/:id
 
-Update an existing note (body, title, starred, parent_type, parent_id).
+Update an existing note (body, title, starred, parent_type, parent_id, source_session_uuid).
 
 **URL params:**
 
@@ -852,6 +859,7 @@ Update an existing note (body, title, starred, parent_type, parent_id).
 | `starred` | integer | no | `0` or `1` |
 | `parent_type` | string | no | `session`, `agent`, or `task` (plurals normalized) |
 | `parent_id` | string | no | ID of the parent entity |
+| `source_session_uuid` | string | no | Author session UUID. Can be set to `null` to clear attribution |
 
 **Response:** `200 OK`
 
@@ -862,7 +870,8 @@ Update an existing note (body, title, starred, parent_type, parent_id).
   "parent_id": "42",
   "title": "Updated title",
   "body": "updated content",
-  "starred": 1
+  "starred": 1,
+  "source_session_uuid": "abc-123"
 }
 ```
 
@@ -883,7 +892,7 @@ curl -X PATCH localhost:5001/api/v1/notes/10 \
 
 ### GET /api/v1/notes
 
-List notes attached to a session or task with optional starred filtering. Starred filtering is pushed to the database query for efficient filtering.
+List notes attached to a session or task with optional starred filtering and source attribution filtering. Starred and source filtering are pushed to the database query for efficient filtering.
 
 **Query params:**
 
@@ -892,6 +901,7 @@ List notes attached to a session or task with optional starred filtering. Starre
 | `session_id` | string | no | Filter to notes attached to a specific session (UUID or integer ID) |
 | `task_id` | integer | no | Filter to notes attached to a specific task |
 | `starred` | integer | no | Filter by starred status; pass `1` to return only starred notes, `0` for unstarred (filtering pushed to DB query) |
+| `source_session_uuid` | string | no | Filter to notes authored by a specific session (UUID). Filtering pushed to DB query |
 | `q` | string | no | Full-text search query (searches note title and body) |
 | `limit` | integer | no | Max results (default 50) |
 
@@ -908,6 +918,7 @@ List notes attached to a session or task with optional starred filtering. Starre
       "title": "Key finding",
       "body": "Found the root cause in session_controller.ex...",
       "starred": 1,
+      "source_session_uuid": "abc-123",
       "created_at": "2026-03-15T10:30:00Z"
     }
   ]
@@ -920,6 +931,8 @@ List notes attached to a session or task with optional starred filtering. Starre
 curl 'localhost:5001/api/v1/notes?session_id=42&starred=1'
 curl 'localhost:5001/api/v1/notes?task_id=1'
 curl 'localhost:5001/api/v1/notes?session_id=42&q=authentication'
+curl 'localhost:5001/api/v1/notes?source_session_uuid=abc-123'
+curl 'localhost:5001/api/v1/notes?session_id=42&source_session_uuid=abc-123'
 ```
 
 ---

@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.State do
         s
         |> assign(:canvases, Canvases.list_canvases())
         |> assign(:projects, Projects.list_projects())
-        |> Loader.load_agents()
+        |> Loader.load_agents(true)
       else
         s
         |> assign(:canvases, [])

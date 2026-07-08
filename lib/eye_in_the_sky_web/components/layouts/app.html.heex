@@ -65,7 +65,9 @@
         title="Open command palette"
         aria-label="Open command palette"
       >
-        <span class="truncate font-medium text-base-content/70">Eye in the Sky</span>
+        <span class="truncate font-medium text-base-content/70">
+          {(assigns[:sidebar_project] && assigns[:sidebar_project].name) || "Eye in the Sky"}
+        </span>
         <kbd class="kbd kbd-xs">⌘K</kbd>
       </button>
     </span>

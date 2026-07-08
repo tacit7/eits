@@ -440,13 +440,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           </div>
         <% end %>
         <div phx-hook="ShiftSelect" id="teams-list-shift-wrapper" data-list-id="team-list">
-        <div id="team-list" phx-update="stream" class="divide-y divide-base-content/8" data-vim-list>
+        <div id="team-list" phx-update="stream" class="divide-y divide-base-content/5" data-vim-list>
           <div
             :for={{dom_id, team} <- @streams.team_list}
             id={dom_id}
             data-row-id={team.id}
             class={[
-              "py-1 group/row flex items-center gap-1 relative",
+              "py-0.5 group/row flex items-center gap-1 relative",
               if(MapSet.member?(@selected_ids, to_string(team.id)),
                 do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg",
                 else: ""
@@ -483,7 +483,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                     true -> "#"
                   end
                 }
-                class="flex-1 py-2 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0 [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
+                class="flex-1 py-2.5 px-3 flex items-center gap-3 rounded-lg hover:bg-base-200/40 transition-colors min-w-0 [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
                 data-vim-list-item
               >
                 <.status_dot status={team_status_atom(team.members)} size="sm" />

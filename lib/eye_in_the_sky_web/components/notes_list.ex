@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
       <div data-vim-list class="divide-y divide-base-content/5 bg-base-100 rounded-xl shadow-sm px-5">
         <%= for note <- @notes do %>
           <div
-            class="py-1 relative group/row flex items-start"
+            class="py-0.5 relative group/row flex items-start"
             data-ctx="note"
             data-ctx-id={note.id}
             data-ctx-starred={to_string(starred?(note))}
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
             <%!-- Collapse: chevron expands inline body --%>
             <div class="collapse flex-1 overflow-visible">
               <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
-              <div class="collapse-title py-3 px-0 min-h-0 flex flex-col gap-1">
+              <div class="collapse-title py-2.5 px-0 min-h-0 flex flex-col gap-1">
                 <%!-- Title — clicking navigates to full editor --%>
                 <div class="flex items-center gap-2 pr-6">
                   <%= if starred?(note) do %>

@@ -18,6 +18,7 @@ defmodule EyeInTheSky.Sessions.StatusTransitions do
   def set_session_idle(%Session{} = session) do
     with {:ok, updated} <- update_session_internal(session, %{status: "idle"}) do
       Events.agent_stopped(updated)
+      Events.session_updated(updated)
       {:ok, updated}
     end
   end

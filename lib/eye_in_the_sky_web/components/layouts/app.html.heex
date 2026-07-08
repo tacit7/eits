@@ -27,16 +27,6 @@
     data-tauri-drag-region
     class="hidden md:flex h-[38px] flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-200/60 px-3 relative"
   >
-    <span class="text-xs text-base-content/50 truncate select-none">
-      <span class="font-medium text-base-content/80">
-        {(assigns[:sidebar_project] && assigns[:sidebar_project].name) || "Eye in the Sky"}
-      </span>
-      <span :if={assigns[:sidebar_tab]} class="mx-1">›</span>
-      <span :if={assigns[:sidebar_tab]}>
-        {Phoenix.Naming.humanize(assigns[:sidebar_tab] || :sessions)}
-      </span>
-    </span>
-
     <%!-- Center group: history arrows + command center, absolute-centered so
          left/right content never shifts it (VS Code layout). Arrows drive
          browser history — LiveView live navs pushState, so back/forward work

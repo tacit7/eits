@@ -411,12 +411,18 @@ Default output groups results by entity type with headers and counts. Use `--jso
 
 ```bash
 eits notes list [--session <uuid>] [--task <id>] [--project <id>] \
-  [--mine] [--starred] [--q <query>|--search <query>] \
+  [--mine] [--by-agent <uuid>] [--starred] [--q <query>|--search <query>] \
   [--all] [--limit <n>] [--full]
 # Default: lists only current session's notes when EITS_SESSION_UUID is set
 # --all: override to list across all sessions
 # --full: dump full body for all notes (default: preview listing)
 # Preview listing shows: title + first 100 chars + size + created date
+# --by-agent <uuid>: filter notes authored by a specific agent session UUID
+
+eits notes mine [--parent-type <type>] [--parent-id <id>] [--starred] \
+  [--q <query>|--search <query>] [--limit <n>] [--full]
+# Lists notes authored by the current session. Requires EITS_SESSION_UUID to be set.
+# Same filters as 'eits notes list', but scoped to the current session only.
 
 eits notes search <query> [--project <id>] [--starred] [--limit <n>] [--full]
 
@@ -433,7 +439,7 @@ eits notes add --body <text> [--title <t>] [--starred]
 # Auto-attach to current session (requires EITS_SESSION_UUID or EITS_SESSION_ID as fallback)
 ```
 
-`--mine` is mutually exclusive with `--session`.
+`--session`, `--mine`, and `--by-agent` are mutually exclusive on `eits notes list`.
 
 ### --help short-circuit
 

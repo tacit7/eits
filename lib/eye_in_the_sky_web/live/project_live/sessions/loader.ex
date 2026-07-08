@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
     socket
     |> assign(:all_agents, all_agents)
-    |> apply_agent_view(true)
+    |> apply_agent_view(false)
   end
 
   defp load_sessions_for_scope(:all, include_archived) do

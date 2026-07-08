@@ -25,6 +25,7 @@ defmodule EyeInTheSkyWeb.TopBar.Jobs do
         active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
       />
     </.tab_pills>
+    <div class="flex-1" />
     <.search_bar
       id="jobs-top-bar-search"
       size="xs"
@@ -33,9 +34,8 @@ defmodule EyeInTheSkyWeb.TopBar.Jobs do
       value={@search_query || ""}
       on_change="filter_jobs"
       on_submit="filter_jobs"
-      class="w-44"
+      class="w-48"
     />
-    <div class="flex-1" />
     <%= if is_nil(@project_id) do %>
       <.link
         navigate="/oban"

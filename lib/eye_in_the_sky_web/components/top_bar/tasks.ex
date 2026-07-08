@@ -97,16 +97,6 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
       </div>
     <% end %>
     <div class="flex-1" />
-    <.search_bar
-      id="top-bar-tasks-search"
-      size="xs"
-      label="Search tasks"
-      placeholder="Search tasks..."
-      value={@search_query || ""}
-      on_change="search"
-      class="w-48"
-      vim_search={true}
-    />
     <%!-- Sort dropdown --%>
     <details
       id="tasks-sort-dropdown"
@@ -116,7 +106,6 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
       class="dropdown"
     >
       <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-        Sort:
         <span class="js-sort-label">{Helpers.sort_label(@sort_by, sort_options(), "Newest")}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
@@ -136,6 +125,16 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
         <% end %>
       </ul>
     </details>
+    <.search_bar
+      id="top-bar-tasks-search"
+      size="xs"
+      label="Search tasks"
+      placeholder="Search tasks..."
+      value={@search_query || ""}
+      on_change="search"
+      class="w-48"
+      vim_search={true}
+    />
     """
   end
 

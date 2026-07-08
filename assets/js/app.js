@@ -86,6 +86,7 @@ import {SessionsDropdownGuard} from "./hooks/sessions_dropdown_guard"
 import {IndeterminateCheckbox} from "./hooks/indeterminate_checkbox"
 import {ShiftSelect} from "./hooks/shift_select"
 import {AgentCombobox} from "./hooks/agent_combobox"
+import {ModelSelectorPopup} from "./hooks/model_selector_popup"
 import {GlobalKeydown} from "./hooks/global_keydown"
 import {DmHistoryCleanup} from "./hooks/dm_history_cleanup"
 import {PreserveDetails} from "./hooks/preserve_details"
@@ -166,6 +167,7 @@ Hooks.SessionsDropdownGuard = SessionsDropdownGuard
 Hooks.IndeterminateCheckbox = IndeterminateCheckbox
 Hooks.ShiftSelect = ShiftSelect
 Hooks.AgentCombobox = AgentCombobox
+Hooks.ModelSelectorPopup = ModelSelectorPopup
 Hooks.GlobalKeydown = GlobalKeydown
 Hooks.DmHistoryCleanup = DmHistoryCleanup
 Hooks.PreserveDetails = PreserveDetails

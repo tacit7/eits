@@ -11,15 +11,29 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   import EyeInTheSkyWeb.Components.CliFlags,
     only: [path_fields: 1, boolean_flags: 1]
 
-  import EyeInTheSkyWeb.Helpers.ViewHelpers,
-    only: [claude_models: 0, codex_models: 0]
+  import EyeInTheSkyWeb.Components.ModelSelector, only: [model_selector: 1]
 
-  import EyeInTheSkyWeb.Helpers.ModelHelpers, only: [pi_models: 0]
+  alias EyeInTheSky.Agents.ModelConfig
+  alias EyeInTheSkyWeb.Helpers.ModelHelpers
 
   @impl true
   def mount(socket) do
     EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
-    {:ok, socket}
+
+    {:ok,
+     assign(socket,
+       pending_provider: "claude",
+       pending_model: ModelHelpers.default_model_for("claude")
+     )}
+  end
+
+  @impl true
+  def handle_event("model_and_provider_selected", %{"provider" => provider, "model" => model}, socket) do
+    if ModelConfig.valid_model?(provider, model) do
+      {:noreply, assign(socket, pending_provider: provider, pending_model: model)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -44,36 +58,19 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
           <.modal_header title="New Agent" toggle_event={@toggle_event} />
 
           <form phx-submit={@submit_event} class="flex flex-col gap-4">
-            <!-- Agent Type -->
-            <.form_field label="Agent Type">
-              <select name="agent_type" class="select select-bordered" required>
-                <option value="claude">Claude</option>
-                <option value="codex">Codex</option>
-                <option value="pi">Pi (multi-provider)</option>
-              </select>
-            </.form_field>
-            
-    <!-- Model Selection Dropdown -->
+            <!-- Provider + Model -->
             <.form_field label="Model">
-              <select name="model" class="select select-bordered" required>
-                <optgroup label="Claude">
-                  <%= for {value, label} <- claude_models() do %>
-                    <option value={value}>{label}</option>
-                  <% end %>
-                </optgroup>
-                <optgroup label="Codex">
-                  <%= for {value, label} <- codex_models() do %>
-                    <option value={value}>{label}</option>
-                  <% end %>
-                </optgroup>
-                <% {pi_slugs, pi_freshness} = pi_models() %>
-                <optgroup label={pi_optgroup_label(pi_freshness)}>
-                  <option :for={slug <- pi_slugs} value={slug}>{slug}</option>
-                  <option :if={pi_slugs == []} disabled>
-                    No Pi providers configured — Settings → Providers
-                  </option>
-                </optgroup>
-              </select>
+              <.model_selector
+                id="new-agent-drawer-model-selector"
+                entries={ModelHelpers.all_model_entries()}
+                selected_provider={@pending_provider}
+                selected_model={@pending_model}
+                allow_provider_switch?={true}
+                event="model_and_provider_selected"
+                myself={@myself}
+              />
+              <input type="hidden" name="agent_type" value={@pending_provider} />
+              <input type="hidden" name="model" value={@pending_model} />
             </.form_field>
             
     <!-- Effort Level (Opus & Sonnet) -->
@@ -146,9 +143,6 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
     </div>
     """
   end
-
-  defp pi_optgroup_label(:stale), do: "Pi (discovered — stale)"
-  defp pi_optgroup_label(_), do: "Pi (discovered)"
 
   defp advanced_section(assigns) do
     ~H"""

@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
   defp section_route(:skills, _project), do: "/skills"
   defp section_route(:prompts, _project), do: "/prompts"
   defp section_route(:teams, _project), do: "/teams"
+  defp section_route(:jobs, %{id: id}), do: "/projects/#{id}/jobs"
   defp section_route(:jobs, _project), do: "/jobs"
   defp section_route(:canvas, _project), do: "/canvases"
   defp section_route(:chat, _project), do: "/chat"

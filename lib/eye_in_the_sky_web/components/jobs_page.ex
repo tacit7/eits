@@ -438,6 +438,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   @impl true
   def render(assigns) do
     ~H"""
+    <div>
     <%!-- Drawers and modals sit outside the flex layout so they aren't clipped --%>
     <%= if @project_id do %>
       <.job_form_drawer
@@ -873,6 +874,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           </div>
         </div>
       <% end %>
+    </div>
     </div>
     """
   end

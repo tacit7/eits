@@ -125,12 +125,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
           else: "w-full max-w-3xl mx-auto"
         )
       ]}>
-        <div class="mb-3">
-          <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-            {length(@filtered_prompts)} prompts
-          </span>
-        </div>
-
         <%!-- Search bar --%>
         <div class="mb-4">
           <form phx-change="search">

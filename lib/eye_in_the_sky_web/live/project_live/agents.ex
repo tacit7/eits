@@ -165,12 +165,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
         ]}
         style="scrollbar-width: none;"
       >
-        <div class="mb-3">
-          <span class="text-mini font-mono tabular-nums text-base-content/45 tracking-wider uppercase">
-            {length(@filtered_agents)} agents
-          </span>
-        </div>
-
         <%= if @filtered_agents != [] do %>
           <div class="divide-y divide-base-content/5" data-vim-list>
             <%= for agent <- @filtered_agents do %>

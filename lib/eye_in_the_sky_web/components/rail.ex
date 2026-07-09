@@ -447,23 +447,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp maybe_reload_on_tab_change(socket, same_tab, same_tab, _section), do: socket
 
-  defp maybe_reload_on_tab_change(socket, _prev_tab, _next_tab, next_section) do
-    socket
-    |> assign(:active_section, next_section)
-    |> assign(:mobile_open, false)
-    |> Loader.maybe_load_sessions(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_channels(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_canvases(next_section)
-    |> Loader.maybe_load_teams(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_tasks(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_jobs(next_section)
-    |> Loader.maybe_load_notes(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_files(next_section)
-    |> Loader.maybe_load_agents(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_skills(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_prompts(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_usage(next_section)
-    |> maybe_start_usage_async(next_section)
+  defp maybe_reload_on_tab_change(socket, _prev_tab, _next_tab, _next_section) do
+    # Page navigation does not change the active flyout section.
+    # The flyout only changes when the user explicitly swipes an icon in the strip.
+    # Data for each section is lazy-loaded when toggle_section fires.
+    assign(socket, :mobile_open, false)
   end
 
   defp maybe_start_usage_async(socket, :usage) do

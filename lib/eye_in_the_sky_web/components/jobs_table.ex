@@ -74,14 +74,14 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 ]}>
                   {job.name}
                 </span>
-                <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/45 flex-shrink-0">
+                <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">
                   {type_label(job.job_type)}
                 </span>
                 <%= if is_nil(job.project_id) and @scope == "overview" do %>
-                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/6 text-base-content/35 flex-shrink-0">global</span>
+                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">global</span>
                 <% end %>
                 <%= if @show_origin and job.origin == "system" do %>
-                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/6 text-base-content/35 flex-shrink-0">system</span>
+                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">system</span>
                 <% end %>
               </div>
               <%!-- Line 2: schedule · last run · next run --%>
@@ -107,7 +107,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-primary/15 text-primary flex-shrink-0">running</span>
             <% end %>
             <%= if job_state == :disabled do %>
-              <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">disabled</span>
+              <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/10 text-base-content/50 flex-shrink-0">disabled</span>
             <% end %>
             <%= if job_state == :failed do %>
               <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-error/15 text-error flex-shrink-0">failed</span>

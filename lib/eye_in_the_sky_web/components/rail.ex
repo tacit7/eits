@@ -109,7 +109,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         show_new_session_form: false,
         show_new_channel_form: false,
         prefill_agent_slug: nil,
-        prefill_agent_name: nil
+        prefill_agent_name: nil,
+        disable_auth: Application.get_env(:eye_in_the_sky, :disable_auth, false)
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
@@ -446,23 +447,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp maybe_reload_on_tab_change(socket, same_tab, same_tab, _section), do: socket
 
-  defp maybe_reload_on_tab_change(socket, _prev_tab, _next_tab, next_section) do
-    socket
-    |> assign(:active_section, next_section)
-    |> assign(:mobile_open, false)
-    |> Loader.maybe_load_sessions(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_channels(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_canvases(next_section)
-    |> Loader.maybe_load_teams(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_tasks(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_jobs(next_section)
-    |> Loader.maybe_load_notes(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_files(next_section)
-    |> Loader.maybe_load_agents(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_skills(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_prompts(next_section, socket.assigns.sidebar_project)
-    |> Loader.maybe_load_usage(next_section)
-    |> maybe_start_usage_async(next_section)
+  defp maybe_reload_on_tab_change(socket, _prev_tab, _next_tab, _next_section) do
+    # Page navigation does not change the active flyout section.
+    # The flyout only changes when the user explicitly swipes an icon in the strip.
+    # Data for each section is lazy-loaded when toggle_section fires.
+    assign(socket, :mobile_open, false)
   end
 
   defp maybe_start_usage_async(socket, :usage) do
@@ -640,47 +629,55 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="flex-1" />
         <div class="mb-3" />
 
-        <.link
-          navigate="/notifications"
-          class={[
-            "relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-            "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"
-          ]}
-          aria-label="Notifications"
-        >
-          <.icon name="hero-bell-mini" class="size-4" />
-          <span
-            :if={@notification_count > 0}
-            class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5"
+        <div class="tooltip tooltip-right" data-tip="Notifications">
+          <.link
+            navigate="/notifications"
+            class={[
+              "relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+              "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"
+            ]}
+            aria-label="Notifications"
           >
-            {@notification_count}
-          </span>
-        </.link>
+            <.icon name="hero-bell-mini" class="size-4" />
+            <span
+              :if={@notification_count > 0}
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5"
+            >
+              {@notification_count}
+            </span>
+          </.link>
+        </div>
 
-        <.link
-          navigate="/iam/policies"
-          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
-          aria-label="IAM Policies"
-        >
-          <.icon name="hero-shield-check-mini" class="size-4" />
-        </.link>
+        <div class="tooltip tooltip-right" data-tip="IAM Policies">
+          <.link
+            navigate="/iam/policies"
+            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            aria-label="IAM Policies"
+          >
+            <.icon name="hero-shield-check-mini" class="size-4" />
+          </.link>
+        </div>
 
-        <.link
-          navigate="/settings"
-          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
-          aria-label="Settings"
-        >
-          <.icon name="hero-cog-6-tooth-mini" class="size-4" />
-        </.link>
+        <div class="tooltip tooltip-right" data-tip="Settings">
+          <.link
+            navigate="/settings"
+            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            aria-label="Settings"
+          >
+            <.icon name="hero-cog-6-tooth-mini" class="size-4" />
+          </.link>
+        </div>
 
-        <.link
-          href="/auth/logout"
-          method="delete"
-          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
-          aria-label="Sign out"
-        >
-          <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
-        </.link>
+        <div :if={!@disable_auth} class="tooltip tooltip-right" data-tip="Sign out">
+          <.link
+            href="/auth/logout"
+            method="delete"
+            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            aria-label="Sign out"
+          >
+            <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
+          </.link>
+        </div>
       </nav>
 
       <.project_switcher

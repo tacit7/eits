@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.archive_session(session) do
       {:noreply,
        socket
-       |> reload_sessions()
+       |> Loader.remove_agent_from_list(session.id)
        |> push_event("evict-dm-history", %{uuids: [session.uuid]})
        |> put_flash(:info, "Session archived")}
     else
@@ -122,7 +122,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
          {:ok, _} <- Sessions.delete_session(session) do
       {:noreply,
        socket
-       |> reload_sessions()
+       |> Loader.remove_agent_from_list(session.id)
        |> put_flash(:info, "Session deleted")}
     else
       {:error, :not_found} ->

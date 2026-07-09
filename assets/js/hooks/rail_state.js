@@ -42,10 +42,10 @@ export const RailState = {
   mounted() {
     migrateOldKeys()
 
-    // Send the full blob to the server once on mount.
-    // The server applies each field defensively. Once the round-trip lands,
-    // drop the pre-paint anti-flash override (set in root.html.heex) —
-    // LiveView state is authoritative from here on.
+    // Send the full blob to the server on first load (cold start).
+    // Rail is now a persistent LiveView — on live navigation it keeps its state
+    // and this mount() never re-fires. On full page reload, mount() fires once,
+    // restores from localStorage, and removes the anti-flash data-rail-collapsed attribute.
     const state = readState()
     this.pushEventTo(this.el, 'restore_rail_state', state, () => {
       document.documentElement.removeAttribute('data-rail-collapsed')
@@ -205,13 +205,8 @@ export const RailState = {
   },
 
   destroyed() {
-    // Live navigation: the root inline script (full loads only) can't re-arm
-    // the anti-flash override, and the next Rail mount defaults to open. If
-    // the persisted state is collapsed, hide the flyout NOW — the next
-    // mount's restore reply removes the attribute again.
-    if (readState().flyout_open === false) {
-      document.documentElement.setAttribute('data-rail-collapsed', '1')
-    }
+    // Full page reload only — live navigation never destroys this hook.
+    // Clean up all event listeners to avoid memory leaks.
     if (this._openHandler) {
       this.el.removeEventListener('rail:open', this._openHandler)
     }

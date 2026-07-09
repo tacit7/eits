@@ -6,7 +6,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
 
   attr :task_search, :string, default: ""
   attr :state_filter, :any, default: nil
-  attr :myself, :any, required: true
 
   def tasks_filters(assigns) do
     ~H"""
@@ -21,7 +20,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
           value={@task_search}
           placeholder="Search tasks…"
           phx-keyup="update_task_search"
-          phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
         />
@@ -29,10 +27,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
 
       <%!-- State filter pills — toggleable; click active pill to clear --%>
       <div class="flex flex-wrap gap-0.5">
-        <.state_pill label="To Do" value="1" current={@state_filter} myself={@myself} />
-        <.state_pill label="In Progress" value="2" current={@state_filter} myself={@myself} />
-        <.state_pill label="In Review" value="4" current={@state_filter} myself={@myself} />
-        <.state_pill label="Done" value="3" current={@state_filter} myself={@myself} />
+        <.state_pill label="To Do" value="1" current={@state_filter} />
+        <.state_pill label="In Progress" value="2" current={@state_filter} />
+        <.state_pill label="In Review" value="4" current={@state_filter} />
+        <.state_pill label="Done" value="3" current={@state_filter} />
       </div>
     </div>
     """
@@ -42,11 +40,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
   attr :task_search, :string, default: ""
   attr :state_filter, :any, default: nil
   attr :sidebar_project, :any, default: nil
-  attr :myself, :any, required: true
 
   def tasks_content(assigns) do
     ~H"""
-    <.task_row :for={t <- @tasks} task={t} myself={@myself} />
+    <.task_row :for={t <- @tasks} task={t} />
 
     <%= if @tasks == [] do %>
       <% filtering = @task_search != "" or not is_nil(@state_filter) %>
@@ -60,7 +57,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
   attr :label, :string, required: true
   attr :value, :string, required: true
   attr :current, :any, default: nil
-  attr :myself, :any, required: true
 
   defp state_pill(assigns) do
     ~H"""
@@ -68,7 +64,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
     <button
       phx-click="set_task_state_filter"
       phx-value-state={if active, do: "all", else: @value}
-      phx-target={@myself}
       class={[
         "text-nano px-1.5 py-0.5 rounded transition-colors",
         if(active,
@@ -83,14 +78,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
   end
 
   attr :task, :map, required: true
-  attr :myself, :any, required: true
 
   def task_row(assigns) do
     ~H"""
     <button
       phx-click="open_task_detail"
       phx-value-task_id={@task.id}
-      phx-target={@myself}
       data-vim-flyout-item
       class="w-full flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
     >

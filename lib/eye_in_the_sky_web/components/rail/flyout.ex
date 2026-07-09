@@ -62,7 +62,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_file_children, :map, default: %{}
   attr :flyout_file_error, :string, default: nil
   attr :flyout_usage, :any, default: nil
-  attr :myself, :any, required: true
 
   def flyout(assigns) do
     ~H"""
@@ -124,7 +123,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <Helpers.section_header_link route="/usage" icon="hero-chart-bar" label="Usage" />
               <button
                 phx-click="refresh_usage"
-                phx-target={@myself}
                 title="Refresh usage"
                 class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
               >
@@ -157,13 +155,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
 
           <%!-- + / action button (right side of header) --%>
           <%= if @active_section == :notes do %>
-            <.header_action_btn phx-click="new_note" phx-target={@myself} title="New note" />
+            <.header_action_btn phx-click="new_note" title="New note" />
           <% end %>
           <%= if @active_section == :tasks do %>
             <.header_action_btn
               phx-click="open_rail_modal"
               phx-value-type="new_task"
-              phx-target={@myself}
               title="New task"
             />
           <% end %>
@@ -171,14 +168,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <.header_action_btn
               phx-click="open_rail_modal"
               phx-value-type="new_prompt"
-              phx-target={@myself}
               title="New prompt"
             />
           <% end %>
           <%= if @active_section == :files do %>
             <button
               phx-click="file_refresh"
-              phx-target={@myself}
               title="Refresh file tree"
               class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
             >
@@ -190,13 +185,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <.header_action_btn
                 phx-click="new_session"
                 phx-value-project_id={@sidebar_project.id}
-                phx-target={@myself}
                 title={"New session in #{@sidebar_project.name}"}
               />
             <% else %>
               <.header_action_btn
                 phx-click="toggle_new_session_form"
-                phx-target={@myself}
                 title="New session"
               />
             <% end %>
@@ -204,7 +197,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           <%= if @active_section == :chat do %>
             <.header_action_btn
               phx-click="toggle_new_channel_form"
-              phx-target={@myself}
               title="New channel"
             />
           <% end %>
@@ -215,49 +207,42 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           <SessionsSection.sessions_filters
             session_name_filter={@session_name_filter}
             session_scope={@session_scope}
-            myself={@myself}
           />
         <% end %>
         <%= if @active_section == :tasks do %>
           <TasksSection.tasks_filters
             task_search={@task_search}
             state_filter={@task_state_filter}
-            myself={@myself}
           />
         <% end %>
         <%= if @active_section == :notes do %>
           <NotesSection.notes_filters
             note_search={@note_search}
             note_parent_type={@note_parent_type}
-            myself={@myself}
           />
         <% end %>
         <%= if @active_section == :agents do %>
           <AgentsSection.agents_filters
             agent_search={@agent_search}
             agent_scope={@agent_scope}
-            myself={@myself}
           />
         <% end %>
         <%= if @active_section == :skills do %>
           <SkillsSection.skills_filters
             skill_search={@skill_search}
             skill_scope={@skill_scope}
-            myself={@myself}
           />
         <% end %>
         <%= if @active_section == :prompts do %>
           <PromptsSection.prompts_filters
             prompt_search={@prompt_search}
             prompt_scope={@prompt_scope}
-            myself={@myself}
           />
         <% end %>
         <%= if @active_section == :teams do %>
           <TeamsSection.teams_filters
             team_search={@team_search}
             team_status={@team_status}
-            myself={@myself}
           />
         <% end %>
 
@@ -277,7 +262,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 session_project_visible={@session_project_visible}
                 session_project_collapsed={@session_project_collapsed}
                 sidebar_project={@sidebar_project}
-                myself={@myself}
               />
             <% :tasks -> %>
               <TasksSection.tasks_content
@@ -285,7 +269,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 task_search={@task_search}
                 state_filter={@task_state_filter}
                 sidebar_project={@sidebar_project}
-                myself={@myself}
               />
             <% :prompts -> %>
               <PromptsSection.prompts_content
@@ -299,14 +282,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 channels={@flyout_channels}
                 active_channel_id={@active_channel_id}
                 unread_counts={@unread_counts}
-                myself={@myself}
               />
             <% :notes -> %>
               <NotesSection.notes_content
                 notes={@flyout_notes}
                 note_search={@note_search}
                 note_parent_type={@note_parent_type}
-                myself={@myself}
               />
             <% :skills -> %>
               <SkillsSection.skills_content
@@ -323,7 +304,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <% :canvas -> %>
               <CanvasSection.canvas_content canvases={@flyout_canvases} />
             <% :agents -> %>
-              <AgentsSection.agents_content agents={@flyout_agents} myself={@myself} />
+              <AgentsSection.agents_content agents={@flyout_agents} />
             <% :notifications -> %>
               <Helpers.simple_link href="/notifications" label="Notifications" icon="hero-bell" />
             <% :iam -> %>
@@ -350,7 +331,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 file_children={@flyout_file_children}
                 file_error={@flyout_file_error}
                 sidebar_project={@sidebar_project}
-                myself={@myself}
               />
             <% nil -> %>
               <%!-- transient nil state during restore_rail_state round-trip; render nothing --%>

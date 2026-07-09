@@ -158,4 +158,31 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
         {:noreply, Phoenix.LiveView.put_flash(socket, :error, "File not found")}
     end
   end
+
+  @doc """
+  Open DB-backed content for `record_id` of `type` in the given editor via EditorSync.
+
+  Returns `{:noreply, socket}` with a flash on success or error.
+  Intended to be called from an `open_in_editor` handle_event clause when
+  `phx-value-id` is set (record mode, no `path` present).
+  """
+  def handle_open_in_editor_record(type, record_id, editor_id, socket) do
+    case EyeInTheSky.EditorSync.open(type, record_id, editor_id) do
+      {:ok, label} ->
+        {:noreply,
+         Phoenix.LiveView.put_flash(
+           socket,
+           :info,
+           "Opened in #{label} — saves sync automatically"
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         Phoenix.LiveView.put_flash(
+           socket,
+           :error,
+           EyeInTheSky.EditorSync.format_error(reason)
+         )}
+    end
+  end
 end

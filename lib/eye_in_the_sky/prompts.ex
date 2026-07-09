@@ -139,10 +139,20 @@ defmodule EyeInTheSky.Prompts do
   def update_prompt(%Prompt{} = prompt, attrs) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    prompt
-    |> Prompt.changeset(attrs)
-    |> Ecto.Changeset.put_change(:updated_at, now)
-    |> Repo.update()
+    result =
+      prompt
+      |> Prompt.changeset(attrs)
+      |> Ecto.Changeset.put_change(:updated_at, now)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated} ->
+        EyeInTheSky.Events.prompt_updated(updated)
+        {:ok, updated}
+
+      err ->
+        err
+    end
   end
 
   @doc """

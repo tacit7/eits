@@ -635,7 +635,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
             class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
             aria-label="Claude Config"
           >
-            <.icon name="lucide-file-cog" class="size-4" />
+            <.custom_icon name="lucide-file-cog" class="size-4" />
           </.link>
         </div>
 

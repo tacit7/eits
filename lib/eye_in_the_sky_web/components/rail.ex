@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.Rail do
   @moduledoc false
-  use EyeInTheSkyWeb, :live_view
+  use EyeInTheSkyWeb, :live_view, layout: false
 
   alias EyeInTheSky.Events
 
@@ -134,9 +134,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       {:ok, socket}
     end
   end
-
-  @impl true
-  def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   # Page LiveView navigation — adopt new sidebar context broadcast by page LiveViews.
   @impl true

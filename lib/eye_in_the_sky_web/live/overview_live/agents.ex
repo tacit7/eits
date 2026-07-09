@@ -1,9 +1,13 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Agents do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
 
   @impl true
@@ -20,6 +24,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
       |> assign(:detail_tab, :preview)
       |> assign(:sidebar_tab, :agents)
       |> assign(:sidebar_project, nil)
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     socket = if connected?(socket), do: load_agents(socket), else: socket
 
@@ -63,6 +69,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
   @impl true
   def handle_event("close_viewer", _params, socket) do
     {:noreply, assign(socket, :selected_agent, nil)}
+  end
+
+  @impl true
+  def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
+    if open_path_allowed?(path, socket) do
+      ViewHelpers.handle_open_in_editor(path, editor_id, socket)
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
   end
 
   @impl true
@@ -245,12 +260,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                   </div>
                 <% end %>
               </div>
-              <button
-                phx-click="close_viewer"
-                class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
-              >
-                <.icon name="hero-x-mark" class="size-4" />
-              </button>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <.open_in_editor_button
+                  path={@selected_agent.abs_path || ""}
+                  installed_editors={@installed_editors}
+                  preferred_editor={@preferred_editor}
+                />
+                <button
+                  phx-click="close_viewer"
+                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                >
+                  <.icon name="hero-x-mark" class="size-4" />
+                </button>
+              </div>
             </div>
             <div class="flex items-center gap-1 mt-3">
               <button
@@ -295,6 +317,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
       <% end %>
     </div>
     """
+  end
+
+  defp open_path_allowed?(path, socket) do
+    File.exists?(path) &&
+      Enum.any?(socket.assigns.agents, &(&1.abs_path == path))
   end
 
   defp source_badge_class(:agents), do: "bg-primary/10 text-primary/70"

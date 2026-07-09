@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Events
   alias EyeInTheSky.{Messages, Sessions}
   alias EyeInTheSky.Settings
 
@@ -232,30 +233,18 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
 
   defp handle_fab_info({event, _}, socket)
        when event in [:notification_created, :notifications_updated, :notification_read] do
-    send_update(EyeInTheSkyWeb.Components.Rail,
-      id: "app-rail",
-      notification_count: :refresh
-    )
-
+    Events.broadcast_rail_refresh_notifications()
     {:halt, socket}
   end
 
   defp handle_fab_info({:project_updated, _project}, socket) do
-    send_update(EyeInTheSkyWeb.Components.Rail,
-      id: "app-rail",
-      refresh_projects: true
-    )
-
+    Events.broadcast_rail_refresh_projects()
     {:halt, socket}
   end
 
   defp handle_fab_info({event, _channel}, socket)
        when event in [:channel_created, :channel_deleted] do
-    send_update(EyeInTheSkyWeb.Components.Rail,
-      id: "app-rail",
-      refresh_channels: true
-    )
-
+    Events.broadcast_rail_refresh_channels()
     {:halt, socket}
   end
 

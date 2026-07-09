@@ -30,8 +30,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   def jobs_table(assigns) do
     ~H"""
     <%= if @jobs != [] do %>
-      <div class="mt-2 rounded-xl border border-base-content/8 overflow-hidden bg-base-100">
-        <div class="divide-y divide-base-content/5">
+      <div class="mt-2 divide-y divide-base-content/5">
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
           <% selected? = @expanded_job_id == job.id %>
@@ -157,7 +156,6 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             </div>
           </div>
         <% end %>
-        </div>
       </div>
     <% else %>
       <.empty_state

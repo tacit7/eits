@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Notes
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.NotesList
@@ -30,6 +31,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       |> assign(:notes_select_mode, false)
       |> assign_notes_new_href(params)
 
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
     {:ok, socket}
   end
 

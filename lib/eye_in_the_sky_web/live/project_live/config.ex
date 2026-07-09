@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   import EyeInTheSkyWeb.Components.ConfigBrowser
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [read_file_for_display: 4]
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
@@ -41,6 +42,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
           socket
         end
 
+      if connected?(socket), do: Events.broadcast_rail_context(socket)
       {:ok, socket}
     end
   end

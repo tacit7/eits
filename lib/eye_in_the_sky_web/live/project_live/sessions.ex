@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Actions
@@ -19,6 +20,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
     socket = mount_project(socket, params, sidebar_tab: :sessions, page_title_prefix: "Sessions")
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     if socket.assigns.project do
       if connected?(socket) do
@@ -48,6 +50,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
       |> assign(:sidebar_tab, :sessions)
       |> assign(:sidebar_project, nil)
 
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
     {:ok, State.init(socket)}
   end
 

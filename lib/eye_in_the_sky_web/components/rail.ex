@@ -1,12 +1,13 @@
 defmodule EyeInTheSkyWeb.Components.Rail do
   @moduledoc false
-  use EyeInTheSkyWeb, :live_component
+  use EyeInTheSkyWeb, :live_view
+
+  alias EyeInTheSky.Events
 
   import EyeInTheSkyWeb.Components.Rail.Flyout
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
-  import Phoenix.LiveView, only: [start_async: 3, connected?: 1]
 
   # Modals previously embedded inside flyout.ex — now rendered at rail top level
   # so the flyout component stays focused on navigation concerns only.
@@ -52,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   }
 
   @impl true
-  def mount(socket) do
+  def mount(_params, _session, socket) do
     socket =
       assign(socket,
         projects: [],
@@ -114,44 +115,60 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
-    # This component mounts on every page, so the unguarded path doubles DB load.
+    # This LiveView mounts once and persists across navigation.
     if connected?(socket) do
+      Events.subscribe_rail_context()
+      Events.subscribe_rail_unread_counts()
+      Events.subscribe_rail_session_update()
+      Events.subscribe_rail_notifications_refresh()
+      Events.subscribe_rail_projects_refresh()
+      Events.subscribe_rail_channels_refresh()
+
       {:ok,
        assign(socket,
          projects: Projects.list_projects_for_sidebar(),
          flyout_sessions: Loader.load_flyout_sessions(nil),
          notification_count: Notifications.unread_count()
-       )}
+       ), layout: false}
     else
-      {:ok, socket}
+      {:ok, socket, layout: false}
     end
   end
 
-  # Both clauses below are triggered via send_update from floating_chat_live.ex,
-  # which attaches them as handle_info hooks (attach_hook(:fab_info, :handle_info, ...)).
-  # handle_info only fires on connected sockets, so no connected?(socket) guard is needed.
+  # Page LiveView navigation — adopt new sidebar context broadcast by page LiveViews.
   @impl true
-  def update(%{notification_count: :refresh}, socket) do
-    {:ok, assign(socket, :notification_count, Notifications.unread_count())}
+  def handle_info({:rail_context, %{sidebar_tab: sidebar_tab, sidebar_project: sidebar_project, active_channel_id: active_channel_id}}, socket) do
+    previous_tab = socket.assigns[:sidebar_tab]
+    previous_project = socket.assigns[:sidebar_project]
+    next_section = Map.get(@section_map, sidebar_tab, :sessions)
+
+    socket =
+      socket
+      |> assign(:sidebar_tab, sidebar_tab)
+      |> assign(:active_channel_id, active_channel_id)
+
+    # Only adopt sidebar_project if non-nil — prevents pages without a project
+    # from clearing a project locally selected via the rail's own project picker.
+    socket =
+      if not is_nil(sidebar_project) do
+        assign(socket, :sidebar_project, sidebar_project)
+      else
+        socket
+      end
+
+    socket = maybe_reload_on_project_change(socket, previous_project, sidebar_project)
+    socket = maybe_reload_on_tab_change(socket, previous_tab, sidebar_tab, next_section)
+
+    {:noreply, socket}
   end
 
-  def update(%{unread_counts: counts}, socket) do
-    {:ok, assign(socket, :unread_counts, counts)}
+  # Chat unread counts pushed by chat_live / chat_live/pubsub_handlers
+  def handle_info({:rail_unread_counts, counts}, socket) do
+    {:noreply, assign(socket, :unread_counts, counts)}
   end
 
-  def update(%{refresh_projects: true}, socket) do
-    {:ok, assign(socket, :projects, Projects.list_projects_for_sidebar())}
-  end
-
-  def update(%{refresh_channels: true}, socket) do
-    {:ok,
-     assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
-  end
-
-  # Targeted update from NavHook when a session is created/updated/stopped.
-  # Replaces the session in-place if it's already in the list (status change).
-  # Falls back to a full reload if the session is new (not yet in the list).
-  def update(%{session_updated: session}, socket) do
+  # Session update pushed by nav_hook
+  def handle_info({:rail_session_updated, session}, socket) do
     sessions = socket.assigns[:flyout_sessions] || []
 
     updated_sessions =
@@ -166,40 +183,22 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         )
       end
 
-    {:ok, assign(socket, :flyout_sessions, updated_sessions)}
+    {:noreply, assign(socket, :flyout_sessions, updated_sessions)}
   end
 
-  def update(assigns, socket) do
-    # Only adopt parent's sidebar_project if it's non-nil — prevents parent re-renders from
-    # clearing a project that was locally selected via the rail's own project picker.
-    sidebar_project =
-      case assigns do
-        %{sidebar_project: p} when not is_nil(p) -> p
-        _ -> socket.assigns[:sidebar_project]
-      end
+  # Notification refresh from floating_chat_live
+  def handle_info(:rail_refresh_notifications, socket) do
+    {:noreply, assign(socket, :notification_count, Notifications.unread_count())}
+  end
 
-    sidebar_tab = Map.get(assigns, :sidebar_tab, socket.assigns[:sidebar_tab] || :sessions)
-    active_channel_id = Map.get(assigns, :active_channel_id, socket.assigns[:active_channel_id])
-    workspace = Map.get(assigns, :workspace, socket.assigns[:workspace])
-    scope_type = Map.get(assigns, :scope_type, socket.assigns[:scope_type] || :project)
+  # Project list refresh from floating_chat_live
+  def handle_info(:rail_refresh_projects, socket) do
+    {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+  end
 
-    previous_tab = socket.assigns[:sidebar_tab]
-    next_section = Map.get(@section_map, sidebar_tab, :sessions)
-
-    previous_project = socket.assigns[:sidebar_project]
-
-    socket =
-      socket
-      |> assign(:sidebar_tab, sidebar_tab)
-      |> assign(:sidebar_project, sidebar_project)
-      |> assign(:active_channel_id, active_channel_id)
-      |> assign(:workspace, workspace)
-      |> assign(:scope_type, scope_type)
-
-    socket = maybe_reload_on_project_change(socket, previous_project, sidebar_project)
-    socket = maybe_reload_on_tab_change(socket, previous_tab, sidebar_tab, next_section)
-
-    {:ok, socket}
+  # Channel list refresh from floating_chat_live
+  def handle_info(:rail_refresh_channels, socket) do
+    {:noreply, assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
   end
 
   @impl true
@@ -466,14 +465,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     <div
       id="app-rail"
       phx-hook="RailState"
-      phx-target={@myself}
       data-project-id={@sidebar_project && @sidebar_project.id}
       class="flex flex-row h-full min-w-0 relative group/rail"
     >
       <div
         :if={@mobile_open && @flyout_open}
         phx-click="close_flyout"
-        phx-target={@myself}
         class="md:hidden fixed inset-0 z-40 bg-black/40"
       />
 
@@ -483,7 +480,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       <button
         id="rail-collapse-toggle"
         phx-click="toggle_collapsed"
-        phx-target={@myself}
         aria-expanded={to_string(@flyout_open)}
         aria-label={if @flyout_open, do: "Collapse sidebar", else: "Expand sidebar"}
         title={if @flyout_open, do: "Collapse sidebar", else: "Expand sidebar"}
@@ -516,7 +512,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       >
         <button
           phx-click="toggle_proj_picker"
-          phx-target={@myself}
           class={[
             "w-8 h-8 rounded-lg mb-2 flex items-center justify-center text-sm font-bold text-white transition-all",
             "bg-primary hover:opacity-90",
@@ -534,97 +529,73 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-folder"
-          label="Files"
-          myself={@myself}
-        />
+          label="Files"        />
         <.rail_item
           section={:sessions}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-bot-message-square"
-          label="Sessions"
-          myself={@myself}
-        />
+          label="Sessions"        />
         <.rail_item
           section={:tasks}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-kanban"
-          label="Tasks"
-          myself={@myself}
-        />
+          label="Tasks"        />
         <.rail_item
           section={:notes}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-pencil-square"
-          label="Notes"
-          myself={@myself}
-        />
+          label="Notes"        />
         <.rail_item
           section={:agents}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-robot"
-          label="Agents"
-          myself={@myself}
-        />
+          label="Agents"        />
         <.rail_item
           section={:skills}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-bolt"
-          label="Skills"
-          myself={@myself}
-        />
+          label="Skills"        />
         <.rail_item
           section={:prompts}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-document-text"
-          label="Prompts"
-          myself={@myself}
-        />
+          label="Prompts"        />
         <.rail_item
           section={:teams}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-users"
-          label="Teams"
-          myself={@myself}
-        />
+          label="Teams"        />
         <.rail_item
           section={:jobs}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-clock"
-          label="Jobs"
-          myself={@myself}
-        />
+          label="Jobs"        />
         <.rail_item
           section={:canvas}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-squares-2x2"
-          label="Canvas"
-          myself={@myself}
-        />
+          label="Canvas"        />
         <.rail_item
           section={:chat}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-chat-bubble-left-ellipsis"
-          label="Chat"
-          myself={@myself}
-        />
+          label="Chat"        />
         <.rail_item
           section={:usage}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-chart-bar"
-          label="Usage"
-          myself={@myself}
-        />
+          label="Usage"        />
 
         <div class="flex-1" />
         <div class="mb-3" />
@@ -686,7 +657,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         sidebar_project={@sidebar_project}
         open={@proj_picker_open}
         new_project_path={@new_project_path}
-        myself={@myself}
         workspace={@workspace}
         scope_type={@scope_type}
       />
@@ -733,20 +703,17 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_children={@flyout_file_children}
         flyout_file_error={@flyout_file_error}
         flyout_usage={@flyout_usage}
-        myself={@myself}
       />
 
       <%!-- ── Channel modal ── --%>
       <.new_channel_modal
         :if={@show_new_channel_form}
-        myself={@myself}
       />
 
       <%!-- ── Rail modal (new task / new prompt) ── --%>
       <.rail_modal
         :if={@rail_modal in [:new_task, :new_prompt]}
         modal={@rail_modal}
-        myself={@myself}
       />
 
       <%!-- ── Task detail modal ── --%>
@@ -755,7 +722,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         task={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
         index={elem(@rail_modal, 1)}
         total={length(elem(@rail_modal, 2))}
-        myself={@myself}
       />
 
       <%!-- ── Note detail modal ── --%>
@@ -764,13 +730,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         note={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
         index={elem(@rail_modal, 1)}
         total={length(elem(@rail_modal, 2))}
-        myself={@myself}
       />
 
       <.file_panel
         file_tabs={@file_tabs}
         active_tab_path={@active_tab_path}
-        myself={@myself}
         socket={@socket}
       />
       <%!-- Splitter handle for split-view mode. Visibility driven by data-editor-mode on <html>. --%>
@@ -796,7 +760,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         current_project={@sidebar_project}
         toggle_event="toggle_new_session_drawer"
         submit_event="create_new_session"
-        target={@myself}
+        target={nil}
         prefill_agent_slug={@prefill_agent_slug}
         prefill_agent_name={@prefill_agent_name}
       />

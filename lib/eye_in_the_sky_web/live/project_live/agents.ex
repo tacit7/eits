@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
@@ -28,6 +29,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
     socket = if connected?(socket), do: load_agents(socket), else: socket
 
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
     {:ok, socket}
   end
 

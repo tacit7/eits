@@ -75,6 +75,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
                 socket
               end
 
+            if connected?(socket), do: Events.broadcast_rail_context(socket)
             {:ok, socket}
         end
     end

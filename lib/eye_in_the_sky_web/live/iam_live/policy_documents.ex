@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
   import EyeInTheSkyWeb.IAMLive.IAMComponents
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.PolicyDocument
@@ -30,6 +31,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
       else
         assign(socket, :documents, [])
       end
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

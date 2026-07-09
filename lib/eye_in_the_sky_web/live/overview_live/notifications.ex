@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Notifications
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1]
@@ -23,6 +24,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
       |> assign(:sidebar_project, nil)
       |> assign(:notifications, notifications)
       |> assign(:filter, "all")
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Prompts
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -16,6 +17,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
       |> assign(:selected_prompt, nil)
       |> assign(:detail_tab, :preview)
 
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
     {:ok, socket}
   end
 

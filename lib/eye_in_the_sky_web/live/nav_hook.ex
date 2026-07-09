@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   Palette events are delegated to PaletteHandlers and PaletteAgentHandlers.
   """
 
-  import Phoenix.LiveView, only: [attach_hook: 4, push_event: 3, connected?: 1, send_update: 2]
+  import Phoenix.LiveView, only: [attach_hook: 4, push_event: 3, connected?: 1]
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Events
@@ -28,13 +28,22 @@ defmodule EyeInTheSkyWeb.NavHook do
       Projects.list_projects()
       |> Enum.map(&%{id: &1.id, name: &1.name})
 
+    # live_render-embedded views (e.g. Rail) don't support :handle_params hooks
+    # because they're not mounted via live/3 in the router. Guard by the private
+    # :router key — router-mounted views always have it; embedded views don't.
+    router_mounted? = Map.get(socket.private, :router) != nil
+
     socket =
       socket
       |> assign(:nav_path, nil)
       |> assign(:mobile_nav_tab, :sessions)
       |> assign(:palette_projects, projects)
       |> assign(:palette_shortcut, Settings.get("palette_shortcut") || "auto")
-      |> attach_hook(:capture_nav_path, :handle_params, &capture_nav_path/3)
+      |> then(fn s ->
+        if router_mounted?,
+          do: attach_hook(s, :capture_nav_path, :handle_params, &capture_nav_path/3),
+          else: s
+      end)
       |> attach_hook(:session_failed_toast, :handle_info, &maybe_push_session_failed/2)
       |> attach_hook(:rail_session_update, :handle_info, &maybe_update_rail_sessions/2)
       |> attach_hook(:palette_sessions, :handle_event, &PaletteHandlers.handle_palette_event/3)
@@ -109,7 +118,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   # Only %Session{} structs have the :name field that sessions_section.ex expects.
   defp maybe_update_rail_sessions({event, %EyeInTheSky.Sessions.Session{} = session}, socket)
        when event in [:agent_updated, :agent_stopped] do
-    send_update(EyeInTheSkyWeb.Components.Rail, id: "app-rail", session_updated: session)
+    Events.broadcast_rail_session_updated(session)
     {:cont, socket}
   end
 

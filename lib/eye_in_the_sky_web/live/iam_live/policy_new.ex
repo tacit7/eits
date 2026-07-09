@@ -19,6 +19,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
   import EyeInTheSkyWeb.IAMLive.IAMComponents
   import EyeInTheSkyWeb.IAMLive.PolicyFormHelpers
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.Policy
@@ -30,16 +31,20 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
     changeset = Policy.create_changeset(%Policy{priority: 0, enabled: true}, %{})
     projects = if connected?(socket), do: Projects.list_projects(), else: []
 
-    {:ok,
-     socket
-     |> assign(:page_title, "New IAM Policy")
-     |> assign(:sidebar_tab, :iam)
-     |> assign(:sidebar_project, nil)
-     |> assign(:form, to_form(changeset))
-     |> assign(:condition_text, "{}")
-     |> assign(:scope, "global")
-     |> assign(:projects, projects)
-     |> assign(:iam_hooks_status, HooksChecker.status())}
+    socket =
+      socket
+      |> assign(:page_title, "New IAM Policy")
+      |> assign(:sidebar_tab, :iam)
+      |> assign(:sidebar_project, nil)
+      |> assign(:form, to_form(changeset))
+      |> assign(:condition_text, "{}")
+      |> assign(:scope, "global")
+      |> assign(:projects, projects)
+      |> assign(:iam_hooks_status, HooksChecker.status())
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
+
+    {:ok, socket}
   end
 
   @impl true

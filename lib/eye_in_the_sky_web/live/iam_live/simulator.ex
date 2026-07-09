@@ -16,6 +16,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
   import EyeInTheSkyWeb.IAMLive.SimulatorComponents
   import EyeInTheSkyWeb.IAMLive.IAMComponents
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.IAM.Context
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.Simulator
@@ -64,14 +65,18 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "IAM Simulator")
-     |> assign(:form, @default_form)
-     |> assign(:result, nil)
-     |> assign(:sidebar_tab, :iam)
-     |> assign(:sidebar_project, nil)
-     |> assign(:iam_hooks_status, HooksChecker.status())}
+    socket =
+      socket
+      |> assign(:page_title, "IAM Simulator")
+      |> assign(:form, @default_form)
+      |> assign(:result, nil)
+      |> assign(:sidebar_tab, :iam)
+      |> assign(:sidebar_project, nil)
+      |> assign(:iam_hooks_status, HooksChecker.status())
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
+
+    {:ok, socket}
   end
 
   @impl true

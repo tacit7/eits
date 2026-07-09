@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Helpers.FileHelpers, only: [path_within?: 2]
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
@@ -82,6 +83,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:pi_providers, :loading)
       |> assign(:pi_model_status, current_model_status())
       |> assign(:pi_key_op_in_flight, false)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

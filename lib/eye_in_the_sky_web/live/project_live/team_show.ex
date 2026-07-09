@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.{Notes, Tasks, Teams}
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
@@ -8,6 +9,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
   @impl true
   def mount(%{"id" => _, "team_id" => team_id_str} = params, _session, socket) do
     socket = mount_project(socket, params, sidebar_tab: :teams, page_title_prefix: "Team")
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     team_id = parse_int(team_id_str)
     project = socket.assigns.project

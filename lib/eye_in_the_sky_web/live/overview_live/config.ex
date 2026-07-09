@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
 
   import EyeInTheSkyWeb.Live.FileBrowserHelpers
 
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
@@ -31,6 +32,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
       |> assign(:file_type, nil)
       |> assign(:creating, nil)
       |> assign(:error, nil)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

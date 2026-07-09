@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.{Notes, Tasks}
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
@@ -55,6 +56,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
         socket
       end
 
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
     {:ok, socket}
   end
 

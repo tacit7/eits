@@ -23,22 +23,26 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         {[], %{}}
       end
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Canvas")
-     |> assign(:sidebar_tab, :canvas)
-     |> assign(:canvases, canvases)
-     |> assign(:active_canvas_id, nil)
-     |> assign(:canvas_sessions, [])
-     |> assign(:subscribed_session_ids, [])
-     |> assign(:creating_canvas, false)
-     |> assign(:renaming_canvas_id, nil)
-     |> assign(:show_session_picker, false)
-     |> assign(:session_search, "")
-     |> assign(:filtered_sessions, [])
-     |> assign(:focus_session_id, nil)
-     |> assign(:canvas_terminals, [])
-     |> assign(:terminal_pty_map, %{})}
+    socket =
+      socket
+      |> assign(:page_title, "Canvas")
+      |> assign(:sidebar_tab, :canvas)
+      |> assign(:canvases, canvases)
+      |> assign(:active_canvas_id, nil)
+      |> assign(:canvas_sessions, [])
+      |> assign(:subscribed_session_ids, [])
+      |> assign(:creating_canvas, false)
+      |> assign(:renaming_canvas_id, nil)
+      |> assign(:show_session_picker, false)
+      |> assign(:session_search, "")
+      |> assign(:filtered_sessions, [])
+      |> assign(:focus_session_id, nil)
+      |> assign(:canvas_terminals, [])
+      |> assign(:terminal_pty_map, %{})
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
+
+    {:ok, socket}
   end
 
   @impl true

@@ -109,7 +109,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         show_new_session_form: false,
         show_new_channel_form: false,
         prefill_agent_slug: nil,
-        prefill_agent_name: nil
+        prefill_agent_name: nil,
+        disable_auth: Application.get_env(:eye_in_the_sky, :disable_auth, false)
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
@@ -640,47 +641,55 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="flex-1" />
         <div class="mb-3" />
 
-        <.link
-          navigate="/notifications"
-          class={[
-            "relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-            "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"
-          ]}
-          aria-label="Notifications"
-        >
-          <.icon name="hero-bell-mini" class="size-4" />
-          <span
-            :if={@notification_count > 0}
-            class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5"
+        <div class="tooltip tooltip-right" data-tip="Notifications">
+          <.link
+            navigate="/notifications"
+            class={[
+              "relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+              "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"
+            ]}
+            aria-label="Notifications"
           >
-            {@notification_count}
-          </span>
-        </.link>
+            <.icon name="hero-bell-mini" class="size-4" />
+            <span
+              :if={@notification_count > 0}
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5"
+            >
+              {@notification_count}
+            </span>
+          </.link>
+        </div>
 
-        <.link
-          navigate="/iam/policies"
-          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
-          aria-label="IAM Policies"
-        >
-          <.icon name="hero-shield-check-mini" class="size-4" />
-        </.link>
+        <div class="tooltip tooltip-right" data-tip="IAM Policies">
+          <.link
+            navigate="/iam/policies"
+            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            aria-label="IAM Policies"
+          >
+            <.icon name="hero-shield-check-mini" class="size-4" />
+          </.link>
+        </div>
 
-        <.link
-          navigate="/settings"
-          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
-          aria-label="Settings"
-        >
-          <.icon name="hero-cog-6-tooth-mini" class="size-4" />
-        </.link>
+        <div class="tooltip tooltip-right" data-tip="Settings">
+          <.link
+            navigate="/settings"
+            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            aria-label="Settings"
+          >
+            <.icon name="hero-cog-6-tooth-mini" class="size-4" />
+          </.link>
+        </div>
 
-        <.link
-          href="/auth/logout"
-          method="delete"
-          class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
-          aria-label="Sign out"
-        >
-          <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
-        </.link>
+        <div :if={!@disable_auth} class="tooltip tooltip-right" data-tip="Sign out">
+          <.link
+            href="/auth/logout"
+            method="delete"
+            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            aria-label="Sign out"
+          >
+            <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
+          </.link>
+        </div>
       </nav>
 
       <.project_switcher

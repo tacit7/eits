@@ -1,8 +1,11 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
   alias EyeInTheSky.Notes
+  alias EyeInTheSky.Settings
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.NotesList
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -29,6 +32,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       |> assign(:show_all, false)
       |> assign(:selected_note_ids, MapSet.new())
       |> assign(:notes_select_mode, false)
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
       |> assign_notes_new_href(params)
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)
@@ -213,6 +218,37 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     end
   end
 
+  @impl true
+  def handle_event("open_in_editor", %{"editor" => editor_id, "id" => id_str}, socket) do
+    case Integer.parse(id_str) do
+      {id, ""} ->
+        if connected?(socket) do
+          Events.subscribe_note(id)
+          Events.subscribe_editor_sync(:note, id)
+        end
+
+        ViewHelpers.handle_open_in_editor_record(:note, id, editor_id, socket)
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid note ID")}
+    end
+  end
+
+  def handle_event("open_in_editor", _params, socket) do
+    {:noreply, put_flash(socket, :error, "No note selected")}
+  end
+
+  @impl true
+  def handle_info({:note_updated, note}, socket) do
+    # Refresh the note in the list if it's visible.
+    notes = Enum.map(socket.assigns.notes, fn n -> if n.id == note.id, do: note, else: n end)
+    {:noreply, assign(socket, :notes, notes)}
+  end
+
+  def handle_info({:editor_sync_failed, :note, _id, _reason}, socket) do
+    {:noreply, put_flash(socket, :error, "Editor sync failed — check your editor")}
+  end
+
   defp load_notes(socket) do
     show_all = Map.get(socket.assigns, :show_all, false)
     project = socket.assigns.project
@@ -353,6 +389,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           current_path={~p"/projects/#{@project.id}/notes"}
           selected_ids={@selected_note_ids}
           select_mode={@notes_select_mode}
+          installed_editors={@installed_editors}
+          preferred_editor={@preferred_editor}
         />
       </div>
     </div>

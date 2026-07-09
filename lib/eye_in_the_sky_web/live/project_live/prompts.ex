@@ -1,9 +1,13 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
   alias EyeInTheSky.Prompts
+  alias EyeInTheSky.Settings
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
   @impl true
@@ -16,6 +20,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
       |> assign(:prompts, [])
       |> assign(:selected_prompt, nil)
       |> assign(:detail_tab, :preview)
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)
     {:ok, socket}
@@ -59,6 +65,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   @impl true
   def handle_event("select_prompt", %{"uuid" => uuid}, socket) do
     selected = Enum.find(socket.assigns.prompts, &(&1.uuid == uuid))
+
+    if selected && Phoenix.LiveView.connected?(socket) do
+      Events.subscribe_prompt(selected.id)
+      Events.subscribe_editor_sync(:prompt, selected.id)
+    end
+
     {:noreply, assign(socket, selected_prompt: selected, detail_tab: :preview)}
   end
 
@@ -98,6 +110,37 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
         end
     end
   end
+
+  @impl true
+  def handle_event("open_in_editor", %{"editor" => editor_id, "id" => id_str}, socket) do
+    case Integer.parse(id_str) do
+      {id, ""} -> ViewHelpers.handle_open_in_editor_record(:prompt, id, editor_id, socket)
+      _ -> {:noreply, put_flash(socket, :error, "Invalid prompt ID")}
+    end
+  end
+
+  def handle_event("open_in_editor", _params, socket) do
+    {:noreply, put_flash(socket, :error, "No record selected")}
+  end
+
+  @impl true
+  def handle_info({:prompt_updated, prompt}, socket) do
+    if socket.assigns.selected_prompt && socket.assigns.selected_prompt.id == prompt.id do
+      {:noreply, assign(socket, :selected_prompt, prompt)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:editor_sync_failed, :prompt, id, _reason}, socket) do
+    if socket.assigns.selected_prompt && socket.assigns.selected_prompt.id == id do
+      {:noreply, put_flash(socket, :error, "Editor sync failed — check your editor")}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info(_msg, socket), do: {:noreply, socket}
 
   defp load_prompts(socket) do
     show_all = Map.get(socket.assigns, :show_all, false)
@@ -265,12 +308,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                     </div>
                   <% end %>
                 </div>
-                <.link
-                  navigate={~p"/projects/#{@project.id}/prompts/#{@selected_prompt.uuid}"}
-                  class="btn btn-ghost btn-xs gap-1 flex-shrink-0"
-                >
-                  <.icon name="hero-arrow-top-right-on-square" class="size-3.5" /> Full edit
-                </.link>
+                <div class="flex items-center gap-1 flex-shrink-0">
+                  <.open_in_editor_button
+                    record_id={@selected_prompt.id}
+                    installed_editors={@installed_editors}
+                    preferred_editor={@preferred_editor}
+                  />
+                  <.link
+                    navigate={~p"/projects/#{@project.id}/prompts/#{@selected_prompt.uuid}"}
+                    class="btn btn-ghost btn-xs gap-1"
+                  >
+                    <.icon name="hero-arrow-top-right-on-square" class="size-3.5" /> Full edit
+                  </.link>
+                </div>
               </div>
               <div class="flex items-center gap-1 mt-3">
                 <button

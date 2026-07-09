@@ -23,6 +23,7 @@
 - [CHAT.md](CHAT.md) — Chat system: channels, routing, @mentions, cross-project membership
 - [CHAT_UI_DESIGN.md](CHAT_UI_DESIGN.md) — Chat UI design spec: message rendering rules, hierarchy, metadata, actions, composer, known issues
 - [EVENTS.md](EVENTS.md) — PubSub Events: all topics, payload shapes, subscribe helpers
+- [SESSION_STATUS_PUBSUB.md](SESSION_STATUS_PUBSUB.md) — Session status PubSub contract: topic→subscriber map, zombie sweep, green dot logic, how to wire new UI surfaces
 - [GITHUB_WEBHOOKS.md](GITHUB_WEBHOOKS.md) — GitHub webhook integration: delivery inbox, dispatcher, built-in handlers, rules engine, smee local dev
 - [ORCHESTRATOR_TIMERS.md](ORCHESTRATOR_TIMERS.md) — OrchestratorTimers: session-scoped auto-nudge timers, PubSub events, UI integration
 - [MOBILE.md](MOBILE.md) — Mobile layout standards: touch targets, sticky offsets, viewport, overflow

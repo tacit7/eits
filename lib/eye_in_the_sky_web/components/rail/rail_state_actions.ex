@@ -226,7 +226,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
     assign(socket, :active_section, Loader.parse_section(section))
   end
 
-  defp maybe_restore_section(socket, _), do: socket
+  # No stored section (fresh browser / cleared storage) — fall back to :sessions
+  # so first-time visitors still see a populated flyout rather than the nil placeholder.
+  defp maybe_restore_section(socket, _) do
+    assign(socket, :active_section, :sessions)
+  end
 
   defp maybe_restore_session_sort(socket, %{"session_sort" => sort}) when is_binary(sort) do
     assign(socket, :session_sort, Loader.parse_session_sort(sort))

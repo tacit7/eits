@@ -30,7 +30,8 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   def jobs_table(assigns) do
     ~H"""
     <%= if @jobs != [] do %>
-      <div class="mt-2 divide-y divide-base-content/5">
+      <div class="mt-2 rounded-xl shadow-sm">
+        <div class="divide-y divide-base-content/5">
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
           <% selected? = @expanded_job_id == job.id %>
@@ -39,7 +40,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             class={[
               "flex items-center gap-3 py-3 px-4 cursor-pointer relative group/row",
               "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:ring-inset",
-              if(selected?, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset", else: "hover:bg-base-200/40"),
+              if(selected?, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg", else: "bg-base-100 hover:bg-base-200/40"),
               if(job_state == :disabled, do: "opacity-60")
             ]}
             phx-click="expand_job"
@@ -156,6 +157,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             </div>
           </div>
         <% end %>
+        </div>
       </div>
     <% else %>
       <.empty_state

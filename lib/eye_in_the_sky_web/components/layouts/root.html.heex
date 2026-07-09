@@ -81,6 +81,7 @@
     </script>
   </head>
   <body class="bg-base-100 min-h-[100dvh] overflow-hidden">
+    <%= live_render(@conn, EyeInTheSkyWeb.Components.Rail, id: "app-rail") %>
     {@inner_content}
   </body>
 </html>

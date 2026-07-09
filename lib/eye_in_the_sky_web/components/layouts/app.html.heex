@@ -105,14 +105,6 @@
   </div>
 
   <div id="app-body" class="flex flex-1 min-h-0">
-  <.live_component
-    module={EyeInTheSkyWeb.Components.Rail}
-    id="app-rail"
-    sidebar_tab={assigns[:sidebar_tab] || :sessions}
-    sidebar_project={assigns[:sidebar_project]}
-    active_channel_id={assigns[:active_channel_id]}
-  />
-
   <%!-- Grab handle for swipe-to-open sidebar on mobile.
        touch-action:none prevents Safari from stealing the gesture for back navigation. --%>
   <%!-- Grab handle starts below the mobile header so it never covers the hamburger button.

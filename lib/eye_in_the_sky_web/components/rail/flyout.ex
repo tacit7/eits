@@ -352,6 +352,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 sidebar_project={@sidebar_project}
                 myself={@myself}
               />
+            <% nil -> %>
+              <%!-- transient nil state during restore_rail_state round-trip; render nothing --%>
             <% _ -> %>
               <TasksSection.nav_links project={@sidebar_project} section={:sessions} />
           <% end %>

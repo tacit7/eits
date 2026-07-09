@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         projects: [],
         flyout_open: true,
         proj_picker_open: false,
-        active_section: :sessions,
+        active_section: nil,
         flyout_sessions: [],
         flyout_channels: [],
         unread_counts: %{},

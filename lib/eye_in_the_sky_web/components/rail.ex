@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.Rail do
   @moduledoc false
-  use EyeInTheSkyWeb, :live_view, layout: false
+  use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Events
 
@@ -129,9 +129,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
          projects: Projects.list_projects_for_sidebar(),
          flyout_sessions: Loader.load_flyout_sessions(nil),
          notification_count: Notifications.unread_count()
-       )}
+       ), layout: false}
     else
-      {:ok, socket}
+      {:ok, socket, layout: false}
     end
   end
 

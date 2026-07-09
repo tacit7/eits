@@ -205,7 +205,11 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
 
       Enum.each(zombies, fn s ->
         Logger.warning("Swept zombie session id=#{s.id} uuid=#{s.uuid} (stuck in working)")
-        Events.session_status(s.id, "failed")
+        updated = %{s | status: "failed"}
+        # Broadcast to "agents" topic so rail sidebar and DM page both update.
+        # Events.session_status/2 only hits "session:<id>:status" which neither subscribes to.
+        Events.session_updated(updated)
+        Events.session_failed(updated, "zombie_swept")
       end)
 
       # H2 fix: single Repo.update_all replaces M individual Agents.update_agent calls.
@@ -224,7 +228,10 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   end
 
   defp archive_session_and_agent(session, now) do
-    Sessions.update_session(session, %{archived_at: now, status: "archived"})
+    case Sessions.update_session(session, %{archived_at: now, status: "archived"}) do
+      {:ok, updated} -> Events.session_updated(updated)
+      _ -> :ok
+    end
 
     # session.agent is preloaded in archive_dead_idle_sessions/0 — no extra SELECT needed.
     if session.agent do

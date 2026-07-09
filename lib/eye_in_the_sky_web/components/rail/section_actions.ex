@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          |> assign(:active_section, sticky)
          |> assign(:flyout_open, true)
          |> assign(:mobile_open, false)
-         |> push_event("save_rail_state", %{flyout_open: true})}
+         |> push_event("save_rail_state", %{flyout_open: true, section: Atom.to_string(sticky)})}
       else
         {:noreply,
          socket
@@ -107,7 +107,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
      socket
      |> assign(:active_section, section)
      |> assign(:flyout_open, true)
-     |> push_event("save_rail_state", %{flyout_open: true})
+     |> push_event("save_rail_state", %{flyout_open: true, section: Atom.to_string(section)})
      |> assign(:proj_picker_open, false)
      |> assign(:session_scope, :current)
      |> assign(:session_project_visible, %{})
@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          |> assign(:mobile_open, false)
          |> assign(:proj_picker_open, false)
          |> assign(:show_new_session_form, false)
-         |> push_event("save_rail_state", %{flyout_open: true})}
+         |> push_event("save_rail_state", %{flyout_open: true, section: Atom.to_string(sticky)})}
     end
   end
 end

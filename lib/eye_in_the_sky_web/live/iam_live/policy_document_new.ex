@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentNew do
 
   import EyeInTheSkyWeb.IAMLive.IAMComponents
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.PolicyDocument
@@ -18,13 +19,17 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentNew do
   def mount(_params, _session, socket) do
     changeset = PolicyDocument.create_changeset(%PolicyDocument{}, %{})
 
-    {:ok,
-     socket
-     |> assign(:page_title, "New Policy Document")
-     |> assign(:sidebar_tab, :iam)
-     |> assign(:sidebar_project, nil)
-     |> assign(:form, to_form(changeset))
-     |> assign(:iam_hooks_status, HooksChecker.status())}
+    socket =
+      socket
+      |> assign(:page_title, "New Policy Document")
+      |> assign(:sidebar_tab, :iam)
+      |> assign(:sidebar_project, nil)
+      |> assign(:form, to_form(changeset))
+      |> assign(:iam_hooks_status, HooksChecker.status())
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
+
+    {:ok, socket}
   end
 
   @impl true

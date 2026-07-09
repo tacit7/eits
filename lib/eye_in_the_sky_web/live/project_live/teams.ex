@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Teams
   alias EyeInTheSky.Teams.Team
   alias EyeInTheSky.Teams.TeamMember
@@ -23,6 +24,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:show_all, false)
       |> assign(:all_teams, [])
       |> stream(:team_list, [], dom_id: fn t -> "team-#{t.id}" end)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     socket =
       if connected?(socket) do
@@ -61,6 +64,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:show_all, true)
       |> assign(:all_teams, [])
       |> stream(:team_list, [], dom_id: fn t -> "team-#{t.id}" end)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     socket =
       if connected?(socket) do

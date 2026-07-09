@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentEdit do
   import EyeInTheSkyWeb.IAMLive.IAMComponents
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.PolicyDocument
@@ -30,14 +31,17 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentEdit do
             {:ok, %PolicyDocument{} = doc} ->
               changeset = PolicyDocument.update_changeset(doc, %{})
 
-              {:ok,
-               socket
-               |> assign(:page_title, "Edit: #{doc.name}")
-               |> assign(:sidebar_tab, :iam)
-               |> assign(:sidebar_project, nil)
-               |> assign(:document, doc)
-               |> assign(:form, to_form(changeset))
-               |> assign(:iam_hooks_status, HooksChecker.status())}
+              s =
+                socket
+                |> assign(:page_title, "Edit: #{doc.name}")
+                |> assign(:sidebar_tab, :iam)
+                |> assign(:sidebar_project, nil)
+                |> assign(:document, doc)
+                |> assign(:form, to_form(changeset))
+                |> assign(:iam_hooks_status, HooksChecker.status())
+
+              Events.broadcast_rail_context(s)
+              {:ok, s}
 
             {:error, :not_found} ->
               {:ok,

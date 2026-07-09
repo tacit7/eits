@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @commands [
@@ -182,12 +183,16 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "Keybinding Reference")
-     |> assign(:sidebar_tab, :keybindings)
-     |> assign(:sidebar_project, nil)
-     |> assign(:commands, @commands)}
+    socket =
+      socket
+      |> assign(:page_title, "Keybinding Reference")
+      |> assign(:sidebar_tab, :keybindings)
+      |> assign(:sidebar_project, nil)
+      |> assign(:commands, @commands)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
+
+    {:ok, socket}
   end
 
   @impl true

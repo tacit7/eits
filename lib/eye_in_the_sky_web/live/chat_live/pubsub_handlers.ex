@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
 
   alias EyeInTheSky.ChannelMessages
   alias EyeInTheSky.Channels
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ChatPresenter
   alias EyeInTheSkyWeb.Live.Shared.AgentStatusHelpers
@@ -165,10 +166,7 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
 
       Logger.info("📬 Pushed delta for message id=#{message.id}")
 
-      Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
-        id: "app-rail",
-        unread_counts: unread_counts
-      )
+      Events.broadcast_rail_unread_counts(unread_counts)
 
       {:noreply,
        socket

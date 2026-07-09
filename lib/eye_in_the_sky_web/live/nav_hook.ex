@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   Palette events are delegated to PaletteHandlers and PaletteAgentHandlers.
   """
 
-  import Phoenix.LiveView, only: [attach_hook: 4, push_event: 3, connected?: 1, send_update: 2]
+  import Phoenix.LiveView, only: [attach_hook: 4, push_event: 3, connected?: 1]
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Events
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   # Only %Session{} structs have the :name field that sessions_section.ex expects.
   defp maybe_update_rail_sessions({event, %EyeInTheSky.Sessions.Session{} = session}, socket)
        when event in [:agent_updated, :agent_stopped] do
-    send_update(EyeInTheSkyWeb.Components.Rail, id: "app-rail", session_updated: session)
+    Events.broadcast_rail_session_updated(session)
     {:cont, socket}
   end
 

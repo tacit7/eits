@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -25,6 +26,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
 
     socket = if connected?(socket), do: load_skills(socket), else: socket
 
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
     {:ok, socket}
   end
 

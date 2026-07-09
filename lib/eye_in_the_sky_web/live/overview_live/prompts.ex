@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.ControllerHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Live.Shared.PromptsHelpers
@@ -21,6 +22,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
       |> assign(:sidebar_project, nil)
 
     socket = if connected?(socket), do: load_prompts(socket), else: socket
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

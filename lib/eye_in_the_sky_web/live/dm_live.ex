@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.DmLive do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.{Agents, Notes, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
@@ -85,6 +86,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
         MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
         socket = mount_session_assigns(socket, params, session, agent, connected?(socket))
+        if connected?(socket), do: Events.broadcast_rail_context(socket)
 
         use_pty = EyeInTheSky.Settings.get_boolean("dm_use_pty")
 

@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Agents do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
@@ -21,6 +22,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
       |> assign(:sidebar_project, nil)
 
     socket = if connected?(socket), do: load_agents(socket), else: socket
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

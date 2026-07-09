@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
   import EyeInTheSkyWeb.ControllerHelpers, only: [normalize_parent_type: 1, parse_int: 1]
   import EyeInTheSkyWeb.NoteLive.Helpers, only: [safe_return_to: 1]
 
-  alias EyeInTheSky.Notes
+  alias EyeInTheSky.{Events, Notes}
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
@@ -17,6 +17,8 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       |> assign(:saved_timer, nil)
       |> assign(:sidebar_tab, :notes)
       |> assign(:sidebar_project, nil)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

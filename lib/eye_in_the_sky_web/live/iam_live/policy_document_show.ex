@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
   import EyeInTheSkyWeb.IAMLive.IAMComponents
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.PolicyDocument
@@ -181,16 +182,19 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
       {:ok, %PolicyDocument{} = doc} ->
         all_policies = IAM.list_policies()
 
-        {:ok,
-         socket
-         |> assign(:page_title, doc.name)
-         |> assign(:sidebar_tab, :iam)
-         |> assign(:sidebar_project, nil)
-         |> assign(:document, doc)
-         |> assign(:all_policies, all_policies)
-         |> assign(:add_policy_id, "")
-         |> assign(:new_agent_type, "")
-         |> assign(:iam_hooks_status, HooksChecker.status())}
+        s =
+          socket
+          |> assign(:page_title, doc.name)
+          |> assign(:sidebar_tab, :iam)
+          |> assign(:sidebar_project, nil)
+          |> assign(:document, doc)
+          |> assign(:all_policies, all_policies)
+          |> assign(:add_policy_id, "")
+          |> assign(:new_agent_type, "")
+          |> assign(:iam_hooks_status, HooksChecker.status())
+
+        Events.broadcast_rail_context(s)
+        {:ok, s}
     end
   end
 

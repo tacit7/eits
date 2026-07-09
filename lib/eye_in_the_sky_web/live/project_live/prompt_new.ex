@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Prompts
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -8,6 +9,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
     socket = mount_project(socket, params, sidebar_tab: :prompts, page_title_prefix: "New Prompt")
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
     changeset = Prompts.change_prompt(%Prompts.Prompt{})
 
     {:ok, assign(socket, :form, to_form(changeset))}

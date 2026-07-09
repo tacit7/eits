@@ -1271,6 +1271,143 @@ See **DM Composer: localStorage History Persistence** and **Keyboard History Nav
 
 ---
 
+## Pi Discovery Cache Warming: DM Composer Init
+
+**Commit:** `42ccd392`
+
+When a DM page mounts with a Pi-session composer, the Pi model discovery cache is automatically warmed to ensure the composer's model selector displays available Pi models immediately, without waiting for another page (drawer, settings, etc.) to trigger a cache refresh.
+
+**Problem solved:**
+
+The composer's model selector (`entries_for_provider("pi")`) is read-only—it never triggers a fetch itself, only reading from the existing cache. For Pi sessions, if the cache was empty on first load, the Pi group would appear empty in the dropdown until some other page (drawer, modal, settings) happened to warm the cache. This created a confusing UX where the Pi selector appeared broken.
+
+**Solution:**
+
+In `DmLive.mount_with_agent/3`, when the session provider is `"pi"`, the mount path now calls:
+
+```elixir
+if session.provider == "pi", do: EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+```
+
+This is an async refresh that populates the cache without blocking the mount. By the time the user opens the model selector dropdown, the cache is already warm and shows all available Pi models.
+
+**Timing:**
+
+- Refresh is async, so mount completes immediately — no user-visible latency
+- Cache refresh happens on every mount, ensuring fresh model availability even if Pi models were added since the session started
+- Subsequent mounts of the same session benefit from the refreshed cache
+
+**File:**
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — `mount_with_agent/3` adds async cache refresh for Pi sessions
+
+---
+
+## DM Model Helpers: Extracted Model Selection Logic
+
+**Commit:** `98fd83e9`
+
+Model selection and composer state management logic was extracted into a dedicated `DmModelHelpers` module, reducing the complexity of `MessageComposer` and centralizing model/effort handling for reuse.
+
+**Module:** `lib/eye_in_the_sky_web/live/shared/dm_model_helpers.ex`
+
+### Exported Functions
+
+**Model Menu Toggle:**
+```elixir
+handle_toggle_model_menu(socket) :: {:noreply, Socket.t()}
+```
+Toggles the `:model_menu` overlay. Used by model selector button click.
+
+**Effort Menu Toggle:**
+```elixir
+handle_toggle_effort_menu(socket) :: {:noreply, Socket.t()}
+```
+Toggles the `:effort_menu` overlay. Used by effort level button click.
+
+**Think Toggle:**
+```elixir
+handle_toggle_thinking(socket) :: {:noreply, Socket.t()}
+```
+Toggles extended thinking on/off via `:thinking_enabled` assign.
+
+**Live Stream Toggle:**
+```elixir
+handle_toggle_live_stream(params, socket) :: {:noreply, Socket.t()}
+```
+Toggles `:show_live_stream` based on `params["enabled"]`. Defaults to toggling current state.
+
+**Model Selection (New Format):**
+```elixir
+handle_select_model(%{"provider" => provider, "model" => model, "effort" => effort}, socket) ::
+  {:noreply, Socket.t()}
+```
+
+Validates and persists a model selection. Enforces:
+1. **Provider lock:** Cannot switch providers mid-conversation (spec §5.2). Rejects payload if `provider != session.provider`.
+2. **Model validation:** Checks `ModelConfig.valid_model?(provider, model)` to ensure the model exists in the provider's registry.
+3. **Persistence:** Calls `Sessions.update_session(session, %{model: model})` and updates socket assigns.
+4. **Effort defaulting:** For Opus models without explicit effort, defaults to `"medium"`.
+
+Closes the model menu overlay on success (`active_overlay: nil`). Returns flash error on validation failure.
+
+**Model Selection (Back-Compat):**
+```elixir
+handle_select_model(%{"model" => model, "effort" => effort}, socket) ::
+  {:noreply, Socket.t()}
+```
+
+Pre-Task-7 format (no `provider` key). Kept for mid-deploy rollout safety — treats the session's own provider as implicit. Uses same validation and persistence as new format.
+
+**Effort Selection:**
+```elixir
+handle_select_effort(%{"effort" => effort}, socket) :: {:noreply, Socket.t()}
+```
+
+Updates `:selected_effort` and closes the effort menu overlay.
+
+**Max Budget:**
+```elixir
+handle_set_max_budget(%{"value" => value}, socket) :: {:noreply, Socket.t()}
+```
+
+Parses the budget value (string → float) and assigns `:max_budget_usd`. Returns `nil` if parsing fails or value ≤ 0 (no limit).
+
+### Model Selection Validation
+
+The `handle_select_model` functions enforce safety constraints:
+
+| Check | Action on Failure |
+|-------|------------------|
+| Provider matches session | Flash error: "Cannot switch provider mid-conversation" |
+| Model is valid for provider | Flash error: "Invalid model selection" |
+| Session update succeeds | Flash error: "Failed to save model selection" (logs changeset error) |
+| Effort is empty and model is Opus | Default effort to `"medium"` instead of empty string |
+
+### Integration with DmLive
+
+`DmLive` imports `DmModelHelpers` and delegates event handlers:
+
+```elixir
+import EyeInTheSkyWeb.Live.Shared.DmModelHelpers
+
+def handle_event("toggle_model_menu", _params, socket) do
+  handle_toggle_model_menu(socket)
+end
+
+def handle_event("select_model", params, socket) do
+  handle_select_model(params, socket)
+end
+```
+
+This pattern keeps `DmLive` focused on LiveView concerns (PubSub, streams, mounts) while `DmModelHelpers` concentrates on model/effort logic.
+
+**Files:**
+- `lib/eye_in_the_sky_web/live/shared/dm_model_helpers.ex` — All model/effort handlers
+- `lib/eye_in_the_sky_web/components/dm_page/message_composer.ex` — Uses DmModelHelpers via DmLive delegation
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — Imports and delegates to DmModelHelpers
+
+---
+
 ## DM Composer: localStorage History Persistence
 
 **Commit:** `57c4b747`

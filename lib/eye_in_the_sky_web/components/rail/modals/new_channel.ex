@@ -2,8 +2,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.NewChannel do
   @moduledoc false
   use EyeInTheSkyWeb, :html
 
-  attr :myself, :any, required: true
-
   def new_channel_modal(assigns) do
     ~H"""
     <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
@@ -12,15 +10,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.NewChannel do
           <span class="text-sm font-semibold text-base-content/80">New Channel</span>
           <button
             type="button"
-            phx-click="toggle_new_channel_form"
-            phx-target={@myself}
-            class="size-5 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+            phx-click="toggle_new_channel_form"            class="size-5 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
           >
             <.icon name="hero-x-mark-mini" class="size-3.5" />
           </button>
         </div>
 
-        <form phx-submit="create_channel" phx-target={@myself} class="flex flex-col gap-2">
+        <form phx-submit="create_channel" class="flex flex-col gap-2">
           <div>
             <input
               type="text"
@@ -39,7 +35,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.NewChannel do
             <button
               type="button"
               phx-click="toggle_new_channel_form"
-              phx-target={@myself}
               class="px-3 py-1 text-xs text-base-content/55 hover:text-base-content/80 transition-colors"
             >
               Cancel

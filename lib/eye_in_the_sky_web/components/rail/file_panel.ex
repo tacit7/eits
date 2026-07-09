@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
 
   attr :file_tabs, :list, required: true
   attr :active_tab_path, :any, required: true
-  attr :myself, :any, required: true
   attr :socket, :any, required: true
 
   def file_panel(assigns) do
@@ -30,9 +29,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
             ]}>
               <button
                 phx-click="file_switch_tab"
-                phx-value-path={tab.path}
-                phx-target={@myself}
-                class={[
+                phx-value-path={tab.path}                class={[
                   "px-3 py-1.5 text-xs truncate max-w-[160px]",
                   if(active,
                     do: "text-base-content/90 font-medium",
@@ -45,9 +42,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
               </button>
               <button
                 phx-click="file_close_tab"
-                phx-value-path={tab.path}
-                phx-target={@myself}
-                class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
+                phx-value-path={tab.path}                class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
                 title="Close"
               >
                 <.icon name="hero-x-mark-mini" class="size-3" />
@@ -113,7 +108,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
   attr :flyout_open, :boolean, required: true
   attr :icon, :string, required: true
   attr :label, :string, required: true
-  attr :myself, :any, required: true
 
   def rail_item(assigns) do
     ~H"""
@@ -124,7 +118,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
       <button
         phx-click="toggle_section"
         phx-value-section={@section}
-        phx-target={@myself}
         aria-label={@label}
         class={[
           "w-8 h-8 flex items-center justify-center transition-colors",

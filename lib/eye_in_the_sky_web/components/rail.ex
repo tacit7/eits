@@ -532,97 +532,73 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-folder"
-          label="Files"
-          myself={nil}
-        />
+          label="Files"        />
         <.rail_item
           section={:sessions}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-bot-message-square"
-          label="Sessions"
-          myself={nil}
-        />
+          label="Sessions"        />
         <.rail_item
           section={:tasks}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-kanban"
-          label="Tasks"
-          myself={nil}
-        />
+          label="Tasks"        />
         <.rail_item
           section={:notes}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-pencil-square"
-          label="Notes"
-          myself={nil}
-        />
+          label="Notes"        />
         <.rail_item
           section={:agents}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-robot"
-          label="Agents"
-          myself={nil}
-        />
+          label="Agents"        />
         <.rail_item
           section={:skills}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-bolt"
-          label="Skills"
-          myself={nil}
-        />
+          label="Skills"        />
         <.rail_item
           section={:prompts}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-document-text"
-          label="Prompts"
-          myself={nil}
-        />
+          label="Prompts"        />
         <.rail_item
           section={:teams}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-users"
-          label="Teams"
-          myself={nil}
-        />
+          label="Teams"        />
         <.rail_item
           section={:jobs}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-clock"
-          label="Jobs"
-          myself={nil}
-        />
+          label="Jobs"        />
         <.rail_item
           section={:canvas}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-squares-2x2"
-          label="Canvas"
-          myself={nil}
-        />
+          label="Canvas"        />
         <.rail_item
           section={:chat}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-chat-bubble-left-ellipsis"
-          label="Chat"
-          myself={nil}
-        />
+          label="Chat"        />
         <.rail_item
           section={:usage}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-chart-bar"
-          label="Usage"
-          myself={nil}
-        />
+          label="Usage"        />
 
         <div class="flex-1" />
         <div class="mb-3" />
@@ -684,7 +660,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         sidebar_project={@sidebar_project}
         open={@proj_picker_open}
         new_project_path={@new_project_path}
-        myself={nil}
         workspace={@workspace}
         scope_type={@scope_type}
       />
@@ -731,20 +706,17 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_children={@flyout_file_children}
         flyout_file_error={@flyout_file_error}
         flyout_usage={@flyout_usage}
-        myself={nil}
       />
 
       <%!-- ── Channel modal ── --%>
       <.new_channel_modal
         :if={@show_new_channel_form}
-        myself={nil}
       />
 
       <%!-- ── Rail modal (new task / new prompt) ── --%>
       <.rail_modal
         :if={@rail_modal in [:new_task, :new_prompt]}
         modal={@rail_modal}
-        myself={nil}
       />
 
       <%!-- ── Task detail modal ── --%>
@@ -753,7 +725,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         task={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
         index={elem(@rail_modal, 1)}
         total={length(elem(@rail_modal, 2))}
-        myself={nil}
       />
 
       <%!-- ── Note detail modal ── --%>
@@ -762,13 +733,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         note={Enum.at(elem(@rail_modal, 2), elem(@rail_modal, 1))}
         index={elem(@rail_modal, 1)}
         total={length(elem(@rail_modal, 2))}
-        myself={nil}
       />
 
       <.file_panel
         file_tabs={@file_tabs}
         active_tab_path={@active_tab_path}
-        myself={nil}
         socket={@socket}
       />
       <%!-- Splitter handle for split-view mode. Visibility driven by data-editor-mode on <html>. --%>

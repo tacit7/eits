@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.AgentLive.Index do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.AgentLive.CanvasHandlers
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Live.Shared.AgentPubSubHandlers
@@ -40,6 +41,8 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
 
     socket =
       if connected?(socket) do
+        Events.broadcast_rail_context(socket)
+
         socket
         |> assign(:projects, EyeInTheSky.Projects.list_projects())
         |> assign(:canvases, EyeInTheSky.Canvases.list_canvases())

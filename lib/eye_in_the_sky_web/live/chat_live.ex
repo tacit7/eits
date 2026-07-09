@@ -37,6 +37,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
         auto_upload: true
       )
 
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
+
     {:ok, socket}
   end
 

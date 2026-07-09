@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.NoteLive.New do
 
   import EyeInTheSkyWeb.NoteLive.Helpers, only: [safe_return_to: 1]
 
-  alias EyeInTheSky.Notes
+  alias EyeInTheSky.{Events, Notes}
 
   @valid_parent_types ["session", "task", "agent", "project", "system"]
 
@@ -18,6 +18,8 @@ defmodule EyeInTheSkyWeb.NoteLive.New do
       |> assign(:return_to, "/notes")
       |> assign(:sidebar_tab, :notes)
       |> assign(:sidebar_project, nil)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

@@ -2,7 +2,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 2, assign: 3]
-  import Phoenix.LiveView, only: [push_navigate: 2]
+  import Phoenix.LiveView, only: [push_navigate: 2, push_event: 3]
 
   alias EyeInTheSkyWeb.Components.Rail.Loader
 
@@ -85,9 +85,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          socket
          |> assign(:active_section, sticky)
          |> assign(:flyout_open, true)
-         |> assign(:mobile_open, false)}
+         |> assign(:mobile_open, false)
+         |> push_event("save_rail_state", %{flyout_open: true})}
       else
-        {:noreply, assign(socket, flyout_open: false, mobile_open: false)}
+        {:noreply,
+         socket
+         |> assign(flyout_open: false, mobile_open: false)
+         |> push_event("save_rail_state", %{flyout_open: false})}
       end
     else
       open_section(section, socket)
@@ -103,6 +107,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
      socket
      |> assign(:active_section, section)
      |> assign(:flyout_open, true)
+     |> push_event("save_rail_state", %{flyout_open: true})
      |> assign(:proj_picker_open, false)
      |> assign(:session_scope, :current)
      |> assign(:session_project_visible, %{})
@@ -132,12 +137,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
     case Loader.sticky_section(socket.assigns.sidebar_tab) do
       nil ->
         {:noreply,
-         assign(socket,
+         socket
+         |> assign(
            flyout_open: false,
            mobile_open: false,
            proj_picker_open: false,
            show_new_session_form: false
-         )}
+         )
+         |> push_event("save_rail_state", %{flyout_open: false})}
 
       sticky ->
         {:noreply,
@@ -146,7 +153,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          |> assign(:flyout_open, true)
          |> assign(:mobile_open, false)
          |> assign(:proj_picker_open, false)
-         |> assign(:show_new_session_form, false)}
+         |> assign(:show_new_session_form, false)
+         |> push_event("save_rail_state", %{flyout_open: true})}
     end
   end
 end

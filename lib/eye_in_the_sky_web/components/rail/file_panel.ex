@@ -117,26 +117,30 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
 
   def rail_item(assigns) do
     ~H"""
-    <button
-      phx-click="toggle_section"
-      phx-value-section={@section}
-      phx-target={@myself}
-      title={@label}
-      aria-label={@label}
-      class={[
-        "w-8 h-8 flex items-center justify-center transition-colors",
-        if(@active_section == @section && @flyout_open,
-          do: "bg-primary/[0.18] text-primary shadow-[inset_2px_0_0_oklch(var(--p)/0.8)]",
-          else: "text-base-content/45 hover:text-base-content/80 hover:bg-base-content/8"
-        )
-      ]}
+    <div
+      class="tooltip tooltip-right"
+      data-tip={if @active_section == @section && @flyout_open, do: nil, else: @label}
     >
-      <%= if String.starts_with?(@icon, "lucide-") do %>
-        <.custom_icon name={@icon} class="size-4" />
-      <% else %>
-        <.icon name={@icon} class="size-4" />
-      <% end %>
-    </button>
+      <button
+        phx-click="toggle_section"
+        phx-value-section={@section}
+        phx-target={@myself}
+        aria-label={@label}
+        class={[
+          "w-8 h-8 flex items-center justify-center transition-colors",
+          if(@active_section == @section && @flyout_open,
+            do: "bg-primary/[0.18] text-primary shadow-[inset_2px_0_0_oklch(var(--p)/0.8)]",
+            else: "text-base-content/45 hover:text-base-content/80 hover:bg-base-content/8"
+          )
+        ]}
+      >
+        <%= if String.starts_with?(@icon, "lucide-") do %>
+          <.custom_icon name={@icon} class="size-4" />
+        <% else %>
+          <.icon name={@icon} class="size-4" />
+        <% end %>
+      </button>
+    </div>
     """
   end
 end

@@ -40,6 +40,11 @@ export async function loadLanguage(lang) {
       const { json } = await import("@codemirror/lang-json")
       return json()
     }
+    case "yaml":
+    case "yml": {
+      const { yaml } = await import("@codemirror/lang-yaml")
+      return yaml()
+    }
     case "shell":
     case "sh":
     case "bash": {

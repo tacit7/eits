@@ -134,4 +134,28 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   def short_model(name), do: ModelHelpers.model_display_name(name)
 
   defdelegate open_in_system(path), to: EyeInTheSkyWeb.Helpers.SystemHelpers
+
+  @doc """
+  Open `path` in the given editor (or preferred editor from settings).
+  Returns `{:noreply, socket}` with a flash set on success or error.
+  Intended to be called directly from a `handle_event/3` clause.
+  """
+  def handle_open_in_editor(path, editor_id, socket) do
+    case EyeInTheSky.Editors.open(editor_id, path) do
+      {:ok, label} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :info, "Opening in #{label}…")}
+
+      {:error, :unknown_editor} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Unknown editor")}
+
+      {:error, :not_installed} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Editor not installed")}
+
+      {:error, :not_allowed} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path is outside allowed directories")}
+
+      {:error, :not_found} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "File not found")}
+    end
+  end
 end

@@ -2,11 +2,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
 
@@ -26,6 +29,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       |> assign(:new_agent_name, "")
       |> assign(:new_agent_description, "")
       |> assign(:top_bar_cta, %{label: "New", event: "toggle_new_agent_form"})
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     socket = if connected?(socket), do: load_agents(socket), else: socket
 
@@ -66,14 +71,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   end
 
   @impl true
-  def handle_event("open_file", _params, socket) do
-    case socket.assigns.selected_agent do
-      %{abs_path: path} when is_binary(path) ->
-        if open_path_allowed?(path, socket), do: ViewHelpers.open_in_system(path)
-        {:noreply, socket}
-
-      _ ->
-        {:noreply, socket}
+  def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
+    if open_path_allowed?(path, socket) do
+      ViewHelpers.handle_open_in_editor(path, editor_id, socket)
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
     end
   end
 
@@ -85,6 +87,42 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
     do: {:noreply, assign(socket, :detail_tab, :raw)}
 
   def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("edit_content", _, socket),
+    do: {:noreply, assign(socket, :detail_tab, :edit)}
+
+  @impl true
+  def handle_event("cancel_edit", _, socket),
+    do: {:noreply, assign(socket, :detail_tab, :preview)}
+
+  @impl true
+  def handle_event("file_changed", %{"content" => content}, socket) do
+    case socket.assigns.selected_agent do
+      %{abs_path: path, id: id} when is_binary(path) ->
+        if open_path_allowed?(path, socket) do
+          case File.write(path, content) do
+            :ok ->
+              socket =
+                socket
+                |> load_agents()
+                |> reselect_agent(id)
+                |> assign(:detail_tab, :preview)
+                |> put_flash(:info, "Agent saved")
+
+              {:noreply, socket}
+
+            {:error, reason} ->
+              {:noreply, put_flash(socket, :error, "Failed to save agent: #{inspect(reason)}")}
+          end
+        else
+          {:noreply, put_flash(socket, :error, "Write not permitted for this path")}
+        end
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "No file path available")}
+    end
+  end
 
   @impl true
   def handle_event("toggle_new_agent_form", _params, socket) do
@@ -252,88 +290,117 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
       <%= if @selected_agent do %>
         <div class="hidden md:flex flex-col flex-1 overflow-hidden">
-          <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
-            <div class="flex items-start justify-between gap-4">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <code class="text-base font-semibold text-base-content">
-                    {@selected_agent.name}
-                  </code>
-                  <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <> source_badge_class(@selected_agent.source)}>
-                    {source_label(@selected_agent.source)}
-                  </span>
-                  <%= if @selected_agent.model do %>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-base-content/5 text-base-content/50">
-                      {@selected_agent.model}
+          <%= if @detail_tab == :edit do %>
+            <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/8 flex items-center gap-3">
+              <code class="text-xs text-base-content/50 font-mono truncate flex-1">{@selected_agent.path}</code>
+              <span class="text-[10px] text-base-content/40">Ctrl+S to save</span>
+              <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+            </div>
+          <% else %>
+            <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <code class="text-base font-semibold text-base-content">
+                      {@selected_agent.name}
+                    </code>
+                    <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <> source_badge_class(@selected_agent.source)}>
+                      {source_label(@selected_agent.source)}
                     </span>
-                  <% end %>
-                </div>
-                <p class="text-xs text-base-content/45 font-mono truncate">{@selected_agent.path}</p>
-                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
-                  {@selected_agent.description}
-                </p>
-                <%= if @selected_agent.tools != [] do %>
-                  <div class="flex flex-wrap gap-1 mt-2">
-                    <%= for tool <- @selected_agent.tools do %>
-                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-base-content/5 text-base-content/50">
-                        {tool}
+                    <%= if @selected_agent.model do %>
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-base-content/5 text-base-content/50">
+                        {@selected_agent.model}
                       </span>
                     <% end %>
                   </div>
+                  <p class="text-xs text-base-content/45 font-mono truncate">{@selected_agent.path}</p>
+                  <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                    {@selected_agent.description}
+                  </p>
+                  <%= if @selected_agent.tools != [] do %>
+                    <div class="flex flex-wrap gap-1 mt-2">
+                      <%= for tool <- @selected_agent.tools do %>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-base-content/5 text-base-content/50">
+                          {tool}
+                        </span>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
+                <div class="flex items-center gap-1 flex-shrink-0">
+                  <.open_in_editor_button
+                    path={@selected_agent.abs_path || ""}
+                    installed_editors={@installed_editors}
+                    preferred_editor={@preferred_editor}
+                  />
+                  <button
+                    phx-click="close_viewer"
+                    title="Close"
+                    class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                  >
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 mt-3">
+                <button
+                  phx-click="set_detail_tab"
+                  phx-value-tab="preview"
+                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                    if(@detail_tab == :preview,
+                      do: "bg-base-content/8 text-base-content",
+                      else: "text-base-content/50 hover:text-base-content")}
+                >
+                  Preview
+                </button>
+                <button
+                  phx-click="set_detail_tab"
+                  phx-value-tab="raw"
+                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                    if(@detail_tab == :raw,
+                      do: "bg-base-content/8 text-base-content",
+                      else: "text-base-content/50 hover:text-base-content")}
+                >
+                  Raw
+                </button>
+                <%= if is_binary(@selected_agent.abs_path) do %>
+                  <button
+                    phx-click="edit_content"
+                    class="px-3 py-1 rounded text-xs font-medium text-base-content/50 hover:text-base-content"
+                  >
+                    Edit
+                  </button>
                 <% end %>
-              </div>
-              <div class="flex items-center gap-1 flex-shrink-0">
-                <button
-                  phx-click="open_file"
-                  title="Open in editor"
-                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
-                >
-                  <.icon name="hero-arrow-top-right-on-square" class="size-4" />
-                </button>
-                <button
-                  phx-click="close_viewer"
-                  title="Close"
-                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
-                >
-                  <.icon name="hero-x-mark" class="size-4" />
-                </button>
+                <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
+                  {FileHelpers.format_size(@selected_agent.size)}
+                </span>
               </div>
             </div>
-            <div class="flex items-center gap-1 mt-3">
-              <button
-                phx-click="set_detail_tab"
-                phx-value-tab="preview"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
-                  if(@detail_tab == :preview, do: "bg-base-content/8 text-base-content", else: "text-base-content/50 hover:text-base-content")}
-              >
-                Preview
-              </button>
-              <button
-                phx-click="set_detail_tab"
-                phx-value-tab="raw"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
-                  if(@detail_tab == :raw, do: "bg-base-content/8 text-base-content", else: "text-base-content/50 hover:text-base-content")}
-              >
-                Raw
-              </button>
-              <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
-                {FileHelpers.format_size(@selected_agent.size)}
-              </span>
+          <% end %>
+          <%= if @detail_tab == :edit do %>
+            <div
+              id={"proj-agent-editor-#{@selected_agent.id}"}
+              phx-hook="CodeMirror"
+              phx-update="ignore"
+              data-content={Base.encode64(@selected_agent.content || "")}
+              data-lang={edit_language(@selected_agent)}
+              class="flex-1 overflow-hidden min-h-0"
+            ></div>
+          <% else %>
+            <div class="flex-1 overflow-y-auto">
+              <%= if @detail_tab == :preview do %>
+                <div
+                  id={"proj-agent-viewer-#{@selected_agent.id}"}
+                  class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                  phx-hook="MarkdownMessage"
+                  data-raw-body={@selected_agent.content}
+                >
+                </div>
+              <% else %>
+                <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_agent.content}</pre>
+              <% end %>
             </div>
-          </div>
-          <div class="flex-1 overflow-y-auto">
-            <%= if @detail_tab == :preview do %>
-              <div
-                id={"proj-agent-viewer-#{@selected_agent.id}"}
-                class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
-                phx-hook="MarkdownMessage"
-                data-raw-body={@selected_agent.content}
-              >
-              </div>
-            <% else %>
-              <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_agent.content}</pre>
-            <% end %>
-          </div>
+          <% end %>
         </div>
       <% end %>
     </div>
@@ -418,18 +485,53 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   defp source_label(:project_agents), do: "project"
   defp source_label(_), do: "unknown"
 
-  defp open_path_allowed?(path, socket) do
-    user_dir = Path.expand("~/.claude/agents")
+  defp edit_language(%{path: path}) when is_binary(path), do: lang_from_path(path)
+  defp edit_language(%{abs_path: path}) when is_binary(path), do: lang_from_path(path)
+  defp edit_language(_), do: "markdown"
 
-    project_dir =
+  defp lang_from_path(path) do
+    case Path.extname(path) do
+      ".yaml" -> "yaml"
+      ".yml" -> "yaml"
+      ".json" -> "json"
+      ".ex" -> "elixir"
+      ".exs" -> "elixir"
+      ".js" -> "javascript"
+      ".ts" -> "typescript"
+      ".css" -> "css"
+      ".html" -> "html"
+      ".heex" -> "html"
+      ".sh" -> "shell"
+      ".bash" -> "shell"
+      ".md" -> "markdown"
+      _ -> "markdown"
+    end
+  end
+
+  defp reselect_agent(socket, id) do
+    selected = Enum.find(socket.assigns.agents, &(&1.id == id))
+    assign(socket, :selected_agent, selected)
+  end
+
+  defp open_path_allowed?(path, socket) do
+    expanded = Path.expand(path)
+    expanded_user = Path.expand("~/.claude/agents")
+
+    project_root =
       case socket.assigns[:project] do
-        %{path: p} when is_binary(p) and p != "" -> Path.join(p, ".claude/agents")
+        %{path: p} when is_binary(p) and p != "" -> Path.expand(Path.join(p, ".claude/agents"))
         _ -> nil
       end
 
-    File.exists?(path) &&
-      (String.starts_with?(path, user_dir) ||
-         (not is_nil(project_dir) && String.starts_with?(path, project_dir)))
+    in_user_dir = String.starts_with?(expanded, expanded_user <> "/")
+
+    in_project_dir =
+      case project_root do
+        nil -> false
+        root -> String.starts_with?(expanded, root <> "/")
+      end
+
+    File.exists?(path) && (in_user_dir || in_project_dir)
   end
 
   defp create_new_agent(agent_name, description, socket) do

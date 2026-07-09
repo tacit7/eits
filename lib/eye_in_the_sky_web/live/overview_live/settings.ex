@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @valid_tabs ~w(general editor auth workflow pricing system desktop providers)
 
-  @known_editors ~w(code cursor vim nano zed)
+  @known_editors EyeInTheSky.Editors.all_ids()
 
   # Function, not attribute: compile-time ~ expansion bakes the build-machine home dir.
   defp allowed_editor_roots, do: [Path.expand("~/.claude")]

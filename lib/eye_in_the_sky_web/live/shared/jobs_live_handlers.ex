@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsLiveHandlers do
   @moduledoc false
 
   import Phoenix.LiveView, only: [put_flash: 3]
+  import Phoenix.Component, only: [assign: 3]
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSkyWeb.Components.JobsPage
   alias EyeInTheSkyWeb.Live.Shared.JobsHelpers
@@ -94,6 +95,25 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsLiveHandlers do
       :error -> {:noreply, put_flash(socket, :error, "Invalid job ID")}
       {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Job not found")}
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # handle_top_bar_switch_tab / handle_top_bar_filter_jobs
+  # Called by both parent LiveViews for events originating in the top bar
+  # (no phx-target). Updates the LV's own assigns (so the toolbar re-renders
+  # with the new active state) AND relays to the component via send_update.
+  # ---------------------------------------------------------------------------
+
+  def handle_top_bar_switch_tab(%{"tab" => tab} = params, socket) do
+    new_tab = if tab == "agent_schedules", do: :agent_schedules, else: :all_jobs
+    Phoenix.LiveView.send_update(JobsPage, id: "jobs-page", event_relay: {"switch_tab", params})
+    {:noreply, assign(socket, :active_tab, new_tab)}
+  end
+
+  def handle_top_bar_filter_jobs(params, socket) do
+    query = params["query"] || params["search"] || ""
+    Phoenix.LiveView.send_update(JobsPage, id: "jobs-page", event_relay: {"filter_jobs", params})
+    {:noreply, assign(socket, :search_query, query)}
   end
 
   # ---------------------------------------------------------------------------

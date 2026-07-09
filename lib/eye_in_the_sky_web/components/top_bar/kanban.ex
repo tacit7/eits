@@ -57,16 +57,6 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
         Cancel
       </button>
     <% else %>
-      <.search_bar
-        id="top-bar-kanban-search"
-        size="xs"
-        label="Search tasks"
-        placeholder="Search tasks..."
-        value={@search_query || ""}
-        on_change="search"
-        class="flex-1 max-w-xs"
-        vim_search={true}
-      />
       <%= if @sidebar_project do %>
         <div class="flex items-center bg-base-200/40 rounded-lg p-0.5">
           <.link
@@ -84,6 +74,17 @@ defmodule EyeInTheSkyWeb.TopBar.Kanban do
           </span>
         </div>
       <% end %>
+      <div class="flex-1" />
+      <.search_bar
+        id="top-bar-kanban-search"
+        size="xs"
+        label="Search tasks"
+        placeholder="Search tasks..."
+        value={@search_query || ""}
+        on_change="search"
+        class="w-48"
+        vim_search={true}
+      />
       <div class="flex items-center gap-1">
         <button
           phx-click="toggle_bulk_mode"

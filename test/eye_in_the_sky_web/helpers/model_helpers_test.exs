@@ -178,22 +178,22 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     end
 
     test "\"sonnet\" normalizes to sonnet slug" do
-      assert ModelHelpers.normalize_model_alias("sonnet") == "claude-sonnet-4-6"
+      assert ModelHelpers.normalize_model_alias("sonnet") == "claude-sonnet-5"
     end
 
     test "\"opus\" normalizes to opus slug" do
-      assert ModelHelpers.normalize_model_alias("opus") == "claude-opus-4-7"
+      assert ModelHelpers.normalize_model_alias("opus") == "claude-opus-4-8"
     end
 
     test "uppercase aliases are case-insensitive" do
-      assert ModelHelpers.normalize_model_alias("OPUS") == "claude-opus-4-7"
-      assert ModelHelpers.normalize_model_alias("SONNET") == "claude-sonnet-4-6"
+      assert ModelHelpers.normalize_model_alias("OPUS") == "claude-opus-4-8"
+      assert ModelHelpers.normalize_model_alias("SONNET") == "claude-sonnet-5"
       assert ModelHelpers.normalize_model_alias("HAIKU") == "claude-haiku-4-5-20251001"
     end
 
     test "mixed-case aliases are case-insensitive" do
-      assert ModelHelpers.normalize_model_alias("Opus") == "claude-opus-4-7"
-      assert ModelHelpers.normalize_model_alias("Sonnet") == "claude-sonnet-4-6"
+      assert ModelHelpers.normalize_model_alias("Opus") == "claude-opus-4-8"
+      assert ModelHelpers.normalize_model_alias("Sonnet") == "claude-sonnet-5"
     end
 
     test "already-full slug passes through unchanged" do
@@ -203,7 +203,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     end
 
     test "nil returns default sonnet slug" do
-      assert ModelHelpers.normalize_model_alias(nil) == "claude-sonnet-4-6"
+      assert ModelHelpers.normalize_model_alias(nil) == "claude-sonnet-5"
     end
 
     test "unknown string passes through unchanged" do
@@ -220,17 +220,17 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.default_model_for("codex") == "gpt-5.5"
     end
 
-    test "\"claude\" returns claude-opus-4-7" do
-      assert ModelHelpers.default_model_for("claude") == "claude-opus-4-7"
+    test "\"claude\" returns claude-opus-4-8" do
+      assert ModelHelpers.default_model_for("claude") == "claude-opus-4-8"
     end
 
     test "nil falls back to claude default" do
-      assert ModelHelpers.default_model_for(nil) == "claude-opus-4-7"
+      assert ModelHelpers.default_model_for(nil) == "claude-opus-4-8"
     end
 
     test "unknown provider falls back to claude default" do
-      assert ModelHelpers.default_model_for("openai") == "claude-opus-4-7"
-      assert ModelHelpers.default_model_for("") == "claude-opus-4-7"
+      assert ModelHelpers.default_model_for("openai") == "claude-opus-4-8"
+      assert ModelHelpers.default_model_for("") == "claude-opus-4-8"
     end
 
     test "default for codex is in valid_model_slugs" do
@@ -247,7 +247,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     test "known claude slug returns its label" do
       assert ModelHelpers.model_display_name("claude-sonnet-4-6") == "Sonnet 4.6"
       assert ModelHelpers.model_display_name("claude-haiku-4-5-20251001") == "Haiku 4.5"
-      assert ModelHelpers.model_display_name("claude-opus-4-7") == "Opus 4.7"
+      assert ModelHelpers.model_display_name("claude-opus-4-8") == "Opus 4.8"
     end
 
     test "known codex slug returns its label" do
@@ -255,12 +255,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.model_display_name("gpt-5.4-mini") == "GPT-5.4 Mini"
     end
 
-    test "short alias \"opus\" returns \"Opus 4.7\"" do
-      assert ModelHelpers.model_display_name("opus") == "Opus 4.7"
+    test "short alias \"opus\" returns \"Opus 4.8\"" do
+      assert ModelHelpers.model_display_name("opus") == "Opus 4.8"
     end
 
-    test "short alias \"sonnet\" returns \"Sonnet 4.6\"" do
-      assert ModelHelpers.model_display_name("sonnet") == "Sonnet 4.6"
+    test "short alias \"sonnet\" returns \"Sonnet 5\"" do
+      assert ModelHelpers.model_display_name("sonnet") == "Sonnet 5"
     end
 
     test "short alias \"haiku\" returns \"Haiku 4.5\"" do
@@ -277,6 +277,185 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "integer input is converted to string" do
       assert ModelHelpers.model_display_name(42) == "42"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # entries_for_provider/1
+  # ---------------------------------------------------------------------------
+
+  defmodule FakeControl do
+    def discover_models do
+      {:ok,
+       [
+         %{"id" => "ollama-lan/qwen3.6:27b", "provider" => "ollama-lan"},
+         %{"id" => "openrouter/qwen/qwen3-coder", "provider" => "openrouter"}
+       ]}
+    end
+  end
+
+  describe "entries_for_provider/1 — claude" do
+    setup do
+      %{entries: ModelHelpers.entries_for_provider("claude")}
+    end
+
+    test "every entry has provider \"claude\" and group \"Claude Code\"", %{entries: entries} do
+      assert entries != []
+      assert Enum.all?(entries, &(&1.provider == "claude"))
+      assert Enum.all?(entries, &(&1.group == "Claude Code"))
+    end
+
+    test "primary current-gen models are not legacy", %{entries: entries} do
+      by_slug = Map.new(entries, &{&1.slug, &1})
+      assert by_slug["claude-opus-4-8"].legacy? == false
+      assert by_slug["claude-fable-5"].legacy? == false
+      assert by_slug["claude-sonnet-5"].legacy? == false
+      assert by_slug["claude-haiku-4-5-20251001"].legacy? == false
+    end
+
+    test "older generation models are legacy", %{entries: entries} do
+      by_slug = Map.new(entries, &{&1.slug, &1})
+      assert by_slug["claude-opus-4-7"].legacy? == true
+      assert by_slug["claude-sonnet-4-6"].legacy? == true
+    end
+
+    test "opus[1m] and sonnet[1m] are premium", %{entries: entries} do
+      by_slug = Map.new(entries, &{&1.slug, &1})
+      assert by_slug["opus[1m]"].premium? == true
+      assert by_slug["sonnet[1m]"].premium? == true
+    end
+
+    test "non-1m entries are not premium", %{entries: entries} do
+      refute Enum.any?(entries, &(&1.slug == "claude-opus-4-8" and &1.premium?))
+    end
+
+    test "exactly one default entry, on claude-opus-4-8", %{entries: entries} do
+      defaults = Enum.filter(entries, & &1.default?)
+      assert [%{slug: "claude-opus-4-8"}] = defaults
+    end
+  end
+
+  describe "entries_for_provider/1 — codex" do
+    setup do
+      %{entries: ModelHelpers.entries_for_provider("codex")}
+    end
+
+    test "every entry has provider \"codex\" and group \"Codex\", never premium", %{entries: entries} do
+      assert entries != []
+      assert Enum.all?(entries, &(&1.provider == "codex"))
+      assert Enum.all?(entries, &(&1.group == "Codex"))
+      refute Enum.any?(entries, & &1.premium?)
+    end
+
+    test "gpt-5.5, gpt-5.4, gpt-5.4-mini are primary; rest are legacy", %{entries: entries} do
+      by_slug = Map.new(entries, &{&1.slug, &1})
+      assert by_slug["gpt-5.5"].legacy? == false
+      assert by_slug["gpt-5.4"].legacy? == false
+      assert by_slug["gpt-5.4-mini"].legacy? == false
+      assert by_slug["gpt-5.3-codex"].legacy? == true
+      assert by_slug["gpt-5.1-codex-max"].legacy? == true
+    end
+
+    test "default is gpt-5.5", %{entries: entries} do
+      assert [%{slug: "gpt-5.5"}] = Enum.filter(entries, & &1.default?)
+    end
+  end
+
+  describe "entries_for_provider/1 — pi" do
+    test "preserves sub_provider from discovery and marks non-ollama as premium" do
+      Application.put_env(:eye_in_the_sky, :pi_control_module, __MODULE__.FakeControl)
+      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :pi_control_module) end)
+      {:ok, _} = EyeInTheSky.Pi.ModelDiscoveryCache.refresh()
+
+      entries = ModelHelpers.entries_for_provider("pi")
+      by_slug = Map.new(entries, &{&1.slug, &1})
+
+      assert by_slug["ollama-lan/qwen3.6:27b"].provider == "pi"
+      assert by_slug["ollama-lan/qwen3.6:27b"].sub_provider == "ollama-lan"
+      assert by_slug["ollama-lan/qwen3.6:27b"].premium? == false
+
+      assert by_slug["openrouter/qwen/qwen3-coder"].sub_provider == "openrouter"
+      assert by_slug["openrouter/qwen/qwen3-coder"].premium? == true
+    end
+
+    test "empty cache returns empty list, does not crash" do
+      EyeInTheSky.Pi.ModelDiscoveryCache.invalidate()
+      assert ModelHelpers.entries_for_provider("pi") == []
+    end
+  end
+
+  describe "all_model_entries/0" do
+    test "concatenates claude, codex, and pi entries" do
+      entries = ModelHelpers.all_model_entries()
+      providers = entries |> Enum.map(& &1.provider) |> Enum.uniq() |> Enum.sort()
+      assert "claude" in providers
+      assert "codex" in providers
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # catalog refresh (Task 1)
+  # ---------------------------------------------------------------------------
+
+  describe "claude_models/0 — refreshed catalog" do
+    test "includes the refreshed Claude 5 family slugs" do
+      values = ModelHelpers.claude_models() |> Enum.map(&elem(&1, 0))
+      assert "claude-opus-4-8" in values
+      assert "claude-fable-5" in values
+      assert "claude-sonnet-5" in values
+      assert "claude-haiku-4-5-20251001" in values
+    end
+
+    test "keeps old-generation slugs for existing sessions (spec §6.3 migration note)" do
+      values = ModelHelpers.claude_models() |> Enum.map(&elem(&1, 0))
+      assert "claude-opus-4-7" in values
+      assert "claude-sonnet-4-6" in values
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # entries_with_current/3
+  # ---------------------------------------------------------------------------
+
+  describe "entries_with_current/3" do
+    test "returns entries unchanged when current slug is already present" do
+      entries = [
+        %EyeInTheSky.ModelEntry{provider: "codex", slug: "gpt-5.5", label: "GPT-5.5", group: "Codex", default?: true},
+        %EyeInTheSky.ModelEntry{provider: "codex", slug: "gpt-5.4", label: "GPT-5.4", group: "Codex"}
+      ]
+
+      result = ModelHelpers.entries_with_current(entries, "codex", "gpt-5.5")
+      assert result == entries
+    end
+
+    test "synthesizes and appends a Current entry when the slug is absent from every list" do
+      entries = [
+        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-opus-4-8", label: "Opus 4.8", group: "Claude Code", default?: true},
+        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-sonnet-5", label: "Sonnet 5", group: "Claude Code"}
+      ]
+
+      result = ModelHelpers.entries_with_current(entries, "claude", "sonnet-4-6")
+
+      assert length(result) == length(entries) + 1
+      synthetic = List.last(result)
+      assert synthetic.provider == "claude"
+      assert synthetic.slug == "sonnet-4-6"
+      assert synthetic.label == "sonnet-4-6"
+      assert synthetic.group == "Current"
+      assert synthetic.sub_provider == nil
+      assert synthetic.premium? == false
+      assert synthetic.legacy? == false
+      assert synthetic.default? == false
+    end
+
+    test "does not duplicate when called twice with the same missing slug" do
+      entries = [
+        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-opus-4-8", label: "Opus 4.8", group: "Claude Code", default?: true}
+      ]
+
+      once = ModelHelpers.entries_with_current(entries, "claude", "sonnet-4-6")
+      twice = ModelHelpers.entries_with_current(once, "claude", "sonnet-4-6")
+      assert length(twice) == length(once)
     end
   end
 end

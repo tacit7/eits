@@ -8,18 +8,6 @@ defmodule EyeInTheSkyWeb.TopBar.Teams do
 
   def toolbar(assigns) do
     ~H"""
-    <.search_bar
-      id="teams-top-bar-search"
-      size="xs"
-      label="Search teams"
-      placeholder="Search teams..."
-      value={@search_query || ""}
-      on_change="search"
-      debounce="300"
-      class="w-44"
-      vim_search={true}
-    />
-    <div class="w-px h-4 bg-base-content/10 mx-0.5" />
     <button
       phx-click="toggle_archived"
       class={[
@@ -32,6 +20,18 @@ defmodule EyeInTheSkyWeb.TopBar.Teams do
     >
       {if @show_archived, do: "Hide archived", else: "Archived"}
     </button>
+    <div class="flex-1" />
+    <.search_bar
+      id="teams-top-bar-search"
+      size="xs"
+      label="Search teams"
+      placeholder="Search teams..."
+      value={@search_query || ""}
+      on_change="search"
+      debounce="300"
+      class="w-48"
+      vim_search={true}
+    />
     """
   end
 end

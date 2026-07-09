@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.TopBar.Prompts do
 
   def toolbar(assigns) do
     ~H"""
+    <div class="flex-1" />
     <.search_bar
       id="prompts-top-bar-search"
       size="xs"
@@ -15,7 +16,7 @@ defmodule EyeInTheSkyWeb.TopBar.Prompts do
       value={@search_query || ""}
       on_change="search"
       debounce="300"
-      class="w-44"
+      class="w-48"
       vim_search={true}
     />
     """

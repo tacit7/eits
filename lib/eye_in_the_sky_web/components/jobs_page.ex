@@ -547,67 +547,6 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
           else: "w-full max-w-3xl mx-auto"
         )
       ]}>
-        <%!-- Overview: title only --%>
-        <%= if is_nil(@project_id) do %>
-          <h1 class="text-xl font-semibold mb-4">Scheduled Jobs</h1>
-        <% end %>
-
-        <%!-- Tabs bar: tabs · search · action buttons all on one line --%>
-        <div class="flex items-center gap-2 border-b border-base-300 mb-4 pb-1">
-          <button
-            class={"btn btn-sm min-h-[36px] #{if @active_tab == :all_jobs, do: "btn-active"}"}
-            phx-click="switch_tab"
-            phx-value-tab="all_jobs"
-            phx-target={@myself}
-          >
-            All Jobs
-          </button>
-          <button
-            class={"btn btn-sm min-h-[36px] #{if @active_tab == :agent_schedules, do: "btn-active"}"}
-            phx-click="switch_tab"
-            phx-value-tab="agent_schedules"
-            phx-target={@myself}
-          >
-            Recurring Agents
-          </button>
-          <form phx-change="filter_jobs" phx-target={@myself} class="flex-1 mx-2">
-            <input
-              type="text"
-              name="search"
-              class="input input-bordered input-xs w-full bg-base-100 text-base-content placeholder-base-content/40 h-[36px]"
-              placeholder="Search…"
-              value={@search_query}
-              phx-debounce="200"
-            />
-          </form>
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <%= if is_nil(@project_id) do %>
-              <.link
-                navigate="/oban"
-                class="btn btn-ghost btn-sm btn-xs text-base-content/50"
-                title="Oban queue dashboard"
-              >
-                <.icon name="hero-queue-list" class="size-3.5" />
-              </.link>
-            <% end %>
-            <button
-              class="btn btn-outline btn-sm btn-xs"
-              phx-click="toggle_claude_drawer"
-              phx-target={@myself}
-            >
-              <.icon name="hero-sparkles" class="size-3.5" /> Create with Claude
-            </button>
-            <button
-              class="btn btn-primary btn-sm btn-xs"
-              phx-click="new_job"
-              phx-value-scope={if @project_id, do: "project", else: "global"}
-              phx-target={@myself}
-            >
-              + New Job
-            </button>
-          </div>
-        </div>
-
         <%= if @active_tab == :all_jobs do %>
           <%= if @project_id do %>
             <%!-- Project view: merged list with "global" inline tag for global jobs --%>

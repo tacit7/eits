@@ -6,10 +6,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   use Phoenix.LiveComponent
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, modal_header: 1]
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [models_for_provider: 1]
-  import EyeInTheSkyWeb.Helpers.ModelHelpers, only: [normalize_model_alias: 1]
+  import EyeInTheSkyWeb.Helpers.ModelHelpers, only: [normalize_model_alias: 1, all_model_entries: 0]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Components.CliFlags, only: [path_fields: 1, boolean_flags: 1]
+  import EyeInTheSkyWeb.Components.ModelSelector, only: [model_selector: 1]
 
   alias EyeInTheSky.Agents.ModelConfig
   alias EyeInTheSky.Claude.AgentFileScanner
@@ -18,6 +18,14 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def mount(socket) do
+    # Warm the Pi discovery cache on mount — Task 9's collapse of
+    # provider_changed/model_changed into one handler dropped the
+    # refresh_async() call the old "pi" branch used to make, leaving the
+    # cross-provider entry list (allow_provider_switch?: true) permanently
+    # missing Pi/Ollama rows for anyone who never separately opened the New
+    # Agent drawer (the only other host still warming the cache).
+    EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+
     {:ok,
      assign(socket,
        selected_model: default_claude_model(),
@@ -60,31 +68,16 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   end
 
   @impl true
-  def handle_event("provider_changed", %{"agent_type" => provider}, socket) do
-    default_model =
-      case provider do
-        "codex" ->
-          ModelConfig.default_model("codex")
-
-        "pi" ->
-          # Warm the discovery cache for the next render; default to the
-          # first discovered model (nil when none configured yet).
-          EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
-
-          case models_for_provider("pi") do
-            [{slug, _label} | _] -> slug
-            [] -> nil
-          end
-
-        _ ->
-          default_claude_model()
-      end
-
-    {:noreply, assign(socket, selected_provider: provider, selected_model: default_model)}
-  end
-
-  def handle_event("model_changed", %{"model" => model}, socket) do
-    {:noreply, assign(socket, :selected_model, model)}
+  def handle_event(
+        "model_and_provider_selected",
+        %{"provider" => provider, "model" => model},
+        socket
+      ) do
+    if ModelConfig.valid_model?(provider, model) do
+      {:noreply, assign(socket, selected_provider: provider, selected_model: model)}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("prompt_selected", %{"prompt_id" => ""}, socket) do
@@ -160,7 +153,21 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               id="new-session-submit-action"
               phx-update="ignore"
             />
-            <.provider_field selected_provider={@selected_provider} myself={@myself} />
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Model</label>
+              <.model_selector
+                id="new-session-model-selector"
+                entries={all_model_entries()}
+                selected_provider={@selected_provider}
+                selected_model={@selected_model}
+                allow_provider_switch?={true}
+                event="model_and_provider_selected"
+                myself={@myself}
+              />
+              <input type="hidden" name="agent_type" value={@selected_provider} />
+              <input type="hidden" name="model" value={@selected_model} />
+            </div>
+            <.effort_selector selected_provider={@selected_provider} selected_model={@selected_model} />
             <.agent_combobox
               available_agents={@available_agents}
               prefill_agent_slug={assigns[:prefill_agent_slug]}
@@ -183,12 +190,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               projects={assigns[:projects]}
               myself={@myself}
             />
-            <.model_selector
-              selected_provider={@selected_provider}
-              selected_model={@selected_model}
-              myself={@myself}
-            />
-            <.effort_selector selected_provider={@selected_provider} selected_model={@selected_model} />
             <.worktree_field />
             <.eits_workflow_field />
             <.cli_flags_section />
@@ -202,27 +203,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         >
         </div>
       </div>
-    </div>
-    """
-  end
-
-  attr :selected_provider, :string, required: true
-  attr :myself, :any, required: true
-
-  defp provider_field(assigns) do
-    ~H"""
-    <div>
-      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Provider</label>
-      <select
-        name="agent_type"
-        class="select select-bordered w-full"
-        phx-change="provider_changed"
-        phx-target={@myself}
-      >
-        <option value="claude" selected={@selected_provider == "claude"}>Claude</option>
-        <option value="codex" selected={@selected_provider == "codex"}>Codex</option>
-        <option value="pi" selected={@selected_provider == "pi"}>Pi (multi-provider)</option>
-      </select>
     </div>
     """
   end
@@ -429,32 +409,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         </select>
       </div>
     <% end %>
-    """
-  end
-
-  attr :selected_provider, :string, required: true
-  attr :selected_model, :string, required: true
-  attr :myself, :any, required: true
-
-  defp model_selector(assigns) do
-    ~H"""
-    <div>
-      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Model</label>
-      <select
-        name="model"
-        class="select select-bordered w-full"
-        required
-        phx-change="model_changed"
-        phx-target={@myself}
-      >
-        <%= for {value, label} <- models_for_provider(@selected_provider) do %>
-          <option value={value} selected={@selected_model == value}>{label}</option>
-        <% end %>
-        <%= if @selected_provider == "pi" and models_for_provider("pi") == [] do %>
-          <option disabled selected>No Pi models discovered — Settings → Providers</option>
-        <% end %>
-      </select>
-    </div>
     """
   end
 

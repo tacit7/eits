@@ -200,6 +200,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
     scope = Map.get(socket.assigns, :scope, socket.assigns.project_id)
     refreshed = Sessions.get_session_with_agent(session_id)
 
+    # Detect if this is a brand-new session so we can prepend it at position 0.
+    # For existing sessions (status updates), at: is ignored — items update in-place.
+    is_new = not Enum.any?(socket.assigns.all_agents, &(&1.id == session_id))
+
     cond do
       is_nil(refreshed) ->
         remove_agent_from_list(socket, session_id)
@@ -237,7 +241,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
 
         case Enum.find(visible_agents, &(&1.id == session_id)) do
           nil -> socket
-          changed -> stream_insert(socket, :session_list, changed)
+          changed ->
+            if is_new,
+              do: Phoenix.LiveView.stream_insert(socket, :session_list, changed, at: 0),
+              else: stream_insert(socket, :session_list, changed)
         end
     end
   end

@@ -304,7 +304,8 @@ defmodule EyeInTheSky.Tasks do
         {:ok, count}
       end)
       |> Ecto.Multi.run(:add_new_session, fn repo, _changes ->
-        repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+        {count, _} = repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+        {:ok, count}
       end)
       |> Ecto.Multi.update(:update_task, Task.changeset(task, %{state_id: in_progress_id, updated_at: now}))
       |> Ecto.Multi.run(:clear_session_intent, fn repo, _changes ->

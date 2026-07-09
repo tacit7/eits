@@ -4,6 +4,14 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
 
   alias EyeInTheSky.Agents.ModelConfig
+  alias EyeInTheSky.ModelEntry
+
+  @claude_primary_slugs ~w(claude-opus-4-8 claude-fable-5 claude-sonnet-5 claude-haiku-4-5-20251001)
+  @claude_premium_aliases ["opus[1m]", "sonnet[1m]"]
+  @claude_default_slug "claude-opus-4-8"
+
+  @codex_primary_slugs ~w(gpt-5.5 gpt-5.4 gpt-5.4-mini)
+  @codex_default_slug "gpt-5.5"
 
   defdelegate valid_model_combos, to: ModelConfig
 
@@ -12,13 +20,16 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models do
     [
+      {"claude-opus-4-8", "Opus 4.8"},
+      {"claude-fable-5", "Fable 5"},
+      {"claude-sonnet-5", "Sonnet 5"},
+      {"claude-haiku-4-5-20251001", "Haiku 4.5"},
       {"claude-opus-4-7", "Opus 4.7"},
       {"claude-opus-4-6", "Opus 4.6"},
       {"claude-opus-4-5-20251101", "Opus 4.5"},
       {"claude-opus-4-1-20250805", "Opus 4.1"},
       {"claude-sonnet-4-6", "Sonnet 4.6"},
-      {"claude-sonnet-4-5-20250929", "Sonnet 4.5"},
-      {"claude-haiku-4-5-20251001", "Haiku 4.5"}
+      {"claude-sonnet-4-5-20250929", "Sonnet 4.5"}
     ]
   end
 
@@ -27,15 +38,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models_with_meta do
     [
-      {"claude-opus-4-7", "Opus 4.7", "Most capable for complex work · 1M context",
+      {"claude-opus-4-8", "Opus 4.8", "Best for everyday, complex tasks · 1M context",
        "text-warning"},
+      {"claude-fable-5", "Fable 5", "Most capable for your hardest and longest-running tasks",
+       "text-warning"},
+      {"claude-sonnet-5", "Sonnet 5", "Efficient for routine tasks", "text-info"},
+      {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fastest for quick answers", "text-success"},
+      {"claude-opus-4-7", "Opus 4.7", "Previous generation · 1M context", "text-warning"},
       {"claude-opus-4-6", "Opus 4.6", "Previous generation · 1M context · extended thinking",
        "text-warning"},
       {"claude-opus-4-5-20251101", "Opus 4.5", "api", "text-warning"},
       {"claude-opus-4-1-20250805", "Opus 4.1", "api", "text-warning"},
-      {"claude-sonnet-4-6", "Sonnet 4.6", "Best for everyday tasks", "text-info"},
-      {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "api", "text-info"},
-      {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fastest for quick answers", "text-success"}
+      {"claude-sonnet-4-6", "Sonnet 4.6", "Previous generation", "text-info"},
+      {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "api", "text-info"}
     ]
   end
 
@@ -70,6 +85,90 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
       {"gpt-5.1-codex-max", "GPT-5.1 Codex Max", "Deep reasoning, large context", "text-success"},
       {"gpt-5.1-codex-mini", "GPT-5.1 Codex Mini", "Cheaper and faster", "text-success"}
     ]
+  end
+
+  @doc """
+  Unified `%ModelEntry{}` list for a provider — the data source for the
+  shared model selector (spec §4.2). Claude/Codex come from the static
+  catalog; Pi comes from `Pi.ModelDiscoveryCache.get_cached/0` directly,
+  preserving the discovery payload's `"provider"` sub-provider key that
+  `pi_models/0` discards.
+
+  `default?` is tagged on the current default slug (not a literal "default"
+  alias slug — `ModelConfig.claude_models/0` has no such entry and the CLI's
+  acceptance of `--model default` is unverified per spec §6.2).
+  """
+  @spec entries_for_provider(String.t()) :: [ModelEntry.t()]
+  def entries_for_provider("claude") do
+    base =
+      for {slug, label} <- claude_models() do
+        %ModelEntry{
+          provider: "claude",
+          slug: slug,
+          label: label,
+          group: "Claude Code",
+          legacy?: slug not in @claude_primary_slugs,
+          default?: slug == @claude_default_slug
+        }
+      end
+
+    premium =
+      for alias_slug <- @claude_premium_aliases do
+        %ModelEntry{
+          provider: "claude",
+          slug: alias_slug,
+          label: short_alias_display(alias_slug),
+          group: "Claude Code",
+          premium?: true
+        }
+      end
+
+    base ++ premium
+  end
+
+  def entries_for_provider("codex") do
+    for {slug, label} <- codex_models() do
+      %ModelEntry{
+        provider: "codex",
+        slug: slug,
+        label: label,
+        group: "Codex",
+        legacy?: slug not in @codex_primary_slugs,
+        default?: slug == @codex_default_slug
+      }
+    end
+  end
+
+  def entries_for_provider("pi") do
+    case EyeInTheSky.Pi.ModelDiscoveryCache.get_cached() do
+      {:ok, models, _freshness} -> Enum.map(models, &pi_entry/1)
+      :empty -> []
+    end
+  end
+
+  def entries_for_provider(_), do: []
+
+  # `premium?` heuristic (spec §4.2): local Ollama routes are free,
+  # everything else goes through a paid cloud API key.
+  defp pi_entry(%{"id" => slug, "provider" => sub_provider}) do
+    %ModelEntry{
+      provider: "pi",
+      slug: slug,
+      label: slug,
+      group: pi_group_label(sub_provider),
+      sub_provider: sub_provider,
+      premium?: not String.starts_with?(sub_provider, "ollama")
+    }
+  end
+
+  defp pi_group_label("ollama"), do: "Ollama"
+  defp pi_group_label("ollama-lan"), do: "Ollama (LAN)"
+  defp pi_group_label(sub_provider), do: String.capitalize(sub_provider)
+
+  @doc "Claude + Codex + Pi entries concatenated (for allow_provider_switch?: true hosts)."
+  @spec all_model_entries() :: [ModelEntry.t()]
+  def all_model_entries do
+    entries_for_provider("claude") ++ entries_for_provider("codex") ++ entries_for_provider("pi")
   end
 
   @doc "Discovered Pi model slugs from the cache. Never calls the harness."
@@ -112,20 +211,20 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   def normalize_model_alias(model) when is_binary(model) do
     case String.downcase(model) do
       "haiku" -> "claude-haiku-4-5-20251001"
-      "sonnet" -> "claude-sonnet-4-6"
-      "opus" -> "claude-opus-4-7"
+      "sonnet" -> "claude-sonnet-5"
+      "opus" -> "claude-opus-4-8"
       _ -> model
     end
   end
 
-  def normalize_model_alias(nil), do: "claude-sonnet-4-6"
+  def normalize_model_alias(nil), do: "claude-sonnet-5"
 
   @doc """
   Returns the default model slug for a provider.
   """
   def default_model_for("codex"), do: "gpt-5.5"
   def default_model_for("pi"), do: nil
-  def default_model_for(_), do: "claude-opus-4-7"
+  def default_model_for(_), do: "claude-opus-4-8"
 
   @doc """
   Returns a human-readable display name for any supported model slug,
@@ -142,10 +241,38 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
 
   def model_display_name(other), do: to_string(other)
 
-  defp short_alias_display("opus"), do: "Opus 4.7"
-  defp short_alias_display("opus[1m]"), do: "Opus 4.6 (1M)"
-  defp short_alias_display("sonnet"), do: "Sonnet 4.6"
-  defp short_alias_display("sonnet[1m]"), do: "Sonnet 4.5 (1M)"
+  @doc """
+  Ensures `current_slug` always appears in `entries`, synthesizing a
+  `group: "Current"` entry if it's absent from every known list (the
+  `sonnet-4-6`-style stale/custom case — spec §4.3). Idempotent.
+  """
+  @spec entries_with_current([EyeInTheSky.ModelEntry.t()], String.t(), String.t()) :: [
+          EyeInTheSky.ModelEntry.t()
+        ]
+  def entries_with_current(entries, provider, current_slug) do
+    if Enum.any?(entries, &(&1.slug == current_slug)) do
+      entries
+    else
+      entries ++
+        [
+          %EyeInTheSky.ModelEntry{
+            provider: provider,
+            slug: current_slug,
+            label: current_slug,
+            group: "Current",
+            sub_provider: nil,
+            premium?: false,
+            legacy?: false,
+            default?: false
+          }
+        ]
+    end
+  end
+
+  defp short_alias_display("opus"), do: "Opus 4.8"
+  defp short_alias_display("opus[1m]"), do: "Opus (1M)"
+  defp short_alias_display("sonnet"), do: "Sonnet 5"
+  defp short_alias_display("sonnet[1m]"), do: "Sonnet (1M)"
   defp short_alias_display("haiku"), do: "Haiku 4.5"
   defp short_alias_display("claude-opus-4-6"), do: "Opus 4.6"
   defp short_alias_display(other), do: other

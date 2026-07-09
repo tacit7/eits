@@ -67,11 +67,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
         else: &AgentManager.create_agent/1
 
     case create_fn.(opts) do
-      {:ok, _result} ->
+      {:ok, %{session: session}} ->
         socket =
           socket
           |> assign(:show_new_session_drawer, false)
-          |> Loader.load_agents()
+          |> Loader.upsert_agent_in_list(session.id)
           |> put_flash(:info, "Session launched")
 
         {:noreply, socket}

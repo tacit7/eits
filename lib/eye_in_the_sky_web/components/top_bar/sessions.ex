@@ -16,25 +16,7 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
 
   def toolbar(assigns) do
     ~H"""
-    <%!-- Sessions: search + filter tabs + sort --%>
-    <form id="top-bar-search" phx-change="search" class="relative flex items-center flex-1 max-w-xs">
-      <label for="top-bar-search-input" class="sr-only">Search sessions</label>
-      <.icon
-        name="hero-magnifying-glass-mini"
-        class="absolute left-2.5 pointer-events-none size-3.5 text-base-content/30"
-      />
-      <input
-        type="text"
-        id="top-bar-search-input"
-        name="query"
-        value={@search_query || ""}
-        placeholder="Search..."
-        phx-debounce="300"
-        autocomplete="off"
-        data-vim-search
-        class="input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors input-xs pl-8 h-7 text-xs"
-      />
-    </form>
+    <%!-- Sessions: filter tabs + sort + search --%>
     <.tab_pills value_key="filter">
       <:item label="All" active={@session_filter == "all"} on_click="filter_session" value="all" />
       <:item
@@ -80,6 +62,25 @@ defmodule EyeInTheSkyWeb.TopBar.Sessions do
         <% end %>
       </ul>
     </details>
+    <div class="flex-1" />
+    <form id="top-bar-search" phx-change="search" class="relative flex items-center w-48">
+      <label for="top-bar-search-input" class="sr-only">Search sessions</label>
+      <.icon
+        name="hero-magnifying-glass-mini"
+        class="absolute left-2.5 pointer-events-none size-3.5 text-base-content/30"
+      />
+      <input
+        type="text"
+        id="top-bar-search-input"
+        name="query"
+        value={@search_query || ""}
+        placeholder="Search..."
+        phx-debounce="300"
+        autocomplete="off"
+        data-vim-search
+        class="input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors input-xs pl-8 h-7 text-xs"
+      />
+    </form>
     """
   end
 

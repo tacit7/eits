@@ -958,6 +958,17 @@ end
   - `:already_claimed` — task state is already in-progress (cannot claim twice)
 - Single `Repo.transaction` ensures no partial success — if any step fails, the entire claim is rolled back
 
+**Critical fix (commit ac0679d7):** `Ecto.Multi.run(:add_new_session)` was returning the raw tuple from `Repo.insert_all/2` (`{count, nil}`) instead of wrapping it in `{:ok, count}`, causing all task claims to crash with a Multi error. Fixed by explicitly destructuring and wrapping:
+
+```elixir
+Ecto.Multi.run(:add_new_session, fn repo, _changes ->
+  {count, _} = repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+  {:ok, count}  # <-- REQUIRED: Multi.run must return {:ok, result} or {:error, reason}
+end)
+```
+
+**Impact:** This fix restored the ability to claim tasks via the web UI and CLI after the Multi chain was wired up.
+
 ### Created By Tracking
 
 Tasks now track who created them via the `created_by_session_id` column. This is separate from session ownership (task_sessions).
@@ -1334,6 +1345,30 @@ end
 ```
 
 This reduces perceived mount latency — the page renders as soon as the slowest query completes (usually filesystem scan), not the sum of all 6. Tasks run concurrently on the pool, so wall-clock time approaches the duration of the slowest single query rather than serialized cumulative time.
+
+---
+
+## Session List Insertion & Ordering
+
+When a new session is created on the project sessions page, it is inserted at the top of the session list (`at: 0`) immediately via `stream_insert`, rather than appended to the end. This provides instant feedback without requiring a page refresh.
+
+**Implementation** in `ProjectLive.Sessions.Loader.upsert_agent_in_list/2`:
+
+The function detects whether the session is brand-new (not yet in `all_agents`) by checking membership:
+
+```elixir
+is_new = not Enum.any?(socket.assigns.all_agents, &(&1.id == session_id))
+
+# For new sessions, insert at position 0 (prepend)
+if is_new,
+  do: Phoenix.LiveView.stream_insert(socket, :session_list, changed, at: 0),
+  else: stream_insert(socket, :session_list, changed)
+```
+
+**Key behaviors:**
+- **New session**: Detected by membership check, inserted at `at: 0` (prepends to visible list)
+- **Status update**: When a session's status changes (already in the list), `at:` is ignored and the item updates in-place via morphdom
+- **Caller simplification**: `do_create_new_session/2` now calls `upsert_agent_in_list` instead of `load_agents`, keeping all assigns consistent and avoiding full refresh
 
 ---
 

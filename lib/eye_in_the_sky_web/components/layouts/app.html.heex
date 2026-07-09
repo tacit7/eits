@@ -105,6 +105,7 @@
   </div>
 
   <div id="app-body" class="flex flex-1 min-h-0">
+  <%= live_render(@socket, EyeInTheSkyWeb.Components.Rail, id: "app-rail", sticky: true) %>
   <%!-- Grab handle for swipe-to-open sidebar on mobile.
        touch-action:none prevents Safari from stealing the gesture for back navigation. --%>
   <%!-- Grab handle starts below the mobile header so it never covers the hamburger button.

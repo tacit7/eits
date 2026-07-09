@@ -463,7 +463,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def render(assigns) do
     ~H"""
     <div
-      id="app-rail"
+      id="rail-root"
       phx-hook="RailState"
       data-project-id={@sidebar_project && @sidebar_project.id}
       class="flex flex-row h-full min-w-0 relative group/rail"

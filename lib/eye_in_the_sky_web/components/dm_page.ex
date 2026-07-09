@@ -266,7 +266,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <%!-- Mobile slim top bar --%>
       <div class="md:hidden sticky top-0 z-30 flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
         <button
-          phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#app-rail")}
+          phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#rail-root")}
           class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-ring"
           aria-label="Open menu"
         >

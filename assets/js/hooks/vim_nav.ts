@@ -353,7 +353,7 @@ export const VimNav = {
   currentProjectPath(): string | null {
     const m = window.location.pathname.match(/^(\/projects\/\d+)/)
     if (m) return m[1]
-    const railId = (document.getElementById("app-rail") as HTMLElement | null)?.dataset.projectId
+    const railId = (document.getElementById("rail-root") as HTMLElement | null)?.dataset.projectId
     return railId ? `/projects/${railId}` : null
   },
 

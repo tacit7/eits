@@ -13,23 +13,28 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
   import EyeInTheSkyWeb.IAMLive.IAMComponents
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "Agent Type")
-     |> assign(:sidebar_tab, :iam)
-     |> assign(:sidebar_project, nil)
-     |> assign(:iam_hooks_status, HooksChecker.status())
-     |> assign(:agent_type, nil)
-     |> assign(:attached_docs, [])
-     |> assign(:effective_policy_count, 0)
-     |> assign(:available_documents, [])
-     |> assign(:attach_doc_id, nil)}
+    socket =
+      socket
+      |> assign(:page_title, "Agent Type")
+      |> assign(:sidebar_tab, :iam)
+      |> assign(:sidebar_project, nil)
+      |> assign(:iam_hooks_status, HooksChecker.status())
+      |> assign(:agent_type, nil)
+      |> assign(:attached_docs, [])
+      |> assign(:effective_policy_count, 0)
+      |> assign(:available_documents, [])
+      |> assign(:attach_doc_id, nil)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
+
+    {:ok, socket}
   end
 
   @impl true

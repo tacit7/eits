@@ -30,6 +30,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
       |> maybe_restore_team_status(params)
       |> maybe_restore_file_expanded(params)
       |> maybe_restore_flyout_open(params)
+      |> reload_section_content()
 
     {:noreply, socket}
   end
@@ -308,4 +309,39 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
   end
 
   defp maybe_restore_flyout_open(socket, _), do: socket
+
+  # Re-fetch flyout content for the restored section so the panel isn't empty
+  # after live navigation. Mirrors the loader pipeline in open_section/2 but
+  # without resetting session_scope / proj_picker_open / etc. — we preserve
+  # whatever state was already restored from localStorage. Skipped entirely
+  # when the flyout is collapsed (no visible content to populate).
+  defp reload_section_content(socket) do
+    if socket.assigns.flyout_open do
+      section = socket.assigns.active_section
+      project = socket.assigns.sidebar_project
+
+      socket
+      |> assign(
+        :flyout_sessions,
+        Loader.load_flyout_sessions(
+          project,
+          socket.assigns.session_sort,
+          socket.assigns.session_name_filter,
+          socket.assigns.session_show
+        )
+      )
+      |> Loader.maybe_load_channels(section, project)
+      |> Loader.maybe_load_canvases(section)
+      |> Loader.maybe_load_teams(section, project)
+      |> Loader.maybe_load_tasks(section, project)
+      |> Loader.maybe_load_jobs(section)
+      |> Loader.maybe_load_notes(section, project)
+      |> Loader.maybe_load_files(section)
+      |> Loader.maybe_load_agents(section, project)
+      |> Loader.maybe_load_skills(section, project)
+      |> Loader.maybe_load_usage(section)
+    else
+      socket
+    end
+  end
 end

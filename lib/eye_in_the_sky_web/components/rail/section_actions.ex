@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          |> assign(:mobile_open, false)
          |> assign(:proj_picker_open, false)
          |> assign(:show_new_session_form, false)
-         |> push_event("save_rail_state", %{flyout_open: true})}
+         |> push_event("save_rail_state", %{flyout_open: true, section: Atom.to_string(sticky)})}
     end
   end
 end

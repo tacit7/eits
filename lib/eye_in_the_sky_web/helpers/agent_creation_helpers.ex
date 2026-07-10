@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_budget: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
+  alias EyeInTheSky.Settings
 
   @doc """
   Build the opts keyword list for AgentManager.create_agent/1.
@@ -69,7 +70,7 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
 
     base = [
       agent_type: params["agent_type"] || "claude",
-      model: params["model"] || "sonnet",
+      model: params["model"] || Settings.get("default_model") || "sonnet",
       effort_level: params["effort_level"],
       max_budget_usd: parse_budget(params["max_budget_usd"]),
       project_id: params["project_id"],

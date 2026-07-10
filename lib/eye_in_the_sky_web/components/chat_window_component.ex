@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         {:noreply, socket}
 
       {:error, _} ->
-        {:noreply, socket}
+        {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end
 

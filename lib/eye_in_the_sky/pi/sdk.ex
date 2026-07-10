@@ -413,17 +413,15 @@ defmodule EyeInTheSky.Pi.SDK do
 
     canceled = consume_cancel_marker(sdk_ref)
 
-    cond do
-      canceled ->
-        # User cancel: the abort produced a turn_end, but the outcome is
-        # terminal :canceled — never completed, never a retryable error shape.
-        state = %{state | terminal: :canceled}
-        log_usage("pi.sdk.canceled", eits_session_id, data)
-        send(caller_pid, {:claude_error, sdk_ref, :user_canceled})
-        after_terminal(state, data)
-
-      true ->
-        finalize_uncanceled(data, state, sticky)
+    if canceled do
+      # User cancel: the abort produced a turn_end, but the outcome is
+      # terminal :canceled — never completed, never a retryable error shape.
+      state = %{state | terminal: :canceled}
+      log_usage("pi.sdk.canceled", eits_session_id, data)
+      send(caller_pid, {:claude_error, sdk_ref, :user_canceled})
+      after_terminal(state, data)
+    else
+      finalize_uncanceled(data, state, sticky)
     end
   end
 

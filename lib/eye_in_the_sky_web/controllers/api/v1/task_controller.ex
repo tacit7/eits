@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
                 since (duration string), stale_since (duration string)
   """
   def index(conn, params) do
-    limit = parse_int(params["limit"], 50)
+    limit = params["limit"] |> parse_int(50) |> max(1) |> min(1000)
 
     with {:ok, time_opts} <- resolve_time_opts(params) do
       tasks = fetch_tasks(params, limit, time_opts)
@@ -253,19 +253,25 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   Body: body, title (optional)
   """
   def annotate(conn, %{"id" => task_id} = params) do
-    case Notes.create_note(%{
-           parent_id: task_id,
-           parent_type: "task",
-           body: trim_param(params["body"] || ""),
-           title: trim_param(params["title"])
-         }) do
-      {:ok, note} ->
-        conn
-        |> put_status(:created)
-        |> json(%{success: true, message: "Annotation added", note_id: note.id})
+    case Tasks.get_task(task_id) do
+      {:error, :not_found} ->
+        {:error, :not_found, "Task not found"}
 
-      {:error, cs} ->
-        {:error, cs}
+      {:ok, _task} ->
+        case Notes.create_note(%{
+               parent_id: task_id,
+               parent_type: "task",
+               body: trim_param(params["body"] || ""),
+               title: trim_param(params["title"])
+             }) do
+          {:ok, note} ->
+            conn
+            |> put_status(:created)
+            |> json(%{success: true, message: "Annotation added", note_id: note.id})
+
+          {:error, cs} ->
+            {:error, cs}
+        end
     end
   end
 
@@ -365,12 +371,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
       session_id ->
         case Tasks.get_task(task_id) do
-          {:ok, _task} ->
-            maybe_link_session(task_id, session_id)
-            json(conn, %{success: true, message: "Session linked to task #{task_id}"})
-
           {:error, :not_found} ->
-            {:error, :bad_request, "Invalid task ID"}
+            {:error, :not_found, "Task not found"}
+
+          {:ok, task} ->
+            case resolve_session_id(session_id) do
+              nil ->
+                {:error, :not_found, "Session not found"}
+
+              int_id ->
+                Tasks.link_session_to_task(task.id, int_id)
+                json(conn, %{success: true, message: "Session linked to task #{task.id}"})
+            end
         end
     end
   end

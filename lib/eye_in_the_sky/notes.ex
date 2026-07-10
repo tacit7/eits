@@ -236,7 +236,7 @@ defmodule EyeInTheSky.Notes do
   """
   def update_note(%Note{} = note, attrs) do
     note
-    |> Ecto.Changeset.cast(attrs, [:body, :title, :starred])
+    |> Ecto.Changeset.cast(attrs, [:body, :title, :starred, :parent_type, :parent_id])
     |> Ecto.Changeset.validate_required([:body])
     |> Repo.update()
   end

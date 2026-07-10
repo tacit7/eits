@@ -116,15 +116,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
       {:ok, note} ->
         conn
         |> put_status(:created)
-        |> json(%{
-          id: note.id,
-          parent_type: note.parent_type,
-          parent_id: note.parent_id,
-          title: note.title,
-          body: note.body,
-          starred: note.starred,
-          source_session_uuid: note.source_session_uuid
-        })
+        |> json(ApiPresenter.present_note(note))
 
       {:error, %Ecto.Changeset{} = changeset} ->
         conn

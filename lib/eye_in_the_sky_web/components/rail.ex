@@ -150,11 +150,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     # Only adopt sidebar_project if non-nil — prevents pages without a project
     # from clearing a project locally selected via the rail's own project picker.
     socket =
-      if not is_nil(sidebar_project) do
-        assign(socket, :sidebar_project, sidebar_project)
-      else
-        socket
-      end
+      if is_nil(sidebar_project), do: socket, else: assign(socket, :sidebar_project, sidebar_project)
 
     socket = maybe_reload_on_project_change(socket, previous_project, sidebar_project)
     socket = maybe_reload_on_tab_change(socket, previous_tab, sidebar_tab, next_section)

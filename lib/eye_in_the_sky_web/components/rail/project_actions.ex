@@ -257,8 +257,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
           # debugging rounds (nothing appears in the UI and nothing is logged).
           errors =
             changeset.errors
-            |> Enum.map(fn {field, {msg, _}} -> "#{field} #{msg}" end)
-            |> Enum.join(", ")
+            |> Enum.map_join(", ", fn {field, {msg, _}} -> "#{field} #{msg}" end)
 
           {:noreply, put_flash(socket, :error, "Could not add project: #{errors}")}
         end

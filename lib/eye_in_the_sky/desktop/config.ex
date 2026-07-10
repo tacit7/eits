@@ -14,8 +14,8 @@ defmodule EyeInTheSky.Desktop.Config do
   """
 
   # Keep in sync with DEFAULT_PORT in src-tauri/src/lib.rs.
-  @default_port 34877
-  @port_range 1024..49151
+  @default_port 34_877
+  @port_range 1024..49_151
 
   @doc "Default embedded-server port (mirrors src-tauri DEFAULT_PORT)."
   def default_port, do: @default_port

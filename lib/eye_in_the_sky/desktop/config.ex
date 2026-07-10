@@ -56,13 +56,7 @@ defmodule EyeInTheSky.Desktop.Config do
   """
   def write_port(port) when is_integer(port) do
     if port in @port_range do
-      path = config_path()
-
-      with :ok <- File.mkdir_p(Path.dirname(path)),
-           config = Map.put(read_config(), "port", port),
-           :ok <- File.write(path, Jason.encode!(config, pretty: true)) do
-        :ok
-      end
+      update_config("port", port)
     else
       {:error, :out_of_range}
     end
@@ -92,11 +86,15 @@ defmodule EyeInTheSky.Desktop.Config do
   `setup()`, before Elixir boots. Returns :ok or {:error, reason}.
   """
   def write_hooks_consent(granted?) when is_boolean(granted?) do
-    path = config_path()
     value = if granted?, do: "granted", else: "denied"
+    update_config("hooks_consent", value)
+  end
+
+  defp update_config(key, value) do
+    path = config_path()
 
     with :ok <- File.mkdir_p(Path.dirname(path)),
-         config = Map.put(read_config(), "hooks_consent", value),
+         config = Map.put(read_config(), key, value),
          :ok <- File.write(path, Jason.encode!(config, pretty: true)) do
       :ok
     end

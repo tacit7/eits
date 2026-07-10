@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpers do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Settings
   alias EyeInTheSky.Tasks
 
   @doc """
@@ -25,7 +26,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpers do
       instructions: task_prompt,
       project_id: project.id,
       project_path: project.path,
-      model: "sonnet"
+      model: Settings.get("default_model") || "sonnet"
     ]
 
     case AgentManager.create_agent(opts) do

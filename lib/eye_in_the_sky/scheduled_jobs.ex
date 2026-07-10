@@ -296,6 +296,7 @@ defmodule EyeInTheSky.ScheduledJobs do
       "mix_task" -> do_enqueue(EyeInTheSky.Workers.MixTaskWorker, job)
       "daily_digest" -> do_enqueue(EyeInTheSky.Workers.DailyDigestWorker, job)
       "workable_task" -> do_enqueue(EyeInTheSky.Workers.WorkableTaskWorker, job)
+      "disable_job" -> do_enqueue(EyeInTheSky.Workers.DisableJobWorker, job)
       other -> {:error, {:unknown_job_type, other}}
     end
   end

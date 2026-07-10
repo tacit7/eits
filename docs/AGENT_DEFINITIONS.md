@@ -182,11 +182,95 @@ If no frontmatter block is found (`--- ... ---`), all fields default to `nil`/`[
 - Sessions preload `agent: :agent_definition` in several queries so the DM page and session cards can display `agent_definition.display_name`.
 - The `Agents` context preloads `:agent_definition` alongside `:project` in `list_agents/1` queries.
 
+## In-Memory Structs
+
+Beyond the database schema, agent and skill definitions are loaded into in-memory structs that include an `abs_path` field:
+
+### AgentDef Struct
+
+Agents loaded from the filesystem (project `.claude/agents/*.md` and global `~/.claude/agents/*.md`) are represented as `AgentDef` structs:
+
+```elixir
+%{
+  id: "slug",                       # filename without .md extension
+  path: ".claude/agents/slug.md",   # relative (project) or absolute (global)
+  abs_path: "/absolute/path/...",   # absolute filesystem path (always set)
+  source: :project_agents,          # or :global_agents, :overrides_agents
+  display_name: "My Agent",         # from frontmatter
+  description: "Does something",    # from frontmatter, first line only
+  content: "---\n...\n\n## ...",    # full file content
+  model: "claude-opus-4",           # from frontmatter
+  mtime: unix_timestamp
+}
+```
+
+The `abs_path` is populated in `agents_helpers.ex` and used to enable the Edit and open-in-editor UI features (see below).
+
+### Skill Struct
+
+Skills loaded from directories (project `.claude/skills/*/` and global `~/.claude/skills/*/`) are represented as `Skill` structs with the same pattern:
+
+```elixir
+%{
+  id: "skill-slug",                 # derived from directory name
+  slug: "skill-slug",
+  filename: "SKILL.md" | "skill.md",
+  path: ".../skill-slug/SKILL.md",  # relative (project) or absolute (global)
+  abs_path: "/absolute/path/...",   # absolute filesystem path (always set)
+  source: :project_skills,          # or :global_skills
+  display_name: "My Skill",         # from frontmatter
+  description: "Does something",
+  content: "---\n...",              # full file content
+  mtime: unix_timestamp
+}
+```
+
+The `abs_path` field allows the UI to edit skill files and open them in external editors.
+
 ## UI Usage
 
-The `display_name` field surfaces in:
+The agent and skill definitions surface in multiple UI surfaces:
+
+### Display Name
+
+The `display_name` field (from frontmatter) surfaces in:
 
 - **DM page** (`dm_page.ex`): shown below the agent name if the definition has a display name.
 - **Session card** (`session_card.ex`): shown as secondary text below the session name.
 
 Both components guard against `Ecto.Association.NotLoaded` before accessing `agent_definition.display_name`.
+
+### Edit Tab (CodeMirror 6)
+
+Agents and skills detail panels include an **Edit** tab that opens a full-screen CodeMirror 6 editor:
+
+- **Pages**: Project Agents detail panel, Project Skills detail panel, Project Files detail panel, Overview Agents page (`/agents`)
+- **Visibility**: The Edit button is **hidden when `abs_path` is `nil`** (no writable path)
+- **Editing**: Users click "Edit" to enter edit mode. The detail panel header and preview/raw tabs are hidden while editing.
+- **Shortcuts**: Ctrl+S saves; Cancel discards changes
+- **Write-back**: 
+  - **Agents/Skills**: Written to disk via `File.write/2` with path allow-list validation (validates that the target path is within an allowed agents/skills directory)
+  - **Prompts**: Written to database via `Prompts.update_prompt/2`
+- **After save**: The agent/skill list is reloaded, the saved item is reselected by ID, and the UI returns to the `:preview` tab
+
+### Open-in-Editor Split-Button
+
+Agents, skills, files, and prompts detail panels include an **Open in Editor** split-button in the panel header:
+
+- **Primary action**: Clicking the button opens the file in the user's preferred editor (configured in Settings → Editor)
+- **Dropdown**: Clicking the chevron shows a dropdown menu of other detected editors on the system
+- **Component**: `OpenInEditorButton` (Svelte component in `lib/eye_in_the_sky_web/components/`)
+- **Requirements**: Requires `abs_path` to be set (hidden when `nil`)
+- **Supported editors**: VS Code, Cursor, Zed, Neovim, Vim, Helix, Sublime Text, Emacs, nano
+- **Detection**: Editors are detected via `EyeInTheSky.Editors` module using:
+  - Process `PATH` environment variable
+  - Standard installation directories (`/opt/homebrew/bin`, `/usr/local/bin`, `/usr/local/sbin`, `~/.local/bin`)
+  - macOS `/Applications` directory (for GUI apps)
+- **Settings**: Settings → Editor tab lists all 9 supported editors and stores the preferred editor choice
+
+### Overview Agents Page
+
+The global agents overview page (`/agents`) displays all available agents (project and global scoped) with their definitions and includes:
+
+- Open-in-editor split-button in the detail panel header (requires `abs_path` to be set)
+- Path validation: The path guard checks `abs_path` directly from the loaded agent list, since this page has no single project root to anchor a prefix check against

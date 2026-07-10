@@ -1,4 +1,6 @@
 defmodule EyeInTheSky.Release do
+  @moduledoc false
+
   @app :eye_in_the_sky
 
   def migrate do

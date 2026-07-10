@@ -1,8 +1,7 @@
 defmodule EyeInTheSkyWeb.ChatLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Events
-  alias EyeInTheSky.{Channels, Sessions}
+  alias EyeInTheSky.{Channels, Events, Sessions}
   alias EyeInTheSkyWeb.ChatLive.ChannelDataLoader
   alias EyeInTheSkyWeb.ChatLive.EventHandlers
   alias EyeInTheSkyWeb.ChatLive.PubSubHandlers

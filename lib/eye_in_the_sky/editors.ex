@@ -77,21 +77,38 @@ defmodule EyeInTheSky.Editors do
   def open(editor_id, path) when is_binary(editor_id) and is_binary(path) do
     dirs = build_search_dirs()
 
-    with {:editor, %{label: label} = ed} <- {:editor, find(editor_id)},
-         {:cmd, cmd} when is_binary(cmd) <- {:cmd, resolve(ed, dirs)},
-         {:allowed, true} <- {:allowed, path_allowed?(path)},
-         {:exists, true} <- {:exists, File.exists?(path)} do
+    with {:ok, %{label: label} = ed} <- fetch_editor(editor_id),
+         {:ok, cmd} <- fetch_cmd(ed, dirs),
+         :ok <- check_allowed(path),
+         :ok <- check_exists(path) do
       launch(cmd, path)
       {:ok, label}
-    else
-      {:editor, nil} -> {:error, :unknown_editor}
-      {:cmd, nil} -> {:error, :not_installed}
-      {:allowed, false} -> {:error, :not_allowed}
-      {:exists, false} -> {:error, :not_found}
     end
   end
 
   # --- Private ---
+
+  defp fetch_editor(editor_id) do
+    case find(editor_id) do
+      nil -> {:error, :unknown_editor}
+      ed -> {:ok, ed}
+    end
+  end
+
+  defp fetch_cmd(ed, dirs) do
+    case resolve(ed, dirs) do
+      nil -> {:error, :not_installed}
+      cmd -> {:ok, cmd}
+    end
+  end
+
+  defp check_allowed(path) do
+    if path_allowed?(path), do: :ok, else: {:error, :not_allowed}
+  end
+
+  defp check_exists(path) do
+    if File.exists?(path), do: :ok, else: {:error, :not_found}
+  end
 
   # Build the list of directories to search, extra dirs first so they win
   # over whatever the process inherited as PATH.
@@ -137,17 +154,20 @@ defmodule EyeInTheSky.Editors do
         home = System.get_env("HOME", "")
         roots = ["/Applications", Path.join(home, "Applications")]
         names = mac_app_names(bin)
-
-        Enum.find_value(roots, fn root ->
-          Enum.find_value(names, fn name ->
-            bundle = Path.join(root, "#{name}.app")
-            if File.exists?(bundle), do: "__open_a__:#{name}", else: nil
-          end)
-        end)
+        find_bundle(roots, names)
 
       _ ->
         nil
     end
+  end
+
+  defp find_bundle(roots, names) do
+    Enum.find_value(roots, fn root ->
+      Enum.find_value(names, fn name ->
+        bundle = Path.join(root, "#{name}.app")
+        if File.exists?(bundle), do: "__open_a__:#{name}", else: nil
+      end)
+    end)
   end
 
   defp launch("__open_a__:" <> app_name, path) do

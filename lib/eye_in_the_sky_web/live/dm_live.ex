@@ -1,9 +1,9 @@
 defmodule EyeInTheSkyWeb.DmLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.Events
-  alias EyeInTheSky.{Agents, Notes, Sessions}
+  alias EyeInTheSky.{Agents, Events, Notes, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Pi.ModelDiscoveryCache
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
   alias EyeInTheSkyWeb.Components.DmPage
 
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         # it never triggers a fetch itself (unlike the drawer/modal). Without
         # this, a Pi session's composer shows an empty Pi group until some
         # other page (drawer/modal/settings) happens to warm the cache first.
-        if session.provider == "pi", do: EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+        if session.provider == "pi", do: ModelDiscoveryCache.refresh_async()
 
         MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
         socket = mount_session_assigns(socket, params, session, agent, connected?(socket))

@@ -28,6 +28,7 @@ defmodule EyeInTheSky.Pi.SDK do
 
   alias EyeInTheSky.Claude.Message
   alias EyeInTheSky.Claude.SDK.Registry
+  alias EyeInTheSky.Claude.Utils
   alias EyeInTheSky.SDK.MessageHandler
 
   require Logger
@@ -46,7 +47,7 @@ defmodule EyeInTheSky.Pi.SDK do
   def loop_opts, do: @loop_opts
 
   @doc "Returns the configured Pi CLI transport module (real or mock for tests)."
-  def cli_module, do: EyeInTheSky.Claude.Utils.pi_cli_module()
+  def cli_module, do: Utils.pi_cli_module()
 
   # -- Public API (same contract as Codex.SDK) ---------------------------------
 

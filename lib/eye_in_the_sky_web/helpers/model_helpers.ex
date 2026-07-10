@@ -5,6 +5,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
 
   alias EyeInTheSky.Agents.ModelConfig
   alias EyeInTheSky.ModelEntry
+  alias EyeInTheSky.Pi.ModelDiscoveryCache
 
   @claude_primary_slugs ~w(claude-opus-4-8 claude-fable-5 claude-sonnet-5 claude-haiku-4-5-20251001)
   @claude_premium_aliases ["opus[1m]", "sonnet[1m]"]
@@ -140,7 +141,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   end
 
   def entries_for_provider("pi") do
-    case EyeInTheSky.Pi.ModelDiscoveryCache.get_cached() do
+    case ModelDiscoveryCache.get_cached() do
       {:ok, models, _freshness} -> Enum.map(models, &pi_entry/1)
       :empty -> []
     end
@@ -174,7 +175,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   @doc "Discovered Pi model slugs from the cache. Never calls the harness."
   @spec pi_models() :: {[String.t()], :fresh | :stale | :empty}
   def pi_models do
-    case EyeInTheSky.Pi.ModelDiscoveryCache.get_cached() do
+    case ModelDiscoveryCache.get_cached() do
       {:ok, models, freshness} -> {Enum.map(models, & &1["id"]), freshness}
       :empty -> {[], :empty}
     end

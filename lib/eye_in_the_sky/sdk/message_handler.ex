@@ -218,74 +218,13 @@ defmodule EyeInTheSky.SDK.MessageHandler do
     %{sdk_ref: sdk_ref, caller_pid: caller_pid} = state
     session_id = Map.get(state, :session_id)
 
-    parser = Keyword.fetch!(opts, :parser)
     tel_prefix = Keyword.get(opts, :telemetry_prefix, [:eits, :sdk])
-    log_raw_key = Keyword.get(opts, :log_raw_key, "log_claude_raw")
-    log_raw_prefix = Keyword.get(opts, :log_raw_prefix, "claude.raw")
-    forward_raw_lines = Keyword.get(opts, :forward_raw_lines, false)
 
     receive do
       {:claude_output, _cli_ref, line} ->
-        maybe_log_raw_line(session_id, line, log_raw_key, log_raw_prefix)
-
-        if forward_raw_lines do
-          broadcast_id = Map.get(state, :eits_session_id) || session_id
-          EyeInTheSky.Events.broadcast_codex_raw(broadcast_id, line)
-        end
-
-        :telemetry.execute(tel_prefix ++ [:output], %{byte_size: byte_size(line)}, %{
-          session_id: session_id
-        })
-
-        case parser.parse_stream_line(line) do
-          {:ok, message} ->
-            case module.handle_message(message, state) do
-              {:continue, new_state} -> run_loop(module, new_state, opts)
-              :stop -> stop_and_unregister(sdk_ref)
-            end
-
-          {:session_id, sid} ->
-            new_state = module.on_session_id(sid, state)
-            run_loop(module, new_state, opts)
-
-          {:result, data} ->
-            module.handle_result(data, state)
-
-          {:error, reason} ->
-            {:error, mapped} = module.on_stream_error(reason, state)
-            send(caller_pid, {:claude_error, sdk_ref, mapped})
-
-            :telemetry.execute(
-              tel_prefix ++ [:error],
-              %{system_time: System.system_time()},
-              %{session_id: session_id, reason: mapped}
-            )
-
-            Logger.error(
-              "[telemetry] #{tel_label(tel_prefix)}.error session_id=#{session_id} reason=#{inspect(mapped)}"
-            )
-
-            stop_and_unregister(sdk_ref)
-            :ok
-
-          {:protocol, data} ->
-            case module.handle_protocol_event(data, state) do
-              {:continue, new_state} ->
-                run_loop(module, new_state, opts)
-
-              {:halt, reason} ->
-                {:error, mapped} = module.on_stream_error(reason, state)
-                send(caller_pid, {:claude_error, sdk_ref, mapped})
-                stop_and_unregister(sdk_ref)
-                :ok
-            end
-
-          :tool_block_stop ->
-            send(caller_pid, {:tool_block_stop, sdk_ref})
-            run_loop(module, state, opts)
-
-          :skip ->
-            run_loop(module, state, opts)
+        case handle_output_line(line, module, state, opts) do
+          {:cont, new_state} -> run_loop(module, new_state, opts)
+          :stop -> :ok
         end
 
       {:claude_exit, _cli_ref, 0} ->
@@ -391,6 +330,87 @@ defmodule EyeInTheSky.SDK.MessageHandler do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  # Handles one {:claude_output, _, line} event from the receive loop.
+  # Returns {:cont, new_state} to continue looping or :stop to halt.
+  # When returning :stop, cleanup (stop_and_unregister) has already been
+  # performed by this function.
+  defp handle_output_line(line, module, state, opts) do
+    %{sdk_ref: sdk_ref, caller_pid: caller_pid} = state
+    session_id = Map.get(state, :session_id)
+
+    parser = Keyword.fetch!(opts, :parser)
+    tel_prefix = Keyword.get(opts, :telemetry_prefix, [:eits, :sdk])
+    log_raw_key = Keyword.get(opts, :log_raw_key, "log_claude_raw")
+    log_raw_prefix = Keyword.get(opts, :log_raw_prefix, "claude.raw")
+    forward_raw_lines = Keyword.get(opts, :forward_raw_lines, false)
+
+    maybe_log_raw_line(session_id, line, log_raw_key, log_raw_prefix)
+
+    if forward_raw_lines do
+      broadcast_id = Map.get(state, :eits_session_id) || session_id
+      EyeInTheSky.Events.broadcast_codex_raw(broadcast_id, line)
+    end
+
+    :telemetry.execute(tel_prefix ++ [:output], %{byte_size: byte_size(line)}, %{
+      session_id: session_id
+    })
+
+    case parser.parse_stream_line(line) do
+      {:ok, message} ->
+        case module.handle_message(message, state) do
+          {:continue, new_state} -> {:cont, new_state}
+          :stop ->
+            stop_and_unregister(sdk_ref)
+            :stop
+        end
+
+      {:session_id, sid} ->
+        {:cont, module.on_session_id(sid, state)}
+
+      {:result, data} ->
+        # handle_result is responsible for calling finalize_after_terminal_event,
+        # which drains remaining output lines and calls stop_and_unregister.
+        module.handle_result(data, state)
+        :stop
+
+      {:error, reason} ->
+        {:error, mapped} = module.on_stream_error(reason, state)
+        send(caller_pid, {:claude_error, sdk_ref, mapped})
+
+        :telemetry.execute(
+          tel_prefix ++ [:error],
+          %{system_time: System.system_time()},
+          %{session_id: session_id, reason: mapped}
+        )
+
+        Logger.error(
+          "[telemetry] #{tel_label(tel_prefix)}.error session_id=#{session_id} reason=#{inspect(mapped)}"
+        )
+
+        stop_and_unregister(sdk_ref)
+        :stop
+
+      {:protocol, data} ->
+        case module.handle_protocol_event(data, state) do
+          {:continue, new_state} ->
+            {:cont, new_state}
+
+          {:halt, reason} ->
+            {:error, mapped} = module.on_stream_error(reason, state)
+            send(caller_pid, {:claude_error, sdk_ref, mapped})
+            stop_and_unregister(sdk_ref)
+            :stop
+        end
+
+      :tool_block_stop ->
+        send(caller_pid, {:tool_block_stop, sdk_ref})
+        {:cont, state}
+
+      :skip ->
+        {:cont, state}
+    end
+  end
 
   defp maybe_log_raw_line(session_id, line, log_raw_key, log_raw_prefix) do
     if EyeInTheSky.Settings.get_boolean(log_raw_key) do

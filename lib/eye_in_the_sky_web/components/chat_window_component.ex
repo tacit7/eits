@@ -172,8 +172,8 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
            provider: provider,
            body: body
          }) do
-      {:ok, _} ->
-        AgentManager.continue_session(session_id, body, [])
+      {:ok, message} ->
+        AgentManager.continue_session(session_id, body, message_id: message.id)
         messages = Messages.list_recent_messages(session_id, 50)
         cs_id = socket.assigns.canvas_session.id
 

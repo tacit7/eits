@@ -169,7 +169,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     params = %{
       "instructions" => "Help me configure Claude Code.",
       "agent" => "claude-config-guide",
-      "model" => "sonnet"
+      "model" => Settings.get("default_model") || "sonnet"
     }
 
     socket =

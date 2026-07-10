@@ -141,7 +141,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   defp open_terminal_at(path) do
     case :os.type() do
       {:unix, :darwin} -> System.cmd("open", ["-a", "Terminal", path])
-      {:win32, _} -> System.cmd("cmd", ["/c", "start", "cmd", "/K", "cd /d #{path}"])
+      {:win32, _} -> System.cmd("cmd", ["/c", "start", "cmd", "/K", "cd", "/d", path])
       _ -> System.cmd("x-terminal-emulator", [], cd: path)
     end
   end

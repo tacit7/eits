@@ -4,6 +4,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
   use EyeInTheSkyWeb, :html
 
   import EyeInTheSkyWeb.Components.ModelSelector, only: [model_selector: 1]
+  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [format_cost: 1, format_number: 1]
 
   alias EyeInTheSkyWeb.Components.DmHelpers
   alias EyeInTheSkyWeb.DmLive.SlashCommands
@@ -615,22 +616,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
     </div>
     """
   end
-
-  defp format_cost(cost) when cost < 0.01, do: "<$0.01"
-  defp format_cost(cost) when cost < 100, do: "$#{:erlang.float_to_binary(cost, decimals: 2)}"
-  defp format_cost(cost), do: "$#{round(cost)}"
-
-  defp format_number(n) when is_integer(n) do
-    n
-    |> Integer.to_string()
-    |> String.reverse()
-    |> String.graphemes()
-    |> Enum.chunk_every(3)
-    |> Enum.join(",")
-    |> String.reverse()
-  end
-
-  defp format_number(_), do: "0"
 
   defp serialize_cli_opts(opts) do
     key_map = SlashCommands.opt_key_to_slug()

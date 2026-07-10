@@ -98,12 +98,16 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
 
   @doc """
   Format a cost value as a dollar string (e.g. "$1.23").
+  Handles small values (<$0.01) and large values (≥$100) with special formatting.
   """
-  def format_cost(value) when is_float(value),
-    do: "$#{:erlang.float_to_binary(value, decimals: 2)}"
+  def format_cost(cost) when is_float(cost) and cost < 0.01, do: "<$0.01"
 
-  def format_cost(value) when is_integer(value),
-    do: "$#{:erlang.float_to_binary(value / 1, decimals: 2)}"
+  def format_cost(cost) when is_float(cost) and cost < 100,
+    do: "$#{:erlang.float_to_binary(cost, decimals: 2)}"
+
+  def format_cost(cost) when is_float(cost), do: "$#{round(cost)}"
+
+  def format_cost(cost) when is_integer(cost), do: format_cost(cost / 1)
 
   def format_cost(_), do: "$0.00"
 

@@ -67,7 +67,9 @@ defmodule EyeInTheSky.Agents.Agent do
       :last_activity_at,
       :agent_definition_id,
       :definition_checksum_at_spawn,
-      :settings
+      :settings,
+      :created_at,
+      :archived_at
     ])
     |> maybe_generate_uuid()
     |> validate_required([])

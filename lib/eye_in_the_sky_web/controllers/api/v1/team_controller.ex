@@ -103,6 +103,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           {:error, changeset}
       end
     else
+      {:error, :not_found} ->
+        {:error, :unauthorized, "Session not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
 
@@ -201,7 +204,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
   # POST /api/v1/teams/:team_id/members
   def join(conn, %{"team_id" => id} = params) do
-    with {:ok, scope} <- get_project_scope(conn, params),
+    scope_params = Map.drop(params, ["session_id", "agent_id"])
+
+    with {:ok, scope} <- get_project_scope(conn, scope_params),
          {:ok, team} <- resolve_team(id),
          :ok <- validate_project_access(team, scope) do
       attrs = %{
@@ -244,7 +249,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
          :ok <- validate_project_access(team, scope),
-         {:ok, member} <- resolve_member(member_id) do
+         {:ok, member} <- resolve_member(member_id),
+         :ok <- verify_member_team(member, team) do
       do_update_member(conn, member, params)
     else
       {:error, :not_found} ->
@@ -266,7 +272,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
          :ok <- validate_project_access(team, scope),
-         {:ok, member} <- resolve_member(member_id) do
+         {:ok, member} <- resolve_member(member_id),
+         :ok <- verify_member_team(member, team) do
       do_leave_team(conn, member)
     else
       {:error, :not_found} ->
@@ -411,13 +418,22 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-  defp do_update_member(conn, member, params) do
-    case Teams.update_member_status(member, params["status"]) do
-      {:ok, updated} ->
-        json(conn, %{success: true, member_id: updated.id, status: updated.status})
+  defp verify_member_team(%{team_id: tid}, %{id: tid}), do: :ok
+  defp verify_member_team(_, _), do: {:error, :forbidden}
 
-      {:error, changeset} ->
-        {:error, changeset}
+  defp do_update_member(conn, member, params) do
+    case params["status"] do
+      nil ->
+        {:error, :bad_request, "status is required"}
+
+      status ->
+        case Teams.update_member_status(member, status) do
+          {:ok, updated} ->
+            json(conn, %{success: true, member_id: updated.id, status: updated.status})
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
     end
   end
 

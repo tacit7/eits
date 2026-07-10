@@ -222,18 +222,7 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   # ---------------------------------------------------------------------------
 
   defdelegate format_size(bytes), to: EyeInTheSkyWeb.Helpers.FileHelpers
-
-  def format_number(n) when is_integer(n) do
-    n
-    |> Integer.to_string()
-    |> String.reverse()
-    |> String.graphemes()
-    |> Enum.chunk_every(3)
-    |> Enum.join(",")
-    |> String.reverse()
-  end
-
-  def format_number(_), do: "0"
+  defdelegate format_number(n), to: EyeInTheSkyWeb.Helpers.ViewHelpers
 
   def to_utc_string(nil), do: ""
   def to_utc_string(ts) when is_binary(ts), do: ts

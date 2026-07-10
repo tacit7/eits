@@ -176,7 +176,6 @@ defmodule EyeInTheSkyWeb.DmLive do
       when scope in ["session", "agent"],
       do: SettingsHandlers.handle_reset_settings(scope, socket)
 
-  def handle_event("toggle_model_menu", _params, socket), do: handle_toggle_model_menu(socket)
 
   def handle_event("toggle_effort_menu", _params, socket), do: handle_toggle_effort_menu(socket)
 

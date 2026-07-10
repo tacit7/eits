@@ -328,7 +328,7 @@ function _mountVimNav() {
   inst.pushEventToShell = (event, payload) => {
     const rail = document.getElementById("app-rail")
     if (!rail) return
-    liveSocket.main?.pushHookEvent(rail, rail, event, payload)
+    liveSocket.getViewByEl(rail)?.pushHookEvent(rail, rail, event, payload)
   }
   inst.pushToList = (event, payload) => {
     const listEl = document.querySelector("[data-vim-list]")

@@ -176,4 +176,13 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
       {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
     end
   end
+
+  @doc "Shared handler for set_detail_tab events (preview/raw tab toggle)."
+  def handle_set_detail_tab(%{"tab" => "preview"}, socket),
+    do: {:noreply, assign(socket, :detail_tab, :preview)}
+
+  def handle_set_detail_tab(%{"tab" => "raw"}, socket),
+    do: {:noreply, assign(socket, :detail_tab, :raw)}
+
+  def handle_set_detail_tab(_params, socket), do: {:noreply, socket}
 end

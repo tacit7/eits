@@ -89,13 +89,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
   end
 
   @impl true
-  def handle_event("set_detail_tab", %{"tab" => "preview"}, socket),
-    do: {:noreply, assign(socket, :detail_tab, :preview)}
-
-  def handle_event("set_detail_tab", %{"tab" => "raw"}, socket),
-    do: {:noreply, assign(socket, :detail_tab, :raw)}
-
-  def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
+  def handle_event("set_detail_tab", params, socket),
+    do: ViewHelpers.handle_set_detail_tab(params, socket)
 
   @impl true
   def handle_event("set_notify_on_stop", params, socket),

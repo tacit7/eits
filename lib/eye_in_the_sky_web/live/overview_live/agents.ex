@@ -343,12 +343,4 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
       socket
     end
   end
-
-  defp source_badge_class(:agents), do: "bg-primary/10 text-primary/70"
-  defp source_badge_class(:project_agents), do: "bg-secondary/10 text-secondary/70"
-  defp source_badge_class(_), do: "bg-base-content/5 text-base-content/50"
-
-  defp source_label(:agents), do: "global"
-  defp source_label(:project_agents), do: "project"
-  defp source_label(_), do: "unknown"
 end

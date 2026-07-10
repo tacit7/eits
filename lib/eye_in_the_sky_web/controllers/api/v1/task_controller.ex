@@ -393,7 +393,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
     case Tasks.get_task(task_id) do
       {:error, :not_found} ->
-        {:error, :bad_request, "Invalid task ID"}
+        {:error, :not_found, "Task not found"}
 
       {:ok, task} ->
         int_id = resolve_session_id(session_uuid)

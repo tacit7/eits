@@ -183,7 +183,7 @@ defmodule EyeInTheSky.Agents do
 
     case Repo.insert(changeset, on_conflict: :nothing, conflict_target: :uuid) do
       {:ok, %Agent{id: nil}} ->
-        {:ok, Repo.get_by!(Agent, uuid: uuid)}
+        get_agent_by_uuid(uuid)
 
       {:ok, agent} ->
         EyeInTheSky.Events.agent_created(agent)

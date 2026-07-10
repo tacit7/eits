@@ -312,11 +312,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
     project_path = socket.assigns.project.path
 
-    if is_binary(project_path) && path_within?(path, project_path) do
-      ViewHelpers.handle_open_in_editor(path, editor_id, socket)
-    else
-      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
-    end
+    ViewHelpers.handle_open_in_editor_with_guard(
+      path,
+      editor_id,
+      socket,
+      fn p, _s -> is_binary(project_path) && path_within?(p, project_path) end
+    )
   end
 
   @impl true

@@ -79,11 +79,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
 
   @impl true
   def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
-    if open_path_allowed?(path, socket) do
-      ViewHelpers.handle_open_in_editor(path, editor_id, socket)
-    else
-      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
-    end
+    ViewHelpers.handle_open_in_editor_with_guard(path, editor_id, socket, &open_path_allowed?/2)
   end
 
   @impl true

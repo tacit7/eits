@@ -158,4 +158,18 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
         {:noreply, Phoenix.LiveView.put_flash(socket, :error, "File not found")}
     end
   end
+
+  @doc """
+  Shared handler for the "open_in_editor" LiveView event with a guard.
+
+  Calls the given guard function with (path, socket) — if it returns true,
+  delegates to handle_open_in_editor/3; otherwise returns a :error flash.
+  """
+  def handle_open_in_editor_with_guard(path, editor_id, socket, guard_fn) do
+    if guard_fn.(path, socket) do
+      handle_open_in_editor(path, editor_id, socket)
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
+  end
 end

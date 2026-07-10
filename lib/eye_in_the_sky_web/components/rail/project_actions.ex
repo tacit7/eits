@@ -286,7 +286,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # Opens the given project in a new Tauri window. No-op in browser context
   # (the JS bridge guard prevents the invoke call from running).
   def handle_open_in_window(%{"project_id" => id_str}, socket) do
-    case EyeInTheSkyWeb.ControllerHelpers.parse_int(id_str) do
+    case parse_int(id_str) do
       nil ->
         {:noreply, socket}
 
@@ -340,32 +340,32 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # and navigates to the equivalent route on the new project.
   def handle_select_project_with_reload(params, socket) do
     previous_project = socket.assigns.sidebar_project
-    {:noreply, socket2} = handle_select_project(params, socket)
-    new_project = socket2.assigns.sidebar_project
+    {:noreply, socket} = handle_select_project(params, socket)
+    new_project = socket.assigns.sidebar_project
 
-    socket3 =
+    socket =
       if new_project != previous_project do
-        socket2
+        socket
         |> assign(
           :flyout_sessions,
           Loader.load_flyout_sessions(
             new_project,
-            socket2.assigns.session_sort,
-            socket2.assigns.session_name_filter
+            socket.assigns.session_sort,
+            socket.assigns.session_name_filter
           )
         )
         |> assign(:flyout_file_expanded, MapSet.new())
         |> assign(:flyout_file_children, %{})
-        |> Loader.maybe_load_files(socket2.assigns.active_section)
+        |> Loader.maybe_load_files(socket.assigns.active_section)
       else
-        socket2
+        socket
       end
 
     project_id = new_project && new_project.id
-    socket4 = push_event(socket3, "save_rail_state", %{project_id: project_id})
 
-    socket5 =
-      socket4
+    socket =
+      socket
+      |> push_event("save_rail_state", %{project_id: project_id})
       |> assign(:proj_picker_open, false)
       |> assign(:scope_type, :project)
 
@@ -373,18 +373,18 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     # the current tab context (sessions, tasks, notes, etc.).
     # Global tabs (:usage, :chat, :canvas, :notifications, :dm) return nil from
     # project_path/2 — in that case skip navigation and stay on the current page.
-    socket6 =
+    socket =
       if not is_nil(new_project) and new_project != previous_project do
         sidebar_tab = socket.assigns[:sidebar_tab] || :sessions
         case project_path(new_project.id, sidebar_tab) do
-          nil -> socket5
-          path -> push_navigate(socket5, to: path)
+          nil -> socket
+          path -> push_navigate(socket, to: path)
         end
       else
-        socket5
+        socket
       end
 
-    {:noreply, socket6}
+    {:noreply, socket}
   end
 
   # Maps the current sidebar_tab to the equivalent project-scoped route.

@@ -369,6 +369,9 @@ The AgentStatus scheduler includes a zombie sweep that marks sessions stuck in `
 - Marks linked agent as `failed` (mirroring the archive path)
 - Sets `status_reason: "zombie_swept"` for visibility
 - Guards against fresh sessions with NULL `last_activity_at` by checking `started_at` is stale (>30min old)
+- Broadcasts `Events.session_updated(updated)` + `Events.session_failed(updated, "zombie_swept")` so the rail sidebar and DM page remove the green dot immediately
+
+> **Do not use `Events.session_status/2` here.** It broadcasts to `"session:<id>:status"`, a topic only session-detail views subscribe to — aggregate list UIs (rail, DM page) would never receive it and the green dot would persist.
 
 This handles production scenarios where AgentWorker crashes abnormally without calling terminate/2.
 

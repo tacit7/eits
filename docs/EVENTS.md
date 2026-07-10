@@ -95,9 +95,9 @@ Sessions.set_session_idle(session)
 | Payload | Broadcaster | Meaning |
 |---|---|---|
 | `{:agent_created, agent}` | `Agents` | Agent identity record inserted |
-| `{:agent_updated, agent}` | `Agents`, `SessionController` | Agent/session record updated |
+| `{:agent_updated, agent}` | `Agents`, `SessionController`, `AgentStatus` | Agent/session record updated |
 | `{:agent_deleted, agent}` | `Agents` | Agent identity record removed |
-| `{:agent_stopped, session}` | `Sessions` | Session terminal state; fired via `broadcast_session_waiting/1` or `set_session_idle/1` |
+| `{:agent_stopped, session}` | `Sessions`, `AgentStatus` | Session terminal state; fired via `broadcast_session_waiting/1`, `set_session_idle/1`, or zombie sweep |
 
 ### `"agent:working"`
 
@@ -120,6 +120,8 @@ All callers use the normalized single-struct form.
 | `{:tool_result, tool_name, error?}` | Tool post-event (after execution) |
 
 ### `"session:<id>:status"` _(id = UUID string)_
+
+> **Warning:** This topic is only consumed by session-detail views that already know which session to watch. The rail sidebar and DM page do **not** subscribe to it — use `"agents"` topic events (`session_updated`, `session_failed`) for any broadcast that needs to update aggregate list UIs.
 
 | Payload | Meaning |
 |---|---|

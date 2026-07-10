@@ -10,6 +10,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [claude_models: 0]
   import EyeInTheSkyWeb.Live.Shared.JobsFormatters, only: [system_timezone: 0]
 
+  alias EyeInTheSky.Settings
+
   attr :show, :boolean, required: true
   attr :prompt, :any, required: true
   attr :job, :any, default: nil
@@ -64,7 +66,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       |> assign(:editing, not is_nil(assigns.job))
       |> assign(:schedule_type, job_field(assigns.job, :schedule_type, "cron"))
       |> assign(:schedule_value, job_field(assigns.job, :schedule_value, ""))
-      |> assign(:model, Map.get(assigns.config, "model", "sonnet"))
+      |> assign(:model, Map.get(assigns.config, "model") || Settings.get("default_model") || "sonnet")
       |> assign(:timezone, job_field(assigns.job, :timezone, system_timezone()))
 
     ~H"""

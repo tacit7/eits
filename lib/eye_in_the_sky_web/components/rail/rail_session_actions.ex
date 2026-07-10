@@ -149,15 +149,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
               {:ok, _} ->
                 socket =
                   socket
-                  |> assign(
-                    :flyout_sessions,
-                    Loader.load_flyout_sessions(
-                      socket.assigns.sidebar_project,
-                      socket.assigns.session_sort,
-                      socket.assigns.session_name_filter,
-                      socket.assigns.session_show
-                    )
-                  )
+                  |> reload_flyout_sessions()
                   |> put_flash(:info, "Session archived")
 
                 {:noreply, socket}
@@ -208,17 +200,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
           {:ok, session} ->
             case Sessions.update_session(session, %{name: String.trim(name)}) do
               {:ok, _} ->
-                socket =
-                  assign(
-                    socket,
-                    :flyout_sessions,
-                    Loader.load_flyout_sessions(
-                      socket.assigns.sidebar_project,
-                      socket.assigns.session_sort,
-                      socket.assigns.session_name_filter,
-                      socket.assigns.session_show
-                    )
-                  )
+                socket = reload_flyout_sessions(socket)
 
                 {:noreply, socket}
 
@@ -230,4 +212,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
   end
 
   def handle_rename_session(_params, socket), do: {:noreply, socket}
+
+  defp reload_flyout_sessions(socket) do
+    assign(
+      socket,
+      :flyout_sessions,
+      Loader.load_flyout_sessions(
+        socket.assigns.sidebar_project,
+        socket.assigns.session_sort,
+        socket.assigns.session_name_filter,
+        socket.assigns.session_show
+      )
+    )
+  end
 end

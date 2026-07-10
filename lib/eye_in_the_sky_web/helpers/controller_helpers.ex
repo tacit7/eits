@@ -131,4 +131,11 @@ defmodule EyeInTheSkyWeb.ControllerHelpers do
 
   @doc "Resolves an agent UUID/integer to an integer agent ID. Returns nil if not found."
   def resolve_agent_int_id(uuid), do: resolve_id(uuid, &EyeInTheSky.Agents.get_agent_by_uuid/1)
+
+  @doc "Returns :ok if session is not in a terminal status; {:error, :sender_terminated} otherwise."
+  def check_sender_not_terminated(%{status: status}) do
+    if status in EyeInTheSky.Sessions.terminated_statuses(),
+      do: {:error, :sender_terminated},
+      else: :ok
+  end
 end

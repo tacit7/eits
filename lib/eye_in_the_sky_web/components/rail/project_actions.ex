@@ -219,7 +219,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
            AgentManager.create_agent(
              project_id: project.id,
              project_path: project.path,
-             model: Settings.get("default_model") || "sonnet",
+             model: Settings.default_model(),
              eits_workflow: "0"
            ) do
       {:noreply, push_navigate(socket, to: "/dm/#{session.id}")}

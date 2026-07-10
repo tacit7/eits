@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
       else
         socket
         |> assign(:show_claude_drawer, false)
-        |> assign(:claude_model, Settings.get("default_model") || "sonnet")
+        |> assign(:claude_model, Settings.default_model())
         |> maybe_assign_web_project(assigns.project_id)
       end
 

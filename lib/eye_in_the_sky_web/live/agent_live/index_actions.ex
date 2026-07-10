@@ -233,7 +233,7 @@ defmodule EyeInTheSkyWeb.AgentLive.IndexActions do
             AgentManager.continue_session(
               session.id,
               direct_message_prompt(body),
-              model: Settings.get("default_model") || "sonnet",
+              model: Settings.default_model(),
               project_path: project_path
             )
 

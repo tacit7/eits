@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
 
     base = [
       agent_type: params["agent_type"] || "claude",
-      model: params["model"] || Settings.get("default_model") || "sonnet",
+      model: params["model"] || Settings.default_model(),
       effort_level: params["effort_level"],
       max_budget_usd: parse_budget(params["max_budget_usd"]),
       project_id: params["project_id"],

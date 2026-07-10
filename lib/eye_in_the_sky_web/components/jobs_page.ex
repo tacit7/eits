@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       |> assign_new(:form, fn -> to_form(ScheduledJobs.change_job(%ScheduledJob{})) end)
       |> assign_new(:form_job_type, fn -> "spawn_agent" end)
       |> assign_new(:form_schedule_type, fn -> "interval" end)
-      |> assign_new(:form_config, fn -> %{"model" => Settings.get("default_model") || "sonnet"} end)
+      |> assign_new(:form_config, fn -> %{"model" => Settings.default_model()} end)
       |> assign_new(:expanded_job_id, fn -> nil end)
       |> assign_new(:selected_job, fn -> nil end)
       |> assign_new(:runs, fn -> [] end)
@@ -145,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
      |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
      |> assign(:form_job_type, "spawn_agent")
      |> assign(:form_schedule_type, "interval")
-     |> assign(:form_config, %{"model" => Settings.get("default_model") || "sonnet"})}
+     |> assign(:form_config, %{"model" => Settings.default_model()})}
   end
 
   defp dispatch_event("cancel_form", params, socket),

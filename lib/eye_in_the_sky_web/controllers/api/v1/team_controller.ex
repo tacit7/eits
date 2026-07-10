@@ -500,11 +500,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-  defp check_sender_not_terminated(session) do
-    if session.status in Sessions.terminated_statuses(),
-      do: {:error, :sender_terminated},
-      else: :ok
-  end
 
   defp check_is_team_member(members, session) do
     if Enum.any?(members, &(&1.session_id == session.id)),

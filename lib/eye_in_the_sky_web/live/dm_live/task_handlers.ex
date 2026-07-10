@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
       [
         description: task.title,
         instructions: task_prompt,
-        model: Settings.get("default_model") || "sonnet"
+        model: Settings.default_model()
       ]
       |> maybe_opt(:project_id, project_id)
       |> maybe_opt(:project_path, project_path)

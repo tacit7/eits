@@ -349,11 +349,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     end
   end
 
-  defp check_sender_not_terminated(session) do
-    if session.status in Sessions.terminated_statuses(),
-      do: {:error, :sender_terminated},
-      else: :ok
-  end
 
   defp resolve_dm_receiver(raw) do
     case resolve_session_target(%{raw: raw, kind: :to}) do

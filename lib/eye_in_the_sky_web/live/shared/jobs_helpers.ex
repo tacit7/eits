@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   defp build_spawn_agent_config(params) do
     %{
       "instructions" => params["config_instructions"] || "",
-      "model" => params["config_model"] || Settings.get("default_model") || "sonnet",
+      "model" => params["config_model"] || Settings.default_model(),
       "project_path" => params["config_project_path"] || "",
       "description" => params["config_description"] || ""
     }
@@ -300,7 +300,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsHelpers do
   # ---------------------------------------------------------------------------
 
   def handle_create_with_claude(params, socket, project, opts \\ []) do
-    model = params["model"] || Settings.get("default_model") || "sonnet"
+    model = params["model"] || Settings.default_model()
     effort_level = params["effort_level"]
     description = params["description"]
     error_msg = Keyword.get(opts, :error_msg, "Project not found")

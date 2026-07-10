@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpers do
       instructions: task_prompt,
       project_id: project.id,
       project_path: project.path,
-      model: Settings.get("default_model") || "sonnet"
+      model: Settings.default_model()
     ]
 
     case AgentManager.create_agent(opts) do

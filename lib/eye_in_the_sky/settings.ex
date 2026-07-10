@@ -93,6 +93,9 @@ defmodule EyeInTheSky.Settings do
     DBConnection.ConnectionError -> Map.get(@defaults, key)
   end
 
+  @doc "Returns the configured default model alias, falling back to \"sonnet\"."
+  def default_model, do: get("default_model")
+
   @doc "Get a setting as a float."
   def get_float(key) do
     case get(key) do

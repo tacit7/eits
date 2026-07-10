@@ -276,7 +276,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
        }) do
     %{
       "instructions" => prompt.prompt_text,
-      "model" => params["model"] || Settings.get("default_model") || "sonnet",
+      "model" => params["model"] || Settings.default_model(),
       "project_path" => path
     }
     |> put_prompt_id(prompt_source, prompt_id_raw)

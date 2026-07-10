@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     case Messages.send_to_session(session_id, body) do
       {:ok, session} ->
         case AgentManager.continue_session(session.id, body,
-               model: Settings.get("default_model") || "sonnet"
+               model: Settings.default_model()
              ) do
           {:ok, _} ->
             {:halt, switch_active_session(socket, session.id)}
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     case Messages.send_to_session(session_id, body) do
       {:ok, session} ->
         case AgentManager.continue_session(session.id, body,
-               model: Settings.get("default_model") || "sonnet"
+               model: Settings.default_model()
              ) do
           {:ok, _} ->
             {:halt, socket}
@@ -169,7 +169,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
     params = %{
       "instructions" => "Help me configure Claude Code.",
       "agent" => "claude-config-guide",
-      "model" => Settings.get("default_model") || "sonnet"
+      "model" => Settings.default_model()
     }
 
     socket =

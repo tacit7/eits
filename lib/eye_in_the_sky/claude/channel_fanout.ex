@@ -204,7 +204,7 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
         Logger.info("ChannelFanout: routing to session=#{session_id} mode=#{mode}")
 
         AgentManager.send_message(session_id, prompt,
-          model: Settings.get("default_model") || "sonnet",
+          model: Settings.default_model(),
           channel_id: channel_id,
           content_blocks: content_blocks,
           context: context

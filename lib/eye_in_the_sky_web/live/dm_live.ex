@@ -555,6 +555,13 @@ defmodule EyeInTheSkyWeb.DmLive do
     {:noreply, socket}
   end
 
+  # Timer already canceled after it fired (cancel_reload_timer set reload_timer to nil
+  # but Process.cancel_timer returned false — message was already in the mailbox).
+  # Discard the stale reload so it does not clobber an incremental stream append.
+  def handle_info(:do_message_reload, %{assigns: %{reload_timer: nil}} = socket) do
+    {:noreply, socket}
+  end
+
   def handle_info(:do_message_reload, socket) do
     socket =
       socket

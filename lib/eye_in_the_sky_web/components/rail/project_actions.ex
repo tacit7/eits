@@ -90,11 +90,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
       id ->
         case Projects.get_project(id) do
-          {:ok, project} -> Projects.delete_project(project)
-          {:error, _} -> :ok
-        end
+          {:ok, project} ->
+            case Projects.delete_project(project) do
+              {:ok, _} -> {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+              {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to delete project")}
+            end
 
-        {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Project not found")}
+        end
     end
   end
 
@@ -191,7 +195,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
       |> String.trim()
 
     if path != "" do
-      name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
+      name = basename_from_path(path)
 
       case Projects.create_project(%{name: name, path: path}) do
         {:ok, _} ->
@@ -232,7 +236,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # path absent or empty → falls through to the inline text-input fallback clause below.
   def handle_folder_picked(%{"path" => path}, socket) when is_binary(path) and path != "" do
     path = String.trim(path)
-    name = path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
+    name = basename_from_path(path)
 
     case Projects.create_project(%{name: name, path: path}) do
       {:ok, _} ->
@@ -267,6 +271,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # Empty payload = cancelled or no Tauri; show the inline text-input fallback.
   def handle_folder_picked(_params, socket),
     do: {:noreply, assign(socket, :new_project_path, "")}
+
+  defp basename_from_path(path) do
+    path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
+  end
 
   defp path_taken?(%Ecto.Changeset{errors: errors}) do
     Enum.any?(errors, fn

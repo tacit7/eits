@@ -70,10 +70,7 @@ defmodule EyeInTheSkyWeb.DmLive.FileAutocomplete do
     if is_binary(raw) and File.dir?(raw) do
       {:ok, raw}
     else
-      case File.cwd() do
-        {:ok, cwd} -> {:ok, cwd}
-        {:error, reason} -> {:error, {:no_cwd, reason}}
-      end
+      {:error, :no_project_path}
     end
   end
 

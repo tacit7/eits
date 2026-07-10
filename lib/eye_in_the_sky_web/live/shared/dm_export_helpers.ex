@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
   alias EyeInTheSky.Codex.SessionImporter, as: CodexImporter
   alias EyeInTheSky.Codex.SessionReader, as: CodexReader
   alias EyeInTheSky.Messages
+  alias EyeInTheSky.Repo
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   def handle_export_jsonl(socket) do
@@ -58,10 +59,18 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
            SessionHelpers.resolve_project_path(socket.assigns.session, socket.assigns.agent),
          {:ok, raw_messages} <-
            SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
-      Messages.delete_session_messages(session_id)
-      %{inserted: inserted} = SessionImporter.import_messages(raw_messages, session_id)
-      socket = load_messages_fn.(socket)
-      {:noreply, put_flash(socket, :info, "Reloaded #{inserted} messages from session file")}
+      case Repo.transaction(fn ->
+             Messages.delete_session_messages(session_id)
+             SessionImporter.import_messages(raw_messages, session_id)
+           end) do
+        {:ok, %{inserted: inserted}} ->
+          socket = load_messages_fn.(socket)
+          {:noreply, put_flash(socket, :info, "Reloaded #{inserted} messages from session file")}
+
+        {:error, reason} ->
+          {:noreply,
+           put_flash(socket, :error, "Reload failed — messages preserved: #{inspect(reason)}")}
+      end
     else
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "No session file found for this session")}
@@ -80,12 +89,20 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
 
     case CodexReader.read_messages(thread_id) do
       {:ok, messages} ->
-        Messages.delete_session_messages(session_id)
-        %{inserted: inserted} = CodexImporter.import_messages(messages, session_id)
-        socket = load_messages_fn.(socket)
+        case Repo.transaction(fn ->
+               Messages.delete_session_messages(session_id)
+               CodexImporter.import_messages(messages, session_id)
+             end) do
+          {:ok, %{inserted: inserted}} ->
+            socket = load_messages_fn.(socket)
 
-        {:noreply,
-         put_flash(socket, :info, "Reloaded #{inserted} messages from Codex session file")}
+            {:noreply,
+             put_flash(socket, :info, "Reloaded #{inserted} messages from Codex session file")}
+
+          {:error, reason} ->
+            {:noreply,
+             put_flash(socket, :error, "Reload failed — messages preserved: #{inspect(reason)}")}
+        end
 
       {:error, :not_found} ->
         {:noreply,

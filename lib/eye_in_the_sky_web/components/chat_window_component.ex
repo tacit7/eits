@@ -173,16 +173,22 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
            body: body
          }) do
       {:ok, message} ->
-        AgentManager.continue_session(session_id, body, message_id: message.id)
-        messages = Messages.list_recent_messages(session_id, 50)
-        cs_id = socket.assigns.canvas_session.id
+        case AgentManager.continue_session(session_id, body, message_id: message.id) do
+          {:ok, _} ->
+            messages = Messages.list_recent_messages(session_id, 50)
+            cs_id = socket.assigns.canvas_session.id
 
-        socket =
-          socket
-          |> assign(:messages, messages)
-          |> push_event("messages-updated-" <> to_string(cs_id), %{})
+            {:noreply,
+             socket
+             |> assign(:messages, messages)
+             |> push_event("messages-updated-" <> to_string(cs_id), %{})}
 
-        {:noreply, socket}
+          {:error, :queue_full} ->
+            {:noreply, put_flash(socket, :error, "Queue is full — max 5 messages pending")}
+
+          {:error, _reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to send message")}
+        end
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to send message")}

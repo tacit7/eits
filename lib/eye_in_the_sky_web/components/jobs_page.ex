@@ -268,17 +268,18 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   end
 
   defp dispatch_event("toggle_job_select", %{"id" => id}, socket) do
-    {:ok, int_id} = parse_job_id(id)
-    selected = socket.assigns.bulk_selected_jobs
+    case parse_job_id(id) do
+      {:ok, int_id} ->
+        selected = socket.assigns.bulk_selected_jobs
+        updated =
+          if MapSet.member?(selected, int_id),
+            do: MapSet.delete(selected, int_id),
+            else: MapSet.put(selected, int_id)
+        {:noreply, assign(socket, :bulk_selected_jobs, updated)}
 
-    updated =
-      if MapSet.member?(selected, int_id),
-        do: MapSet.delete(selected, int_id),
-        else: MapSet.put(selected, int_id)
-
-    {:noreply, assign(socket, :bulk_selected_jobs, updated)}
-  rescue
-    _ -> {:noreply, socket}
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   defp dispatch_event("select_all_jobs", %{"scope" => scope}, socket) do
@@ -305,45 +306,11 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   end
 
   defp dispatch_event("bulk_enable", %{"scope" => _scope}, socket) do
-    selected = socket.assigns.bulk_selected_jobs
-
-    if MapSet.size(selected) == 0 do
-      {:noreply, socket}
-    else
-      job_ids = MapSet.to_list(selected)
-
-      {updated_count, _} =
-        ScheduledJobs.bulk_update_enabled(job_ids, true, socket.assigns.project_id)
-
-      {:noreply,
-       socket
-       |> assign(:bulk_selected_jobs, MapSet.new())
-       |> load_jobs()
-       |> then(
-         &put_flash(&1, :info, "Enabled #{updated_count} job#{if updated_count != 1, do: "s"}")
-       )}
-    end
+    do_bulk_toggle_enabled(true, "Enabled", socket)
   end
 
   defp dispatch_event("bulk_disable", %{"scope" => _scope}, socket) do
-    selected = socket.assigns.bulk_selected_jobs
-
-    if MapSet.size(selected) == 0 do
-      {:noreply, socket}
-    else
-      job_ids = MapSet.to_list(selected)
-
-      {updated_count, _} =
-        ScheduledJobs.bulk_update_enabled(job_ids, false, socket.assigns.project_id)
-
-      {:noreply,
-       socket
-       |> assign(:bulk_selected_jobs, MapSet.new())
-       |> load_jobs()
-       |> then(
-         &put_flash(&1, :info, "Disabled #{updated_count} job#{if updated_count != 1, do: "s"}")
-       )}
-    end
+    do_bulk_toggle_enabled(false, "Disabled", socket)
   end
 
   defp dispatch_event("clear_bulk_selection", _params, socket) do
@@ -351,6 +318,27 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   end
 
   defp dispatch_event(_event, _params, socket), do: {:noreply, socket}
+
+  defp do_bulk_toggle_enabled(enabled, label, socket) do
+    selected = socket.assigns.bulk_selected_jobs
+
+    if MapSet.size(selected) == 0 do
+      {:noreply, socket}
+    else
+      job_ids = MapSet.to_list(selected)
+
+      {updated_count, _} =
+        ScheduledJobs.bulk_update_enabled(job_ids, enabled, socket.assigns.project_id)
+
+      {:noreply,
+       socket
+       |> assign(:bulk_selected_jobs, MapSet.new())
+       |> load_jobs()
+       |> then(
+         &put_flash(&1, :info, "#{label} #{updated_count} job#{if updated_count != 1, do: "s"}")
+       )}
+    end
+  end
 
   defp do_run_job(job, socket) do
     case ScheduledJobs.run_now(job.id, socket.assigns.project_id) do

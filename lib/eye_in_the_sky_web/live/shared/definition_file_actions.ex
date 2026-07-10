@@ -31,6 +31,51 @@ defmodule EyeInTheSkyWeb.Live.Shared.DefinitionFileActions do
   @doc "Deletes a single definition file."
   def delete_file(abs_path), do: File.rm(abs_path)
 
+  @doc """
+  Shared handler for duplicate_definition_file events.
+
+  Takes a guard function (e.g., `open_path_allowed?/2`) and a reload function
+  (e.g., `load_agents/1`) to eliminate boilerplate across LiveViews.
+  """
+  def handle_duplicate(path, socket, guard_fn, reload_fn) do
+    if guard_fn.(path, socket) do
+      case duplicate_file(path) do
+        {:ok, _new_path} ->
+          {:noreply, reload_fn.(socket) |> Phoenix.LiveView.put_flash(:info, "Duplicated")}
+
+        {:error, _} ->
+          {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Duplicate failed")}
+      end
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
+  @doc """
+  Shared handler for delete_definition_file events.
+
+  Takes a guard function (e.g., `open_path_allowed?/2`), a reload function
+  (e.g., `load_agents/1`), and an optional clear function to clean up selected
+  state (e.g., `&maybe_clear_selected(&1, path)`).
+  """
+  def handle_delete(path, socket, guard_fn, reload_fn, clear_fn \\ &Function.identity/1) do
+    if guard_fn.(path, socket) do
+      case delete_file(path) do
+        :ok ->
+          {:noreply,
+           socket
+           |> reload_fn.()
+           |> clear_fn.()
+           |> Phoenix.LiveView.put_flash(:info, "Deleted")}
+
+        {:error, _} ->
+          {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Delete failed")}
+      end
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
   defp unique_copy_path(dir, base, ext, n) do
     suffix = if n, do: "-copy-#{n}", else: "-copy"
     candidate = Path.join(dir, "#{base}#{suffix}#{ext}")

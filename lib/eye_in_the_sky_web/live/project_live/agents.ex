@@ -78,35 +78,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
   @impl true
   def handle_event("duplicate_definition_file", %{"path" => path}, socket) do
-    if open_path_allowed?(path, socket) do
-      case DefinitionFileActions.duplicate_file(path) do
-        {:ok, _new_path} -> {:noreply, socket |> load_agents() |> put_flash(:info, "Duplicated")}
-        {:error, _} -> {:noreply, put_flash(socket, :error, "Duplicate failed")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "Path not allowed")}
-    end
+    DefinitionFileActions.handle_duplicate(path, socket, &open_path_allowed?/2, &load_agents/1)
   end
 
   @impl true
   def handle_event("delete_definition_file", %{"path" => path}, socket) do
-    if open_path_allowed?(path, socket) do
-      case DefinitionFileActions.delete_file(path) do
-        :ok ->
-          socket =
-            socket
-            |> load_agents()
-            |> maybe_clear_selected(path)
-            |> put_flash(:info, "Deleted")
-
-          {:noreply, socket}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Delete failed")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "Path not allowed")}
-    end
+    DefinitionFileActions.handle_delete(path, socket, &open_path_allowed?/2, &load_agents/1,
+      &maybe_clear_selected(&1, path))
   end
 
   @impl true

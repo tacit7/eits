@@ -186,9 +186,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     editor = Settings.get("preferred_editor") || "code"
     allowed? = Enum.any?(allowed_editor_roots(), &path_within?(path, &1))
 
-    if not allowed? do
-      {:noreply, put_flash(socket, :error, "Path is outside allowed directories")}
-    else
+    if allowed? do
       case EyeInTheSky.Editors.open(editor, path) do
         {:ok, label} ->
           {:noreply, put_flash(socket, :info, "Opening in #{label}...")}
@@ -205,6 +203,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         {:error, :not_allowed} ->
           {:noreply, put_flash(socket, :error, "Path not allowed")}
       end
+    else
+      {:noreply, put_flash(socket, :error, "Path is outside allowed directories")}
     end
   end
 

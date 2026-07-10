@@ -19,6 +19,7 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{Channels, Messages, Sessions}
   alias EyeInTheSky.Claude.ChannelProtocol
+  alias EyeInTheSky.Settings
 
   @doc """
   Fan out `body` to all current members of `channel_id`, skipping `sender_session_id`.
@@ -203,7 +204,7 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
         Logger.info("ChannelFanout: routing to session=#{session_id} mode=#{mode}")
 
         AgentManager.send_message(session_id, prompt,
-          model: "sonnet",
+          model: Settings.get("default_model") || "sonnet",
           channel_id: channel_id,
           content_blocks: content_blocks,
           context: context

@@ -76,9 +76,7 @@ defmodule EyeInTheSky.Application do
           # Session store with TTL-based expiration (prevents unbounded ETS growth)
           EyeInTheSky.SessionStore,
           # In-process cache for Anthropic rate-limit API responses (5-min TTL)
-          EyeInTheSky.Claude.RateLimitClient,
-          # Periodic scheduler: zombie sweep + dead-idle archive (every 5 min)
-          EyeInTheSky.Scheduler.AgentStatus
+          EyeInTheSky.Claude.RateLimitClient
         ]
 
     iam_seeds =
@@ -106,7 +104,11 @@ defmodule EyeInTheSky.Application do
           # Poll for external task changes from spawned agents
           EyeInTheSky.Tasks.Poller,
           # Process incoming GitHub webhook deliveries
-          EyeInTheSky.Github.WebhookDispatcher
+          EyeInTheSky.Github.WebhookDispatcher,
+          # Periodic scheduler: zombie sweep + dead-idle archive (every 5 min).
+          # Holds a sandbox connection mid-query; must be skipped in test env
+          # (start_pollers: false) or it crashes on SQL Sandbox OwnershipError.
+          EyeInTheSky.Scheduler.AgentStatus
         ]
       else
         []

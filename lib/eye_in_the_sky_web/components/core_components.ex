@@ -530,8 +530,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     """
   end
 
-  # EXCEPTION: These icons use inline SVG because Heroicons has no equivalent.
-  # Remove when Heroicons adds robot/kanban/bot icons.
+  # Lucide icons, rendered as inline SVG. Use these only where Heroicons has no
+  # icon matching the concept — otherwise prefer `<.icon name="hero-..." />`.
   attr :name, :string, required: true
   attr :class, :string, default: "size-4"
 

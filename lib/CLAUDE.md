@@ -72,13 +72,26 @@ Add a named function to Events for any new broadcast — don't hardcode topic st
 
 ### Icons
 
-**Always use Heroicons** via `<.icon>`. Never use inline SVG.
+**Prefer Heroicons** via `<.icon>`. Reach for a Lucide icon only when Heroicons has nothing that fits the concept — Lucide's larger set often has the more precise metaphor (robot, kanban, git-branch, file-cog).
 
 ```heex
 <.icon name="hero-folder" class="w-4 h-4" />
 <.icon name="hero-document-text" class="w-4 h-4" />
 <.icon name="hero-chevron-right" class="w-4 h-4" />
 ```
+
+The two live behind **different components**, and calling the wrong one raises `FunctionClauseError` at render time:
+
+| Prefix | Component | Backing |
+|--------|-----------|---------|
+| `hero-*` | `<.icon>` | Tailwind class from `deps/heroicons`, bundled by `assets/vendor/heroicons.js` |
+| `lucide-*` | `<.custom_icon>` | Inline SVG, one function clause per icon in `core_components.ex` |
+
+```heex
+<.custom_icon name="lucide-file-cog" class="size-4" />
+```
+
+Adding a Lucide icon is a two-step change: copy the paths from [lucide.dev](https://lucide.dev) into a new `custom_icon/1` clause, then call it with `<.custom_icon>`. Never write inline SVG at the call site.
 
 ### Full-Text Search
 

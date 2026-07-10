@@ -6,7 +6,7 @@ type: project
 
 ## File Locations
 
-- `lib/eye_in_the_sky_web/components/rail.ex` — main LiveComponent, all state + event handlers
+- `lib/eye_in_the_sky_web/components/rail.ex` — main LiveView (converted from LiveComponent 2026-07-09), all state + event handlers
 - `lib/eye_in_the_sky_web/components/rail/flyout.ex` — flyout shell + `section_header_link` component (extracted ~2026-04-30)
 - `lib/eye_in_the_sky_web/components/rail/flyout/` — **13 per-section sub-modules** (split ~2026-05-01):
   - `agents_section.ex`, `canvas_section.ex`, `chat_section.ex`, `files_section.ex`
@@ -20,11 +20,23 @@ type: project
 - `lib/eye_in_the_sky_web/components/rail/filter_actions.ex` — filter/search event handlers
 - `lib/eye_in_the_sky_web/components/rail/loader.ex` — lazy-loading functions extracted from rail.ex
 - `lib/eye_in_the_sky_web/components/rail/section_actions.ex` — section toggle/open event handlers
-- `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — renders `<.live_component module={Rail} id="app-rail" ...>`
+- `lib/eye_in_the_sky_web/components/layouts/app.html.heex` — renders `<%= live_render(@socket, Rail, id: "app-rail", sticky: true) %>` inside `#app-body`
 - `assets/js/hooks/rail_state.js` — RailState hook: localStorage persistence, mobile swipe, section restore
 - `docs/RAIL_MENU.md` — full architecture doc (canonical reference)
 
 **CRITICAL**: flyout.ex is now a thin shell. Section content lives in `flyout/<section>_section.ex`. When adding or editing flyout content for a section, edit the sub-module, not flyout.ex directly.
+
+## Rail LiveView Conversion (2026-07-09)
+
+Rail was a LiveComponent owned by the page LiveView process. On every `push_navigate`, the old process died and the new one remounted Rail — causing flyout flicker and active-section flash. Fixed by converting to a standalone LiveView with `sticky: true`.
+
+**What changed:**
+- `use EyeInTheSkyWeb, :live_component` → `use EyeInTheSkyWeb, :live_view`
+- `def update(...)` → `def handle_info(...)` for all 6 PubSub message types
+- `def mount(_params, _session, socket)` with `if connected?(socket)` guard for PubSub subscriptions
+- All 41 page LiveViews call `Events.broadcast_rail_context(socket)` in mount (connected? guarded)
+- `send_update(Rail, ...)` in floating_chat_live, nav_hook, chat_live → `Events.broadcast_rail_*()` PubSub calls
+- All `attr :myself` and `phx-target={@myself}` removed from flyout components (Rail is a LiveView, not a Component — events route to the enclosing LiveView automatically)
 
 ## Section Map (current)
 
@@ -202,10 +214,13 @@ Non-blocking detail cards float to the right of the flyout. Clicking a row opens
 4. `base_tasks_query` must filter `archived == false` by default (was leaking archived tasks)
 5. Always guard `is_nil(project_id)` before building project-scoped Ecto queries — avoids nil comparison warning
 6. Canvas routes are in `:app` live_session — they get the full rail layout
-7. `sidebar_project: nil` from a parent does NOT clear the current rail project (within same LV process). For explicit clearing, introduce a sentinel like `:clear`
-8. Rail LiveComponent state is NOT route-durable across LiveView navigation. Use localStorage (via RailState hook) for cross-route persistence — NOT URL params for the rail project.
+7. `sidebar_project: nil` from a page broadcast does NOT clear the current rail project — Rail ignores nil broadcasts and keeps current.
+8. Rail is now a persistent LiveView — state survives navigation. localStorage (RailState hook) still handles project persistence for initial mount.
 9. `phx-change` on bare inputs (no form wrapper) only fires on blur. Use `phx-keyup` for real-time filtering.
-10. Canvas URLs do NOT carry `?project_id=X`. There is no `maybe_assign_sidebar_project/2`. Project persistence is handled by the localStorage mechanism above.
+10. Canvas URLs do NOT carry `?project_id=X`. Project persistence is handled by the localStorage mechanism above.
+11. **live_render wrapper ID vs render root ID**: `live_render(..., id: "app-rail")` sets the ID on the outer Phoenix wrapper div (`display:contents`). The Rail's own render root uses `id="rail-root"`. These MUST differ — duplicate IDs cause "Multiple IDs detected" console errors on every patch cycle and break DOM event routing. Rule: `phx-target="#app-rail"` for LiveView process events; `JS.dispatch(to: "#rail-root")` for DOM hook events.
+12. **`layout: false` goes in mount return tuple**, not the `use` macro. `use EyeInTheSkyWeb, :live_view, layout: false` is invalid Elixir (use/3 undefined). Both connected and disconnected branches of mount/3 must return `{:ok, socket, layout: false}`.
+13. **NavHook handle_params guard**: `NavHook`'s `on_mount` runs for ALL LiveViews including `live_render`-embedded ones. Guard `attach_hook(:capture_nav_path, :handle_params, ...)` with `Map.get(socket.private, :router) != nil` — embedded views don't have the `:router` private key.
 
 ## State Ownership Rules
 

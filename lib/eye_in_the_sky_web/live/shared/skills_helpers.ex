@@ -257,4 +257,15 @@ defmodule EyeInTheSkyWeb.Live.Shared.SkillsHelpers do
       line -> String.replace(line, ~r/^#+\s*/, "") |> String.trim()
     end
   end
+
+  def source_badge_class(:skills), do: "bg-primary/10 text-primary/70"
+  def source_badge_class(:project_skills), do: "bg-secondary/10 text-secondary/70"
+  def source_badge_class(:project_commands), do: "bg-secondary/10 text-secondary/70"
+  def source_badge_class(_), do: "bg-base-content/5 text-base-content/50"
+
+  def source_label(:skills), do: "skill"
+  def source_label(:commands), do: "command"
+  def source_label(:project_skills), do: "project skill"
+  def source_label(:project_commands), do: "project cmd"
+  def source_label(_), do: "unknown"
 end

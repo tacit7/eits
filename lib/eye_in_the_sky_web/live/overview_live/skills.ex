@@ -338,16 +338,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
     """
   end
 
-  defp source_badge_class(:skills), do: "bg-primary/10 text-primary/70"
-  defp source_badge_class(:project_skills), do: "bg-secondary/10 text-secondary/70"
-  defp source_badge_class(:project_commands), do: "bg-secondary/10 text-secondary/70"
-  defp source_badge_class(_), do: "bg-base-content/5 text-base-content/50"
-
-  defp source_label(:skills), do: "skill"
-  defp source_label(:commands), do: "command"
-  defp source_label(:project_skills), do: "project skill"
-  defp source_label(:project_commands), do: "project cmd"
-
   defp open_path_allowed?(path, socket) do
     File.exists?(path) && Enum.any?(socket.assigns.skills, &(&1.abs_path == path))
   end

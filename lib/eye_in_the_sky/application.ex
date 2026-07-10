@@ -76,7 +76,9 @@ defmodule EyeInTheSky.Application do
           # Session store with TTL-based expiration (prevents unbounded ETS growth)
           EyeInTheSky.SessionStore,
           # In-process cache for Anthropic rate-limit API responses (5-min TTL)
-          EyeInTheSky.Claude.RateLimitClient
+          EyeInTheSky.Claude.RateLimitClient,
+          # Periodic scheduler: zombie sweep + dead-idle archive (every 5 min)
+          EyeInTheSky.Scheduler.AgentStatus
         ]
 
     iam_seeds =

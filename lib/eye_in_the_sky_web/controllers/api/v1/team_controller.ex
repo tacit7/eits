@@ -500,7 +500,6 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-
   defp check_is_team_member(members, session) do
     if Enum.any?(members, &(&1.session_id == session.id)),
       do: :ok,

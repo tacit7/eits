@@ -349,7 +349,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     end
   end
 
-
   defp resolve_dm_receiver(raw) do
     case resolve_session_target(%{raw: raw, kind: :to}) do
       {:ok, session} -> {:ok, session}

@@ -102,4 +102,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Selection do
     |> assign(:indeterminate_ids, MapSet.new())
     |> assign(:off_screen_selected_count, 0)
   end
+
+  @doc """
+  Compute the set of IDs in the range [anchor, target] within ordered_ids.
+  ordered_ids should be pre-filtered (visible only) and normalized to strings.
+  Returns {:ok, range_ids} where range_ids is a MapSet of string IDs, or
+  :not_found if either anchor or target is not in ordered_ids.
+  """
+  def range_ids(ordered_ids, anchor, target)
+      when is_list(ordered_ids) and is_binary(anchor) and is_binary(target) do
+    anchor_idx = Enum.find_index(ordered_ids, &(&1 == anchor))
+    target_idx = Enum.find_index(ordered_ids, &(&1 == target))
+
+    if is_nil(anchor_idx) or is_nil(target_idx) do
+      :not_found
+    else
+      ids =
+        ordered_ids
+        |> Enum.slice(min(anchor_idx, target_idx)..max(anchor_idx, target_idx))
+        |> MapSet.new()
+
+      {:ok, ids}
+    end
+  end
 end

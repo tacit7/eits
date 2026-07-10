@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]
 
   alias EyeInTheSky.{Notes, Tasks}
+  alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
 
   # ---------------------------------------------------------------------------
   # Event handlers with no dependency on per-LiveView private functions
@@ -359,37 +360,31 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     anchor = to_string(anchor_id)
     target = to_string(target_id)
 
-    anchor_idx = Enum.find_index(ordered_ids, &(&1 == anchor))
-    target_idx = Enum.find_index(ordered_ids, &(&1 == target))
+    case Selection.range_ids(ordered_ids, anchor, target) do
+      :not_found ->
+        {:noreply, socket}
 
-    if is_nil(anchor_idx) or is_nil(target_idx) do
-      {:noreply, socket}
-    else
-      range_ids =
-        ordered_ids
-        |> Enum.slice(min(anchor_idx, target_idx)..max(anchor_idx, target_idx))
-        |> MapSet.new()
+      {:ok, range_ids} ->
+        selected = MapSet.union(socket.assigns.selected_task_ids, range_ids)
+        prev_select_mode = socket.assigns.tasks_select_mode
+        new_select_mode = MapSet.size(selected) > 0
+        select_mode_changed? = prev_select_mode != new_select_mode
 
-      selected = MapSet.union(socket.assigns.selected_task_ids, range_ids)
-      prev_select_mode = socket.assigns.tasks_select_mode
-      new_select_mode = MapSet.size(selected) > 0
-      select_mode_changed? = prev_select_mode != new_select_mode
+        socket =
+          socket
+          |> assign(:selected_task_ids, selected)
+          |> assign(:tasks_select_mode, new_select_mode)
 
-      socket =
-        socket
-        |> assign(:selected_task_ids, selected)
-        |> assign(:tasks_select_mode, new_select_mode)
+        socket =
+          if select_mode_changed? do
+            reinsert_all_tasks(socket)
+          else
+            # Only re-insert the rows in the range
+            range_tasks = Enum.filter(socket.assigns.loaded_tasks, &MapSet.member?(range_ids, task_id(&1)))
+            Enum.reduce(range_tasks, socket, fn task, acc -> stream_insert(acc, :tasks, task) end)
+          end
 
-      socket =
-        if select_mode_changed? do
-          reinsert_all_tasks(socket)
-        else
-          # Only re-insert the rows in the range
-          range_tasks = Enum.filter(socket.assigns.loaded_tasks, &MapSet.member?(range_ids, task_id(&1)))
-          Enum.reduce(range_tasks, socket, fn task, acc -> stream_insert(acc, :tasks, task) end)
-        end
-
-      {:noreply, socket}
+        {:noreply, socket}
     end
   end
 

@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   alias EyeInTheSky.Teams.TeamMember
   alias EyeInTheSkyWeb.Live.Shared.BulkHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -348,26 +349,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     anchor = to_string(anchor_id)
     target = to_string(target_id)
 
-    anchor_idx = Enum.find_index(ordered_ids, &(&1 == anchor))
-    target_idx = Enum.find_index(ordered_ids, &(&1 == target))
+    case Selection.range_ids(ordered_ids, anchor, target) do
+      :not_found ->
+        {:noreply, socket}
 
-    if is_nil(anchor_idx) or is_nil(target_idx) do
-      {:noreply, socket}
-    else
-      range_ids =
-        ordered_ids
-        |> Enum.slice(min(anchor_idx, target_idx)..max(anchor_idx, target_idx))
-        |> MapSet.new()
+      {:ok, range_ids} ->
+        selected = MapSet.union(socket.assigns.selected_ids, range_ids)
 
-      selected = MapSet.union(socket.assigns.selected_ids, range_ids)
+        socket =
+          socket
+          |> assign(:selected_ids, selected)
+          |> assign(:select_mode, MapSet.size(selected) > 0)
+          |> reinsert_all_teams()
 
-      socket =
-        socket
-        |> assign(:selected_ids, selected)
-        |> assign(:select_mode, MapSet.size(selected) > 0)
-        |> reinsert_all_teams()
-
-      {:noreply, socket}
+        {:noreply, socket}
     end
   end
 

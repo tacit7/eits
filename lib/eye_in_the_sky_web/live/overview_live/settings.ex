@@ -38,8 +38,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @valid_tabs ~w(general editor auth workflow pricing system desktop providers)
 
-  @known_editors EyeInTheSky.Editors.all_ids()
-
   # Function, not attribute: compile-time ~ expansion bakes the build-machine home dir.
   defp allowed_editor_roots, do: [Path.expand("~/.claude")]
 
@@ -186,25 +184,27 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   @impl true
   def handle_event("open_in_editor", %{"path" => path}, socket) when byte_size(path) > 0 do
     editor = Settings.get("preferred_editor") || "code"
-
     allowed? = Enum.any?(allowed_editor_roots(), &path_within?(path, &1))
 
-    cond do
-      editor not in @known_editors ->
-        {:noreply, put_flash(socket, :error, "Editor #{inspect(editor)} is not allowed")}
+    if not allowed? do
+      {:noreply, put_flash(socket, :error, "Path is outside allowed directories")}
+    else
+      case EyeInTheSky.Editors.open(editor, path) do
+        {:ok, label} ->
+          {:noreply, put_flash(socket, :info, "Opening in #{label}...")}
 
-      not File.exists?(path) ->
-        {:noreply, put_flash(socket, :error, "Path does not exist")}
+        {:error, :unknown_editor} ->
+          {:noreply, put_flash(socket, :error, "Editor #{inspect(editor)} is not configured")}
 
-      not allowed? ->
-        {:noreply, put_flash(socket, :error, "Path is outside allowed directories")}
+        {:error, :not_installed} ->
+          {:noreply, put_flash(socket, :error, "Editor #{inspect(editor)} is not installed")}
 
-      true ->
-        Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-          System.cmd(editor, [path], stderr_to_stdout: true)
-        end)
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, "File not found")}
 
-        {:noreply, put_flash(socket, :info, "Opening in #{editor}...")}
+        {:error, :not_allowed} ->
+          {:noreply, put_flash(socket, :error, "Path not allowed")}
+      end
     end
   end
 

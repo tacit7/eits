@@ -61,7 +61,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       <div class="p-1.5 max-h-48 overflow-y-auto">
         <%= for project <- @projects do %>
           <% selected = @scope_type == :project && not is_nil(@sidebar_project) && @sidebar_project.id == project.id %>
-          <div class="group/proj relative flex items-center">
+          <div
+            class="group/proj relative flex items-center"
+            data-ctx="project"
+            data-ctx-id={project.id}
+            data-ctx-name={project.name}
+            data-ctx-path={project.path}
+          >
             <button
               phx-click="select_project"
               phx-value-project_id={project.id}

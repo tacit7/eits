@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Components.Rail.Loader
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   def handle_select_project(%{"project_id" => id_str}, socket) do
     case parse_int(id_str) do
@@ -94,6 +95,65 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
         end
 
         {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+    end
+  end
+
+  # Context-menu rename: name comes from the ctx-menu's own prompt dialog, so
+  # this is a direct rename with no dependency on renaming_project_id/
+  # rename_value (those back an inline-edit UI no template currently renders).
+  def handle_rename_project(%{"project_id" => id_str, "name" => name}, socket)
+      when is_binary(name) do
+    trimmed = String.trim(name)
+
+    with id when not is_nil(id) <- parse_int(id_str),
+         true <- trimmed != "",
+         {:ok, project} <- Projects.get_project(id),
+         {:ok, _} <- Projects.update_project(project, %{name: trimmed}) do
+      {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+    else
+      {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Project not found")}
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_rename_project(_params, socket), do: {:noreply, socket}
+
+  @doc """
+  Opens a terminal window cd'd into the project's path. Path comes from the
+  DB, never from the client — same trust boundary as handle_open_worktree.
+  """
+  def handle_open_terminal(%{"project_id" => id_str}, socket) do
+    with id when not is_nil(id) <- parse_int(id_str),
+         {:ok, project} <- Projects.get_project(id),
+         path when is_binary(path) and path != "" <- project.path,
+         true <- File.dir?(path) do
+      open_terminal_at(path)
+      {:noreply, socket}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "No path to open a terminal in")}
+    end
+  end
+
+  defp open_terminal_at(path) do
+    case :os.type() do
+      {:unix, :darwin} -> System.cmd("open", ["-a", "Terminal", path])
+      {:win32, _} -> System.cmd("cmd", ["/c", "start", "cmd", "/K", "cd /d #{path}"])
+      _ -> System.cmd("x-terminal-emulator", [], cd: path)
+    end
+  end
+
+  @doc """
+  Opens the project's path in the user's preferred external editor
+  (`EyeInTheSky.Editors`). Path comes from the DB, never from the client.
+  """
+  def handle_open_in_editor(%{"project_id" => id_str}, socket) do
+    with id when not is_nil(id) <- parse_int(id_str),
+         {:ok, project} <- Projects.get_project(id),
+         path when is_binary(path) and path != "" <- project.path do
+      editor = Settings.get("preferred_editor") || "code"
+      ViewHelpers.handle_open_in_editor(path, editor, socket)
+    else
+      _ -> {:noreply, put_flash(socket, :error, "No path to open in an editor")}
     end
   end
 

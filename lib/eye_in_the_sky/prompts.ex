@@ -123,7 +123,7 @@ defmodule EyeInTheSky.Prompts do
   Creates a prompt. Auto-generates UUID and timestamps if not provided.
   """
   def create_prompt(attrs \\ %{}) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     %Prompt{}
     |> Prompt.changeset(attrs)
@@ -137,7 +137,7 @@ defmodule EyeInTheSky.Prompts do
   Updates a prompt.
   """
   def update_prompt(%Prompt{} = prompt, attrs) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     prompt
     |> Prompt.changeset(attrs)
@@ -167,6 +167,34 @@ defmodule EyeInTheSky.Prompts do
   """
   def change_prompt(%Prompt{} = prompt, attrs \\ %{}) do
     Prompt.changeset(prompt, attrs)
+  end
+
+  @doc """
+  Duplicates a prompt into a new row with a unique `-copy`, `-copy-2`, ...
+  slug suffix (slugs are unique across the whole table, not just per
+  project — see idx_subagent_prompts_slug_global). Version resets to 1.
+  """
+  def duplicate_prompt(%Prompt{} = prompt) do
+    create_prompt(%{
+      name: "#{prompt.name} (copy)",
+      slug: unique_copy_slug(prompt.slug, nil),
+      description: prompt.description,
+      prompt_text: prompt.prompt_text,
+      project_id: prompt.project_id,
+      tags: prompt.tags,
+      created_by: prompt.created_by
+    })
+  end
+
+  defp unique_copy_slug(base_slug, n) do
+    suffix = if n, do: "-copy-#{n}", else: "-copy"
+    candidate = "#{base_slug}#{suffix}"
+
+    if Repo.exists?(from p in Prompt, where: p.slug == ^candidate) do
+      unique_copy_slug(base_slug, (n || 1) + 1)
+    else
+      candidate
+    end
   end
 
   @doc """

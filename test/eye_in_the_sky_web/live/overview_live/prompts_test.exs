@@ -265,4 +265,56 @@ defmodule EyeInTheSkyWeb.OverviewLive.PromptsTest do
       assert tag == :noreply
     end
   end
+
+  alias EyeInTheSky.Prompts
+
+  defp create_db_prompt(attrs \\ %{}) do
+    {:ok, p} =
+      Prompts.create_prompt(
+        Map.merge(
+          %{
+            name: "Test",
+            slug: "test-#{System.unique_integer([:positive])}",
+            prompt_text: "Do something"
+          },
+          attrs
+        )
+      )
+
+    p
+  end
+
+  describe "handle_event/3 - duplicate_prompt" do
+    test "duplicates the prompt and reloads" do
+      p = create_db_prompt()
+      socket = build_socket()
+
+      {:noreply, result} = PromptsLive.handle_event("duplicate_prompt", %{"uuid" => p.uuid}, socket)
+
+      assert result.assigns.flash["info"] == "Duplicated"
+      assert Enum.any?(result.assigns.prompts, &(&1.slug == "#{p.slug}-copy"))
+    end
+
+    test "flashes an error for an unknown uuid" do
+      socket = build_socket()
+
+      {:noreply, result} =
+        PromptsLive.handle_event("duplicate_prompt", %{"uuid" => Ecto.UUID.generate()}, socket)
+
+      assert result.assigns.flash["error"] == "Prompt not found"
+    end
+  end
+
+  describe "handle_event/3 - deactivate_prompt" do
+    test "deactivates the prompt, reloads, and clears selection if it was selected" do
+      p = create_db_prompt()
+      socket = build_socket(%{selected_prompt: p})
+
+      {:noreply, result} = PromptsLive.handle_event("deactivate_prompt", %{"uuid" => p.uuid}, socket)
+
+      assert result.assigns.flash["info"] == "Deactivated"
+      assert is_nil(result.assigns.selected_prompt)
+      refute Enum.any?(result.assigns.prompts, &(&1.uuid == p.uuid))
+    end
+  end
 end

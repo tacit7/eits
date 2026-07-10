@@ -5,7 +5,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
   import Phoenix.LiveView, only: [push_event: 3, put_flash: 3]
 
   alias EyeInTheSky.Projects.FileTree
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Components.Rail.Loader
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   def handle_file_open(%{"path" => path}, socket) do
     with %{path: root} when not is_nil(root) <- socket.assigns.sidebar_project,
@@ -171,6 +173,83 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
       {:noreply, socket}
     else
       _ -> {:noreply, socket}
+    end
+  end
+
+  @doc """
+  Reveals a file or directory in the OS file manager. The Phoenix server
+  always runs on the user's machine (dev server or the desktop app's
+  embedded release), so a server-side `open -R` works for both web and
+  desktop — same trust boundary as RailSessionActions.handle_open_worktree.
+  """
+  def handle_reveal_file(%{"path" => rel_path}, socket) do
+    with %{path: root} when not is_nil(root) <- socket.assigns.sidebar_project,
+         {:ok, abs_path} <- FileTree.resolve(root, rel_path) do
+      reveal_path(abs_path)
+      {:noreply, socket}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not reveal path")}
+    end
+  end
+
+  defp reveal_path(path) do
+    case :os.type() do
+      {:unix, :darwin} -> System.cmd("open", ["-R", path])
+      {:win32, _} -> System.cmd("explorer", ["/select,", path])
+      _ -> System.cmd("xdg-open", [Path.dirname(path)])
+    end
+  end
+
+  def handle_open_file_in_editor(%{"path" => rel_path}, socket) do
+    with %{path: root} when not is_nil(root) <- socket.assigns.sidebar_project,
+         {:ok, abs_path} <- FileTree.resolve(root, rel_path) do
+      editor = Settings.get("preferred_editor") || "code"
+      ViewHelpers.handle_open_in_editor(abs_path, editor, socket)
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not open file")}
+    end
+  end
+
+  @doc """
+  Renames a file on disk (regular files only — see FileTree.rename/3) and
+  keeps any open editor tab in sync. Renaming a directory's open descendant
+  tabs is NOT remapped — a save against a stale tab path will error rather
+  than corrupt data, but the user needs to re-open the tab. Acceptable
+  because rename here is deliberately scoped to files, not directories.
+  """
+  def handle_rename_file(%{"path" => rel_path, "name" => new_name}, socket) do
+    with %{path: root} when not is_nil(root) <- socket.assigns.sidebar_project,
+         {:ok, new_rel_path} <- FileTree.rename(root, rel_path, new_name) do
+      tabs =
+        Enum.map(socket.assigns.file_tabs, fn tab ->
+          if tab.path == rel_path do
+            %{tab | path: new_rel_path, name: Path.basename(new_rel_path)}
+          else
+            tab
+          end
+        end)
+
+      active =
+        if socket.assigns.active_tab_path == rel_path,
+          do: new_rel_path,
+          else: socket.assigns.active_tab_path
+
+      socket
+      |> assign(:file_tabs, tabs)
+      |> assign(:active_tab_path, active)
+      |> handle_file_refresh()
+    else
+      {:error, :target_exists} ->
+        {:noreply, put_flash(socket, :error, "A file with that name already exists")}
+
+      {:error, :invalid_name} ->
+        {:noreply, put_flash(socket, :error, "Invalid file name")}
+
+      {:error, :unsupported_file_type} ->
+        {:noreply, put_flash(socket, :error, "Only files can be renamed")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Rename failed")}
     end
   end
 

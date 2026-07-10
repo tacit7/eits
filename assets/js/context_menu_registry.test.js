@@ -57,6 +57,158 @@ const run = (type, dataset, label, isTauri = false) => {
 describe('item action contract (event + payload)', () => {
   const S = { ctxId: '42', ctxUuid: 'uuid-abc', ctxName: 'foo' }
 
+  it('project Rename… awaits the ctx-menu prompt then pushes rename_project', async () => {
+    const item = itemsFor('project', { ctxId: '7', ctxName: 'eits-web' }, false).find((i) => i.label === 'Rename…')
+    const c = mockCtx()
+    c.prompt = async () => 'new-name'
+    await item.run(c)
+    expect(c.calls.push).toEqual([['rename_project', { project_id: '7', name: 'new-name' }]])
+  })
+
+  it('project Rename… pushes nothing when the prompt is cancelled', async () => {
+    const item = itemsFor('project', { ctxId: '7', ctxName: 'eits-web' }, false).find((i) => i.label === 'Rename…')
+    const c = mockCtx()
+    await item.run(c)
+    expect(c.calls.push).toEqual([])
+  })
+
+  it('Copy project path copies data-ctx-path', () => {
+    expect(run('project', { ctxId: '7', ctxPath: '/Users/x/proj' }, 'Copy project path').copy).toEqual([
+      '/Users/x/proj',
+    ])
+  })
+
+  it('project Delete pushes delete_project keyed on project_id', () => {
+    expect(run('project', { ctxId: '7' }, 'Delete project').push).toEqual([['delete_project', { project_id: '7' }]])
+  })
+
+  it('Open in New Window is tauri-only for projects', () => {
+    const web = itemsFor('project', { ctxId: '7' }, false)
+    const app = itemsFor('project', { ctxId: '7' }, true)
+    expect(web.some((i) => i.label === 'Open in New Window')).toBe(false)
+    expect(app.some((i) => i.label === 'Open in New Window')).toBe(true)
+  })
+
+  it('file: directories have no Open/Open-in-editor/Rename, files do', () => {
+    const dir = itemsFor('file', { ctxPath: 'src', ctxIsDir: 'true' }, false)
+    const file = itemsFor('file', { ctxPath: 'src/app.js', ctxIsDir: undefined }, false)
+    expect(dir.some((i) => i.label === 'Open')).toBe(false)
+    expect(dir.some((i) => i.label === 'Open in External Editor')).toBe(false)
+    expect(dir.some((i) => i.label === 'Rename…')).toBe(false)
+    expect(file.some((i) => i.label === 'Open')).toBe(true)
+    expect(file.some((i) => i.label === 'Open in External Editor')).toBe(true)
+    expect(file.some((i) => i.label === 'Rename…')).toBe(true)
+  })
+
+  it('file Open pushes file_open keyed on relative path', () => {
+    expect(run('file', { ctxPath: 'src/app.js' }, 'Open').push).toEqual([['file_open', { path: 'src/app.js' }]])
+  })
+
+  it('file Copy path copies the absolute path, Copy relative path copies the relative one', () => {
+    const dataset = { ctxPath: 'src/app.js', ctxAbsPath: '/proj/src/app.js' }
+    expect(run('file', dataset, 'Copy path').copy).toEqual(['/proj/src/app.js'])
+    expect(run('file', dataset, 'Copy relative path').copy).toEqual(['src/app.js'])
+  })
+
+  it('file Rename… awaits the prompt then pushes rename_file', async () => {
+    const item = itemsFor('file', { ctxPath: 'src/app.js', ctxName: 'app.js' }, false).find(
+      (i) => i.label === 'Rename…'
+    )
+    const c = mockCtx()
+    c.prompt = async () => 'app2.js'
+    await item.run(c)
+    expect(c.calls.push).toEqual([['rename_file', { path: 'src/app.js', name: 'app2.js' }]])
+  })
+
+  it('directory Reveal in Finder pushes reveal_file keyed on its own path', () => {
+    expect(run('file', { ctxPath: 'src', ctxIsDir: 'true' }, 'Reveal in Finder').push).toEqual([
+      ['reveal_file', { path: 'src' }],
+    ])
+  })
+
+  it('definition_file: directory-backed skills have no Duplicate/Delete, bare files do', () => {
+    const dirBacked = itemsFor('definition_file', { ctxAbsPath: '/s/SKILL.md', ctxIsDir: 'true' }, false)
+    const bareFile = itemsFor('definition_file', { ctxAbsPath: '/a/reviewer.md', ctxIsDir: undefined }, false)
+    expect(dirBacked.some((i) => i.label === 'Duplicate')).toBe(false)
+    expect(dirBacked.some((i) => i.label === 'Delete')).toBe(false)
+    expect(bareFile.some((i) => i.label === 'Duplicate')).toBe(true)
+    expect(bareFile.some((i) => i.label === 'Delete')).toBe(true)
+    // Edit/Export are present regardless of dir-backing
+    expect(dirBacked.some((i) => i.label === 'Edit')).toBe(true)
+    expect(dirBacked.some((i) => i.label === 'Export/Copy config')).toBe(true)
+  })
+
+  it('definition_file Edit pushes open_in_editor with the dataset editor + abs path', () => {
+    expect(
+      run('definition_file', { ctxAbsPath: '/a/reviewer.md', ctxEditor: 'code' }, 'Edit').push
+    ).toEqual([['open_in_editor', { editor: 'code', path: '/a/reviewer.md' }]])
+  })
+
+  it('definition_file Export/Copy config copies the full raw content', () => {
+    expect(run('definition_file', { ctxAbsPath: '/a/reviewer.md', ctxContent: '---\nname: x\n---' }, 'Export/Copy config').copy).toEqual([
+      '---\nname: x\n---',
+    ])
+  })
+
+  it('definition_file Duplicate/Delete push keyed on abs path', () => {
+    const dataset = { ctxAbsPath: '/a/reviewer.md' }
+    expect(run('definition_file', dataset, 'Duplicate').push).toEqual([
+      ['duplicate_definition_file', { path: '/a/reviewer.md' }],
+    ])
+    expect(run('definition_file', dataset, 'Delete').push).toEqual([
+      ['delete_definition_file', { path: '/a/reviewer.md' }],
+    ])
+  })
+
+  it('channel Open navigates to /chat?channel_id=', () => {
+    expect(run('channel', { ctxId: '5' }, 'Open').navigate).toEqual(['/chat?channel_id=5'])
+  })
+
+  it('channel Rename… awaits the prompt then pushes rename_channel', async () => {
+    const item = itemsFor('channel', { ctxId: '5', ctxName: 'general' }, false).find((i) => i.label === 'Rename…')
+    const c = mockCtx()
+    c.prompt = async () => 'renamed'
+    await item.run(c)
+    expect(c.calls.push).toEqual([['rename_channel', { channel_id: '5', name: 'renamed' }]])
+  })
+
+  it('channel Delete pushes delete_channel keyed on channel_id', () => {
+    expect(run('channel', { ctxId: '5' }, 'Delete channel').push).toEqual([['delete_channel', { channel_id: '5' }]])
+  })
+
+  it('team Open navigates to the precomputed ctx path', () => {
+    expect(run('team', { ctxId: '9', ctxPath: '/projects/1/teams/9' }, 'Open').navigate).toEqual([
+      '/projects/1/teams/9',
+    ])
+  })
+
+  it('team Delete pushes delete_team keyed on id', () => {
+    expect(run('team', { ctxId: '9' }, 'Delete team').push).toEqual([['delete_team', { id: '9' }]])
+  })
+
+  it('prompt: Open full editor only appears when ctxPath is present', () => {
+    const withPath = itemsFor('prompt', { ctxId: '1', ctxUuid: 'u1', ctxPath: '/projects/1/prompts/u1' }, false)
+    const withoutPath = itemsFor('prompt', { ctxId: '1', ctxUuid: 'u1' }, false)
+    expect(withPath.some((i) => i.label === 'Open full editor')).toBe(true)
+    expect(withoutPath.some((i) => i.label === 'Open full editor')).toBe(false)
+  })
+
+  it('prompt Open pushes select_prompt with both id and uuid', () => {
+    expect(run('prompt', { ctxId: '1', ctxUuid: 'u1' }, 'Open').push).toEqual([
+      ['select_prompt', { id: '1', uuid: 'u1' }],
+    ])
+  })
+
+  it('prompt Copy slug copies data-ctx-slug', () => {
+    expect(run('prompt', { ctxUuid: 'u1', ctxSlug: 'my-prompt' }, 'Copy slug').copy).toEqual(['my-prompt'])
+  })
+
+  it('prompt Duplicate/Deactivate push keyed on uuid', () => {
+    const dataset = { ctxUuid: 'u1' }
+    expect(run('prompt', dataset, 'Duplicate').push).toEqual([['duplicate_prompt', { uuid: 'u1' }]])
+    expect(run('prompt', dataset, 'Deactivate').push).toEqual([['deactivate_prompt', { uuid: 'u1' }]])
+  })
+
   it('session Rename pushes rename_session with the string id and NO prompt', () => {
     // Must match the page "…" menu (inline edit) — a bare session_id, routed to
     // the page LiveView. Regression guard for the prompt+extra.name version.

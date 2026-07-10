@@ -237,4 +237,43 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActionsTest do
       assert is_map_key(updated_socket.assigns, :flyout_file_expanded)
     end
   end
+
+  describe "handle_rename_file/2" do
+    setup do
+      dir = Path.join(System.tmp_dir!(), "rename_test_#{:erlang.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      File.write!(Path.join(dir, "old.txt"), "hi")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      %{dir: dir}
+    end
+
+    test "renames the file on disk and updates the matching open tab", %{socket: socket, dir: dir} do
+      socket = %{
+        socket
+        | assigns: %{
+            socket.assigns
+            | sidebar_project: %{path: dir},
+              file_tabs: [%{path: "old.txt", name: "old.txt", content: "hi", hash: "x"}],
+              active_tab_path: "old.txt"
+          }
+      }
+
+      {:noreply, updated} = FileActions.handle_rename_file(%{"path" => "old.txt", "name" => "new.txt"}, socket)
+
+      refute File.exists?(Path.join(dir, "old.txt"))
+      assert File.exists?(Path.join(dir, "new.txt"))
+      assert updated.assigns.active_tab_path == "new.txt"
+      assert [%{path: "new.txt", name: "new.txt"}] = updated.assigns.file_tabs
+    end
+
+    test "flashes an error and leaves the file alone when the target name exists", %{socket: socket, dir: dir} do
+      File.write!(Path.join(dir, "taken.txt"), "x")
+      socket = %{socket | assigns: %{socket.assigns | sidebar_project: %{path: dir}}}
+
+      {:noreply, updated} = FileActions.handle_rename_file(%{"path" => "old.txt", "name" => "taken.txt"}, socket)
+
+      assert File.exists?(Path.join(dir, "old.txt"))
+      assert updated.assigns.flash["error"] =~ "already exists"
+    end
+  end
 end

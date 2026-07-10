@@ -63,6 +63,43 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   end
 
   @impl true
+  def handle_event("duplicate_prompt", %{"uuid" => uuid}, socket) do
+    case Prompts.get_prompt_by_uuid(uuid) do
+      {:ok, prompt} ->
+        case Prompts.duplicate_prompt(prompt) do
+          {:ok, _copy} -> {:noreply, socket |> load_prompts() |> put_flash(:info, "Duplicated")}
+          {:error, _} -> {:noreply, put_flash(socket, :error, "Duplicate failed")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Prompt not found")}
+    end
+  end
+
+  @impl true
+  def handle_event("deactivate_prompt", %{"uuid" => uuid}, socket) do
+    case Prompts.get_prompt_by_uuid(uuid) do
+      {:ok, prompt} ->
+        case Prompts.deactivate_prompt(prompt) do
+          {:ok, _} ->
+            socket =
+              socket
+              |> load_prompts()
+              |> maybe_clear_selected_prompt(uuid)
+              |> put_flash(:info, "Deactivated")
+
+            {:noreply, socket}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Deactivate failed")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Prompt not found")}
+    end
+  end
+
+  @impl true
   def handle_event("set_detail_tab", %{"tab" => tab}, socket) do
     {:noreply, assign(socket, :detail_tab, String.to_existing_atom(tab))}
   end
@@ -96,6 +133,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
           {:error, _changeset} ->
             {:noreply, put_flash(socket, :error, "Failed to save prompt")}
         end
+    end
+  end
+
+  defp maybe_clear_selected_prompt(socket, uuid) do
+    if socket.assigns.selected_prompt && socket.assigns.selected_prompt.uuid == uuid do
+      assign(socket, :selected_prompt, nil)
+    else
+      socket
     end
   end
 
@@ -156,6 +201,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                   phx-value-uuid={prompt.uuid}
                   data-vim-list-item
                   role="button"
+                  data-ctx="prompt"
+                  data-ctx-id={prompt.id}
+                  data-ctx-uuid={prompt.uuid}
+                  data-ctx-slug={prompt.slug}
+                  data-ctx-path={~p"/projects/#{@project.id}/prompts/#{prompt.uuid}"}
                 >
                   <div class="flex items-center gap-2">
                     <.icon

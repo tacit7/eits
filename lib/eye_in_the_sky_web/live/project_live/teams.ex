@@ -483,10 +483,21 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                 />
               </div>
 
-              <div class={[
-                "flex items-center gap-1 w-full min-w-0",
-                if(@select_mode, do: "pl-10 sm:pl-0", else: "")
-              ]}>
+              <div
+                class={[
+                  "flex items-center gap-1 w-full min-w-0",
+                  if(@select_mode, do: "pl-10 sm:pl-0", else: "")
+                ]}
+                data-ctx="team"
+                data-ctx-id={team.id}
+                data-ctx-path={
+                  cond do
+                    @project -> ~p"/projects/#{@project.id}/teams/#{team.id}"
+                    team.project_id -> ~p"/projects/#{team.project_id}/teams/#{team.id}"
+                    true -> "/teams"
+                  end
+                }
+              >
                 <.link
                   navigate={
                     cond do

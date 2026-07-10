@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
   use EyeInTheSkyWeb, :live_view
 
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Prompts
   alias EyeInTheSkyWeb.ControllerHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Live.Shared.PromptsHelpers
@@ -70,6 +71,43 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
   @impl true
   def handle_event("close_viewer", _params, socket) do
     {:noreply, assign(socket, :selected_prompt, nil)}
+  end
+
+  @impl true
+  def handle_event("duplicate_prompt", %{"uuid" => uuid}, socket) do
+    case Prompts.get_prompt_by_uuid(uuid) do
+      {:ok, prompt} ->
+        case Prompts.duplicate_prompt(prompt) do
+          {:ok, _copy} -> {:noreply, socket |> load_prompts() |> put_flash(:info, "Duplicated")}
+          {:error, _} -> {:noreply, put_flash(socket, :error, "Duplicate failed")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Prompt not found")}
+    end
+  end
+
+  @impl true
+  def handle_event("deactivate_prompt", %{"uuid" => uuid}, socket) do
+    case Prompts.get_prompt_by_uuid(uuid) do
+      {:ok, prompt} ->
+        case Prompts.deactivate_prompt(prompt) do
+          {:ok, _} ->
+            socket =
+              socket
+              |> load_prompts()
+              |> maybe_clear_selected_prompt(uuid)
+              |> put_flash(:info, "Deactivated")
+
+            {:noreply, socket}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Deactivate failed")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Prompt not found")}
+    end
   end
 
   @impl true
@@ -153,13 +191,20 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                     phx-click="select_prompt"
                     phx-value-id={prompt.id}
                   />
-                  <div class={[
-                    "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
-                    if(selected?,
-                      do: "bg-primary/5 border-l-2 border-primary",
-                      else: "hover:bg-base-content/4"
-                    )
-                  ]}>
+                  <div
+                    class={[
+                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
+                      if(selected?,
+                        do: "bg-primary/5 border-l-2 border-primary",
+                        else: "hover:bg-base-content/4"
+                      )
+                    ]}
+                    data-ctx="prompt"
+                    data-ctx-id={prompt.id}
+                    data-ctx-uuid={prompt.uuid}
+                    data-ctx-slug={prompt.slug}
+                    data-ctx-path={if prompt.project_id, do: ~p"/projects/#{prompt.project_id}/prompts/#{prompt.uuid}"}
+                  >
                     <div class="flex items-center gap-2">
                       <.icon
                         name="hero-chat-bubble-left-right"
@@ -295,5 +340,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
       <% end %>
     </div>
     """
+  end
+
+  defp maybe_clear_selected_prompt(socket, uuid) do
+    if socket.assigns.selected_prompt && socket.assigns.selected_prompt.uuid == uuid do
+      assign(socket, :selected_prompt, nil)
+    else
+      socket
+    end
   end
 end

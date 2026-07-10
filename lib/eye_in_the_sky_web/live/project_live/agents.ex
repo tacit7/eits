@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
+  alias EyeInTheSkyWeb.Live.Shared.DefinitionFileActions
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -76,6 +77,39 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       ViewHelpers.handle_open_in_editor(path, editor_id, socket)
     else
       {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
+  @impl true
+  def handle_event("duplicate_definition_file", %{"path" => path}, socket) do
+    if open_path_allowed?(path, socket) do
+      case DefinitionFileActions.duplicate_file(path) do
+        {:ok, _new_path} -> {:noreply, socket |> load_agents() |> put_flash(:info, "Duplicated")}
+        {:error, _} -> {:noreply, put_flash(socket, :error, "Duplicate failed")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_definition_file", %{"path" => path}, socket) do
+    if open_path_allowed?(path, socket) do
+      case DefinitionFileActions.delete_file(path) do
+        :ok ->
+          socket =
+            socket
+            |> load_agents()
+            |> maybe_clear_selected(path)
+            |> put_flash(:info, "Deleted")
+
+          {:noreply, socket}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Delete failed")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Path not allowed")}
     end
   end
 
@@ -223,6 +257,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                   phx-value-id={agent.id}
                   data-vim-list-item
                   role="button"
+                  data-ctx="definition_file"
+                  data-ctx-abs-path={agent.abs_path}
+                  data-ctx-content={agent.content}
+                  data-ctx-editor={@preferred_editor}
                 >
                   <div class="flex items-center gap-2">
                     <.custom_icon
@@ -532,6 +570,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       end
 
     File.exists?(path) && (in_user_dir || in_project_dir)
+  end
+
+  defp maybe_clear_selected(socket, path) do
+    if socket.assigns.selected_agent && socket.assigns.selected_agent.abs_path == path do
+      assign(socket, :selected_agent, nil)
+    else
+      socket
+    end
   end
 
   defp create_new_agent(agent_name, description, socket) do

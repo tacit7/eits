@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.FileHelpers
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
+  alias EyeInTheSkyWeb.Live.Shared.DefinitionFileActions
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
@@ -92,6 +93,39 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
       ViewHelpers.handle_open_in_editor(path, editor_id, socket)
     else
       {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
+  @impl true
+  def handle_event("duplicate_definition_file", %{"path" => path}, socket) do
+    if skill_write_allowed?(path, socket) do
+      case DefinitionFileActions.duplicate_file(path) do
+        {:ok, _new_path} -> {:noreply, socket |> load_skills() |> put_flash(:info, "Duplicated")}
+        {:error, _} -> {:noreply, put_flash(socket, :error, "Duplicate failed")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_definition_file", %{"path" => path}, socket) do
+    if skill_write_allowed?(path, socket) do
+      case DefinitionFileActions.delete_file(path) do
+        :ok ->
+          socket =
+            socket
+            |> load_skills()
+            |> maybe_clear_selected(path)
+            |> put_flash(:info, "Deleted")
+
+          {:noreply, socket}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Delete failed")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Path not allowed")}
     end
   end
 
@@ -204,13 +238,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                     phx-click="select_skill"
                     phx-value-id={skill.id}
                   />
-                  <div class={[
-                    "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
-                    if(selected?,
-                      do: "bg-primary/5",
-                      else: "hover:bg-base-content/4"
-                    )
-                  ]}>
+                  <div
+                    class={[
+                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
+                      if(selected?,
+                        do: "bg-primary/5",
+                        else: "hover:bg-base-content/4"
+                      )
+                    ]}
+                    data-ctx="definition_file"
+                    data-ctx-abs-path={skill.abs_path}
+                    data-ctx-content={skill.content}
+                    data-ctx-editor={@preferred_editor}
+                    data-ctx-is-dir={to_string(skill.source in [:skills, :project_skills])}
+                  >
                     <div class="flex items-center gap-2">
                       <.icon
                         name="hero-puzzle-piece"
@@ -434,5 +475,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
 
     allowed = [expanded_user_skills, expanded_user_commands | project_roots]
     Enum.any?(allowed, fn root -> String.starts_with?(expanded, root <> "/") end)
+  end
+
+  defp maybe_clear_selected(socket, path) do
+    if socket.assigns.selected_skill && socket.assigns.selected_skill.abs_path == path do
+      assign(socket, :selected_skill, nil)
+    else
+      socket
+    end
   end
 end

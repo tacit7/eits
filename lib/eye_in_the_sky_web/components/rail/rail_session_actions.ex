@@ -104,8 +104,38 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
     end
   end
 
+  # Context-menu rename: name comes from the ctx-menu's own prompt dialog.
+  def handle_rename_channel(%{"channel_id" => channel_id, "name" => name}, socket)
+      when is_binary(name) do
+    trimmed = String.trim(name)
+
+    case {trimmed, Channels.get_channel(channel_id)} do
+      {"", _} ->
+        {:noreply, socket}
+
+      {_, nil} ->
+        {:noreply, put_flash(socket, :error, "Channel not found")}
+
+      {_, channel} ->
+        case Channels.update_channel(channel, %{name: trimmed}) do
+          {:ok, _} ->
+            {:noreply,
+             assign(
+               socket,
+               :flyout_channels,
+               Loader.load_flyout_channels(socket.assigns.sidebar_project)
+             )}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to rename channel")}
+        end
+    end
+  end
+
+  def handle_rename_channel(_params, socket), do: {:noreply, socket}
+
   def handle_archive_session(%{"session_id" => session_id_str}, socket) do
-    case Integer.parse(session_id_str) do
+    case Integer.parse(to_string(session_id_str)) do
       {session_id, ""} ->
         case EyeInTheSky.Sessions.get_session(session_id) do
           {:error, :not_found} ->

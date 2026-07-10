@@ -12,7 +12,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
       <% active =
         not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
       <% unread = Map.get(@unread_counts, channel.id, 0) %>
-      <div class="group flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-base-content/5">
+      <div
+        class="group flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-base-content/5"
+        data-ctx="channel"
+        data-ctx-id={channel.id}
+        data-ctx-name={channel.name}
+      >
         <.link
           navigate={"/chat?channel_id=#{channel.id}"}
           data-vim-flyout-item

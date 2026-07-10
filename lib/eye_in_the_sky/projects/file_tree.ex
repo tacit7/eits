@@ -110,6 +110,57 @@ defmodule EyeInTheSky.Projects.FileTree do
     end
   end
 
+  @doc """
+  Resolves `rel_path` to a symlink-resolved absolute path inside root_path.
+  For read-only external actions (reveal in file manager, open in editor) —
+  unlike read_file/2, this does not gate on file type or size.
+  """
+  def resolve(root_path, rel_path) do
+    with :ok <- validate_root_path(root_path),
+         :ok <- validate_file_path(rel_path),
+         {:ok, abs_path} <- safe_path(root_path, rel_path),
+         {:ok, real_path} <- validate_real_path_inside_root(abs_path, root_path) do
+      {:ok, real_path}
+    end
+  end
+
+  @doc """
+  Renames a file within root_path. `new_name` must be a bare filename (no
+  path separators) — the file stays in its current directory. Refuses
+  directories and symlinks, and refuses to overwrite an existing entry.
+  """
+  def rename(root_path, rel_path, new_name) do
+    with :ok <- validate_new_name(new_name),
+         {:ok, real_path} <- resolve(root_path, rel_path),
+         {:ok, stat} <- stat_file(real_path),
+         :ok <- validate_file_type_for_rename(stat),
+         new_rel_path = join_sibling(rel_path, new_name),
+         {:ok, new_abs_path} <- safe_path(root_path, new_rel_path),
+         false <- File.exists?(new_abs_path),
+         :ok <- File.rename(real_path, new_abs_path) do
+      {:ok, new_rel_path}
+    else
+      true -> {:error, :target_exists}
+      error -> error
+    end
+  end
+
+  defp validate_new_name(name) when is_binary(name) and name not in ["", ".", ".."] do
+    if String.contains?(name, "/"), do: {:error, :invalid_name}, else: :ok
+  end
+
+  defp validate_new_name(_), do: {:error, :invalid_name}
+
+  defp validate_file_type_for_rename(%{type: :regular}), do: :ok
+  defp validate_file_type_for_rename(_), do: {:error, :unsupported_file_type}
+
+  defp join_sibling(rel_path, new_name) do
+    case Path.dirname(rel_path) do
+      "." -> new_name
+      dir -> Path.join(dir, new_name)
+    end
+  end
+
   # --- Path Validation ---
 
   defp validate_root_path(nil), do: {:error, :missing_root_path}

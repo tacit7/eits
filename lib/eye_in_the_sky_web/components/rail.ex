@@ -284,6 +284,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("delete_project", params, socket),
     do: ProjectActions.handle_delete_project(params, socket)
 
+  # Rename via the context menu's own prompt dialog — a self-contained
+  # request/response, unlike start_rename_project/commit_rename_project
+  # (which target an inline-edit UI that no template currently renders).
+  def handle_event("rename_project", params, socket),
+    do: ProjectActions.handle_rename_project(params, socket)
+
+  def handle_event("open_project_terminal", params, socket),
+    do: ProjectActions.handle_open_terminal(params, socket)
+
+  def handle_event("open_project_in_editor", params, socket),
+    do: ProjectActions.handle_open_in_editor(params, socket)
+
   def handle_event("set_bookmark", params, socket),
     do: ProjectActions.handle_set_bookmark(params, socket)
 
@@ -319,6 +331,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("delete_channel", params, socket),
     do: RailSessionActions.handle_delete_channel(params, socket)
+
+  def handle_event("rename_channel", params, socket),
+    do: RailSessionActions.handle_rename_channel(params, socket)
 
   def handle_event("set_session_sort", params, socket),
     do: FilterActions.handle_set_session_sort(params, socket)
@@ -415,6 +430,15 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("file_refresh", _params, socket),
     do: FileActions.handle_file_refresh(socket)
+
+  def handle_event("reveal_file", params, socket),
+    do: FileActions.handle_reveal_file(params, socket)
+
+  def handle_event("open_file_in_editor", params, socket),
+    do: FileActions.handle_open_file_in_editor(params, socket)
+
+  def handle_event("rename_file", params, socket),
+    do: FileActions.handle_rename_file(params, socket)
 
   @impl true
   def handle_async(:load_usage, {:ok, result}, socket) do

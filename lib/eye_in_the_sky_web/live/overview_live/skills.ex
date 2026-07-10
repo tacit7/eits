@@ -1,9 +1,14 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
+  alias EyeInTheSkyWeb.Live.Shared.DefinitionFileActions
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Live.Shared.SkillsHelpers
 
   @impl true
@@ -21,6 +26,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
       |> assign(:detail_tab, :preview)
       |> assign(:sidebar_tab, :skills)
       |> assign(:sidebar_project, nil)
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     socket = if connected?(socket), do: load_skills(socket), else: socket
 
@@ -68,6 +75,48 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   @impl true
   def handle_event("close_viewer", _params, socket) do
     {:noreply, assign(socket, :selected_skill, nil)}
+  end
+
+  @impl true
+  def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
+    if open_path_allowed?(path, socket) do
+      ViewHelpers.handle_open_in_editor(path, editor_id, socket)
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
+  @impl true
+  def handle_event("duplicate_definition_file", %{"path" => path}, socket) do
+    if open_path_allowed?(path, socket) do
+      case DefinitionFileActions.duplicate_file(path) do
+        {:ok, _new_path} -> {:noreply, socket |> load_skills() |> put_flash(:info, "Duplicated")}
+        {:error, _} -> {:noreply, put_flash(socket, :error, "Duplicate failed")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Path not allowed")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_definition_file", %{"path" => path}, socket) do
+    if open_path_allowed?(path, socket) do
+      case DefinitionFileActions.delete_file(path) do
+        :ok ->
+          socket =
+            socket
+            |> load_skills()
+            |> maybe_clear_selected(path)
+            |> put_flash(:info, "Deleted")
+
+          {:noreply, socket}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Delete failed")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Path not allowed")}
+    end
   end
 
   @impl true
@@ -155,13 +204,20 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                     phx-click="select_skill"
                     phx-value-id={skill.id}
                   />
-                  <div class={[
-                    "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
-                    if(selected?,
-                      do: "bg-primary/5 border-l-2 border-primary",
-                      else: "hover:bg-base-content/4"
-                    )
-                  ]}>
+                  <div
+                    class={[
+                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
+                      if(selected?,
+                        do: "bg-primary/5 border-l-2 border-primary",
+                        else: "hover:bg-base-content/4"
+                      )
+                    ]}
+                    data-ctx="definition_file"
+                    data-ctx-abs-path={skill.abs_path}
+                    data-ctx-content={skill.content}
+                    data-ctx-editor={@preferred_editor}
+                    data-ctx-is-dir={to_string(skill.source in [:skills, :project_skills])}
+                  >
                     <%!-- Name row --%>
                     <div class="flex items-center gap-2">
                       <.icon
@@ -247,12 +303,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                   {@selected_skill.description}
                 </p>
               </div>
-              <button
-                phx-click="close_viewer"
-                class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
-              >
-                <.icon name="hero-x-mark" class="size-4" />
-              </button>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <.open_in_editor_button
+                  path={@selected_skill.abs_path || ""}
+                  installed_editors={@installed_editors}
+                  preferred_editor={@preferred_editor}
+                />
+                <button
+                  phx-click="close_viewer"
+                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                >
+                  <.icon name="hero-x-mark" class="size-4" />
+                </button>
+              </div>
             </div>
             <%!-- Preview / Raw tabs --%>
             <div class="flex items-center gap-1 mt-3">
@@ -310,4 +373,16 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
   defp source_label(:commands), do: "command"
   defp source_label(:project_skills), do: "project skill"
   defp source_label(:project_commands), do: "project cmd"
+
+  defp open_path_allowed?(path, socket) do
+    File.exists?(path) && Enum.any?(socket.assigns.skills, &(&1.abs_path == path))
+  end
+
+  defp maybe_clear_selected(socket, path) do
+    if socket.assigns.selected_skill && socket.assigns.selected_skill.abs_path == path do
+      assign(socket, :selected_skill, nil)
+    else
+      socket
+    end
+  end
 end

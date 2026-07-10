@@ -227,6 +227,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
             </span>
           <% end %>
           <%= if @dm_info.url do %>
+            <% parsed_uri = URI.parse(@dm_info.url) %>
             <a
               href={@dm_info.url}
               target="_blank"
@@ -235,7 +236,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
               title={@dm_info.url}
             >
               <.icon name="hero-arrow-top-right-on-square" class="size-3 flex-shrink-0" />
-              {URI.parse(@dm_info.url).host}{URI.parse(@dm_info.url).path}
+              {parsed_uri.host}{parsed_uri.path}
             </a>
           <% end %>
         </div>

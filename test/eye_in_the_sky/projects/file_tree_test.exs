@@ -503,6 +503,58 @@ defmodule EyeInTheSky.Projects.FileTreeTest do
     end
   end
 
+  describe "resolve/2" do
+    test "resolves a real file inside root", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, "a.txt"), "hi")
+      assert {:ok, path} = FileTree.resolve(tmp_dir, "a.txt")
+      assert path == Path.join(tmp_dir, "a.txt") |> Path.expand()
+    end
+
+    test "rejects traversal outside root", %{tmp_dir: tmp_dir} do
+      assert {:error, :outside_project} = FileTree.resolve(tmp_dir, "../../etc/passwd")
+    end
+  end
+
+  describe "rename/3" do
+    test "renames a regular file within its directory", %{tmp_dir: tmp_dir} do
+      File.mkdir_p!(Path.join(tmp_dir, "lib"))
+      File.write!(Path.join(tmp_dir, "lib/old.ex"), "defmodule Old do\nend")
+
+      assert {:ok, "lib/new.ex"} = FileTree.rename(tmp_dir, "lib/old.ex", "new.ex")
+      refute File.exists?(Path.join(tmp_dir, "lib/old.ex"))
+      assert File.read!(Path.join(tmp_dir, "lib/new.ex")) == "defmodule Old do\nend"
+    end
+
+    test "renames a root-level file", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, "old.txt"), "hi")
+      assert {:ok, "new.txt"} = FileTree.rename(tmp_dir, "old.txt", "new.txt")
+      assert File.exists?(Path.join(tmp_dir, "new.txt"))
+    end
+
+    test "refuses to overwrite an existing file", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, "a.txt"), "a")
+      File.write!(Path.join(tmp_dir, "b.txt"), "b")
+      assert {:error, :target_exists} = FileTree.rename(tmp_dir, "a.txt", "b.txt")
+      assert File.exists?(Path.join(tmp_dir, "a.txt"))
+    end
+
+    test "refuses to rename a directory", %{tmp_dir: tmp_dir} do
+      File.mkdir_p!(Path.join(tmp_dir, "lib"))
+      assert {:error, :unsupported_file_type} = FileTree.rename(tmp_dir, "lib", "lib2")
+    end
+
+    test "refuses a new name containing a path separator", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, "a.txt"), "a")
+      assert {:error, :invalid_name} = FileTree.rename(tmp_dir, "a.txt", "sub/b.txt")
+    end
+
+    test "refuses . and .. as new names", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, "a.txt"), "a")
+      assert {:error, :invalid_name} = FileTree.rename(tmp_dir, "a.txt", ".")
+      assert {:error, :invalid_name} = FileTree.rename(tmp_dir, "a.txt", "..")
+    end
+  end
+
   describe "language detection" do
     test "detects Elixir" do
       assert {:ok, result} = create_and_read_file("foo.ex", "code")

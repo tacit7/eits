@@ -9,11 +9,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmModelHelpers do
   alias EyeInTheSky.Agents.ModelConfig
   alias EyeInTheSky.Sessions
 
-  def handle_toggle_model_menu(socket) do
-    overlay = toggle_overlay(socket.assigns.active_overlay, :model_menu)
-    {:noreply, assign(socket, :active_overlay, overlay)}
-  end
-
   def handle_toggle_effort_menu(socket) do
     overlay = toggle_overlay(socket.assigns.active_overlay, :effort_menu)
     {:noreply, assign(socket, :active_overlay, overlay)}

@@ -98,12 +98,16 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
 
   @doc """
   Format a cost value as a dollar string (e.g. "$1.23").
+  Handles small values (<$0.01) and large values (≥$100) with special formatting.
   """
-  def format_cost(value) when is_float(value),
-    do: "$#{:erlang.float_to_binary(value, decimals: 2)}"
+  def format_cost(cost) when is_float(cost) and cost < 0.01, do: "<$0.01"
 
-  def format_cost(value) when is_integer(value),
-    do: "$#{:erlang.float_to_binary(value / 1, decimals: 2)}"
+  def format_cost(cost) when is_float(cost) and cost < 100,
+    do: "$#{:erlang.float_to_binary(cost, decimals: 2)}"
+
+  def format_cost(cost) when is_float(cost), do: "$#{round(cost)}"
+
+  def format_cost(cost) when is_integer(cost), do: format_cost(cost / 1)
 
   def format_cost(_), do: "$0.00"
 
@@ -134,4 +138,42 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
   def short_model(name), do: ModelHelpers.model_display_name(name)
 
   defdelegate open_in_system(path), to: EyeInTheSkyWeb.Helpers.SystemHelpers
+
+  @doc """
+  Open `path` in the given editor (or preferred editor from settings).
+  Returns `{:noreply, socket}` with a flash set on success or error.
+  Intended to be called directly from a `handle_event/3` clause.
+  """
+  def handle_open_in_editor(path, editor_id, socket) do
+    case EyeInTheSky.Editors.open(editor_id, path) do
+      {:ok, label} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :info, "Opening in #{label}…")}
+
+      {:error, :unknown_editor} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Unknown editor")}
+
+      {:error, :not_installed} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Editor not installed")}
+
+      {:error, :not_allowed} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path is outside allowed directories")}
+
+      {:error, :not_found} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "File not found")}
+    end
+  end
+
+  @doc """
+  Shared handler for the "open_in_editor" LiveView event with a guard.
+
+  Calls the given guard function with (path, socket) — if it returns true,
+  delegates to handle_open_in_editor/3; otherwise returns a :error flash.
+  """
+  def handle_open_in_editor_with_guard(path, editor_id, socket, guard_fn) do
+    if guard_fn.(path, socket) do
+      handle_open_in_editor(path, editor_id, socket)
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
+    end
+  end
 end

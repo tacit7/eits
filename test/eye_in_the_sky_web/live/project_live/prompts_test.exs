@@ -84,4 +84,48 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
       assert render(lv) =~ "Clickable Prompt"
     end
   end
+
+  describe "handle_event/3 - duplicate_prompt" do
+    test "duplicates the prompt and reloads", %{conn: conn, project: project} do
+      {:ok, prompt} =
+        Prompts.create_prompt(%{
+          project_id: project.id,
+          name: "Original",
+          slug: "original",
+          prompt_text: "text"
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts")
+
+      html = render_click(lv, "duplicate_prompt", %{"uuid" => prompt.uuid})
+
+      assert html =~ "original-copy"
+    end
+
+    test "flashes an error for an unknown uuid", %{conn: conn, project: project} do
+      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts")
+
+      html = render_click(lv, "duplicate_prompt", %{"uuid" => Ecto.UUID.generate()})
+
+      assert html =~ "Prompt not found"
+    end
+  end
+
+  describe "handle_event/3 - deactivate_prompt" do
+    test "deactivates the prompt and removes it from the active list", %{conn: conn, project: project} do
+      {:ok, prompt} =
+        Prompts.create_prompt(%{
+          project_id: project.id,
+          name: "To Deactivate",
+          slug: "to-deactivate",
+          prompt_text: "text"
+        })
+
+      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts")
+
+      html = render_click(lv, "deactivate_prompt", %{"uuid" => prompt.uuid})
+
+      refute html =~ "To Deactivate"
+    end
+  end
 end

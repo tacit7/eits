@@ -1,8 +1,9 @@
 defmodule EyeInTheSkyWeb.DmLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Agents, Notes, Sessions}
+  alias EyeInTheSky.{Agents, Events, Notes, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Pi.ModelDiscoveryCache
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
   alias EyeInTheSkyWeb.Components.DmPage
 
@@ -81,10 +82,11 @@ defmodule EyeInTheSkyWeb.DmLive do
         # it never triggers a fetch itself (unlike the drawer/modal). Without
         # this, a Pi session's composer shows an empty Pi group until some
         # other page (drawer/modal/settings) happens to warm the cache first.
-        if session.provider == "pi", do: EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+        if session.provider == "pi", do: ModelDiscoveryCache.refresh_async()
 
         MountState.maybe_subscribe(connected?(socket), session.id, socket.assigns.current_user)
         socket = mount_session_assigns(socket, params, session, agent, connected?(socket))
+        if connected?(socket), do: Events.broadcast_rail_context(socket)
 
         use_pty = EyeInTheSky.Settings.get_boolean("dm_use_pty")
 
@@ -173,8 +175,6 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("reset_dm_settings", %{"scope" => scope}, socket)
       when scope in ["session", "agent"],
       do: SettingsHandlers.handle_reset_settings(scope, socket)
-
-  def handle_event("toggle_model_menu", _params, socket), do: handle_toggle_model_menu(socket)
 
   def handle_event("toggle_effort_menu", _params, socket), do: handle_toggle_effort_menu(socket)
 

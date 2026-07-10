@@ -530,8 +530,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     """
   end
 
-  # EXCEPTION: These icons use inline SVG because Heroicons has no equivalent.
-  # Remove when Heroicons adds robot/kanban/bot icons.
+  # Lucide icons, rendered as inline SVG. Use these only where Heroicons has no
+  # icon matching the concept — otherwise prefer `<.icon name="hero-..." />`.
   attr :name, :string, required: true
   attr :class, :string, default: "size-4"
 
@@ -617,6 +617,34 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       <circle cx="18" cy="6" r="3" />
       <circle cx="6" cy="18" r="3" />
       <path d="M18 9a9 9 0 0 1-9 9" />
+    </svg>
+    """
+  end
+
+  def custom_icon(%{name: "lucide-file-cog"} = assigns) do
+    ~H"""
+    <svg
+      class={@class}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+      <path d="M4.677 21.5a2 2 0 0 0 1.313.5H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v2.5" />
+      <circle cx="6" cy="14" r="3" />
+      <path d="m2.305 15.53.923-.382" />
+      <path d="m3.228 12.852-.924-.383" />
+      <path d="m4.852 11.228-.383-.923" />
+      <path d="m4.852 16.772-.383.924" />
+      <path d="m7.148 11.228.383-.923" />
+      <path d="m7.53 17.696-.382-.924" />
+      <path d="m8.772 12.852.924-.383" />
+      <path d="m8.772 15.148.924.383" />
     </svg>
     """
   end

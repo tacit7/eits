@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Jobs do
 
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.Live.Shared.JobsLiveHandlers
 
   @impl true
@@ -23,6 +24,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Jobs do
       |> assign(:project_id, nil)
       |> assign(:active_tab, :all_jobs)
       |> assign(:search_query, "")
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

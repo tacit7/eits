@@ -103,21 +103,31 @@ export const CtxMenu = {
       },
       push(event, payload) {
         hook._close()
-        // archive_session / open_worktree reuse the Rail LC handlers (always
-        // mounted) — same protocol as the retired native menu. rename_session
-        // deliberately goes to the PAGE LiveView instead, so it triggers the
+        // Rail is its own live_render'd LiveView, not reachable via this
+        // hook's default pushEvent (which targets the page LiveView). Events
+        // owned by Rail (sessions, projects, files) bridge through a window
+        // CustomEvent that RailState (mounted inside Rail's own tree)
+        // forwards via pushEventTo. rename_session is the one exception —
+        // it deliberately goes to the PAGE LiveView, so it triggers the
         // page's inline edit-in-place rename (matching the "…" menu) rather
-        // than the Rail's prompt+DB rename. Everything else → page LiveView.
-        const railEvents = ['archive_session', 'open_worktree']
+        // than Rail's own prompt+DB rename.
+        const railEvents = [
+          'archive_session',
+          'open_worktree',
+          'open_in_window',
+          'rename_project',
+          'delete_project',
+          'open_project_terminal',
+          'open_project_in_editor',
+          'file_open',
+          'reveal_file',
+          'open_file_in_editor',
+          'rename_file',
+          'rename_channel',
+          'delete_channel',
+        ]
         if (railEvents.includes(event)) {
-          // extra spreads AFTER the stringified session_id in the bridge —
-          // never default it to the whole payload or its integer session_id
-          // clobbers the string one and Integer.parse/1 raises server-side.
-          window.dispatchEvent(
-            new CustomEvent('tauri:session-action', {
-              detail: { action: event, session_id: payload.session_id, extra: payload.extra ?? {} },
-            })
-          )
+          window.dispatchEvent(new CustomEvent('tauri:rail-action', { detail: { action: event, payload } }))
         } else {
           hook.pushEvent(event, payload)
         }

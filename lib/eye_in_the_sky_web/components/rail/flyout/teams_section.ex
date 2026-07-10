@@ -6,7 +6,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
 
   attr :team_search, :string, default: ""
   attr :team_status, :string, default: "active"
-  attr :myself, :any, required: true
 
   def teams_filters(assigns) do
     ~H"""
@@ -21,7 +20,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
           value={@team_search}
           placeholder="Search teams…"
           phx-keyup="update_team_search"
-          phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
         />
@@ -29,9 +27,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
 
       <%!-- Status pills --%>
       <div class="flex items-center gap-0.5">
-        <.status_pill label="Active" value="active" current={@team_status} myself={@myself} />
-        <.status_pill label="All" value="all" current={@team_status} myself={@myself} />
-        <.status_pill label="Archived" value="archived" current={@team_status} myself={@myself} />
+        <.status_pill label="Active" value="active" current={@team_status} />
+        <.status_pill label="All" value="all" current={@team_status} />
+        <.status_pill label="Archived" value="archived" current={@team_status} />
       </div>
     </div>
     """
@@ -81,7 +79,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
   attr :label, :string, required: true
   attr :value, :string, required: true
   attr :current, :string, default: "active"
-  attr :myself, :any, required: true
 
   defp status_pill(assigns) do
     ~H"""
@@ -89,7 +86,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
     <button
       phx-click="set_team_status"
       phx-value-status={@value}
-      phx-target={@myself}
       class={[
         "text-nano px-1.5 py-0.5 rounded transition-colors",
         if(active,

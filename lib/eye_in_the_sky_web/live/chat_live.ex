@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.ChatLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Channels, Sessions}
+  alias EyeInTheSky.{Channels, Events, Sessions}
   alias EyeInTheSkyWeb.ChatLive.ChannelDataLoader
   alias EyeInTheSkyWeb.ChatLive.EventHandlers
   alias EyeInTheSkyWeb.ChatLive.PubSubHandlers
@@ -35,6 +35,8 @@ defmodule EyeInTheSkyWeb.ChatLive do
         max_file_size: 20_000_000,
         auto_upload: true
       )
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end
@@ -166,10 +168,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
     socket = manage_stream_subscriptions(socket, data.channel_members)
 
     if connected?(socket) do
-      Phoenix.LiveView.send_update(EyeInTheSkyWeb.Components.Rail,
-        id: "app-rail",
-        unread_counts: unread_counts
-      )
+      Events.broadcast_rail_unread_counts(unread_counts)
     end
 
     socket

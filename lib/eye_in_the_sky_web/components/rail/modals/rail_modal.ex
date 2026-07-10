@@ -3,7 +3,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.RailModal do
   use EyeInTheSkyWeb, :html
 
   attr :modal, :atom, required: true
-  attr :myself, :any, required: true
 
   def rail_modal(assigns) do
     ~H"""
@@ -16,14 +15,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.RailModal do
           <button
             type="button"
             phx-click="close_rail_modal"
-            phx-target={@myself}
             class="size-5 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
           >
             <.icon name="hero-x-mark-mini" class="size-3.5" />
           </button>
         </div>
 
-        <form phx-submit="submit_rail_modal" phx-target={@myself} class="flex flex-col gap-2">
+        <form phx-submit="submit_rail_modal" class="flex flex-col gap-2">
           <input
             type="text"
             name="title"
@@ -43,7 +41,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.RailModal do
             <button
               type="button"
               phx-click="close_rail_modal"
-              phx-target={@myself}
               class="px-3 py-1 text-xs text-base-content/55 hover:text-base-content/80 transition-colors"
             >
               Cancel

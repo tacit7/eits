@@ -17,6 +17,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
   import EyeInTheSkyWeb.IAMLive.IAMComponents
   import EyeInTheSkyWeb.IAMLive.PolicyFormHelpers
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.IAM
   alias EyeInTheSky.IAM.HooksChecker
   alias EyeInTheSky.IAM.Policy
@@ -39,20 +40,23 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
             {:ok, %Policy{} = policy} ->
               changeset = Policy.update_changeset(policy, %{})
 
-              {:ok,
-               socket
-               |> assign(:page_title, "Edit: #{policy.name}")
-               |> assign(:sidebar_tab, :iam)
-               |> assign(:sidebar_project, nil)
-               |> assign(:policy, policy)
-               |> assign(:system?, not is_nil(policy.system_key))
-               |> assign(:editable_fields, MapSet.new(policy.editable_fields || []))
-               |> assign(:form, to_form(changeset))
-               |> assign(:condition_text, encode_condition(policy.condition))
-               |> assign(:scope, infer_scope(policy))
-               |> assign(:projects, Projects.list_projects())
-               |> assign(:matcher_source, load_matcher_source(policy.builtin_matcher))
-               |> assign(:iam_hooks_status, HooksChecker.status())}
+              s =
+                socket
+                |> assign(:page_title, "Edit: #{policy.name}")
+                |> assign(:sidebar_tab, :iam)
+                |> assign(:sidebar_project, nil)
+                |> assign(:policy, policy)
+                |> assign(:system?, not is_nil(policy.system_key))
+                |> assign(:editable_fields, MapSet.new(policy.editable_fields || []))
+                |> assign(:form, to_form(changeset))
+                |> assign(:condition_text, encode_condition(policy.condition))
+                |> assign(:scope, infer_scope(policy))
+                |> assign(:projects, Projects.list_projects())
+                |> assign(:matcher_source, load_matcher_source(policy.builtin_matcher))
+                |> assign(:iam_hooks_status, HooksChecker.status())
+
+              Events.broadcast_rail_context(s)
+              {:ok, s}
 
             {:error, :not_found} ->
               {:ok,

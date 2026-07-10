@@ -105,14 +105,7 @@
   </div>
 
   <div id="app-body" class="flex flex-1 min-h-0">
-  <.live_component
-    module={EyeInTheSkyWeb.Components.Rail}
-    id="app-rail"
-    sidebar_tab={assigns[:sidebar_tab] || :sessions}
-    sidebar_project={assigns[:sidebar_project]}
-    active_channel_id={assigns[:active_channel_id]}
-  />
-
+  <%= live_render(@socket, EyeInTheSkyWeb.Components.Rail, id: "app-rail", sticky: true) %>
   <%!-- Grab handle for swipe-to-open sidebar on mobile.
        touch-action:none prevents Safari from stealing the gesture for back navigation. --%>
   <%!-- Grab handle starts below the mobile header so it never covers the hamburger button.
@@ -131,7 +124,7 @@
       assigns[:hide_mobile_header] && "hidden"
     ]}>
       <button
-        phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#app-rail")}
+        phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#rail-root")}
         class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
         title="Open menu"
         aria-label="Open sidebar menu"

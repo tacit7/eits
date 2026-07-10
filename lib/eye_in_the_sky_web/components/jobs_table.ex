@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   def jobs_table(assigns) do
     ~H"""
     <%= if @jobs != [] do %>
-      <div class="mt-2 rounded-xl border border-base-content/8 overflow-hidden bg-base-100">
+      <div class="mt-2 rounded-xl shadow-sm">
         <div class="divide-y divide-base-content/5">
         <%= for job <- @jobs do %>
           <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
@@ -40,8 +40,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             class={[
               "flex items-center gap-3 py-3 px-4 cursor-pointer relative group/row",
               "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:ring-inset",
-              if(selected?, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset", else: "hover:bg-base-200/40"),
-              if(job_state == :disabled, do: "opacity-60")
+              if(selected?, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg", else: "bg-base-100 hover:bg-base-200/40")
             ]}
             phx-click="expand_job"
             phx-value-id={job.id}
@@ -74,14 +73,14 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 ]}>
                   {job.name}
                 </span>
-                <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/45 flex-shrink-0">
+                <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">
                   {type_label(job.job_type)}
                 </span>
                 <%= if is_nil(job.project_id) and @scope == "overview" do %>
-                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/6 text-base-content/35 flex-shrink-0">global</span>
+                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">global</span>
                 <% end %>
                 <%= if @show_origin and job.origin == "system" do %>
-                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/6 text-base-content/35 flex-shrink-0">system</span>
+                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">system</span>
                 <% end %>
               </div>
               <%!-- Line 2: schedule · last run · next run --%>
@@ -107,7 +106,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
               <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-primary/15 text-primary flex-shrink-0">running</span>
             <% end %>
             <%= if job_state == :disabled do %>
-              <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">disabled</span>
+              <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/10 text-base-content/50 flex-shrink-0">disabled</span>
             <% end %>
             <%= if job_state == :failed do %>
               <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-error/15 text-error flex-shrink-0">failed</span>

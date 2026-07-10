@@ -384,7 +384,7 @@ if (window.__TAURI_INTERNALS__) {
 
 // Tauri file drop forwarding lives in the DragUpload hook (hooks/drag_upload.js)
 // — hooks are the only public API for pushing events to a LiveView.
-// The phx:pick_folder and tauri:session-action bridges live in the RailState
+// The phx:pick_folder and tauri:rail-action bridges live in the RailState
 // hook (hooks/rail_state.js) for the same reason: the previous app.js relays
 // called view.pushEventTo, which does not exist on LiveView's View class, so
 // every event was dropped silently (project creation via the native folder
@@ -419,9 +419,10 @@ if (window.__TAURI_INTERNALS__) {
     })
   }
 
-  // Session context menus are the web-rendered CtxMenu hook now (browser +
-  // desktop parity) — the native show_session_context_menu path is retired.
-  // tauri:session-action handling lives in the RailState hook — see note above.
+  // Session/project/file context menus are the web-rendered CtxMenu hook now
+  // (browser + desktop parity) — the native show_session_context_menu path
+  // is retired. tauri:rail-action handling lives in the RailState hook — see
+  // note above.
 }
 
 // The lines below enable quality of life phoenix_live_reload

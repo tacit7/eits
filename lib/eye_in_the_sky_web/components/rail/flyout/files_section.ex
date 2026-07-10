@@ -10,7 +10,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
   attr :file_children, :map, default: %{}
   attr :file_error, :string, default: nil
   attr :sidebar_project, :any, default: nil
-  attr :myself, :any, required: true
 
   def files_content(assigns) do
     assigns =
@@ -43,7 +42,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
             <button
               phx-click={if expanded, do: "file_collapse", else: "file_expand"}
               phx-value-path={node.path}
-              phx-target={@myself}
+              data-ctx="file"
+              data-ctx-path={node.path}
+              data-ctx-name={node.name}
+              data-ctx-is-dir="true"
+              data-ctx-abs-path={Path.join(@sidebar_project.path, node.path)}
               class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-xs text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
               style={"padding-left: #{indent + 8}px"}
             >
@@ -62,7 +65,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
             <button
               phx-click="file_open"
               phx-value-path={node.path}
-              phx-target={@myself}
+              data-ctx="file"
+              data-ctx-path={node.path}
+              data-ctx-name={node.name}
+              data-ctx-abs-path={Path.join(@sidebar_project.path, node.path)}
               class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-xs text-base-content/55 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
               style={"padding-left: #{indent + 20}px"}
             >

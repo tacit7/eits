@@ -547,10 +547,14 @@ Tasks and prompts sections feature inline `+` buttons that open modals with simp
 
 All icons in the rail and flyout use **custom_icon/1 or the standard `.icon` component** (from core_components.ex):
 
-- **Lucide icons** (e.g., `kanban`, `globe`): use `.custom_icon` — these are consolidated inline SVGs to reduce imports
+- **Lucide icons** (e.g., `kanban`, `globe`, `file-cog`): use `.custom_icon` — these are consolidated inline SVGs to reduce imports
 - **Heroicons** (e.g., `hero-list-bullet`, `hero-plus-mini`): use `.icon` — standard Heroicons fallback
 
 Do NOT use raw inline SVGs elsewhere. Add new icons to `custom_icon/1` in core_components.ex.
+
+**Lucide icons currently in custom_icon/1**:
+- `lucide-kanban` — Tasks section header
+- `lucide-file-cog` — Claude Config bottom nav link
 
 **Section-specific icons**:
 - **Skills section header**: `hero-bolt`
@@ -571,6 +575,26 @@ Related components:
 - `NotesList` (`notes_list.ex`) — bulk delete for notes, with toolbar
 - `ProjectSessionsTable` — bulk delete for sessions
 - `TaskCardListRow` — individual row handling for task selection
+
+---
+
+## Bottom Navigation Shortcuts
+
+The rail footer provides quick-access navigation links positioned at the bottom, above the user menu. These are persistent toggles/links that do not open the flyout:
+
+**Claude Config** (`/config`)
+- Icon: `lucide-file-cog` (via `custom_icon/1`)
+- Tooltip: "Claude Config"
+- Navigates to the Claude Code configuration page
+- Styled: small icon button with hover background, rounded corners, same as Settings
+
+**Settings** (`/settings`)
+- Icon: `hero-cog-6-tooth` (via `.icon` component)
+- Tooltip: "Settings"
+- Navigates to the settings page
+- Styled: same as Claude Config button
+
+These shortcuts are added to the rail component in `lib/eye_in_the_sky_web/components/rail.ex` at the bottom of the rail stack, positioned above the user account menu.
 
 ---
 

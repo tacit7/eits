@@ -1,6 +1,7 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.{Notes, Projects, Tasks}
 
   alias EyeInTheSkyWeb.Live.Shared.{
@@ -40,6 +41,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban do
       )
       |> init_assigns()
       |> FilterHandlers.assign_filter_count()
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     if socket.assigns.project do
       {:ok, socket |> KanbanFilters.load_tasks() |> rebuild_session_status_ids()}

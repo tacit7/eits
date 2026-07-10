@@ -1858,6 +1858,225 @@ end
 
 ---
 
+## External Editor Integration
+
+### EyeInTheSky.Editors Module
+
+**Purpose:** Registry of known external editors (VS Code, Cursor, Zed, Neovim, Vim, Helix, Sublime Text, Emacs, nano) with detection and async launch support.
+
+**Location:** `lib/eye_in_the_sky/editors.ex`
+
+**Key functions:**
+
+```elixir
+# All editor IDs in registry order
+def all_ids, do: ["code", "cursor", "zed", "nvim", "vim", "hx", "subl", "emacs", "nano"]
+
+# All installed editors (subset of all_ids where binary is found)
+def detect_installed() do
+  Enum.filter(@editors, &installed?/1)
+end
+
+# Find editor by ID
+def find(id), do: Enum.find(@editors, &(&1.id == id))
+
+# Launch path in editor
+def open(editor_id, path) do
+  with {:editor, editor} <- {:editor, find(editor_id)},
+       {:installed, true} <- {:installed, !!System.find_executable(editor.bin)},
+       {:allowed, true} <- {:allowed, path_allowed?(path)},
+       {:exists, true} <- {:exists, File.exists?(path)} do
+    Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
+      System.cmd(editor.bin, [path], stderr_to_stdout: true, cd: "/")
+    end)
+    {:ok, editor.label}
+  else
+    # Returns {:error, :unknown_editor | :not_installed | :not_allowed | :not_found}
+    error_tuple -> error_tuple
+  end
+end
+```
+
+**Editor detection (macOS-aware):** On macOS, probes extra PATH directories (`/opt/homebrew/bin`, `/usr/local/bin`, `/usr/local/sbin`, `~/.local/bin`) before checking the system PATH, then checks `/Applications` for `.app` bundles. GUI processes don't inherit `/opt/homebrew/bin` from shell, so detection must probe extra dirs explicitly.
+
+**Allowed paths:** File writes are restricted to whitelisted roots (`~/.claude`, `~/projects`). Attempts to open files outside these roots are rejected with `:not_allowed`.
+
+**When to use:**
+- New surfaces that launch external editors (agents/skills/files detail panels)
+- Settings editor selector — shows only installed editors
+- Primary action on editor buttons (click opens preferred_editor, dropdown lists detected alternatives)
+
+---
+
+### OpenInEditorButton Component
+
+**Purpose:** DaisyUI split-button component for opening files in external editors. Primary click opens the preferred editor; dropdown button lists other detected editors.
+
+**Location:** `lib/eye_in_the_sky_web/components/open_in_editor_button.ex`
+
+**Props:**
+
+```elixir
+<.open_in_editor_button
+  path={@agent_path}
+  editor_id={@settings.preferred_editor}
+  installed_editors={Editors.detect_installed()}
+  myself={@myself}
+/>
+```
+
+**Attributes:**
+- `path` (required) — file path to open
+- `editor_id` (required) — preferred editor ID (from user settings)
+- `installed_editors` (required) — list of detected Editor structs
+- `myself` (required) — component target for event handling
+
+**Rendering:**
+- Primary button labeled with preferred editor name (e.g., "VS Code") — clicking calls `handle_open_in_editor(editor_id, path)`
+- Chevron dropdown reveals list of other installed editors in a DaisyUI menu
+
+**When to use:**
+- Agents detail panel (agents/skills/prompts pages)
+- Files explorer page (project-scoped)
+- Overview Agents page (`/agents` global)
+- Any surface where users need to edit a file externally
+
+---
+
+### ViewHelpers.handle_open_in_editor/3
+
+**Purpose:** Shared LiveView event handler for opening files in external editors. Centralized error handling and flash message logic.
+
+**Signature:**
+```elixir
+def handle_open_in_editor(editor_id, path, socket) do
+  case Editors.open(editor_id, path) do
+    {:ok, label} ->
+      {:noreply, put_flash(socket, :info, "Opening in #{label}")}
+    
+    {:error, :unknown_editor} ->
+      {:noreply, put_flash(socket, :error, "Editor not found")}
+    
+    {:error, :not_installed} ->
+      {:noreply, put_flash(socket, :error, "Editor not installed")}
+    
+    {:error, :not_allowed} ->
+      {:noreply, put_flash(socket, :error, "Path not allowed")}
+    
+    {:error, :not_found} ->
+      {:noreply, put_flash(socket, :error, "File not found")}
+  end
+end
+```
+
+**Usage in LiveView event handlers:**
+
+```elixir
+def handle_event("open_in_editor", %{"editor_id" => editor_id, "path" => path}, socket) do
+  ViewHelpers.handle_open_in_editor(editor_id, path, socket)
+end
+```
+
+**Why canonical:** All editor-launch surfaces (agents, skills, files, overview) use the same error handling and messaging. Centralizing in ViewHelpers eliminates duplication and ensures consistent user feedback.
+
+---
+
+### CodeMirror 6 Edit Tab in Detail Panels
+
+**Purpose:** Agents, skills, and prompts detail panels include an "Edit" tab that replaces the preview/raw area with a full CodeMirror 6 editor. Saves via Ctrl+S (or Cmd+S on macOS); Cancel discards changes.
+
+**Location:**
+- Agents: `lib/eye_in_the_sky_web/live/project_live/agents.ex`
+- Skills: `lib/eye_in_the_sky_web/live/project_live/skills.ex`
+- Prompts: `lib/eye_in_the_sky_web/live/project_live/prompts.ex`
+- Overview Agents: `lib/eye_in_the_sky_web/live/overview_live/agents.ex`
+
+**Behavior:**
+1. Detail panel header shows tabs: `:preview`, `:raw`, `:edit`
+2. Click `:edit` tab → replaces content area with CodeMirror 6 editor
+3. Initial content: base64-decoded from server-sent `edit_content` assign
+4. Ctrl+S (any platform) or Cmd+S (macOS) saves; Cancel discards
+5. On save: reload item list, re-select saved item by id, return to `:preview` tab
+
+**Content sources by type:**
+- **Agents:** Read from `agent.yaml` file via `File.read!/1` (agents have `abs_path` field)
+- **Skills:** Read from `skill.yaml` file via `File.read!/1` (skills have `abs_path` field)
+- **Prompts:** Read from `prompts.body` in the database (no file path)
+
+**File write validation (agents & skills):**
+
+```elixir
+def skill_write_allowed?(file_path, skill_id) do
+  skill = Skills.get_skill!(skill_id)
+  allowed_roots = [Path.expand(Config.skills_dir())]
+  
+  expanded_path = Path.expand(file_path)
+  expanded_root = Path.expand(skill.abs_path)
+  
+  # Both target and allowed root must expand cleanly
+  String.starts_with?(expanded_root, Enum.map(allowed_roots, &Path.expand/1))
+  and String.starts_with?(expanded_path, [expanded_root])
+end
+```
+
+Path validation uses `Path.expand/1` on both the target and allowed roots to prevent symlink-escape attacks. File.write/2 is only called if `skill_write_allowed?/2` returns true.
+
+**Edit button hidden when:**
+- `abs_path` is `nil` (no writable path for agents/skills)
+- User doesn't have permission to edit (for future RBAC)
+
+**Language detection:**
+- `.yaml`, `.yml` files → CodeMirror YAML language mode
+- Agents/skills default to YAML (frontmatter + body)
+- Prompts use Markdown
+
+**@codemirror/lang-yaml support:**
+- Added to npm deps via `assets/package.json`
+- Registered in `assets/js/cm_lang.js`: `yaml: () => import("@codemirror/lang-yaml")`
+- Registered in `vite.config.mjs` as file extensions: `yaml`, `yml`
+
+**When to use:**
+- Users need to edit agent/skill definitions in-browser without external editor
+- Quick edits to prompts without context switching
+- Centralized config management within the app
+
+---
+
+### abs_path Field in Skill Struct
+
+**Purpose:** Mirrors `AgentDef.abs_path` — stores the absolute path to the skill definition file on disk. Used to determine whether the Edit button should appear and as the target for file writes.
+
+**Location:** `lib/eye_in_the_sky_web/schemas/skill.ex`
+
+**Populated by:** `skills_helpers.ex` during skill loading:
+
+```elixir
+def build_skill_from_file(path, project) do
+  content = File.read!(path)
+  skill = parse_skill_yaml(content)
+  
+  %Skill{
+    skill
+    | abs_path: path,  # Absolute path to the skill definition file
+      project_id: project.id
+  }
+end
+```
+
+**Edit button logic:**
+```heex
+<!-- Show Edit button only if abs_path is not nil -->
+<button :if={@selected_skill.abs_path} phx-click="edit" class="btn btn-sm">Edit</button>
+```
+
+**Why abs_path matters:**
+- Distinguishes user-created (disk-backed) skills from built-in/readonly skills
+- Enables safe file writes with path validation
+- Allows "Open in Editor" to know where the file lives
+- Empty/nil abs_path means read-only (no edit capability)
+
+---
+
 ## UI Component Patterns
 
 ### Action Dropdown Menu (Session Row / Kanban Card)

@@ -8,7 +8,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
   attr :sidebar_project, :any, default: nil
   attr :open, :boolean, default: false
   attr :new_project_path, :any, default: nil
-  attr :myself, :any, required: true
   attr :workspace, :any, default: nil
   attr :scope_type, :atom, default: :project
 
@@ -29,9 +28,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       <div class="px-1.5 pb-1.5">
         <% ws_selected = @scope_type == :workspace %>
         <button
-          phx-click="select_workspace"
-          phx-target={@myself}
-          class={[
+          phx-click="select_workspace"          class={[
             "w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-left transition-colors",
             if(ws_selected,
               do: "bg-primary/10 text-primary",
@@ -64,11 +61,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       <div class="p-1.5 max-h-48 overflow-y-auto">
         <%= for project <- @projects do %>
           <% selected = @scope_type == :project && not is_nil(@sidebar_project) && @sidebar_project.id == project.id %>
-          <div class="group/proj relative flex items-center">
+          <div
+            class="group/proj relative flex items-center"
+            data-ctx="project"
+            data-ctx-id={project.id}
+            data-ctx-name={project.name}
+            data-ctx-path={project.path}
+          >
             <button
               phx-click="select_project"
               phx-value-project_id={project.id}
-              phx-target={@myself}
               class={[
                 "flex-1 flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-left transition-colors",
                 if(selected,
@@ -92,7 +94,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
             <button
               phx-click="open_in_window"
               phx-value-project_id={project.id}
-              phx-target={@myself}
               title="Open in New Window"
               class="absolute right-1 opacity-0 group-hover/proj:opacity-100 transition-opacity p-1 rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8"
             >
@@ -106,7 +107,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
         <%= if is_nil(@new_project_path) do %>
           <button
             phx-click="show_new_project"
-            phx-target={@myself}
             class="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-base-content/50 hover:text-base-content/80 hover:bg-base-content/5 transition-colors"
           >
             <.icon name="hero-plus-mini" class="size-3.5" /> Add repo
@@ -114,7 +114,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
         <% else %>
           <form
             phx-submit="create_project"
-            phx-target={@myself}
             class="flex items-center gap-1 px-2 py-1"
           >
             <input
@@ -122,7 +121,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
               name="path"
               value={@new_project_path}
               phx-keyup="update_project_path"
-              phx-target={@myself}
               placeholder="/path/to/project"
               class="flex-1 bg-transparent border-b border-primary/40 text-sm text-base-content/80 placeholder:text-base-content/25 outline-none py-0.5 font-mono"
               autofocus
@@ -137,7 +135,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
             <button
               type="button"
               phx-click="cancel_new_project"
-              phx-target={@myself}
               class="text-base-content/30 hover:text-base-content/60"
               aria-label="Cancel"
             >

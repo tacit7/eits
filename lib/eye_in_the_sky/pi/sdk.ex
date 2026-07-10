@@ -28,6 +28,7 @@ defmodule EyeInTheSky.Pi.SDK do
 
   alias EyeInTheSky.Claude.Message
   alias EyeInTheSky.Claude.SDK.Registry
+  alias EyeInTheSky.Claude.Utils
   alias EyeInTheSky.SDK.MessageHandler
 
   require Logger
@@ -46,7 +47,7 @@ defmodule EyeInTheSky.Pi.SDK do
   def loop_opts, do: @loop_opts
 
   @doc "Returns the configured Pi CLI transport module (real or mock for tests)."
-  def cli_module, do: EyeInTheSky.Claude.Utils.pi_cli_module()
+  def cli_module, do: Utils.pi_cli_module()
 
   # -- Public API (same contract as Codex.SDK) ---------------------------------
 
@@ -413,17 +414,15 @@ defmodule EyeInTheSky.Pi.SDK do
 
     canceled = consume_cancel_marker(sdk_ref)
 
-    cond do
-      canceled ->
-        # User cancel: the abort produced a turn_end, but the outcome is
-        # terminal :canceled — never completed, never a retryable error shape.
-        state = %{state | terminal: :canceled}
-        log_usage("pi.sdk.canceled", eits_session_id, data)
-        send(caller_pid, {:claude_error, sdk_ref, :user_canceled})
-        after_terminal(state, data)
-
-      true ->
-        finalize_uncanceled(data, state, sticky)
+    if canceled do
+      # User cancel: the abort produced a turn_end, but the outcome is
+      # terminal :canceled — never completed, never a retryable error shape.
+      state = %{state | terminal: :canceled}
+      log_usage("pi.sdk.canceled", eits_session_id, data)
+      send(caller_pid, {:claude_error, sdk_ref, :user_canceled})
+      after_terminal(state, data)
+    else
+      finalize_uncanceled(data, state, sticky)
     end
   end
 

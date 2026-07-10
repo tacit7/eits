@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
 
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Commits
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
@@ -87,6 +88,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         |> put_flash(:error, "Invalid project ID")
       end
 
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
     {:ok, socket}
   end
 

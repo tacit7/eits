@@ -33,6 +33,44 @@ defmodule EyeInTheSkyWeb.Live.Shared.PromptsHelpers do
     {:noreply, socket |> assign(:scope_filter, scope) |> reload_fn.()}
   end
 
+  def handle_duplicate_prompt(uuid, socket, reload_fn) do
+    case Prompts.get_prompt_by_uuid(uuid) do
+      {:ok, prompt} ->
+        case Prompts.duplicate_prompt(prompt) do
+          {:ok, _copy} ->
+            {:noreply, socket |> reload_fn.() |> Phoenix.LiveView.put_flash(:info, "Duplicated")}
+
+          {:error, _} ->
+            {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Duplicate failed")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Prompt not found")}
+    end
+  end
+
+  def handle_deactivate_prompt(uuid, socket, reload_fn, clear_fn) do
+    case Prompts.get_prompt_by_uuid(uuid) do
+      {:ok, prompt} ->
+        case Prompts.deactivate_prompt(prompt) do
+          {:ok, _} ->
+            socket =
+              socket
+              |> reload_fn.()
+              |> clear_fn.(uuid)
+              |> Phoenix.LiveView.put_flash(:info, "Deactivated")
+
+            {:noreply, socket}
+
+          {:error, _} ->
+            {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Deactivate failed")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Prompt not found")}
+    end
+  end
+
   def apply_filters_and_sort(prompts, assigns) do
     prompts
     |> filter_by_scope(assigns[:scope_filter] || "all")

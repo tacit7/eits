@@ -7,7 +7,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
   attr :task, :map, required: true
   attr :index, :integer, required: true
   attr :total, :integer, required: true
-  attr :myself, :any, required: true
 
   def task_detail_modal(assigns) do
     task_link =
@@ -27,7 +26,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
         <button
           type="button"
           phx-click="close_rail_modal"
-          phx-target={@myself}
           class="size-5 flex-shrink-0 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
         >
           <.icon name="hero-x-mark-mini" class="size-3.5" />
@@ -59,9 +57,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
           <button
             type="button"
             phx-click="task_detail_nav"
-            phx-value-dir="prev"
-            phx-target={@myself}
-            disabled={@total <= 1}
+            phx-value-dir="prev"            disabled={@total <= 1}
             class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
           >
             <.icon name="hero-chevron-left-mini" class="size-3.5" />
@@ -72,9 +68,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
           <button
             type="button"
             phx-click="task_detail_nav"
-            phx-value-dir="next"
-            phx-target={@myself}
-            disabled={@total <= 1}
+            phx-value-dir="next"            disabled={@total <= 1}
             class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
           >
             <.icon name="hero-chevron-right-mini" class="size-3.5" />

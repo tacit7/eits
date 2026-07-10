@@ -14,11 +14,12 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   import EyeInTheSkyWeb.Components.ModelSelector, only: [model_selector: 1]
 
   alias EyeInTheSky.Agents.ModelConfig
+  alias EyeInTheSky.Pi.ModelDiscoveryCache
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
 
   @impl true
   def mount(socket) do
-    EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+    ModelDiscoveryCache.refresh_async()
 
     {:ok,
      assign(socket,

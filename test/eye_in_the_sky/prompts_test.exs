@@ -37,4 +37,34 @@ defmodule EyeInTheSky.PromptsTest do
       assert {"has active schedules", _} = changeset.errors[:scheduled_jobs]
     end
   end
+
+  describe "duplicate_prompt/1" do
+    test "copies fields into a new row with a -copy slug suffix" do
+      prompt = create_prompt("Reviewer")
+
+      assert {:ok, copy} = Prompts.duplicate_prompt(prompt)
+
+      assert copy.id != prompt.id
+      assert copy.slug == "#{prompt.slug}-copy"
+      assert copy.name == "Reviewer (copy)"
+      assert copy.prompt_text == prompt.prompt_text
+      assert copy.version == 1
+    end
+
+    test "increments the suffix when -copy is already taken" do
+      prompt = create_prompt("Reviewer")
+      {:ok, _first_copy} = Prompts.duplicate_prompt(prompt)
+
+      assert {:ok, second_copy} = Prompts.duplicate_prompt(prompt)
+      assert second_copy.slug == "#{prompt.slug}-copy-2"
+    end
+
+    test "carries over project_id" do
+      prompt = create_prompt("Reviewer")
+      {:ok, scoped} = Prompts.update_prompt(prompt, %{project_id: 999_001})
+
+      assert {:ok, copy} = Prompts.duplicate_prompt(scoped)
+      assert copy.project_id == 999_001
+    end
+  end
 end

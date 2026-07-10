@@ -245,4 +245,56 @@ defmodule EyeInTheSkyWeb.OverviewLive.AgentsTest do
       assert tag == :noreply
     end
   end
+
+  describe "handle_event/3 - duplicate_definition_file" do
+    setup do
+      dir = Path.join(System.tmp_dir!(), "agents_dup_test_#{:erlang.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      path = Path.join(dir, "reviewer.md")
+      File.write!(path, "---\nname: reviewer\n---\nBody")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      %{path: path, dir: dir}
+    end
+
+    test "duplicates a known agent file and reloads", %{path: path} do
+      agent = %{id: "a1", abs_path: path}
+      socket = build_socket(%{agents: [agent]})
+
+      {:noreply, result} = AgentsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
+
+      assert File.exists?(Path.join(Path.dirname(path), "reviewer-copy.md"))
+      assert result.assigns.flash["info"] == "Duplicated"
+    end
+
+    test "rejects a path not in the currently loaded agents list", %{path: path} do
+      socket = build_socket(%{agents: []})
+
+      {:noreply, result} = AgentsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
+
+      refute File.exists?(Path.join(Path.dirname(path), "reviewer-copy.md"))
+      assert result.assigns.flash["error"] == "Path not allowed"
+    end
+  end
+
+  describe "handle_event/3 - delete_definition_file" do
+    setup do
+      dir = Path.join(System.tmp_dir!(), "agents_del_test_#{:erlang.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      path = Path.join(dir, "reviewer.md")
+      File.write!(path, "content")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      %{path: path}
+    end
+
+    test "deletes a known agent file and clears selection if it was selected", %{path: path} do
+      agent = %{id: "a1", abs_path: path}
+      socket = build_socket(%{agents: [agent], selected_agent: agent})
+
+      {:noreply, result} = AgentsLive.handle_event("delete_definition_file", %{"path" => path}, socket)
+
+      refute File.exists?(path)
+      assert is_nil(result.assigns.selected_agent)
+      assert result.assigns.flash["info"] == "Deleted"
+    end
+  end
 end

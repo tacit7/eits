@@ -4,7 +4,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
 
   attr :skill_search, :string, default: ""
   attr :skill_scope, :string, default: "all"
-  attr :myself, :any, required: true
 
   def skills_filters(assigns) do
     ~H"""
@@ -19,7 +18,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
           value={@skill_search}
           placeholder="Search skills…"
           phx-keyup="update_skill_search"
-          phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
         />
@@ -27,8 +25,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
 
       <%!-- Scope pills --%>
       <div class="flex items-center gap-0.5">
-        <.scope_pill label="All" value="all" current={@skill_scope} myself={@myself} />
-        <.scope_pill label="Project" value="project" current={@skill_scope} myself={@myself} />
+        <.scope_pill label="All" value="all" current={@skill_scope} />
+        <.scope_pill label="Project" value="project" current={@skill_scope} />
       </div>
     </div>
     """
@@ -76,7 +74,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
   attr :label, :string, required: true
   attr :value, :string, required: true
   attr :current, :string, default: "all"
-  attr :myself, :any, required: true
 
   defp scope_pill(assigns) do
     ~H"""
@@ -84,7 +81,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SkillsSection do
     <button
       phx-click="set_skill_scope"
       phx-value-scope={@value}
-      phx-target={@myself}
       class={[
         "text-nano px-1.5 py-0.5 rounded transition-colors",
         if(active,

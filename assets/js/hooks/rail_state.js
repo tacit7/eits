@@ -42,10 +42,10 @@ export const RailState = {
   mounted() {
     migrateOldKeys()
 
-    // Send the full blob to the server once on mount.
-    // The server applies each field defensively. Once the round-trip lands,
-    // drop the pre-paint anti-flash override (set in root.html.heex) —
-    // LiveView state is authoritative from here on.
+    // Send the full blob to the server on first load (cold start).
+    // Rail is now a persistent LiveView — on live navigation it keeps its state
+    // and this mount() never re-fires. On full page reload, mount() fires once,
+    // restores from localStorage, and removes the anti-flash data-rail-collapsed attribute.
     const state = readState()
     this.pushEventTo(this.el, 'restore_rail_state', state, () => {
       document.documentElement.removeAttribute('data-rail-collapsed')
@@ -169,15 +169,16 @@ export const RailState = {
     }
     window.addEventListener('phx:pick_folder', this._pickFolderHandler)
 
-    // tauri:session-action — fired by Rust after a native context-menu
-    // selection that needs a LiveView round-trip (archive, rename, etc).
-    // Payload: { action: 'archive_session', session_id: 123, extra: {} }
-    this._sessionActionHandler = (e) => {
-      const { action, session_id, extra } = e.detail ?? {}
+    // tauri:rail-action — bridges a ctx-menu selection (session/project/file)
+    // to Rail, which is its own live_render'd LiveView and unreachable via
+    // the ctx-menu hook's default pushEvent (that targets the page LiveView).
+    // Payload: { action: 'archive_session', payload: { session_id: 123 } }
+    this._railActionHandler = (e) => {
+      const { action, payload } = e.detail ?? {}
       if (!action) return
-      this.pushEventTo(this.el, action, { session_id: String(session_id), ...(extra ?? {}) })
+      this.pushEventTo(this.el, action, payload ?? {})
     }
-    window.addEventListener('tauri:session-action', this._sessionActionHandler)
+    window.addEventListener('tauri:rail-action', this._railActionHandler)
 
     if (TOUCH_DEVICE) {
       // Swipe left on open flyout → close
@@ -205,13 +206,8 @@ export const RailState = {
   },
 
   destroyed() {
-    // Live navigation: the root inline script (full loads only) can't re-arm
-    // the anti-flash override, and the next Rail mount defaults to open. If
-    // the persisted state is collapsed, hide the flyout NOW — the next
-    // mount's restore reply removes the attribute again.
-    if (readState().flyout_open === false) {
-      document.documentElement.setAttribute('data-rail-collapsed', '1')
-    }
+    // Full page reload only — live navigation never destroys this hook.
+    // Clean up all event listeners to avoid memory leaks.
     if (this._openHandler) {
       this.el.removeEventListener('rail:open', this._openHandler)
     }
@@ -223,8 +219,8 @@ export const RailState = {
     if (this._pickFolderHandler) {
       window.removeEventListener('phx:pick_folder', this._pickFolderHandler)
     }
-    if (this._sessionActionHandler) {
-      window.removeEventListener('tauri:session-action', this._sessionActionHandler)
+    if (this._railActionHandler) {
+      window.removeEventListener('tauri:rail-action', this._railActionHandler)
     }
     if (this._flyoutGesture) {
       const flyoutPanel = this.el.querySelector('[data-flyout-panel]')

@@ -13,6 +13,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   alias EyeInTheSky.Agents.ModelConfig
   alias EyeInTheSky.Claude.AgentFileScanner
+  alias EyeInTheSky.Pi.ModelDiscoveryCache
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Settings
 
@@ -24,7 +25,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     # cross-provider entry list (allow_provider_switch?: true) permanently
     # missing Pi/Ollama rows for anyone who never separately opened the New
     # Agent drawer (the only other host still warming the cache).
-    EyeInTheSky.Pi.ModelDiscoveryCache.refresh_async()
+    ModelDiscoveryCache.refresh_async()
 
     {:ok,
      assign(socket,

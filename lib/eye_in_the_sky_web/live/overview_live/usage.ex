@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
 
   import EyeInTheSkyWeb.Components.UsageComponents
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Metrics.TokenIngestion
   alias EyeInTheSky.Metrics.UsageReport
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
@@ -21,6 +22,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
       |> assign(:recalculating, false)
       |> assign(:date_range, range)
       |> load_all_async(range)
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end

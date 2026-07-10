@@ -1,8 +1,14 @@
 defmodule EyeInTheSkyWeb.OverviewLive.Agents do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Editors
+  alias EyeInTheSky.Events
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.FileHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
+  alias EyeInTheSkyWeb.Live.Shared.DefinitionFileActions
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Live.Shared.AgentsHelpers
 
   @impl true
@@ -19,8 +25,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
       |> assign(:detail_tab, :preview)
       |> assign(:sidebar_tab, :agents)
       |> assign(:sidebar_project, nil)
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     socket = if connected?(socket), do: load_agents(socket), else: socket
+
+    if connected?(socket), do: Events.broadcast_rail_context(socket)
 
     {:ok, socket}
   end
@@ -60,6 +70,22 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
   @impl true
   def handle_event("close_viewer", _params, socket) do
     {:noreply, assign(socket, :selected_agent, nil)}
+  end
+
+  @impl true
+  def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
+    ViewHelpers.handle_open_in_editor_with_guard(path, editor_id, socket, &open_path_allowed?/2)
+  end
+
+  @impl true
+  def handle_event("duplicate_definition_file", %{"path" => path}, socket) do
+    DefinitionFileActions.handle_duplicate(path, socket, &open_path_allowed?/2, &load_agents/1)
+  end
+
+  @impl true
+  def handle_event("delete_definition_file", %{"path" => path}, socket) do
+    DefinitionFileActions.handle_delete(path, socket, &open_path_allowed?/2, &load_agents/1,
+      &maybe_clear_selected(&1, path))
   end
 
   @impl true
@@ -136,6 +162,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                   phx-click="select_agent"
                   phx-value-id={agent.id}
                   role="button"
+                  data-ctx="definition_file"
+                  data-ctx-abs-path={agent.abs_path}
+                  data-ctx-content={agent.content}
+                  data-ctx-editor={@preferred_editor}
                 >
                   <%!-- Name row --%>
                   <div class="flex items-center gap-2">
@@ -242,12 +272,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                   </div>
                 <% end %>
               </div>
-              <button
-                phx-click="close_viewer"
-                class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
-              >
-                <.icon name="hero-x-mark" class="size-4" />
-              </button>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <.open_in_editor_button
+                  path={@selected_agent.abs_path || ""}
+                  installed_editors={@installed_editors}
+                  preferred_editor={@preferred_editor}
+                />
+                <button
+                  phx-click="close_viewer"
+                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                >
+                  <.icon name="hero-x-mark" class="size-4" />
+                </button>
+              </div>
             </div>
             <div class="flex items-center gap-1 mt-3">
               <button
@@ -292,6 +329,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
       <% end %>
     </div>
     """
+  end
+
+  defp open_path_allowed?(path, socket) do
+    File.exists?(path) &&
+      Enum.any?(socket.assigns.agents, &(&1.abs_path == path))
+  end
+
+  defp maybe_clear_selected(socket, path) do
+    if socket.assigns.selected_agent && socket.assigns.selected_agent.abs_path == path do
+      assign(socket, :selected_agent, nil)
+    else
+      socket
+    end
   end
 
   defp source_badge_class(:agents), do: "bg-primary/10 text-primary/70"

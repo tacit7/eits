@@ -296,7 +296,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
         socket
         |> assign(:show_archive_confirm, false)
         |> Selection.clear_selection()
-        |> Loader.load_agents()
+        |> Loader.load_agents(true)
         |> push_event("evict-dm-history", %{uuids: uuids})
         |> put_flash(flash_level, flash_msg)
 
@@ -326,8 +326,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
     socket =
       socket
-      |> assign(:selected_ids, MapSet.new())
-      |> Loader.load_agents()
+      |> Selection.clear_selection()
+      |> Loader.load_agents(true)
       |> put_flash(:info, "Deleted #{deleted} session#{if deleted != 1, do: "s"}")
 
     {:noreply, socket}

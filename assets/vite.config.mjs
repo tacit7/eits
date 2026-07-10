@@ -28,6 +28,7 @@ export default defineConfig({
       "@codemirror/lang-html",
       "@codemirror/lang-json",
       "@codemirror/lang-markdown",
+      "@codemirror/lang-yaml",
       "codemirror-lang-elixir",
       // Theme packages
       "@codemirror/theme-one-dark",
@@ -67,7 +68,7 @@ export default defineConfig({
     },
     // Force single instance of CM6 core packages — prevents duplicate @codemirror/state
     // which breaks instanceof checks when language/theme extensions are loaded dynamically.
-    dedupe: ["@codemirror/state", "@codemirror/view", "@codemirror/language"],
+    dedupe: ["@codemirror/state", "@codemirror/view", "@codemirror/language", "@codemirror/lang-yaml"],
   },
   assetsInclude: [],
   plugins: [

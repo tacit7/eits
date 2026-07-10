@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
     socket =
       if connected?(socket) do
         Events.subscribe_bookmarks()
+        Events.broadcast_rail_context(socket)
         load_bookmarks(socket)
       else
         socket

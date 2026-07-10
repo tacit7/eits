@@ -397,6 +397,68 @@ defmodule EyeInTheSky.Events do
   def pi_models_refreshed(result),
     do: broadcast("pi:models", {:pi_models_refreshed, result})
 
+  # ---------------------------------------------------------------------------
+  # Rail context — page LiveViews → RailLive
+  # ---------------------------------------------------------------------------
+  # These replace send_update(Rail, ...) calls which only work within the same
+  # LiveView process. RailLive is now a standalone process; PubSub is the
+  # correct cross-process channel.
+
+  @doc "Subscribe to rail context updates. Call from RailLive.mount/3 (connected? guard)."
+  def subscribe_rail_context, do: sub("rail:context")
+
+  @doc """
+  Broadcast current rail context from a page LiveView.
+
+  Call after sidebar assigns are set in mount/3 and handle_params/3.
+  Reads sidebar_tab, sidebar_project, and active_channel_id from socket.assigns.
+  """
+  def broadcast_rail_context(socket) do
+    broadcast("rail:context", {
+      :rail_context,
+      %{
+        sidebar_tab: socket.assigns[:sidebar_tab] || :sessions,
+        sidebar_project: socket.assigns[:sidebar_project],
+        active_channel_id: socket.assigns[:active_channel_id]
+      }
+    })
+  end
+
+  @doc "Subscribe to rail unread count updates (call from RailLive)."
+  def subscribe_rail_unread_counts, do: sub("rail:unread_counts")
+
+  @doc "Broadcast unread channel counts from chat_live to RailLive."
+  def broadcast_rail_unread_counts(counts),
+    do: broadcast("rail:unread_counts", {:rail_unread_counts, counts})
+
+  @doc "Subscribe to targeted session updates for the Rail flyout (call from RailLive)."
+  def subscribe_rail_session_update, do: sub("rail:session_update")
+
+  @doc "Broadcast a single session update to RailLive (replaces send_update session_updated:)."
+  def broadcast_rail_session_updated(session),
+    do: broadcast("rail:session_update", {:rail_session_updated, session})
+
+  @doc "Subscribe to notification-count refresh signals for the Rail."
+  def subscribe_rail_notifications_refresh, do: sub("rail:refresh:notifications")
+
+  @doc "Signal RailLive to refresh its notification count."
+  def broadcast_rail_refresh_notifications,
+    do: broadcast("rail:refresh:notifications", :rail_refresh_notifications)
+
+  @doc "Subscribe to project-list refresh signals for the Rail."
+  def subscribe_rail_projects_refresh, do: sub("rail:refresh:projects")
+
+  @doc "Signal RailLive to refresh its project list."
+  def broadcast_rail_refresh_projects,
+    do: broadcast("rail:refresh:projects", :rail_refresh_projects)
+
+  @doc "Subscribe to channel-list refresh signals for the Rail."
+  def subscribe_rail_channels_refresh, do: sub("rail:refresh:channels")
+
+  @doc "Signal RailLive to refresh its flyout channel list."
+  def broadcast_rail_refresh_channels,
+    do: broadcast("rail:refresh:channels", :rail_refresh_channels)
+
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)
   defp unsub(topic), do: Phoenix.PubSub.unsubscribe(@pubsub, topic)

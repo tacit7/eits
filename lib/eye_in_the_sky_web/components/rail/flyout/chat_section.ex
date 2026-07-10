@@ -5,7 +5,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
   attr :channels, :list, default: []
   attr :active_channel_id, :any, default: nil
   attr :unread_counts, :map, default: %{}
-  attr :myself, :any, required: true
 
   def chat_content(assigns) do
     ~H"""
@@ -13,7 +12,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
       <% active =
         not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
       <% unread = Map.get(@unread_counts, channel.id, 0) %>
-      <div class="group flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-base-content/5">
+      <div
+        class="group flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-base-content/5"
+        data-ctx="channel"
+        data-ctx-id={channel.id}
+        data-ctx-name={channel.name}
+      >
         <.link
           navigate={"/chat?channel_id=#{channel.id}"}
           data-vim-flyout-item
@@ -44,7 +48,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
         <button
           phx-click="delete_channel"
           phx-value-channel_id={channel.id}
-          phx-target={@myself}
           title="Delete channel"
           data-confirm={"Delete ##{channel.name}?"}
           class="opacity-0 group-hover:opacity-100 flex items-center justify-center text-base-content/35 hover:text-base-content/70 transition-all flex-shrink-0 size-5"

@@ -7,7 +7,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
 
   attr :session_name_filter, :string, default: ""
   attr :session_scope, :atom, default: :current
-  attr :myself, :any, required: true
 
   def sessions_filters(assigns) do
     ~H"""
@@ -22,15 +21,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
           value={@session_name_filter}
           placeholder="Search sessions…"
           phx-keyup="update_session_name_filter"
-          phx-target={@myself}
           phx-debounce="200"
           class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/[0.04] border border-base-content/[0.15] rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/35"
         />
       </div>
       <%!-- Scope toggle --%>
       <div class="flex gap-0.5">
-        <.scope_pill label="Current" value="current" current={@session_scope} myself={@myself} />
-        <.scope_pill label="All Projects" value="all" current={@session_scope} myself={@myself} />
+        <.scope_pill label="Current" value="current" current={@session_scope} />
+        <.scope_pill label="All Projects" value="all" current={@session_scope} />
       </div>
     </div>
     """
@@ -39,7 +37,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   attr :label, :string, required: true
   attr :value, :string, required: true
   attr :current, :atom, default: :current
-  attr :myself, :any, required: true
 
   defp scope_pill(assigns) do
     ~H"""
@@ -47,7 +44,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
     <button
       phx-click="set_session_scope"
       phx-value-scope={@value}
-      phx-target={@myself}
       class={[
         "text-nano px-2 py-0.5 rounded transition-colors",
         if(active,
@@ -72,7 +68,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   attr :session_project_visible, :map, default: %{}
   attr :session_project_collapsed, :any, default: nil
   attr :sidebar_project, :any, default: nil
-  attr :myself, :any, required: true
 
   def sessions_content(assigns) do
     is_searching = assigns.session_name_filter != ""
@@ -105,7 +100,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
             session_project_visible={@session_project_visible}
             session_project_collapsed={@session_project_collapsed || MapSet.new()}
             session_name_filter={@session_name_filter}
-            myself={@myself}
           />
         <% else %>
           <.current_content
@@ -159,7 +153,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   attr :session_project_visible, :map, required: true
   attr :session_project_collapsed, :any, required: true
   attr :session_name_filter, :string, default: ""
-  attr :myself, :any, required: true
 
   defp all_projects_content(assigns) do
     ~H"""
@@ -179,7 +172,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
           <button
             phx-click="toggle_project_sessions"
             phx-value-project_id={project.id}
-            phx-target={@myself}
             class="flex items-center gap-1.5 min-w-0 flex-1 text-left hover:text-base-content/80 transition-colors"
           >
             <.icon
@@ -212,7 +204,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
             <button
               phx-click="show_more_project_sessions"
               phx-value-project_id={project.id}
-              phx-target={@myself}
               class="w-full px-4 pb-2 text-left text-nano text-base-content/35 hover:text-primary/70 transition-colors select-none"
             >
               Show more

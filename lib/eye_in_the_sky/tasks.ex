@@ -245,7 +245,8 @@ defmodule EyeInTheSky.Tasks do
     1. Creates an annotation note with the given message
     2. Moves the task to Done state
 
-  Returns `{:ok, %{task: task, note: note}}` or `{:error, step, changeset, changes}`.
+  Returns `{:ok, %{task: task, note: note}}` or `{:error, reason}` where reason is
+  the Ecto changeset or error from the failed Multi step.
   """
   def complete_task(%Task{} = task, message) when is_binary(message) and message != "" do
     done_state_id = WorkflowState.done_id()

@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Messages, Sessions}
+  alias EyeInTheSky.Messages
   alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter

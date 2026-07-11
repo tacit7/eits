@@ -4,15 +4,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,
-    only: [connected?: 1, put_flash: 3, push_event: 3, stream: 4, stream_insert: 3]
-
-  # stream/4 requires LiveView lifecycle infrastructure (live_temp.lifecycle).
-  # Mock sockets in unit tests lack this; safe_stream skips gracefully.
-  defp safe_stream(socket, name, items, opts) do
-    stream(socket, name, items, opts)
-  rescue
-    KeyError -> socket
-  end
+    only: [connected?: 1, put_flash: 3, push_event: 3, stream_insert: 3]
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.SessionImporter
@@ -23,6 +15,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   alias EyeInTheSkyWeb.DmLive.MessageGrouper
   alias EyeInTheSkyWeb.DmLive.TabHelpers
   alias EyeInTheSkyWeb.DmLive.UploadHelpers
+  alias EyeInTheSkyWeb.Live.Shared.SafeStreamHelper
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   require Logger
@@ -210,7 +203,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     socket
     |> assign(:messages, nil)
     |> assign(:last_stream_tail, [])
-    |> safe_stream(:grouped_messages, [], reset: true)
+    |> SafeStreamHelper.safe_stream(:grouped_messages, [], reset: true)
   end
 
   @doc """

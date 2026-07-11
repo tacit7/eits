@@ -66,14 +66,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         members: Enum.map(members, &ApiPresenter.present_member/1)
       })
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -142,14 +135,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
             {:error, changeset}
         end
       else
-        {:error, :not_found} ->
-          {:error, :not_found, "Team not found"}
-
-        {:error, :unauthorized} ->
-          {:error, :unauthorized, "Unauthorized"}
-
-        {:error, :forbidden} ->
-          {:error, :forbidden, "Access denied: team does not belong to your project"}
+        error -> handle_team_errors(error)
       end
     end
   end
@@ -167,14 +153,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           {:error, changeset}
       end
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -191,14 +170,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         members: Enum.map(members, &ApiPresenter.present_member/1)
       })
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -233,14 +205,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           {:error, changeset}
       end
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -253,17 +218,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
          :ok <- verify_member_team(member, team) do
       do_update_member(conn, member, params)
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
       {:error, :member_not_found} ->
         {:error, :not_found, "Member not found"}
 
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -276,17 +234,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
          :ok <- verify_member_team(member, team) do
       do_leave_team(conn, member)
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
       {:error, :member_not_found} ->
         {:error, :not_found, "Member not found"}
 
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -308,14 +259,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
              :ok <- validate_project_access(team, scope) do
           do_broadcast(conn, team, from_raw, String.trim(body))
         else
-          {:error, :not_found} ->
-            {:error, :not_found, "Team not found"}
-
-          {:error, :unauthorized} ->
-            {:error, :unauthorized, "Unauthorized"}
-
-          {:error, :forbidden} ->
-            {:error, :forbidden, "Access denied: team does not belong to your project"}
+          error -> handle_team_errors(error)
         end
     end
   end
@@ -505,4 +449,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       do: :ok,
       else: {:error, :not_member}
   end
+
+  defp handle_team_errors({:error, :not_found}),
+    do: {:error, :not_found, "Team not found"}
+
+  defp handle_team_errors({:error, :unauthorized}),
+    do: {:error, :unauthorized, "Unauthorized"}
+
+  defp handle_team_errors({:error, :forbidden}),
+    do: {:error, :forbidden, "Access denied: team does not belong to your project"}
 end

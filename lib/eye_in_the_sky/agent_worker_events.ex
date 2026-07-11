@@ -211,12 +211,6 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     :ok
   end
 
-  # Backwards-compatible — callers that don't yet pass job_context fall through to
-  # the normal save path. Remove once agent_worker.ex is updated to pass job_context.
-  def on_result_received(session_id, params) when not is_map_key(params, :job_context) do
-    on_result_received(session_id, Map.put(params, :job_context, nil))
-  end
-
   def on_result_received(session_id, _params) do
     Logger.warning("[#{session_id}] Result has no text content")
   end

@@ -2,7 +2,7 @@
 
 Claude Code integration scripts that manage session lifecycle, context injection, and tool-use enforcement.
 
-**Location:** `priv/scripts/eits-*.sh`
+**Location:** `priv/scripts/eits-*.sh` (canonical) → installed to `~/.config/eits/hooks/`
 **Registered in:** `~/.claude/settings.json`
 
 ---
@@ -24,21 +24,43 @@ This command:
 
 ### Uninstalling
 
-To remove EITS hook registrations from `~/.claude/settings.json`:
-
 ```bash
 eits hooks uninstall
 ```
 
-This removes all EITS-managed hook entries but leaves the script files and eits CLI binary in place.
+Removes all EITS-managed hook entries from `~/.claude/settings.json` but leaves scripts and CLI binary in place.
 
 ---
 
-## How Context Injection Works
+## Session Status Lifecycle
 
-Context injection differs by hook type:
+Status transitions are driven by **two layers**: the Elixir backend and Claude Code hooks. Understanding which layer does what is critical.
 
-**SessionStart hooks** — anything printed to `stdout` is automatically injected into Claude's context.
+### Backend (Elixir — `agent_worker_events.ex`)
+
+`on_sdk_completed/3` fires inside the AgentWorker process after every Claude turn. It is the **primary** source of `working → idle` transitions — it runs before any bash Stop hooks and writes directly to the DB.
+
+**Key behavior (as of 2026-07-11):** `on_sdk_completed` only writes `idle` if the session is currently `working`. If an agent explicitly set a different status during its turn (e.g. `waiting`), that status is preserved. Callers: `Events.agent_stopped` and `notify_agent_status` still fire regardless, so the UI always reflects the turn end.
+
+### Hooks (bash)
+
+Hooks handle the secondary status transitions around session start, end, and error cases.
+
+| Status | Source | Trigger |
+|--------|--------|---------|
+| `working` | `UserPromptSubmit` hook (`eits-prompt-submit.sh`) | Each user prompt |
+| `working` | `SessionStart` hook (`eits-session-startup.sh` / `eits-session-resume.sh`) | Session start/resume |
+| `idle` | AgentWorker backend (`on_sdk_completed`) | Turn completes, only if currently `working` |
+| `waiting` | `SessionEnd` hook (`eits-session-end.sh`) for `sdk-cli` | Process exits |
+| `completed` | `SessionEnd` hook (`eits-session-end.sh`) for `cli` | Process exits |
+| `failed` | AgentWorker (`on_max_retries_exceeded` / `on_session_failed`) | Error |
+| `compacting` | `PreCompact` hook (`eits-pre-compact.sh`) | Before compaction |
+
+---
+
+## Context Injection
+
+**SessionStart hooks** — anything printed to `stdout` is injected into Claude's context.
 
 ```bash
 echo "$CONTEXT"   # injected directly into conversation context
@@ -108,17 +130,6 @@ Fires when a new session starts or is cleared (`/clear`).
 6. Updates session status to `working` via `eits sessions update --status working`
 7. Echoes a `$CONTEXT` markdown block to stdout for injection
 
-**Context injected (new sessions):**
-```
-# Eye in the Sky Integration Active
-**IMPORTANT**: Immediately invoke the Skill tool with `skill: "eits-init"` ...
-```
-
-**Context injected (pre-registered / spawned sessions):**
-```
-Session pre-registered. EITS_AGENT_UUID is already set — skip /eits-init.
-```
-
 ---
 
 ### SessionStart (resume) — `eits-session-resume.sh`
@@ -149,22 +160,29 @@ Fires after context compaction completes.
 
 ### SessionEnd — `eits-session-end.sh`
 
-Fires when the session window closes.
+Fires once when the Claude CLI process exits.
 
 **What it does:**
 1. Lists in-progress tasks for the session via `eits tasks list --session $session_id --state 2`
 2. Moves each to In Review (`state_id=4`) via `eits tasks update --state 4`
-3. Marks session as `completed` via `eits sessions update --status completed`
+3. **Status transition** — only if current status is `working` or unknown:
+   - `cli` (interactive) → `completed`
+   - `sdk-cli` (headless/spawned) → `waiting` (session can be resumed)
+
+> **Note:** The status guard prevents clobbering a status the agent explicitly set (e.g. the agent called `eits sessions update --status waiting` during its last turn — that survives).
 
 ---
 
-### Stop — `eits-session-stop.sh`
+### Stop — `eits-stop-auto-close-tasks.sh`
 
-Fires after every Claude turn completes.
+Fires after every Claude turn completes. **This is the only active Stop hook.**
 
 **What it does:**
-- Sets session status to `idle` via `eits sessions update --status idle`
+- Finds in-progress tasks linked to the session via `eits tasks list --session $session_id --state 2`
+- Auto-completes each via `eits tasks complete $task_id --message "Auto-closed at session stop."`
 - Guards against infinite loops via `stop_hook_active` field in input JSON
+
+> **Note:** `eits-session-stop.sh` (which previously set session status to `idle`) is **not registered** in `~/.claude/settings.json`. Status transitions after turns are handled by the Elixir backend (`on_sdk_completed`), not bash hooks.
 
 ---
 
@@ -177,7 +195,7 @@ Fires before any `Edit` or `Write` tool call. Enforces the EITS workflow.
 **What it does:**
 1. Calls `eits sessions get` — fails open if API is unreachable
 2. **Non-spawned sessions**: denies if session has no name (requires `/eits-init`)
-3. **Non-spawned sessions**: denies if no active task (`state_id=2`) via `eits tasks list --session $session_id --state 2 --json` (JSON output required for jq parsing)
+3. **Non-spawned sessions**: denies if no active task (`state_id=2`) via `eits tasks list --session $session_id --state 2`
 
 **Deny response format:**
 ```json
@@ -207,12 +225,6 @@ Silent — exits 0, no feedback to Claude.
 
 ---
 
-### PostToolUse (all) — `eits-post-tool-use.sh`
-
-No-op placeholder, reserved for future tool result tracking.
-
----
-
 ### UserPromptSubmit — `eits-prompt-submit.sh`
 
 Fires before Claude processes each user prompt.
@@ -234,56 +246,47 @@ Sets session to `compacting` before context compaction begins so the UI can show
 
 ---
 
-## settings.json Registration
+## Current settings.json Registration
 
 ```json
 {
   "hooks": {
     "SessionStart": [
       { "matcher": "startup", "hooks": [
-        { "command": "eits-session-startup.sh" },
-        { "command": "eits-agent-working.sh" }
+        { "command": "~/.config/eits/hooks/eits-session-startup.sh" },
+        { "command": "~/.config/eits/hooks/eits-agent-working.sh" }
       ]},
       { "matcher": "resume", "hooks": [
-        { "command": "eits-session-resume.sh" },
-        { "command": "eits-agent-working.sh" }
+        { "command": "~/.config/eits/hooks/eits-session-resume.sh" },
+        { "command": "~/.config/eits/hooks/eits-agent-working.sh" }
       ]},
       { "matcher": "compact", "hooks": [
-        { "command": "eits-session-compact.sh" },
-        { "command": "eits-session-startup.sh" }
+        { "command": "~/.config/eits/hooks/eits-session-compact.sh" },
+        { "command": "~/.config/eits/hooks/eits-session-startup.sh" }
       ]},
       { "matcher": "clear", "hooks": [
-        { "command": "eits-session-startup.sh" },
-        { "command": "eits-agent-working.sh" }
+        { "command": "~/.config/eits/hooks/eits-session-startup.sh" },
+        { "command": "~/.config/eits/hooks/eits-agent-working.sh" }
       ]}
     ],
-    "PreToolUse": [
-      { "matcher": "Edit|Write", "hooks": [{ "command": "eits-pre-tool-use.sh" }] },
-      { "hooks": [{ "command": "eits-nats-tool-pre.sh", "async": true }] }
-    ],
-    "PostToolUse": [
-      { "hooks": [{ "command": "eits-post-tool-use.sh" }] },
-      { "matcher": "Bash", "hooks": [{ "command": "eits-post-tool-commit.sh" }] }
-    ],
-    "UserPromptSubmit": [
-      { "hooks": [{ "command": "eits-prompt-submit.sh", "async": true }] }
-    ],
-    "PreCompact": [
-      { "hooks": [{ "command": "eits-pre-compact.sh", "async": true }] }
-    ],
     "SessionEnd": [
-      { "hooks": [{ "command": "eits-session-end.sh" }] }
+      { "hooks": [{ "command": "~/.config/eits/hooks/eits-session-end.sh" }] }
     ],
     "Stop": [
-      { "hooks": [{ "command": "eits-session-stop.sh" }] }
+      { "hooks": [{ "command": "~/.config/eits/hooks/eits-stop-auto-close-tasks.sh" }] },
+      { "matcher": "", "hooks": [{ "type": "command", "command": "curl -sf --max-time 5 -X POST http://127.0.0.1:34877/api/v1/iam/hook -H 'Content-Type: application/json' -d @- || true" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "command": "~/.config/eits/hooks/eits-prompt-submit.sh", "async": true }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "curl -sf --max-time 5 -X POST http://127.0.0.1:34877/api/v1/iam/hook -H 'Content-Type: application/json' -d @- || true" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "curl -sf --max-time 5 -X POST http://127.0.0.1:34877/api/v1/iam/hook -H 'Content-Type: application/json' -d @- || true" }] }
     ]
   }
 }
 ```
 
----
-
-## Cleanup TODO
-
-- Remove `eits-nats-tool-pre.sh` from settings.json and delete the script — NATS is no longer used
-- Remove `.git/hooks/post-commit` (`eits-post-commit.sh`) to avoid double-logging commits now that `eits-post-tool-commit.sh` handles it via Claude Code hooks
+> **Note:** The IAM curl hook (`http://127.0.0.1:34877/api/v1/iam/hook`) handles PreToolUse, PostToolUse, and Stop. It enforces IAM policies — see [IAM_HOOK_INSTALL.md](IAM_HOOK_INSTALL.md) for details.

@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpers do
     task = Tasks.get_task_by_uuid_or_id!(task_id)
     project = socket.assigns.project
 
-    task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
+    task_prompt = build_task_prompt(task)
 
     opts = [
       description: task.title,
@@ -43,5 +43,10 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpers do
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
     end
+  end
+
+  @doc "Builds the initial prompt for an agent spawned from a task."
+  def build_task_prompt(task) do
+    "#{task.title}\n\n#{task.description || ""}" |> String.trim()
   end
 end

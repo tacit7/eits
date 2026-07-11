@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Settings
   alias EyeInTheSky.Tasks
+  alias EyeInTheSkyWeb.Live.Shared.AgentHelpers
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
 
   @doc """
@@ -35,7 +36,7 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
         _ -> nil
       end
 
-    task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
+    task_prompt = AgentHelpers.build_task_prompt(task)
 
     opts =
       [

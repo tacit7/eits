@@ -546,6 +546,7 @@ defmodule EyeInTheSkyWeb.DmLive do
       socket
       |> assign(:syncing, false)
       |> TabHelpers.force_reload_messages(socket.assigns.session_id)
+      |> push_event("scroll_to_bottom", %{})
 
     {:noreply, socket}
   end

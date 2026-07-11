@@ -54,15 +54,11 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     # preserve it — just fire the stopped broadcasts so the UI reflects the turn end.
     case update_session_status_if_working(session_id, status, nil) do
       {:ok, session} ->
-        update_agent_status(session, "idle")
-        Events.agent_stopped(session)
-        notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
+        finish_sdk_completion(session, provider_conversation_id)
 
       {:skipped, session} ->
-        # Status was already changed by the agent — broadcast stopped without writing idle.
-        update_agent_status(session, "idle")
-        Events.agent_stopped(session)
-        notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
+        # Status was already changed by the agent — broadcast stopped and agent status set to idle.
+        finish_sdk_completion(session, provider_conversation_id)
 
       :error ->
         :ok
@@ -70,6 +66,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   defp completion_status_for(_provider), do: "idle"
+
+  defp finish_sdk_completion(session, provider_conversation_id) do
+    update_agent_status(session, "idle")
+    Events.agent_stopped(session)
+    notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
+  end
 
   @doc "Codex thread.started received — confirm session is working."
   def on_codex_thread_started(session_id) do

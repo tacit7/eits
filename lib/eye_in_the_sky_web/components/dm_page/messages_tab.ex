@@ -394,11 +394,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 <%!-- Body --%>
                 <div class={[
                   "break-words",
-                  @tier == :primary &&
+                  @tier != :secondary &&
                     "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content",
-                  @tier == :secondary && "text-[var(--text-secondary)] text-sm",
-                  @tier not in [:primary, :secondary] &&
-                    "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content"
+                  @tier == :secondary && "text-[var(--text-secondary)] text-sm"
                 ]}>
                   <.message_body message={@message} compact={false} search_query={@search_query} />
                 </div>

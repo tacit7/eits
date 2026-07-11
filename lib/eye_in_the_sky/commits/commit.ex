@@ -25,7 +25,7 @@ defmodule EyeInTheSky.Commits.Commit do
     |> cast(attrs, [:session_id, :commit_hash, :commit_message])
     |> validate_required([:session_id, :commit_hash])
     |> validate_session_exists()
-    |> unique_constraint(:commit_hash)
+    |> unique_constraint([:session_id, :commit_hash], name: :commits_session_id_commit_hash_index)
   end
 
   # Validate that session_id refers to an existing session

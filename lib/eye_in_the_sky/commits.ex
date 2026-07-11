@@ -98,7 +98,7 @@ defmodule EyeInTheSky.Commits do
   def create_commit(attrs \\ %{}) do
     %Commit{}
     |> Commit.changeset(attrs)
-    |> Repo.insert(on_conflict: :nothing, conflict_target: :commit_hash)
+    |> Repo.insert(on_conflict: :nothing, conflict_target: [:session_id, :commit_hash])
   end
 
   @doc """

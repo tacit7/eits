@@ -173,16 +173,40 @@ Fires once when the Claude CLI process exits.
 
 ---
 
-### Stop — `eits-stop-auto-close-tasks.sh`
+### Stop (1) — `eits-session-stop.sh`
 
-Fires after every Claude turn completes. **This is the only active Stop hook.**
+Fires after every Claude turn. Runs first in the Stop chain.
+
+**Section 1 — Task annotation enforcement (blocking)**
+
+Parses the current turn's transcript. If the agent used mutating tools (Edit/Write/MultiEdit/Bash with side effects) but never called `eits tasks annotate/update/complete`:
+- Blocks the turn with `exit 2`
+- Prints the task ID, title, and the exact commands to fix it
+
+Read-only turns (Read/Grep/WebSearch) and DM-only Bash calls are always exempt.
+
+**Section 2 — Team notification (non-blocking, background)**
+
+If this session belongs to an active team:
+1. Queries `GET /api/v1/teams?status=active` for all active teams
+2. Checks each team's member list for this session
+3. DMs all members with `role=orchestrator`; falls back to all other members if no orchestrator role is set
+4. Message: `"Turn complete. Task #<id>: <title>"`
+
+Runs in the background — never delays the turn.
+
+---
+
+### Stop (2) — `eits-stop-auto-close-tasks.sh`
+
+Fires after `eits-session-stop.sh`. Safety net for tasks left open.
 
 **What it does:**
-- Finds in-progress tasks linked to the session via `eits tasks list --session $session_id --state 2`
-- Auto-completes each via `eits tasks complete $task_id --message "Auto-closed at session stop."`
-- Guards against infinite loops via `stop_hook_active` field in input JSON
+- Finds in-progress tasks linked to the session
+- Auto-completes each with `"Auto-closed at session stop."`
+- Guards against infinite loops via `stop_hook_active`
 
-> **Note:** `eits-session-stop.sh` (which previously set session status to `idle`) is **not registered** in `~/.claude/settings.json`. Status transitions after turns are handled by the Elixir backend (`on_sdk_completed`), not bash hooks.
+> If `eits-session-stop.sh` blocked with `exit 2`, this hook still runs — Claude Code continues the Stop chain regardless of individual hook exit codes unless the chain is configured to abort on failure.
 
 ---
 
@@ -273,6 +297,7 @@ Sets session to `compacting` before context compaction begins so the UI can show
       { "hooks": [{ "command": "~/.config/eits/hooks/eits-session-end.sh" }] }
     ],
     "Stop": [
+      { "hooks": [{ "command": "~/.config/eits/hooks/eits-session-stop.sh" }] },
       { "hooks": [{ "command": "~/.config/eits/hooks/eits-stop-auto-close-tasks.sh" }] },
       { "matcher": "", "hooks": [{ "type": "command", "command": "curl -sf --max-time 5 -X POST http://127.0.0.1:34877/api/v1/iam/hook -H 'Content-Type: application/json' -d @- || true" }] }
     ],

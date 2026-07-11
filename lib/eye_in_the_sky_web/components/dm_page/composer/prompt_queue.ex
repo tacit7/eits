@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
 
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
   attr :prompts, :list, required: true
@@ -24,7 +25,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
           <div class="px-3 py-2">
             <div class="flex items-center gap-2">
               <span class="flex-shrink-0 text-xs font-mono font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-base-content/[0.06] text-base-content/40">
-                {ViewHelpers.model_display_name(prompt.context[:model] || "opus")}
+                {ViewHelpers.model_display_name(prompt.context[:model] || Settings.get("default_model"))}
               </span>
               <%= if long? do %>
                 <details class="flex-1 min-w-0 group/pq">

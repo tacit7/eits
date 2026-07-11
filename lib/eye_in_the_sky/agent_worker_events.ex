@@ -60,6 +60,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
       {:skipped, session} ->
         # Status was already changed by the agent — broadcast stopped without writing idle.
+        update_agent_status(session, "idle")
         Events.agent_stopped(session)
         notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
 

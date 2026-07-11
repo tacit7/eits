@@ -49,9 +49,17 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
     status = completion_status_for(provider)
 
-    case update_session_status(session_id, status, nil) do
+    # Only overwrite status when the session is still "working". If an agent
+    # explicitly set "waiting" (or any other non-working status) during its turn,
+    # preserve it — just fire the stopped broadcasts so the UI reflects the turn end.
+    case update_session_status_if_working(session_id, status, nil) do
       {:ok, session} ->
         update_agent_status(session, "idle")
+        Events.agent_stopped(session)
+        notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
+
+      {:skipped, session} ->
+        # Status was already changed by the agent — broadcast stopped without writing idle.
         Events.agent_stopped(session)
         notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
 
@@ -325,6 +333,32 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     end
 
     :ok
+  end
+
+  # Like update_session_status/3 but only writes when the session is currently "working".
+  # Returns {:ok, updated_session}, {:skipped, current_session}, or :error.
+  # Used by on_sdk_completed so agents can set their own terminal status (e.g. "waiting")
+  # during a turn without it being clobbered by the AgentWorker after the turn ends.
+  defp update_session_status_if_working(session_id, status, reason) do
+    idle_like? = status in ["idle", "waiting"]
+
+    attrs =
+      if idle_like?,
+        do: %{status: status, last_activity_at: DateTime.utc_now()},
+        else: %{status: status}
+
+    attrs = Map.put(attrs, :status_reason, reason)
+
+    case Sessions.get_session(session_id) do
+      {:ok, session} when session.status == "working" ->
+        apply_session_update(session, attrs, session_id, idle_like?)
+
+      {:ok, session} ->
+        {:skipped, session}
+
+      {:error, _} ->
+        :error
+    end
   end
 
   # Synchronous — fast DB write where ordering matters. Running in a Task risks

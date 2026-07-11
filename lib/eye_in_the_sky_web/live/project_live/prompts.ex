@@ -68,7 +68,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     selected = Enum.find(socket.assigns.prompts, &(&1.uuid == uuid))
 
     if selected && Phoenix.LiveView.connected?(socket) do
-      Events.subscribe_prompt(selected.id)
       Events.subscribe_editor_sync(:prompt, selected.id)
     end
 

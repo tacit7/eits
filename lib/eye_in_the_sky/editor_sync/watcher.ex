@@ -17,7 +17,7 @@ defmodule EyeInTheSky.EditorSync.Watcher do
   Both intervals are injected via start_link opts so tests can use fast values.
   """
 
-  use GenServer
+  use GenServer, restart: :temporary
 
   require Logger
 
@@ -55,7 +55,8 @@ defmodule EyeInTheSky.EditorSync.Watcher do
       idle_timeout_ms: idle_ms
     }
 
-    GenServer.start_link(__MODULE__, state)
+    name = {:via, Registry, {EyeInTheSky.EditorSync.Registry, {type, record_id}}}
+    GenServer.start_link(__MODULE__, state, name: name)
   end
 
   # ---------------------------------------------------------------------------

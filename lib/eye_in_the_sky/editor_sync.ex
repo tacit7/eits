@@ -86,11 +86,15 @@ defmodule EyeInTheSky.EditorSync do
              @supervisor,
              {EyeInTheSky.EditorSync.Watcher, watcher_opts}
            ) do
-        {:ok, pid} ->
-          # Register so future opens find this watcher.
-          Registry.register(@registry, {type, record_id}, pid)
+        {:ok, _pid} ->
           # Fire-and-forget: editor launch errors surface as OS notifications,
           # not return values, because the editor process outlives this call.
+          launch_editor(editor, tmp_path)
+          {:ok, editor.label}
+
+        {:error, {:already_started, _pid}} ->
+          # Race: another caller started the watcher between our registry_lookup
+          # and this start_child. Treat as success — reopen the existing file.
           launch_editor(editor, tmp_path)
           {:ok, editor.label}
 

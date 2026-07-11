@@ -25,7 +25,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.Reconciliation do
         msg
 
       {cmds, clean} ->
-        CmdDispatcher.dispatch_all(cmds, state.session_id)
+        CmdDispatcher.dispatch_all(cmds, state.session_id, state.agent_id)
         %{msg | content: clean}
     end
   end

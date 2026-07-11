@@ -80,24 +80,6 @@ defmodule EyeInTheSky.Commits do
     |> Repo.all()
   end
 
-  @doc """
-  Gets a single commit.
-
-  Raises `Ecto.NoResultsError` if the Commit does not exist.
-  """
-  def get_commit!(id) do
-    Repo.get!(Commit, id)
-  end
-
-  @doc """
-  Gets a commit by hash.
-  """
-  def get_commit_by_hash(hash) do
-    case Repo.get_by(Commit, commit_hash: hash) do
-      nil -> {:error, :not_found}
-      commit -> {:ok, commit}
-    end
-  end
 
   @doc """
   Creates a commit.
@@ -108,28 +90,6 @@ defmodule EyeInTheSky.Commits do
     |> Repo.insert(on_conflict: :nothing, conflict_target: [:session_id, :commit_hash])
   end
 
-  @doc """
-  Updates a commit.
-  """
-  def update_commit(%Commit{} = commit, attrs) do
-    commit
-    |> Commit.changeset(attrs)
-    |> Repo.update()
-  end
-
-  @doc """
-  Deletes a commit.
-  """
-  def delete_commit(%Commit{} = commit) do
-    Repo.delete(commit)
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for tracking commit changes.
-  """
-  def change_commit(%Commit{} = commit, attrs \\ %{}) do
-    Commit.changeset(commit, attrs)
-  end
 
   @doc """
   Full-text search across commit messages using ILIKE.

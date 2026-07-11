@@ -26,24 +26,7 @@ defmodule EyeInTheSky.Commits.Commit do
     commit
     |> cast(attrs, [:session_id, :agent_id, :commit_hash, :commit_message])
     |> validate_required([:session_id, :commit_hash])
-    |> validate_session_exists()
     |> unique_constraint([:session_id, :commit_hash], name: :commits_session_id_commit_hash_index)
-  end
-
-  # Validate that session_id refers to an existing session
-  defp validate_session_exists(changeset) do
-    case get_change(changeset, :session_id) do
-      nil ->
-        changeset
-
-      session_id ->
-        case EyeInTheSky.Sessions.get_session(session_id) do
-          {:ok, _} ->
-            changeset
-
-          {:error, _} ->
-            add_error(changeset, :session_id, "session not found")
-        end
-    end
+    |> foreign_key_constraint(:session_id)
   end
 end

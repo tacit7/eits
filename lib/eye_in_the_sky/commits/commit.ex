@@ -12,6 +12,8 @@ defmodule EyeInTheSky.Commits.Commit do
       foreign_key: :session_id,
       type: :integer
 
+    belongs_to :agent, EyeInTheSky.Agents.Agent
+
     many_to_many :tasks, EyeInTheSky.Tasks.Task,
       join_through: "commit_tasks",
       join_keys: [commit_id: :id, task_id: :id]
@@ -22,7 +24,7 @@ defmodule EyeInTheSky.Commits.Commit do
   @doc false
   def changeset(commit, attrs) do
     commit
-    |> cast(attrs, [:session_id, :commit_hash, :commit_message])
+    |> cast(attrs, [:session_id, :agent_id, :commit_hash, :commit_message])
     |> validate_required([:session_id, :commit_hash])
     |> validate_session_exists()
     |> unique_constraint([:session_id, :commit_hash], name: :commits_session_id_commit_hash_index)

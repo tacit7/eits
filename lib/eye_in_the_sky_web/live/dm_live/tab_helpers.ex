@@ -98,7 +98,9 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     |> assign(
       :commits,
       maybe_load_tab_data(tab, "commits", socket.assigns[:commits], fn ->
-        Commits.list_commits_for_session(session_id)
+        agent_id = socket.assigns.session.agent_id
+
+        Commits.list_commits_for_session_and_agent(session_id, agent_id)
         |> enrich_commit_messages(socket)
       end)
     )

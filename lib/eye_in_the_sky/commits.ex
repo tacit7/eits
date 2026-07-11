@@ -54,6 +54,24 @@ defmodule EyeInTheSky.Commits do
   end
 
   @doc """
+  Returns commits for a session, plus orphaned commits (session_id IS NULL)
+  from the same agent. Recovers commits whose session was hard-deleted, which
+  sets session_id to NULL via the FK ON DELETE SET NULL constraint.
+  """
+  def list_commits_for_session_and_agent(session_id, agent_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
+    from(c in Commit,
+      where:
+        c.session_id == ^session_id or
+          (is_nil(c.session_id) and c.agent_id == ^agent_id),
+      order_by: [desc: c.created_at],
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Counts commits for a specific session.
   """
   def count_commits_for_session(session_id) do

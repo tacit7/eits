@@ -137,6 +137,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
           Commits.create_commit(%{
             session_id: session.id,
+            agent_id: agent.id,
             commit_hash: hash,
             commit_message: message
           })

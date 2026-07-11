@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   use EyeInTheSkyWeb, :controller
 
+  require Logger
+
   action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
 
   import EyeInTheSkyWeb.ControllerHelpers
@@ -527,7 +529,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
         :ok
     end
   rescue
-    _ -> :ok
+    e ->
+      Logger.warning("set_session_intent failed for session #{session_id}: #{inspect(e)}")
+      :ok
   end
 
   defp resolve_session_id(sid) do

@@ -28,20 +28,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)
 
-    socket =
-      if connected?(socket) do
-        teams = load_teams(socket, false, false, "")
-
-        socket
-        |> assign(:all_teams, teams)
-        |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
-        |> init_selection_assigns()
-      else
-        socket
-        |> init_selection_assigns()
-      end
-
-    {:ok, socket}
+    {:ok, load_teams_if_connected(socket, false)}
   end
 
   def mount(_params, _session, socket) do
@@ -64,20 +51,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)
 
-    socket =
-      if connected?(socket) do
-        teams = load_teams(socket, false, true, "")
+    {:ok, load_teams_if_connected(socket, true)}
+  end
 
-        socket
-        |> assign(:all_teams, teams)
-        |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
-        |> init_selection_assigns()
-      else
-        socket
-        |> init_selection_assigns()
-      end
+  defp load_teams_if_connected(socket, show_all) do
+    if connected?(socket) do
+      teams = load_teams(socket, false, show_all, "")
 
-    {:ok, socket}
+      socket
+      |> assign(:all_teams, teams)
+      |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+      |> init_selection_assigns()
+    else
+      socket |> init_selection_assigns()
+    end
   end
 
   @impl true

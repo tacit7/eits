@@ -171,49 +171,25 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     do: handle_toggle_job(params, socket, &load_jobs/1, socket.assigns.project_id)
 
   defp dispatch_event("run_now", %{"id" => id} = _params, socket) do
-    with {:ok, int_id} <- parse_job_id(id),
-         {:ok, job} <- ScheduledJobs.get_job(int_id),
-         :ok <- check_job_access(job, socket.assigns.project_id) do
-      # Show confirmation modal for agent jobs, run immediately for others
-      case job.job_type do
-        "spawn_agent" ->
-          {:noreply, assign(socket, :confirm_run_modal_job, job)}
+    case fetch_job_for_run(id, socket.assigns.project_id) do
+      {:ok, job} ->
+        case job.job_type do
+          "spawn_agent" -> {:noreply, assign(socket, :confirm_run_modal_job, job)}
+          _ -> do_run_job(job, socket)
+        end
 
-        _ ->
-          do_run_job(job, socket)
-      end
-    else
-      :error ->
-        send(self(), {:jobs_page_flash, :error, "Invalid job ID"})
-        {:noreply, socket}
-
-      {:error, :not_found} ->
-        send(self(), {:jobs_page_flash, :error, "Job not found"})
-        {:noreply, socket}
-
-      {:error, :access_denied} ->
-        send(self(), {:jobs_page_flash, :error, "Access denied"})
-        {:noreply, socket}
+      {:error, reason} ->
+        handle_run_job_error(reason, socket)
     end
   end
 
   defp dispatch_event("confirm_run_job", params, socket) do
-    with {:ok, int_id} <- parse_job_id(params["id"]),
-         {:ok, job} <- ScheduledJobs.get_job(int_id),
-         :ok <- check_job_access(job, socket.assigns.project_id) do
-      {:noreply, assign(socket, :confirm_run_modal_job, nil) |> then(&do_run_job(job, &1))}
-    else
-      :error ->
-        send(self(), {:jobs_page_flash, :error, "Invalid job ID"})
-        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+    case fetch_job_for_run(params["id"], socket.assigns.project_id) do
+      {:ok, job} ->
+        {:noreply, socket |> assign(:confirm_run_modal_job, nil) |> then(&do_run_job(job, &1))}
 
-      {:error, :not_found} ->
-        send(self(), {:jobs_page_flash, :error, "Job not found"})
-        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
-
-      {:error, :access_denied} ->
-        send(self(), {:jobs_page_flash, :error, "Access denied"})
-        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+      {:error, reason} ->
+        handle_run_job_error(reason, socket)
     end
   end
 
@@ -318,6 +294,29 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   end
 
   defp dispatch_event(_event, _params, socket), do: {:noreply, socket}
+
+  defp fetch_job_for_run(id, project_id) do
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id),
+         :ok <- check_job_access(job, project_id) do
+      {:ok, job}
+    else
+      :error -> {:error, :invalid_id}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp handle_run_job_error(reason, socket) do
+    message =
+      case reason do
+        :invalid_id -> "Invalid job ID"
+        :not_found -> "Job not found"
+        :access_denied -> "Access denied"
+      end
+
+    send(self(), {:jobs_page_flash, :error, message})
+    {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+  end
 
   defp do_bulk_toggle_enabled(enabled, label, socket) do
     selected = socket.assigns.bulk_selected_jobs

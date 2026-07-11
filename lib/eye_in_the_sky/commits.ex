@@ -152,7 +152,7 @@ defmodule EyeInTheSky.Commits do
     pattern = "%#{query}%"
 
     from(c in Commit,
-      join: s in EyeInTheSky.Sessions.Session,
+      left_join: s in EyeInTheSky.Sessions.Session,
       on: s.id == c.session_id,
       where: ilike(c.commit_message, ^pattern),
       order_by: [desc: c.created_at],

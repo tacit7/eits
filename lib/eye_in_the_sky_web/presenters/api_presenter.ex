@@ -77,7 +77,14 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
   end
 
   def present_commit(c) do
-    %{id: c.id, commit_hash: c.commit_hash, commit_message: c.commit_message}
+    %{
+      id: c.id,
+      commit_hash: c.commit_hash,
+      commit_message: c.commit_message,
+      created_at: c.created_at,
+      agent_id: c.agent_id,
+      session_id: c.session_id
+    }
   end
 
   def present_agent(agent) do

@@ -121,7 +121,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
   defp recent_commits_for_agent(agent_id, limit) do
     case Sessions.list_sessions_for_agent(agent_id, limit: 1) do
-      [session | _] -> Commits.list_recent_commits(session.id, limit)
+      [session | _] -> Commits.list_commits_for_session_and_agent(session.id, agent_id, limit: limit)
       [] -> []
     end
   end

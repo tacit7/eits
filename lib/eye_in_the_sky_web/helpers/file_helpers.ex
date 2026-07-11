@@ -114,6 +114,63 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
     ".toml" => %{atom: :toml, class: "toml", cm: "text"}
   }
 
+  @binary_extensions MapSet.new([
+    # Executables and libraries
+    ".so",
+    ".dll",
+    ".dylib",
+    ".exe",
+    ".bin",
+    ".o",
+    ".a",
+    ".lib",
+    # Archives
+    ".zip",
+    ".tar",
+    ".gz",
+    ".bz2",
+    ".xz",
+    ".7z",
+    ".rar",
+    # Images
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".ico",
+    ".svg",
+    ".webp",
+    # Media
+    ".mp3",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".mkv",
+    ".wav",
+    ".flac",
+    # Documents
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    # Databases
+    ".db",
+    ".sqlite",
+    ".sqlite3",
+    ".db-shm",
+    ".db-wal",
+    # Others
+    ".wasm",
+    ".beam",
+    ".class",
+    ".jar",
+    ".war"
+  ])
+
   defp file_type_info(ext),
     do: Map.get(@file_types, ext, %{atom: :text, class: "plaintext", cm: "text"})
 
@@ -178,65 +235,8 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
   """
   @spec binary_file?(String.t()) :: boolean
   def binary_file?(path) do
-    binary_extensions = [
-      # Executables and libraries
-      ".so",
-      ".dll",
-      ".dylib",
-      ".exe",
-      ".bin",
-      ".o",
-      ".a",
-      ".lib",
-      # Archives
-      ".zip",
-      ".tar",
-      ".gz",
-      ".bz2",
-      ".xz",
-      ".7z",
-      ".rar",
-      # Images
-      ".jpg",
-      ".jpeg",
-      ".png",
-      ".gif",
-      ".bmp",
-      ".ico",
-      ".svg",
-      ".webp",
-      # Media
-      ".mp3",
-      ".mp4",
-      ".avi",
-      ".mov",
-      ".mkv",
-      ".wav",
-      ".flac",
-      # Documents
-      ".pdf",
-      ".doc",
-      ".docx",
-      ".xls",
-      ".xlsx",
-      ".ppt",
-      ".pptx",
-      # Databases
-      ".db",
-      ".sqlite",
-      ".sqlite3",
-      ".db-shm",
-      ".db-wal",
-      # Others
-      ".wasm",
-      ".beam",
-      ".class",
-      ".jar",
-      ".war"
-    ]
-
     extension = path |> Path.extname() |> String.downcase()
-    Enum.member?(binary_extensions, extension)
+    MapSet.member?(@binary_extensions, extension)
   end
 
   @base_icon_path "/images/file-icons"

@@ -3,8 +3,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
   alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
-  alias EyeInTheSky.Settings
   alias EyeInTheSky.{Notes, Tasks}
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.Components.TasksBulkActions

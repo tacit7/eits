@@ -216,12 +216,7 @@ defmodule EyeInTheSky.EditorSync do
         roots = ["/Applications", Path.join(home, "Applications")]
         names = mac_app_names(bin)
 
-        Enum.find_value(roots, fn root ->
-          Enum.find_value(names, fn name ->
-            bundle = Path.join(root, "#{name}.app")
-            if File.exists?(bundle), do: "__open_a__:#{name}", else: nil
-          end)
-        end)
+        Enum.find_value(roots, fn root -> find_mac_app_bundle(root, names) end)
 
       _ ->
         nil
@@ -234,6 +229,13 @@ defmodule EyeInTheSky.EditorSync do
   defp mac_app_names("subl"), do: ["Sublime Text"]
   defp mac_app_names("emacs"), do: ["Emacs"]
   defp mac_app_names(_), do: []
+
+  defp find_mac_app_bundle(root, names) do
+    Enum.find_value(names, fn name ->
+      bundle = Path.join(root, "#{name}.app")
+      if File.exists?(bundle), do: "__open_a__:#{name}", else: nil
+    end)
+  end
 
   defp launch_editor(%{terminal: true, cmd: cmd}, path) do
     # Use .command file trick — same as Editors.launch_in_terminal/2

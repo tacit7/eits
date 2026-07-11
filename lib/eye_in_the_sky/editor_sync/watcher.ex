@@ -89,10 +89,7 @@ defmodule EyeInTheSky.EditorSync.Watcher do
         count = state.missing_count + 1
 
         if count >= @max_missing do
-          Logger.debug("[EditorSync.Watcher] file gone after #{count} misses, stopping",
-            type: state.type,
-            id: state.record_id
-          )
+          Logger.debug("[EditorSync.Watcher] file gone after #{count} misses, stopping type=#{state.type} id=#{state.record_id}")
 
           stop_self()
           state
@@ -135,10 +132,7 @@ defmodule EyeInTheSky.EditorSync.Watcher do
   defp sync_to_db(state, content, hash, stat) do
     case reload_record(state.type, state.record_id) do
       nil ->
-        Logger.warning("[EditorSync.Watcher] record deleted mid-watch",
-          type: state.type,
-          id: state.record_id
-        )
+        Logger.warning("[EditorSync.Watcher] record deleted mid-watch type=#{state.type} id=#{state.record_id}")
 
         Events.editor_sync_failed(state.type, state.record_id, :record_deleted)
         stop_self()
@@ -160,10 +154,7 @@ defmodule EyeInTheSky.EditorSync.Watcher do
             }
 
           {:error, reason} ->
-            Logger.error("[EditorSync.Watcher] DB write failed: #{inspect(reason)}",
-              type: state.type,
-              id: state.record_id
-            )
+            Logger.error("[EditorSync.Watcher] DB write failed: #{inspect(reason)} type=#{state.type} id=#{state.record_id}")
 
             Events.editor_sync_failed(state.type, state.record_id, reason)
             stop_self()
@@ -176,10 +167,7 @@ defmodule EyeInTheSky.EditorSync.Watcher do
     elapsed = System.monotonic_time(:millisecond) - state.last_change_ms
 
     if elapsed > state.idle_timeout_ms do
-      Logger.debug("[EditorSync.Watcher] idle timeout, stopping",
-        type: state.type,
-        id: state.record_id
-      )
+      Logger.debug("[EditorSync.Watcher] idle timeout, stopping type=#{state.type} id=#{state.record_id}")
 
       stop_self()
     end

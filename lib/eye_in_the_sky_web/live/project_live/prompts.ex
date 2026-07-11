@@ -161,7 +161,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
     end
   end
 
-
   defp load_prompts(socket) do
     show_all = Map.get(socket.assigns, :show_all, false)
     query = socket.assigns.search_query

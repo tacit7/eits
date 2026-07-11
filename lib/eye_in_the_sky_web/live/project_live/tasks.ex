@@ -246,6 +246,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     case Integer.parse(id_str) do
       {id, ""} ->
         if Phoenix.LiveView.connected?(socket) do
+          Events.unsubscribe_editor_sync(:task, id)
           Events.subscribe_editor_sync(:task, id)
         end
 

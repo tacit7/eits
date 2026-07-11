@@ -335,11 +335,8 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     :ok
   end
 
-  # Like update_session_status/3 but only writes when the session is currently "working".
-  # Returns {:ok, updated_session}, {:skipped, current_session}, or :error.
-  # Used by on_sdk_completed so agents can set their own terminal status (e.g. "waiting")
-  # during a turn without it being clobbered by the AgentWorker after the turn ends.
-  defp update_session_status_if_working(session_id, status, reason) do
+  # Returns {attrs_map, idle_like?} for session status update calls.
+  defp build_status_attrs(status, reason) do
     idle_like? = status in ["idle", "waiting"]
 
     attrs =
@@ -347,7 +344,15 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         do: %{status: status, last_activity_at: DateTime.utc_now()},
         else: %{status: status}
 
-    attrs = Map.put(attrs, :status_reason, reason)
+    {Map.put(attrs, :status_reason, reason), idle_like?}
+  end
+
+  # Like update_session_status/3 but only writes when the session is currently "working".
+  # Returns {:ok, updated_session}, {:skipped, current_session}, or :error.
+  # Used by on_sdk_completed so agents can set their own terminal status (e.g. "waiting")
+  # during a turn without it being clobbered by the AgentWorker after the turn ends.
+  defp update_session_status_if_working(session_id, status, reason) do
+    {attrs, idle_like?} = build_status_attrs(status, reason)
 
     case Sessions.get_session(session_id) do
       {:ok, session} when session.status == "working" ->
@@ -366,14 +371,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # broadcast must only fire after a successful update.
   # Returns {:ok, updated_session} or :error.
   defp update_session_status(session_id, status, reason \\ nil) do
-    idle_like? = status in ["idle", "waiting"]
-
-    attrs =
-      if idle_like?,
-        do: %{status: status, last_activity_at: DateTime.utc_now()},
-        else: %{status: status}
-
-    attrs = Map.put(attrs, :status_reason, reason)
+    {attrs, idle_like?} = build_status_attrs(status, reason)
 
     case Sessions.get_session(session_id) do
       {:ok, session} -> apply_session_update(session, attrs, session_id, idle_like?)

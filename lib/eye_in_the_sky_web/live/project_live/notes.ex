@@ -223,6 +223,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     case Integer.parse(id_str) do
       {id, ""} ->
         if connected?(socket) do
+          Events.unsubscribe_editor_sync(:note, id)
           Events.subscribe_editor_sync(:note, id)
         end
 

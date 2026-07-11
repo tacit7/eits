@@ -48,10 +48,10 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   end
 
   @doc """
-  Returns the default model slug for a provider (Codex).
-  Claude defaults remain in the caller (SpawnValidator) to preserve backward-compat
-  API behavior — spawning a Claude agent with no model still resolves to "haiku".
-  Pi has no default — model must be specified explicitly (resolved from discovery in Phase 2).
+  Returns the default model slug for a provider.
+  Claude: resolved from Settings.default_model() (user-configured)
+  Codex: "gpt-5.5"
+  Pi: nil (no default; model must be specified explicitly from discovery)
   """
   def default_model("codex"), do: "gpt-5.5"
   def default_model("pi"), do: nil

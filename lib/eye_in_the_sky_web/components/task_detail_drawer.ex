@@ -5,6 +5,8 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
 
   use EyeInTheSkyWeb, :html
 
+  import EyeInTheSkyWeb.Components.OpenInEditorButton
+
   import EyeInTheSkyWeb.Helpers.ViewHelpers,
     only: [relative_time: 1, overdue?: 1, due_today?: 1, format_date_input: 1]
 
@@ -24,6 +26,8 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
   attr :projects, :list, default: []
   attr :current_project_id, :any, default: nil
   attr :focus, :string, default: nil
+  attr :installed_editors, :list, default: []
+  attr :preferred_editor, :string, default: "code"
 
   slot :checklist
 
@@ -158,7 +162,15 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
 
             <%!-- Description --%>
             <div>
-              <.detail_label text="Description" />
+              <div class="flex items-center justify-between mb-1">
+                <.detail_label text="Description" />
+                <.open_in_editor_button
+                  :if={@installed_editors != []}
+                  record_id={@task.id}
+                  installed_editors={@installed_editors}
+                  preferred_editor={@preferred_editor}
+                />
+              </div>
               <textarea
                 name="description"
                 class="w-full min-h-[100px] bg-base-200 border border-base-300 rounded-lg px-3 py-2 text-base focus:border-primary/30 focus:outline-none resize-y"

@@ -235,10 +235,20 @@ defmodule EyeInTheSky.Notes do
   Updates a note's body (and optionally title).
   """
   def update_note(%Note{} = note, attrs) do
-    note
-    |> Ecto.Changeset.cast(attrs, [:body, :title, :starred, :parent_type, :parent_id])
-    |> Ecto.Changeset.validate_required([:body])
-    |> Repo.update()
+    result =
+      note
+      |> Ecto.Changeset.cast(attrs, [:body, :title, :starred, :parent_type, :parent_id])
+      |> Ecto.Changeset.validate_required([:body])
+      |> Repo.update()
+
+    case result do
+      {:ok, updated} ->
+        EyeInTheSky.Events.note_updated(updated)
+        {:ok, updated}
+
+      err ->
+        err
+    end
   end
 
   @doc """

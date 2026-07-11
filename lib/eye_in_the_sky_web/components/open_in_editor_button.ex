@@ -1,28 +1,56 @@
 defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
   @moduledoc """
-  Split-button that opens a file path in an external editor.
+  Split-button that opens content in an external editor.
 
-  Primary half — one click, opens in the preferred editor.
-  Chevron half — dropdown listing every other detected editor.
+  Supports two mutually exclusive modes — exactly one must be set:
 
-  Usage:
+  - **File mode** (`path`): opens a file path directly via `Editors.open/2`.
+  - **Record mode** (`record_id`): opens DB-backed content via `EditorSync.open/3`
+    and syncs saves back to the DB automatically.
+
+  Usage (file mode):
       <.open_in_editor_button
         path={@selected_skill.abs_path}
         installed_editors={@installed_editors}
         preferred_editor={@preferred_editor}
       />
 
-  Renders nothing when `path` is nil/empty or no editors are installed.
+  Usage (record mode):
+      <.open_in_editor_button
+        record_id={@selected_note.id}
+        installed_editors={@installed_editors}
+        preferred_editor={@preferred_editor}
+      />
+
+  The emitted event is `open_in_editor` in both cases, with:
+  - File mode: `phx-value-path`
+  - Record mode: `phx-value-id`
+
+  The parent LiveView handler checks which value is present and dispatches
+  to `Editors.open/2` or `EditorSync.open/3` accordingly.
+
+  Renders nothing when no editors are installed or the active value is
+  nil/empty.
   """
 
   use Phoenix.Component
   import EyeInTheSkyWeb.CoreComponents
 
-  attr :path, :string, required: true
+  attr :path, :string, default: nil
+  attr :record_id, :integer, default: nil
   attr :installed_editors, :list, default: []
   attr :preferred_editor, :string, default: "code"
 
   def open_in_editor_button(assigns) do
+    # Exactly one of path or record_id must be set.
+    path_set? = is_binary(assigns.path) && assigns.path != ""
+    id_set? = not is_nil(assigns.record_id)
+
+    if path_set? == id_set? do
+      raise "OpenInEditorButton: exactly one of path or record_id is required " <>
+              "(path=#{inspect(assigns.path)}, record_id=#{inspect(assigns.record_id)})"
+    end
+
     preferred =
       Enum.find(assigns.installed_editors, &(&1.id == assigns.preferred_editor)) ||
         List.first(assigns.installed_editors)
@@ -34,15 +62,17 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
       assigns
       |> assign(:preferred, preferred)
       |> assign(:others, others)
+      |> assign(:active, path_set? || id_set?)
 
     ~H"""
-    <%= if @preferred && is_binary(@path) && @path != "" do %>
+    <%= if @preferred && @active do %>
       <div class="join">
         <button
           class="btn btn-ghost btn-xs join-item gap-1.5 min-h-[30px] h-[30px]"
           phx-click="open_in_editor"
           phx-value-editor={@preferred.id}
           phx-value-path={@path}
+          phx-value-id={@record_id}
           title={"Open in #{@preferred.label}"}
         >
           <.icon name="hero-arrow-top-right-on-square" class="size-3.5" />
@@ -68,6 +98,7 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
                     phx-click="open_in_editor"
                     phx-value-editor={ed.id}
                     phx-value-path={@path}
+                    phx-value-id={@record_id}
                   >
                     {ed.label}
                   </button>

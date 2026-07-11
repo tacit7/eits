@@ -9,6 +9,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   alias EyeInTheSky.Events
   alias EyeInTheSky.OrchestratorTimers
   alias EyeInTheSky.{Projects, Tasks}
+  alias EyeInTheSky.Settings
   alias EyeInTheSky.Settings.JsonSettings
   alias EyeInTheSkyWeb.Helpers.PubSubHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
@@ -88,7 +89,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:active_tab, "messages")
     |> assign(:session_ref, nil)
     |> assign(:processing, false)
-    |> assign(:selected_model, session.model || "opus")
+    |> assign(:selected_model, session.model || Settings.default_model())
     |> assign(:selected_effort, "medium")
     |> assign(:active_overlay, nil)
     |> assign(:show_live_stream, get_in(effective, ["general", "show_live_stream"]))

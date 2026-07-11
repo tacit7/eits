@@ -80,7 +80,6 @@ defmodule EyeInTheSky.Commits do
     |> Repo.all()
   end
 
-
   @doc """
   Creates a commit.
   """
@@ -89,7 +88,6 @@ defmodule EyeInTheSky.Commits do
     |> Commit.changeset(attrs)
     |> Repo.insert(on_conflict: :nothing, conflict_target: [:session_id, :commit_hash])
   end
-
 
   @doc """
   Full-text search across commit messages using ILIKE.

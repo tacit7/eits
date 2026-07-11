@@ -35,14 +35,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         socket
         |> assign(:all_teams, teams)
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
-        |> assign(:selected_ids, MapSet.new())
-        |> assign(:select_mode, false)
-        |> assign(:show_archive_confirm, false)
+        |> init_selection_assigns()
       else
         socket
-        |> assign(:selected_ids, MapSet.new())
-        |> assign(:select_mode, false)
-        |> assign(:show_archive_confirm, false)
+        |> init_selection_assigns()
       end
 
     {:ok, socket}
@@ -75,14 +71,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
         socket
         |> assign(:all_teams, teams)
         |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
-        |> assign(:selected_ids, MapSet.new())
-        |> assign(:select_mode, false)
-        |> assign(:show_archive_confirm, false)
+        |> init_selection_assigns()
       else
         socket
-        |> assign(:selected_ids, MapSet.new())
-        |> assign(:select_mode, false)
-        |> assign(:show_archive_confirm, false)
+        |> init_selection_assigns()
       end
 
     {:ok, socket}
@@ -660,5 +652,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
   defp team_status_atom(members) do
     if Enum.any?(members, &(&1.status == "active")), do: :working, else: :idle
+  end
+
+  defp init_selection_assigns(socket) do
+    socket
+    |> assign(:selected_ids, MapSet.new())
+    |> assign(:select_mode, false)
+    |> assign(:show_archive_confirm, false)
   end
 end

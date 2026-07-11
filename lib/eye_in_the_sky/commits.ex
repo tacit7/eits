@@ -33,17 +33,6 @@ defmodule EyeInTheSky.Commits do
   end
 
   @doc """
-  Returns recent commits for a session with a limit.
-  """
-  def list_recent_commits(session_id, limit \\ 10) do
-    Commit
-    |> where([c], c.session_id == ^session_id)
-    |> order_by([c], desc: c.created_at)
-    |> limit(^limit)
-    |> Repo.all()
-  end
-
-  @doc """
   Returns commits for a specific session.
   """
   def list_commits_for_session(session_id, opts \\ []) do

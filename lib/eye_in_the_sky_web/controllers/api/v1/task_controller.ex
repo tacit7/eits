@@ -494,14 +494,20 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
 
-  defp maybe_mark_member_done(nil), do: :ok
-  defp maybe_mark_member_done(""), do: :ok
+  # Shared nil-guard resolver helper: resolve session_id to int_id and invoke fun.
+  # Returns :ok if session_id is nil/"", or if resolve fails.
+  defp with_session_int_id(nil, _fun), do: :ok
+  defp with_session_int_id("", _fun), do: :ok
 
-  defp maybe_mark_member_done(session_id) do
+  defp with_session_int_id(session_id, fun) do
     case Helpers.resolve_session_int_id(session_id) do
-      {:ok, int_id} -> Teams.mark_member_done_by_session(int_id)
+      {:ok, int_id} -> fun.(int_id)
       _ -> :ok
     end
+  end
+
+  defp maybe_mark_member_done(session_id) do
+    with_session_int_id(session_id, &Teams.mark_member_done_by_session/1)
   end
 
   # Sets intent on the calling session after task completion.
@@ -510,14 +516,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp set_session_intent("", _intent), do: :ok
 
   defp set_session_intent(session_id, intent) do
-    case Helpers.resolve_session_int_id(session_id) do
-      {:ok, int_id} ->
-        session = Sessions.get_session!(int_id)
-        Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
-
-      _ ->
-        :ok
-    end
+    with_session_int_id(session_id, fn int_id ->
+      session = Sessions.get_session!(int_id)
+      Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
+    end)
   rescue
     e ->
       Logger.warning("set_session_intent failed for session #{session_id}: #{inspect(e)}")

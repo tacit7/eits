@@ -90,11 +90,13 @@ defmodule EyeInTheSkyWeb.ChatLive do
     if connected?(socket) && channel_id do
       prev_channel_id = socket.assigns[:active_channel_id]
 
-      if prev_channel_id && to_string(prev_channel_id) != to_string(channel_id) do
-        unsubscribe_channel_messages(prev_channel_id)
-      end
-
-      unless prev_channel_id && to_string(prev_channel_id) == to_string(channel_id) do
+      if prev_channel_id do
+        if to_string(prev_channel_id) != to_string(channel_id) do
+          unsubscribe_channel_messages(prev_channel_id)
+          subscribe_channel_messages(channel_id)
+        end
+        # else: same channel, already subscribed — do nothing
+      else
         subscribe_channel_messages(channel_id)
       end
     end

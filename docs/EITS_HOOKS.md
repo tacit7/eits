@@ -185,7 +185,11 @@ Parses the current turn's transcript. If the agent used mutating tools (Edit/Wri
 
 Read-only turns (Read/Grep/WebSearch) and DM-only Bash calls are always exempt.
 
-**Section 2 — Team notification (non-blocking, background)**
+**Section 2 — sdk-cli idle transition**
+
+If `CLAUDE_CODE_ENTRYPOINT=sdk-cli`, reads current session status and sets it to `idle` if still `working`. Runs in the background, never blocks. Belt-and-suspenders alongside the AgentWorker backend — prevents sessions from getting stuck in `working` when a turn ends without a clean `on_sdk_completed` event. Status guard: only fires if currently `working` — won't clobber `waiting`/`completed`/`failed`.
+
+**Section 3 — Team notification (non-blocking, background)**
 
 If this session belongs to an active team:
 1. Queries `GET /api/v1/teams?status=active` for all active teams

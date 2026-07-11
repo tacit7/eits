@@ -117,8 +117,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     Events.stream_error(session_id, provider_conversation_id, error_text)
 
     case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
-      {:ok, session} -> update_agent_status(session, "failed")
-      :error -> :ok
+      {:ok, session} ->
+        update_agent_status(session, "failed")
+        Events.agent_stopped(session)
+
+      :error ->
+        :ok
     end
 
     :ok

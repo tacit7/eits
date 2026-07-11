@@ -367,25 +367,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   POST /api/v1/tasks/:id/sessions - Link a session to a task.
   """
   def link_session(conn, %{"id" => task_id} = params) do
-    case params["session_id"] do
-      nil ->
-        {:error, :bad_request, "session_id is required"}
-
-      session_id ->
-        case Tasks.get_task(task_id) do
-          {:error, :not_found} ->
-            {:error, :not_found, "Task not found"}
-
-          {:ok, task} ->
-            case resolve_session_id(session_id) do
-              nil ->
-                {:error, :not_found, "Session not found"}
-
-              int_id ->
-                Tasks.link_session_to_task(task.id, int_id)
-                json(conn, %{success: true, message: "Session linked to task #{task.id}"})
-            end
-        end
+    with {:ok, session_id} <- require_session_id_param(params["session_id"]),
+         {:ok, task} <- Tasks.get_task(task_id),
+         {:ok, int_id} <- resolve_link_session_id(session_id) do
+      Tasks.link_session_to_task(task.id, int_id)
+      json(conn, %{success: true, message: "Session linked to task #{task.id}"})
+    else
+      {:error, :no_session} -> {:error, :bad_request, "session_id is required"}
+      {:error, :not_found} -> {:error, :not_found, "Task not found"}
+      {:error, :not_found, msg} -> {:error, :not_found, msg}
     end
   end
 
@@ -532,6 +522,17 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     e ->
       Logger.warning("set_session_intent failed for session #{session_id}: #{inspect(e)}")
       :ok
+  end
+
+  defp require_session_id_param(nil), do: {:error, :no_session}
+  defp require_session_id_param(""), do: {:error, :no_session}
+  defp require_session_id_param(id), do: {:ok, id}
+
+  defp resolve_link_session_id(session_id) do
+    case resolve_session_id(session_id) do
+      nil -> {:error, :not_found, "Session not found"}
+      int_id -> {:ok, int_id}
+    end
   end
 
   defp resolve_session_id(sid) do

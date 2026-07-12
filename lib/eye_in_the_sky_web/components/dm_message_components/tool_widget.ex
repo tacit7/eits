@@ -26,9 +26,20 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
     ~H"""
     <%= if @flat do %>
       <%!-- Flat mode: no toggle, body always visible. Used inside tool clusters. --%>
-      <div class="my-px">
+      <div class="my-px group">
         <div class="flex items-center gap-1.5 py-0.5 px-1">
           {render_slot(@summary)}
+          <button
+            :if={@copy_text}
+            type="button"
+            class="tool-copy-btn ml-auto shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 p-0.5 rounded text-base-content/25 hover:text-base-content/55"
+            data-copy-btn
+            data-copy-text={@copy_text}
+            aria-label={@copy_title}
+            title={@copy_title}
+          >
+            <.icon name="hero-clipboard-document" class="size-2.5" />
+          </button>
         </div>
         <div class="pl-3 border-l border-[var(--border-subtle)]">
           {render_slot(@inner_block)}
@@ -50,10 +61,23 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
         }>
           {render_slot(@summary)}
           <button
+            :if={@compact && @copy_text}
+            type="button"
+            class="tool-copy-btn shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 p-0.5 rounded text-base-content/25 hover:text-base-content/55"
+            data-copy-btn
+            data-copy-text={@copy_text}
+            aria-label={@copy_title}
+            title={@copy_title}
+          >
+            <.icon name="hero-clipboard-document" class="size-2.5" />
+          </button>
+          <button
             :if={!@compact && @copy_text}
+            type="button"
             class="tool-copy-btn ml-auto mr-1 shrink-0"
             data-copy-btn
             data-copy-text={@copy_text}
+            aria-label={@copy_title}
             title={@copy_title}
           >
             <.icon name="hero-clipboard-document" class="size-3.5" />

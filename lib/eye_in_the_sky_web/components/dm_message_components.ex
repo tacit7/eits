@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
   def message_tier(message) do
     stream_type = get_in(message.metadata || %{}, ["stream_type"])
-    is_tool_event = stream_type in ["tool_result", "tool_use"]
+    is_tool_event = stream_type in ["tool_result", "tool_use", "output", "bash"]
 
     body = message.body || ""
     segments = parse_body_segments(body)
@@ -179,10 +179,25 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         {nil, raw_body}
       end
 
-    segments = parse_body_segments(body)
-    thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
+    sender_role = assigns.message.sender_role || "agent"
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
+
+    # Only parse tool-call segments for agent/tool messages. User and system
+    # prose that happens to start with "Tool:" or "> `Name`" must stay as text.
+    segments =
+      if sender_role in ["user", "system"],
+        do: [{:text, body}],
+        else: parse_body_segments(body)
+
+    thinking = get_in(assigns.message.metadata || %{}, ["thinking"])
     id_prefix = if assigns.extra_id, do: "#{assigns.extra_id}-", else: ""
+
+    # True when stream_type is "bash" and the body did not parse as any tool
+    # call — legacy alias for a call event with a plain-text or JSON body.
+    bash_fallback =
+      stream_type == "bash" and
+        not Enum.any?(segments, &match?({:tool_call, _, _}, &1)) and
+        String.trim(body) != ""
 
     assigns =
       assigns
@@ -191,6 +206,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       |> assign(:stream_type, stream_type)
       |> assign(:id_prefix, id_prefix)
       |> assign(:dm_info, dm_info)
+      |> assign(:bash_fallback, bash_fallback)
+      |> assign(:bash_body, body)
 
     ~H"""
     <div class={[
@@ -292,28 +309,33 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           }>{@thinking}</pre>
         </div>
       </details>
-      <%= if @stream_type == "tool_result" do %>
-        <.tool_result_body body={@message.body} compact={@compact} flat={@flat} />
-      <% else %>
-        <%= for {segment, idx} <- Enum.with_index(@segments) do %>
-          <%= case segment do %>
-            <% {:tool_call, name, rest} -> %>
-              <.tool_widget name={name} rest={rest} compact={@compact} flat={@flat} />
-            <% {:text, text} when text != "" -> %>
-              <div
-                id={"msg-body-#{@id_prefix}#{@message.id}-#{idx}"}
-                class={[
-                  "dm-markdown leading-relaxed text-base-content/85",
-                  if(@compact, do: "text-xs", else: "text-sm")
-                ]}
-                phx-hook="MarkdownMessage"
-                data-raw-body={text}
-              >
-                <pre class="whitespace-pre-wrap font-sans text-inherit m-0 p-0">{text}</pre>
-              </div>
-            <% _ -> %>
+      <%= cond do %>
+        <% @stream_type in ["tool_result", "output"] -> %>
+          <%!-- "output" is a legacy alias for tool_result — both route to the output widget. --%>
+          <.tool_result_body body={@message.body} compact={@compact} flat={@flat} />
+        <% @bash_fallback -> %>
+          <%!-- "bash" stream type with a non-tool-call body: render as a Bash call widget. --%>
+          <.tool_widget name="Bash" rest={@bash_body} compact={@compact} flat={@flat} />
+        <% true -> %>
+          <%= for {segment, idx} <- Enum.with_index(@segments) do %>
+            <%= case segment do %>
+              <% {:tool_call, name, rest} -> %>
+                <.tool_widget name={name} rest={rest} compact={@compact} flat={@flat} />
+              <% {:text, text} when text != "" -> %>
+                <div
+                  id={"msg-body-#{@id_prefix}#{@message.id}-#{idx}"}
+                  class={[
+                    "dm-markdown leading-relaxed text-base-content/85",
+                    if(@compact, do: "text-xs", else: "text-sm")
+                  ]}
+                  phx-hook="MarkdownMessage"
+                  data-raw-body={text}
+                >
+                  <pre class="whitespace-pre-wrap font-sans text-inherit m-0 p-0">{text}</pre>
+                </div>
+              <% _ -> %>
+            <% end %>
           <% end %>
-        <% end %>
       <% end %>
     </div>
     """

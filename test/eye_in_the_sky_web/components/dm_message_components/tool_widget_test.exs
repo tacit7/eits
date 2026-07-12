@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidgetTest do
       assert html =~ "clipboard-document"
     end
 
-    test "does not render copy button in compact mode" do
+    test "renders copy button in compact mode" do
       html =
         render_component(
           &ToolWidget.tool_result_body/1,
@@ -49,8 +49,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidgetTest do
           compact: true
         )
 
-      refute html =~ "Copy output"
-      refute html =~ "clipboard-document"
+      assert html =~ "Copy output"
+      assert html =~ "clipboard-document"
     end
 
     test "renders collapsible details element" do

@@ -262,7 +262,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
     segments = parse_body_segments(assigns.message.body)
-    body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+
+    body_is_tool_calls =
+      role not in [:user, :system] and segments != [] and
+        Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+
     is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
     is_same_sender = assigns.prev_role != nil && assigns.prev_role == assigns.message.sender_role
     is_new_turn = assigns.prev_role != nil && assigns.prev_role != assigns.message.sender_role

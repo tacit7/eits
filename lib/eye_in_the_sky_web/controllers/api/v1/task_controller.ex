@@ -517,13 +517,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp set_session_intent(session_id, intent) do
     with_session_int_id(session_id, fn int_id ->
-      session = Sessions.get_session!(int_id)
-      Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
+      case Sessions.get_session(int_id) do
+        {:ok, session} ->
+          Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
+        {:error, :not_found} ->
+          :ok
+      end
     end)
-  rescue
-    e ->
-      Logger.warning("set_session_intent failed for session #{session_id}: #{inspect(e)}")
-      :ok
   end
 
   defp require_session_id_param(nil), do: {:error, :no_session}

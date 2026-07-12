@@ -457,18 +457,14 @@ defmodule EyeInTheSky.IAM do
         %{agent_type: agent_type, document_id: doc_id, inserted_at: now, updated_at: now}
       end)
 
-    try do
-      {count, _} =
-        Repo.insert_all(AgentTypeDocument, rows,
-          on_conflict: :nothing,
-          conflict_target: [:agent_type, :document_id]
-        )
+    {count, _} =
+      Repo.insert_all(AgentTypeDocument, rows,
+        on_conflict: :nothing,
+        conflict_target: [:agent_type, :document_id]
+      )
 
-      invalidate_cache()
-      {:ok, count}
-    rescue
-      e -> {:error, e}
-    end
+    invalidate_cache()
+    {:ok, count}
   end
 
   @doc """

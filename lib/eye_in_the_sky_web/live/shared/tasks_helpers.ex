@@ -121,35 +121,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   def handle_delete_task(params, socket, reload_fn) do
     task_id = extract_task_id(params)
     task = Tasks.get_task_by_uuid_or_id!(task_id)
-
-    case Tasks.delete_task_with_associations(task) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> assign(:show_task_detail_drawer, false)
-         |> assign(:selected_task, nil)
-         |> reload_fn.()}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete task")}
-    end
+    do_task_mutation(task, &Tasks.delete_task_with_associations/1, socket, reload_fn, "Failed to delete task")
   end
 
   def handle_archive_task(params, socket, reload_fn) do
     task_id = extract_task_id(params)
     task = Tasks.get_task_by_uuid_or_id!(task_id)
-
-    case Tasks.archive_task(task) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> assign(:show_task_detail_drawer, false)
-         |> assign(:selected_task, nil)
-         |> reload_fn.()}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to archive task")}
-    end
+    do_task_mutation(task, &Tasks.archive_task/1, socket, reload_fn, "Failed to archive task")
   end
 
   def handle_add_task_annotation(%{"task_id" => task_id, "body" => body}, socket) do
@@ -423,5 +401,19 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     |> String.split(",")
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
+  end
+
+  defp do_task_mutation(task, operation_fn, socket, reload_fn, error_msg) do
+    case operation_fn.(task) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:show_task_detail_drawer, false)
+         |> assign(:selected_task, nil)
+         |> reload_fn.()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, error_msg)}
+    end
   end
 end

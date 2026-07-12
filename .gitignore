@@ -110,3 +110,6 @@ pr-*.md
 /priv/bin/eits-pi-harness
 /priv/bin/pi/
 /var/pi-sessions/
+
+# Local scratch report output
+/reach_report/

@@ -1,137 +1,14 @@
 defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   @moduledoc false
-  import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [month_name: 1]
-  alias EyeInTheSky.Utils.ToolHelpers
+  alias EyeInTheSky.ScheduledJobs.ScheduleDescription
 
   # ---------------------------------------------------------------------------
   # Schedule formatting
   # ---------------------------------------------------------------------------
 
-  def format_schedule(%{schedule_type: "interval", schedule_value: val}) do
-    case ToolHelpers.parse_int(val) do
-      nil -> val
-      s when s >= 3600 -> "Every #{div(s, 3600)}h"
-      s when s >= 60 -> "Every #{div(s, 60)}m"
-      s -> "Every #{s}s"
-    end
-  end
-
-  def format_schedule(%{schedule_type: "cron", schedule_value: val}), do: describe_cron(val)
-  def format_schedule(_), do: "?"
-
-  @days_of_week %{
-    0 => "Sun",
-    1 => "Mon",
-    2 => "Tue",
-    3 => "Wed",
-    4 => "Thu",
-    5 => "Fri",
-    6 => "Sat",
-    7 => "Sun"
-  }
-
-  def describe_cron(expr) do
-    case String.split(String.trim(expr), ~r/\s+/) do
-      [min, hour, dom, mon, dow] ->
-        time = format_cron_time(min, hour)
-        day = format_cron_day(dow, dom, mon)
-
-        case {time, day} do
-          {nil, nil} -> expr
-          {t, nil} -> t
-          {nil, d} -> d
-          {t, d} -> "#{d} at #{t}"
-        end
-
-      _ ->
-        expr
-    end
-  end
-
-  def format_cron_time(min, hour) do
-    case {parse_cron_num(min), parse_cron_num(hour)} do
-      {{:ok, m}, {:ok, h}} ->
-        {display_h, period} = to_12h(h)
-
-        if m == 0,
-          do: "#{display_h} #{period}",
-          else: "#{display_h}:#{String.pad_leading("#{m}", 2, "0")} #{period}"
-
-      {_, {:step, n}} ->
-        "Every #{n}h"
-
-      {{:step, n}, _} ->
-        "Every #{n}m"
-
-      _ ->
-        nil
-    end
-  end
-
-  defp to_12h(0), do: {12, "AM"}
-  defp to_12h(12), do: {12, "PM"}
-  defp to_12h(h) when h < 12, do: {h, "AM"}
-  defp to_12h(h), do: {h - 12, "PM"}
-
-  def format_cron_day(dow, dom, mon) do
-    cond do
-      dow != "*" and dom == "*" and mon == "*" ->
-        format_dow(dow)
-
-      dow == "*" and dom != "*" and mon == "*" ->
-        "Day #{dom}"
-
-      dow == "*" and dom != "*" and mon != "*" ->
-        "#{month_name(mon)} #{dom}"
-
-      dow == "*" and dom == "*" and mon == "*" ->
-        "Daily"
-
-      true ->
-        nil
-    end
-  end
-
-  def format_dow(dow) do
-    cond do
-      dow == "1-5" ->
-        "Weekdays"
-
-      dow == "0,6" or dow == "6,0" ->
-        "Weekends"
-
-      String.contains?(dow, ",") ->
-        dow |> String.split(",") |> Enum.map_join(", ", &day_name/1)
-
-      String.contains?(dow, "-") ->
-        [start_day, end_day] = String.split(dow, "-", parts: 2)
-        "#{day_name(start_day)}-#{day_name(end_day)}"
-
-      true ->
-        day_name(dow)
-    end
-  end
-
-  def day_name(n) when is_integer(n), do: Map.get(@days_of_week, n, "?")
-
-  def day_name(n) when is_binary(n) do
-    case ToolHelpers.parse_int(n) do
-      nil -> "?"
-      num -> Map.get(@days_of_week, num, "?")
-    end
-  end
-
-  def day_name(_), do: "?"
-
-  def parse_cron_num("*"), do: {:ok, :any}
-
-  def parse_cron_num("*/" <> step) do
-    if n = ToolHelpers.parse_int(step), do: {:step, n}, else: :error
-  end
-
-  def parse_cron_num(s) do
-    if n = ToolHelpers.parse_int(s), do: {:ok, n}, else: :error
-  end
+  # Single source of truth lives in ScheduleDescription (domain layer), shared
+  # with the job create/edit form preview so the table and form can never disagree.
+  defdelegate format_schedule(job), to: ScheduleDescription, as: :describe
 
   # ---------------------------------------------------------------------------
   # Timezone

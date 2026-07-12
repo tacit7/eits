@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperTest do
   # ---------------------------------------------------------------------------
 
   describe "diff_from_cached_tail/2 — stable cluster identity" do
-    test "12 consecutive tool events: cluster ID never changes as window slides" do
+    test "12 consecutive tool events: new_tail cluster ID stays cluster-row-1 as window slides" do
       # Build a run of 12 consecutive tool events (exceeds @tail_window = 10).
       messages = Enum.map(1..12, &tool_msg/1)
 
@@ -56,24 +56,14 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperTest do
       # last_stream_tail is set to the rows from grouped_rows([msg1..msg10]).
       initial_tail = messages |> Enum.take(10) |> MessageGrouper.grouped_rows()
 
-      # Message 11 arrives — window slides to [msg2..msg11].
-      {changed11, tail11} =
+      # Message 11 arrives.
+      {_changed11, tail11} =
         MessageGrouper.diff_from_cached_tail(initial_tail, Enum.take(messages, 11))
 
       # Message 12 arrives.
-      {changed12, tail12} = MessageGrouper.diff_from_cached_tail(tail11, messages)
+      {_changed12, tail12} = MessageGrouper.diff_from_cached_tail(tail11, messages)
 
-      # The cluster ID must be cluster-row-1 throughout — never cluster-row-2 or higher.
-      cluster_ids_in_changed11 =
-        changed11 |> Enum.filter(&(&1.type == :cluster)) |> Enum.map(& &1.id)
-
-      cluster_ids_in_changed12 =
-        changed12 |> Enum.filter(&(&1.type == :cluster)) |> Enum.map(& &1.id)
-
-      assert cluster_ids_in_changed11 == ["cluster-row-1"]
-      assert cluster_ids_in_changed12 == ["cluster-row-1"]
-
-      # The tail should also use the stable ID.
+      # The new_tail cluster ID must be cluster-row-1 throughout.
       cluster_in_tail11 = Enum.find(tail11, &(&1.type == :cluster))
       cluster_in_tail12 = Enum.find(tail12, &(&1.type == :cluster))
       assert cluster_in_tail11.id == "cluster-row-1"
@@ -99,15 +89,15 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperTest do
       assert orphan_summaries == []
     end
 
-    test "cluster events list in changed row includes ALL events (not just window slice)" do
+    test "new_tail cluster includes ALL events, not just window slice" do
       messages = Enum.map(1..11, &tool_msg/1)
       initial_tail = messages |> Enum.take(10) |> MessageGrouper.grouped_rows()
 
-      {changed, _} = MessageGrouper.diff_from_cached_tail(initial_tail, messages)
+      {_changed, new_tail} = MessageGrouper.diff_from_cached_tail(initial_tail, messages)
 
-      cluster_row = Enum.find(changed, &(&1.type == :cluster))
+      cluster_row = Enum.find(new_tail, &(&1.type == :cluster))
       event_ids = Enum.map(cluster_row.data, & &1.id)
-      # All 11 events must be present, not just the 10 in the window.
+      # new_tail cluster must hold all 11 events, not just the window slice.
       assert event_ids == Enum.to_list(1..11)
     end
 
@@ -169,13 +159,14 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperTest do
       assert cluster.meta.count == 2
     end
 
-    test "result-only cluster has count 0 and result_only: true" do
+    test "result-only cluster has result_only: true and count > 0 (event count, not call count)" do
       messages = [result_msg(1), result_msg(2)]
       rows = MessageGrouper.grouped_rows(messages)
 
       cluster = Enum.find(rows, &(&1.type == :cluster))
-      assert cluster.meta.count == 0
       assert cluster.meta.result_only == true
+      # count reflects the number of result events (not 0) so the UI can display "2 results"
+      assert cluster.meta.count == 2
     end
 
     test "non-result-only cluster has result_only: false" do

@@ -87,7 +87,10 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       |> Enum.map(&to_stream_row/1)
 
     old_by_id = Map.new(cached_old_tail, &{&1.id, &1})
-    changed = Enum.filter(new_tail_rows, fn row -> Map.get(old_by_id, row.id) != row end)
+    # Only emit rows whose IDs are absent from the old tail — morphdom updates
+    # existing IDs in place on next mount; emitting same-ID updates here would
+    # cause the concatenated (old ++ changed) set to have duplicate IDs.
+    changed = Enum.filter(new_tail_rows, fn row -> not Map.has_key?(old_by_id, row.id) end)
 
     {changed, new_tail_rows}
   end
@@ -212,13 +215,17 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       end
 
     call_count = count_tool_calls(events)
+    result_only = call_count == 0
+    # When all events are results/outputs (no calls), display the result count
+    # rather than "0 calls" — the UI uses result_only: true to label it correctly.
+    display_count = if result_only, do: length(events), else: call_count
     tool_groups = build_tool_groups(events)
 
     cluster =
       {:cluster, events,
        %{
-         count: call_count,
-         result_only: call_count == 0,
+         count: display_count,
+         result_only: result_only,
          tool_groups: tool_groups,
          first_at: first.inserted_at,
          duration_ms: if(duration_ms && duration_ms > 1000, do: duration_ms)

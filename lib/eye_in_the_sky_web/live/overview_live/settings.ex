@@ -258,16 +258,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     {:noreply, apply_theme_setting(socket, theme)}
   end
 
-  defp apply_theme_setting(socket, theme) do
-    Settings.put("theme", theme)
-    settings = Settings.all()
-
-    socket
-    |> assign(:settings, settings)
-    |> flash_saved("theme")
-    |> push_event("apply_theme", %{theme: theme})
-  end
-
   @impl true
   def handle_event("save_pricing", params, socket) do
     pricing_keys =
@@ -347,6 +337,20 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("pi_refresh_models", _params, socket) do
     ModelDiscoveryCache.refresh_async()
     {:noreply, assign(socket, :pi_model_status, :loading)}
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers — settings application, Pi operations, rendering
+  # ---------------------------------------------------------------------------
+
+  defp apply_theme_setting(socket, theme) do
+    Settings.put("theme", theme)
+    settings = Settings.all()
+
+    socket
+    |> assign(:settings, settings)
+    |> flash_saved("theme")
+    |> push_event("apply_theme", %{theme: theme})
   end
 
   # Runs the blocking harness IPC in a supervised Task so the LiveView socket

@@ -209,32 +209,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   def handle_event("close_create_note_modal", _params, socket),
     do: {:noreply, assign(socket, :active_overlay, nil)}
 
-  def handle_event("create_note", %{"title" => title, "body" => body}, socket) do
-    session_id = socket.assigns.session_id
-
-    note_attrs = %{
-      parent_type: "session",
-      parent_id: to_string(session_id),
-      title: if(title != "", do: title, else: nil),
-      body: body
-    }
-
-    case Notes.create_note(note_attrs) do
-      {:ok, _note} ->
-        updated_notes = Notes.list_notes_for_session(session_id)
-
-        socket =
-          socket
-          |> assign(:notes, updated_notes)
-          |> assign(:active_overlay, nil)
-          |> put_flash(:info, "Note created")
-
-        {:noreply, socket}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to create note: #{inspect(reason)}")}
-    end
-  end
+  def handle_event("create_note", params, socket), do: Actions.handle_create_note(socket, params)
 
   def handle_event("toggle_thinking", _params, socket), do: handle_toggle_thinking(socket)
 

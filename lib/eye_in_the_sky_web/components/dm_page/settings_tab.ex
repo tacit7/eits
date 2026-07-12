@@ -7,10 +7,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     * Sub-tabs                 — General | Claude flags | Codex flags.
                                  Claude/Codex sub-tabs are hidden based on
                                  @session.provider.
-
-  Persistence is stubbed — all inputs fire `dm_setting_update`, which is
-  currently a no-op in DmLive until the JSONB columns land on
-  sessions.settings / agents.settings.
   """
   use EyeInTheSkyWeb, :html
 

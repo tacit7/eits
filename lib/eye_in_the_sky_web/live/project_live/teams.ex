@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:search_query, "")
       |> assign(:show_all, false)
       |> assign(:all_teams, [])
-      |> stream(:team_list, [], dom_id: fn t -> "team-#{t.id}" end)
+      |> stream(:team_list, [], dom_id: &team_dom_id/1)
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)
 
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       |> assign(:search_query, "")
       |> assign(:show_all, true)
       |> assign(:all_teams, [])
-      |> stream(:team_list, [], dom_id: fn t -> "team-#{t.id}" end)
+      |> stream(:team_list, [], dom_id: &team_dom_id/1)
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)
 
@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
       socket
       |> assign(:all_teams, teams)
-      |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+      |> stream(:team_list, teams, reset: true, dom_id: &team_dom_id/1)
       |> init_selection_assigns()
     else
       socket |> init_selection_assigns()
@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           load_teams(socket, socket.assigns.show_archived, true, socket.assigns.search_query)
 
         assign(socket, :all_teams, teams)
-        |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+        |> stream(:team_list, teams, reset: true, dom_id: &team_dom_id/1)
       else
         socket
       end
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           load_teams(socket, socket.assigns.show_archived, false, socket.assigns.search_query)
 
         assign(socket, :all_teams, teams)
-        |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+        |> stream(:team_list, teams, reset: true, dom_id: &team_dom_id/1)
       else
         socket
       end
@@ -123,7 +123,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     socket =
       socket
       |> update(:all_teams, &Enum.reject(&1, fn t -> t.id == team_id end))
-      |> stream_delete_by_dom_id(:team_list, "team-#{team_id}")
+      |> stream_delete_by_dom_id(:team_list, team_dom_id(team_id))
 
     {:noreply, socket}
   end
@@ -161,7 +161,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       socket
       |> assign(:search_query, query)
       |> assign(:all_teams, teams)
-      |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+      |> stream(:team_list, teams, reset: true, dom_id: &team_dom_id/1)
 
     {:noreply, socket}
   end
@@ -201,7 +201,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
       socket
       |> assign(:show_archived, show_archived)
       |> assign(:all_teams, teams)
-      |> stream(:team_list, teams, reset: true, dom_id: fn t -> "team-#{t.id}" end)
+      |> stream(:team_list, teams, reset: true, dom_id: &team_dom_id/1)
 
     {:noreply, socket}
   end
@@ -617,7 +617,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           socket =
             socket
             |> update(:all_teams, &Enum.reject(&1, fn t -> t.id == team_id end))
-            |> stream_delete_by_dom_id(:team_list, "team-#{team_id}")
+            |> stream_delete_by_dom_id(:team_list, team_dom_id(team_id))
 
           {:noreply, socket}
         end
@@ -647,4 +647,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
     |> assign(:select_mode, false)
     |> assign(:show_archive_confirm, false)
   end
+
+  defp team_dom_id(%{id: id}), do: "team-#{id}"
+  defp team_dom_id(id) when is_integer(id), do: "team-#{id}"
 end

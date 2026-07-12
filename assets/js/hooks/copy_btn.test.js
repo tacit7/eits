@@ -37,9 +37,13 @@ const COPY_BTN_CHECK_ICON =
  */
 function handleCopyClick(e, clipboard) {
   const btn = e.target.closest('[data-copy-btn]')
-  if (!btn || btn.dataset.copied) return Promise.resolve(null)
+  if (!btn) return Promise.resolve(null)
+  // Always suppress propagation and default so a repeated click during the
+  // copied-feedback interval never toggles the containing <details> or submits
+  // a surrounding form. Mirrors app.js ordering exactly.
   e.stopPropagation()
   e.preventDefault()
+  if (btn.dataset.copied) return Promise.resolve(null)
   const text = btn.dataset.copyText ?? ''
   return (clipboard?.writeText(text) ?? Promise.resolve()).then(
     () => {
@@ -153,7 +157,7 @@ describe('copy button handler', () => {
     expect(clipboard.writeText).toHaveBeenCalledTimes(1)
   })
 
-  it('does not stop propagation or prevent default on the no-op second click', async () => {
+  it('still stops propagation and prevents default on the no-op second click (must not toggle surrounding <details>)', async () => {
     btn = makeBtn()
     const e1 = makeClickEvent(btn)
     await handleCopyClick(e1, clipboard)
@@ -161,8 +165,13 @@ describe('copy button handler', () => {
     const e2 = makeClickEvent(btn)
     await handleCopyClick(e2, clipboard)
 
-    // e2 should not have been intercepted (it's a no-op; btn.dataset.copied is set).
-    expect(e2.stopPropagation).not.toHaveBeenCalled()
+    // Production runs stopPropagation/preventDefault unconditionally, before
+    // the data-copied early-return, so a repeated click during the
+    // copied-feedback interval never toggles a surrounding <details> or
+    // submits a form. This must hold even though the click is a clipboard no-op.
+    expect(e2.stopPropagation).toHaveBeenCalled()
+    expect(e2.preventDefault).toHaveBeenCalled()
+    expect(clipboard.writeText).toHaveBeenCalledTimes(1)
   })
 
   // -------------------------------------------------------------------------

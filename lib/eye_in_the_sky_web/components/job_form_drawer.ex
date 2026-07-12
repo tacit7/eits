@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
   import EyeInTheSkyWeb.CoreComponents
   import EyeInTheSkyWeb.Live.Shared.JobsFormatters, only: [cfg: 2]
 
-  alias EyeInTheSky.ScheduledJobs.CronPreview
+  alias EyeInTheSky.ScheduledJobs.ScheduleDescription
 
   @common_timezones [
     "Etc/UTC",
@@ -177,7 +177,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 {translate_error(err)}
               </p>
               <%= if @form_schedule_type == "cron" && (@form[:schedule_value].errors == [] || @form[:schedule_value].errors == nil) && (@form[:schedule_value].value || "") != "" do %>
-                <% preview = CronPreview.preview(@form[:schedule_value].value) %>
+                <% preview = ScheduleDescription.preview(@form[:schedule_value].value) %>
                 <%= if preview do %>
                   <p class="mt-2 text-xs text-base-content/70">
                     <.icon name="hero-check-circle" class="inline size-3.5 text-success mr-1" /> {preview}

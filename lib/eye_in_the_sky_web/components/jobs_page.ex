@@ -21,6 +21,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
 
   alias EyeInTheSky.ScheduledJobs
   alias EyeInTheSky.ScheduledJobs.ScheduledJob
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Components.AgentScheduleSection
   alias EyeInTheSkyWeb.Components.AIJobCreator
   import EyeInTheSkyWeb.Live.Shared.JobsHelpers
@@ -88,7 +89,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
       |> assign_new(:form, fn -> to_form(ScheduledJobs.change_job(%ScheduledJob{})) end)
       |> assign_new(:form_job_type, fn -> "spawn_agent" end)
       |> assign_new(:form_schedule_type, fn -> "interval" end)
-      |> assign_new(:form_config, fn -> %{} end)
+      |> assign_new(:form_config, fn -> %{"model" => Settings.default_model()} end)
       |> assign_new(:expanded_job_id, fn -> nil end)
       |> assign_new(:selected_job, fn -> nil end)
       |> assign_new(:runs, fn -> [] end)
@@ -144,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
      |> assign(:form, to_form(ScheduledJobs.change_job(%ScheduledJob{})))
      |> assign(:form_job_type, "spawn_agent")
      |> assign(:form_schedule_type, "interval")
-     |> assign(:form_config, %{})}
+     |> assign(:form_config, %{"model" => Settings.default_model()})}
   end
 
   defp dispatch_event("cancel_form", params, socket),
@@ -170,49 +171,25 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     do: handle_toggle_job(params, socket, &load_jobs/1, socket.assigns.project_id)
 
   defp dispatch_event("run_now", %{"id" => id} = _params, socket) do
-    with {:ok, int_id} <- parse_job_id(id),
-         {:ok, job} <- ScheduledJobs.get_job(int_id),
-         :ok <- check_job_access(job, socket.assigns.project_id) do
-      # Show confirmation modal for agent jobs, run immediately for others
-      case job.job_type do
-        "spawn_agent" ->
-          {:noreply, assign(socket, :confirm_run_modal_job, job)}
+    case fetch_job_for_run(id, socket.assigns.project_id) do
+      {:ok, job} ->
+        case job.job_type do
+          "spawn_agent" -> {:noreply, assign(socket, :confirm_run_modal_job, job)}
+          _ -> do_run_job(job, socket)
+        end
 
-        _ ->
-          do_run_job(job, socket)
-      end
-    else
-      :error ->
-        send(self(), {:jobs_page_flash, :error, "Invalid job ID"})
-        {:noreply, socket}
-
-      {:error, :not_found} ->
-        send(self(), {:jobs_page_flash, :error, "Job not found"})
-        {:noreply, socket}
-
-      {:error, :access_denied} ->
-        send(self(), {:jobs_page_flash, :error, "Access denied"})
-        {:noreply, socket}
+      {:error, reason} ->
+        handle_run_job_error(reason, socket)
     end
   end
 
   defp dispatch_event("confirm_run_job", params, socket) do
-    with {:ok, int_id} <- parse_job_id(params["id"]),
-         {:ok, job} <- ScheduledJobs.get_job(int_id),
-         :ok <- check_job_access(job, socket.assigns.project_id) do
-      {:noreply, assign(socket, :confirm_run_modal_job, nil) |> then(&do_run_job(job, &1))}
-    else
-      :error ->
-        send(self(), {:jobs_page_flash, :error, "Invalid job ID"})
-        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+    case fetch_job_for_run(params["id"], socket.assigns.project_id) do
+      {:ok, job} ->
+        {:noreply, socket |> assign(:confirm_run_modal_job, nil) |> then(&do_run_job(job, &1))}
 
-      {:error, :not_found} ->
-        send(self(), {:jobs_page_flash, :error, "Job not found"})
-        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
-
-      {:error, :access_denied} ->
-        send(self(), {:jobs_page_flash, :error, "Access denied"})
-        {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+      {:error, reason} ->
+        handle_run_job_error(reason, socket)
     end
   end
 
@@ -267,17 +244,18 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   end
 
   defp dispatch_event("toggle_job_select", %{"id" => id}, socket) do
-    {:ok, int_id} = parse_job_id(id)
-    selected = socket.assigns.bulk_selected_jobs
+    case parse_job_id(id) do
+      {:ok, int_id} ->
+        selected = socket.assigns.bulk_selected_jobs
+        updated =
+          if MapSet.member?(selected, int_id),
+            do: MapSet.delete(selected, int_id),
+            else: MapSet.put(selected, int_id)
+        {:noreply, assign(socket, :bulk_selected_jobs, updated)}
 
-    updated =
-      if MapSet.member?(selected, int_id),
-        do: MapSet.delete(selected, int_id),
-        else: MapSet.put(selected, int_id)
-
-    {:noreply, assign(socket, :bulk_selected_jobs, updated)}
-  rescue
-    _ -> {:noreply, socket}
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   defp dispatch_event("select_all_jobs", %{"scope" => scope}, socket) do
@@ -304,45 +282,11 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   end
 
   defp dispatch_event("bulk_enable", %{"scope" => _scope}, socket) do
-    selected = socket.assigns.bulk_selected_jobs
-
-    if MapSet.size(selected) == 0 do
-      {:noreply, socket}
-    else
-      job_ids = MapSet.to_list(selected)
-
-      {updated_count, _} =
-        ScheduledJobs.bulk_update_enabled(job_ids, true, socket.assigns.project_id)
-
-      {:noreply,
-       socket
-       |> assign(:bulk_selected_jobs, MapSet.new())
-       |> load_jobs()
-       |> then(
-         &put_flash(&1, :info, "Enabled #{updated_count} job#{if updated_count != 1, do: "s"}")
-       )}
-    end
+    do_bulk_toggle_enabled(true, "Enabled", socket)
   end
 
   defp dispatch_event("bulk_disable", %{"scope" => _scope}, socket) do
-    selected = socket.assigns.bulk_selected_jobs
-
-    if MapSet.size(selected) == 0 do
-      {:noreply, socket}
-    else
-      job_ids = MapSet.to_list(selected)
-
-      {updated_count, _} =
-        ScheduledJobs.bulk_update_enabled(job_ids, false, socket.assigns.project_id)
-
-      {:noreply,
-       socket
-       |> assign(:bulk_selected_jobs, MapSet.new())
-       |> load_jobs()
-       |> then(
-         &put_flash(&1, :info, "Disabled #{updated_count} job#{if updated_count != 1, do: "s"}")
-       )}
-    end
+    do_bulk_toggle_enabled(false, "Disabled", socket)
   end
 
   defp dispatch_event("clear_bulk_selection", _params, socket) do
@@ -350,6 +294,50 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   end
 
   defp dispatch_event(_event, _params, socket), do: {:noreply, socket}
+
+  defp fetch_job_for_run(id, project_id) do
+    with {:ok, int_id} <- parse_job_id(id),
+         {:ok, job} <- ScheduledJobs.get_job(int_id),
+         :ok <- check_job_access(job, project_id) do
+      {:ok, job}
+    else
+      :error -> {:error, :invalid_id}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp handle_run_job_error(reason, socket) do
+    message =
+      case reason do
+        :invalid_id -> "Invalid job ID"
+        :not_found -> "Job not found"
+        :access_denied -> "Access denied"
+      end
+
+    send(self(), {:jobs_page_flash, :error, message})
+    {:noreply, assign(socket, :confirm_run_modal_job, nil)}
+  end
+
+  defp do_bulk_toggle_enabled(enabled, label, socket) do
+    selected = socket.assigns.bulk_selected_jobs
+
+    if MapSet.size(selected) == 0 do
+      {:noreply, socket}
+    else
+      job_ids = MapSet.to_list(selected)
+
+      {updated_count, _} =
+        ScheduledJobs.bulk_update_enabled(job_ids, enabled, socket.assigns.project_id)
+
+      {:noreply,
+       socket
+       |> assign(:bulk_selected_jobs, MapSet.new())
+       |> load_jobs()
+       |> then(
+         &put_flash(&1, :info, "#{label} #{updated_count} job#{if updated_count != 1, do: "s"}")
+       )}
+    end
+  end
 
   defp do_run_job(job, socket) do
     case ScheduledJobs.run_now(job.id, socket.assigns.project_id) do
@@ -430,6 +418,20 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
        when job_project_id != project_id, do: {:error, :access_denied}
 
   defp check_job_access(_job, _project_id), do: :ok
+
+  # ---------------------------------------------------------------------------
+  # CSS Helper Functions
+  # ---------------------------------------------------------------------------
+
+  defp run_status_dot_class("completed"), do: "bg-success"
+  defp run_status_dot_class("failed"), do: "bg-error"
+  defp run_status_dot_class("running"), do: "bg-info animate-pulse"
+  defp run_status_dot_class(_), do: "bg-base-content/15"
+
+  defp run_status_text_class("completed"), do: "text-success/80"
+  defp run_status_text_class("failed"), do: "text-error/80"
+  defp run_status_text_class("running"), do: "text-info/80"
+  defp run_status_text_class(_), do: "text-base-content/60"
 
   # ---------------------------------------------------------------------------
   # Template
@@ -548,36 +550,20 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         )
       ]}>
         <%= if @active_tab == :all_jobs do %>
-          <%= if @project_id do %>
-            <%!-- Project view: merged list with "global" inline tag for global jobs --%>
-            <.jobs_table
-              jobs={(@project_jobs || []) ++ (@global_jobs || [])}
-              expanded_job_id={@expanded_job_id}
-              runs={@runs}
-              running_ids={@running_ids}
-              last_run_map={@last_run_map}
-              last_failed_runs={@last_failed_runs}
-              last_n_runs_map={@last_n_runs_map}
-              scope="overview"
-              show_origin={true}
-              bulk_selected_jobs={@bulk_selected_jobs}
-              target={@myself}
-            />
-          <% else %>
-            <.jobs_table
-              jobs={@jobs}
-              expanded_job_id={@expanded_job_id}
-              runs={@runs}
-              running_ids={@running_ids}
-              last_run_map={@last_run_map}
-              last_failed_runs={@last_failed_runs}
-              last_n_runs_map={@last_n_runs_map}
-              scope="overview"
-              show_origin={true}
-              bulk_selected_jobs={@bulk_selected_jobs}
-              target={@myself}
-            />
-          <% end %>
+          <% job_list = if @project_id, do: (@project_jobs || []) ++ (@global_jobs || []), else: @jobs %>
+          <.jobs_table
+            jobs={job_list}
+            expanded_job_id={@expanded_job_id}
+            runs={@runs}
+            running_ids={@running_ids}
+            last_run_map={@last_run_map}
+            last_failed_runs={@last_failed_runs}
+            last_n_runs_map={@last_n_runs_map}
+            scope="overview"
+            show_origin={true}
+            bulk_selected_jobs={@bulk_selected_jobs}
+            target={@myself}
+          />
         <% end %>
       </div>
 
@@ -735,12 +721,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                       title={run.status}
                       class={[
                         "size-2.5 rounded-full flex-shrink-0",
-                        case run.status do
-                          "completed" -> "bg-success"
-                          "failed" -> "bg-error"
-                          "running" -> "bg-info animate-pulse"
-                          _ -> "bg-base-content/15"
-                        end
+                        run_status_dot_class(run.status)
                       ]}
                     />
                   <% end %>
@@ -757,23 +738,13 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                     <div class="py-2 flex items-center gap-3">
                       <span class={[
                         "size-2 rounded-full flex-shrink-0",
-                        case run.status do
-                          "completed" -> "bg-success"
-                          "failed" -> "bg-error"
-                          "running" -> "bg-info animate-pulse"
-                          _ -> "bg-base-content/20"
-                        end
+                        run_status_dot_class(run.status)
                       ]} />
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
                           <span class={[
                             "text-xs font-medium",
-                            case run.status do
-                              "completed" -> "text-success/80"
-                              "failed" -> "text-error/80"
-                              "running" -> "text-info/80"
-                              _ -> "text-base-content/60"
-                            end
+                            run_status_text_class(run.status)
                           ]}>
                             {String.capitalize(run.status)}
                           </span>

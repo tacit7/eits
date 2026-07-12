@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpers do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Settings
   alias EyeInTheSky.Tasks
 
   @doc """
@@ -15,32 +16,42 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpers do
   Returns `{:noreply, socket}`.
   """
   def handle_start_agent_for_task(%{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    project = socket.assigns.project
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        project = socket.assigns.project
 
-    task_prompt = "#{task.title}\n\n#{task.description || ""}" |> String.trim()
+        task_prompt = build_task_prompt(task)
 
-    opts = [
-      description: task.title,
-      instructions: task_prompt,
-      project_id: project.id,
-      project_path: project.path,
-      model: "sonnet"
-    ]
+        opts = [
+          description: task.title,
+          instructions: task_prompt,
+          project_id: project.id,
+          project_path: project.path,
+          model: Settings.default_model()
+        ]
 
-    case AgentManager.create_agent(opts) do
-      {:ok, %{session: session}} ->
-        Tasks.link_session_to_task(task.id, session.id)
+        case AgentManager.create_agent(opts) do
+          {:ok, %{session: session}} ->
+            Tasks.link_session_to_task(task.id, session.id)
 
-        socket =
-          socket
-          |> assign(:show_task_detail_drawer, false)
-          |> put_flash(:info, "Agent spawned for task: #{String.slice(task.title, 0..40)}")
+            socket =
+              socket
+              |> assign(:show_task_detail_drawer, false)
+              |> put_flash(:info, "Agent spawned for task: #{String.slice(task.title, 0..40)}")
 
-        {:noreply, socket}
+            {:noreply, socket}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
     end
+  end
+
+  @doc "Builds the initial prompt for an agent spawned from a task."
+  def build_task_prompt(task) do
+    "#{task.title}\n\n#{task.description || ""}" |> String.trim()
   end
 end

@@ -172,20 +172,26 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
            provider: provider,
            body: body
          }) do
-      {:ok, _} ->
-        AgentManager.continue_session(session_id, body, [])
-        messages = Messages.list_recent_messages(session_id, 50)
-        cs_id = socket.assigns.canvas_session.id
+      {:ok, message} ->
+        case AgentManager.continue_session(session_id, body, message_id: message.id) do
+          {:ok, _} ->
+            messages = Messages.list_recent_messages(session_id, 50)
+            cs_id = socket.assigns.canvas_session.id
 
-        socket =
-          socket
-          |> assign(:messages, messages)
-          |> push_event("messages-updated-" <> to_string(cs_id), %{})
+            {:noreply,
+             socket
+             |> assign(:messages, messages)
+             |> push_event("messages-updated-" <> to_string(cs_id), %{})}
 
-        {:noreply, socket}
+          {:error, :queue_full} ->
+            {:noreply, put_flash(socket, :error, "Queue is full — max 5 messages pending")}
+
+          {:error, _reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to send message")}
+        end
 
       {:error, _} ->
-        {:noreply, socket}
+        {:noreply, put_flash(socket, :error, "Failed to send message")}
     end
   end
 
@@ -227,8 +233,13 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
 
     # Tool events: explicit stream_type OR body that parses entirely as tool calls
+    # (but never for user/system prose, which may itself resemble a tool call, e.g. "> `Bash` ...")
     segments = DmHelpers.parse_body_segments(assigns.message.body)
-    body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+
+    body_is_tool_calls =
+      role not in [:user, :system] and segments != [] and
+        Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+
     is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
 
     assigns =

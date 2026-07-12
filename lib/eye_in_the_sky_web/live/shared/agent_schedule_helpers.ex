@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.Claude.AgentFileScanner
-  alias EyeInTheSky.{Projects, Prompts, ScheduledJobs}
+  alias EyeInTheSky.{Projects, Prompts, ScheduledJobs, Settings}
 
   @doc "Initialize agent schedule assigns. Call from mount/3."
   def assign_agent_schedule_defaults(socket) do
@@ -276,7 +276,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
        }) do
     %{
       "instructions" => prompt.prompt_text,
-      "model" => params["model"] || "sonnet",
+      "model" => params["model"] || Settings.default_model(),
       "project_path" => path
     }
     |> put_prompt_id(prompt_source, prompt_id_raw)

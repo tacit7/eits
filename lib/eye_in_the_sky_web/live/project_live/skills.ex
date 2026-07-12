@@ -79,13 +79,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
   end
 
   @impl true
-  def handle_event("set_detail_tab", %{"tab" => "preview"}, socket),
-    do: {:noreply, assign(socket, :detail_tab, :preview)}
-
-  def handle_event("set_detail_tab", %{"tab" => "raw"}, socket),
-    do: {:noreply, assign(socket, :detail_tab, :raw)}
-
-  def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
+  def handle_event("set_detail_tab", params, socket),
+    do: ViewHelpers.handle_set_detail_tab(params, socket)
 
   @impl true
   def handle_event("open_in_editor", %{"editor" => editor_id, "path" => path}, socket) do
@@ -391,16 +386,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
     </div>
     """
   end
-
-  defp source_badge_class(:skills), do: "bg-primary/10 text-primary/70"
-  defp source_badge_class(:project_skills), do: "bg-secondary/10 text-secondary/70"
-  defp source_badge_class(:project_commands), do: "bg-secondary/10 text-secondary/70"
-  defp source_badge_class(_), do: "bg-base-content/5 text-base-content/50"
-
-  defp source_label(:skills), do: "skill"
-  defp source_label(:commands), do: "command"
-  defp source_label(:project_skills), do: "project skill"
-  defp source_label(:project_commands), do: "project cmd"
 
   defp edit_language(%{path: path}) when is_binary(path), do: lang_from_path(path)
   defp edit_language(%{abs_path: path}) when is_binary(path), do: lang_from_path(path)

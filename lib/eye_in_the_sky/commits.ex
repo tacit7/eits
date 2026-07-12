@@ -33,17 +33,6 @@ defmodule EyeInTheSky.Commits do
   end
 
   @doc """
-  Returns recent commits for a session with a limit.
-  """
-  def list_recent_commits(session_id, limit \\ 10) do
-    Commit
-    |> where([c], c.session_id == ^session_id)
-    |> order_by([c], desc: c.created_at)
-    |> limit(^limit)
-    |> Repo.all()
-  end
-
-  @doc """
   Returns commits for a specific session.
   """
   def list_commits_for_session(session_id, opts \\ []) do
@@ -51,6 +40,24 @@ defmodule EyeInTheSky.Commits do
       order_by: [desc: :created_at],
       limit: Keyword.get(opts, :limit)
     )
+  end
+
+  @doc """
+  Returns commits for a session, plus orphaned commits (session_id IS NULL)
+  from the same agent. Recovers commits whose session was hard-deleted, which
+  sets session_id to NULL via the FK ON DELETE SET NULL constraint.
+  """
+  def list_commits_for_session_and_agent(session_id, agent_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 500)
+
+    from(c in Commit,
+      where:
+        c.session_id == ^session_id or
+          (is_nil(c.session_id) and c.agent_id == ^agent_id),
+      order_by: [desc: c.created_at],
+      limit: ^limit
+    )
+    |> Repo.all()
   end
 
   @doc """
@@ -74,54 +81,12 @@ defmodule EyeInTheSky.Commits do
   end
 
   @doc """
-  Gets a single commit.
-
-  Raises `Ecto.NoResultsError` if the Commit does not exist.
-  """
-  def get_commit!(id) do
-    Repo.get!(Commit, id)
-  end
-
-  @doc """
-  Gets a commit by hash.
-  """
-  def get_commit_by_hash(hash) do
-    case Repo.get_by(Commit, commit_hash: hash) do
-      nil -> {:error, :not_found}
-      commit -> {:ok, commit}
-    end
-  end
-
-  @doc """
   Creates a commit.
   """
   def create_commit(attrs \\ %{}) do
     %Commit{}
     |> Commit.changeset(attrs)
-    |> Repo.insert(on_conflict: :nothing, conflict_target: :commit_hash)
-  end
-
-  @doc """
-  Updates a commit.
-  """
-  def update_commit(%Commit{} = commit, attrs) do
-    commit
-    |> Commit.changeset(attrs)
-    |> Repo.update()
-  end
-
-  @doc """
-  Deletes a commit.
-  """
-  def delete_commit(%Commit{} = commit) do
-    Repo.delete(commit)
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for tracking commit changes.
-  """
-  def change_commit(%Commit{} = commit, attrs \\ %{}) do
-    Commit.changeset(commit, attrs)
+    |> Repo.insert(on_conflict: :nothing, conflict_target: [:session_id, :commit_hash])
   end
 
   @doc """
@@ -134,7 +99,7 @@ defmodule EyeInTheSky.Commits do
     pattern = "%#{query}%"
 
     from(c in Commit,
-      join: s in EyeInTheSky.Sessions.Session,
+      left_join: s in EyeInTheSky.Sessions.Session,
       on: s.id == c.session_id,
       where: ilike(c.commit_message, ^pattern),
       order_by: [desc: c.created_at],

@@ -87,8 +87,8 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       too_old?(agent.last_activity_at, now) -> "unknown"
       # Stale: inactive for more than 1 hour
       stale?(agent.last_activity_at, now) -> "stale"
-      # Idle: created less than 1 hour ago
-      waiting?(agent.created_at, now) -> "idle"
+      # Idle: only when there has been no activity at all and agent is newly created
+      is_nil(agent.last_activity_at) and waiting?(agent.created_at, now) -> "idle"
       true -> :skip
     end
   end
@@ -213,11 +213,17 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
       end)
 
       # H2 fix: single Repo.update_all replaces M individual Agents.update_agent calls.
+      # Only mark agents failed if they have no other live (non-terminal) sessions.
       if agent_ids != [] do
-        Repo.update_all(
-          from(a in Agent, where: a.id in ^agent_ids),
-          set: [status: "failed"]
-        )
+        live = agents_with_live_sessions(agent_ids)
+        dead_agent_ids = Enum.reject(agent_ids, &MapSet.member?(live, &1))
+
+        if dead_agent_ids != [] do
+          Repo.update_all(
+            from(a in Agent, where: a.id in ^dead_agent_ids),
+            set: [status: "failed"]
+          )
+        end
       end
 
       Logger.info("Zombie sweep: marked #{length(zombies)} sessions as failed")
@@ -225,6 +231,17 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   rescue
     DBConnection.ConnectionError ->
       Logger.warning("sweep_zombie_sessions: DB unavailable, skipping")
+  end
+
+  defp agents_with_live_sessions(agent_ids) do
+    from(s in Session,
+      where: s.agent_id in ^agent_ids,
+      where: s.status not in ["completed", "failed", "archived"],
+      select: s.agent_id,
+      distinct: true
+    )
+    |> Repo.all()
+    |> MapSet.new()
   end
 
   defp archive_session_and_agent(session, now) do

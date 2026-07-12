@@ -126,10 +126,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
 
   defp validate_entry_path(base, name) do
     full = Path.join(base, name)
-    real_base = claude_dir() |> Path.expand() |> resolve_real_path()
+    real_base = claude_dir() |> Path.expand()
     # Resolve the *parent* directory (which must exist) to catch symlink traversal.
     # Appending the validated name is safe because name contains no "/" or "..".
-    real_parent = base |> Path.expand() |> resolve_real_path()
+    real_parent = base |> Path.expand()
     real_full = Path.join(real_parent, name)
 
     cond do
@@ -219,10 +219,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
     idx = Enum.find_index(@pinned_order, &(String.downcase(&1) == String.downcase(name)))
     pinned = if idx, do: {0, idx}, else: {1, 0}
     {pinned, !entry.is_dir, String.downcase(name)}
-  end
-
-  defp resolve_real_path(path) do
-    Path.expand(path)
   end
 
   defp relative_path(path) do

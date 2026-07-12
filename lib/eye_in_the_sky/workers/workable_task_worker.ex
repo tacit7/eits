@@ -61,7 +61,7 @@ defmodule EyeInTheSky.Workers.WorkableTaskWorker do
   defp execute(job) do
     config = ScheduledJobs.decode_config(job)
     tag_name = config["tag"] || "workable"
-    model = config["model"] || "haiku"
+    model = config["model"] || EyeInTheSky.Settings.default_model()
 
     tasks = fetch_workable_tasks(tag_name, @batch_limit, job.project_id)
     spawn_tasks(tasks, %{model: model, tag_name: tag_name, project_id: job.project_id})

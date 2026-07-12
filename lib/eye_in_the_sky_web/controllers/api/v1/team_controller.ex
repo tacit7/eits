@@ -66,14 +66,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         members: Enum.map(members, &ApiPresenter.present_member/1)
       })
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -103,6 +96,9 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           {:error, changeset}
       end
     else
+      {:error, :not_found} ->
+        {:error, :unauthorized, "Session not found"}
+
       {:error, :unauthorized} ->
         {:error, :unauthorized, "Unauthorized"}
 
@@ -139,14 +135,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
             {:error, changeset}
         end
       else
-        {:error, :not_found} ->
-          {:error, :not_found, "Team not found"}
-
-        {:error, :unauthorized} ->
-          {:error, :unauthorized, "Unauthorized"}
-
-        {:error, :forbidden} ->
-          {:error, :forbidden, "Access denied: team does not belong to your project"}
+        error -> handle_team_errors(error)
       end
     end
   end
@@ -164,14 +153,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           {:error, changeset}
       end
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -188,20 +170,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         members: Enum.map(members, &ApiPresenter.present_member/1)
       })
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
   # POST /api/v1/teams/:team_id/members
   def join(conn, %{"team_id" => id} = params) do
-    with {:ok, scope} <- get_project_scope(conn, params),
+    scope_params = Map.drop(params, ["session_id", "agent_id"])
+
+    with {:ok, scope} <- get_project_scope(conn, scope_params),
          {:ok, team} <- resolve_team(id),
          :ok <- validate_project_access(team, scope) do
       attrs = %{
@@ -228,14 +205,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
           {:error, changeset}
       end
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -244,20 +214,14 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
          :ok <- validate_project_access(team, scope),
-         {:ok, member} <- resolve_member(member_id) do
+         {:ok, member} <- resolve_member(member_id),
+         :ok <- verify_member_team(member, team) do
       do_update_member(conn, member, params)
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
       {:error, :member_not_found} ->
         {:error, :not_found, "Member not found"}
 
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -266,20 +230,14 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     with {:ok, scope} <- get_project_scope(conn, params),
          {:ok, team} <- resolve_team(team_id),
          :ok <- validate_project_access(team, scope),
-         {:ok, member} <- resolve_member(member_id) do
+         {:ok, member} <- resolve_member(member_id),
+         :ok <- verify_member_team(member, team) do
       do_leave_team(conn, member)
     else
-      {:error, :not_found} ->
-        {:error, :not_found, "Team not found"}
-
       {:error, :member_not_found} ->
         {:error, :not_found, "Member not found"}
 
-      {:error, :unauthorized} ->
-        {:error, :unauthorized, "Unauthorized"}
-
-      {:error, :forbidden} ->
-        {:error, :forbidden, "Access denied: team does not belong to your project"}
+      error -> handle_team_errors(error)
     end
   end
 
@@ -301,14 +259,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
              :ok <- validate_project_access(team, scope) do
           do_broadcast(conn, team, from_raw, String.trim(body))
         else
-          {:error, :not_found} ->
-            {:error, :not_found, "Team not found"}
-
-          {:error, :unauthorized} ->
-            {:error, :unauthorized, "Unauthorized"}
-
-          {:error, :forbidden} ->
-            {:error, :forbidden, "Access denied: team does not belong to your project"}
+          error -> handle_team_errors(error)
         end
     end
   end
@@ -411,13 +362,22 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-  defp do_update_member(conn, member, params) do
-    case Teams.update_member_status(member, params["status"]) do
-      {:ok, updated} ->
-        json(conn, %{success: true, member_id: updated.id, status: updated.status})
+  defp verify_member_team(%{team_id: tid}, %{id: tid}), do: :ok
+  defp verify_member_team(_, _), do: {:error, :forbidden}
 
-      {:error, changeset} ->
-        {:error, changeset}
+  defp do_update_member(conn, member, params) do
+    case params["status"] do
+      nil ->
+        {:error, :bad_request, "status is required"}
+
+      status ->
+        case Teams.update_member_status(member, status) do
+          {:ok, updated} ->
+            json(conn, %{success: true, member_id: updated.id, status: updated.status})
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
     end
   end
 
@@ -484,15 +444,18 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
     end
   end
 
-  defp check_sender_not_terminated(session) do
-    if session.status in Sessions.terminated_statuses(),
-      do: {:error, :sender_terminated},
-      else: :ok
-  end
-
   defp check_is_team_member(members, session) do
     if Enum.any?(members, &(&1.session_id == session.id)),
       do: :ok,
       else: {:error, :not_member}
   end
+
+  defp handle_team_errors({:error, :not_found}),
+    do: {:error, :not_found, "Team not found"}
+
+  defp handle_team_errors({:error, :unauthorized}),
+    do: {:error, :unauthorized, "Unauthorized"}
+
+  defp handle_team_errors({:error, :forbidden}),
+    do: {:error, :forbidden, "Access denied: team does not belong to your project"}
 end

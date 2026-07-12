@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   require Logger
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Messages, Sessions}
+  alias EyeInTheSky.Messages
   alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
@@ -347,12 +347,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       {:ok, session} -> {:ok, session}
       {:error, :not_found} -> {:error, :sender_not_found}
     end
-  end
-
-  defp check_sender_not_terminated(session) do
-    if session.status in Sessions.terminated_statuses(),
-      do: {:error, :sender_terminated},
-      else: :ok
   end
 
   defp resolve_dm_receiver(raw) do

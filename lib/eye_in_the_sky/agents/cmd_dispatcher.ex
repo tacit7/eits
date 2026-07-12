@@ -86,11 +86,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   Dispatches a list of EITS-CMD lines in the context of the given session.
   Each command is dispatched asynchronously to avoid blocking the worker.
   """
-  @spec dispatch_all([String.t()], integer()) :: :ok
-  def dispatch_all(cmd_lines, from_session_id) do
+  @spec dispatch_all([String.t()], integer(), integer() | nil) :: :ok
+  def dispatch_all(cmd_lines, from_session_id, agent_id) do
     Enum.each(cmd_lines, fn line ->
       AsyncTask.start(fn ->
-        dispatch(String.trim(line), from_session_id)
+        dispatch(String.trim(line), from_session_id, agent_id)
       end)
     end)
   end
@@ -99,24 +99,24 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   # Top-level router
   # ---------------------------------------------------------------------------
 
-  defp dispatch(@cmd_prefix <> rest, from_session_id) do
+  defp dispatch(@cmd_prefix <> rest, from_session_id, agent_id) do
     case String.split(String.trim(rest), " ", parts: 2) do
-      [cmd, args] -> route_cmd(cmd, args, from_session_id)
+      [cmd, args] -> route_cmd(cmd, args, from_session_id, agent_id)
       [unknown] -> notify_error(from_session_id, unknown, :unknown_command)
       _ -> notify_error(from_session_id, rest, :unknown_command)
     end
   end
 
-  defp dispatch(line, from_session_id),
+  defp dispatch(line, from_session_id, _agent_id),
     do: notify_error(from_session_id, "parse", {:malformed_line, line})
 
-  defp route_cmd("dm", args, sid), do: DmHandler.dispatch(args, sid)
-  defp route_cmd("task", args, sid), do: TaskHandler.dispatch(args, sid)
-  defp route_cmd("note", args, sid), do: dispatch_note(args, sid)
-  defp route_cmd("commit", hash, sid), do: dispatch_commit(String.trim(hash), sid)
-  defp route_cmd("spawn", args, sid), do: dispatch_spawn(args, sid)
-  defp route_cmd("channel", args, sid), do: dispatch_channel(args, sid)
-  defp route_cmd(unknown, _args, sid), do: notify_error(sid, unknown, :unknown_command)
+  defp route_cmd("dm", args, sid, _agent_id), do: DmHandler.dispatch(args, sid)
+  defp route_cmd("task", args, sid, _agent_id), do: TaskHandler.dispatch(args, sid)
+  defp route_cmd("note", args, sid, _agent_id), do: dispatch_note(args, sid)
+  defp route_cmd("commit", hash, sid, agent_id), do: dispatch_commit(String.trim(hash), sid, agent_id)
+  defp route_cmd("spawn", args, sid, _agent_id), do: dispatch_spawn(args, sid)
+  defp route_cmd("channel", args, sid, _agent_id), do: dispatch_channel(args, sid)
+  defp route_cmd(unknown, _args, sid, _agent_id), do: notify_error(sid, unknown, :unknown_command)
 
   # ---------------------------------------------------------------------------
   # note
@@ -147,10 +147,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   # commit
   # ---------------------------------------------------------------------------
 
-  defp dispatch_commit(hash, from_session_id) when hash != "" do
+  defp dispatch_commit(hash, from_session_id, agent_id) when hash != "" do
     case validate_session_exists(from_session_id) do
       :ok ->
-        case Commits.create_commit(%{commit_hash: hash, session_id: from_session_id}) do
+        case Commits.create_commit(%{commit_hash: hash, session_id: from_session_id, agent_id: agent_id}) do
           {:ok, _} -> notify_success(from_session_id, "commit #{hash} logged")
           {:error, reason} -> notify_error(from_session_id, "commit", reason)
         end
@@ -160,7 +160,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
     end
   end
 
-  defp dispatch_commit(_, from_session_id),
+  defp dispatch_commit(_, from_session_id, _agent_id),
     do: notify_error(from_session_id, "commit", :empty_hash)
 
   # Validate that session_id refers to an existing session

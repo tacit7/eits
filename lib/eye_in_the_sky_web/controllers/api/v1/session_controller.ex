@@ -126,29 +126,37 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     |> Helpers.maybe_put(:project_id, parse_int(params["project_id"], nil))
     |> Helpers.maybe_put(:git_worktree_path, params["worktree_path"])
     |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
-    |> then(fn a ->
-      if params["clear_entrypoint"] in [true, "true"], do: Map.put(a, :entrypoint, nil), else: a
-    end)
-    |> then(fn a ->
-      if status && status != "waiting" && !params["status_reason"],
-        do: Map.put(a, :status_reason, nil),
-        else: a
-    end)
-    |> then(fn a ->
-      if status in Sessions.terminated_statuses(),
-        do: Map.put(a, :ended_at, params["ended_at"] || DateTime.utc_now()),
-        else: a
-    end)
-    |> then(fn a ->
-      # When a new turn starts, clear intent and record the turn boundary.
-      # This is the staleness fence: intent is only valid for the current turn.
-      if status == "working" do
-        now = DateTime.utc_now()
-        a |> Map.put(:intent, nil) |> Map.put(:intent_set_at, nil) |> Map.put(:turn_start_at, now)
-      else
-        a
-      end
-    end)
+    |> maybe_clear_entrypoint(params)
+    |> maybe_clear_status_reason(status, params)
+    |> maybe_set_ended_at(status, params)
+    |> maybe_clear_intent(status)
+  end
+
+  defp maybe_clear_entrypoint(attrs, params) do
+    if params["clear_entrypoint"] in [true, "true"], do: Map.put(attrs, :entrypoint, nil), else: attrs
+  end
+
+  defp maybe_clear_status_reason(attrs, status, params) do
+    if status && status != "waiting" && !params["status_reason"],
+      do: Map.put(attrs, :status_reason, nil),
+      else: attrs
+  end
+
+  defp maybe_set_ended_at(attrs, status, params) do
+    if status in Sessions.terminated_statuses(),
+      do: Map.put(attrs, :ended_at, params["ended_at"] || DateTime.utc_now()),
+      else: attrs
+  end
+
+  # When a new turn starts, clear intent and record the turn boundary.
+  # This is the staleness fence: intent is only valid for the current turn.
+  defp maybe_clear_intent(attrs, status) do
+    if status == "working" do
+      now = DateTime.utc_now()
+      attrs |> Map.put(:intent, nil) |> Map.put(:intent_set_at, nil) |> Map.put(:turn_start_at, now)
+    else
+      attrs
+    end
   end
 
   @doc """

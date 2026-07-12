@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 2]
 
   alias EyeInTheSky.{Notes, Tasks}
+  alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
 
   # ---------------------------------------------------------------------------
   # Event handlers with no dependency on per-LiveView private functions
@@ -21,30 +22,40 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   end
 
   def handle_open_task_detail(%{"task_id" => task_id} = params, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    notes = Notes.list_notes_for_task(task.id)
-    focus = Map.get(params, "focus")
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        notes = Notes.list_notes_for_task(task.id)
+        focus = Map.get(params, "focus")
 
-    {:noreply,
-     socket
-     |> assign(:selected_task, task)
-     |> assign(:task_notes, notes)
-     |> assign(:task_detail_focus, focus)
-     |> assign(:show_task_detail_drawer, true)}
+        {:noreply,
+         socket
+         |> assign(:selected_task, task)
+         |> assign(:task_notes, notes)
+         |> assign(:task_detail_focus, focus)
+         |> assign(:show_task_detail_drawer, true)}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
+    end
   end
 
   def handle_open_task_detail(_params, socket), do: {:noreply, socket}
 
   # Variant for LiveViews that use an `active_overlay` atom rather than a boolean drawer assign.
   def handle_open_task_detail_with_overlay(%{"task_id" => task_id}, socket, overlay_value) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    notes = Notes.list_notes_for_task(task.id)
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        notes = Notes.list_notes_for_task(task.id)
 
-    {:noreply,
-     socket
-     |> assign(:selected_task, task)
-     |> assign(:task_notes, notes)
-     |> assign(:active_overlay, overlay_value)}
+        {:noreply,
+         socket
+         |> assign(:selected_task, task)
+         |> assign(:task_notes, notes)
+         |> assign(:active_overlay, overlay_value)}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
+    end
   end
 
   def handle_open_task_detail_with_overlay(_params, socket, _overlay_value),
@@ -119,58 +130,53 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
 
   def handle_delete_task(params, socket, reload_fn) do
     task_id = extract_task_id(params)
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
 
-    case Tasks.delete_task_with_associations(task) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> assign(:show_task_detail_drawer, false)
-         |> assign(:selected_task, nil)
-         |> reload_fn.()}
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        do_task_mutation(task, &Tasks.delete_task_with_associations/1, socket, reload_fn, "Failed to delete task")
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete task")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
     end
   end
 
   def handle_archive_task(params, socket, reload_fn) do
     task_id = extract_task_id(params)
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
 
-    case Tasks.archive_task(task) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> assign(:show_task_detail_drawer, false)
-         |> assign(:selected_task, nil)
-         |> reload_fn.()}
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        do_task_mutation(task, &Tasks.archive_task/1, socket, reload_fn, "Failed to archive task")
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to archive task")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
     end
   end
 
   def handle_add_task_annotation(%{"task_id" => task_id, "body" => body}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    body = String.trim(body)
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        body = String.trim(body)
 
-    if body != "" do
-      case Notes.create_note(%{
-             parent_type: "task",
-             parent_id: task.uuid || to_string(task.id),
-             body: body
-           }) do
-        {:ok, _note} ->
-          notes = Notes.list_notes_for_task(task.id)
-          {:noreply, assign(socket, :task_notes, notes)}
+        if body != "" do
+          case Notes.create_note(%{
+                 parent_type: "task",
+                 parent_id: task.uuid || to_string(task.id),
+                 body: body
+               }) do
+            {:ok, _note} ->
+              notes = Notes.list_notes_for_task(task.id)
+              {:noreply, assign(socket, :task_notes, notes)}
 
-        {:error, changeset} ->
-          Logger.error("Failed to create task annotation: #{inspect(changeset.errors)}")
-          {:noreply, put_flash(socket, :error, "Failed to save annotation")}
-      end
-    else
-      {:noreply, socket}
+            {:error, changeset} ->
+              Logger.error("Failed to create task annotation: #{inspect(changeset.errors)}")
+              {:noreply, put_flash(socket, :error, "Failed to save annotation")}
+          end
+        else
+          {:noreply, socket}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
     end
   end
 
@@ -359,37 +365,31 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     anchor = to_string(anchor_id)
     target = to_string(target_id)
 
-    anchor_idx = Enum.find_index(ordered_ids, &(&1 == anchor))
-    target_idx = Enum.find_index(ordered_ids, &(&1 == target))
+    case Selection.range_ids(ordered_ids, anchor, target) do
+      :not_found ->
+        {:noreply, socket}
 
-    if is_nil(anchor_idx) or is_nil(target_idx) do
-      {:noreply, socket}
-    else
-      range_ids =
-        ordered_ids
-        |> Enum.slice(min(anchor_idx, target_idx)..max(anchor_idx, target_idx))
-        |> MapSet.new()
+      {:ok, range_ids} ->
+        selected = MapSet.union(socket.assigns.selected_task_ids, range_ids)
+        prev_select_mode = socket.assigns.tasks_select_mode
+        new_select_mode = MapSet.size(selected) > 0
+        select_mode_changed? = prev_select_mode != new_select_mode
 
-      selected = MapSet.union(socket.assigns.selected_task_ids, range_ids)
-      prev_select_mode = socket.assigns.tasks_select_mode
-      new_select_mode = MapSet.size(selected) > 0
-      select_mode_changed? = prev_select_mode != new_select_mode
+        socket =
+          socket
+          |> assign(:selected_task_ids, selected)
+          |> assign(:tasks_select_mode, new_select_mode)
 
-      socket =
-        socket
-        |> assign(:selected_task_ids, selected)
-        |> assign(:tasks_select_mode, new_select_mode)
+        socket =
+          if select_mode_changed? do
+            reinsert_all_tasks(socket)
+          else
+            # Only re-insert the rows in the range
+            range_tasks = Enum.filter(socket.assigns.loaded_tasks, &MapSet.member?(range_ids, task_id(&1)))
+            Enum.reduce(range_tasks, socket, fn task, acc -> stream_insert(acc, :tasks, task) end)
+          end
 
-      socket =
-        if select_mode_changed? do
-          reinsert_all_tasks(socket)
-        else
-          # Only re-insert the rows in the range
-          range_tasks = Enum.filter(socket.assigns.loaded_tasks, &MapSet.member?(range_ids, task_id(&1)))
-          Enum.reduce(range_tasks, socket, fn task, acc -> stream_insert(acc, :tasks, task) end)
-        end
-
-      {:noreply, socket}
+        {:noreply, socket}
     end
   end
 
@@ -428,5 +428,19 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     |> String.split(",")
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
+  end
+
+  defp do_task_mutation(task, operation_fn, socket, reload_fn, error_msg) do
+    case operation_fn.(task) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:show_task_detail_drawer, false)
+         |> assign(:selected_task, nil)
+         |> reload_fn.()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, error_msg)}
+    end
   end
 end

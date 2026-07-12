@@ -56,8 +56,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Pi do
 
   defp eits_custom_instructions(state, context) do
     if (context[:eits_workflow] || "1") != "0" do
-      EyeInTheSky.Codex.SDK.eits_init_prompt(state)
-      |> String.replace("--provider codex", "--provider pi")
+      pi_eits_init_prompt(state)
     else
       nil
     end
@@ -68,5 +67,34 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Pi do
 
   defp warn_content_blocks(blocks) when is_list(blocks) do
     Logger.warning("[Pi] Stripping #{length(blocks)} content block(s): Pi Phase 1 is text-only")
+  end
+
+  @eits_cli_reference """
+      eits tasks begin --title "<title>"
+      eits tasks annotate <id> --body "..."
+      eits tasks update <id> --state 4
+      eits dm --to <session_uuid> --message "<text>"
+      eits commits create --hash <hash>
+    """
+
+  defp pi_eits_init_prompt(state) do
+    """
+    EITS context:
+    - EITS_SESSION_UUID=#{state.eits_session_uuid}
+    - EITS_SESSION_ID=#{state.session_id}
+    - EITS_AGENT_ID=#{state.agent_id}
+    - EITS_PROJECT_ID=#{state.project_id}
+
+    Use the eits CLI script for all EITS operations:
+
+    #{@eits_cli_reference}
+    To spawn a child agent, always pass --provider pi:
+      eits agents spawn --provider pi --instructions "<text>" [--model <model>]
+
+    You MUST claim a task before editing files:
+      eits tasks begin --title "<title of your work>"
+
+    Now proceed with the task:
+    """
   end
 end

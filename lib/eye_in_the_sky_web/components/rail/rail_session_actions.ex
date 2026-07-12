@@ -3,8 +3,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
 
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   alias EyeInTheSky.{Channels, Events}
+  alias EyeInTheSky.Sessions
   alias EyeInTheSkyWeb.AgentLive.IndexActions
   alias EyeInTheSkyWeb.Components.Rail.Loader
 
@@ -135,26 +137,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
   def handle_rename_channel(_params, socket), do: {:noreply, socket}
 
   def handle_archive_session(%{"session_id" => session_id_str}, socket) do
-    case Integer.parse(to_string(session_id_str)) do
-      {session_id, ""} ->
-        case EyeInTheSky.Sessions.get_session(session_id) do
+    case parse_int(session_id_str) do
+      nil -> {:noreply, socket}
+      session_id ->
+        case Sessions.get_session(session_id) do
           {:error, :not_found} ->
             {:noreply, put_flash(socket, :error, "Session not found")}
 
           {:ok, session} ->
-            case EyeInTheSky.Sessions.archive_session(session) do
+            case Sessions.archive_session(session) do
               {:ok, _} ->
                 socket =
                   socket
-                  |> assign(
-                    :flyout_sessions,
-                    Loader.load_flyout_sessions(
-                      socket.assigns.sidebar_project,
-                      socket.assigns.session_sort,
-                      socket.assigns.session_name_filter,
-                      socket.assigns.session_show
-                    )
-                  )
+                  |> reload_flyout_sessions()
                   |> put_flash(:info, "Session archived")
 
                 {:noreply, socket}
@@ -163,9 +158,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
                 {:noreply, put_flash(socket, :error, "Could not archive session")}
             end
         end
-
-      _ ->
-        {:noreply, socket}
     end
   end
 
@@ -177,8 +169,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
   from the client.
   """
   def handle_open_worktree(%{"session_id" => session_id_str}, socket) do
-    with {session_id, ""} <- Integer.parse(to_string(session_id_str)),
-         {:ok, session} <- EyeInTheSky.Sessions.get_session(session_id),
+    with session_id when not is_nil(session_id) <- parse_int(session_id_str),
+         {:ok, session} <- Sessions.get_session(session_id),
          path when is_binary(path) and path != "" <- session.git_worktree_path,
          true <- File.dir?(path) do
       System.cmd(reveal_cmd(), [path])
@@ -198,26 +190,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
 
   def handle_rename_session(%{"session_id" => session_id_str, "name" => name}, socket)
       when is_binary(name) and name != "" do
-    case Integer.parse(session_id_str) do
-      {session_id, ""} ->
-        case EyeInTheSky.Sessions.get_session(session_id) do
+    case parse_int(session_id_str) do
+      nil -> {:noreply, socket}
+      session_id ->
+        case Sessions.get_session(session_id) do
           {:error, :not_found} ->
             {:noreply, put_flash(socket, :error, "Session not found")}
 
           {:ok, session} ->
-            case EyeInTheSky.Sessions.update_session(session, %{name: String.trim(name)}) do
+            case Sessions.update_session(session, %{name: String.trim(name)}) do
               {:ok, _} ->
-                socket =
-                  assign(
-                    socket,
-                    :flyout_sessions,
-                    Loader.load_flyout_sessions(
-                      socket.assigns.sidebar_project,
-                      socket.assigns.session_sort,
-                      socket.assigns.session_name_filter,
-                      socket.assigns.session_show
-                    )
-                  )
+                socket = reload_flyout_sessions(socket)
 
                 {:noreply, socket}
 
@@ -225,11 +208,21 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
                 {:noreply, put_flash(socket, :error, "Could not rename session")}
             end
         end
-
-      _ ->
-        {:noreply, socket}
     end
   end
 
   def handle_rename_session(_params, socket), do: {:noreply, socket}
+
+  defp reload_flyout_sessions(socket) do
+    assign(
+      socket,
+      :flyout_sessions,
+      Loader.load_flyout_sessions(
+        socket.assigns.sidebar_project,
+        socket.assigns.session_sort,
+        socket.assigns.session_name_filter,
+        socket.assigns.session_show
+      )
+    )
+  end
 end

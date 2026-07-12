@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
 
   alias EyeInTheSky.{Agents, Projects, Sessions}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSky.Settings
 
   # ---------------------------------------------------------------------------
   # palette:create-agent
@@ -266,7 +267,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
 
     opts = [
       instructions: instructions,
-      model: params["model"] || "haiku",
+      model: params["model"] || Settings.default_model(),
       project_id: project_id,
       project_path: project_path,
       parent_session_id: parent_session_id
@@ -297,7 +298,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
             instructions = if new_instructions != "", do: new_instructions, else: ""
 
             # Send initial message to start the session
-            opts = [instructions: instructions, model: "haiku"]
+            opts = [instructions: instructions, model: Settings.default_model()]
 
             case AgentManager.send_message(session.id, instructions, opts) do
               {:ok, _admission} ->

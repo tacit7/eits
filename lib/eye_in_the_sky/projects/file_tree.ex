@@ -101,8 +101,9 @@ defmodule EyeInTheSky.Projects.FileTree do
       {:error, :absolute_path_not_allowed}
     else
       target = Path.expand(Path.join(root, rel_path))
+      root_prefix = String.trim_trailing(root, "/") <> "/"
 
-      if target == root or String.starts_with?(target, root <> "/") do
+      if target == root or String.starts_with?(target, root_prefix) do
         {:ok, target}
       else
         {:error, :outside_project}

@@ -89,13 +89,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
   end
 
   @impl true
-  def handle_event("set_detail_tab", %{"tab" => "preview"}, socket),
-    do: {:noreply, assign(socket, :detail_tab, :preview)}
-
-  def handle_event("set_detail_tab", %{"tab" => "raw"}, socket),
-    do: {:noreply, assign(socket, :detail_tab, :raw)}
-
-  def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
+  def handle_event("set_detail_tab", params, socket),
+    do: ViewHelpers.handle_set_detail_tab(params, socket)
 
   @impl true
   def handle_event("set_notify_on_stop", params, socket),
@@ -343,12 +338,4 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
       socket
     end
   end
-
-  defp source_badge_class(:agents), do: "bg-primary/10 text-primary/70"
-  defp source_badge_class(:project_agents), do: "bg-secondary/10 text-secondary/70"
-  defp source_badge_class(_), do: "bg-base-content/5 text-base-content/50"
-
-  defp source_label(:agents), do: "global"
-  defp source_label(:project_agents), do: "project"
-  defp source_label(_), do: "unknown"
 end

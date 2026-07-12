@@ -49,11 +49,16 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   def on_sdk_completed(session_id, provider_conversation_id, provider \\ "claude") do
     status = completion_status_for(provider)
 
-    case update_session_status(session_id, status, nil) do
+    # Only overwrite status when the session is still "working". If an agent
+    # explicitly set "waiting" (or any other non-working status) during its turn,
+    # preserve it — just fire the stopped broadcasts so the UI reflects the turn end.
+    case update_session_status_if_working(session_id, status, nil) do
       {:ok, session} ->
-        update_agent_status(session, "idle")
-        Events.agent_stopped(session)
-        notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
+        finish_sdk_completion(session, provider_conversation_id)
+
+      {:skipped, session} ->
+        # Status was already changed by the agent — broadcast stopped and agent status set to idle.
+        finish_sdk_completion(session, provider_conversation_id)
 
       :error ->
         :ok
@@ -61,6 +66,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   end
 
   defp completion_status_for(_provider), do: "idle"
+
+  defp finish_sdk_completion(session, provider_conversation_id) do
+    update_agent_status(session, "idle")
+    Events.agent_stopped(session)
+    notify_agent_status(session, :resumable, resource_id: provider_conversation_id)
+  end
 
   @doc "Codex thread.started received — confirm session is working."
   def on_codex_thread_started(session_id) do
@@ -106,8 +117,12 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     Events.stream_error(session_id, provider_conversation_id, error_text)
 
     case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
-      {:ok, session} -> update_agent_status(session, "failed")
-      :error -> :ok
+      {:ok, session} ->
+        update_agent_status(session, "failed")
+        Events.agent_stopped(session)
+
+      :error ->
+        :ok
     end
 
     :ok
@@ -198,12 +213,6 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     maybe_mark_channel_read(channel_id, session_id)
 
     :ok
-  end
-
-  # Backwards-compatible — callers that don't yet pass job_context fall through to
-  # the normal save path. Remove once agent_worker.ex is updated to pass job_context.
-  def on_result_received(session_id, params) when not is_map_key(params, :job_context) do
-    on_result_received(session_id, Map.put(params, :job_context, nil))
   end
 
   def on_result_received(session_id, _params) do
@@ -327,11 +336,8 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     :ok
   end
 
-  # Synchronous — fast DB write where ordering matters. Running in a Task risks
-  # two concurrent read-then-write pairs racing each other, and the session_idle
-  # broadcast must only fire after a successful update.
-  # Returns {:ok, updated_session} or :error.
-  defp update_session_status(session_id, status, reason \\ nil) do
+  # Returns {attrs_map, idle_like?} for session status update calls.
+  defp build_status_attrs(status, reason) do
     idle_like? = status in ["idle", "waiting"]
 
     attrs =
@@ -339,7 +345,34 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         do: %{status: status, last_activity_at: DateTime.utc_now()},
         else: %{status: status}
 
-    attrs = Map.put(attrs, :status_reason, reason)
+    {Map.put(attrs, :status_reason, reason), idle_like?}
+  end
+
+  # Like update_session_status/3 but only writes when the session is currently "working".
+  # Returns {:ok, updated_session}, {:skipped, current_session}, or :error.
+  # Used by on_sdk_completed so agents can set their own terminal status (e.g. "waiting")
+  # during a turn without it being clobbered by the AgentWorker after the turn ends.
+  defp update_session_status_if_working(session_id, status, reason) do
+    {attrs, idle_like?} = build_status_attrs(status, reason)
+
+    case Sessions.get_session(session_id) do
+      {:ok, session} when session.status == "working" ->
+        apply_session_update(session, attrs, session_id, idle_like?)
+
+      {:ok, session} ->
+        {:skipped, session}
+
+      {:error, _} ->
+        :error
+    end
+  end
+
+  # Synchronous — fast DB write where ordering matters. Running in a Task risks
+  # two concurrent read-then-write pairs racing each other, and the session_idle
+  # broadcast must only fire after a successful update.
+  # Returns {:ok, updated_session} or :error.
+  defp update_session_status(session_id, status, reason \\ nil) do
+    {attrs, idle_like?} = build_status_attrs(status, reason)
 
     case Sessions.get_session(session_id) do
       {:ok, session} -> apply_session_update(session, attrs, session_id, idle_like?)

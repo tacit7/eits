@@ -176,4 +176,40 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
       {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path not allowed")}
     end
   end
+
+  @doc """
+  Open DB-backed content for `record_id` of `type` in the given editor via EditorSync.
+
+  Returns `{:noreply, socket}` with a flash on success or error.
+  Intended to be called from an `open_in_editor` handle_event clause when
+  `phx-value-id` is set (record mode, no `path` present).
+  """
+  def handle_open_in_editor_record(type, record_id, editor_id, socket) do
+    case EyeInTheSky.EditorSync.open(type, record_id, editor_id) do
+      {:ok, label} ->
+        {:noreply,
+         Phoenix.LiveView.put_flash(
+           socket,
+           :info,
+           "Opened in #{label} — saves sync automatically"
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         Phoenix.LiveView.put_flash(
+           socket,
+           :error,
+           EyeInTheSky.EditorSync.format_error(reason)
+         )}
+    end
+  end
+
+  @doc "Shared handler for set_detail_tab events (preview/raw tab toggle)."
+  def handle_set_detail_tab(%{"tab" => "preview"}, socket),
+    do: {:noreply, assign(socket, :detail_tab, :preview)}
+
+  def handle_set_detail_tab(%{"tab" => "raw"}, socket),
+    do: {:noreply, assign(socket, :detail_tab, :raw)}
+
+  def handle_set_detail_tab(_params, socket), do: {:noreply, socket}
 end

@@ -16,6 +16,9 @@ defmodule EyeInTheSky.Application do
     # Settings.get/1 call (plug, env module) has a table to write to.
     EyeInTheSky.Settings.init_cache()
 
+    # Generate a per-process-instance namespace for editor sync temp files.
+    EyeInTheSky.Instance.init()
+
     # Tauri integration: if launched by the Tauri wrapper, ELIXIRKIT_PUBSUB
     # will be set to the Rust-side PubSub URL. Otherwise run in standalone mode.
     elixirkit_pubsub = System.get_env("ELIXIRKIT_PUBSUB")
@@ -76,7 +79,11 @@ defmodule EyeInTheSky.Application do
           # Session store with TTL-based expiration (prevents unbounded ETS growth)
           EyeInTheSky.SessionStore,
           # In-process cache for Anthropic rate-limit API responses (5-min TTL)
-          EyeInTheSky.Claude.RateLimitClient
+          EyeInTheSky.Claude.RateLimitClient,
+          # Registry for EditorSync watchers (one per record, keyed by {type, id})
+          {Registry, keys: :unique, name: EyeInTheSky.EditorSync.Registry},
+          # DynamicSupervisor for EditorSync file-watcher GenServers
+          {DynamicSupervisor, name: EyeInTheSky.EditorSync.Supervisor, strategy: :one_for_one}
         ]
 
     iam_seeds =
@@ -104,7 +111,11 @@ defmodule EyeInTheSky.Application do
           # Poll for external task changes from spawned agents
           EyeInTheSky.Tasks.Poller,
           # Process incoming GitHub webhook deliveries
-          EyeInTheSky.Github.WebhookDispatcher
+          EyeInTheSky.Github.WebhookDispatcher,
+          # Periodic scheduler: zombie sweep + dead-idle archive (every 5 min).
+          # Holds a sandbox connection mid-query; must be skipped in test env
+          # (start_pollers: false) or it crashes on SQL Sandbox OwnershipError.
+          EyeInTheSky.Scheduler.AgentStatus
         ]
       else
         []

@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSky.Channels.Channel
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.ChatLive.ChannelHelpers
   alias EyeInTheSkyWeb.ControllerHelpers
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
@@ -132,7 +133,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
         recipient_role: "agent",
         provider: "system",
         body:
-          "Creating new agent (#{params["model"] || "sonnet"})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
+          "Creating new agent (#{params["model"] || Settings.default_model()})#{if agent_name != "", do: " - #{agent_name}", else: ""}..."
       })
 
     description = params["description"] || ""

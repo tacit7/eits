@@ -455,10 +455,10 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       assert json_response(conn, 404)["error"] == "Session not found"
     end
 
-    test "regression: invalid task id on unlink returns 400", %{conn: conn} do
+    test "regression: nonexistent task id on unlink returns 404", %{conn: conn} do
       conn = delete(conn, ~p"/api/v1/tasks/9999999/sessions/#{Ecto.UUID.generate()}")
-      resp = json_response(conn, 400)
-      assert resp["error"] == "Invalid task ID"
+      resp = json_response(conn, 404)
+      assert resp["error"] == "Task not found"
     end
   end
 

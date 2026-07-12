@@ -165,6 +165,8 @@ defmodule EyeInTheSky.Agents do
   """
   @spec create_agent(map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def create_agent(attrs \\ %{}) do
+    attrs = Map.put_new(attrs, :created_at, DateTime.utc_now())
+
     %Agent{}
     |> Agent.changeset(attrs)
     |> Repo.insert()
@@ -176,15 +178,19 @@ defmodule EyeInTheSky.Agents do
   Uses on_conflict: :nothing to handle UUID uniqueness races without exceptions.
   """
   def find_or_create_agent(%{uuid: uuid} = attrs) do
-    case Repo.get_by(Agent, uuid: uuid) do
-      nil ->
-        %Agent{}
-        |> Agent.changeset(attrs)
-        |> Repo.insert()
-        |> broadcast_result(&EyeInTheSky.Events.agent_created/1)
+    attrs = Map.put_new(attrs, :created_at, DateTime.utc_now())
+    changeset = Agent.changeset(%Agent{}, attrs)
 
-      existing ->
-        {:ok, existing}
+    case Repo.insert(changeset, on_conflict: :nothing, conflict_target: :uuid) do
+      {:ok, %Agent{id: nil}} ->
+        get_agent_by_uuid(uuid)
+
+      {:ok, agent} ->
+        EyeInTheSky.Events.agent_created(agent)
+        {:ok, agent}
+
+      {:error, changeset} ->
+        {:error, changeset}
     end
   end
 

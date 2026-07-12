@@ -1,6 +1,8 @@
 defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   use EyeInTheSkyWeb, :controller
 
+  require Logger
+
   action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
 
   import EyeInTheSkyWeb.ControllerHelpers
@@ -17,7 +19,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
                 since (duration string), stale_since (duration string)
   """
   def index(conn, params) do
-    limit = parse_int(params["limit"], 50)
+    limit = params["limit"] |> parse_int(50) |> max(1) |> min(1000)
 
     with {:ok, time_opts} <- resolve_time_opts(params) do
       tasks = fetch_tasks(params, limit, time_opts)
@@ -253,19 +255,25 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   Body: body, title (optional)
   """
   def annotate(conn, %{"id" => task_id} = params) do
-    case Notes.create_note(%{
-           parent_id: task_id,
-           parent_type: "task",
-           body: trim_param(params["body"] || ""),
-           title: trim_param(params["title"])
-         }) do
-      {:ok, note} ->
-        conn
-        |> put_status(:created)
-        |> json(%{success: true, message: "Annotation added", note_id: note.id})
+    case Tasks.get_task(task_id) do
+      {:error, :not_found} ->
+        {:error, :not_found, "Task not found"}
 
-      {:error, cs} ->
-        {:error, cs}
+      {:ok, _task} ->
+        case Notes.create_note(%{
+               parent_id: task_id,
+               parent_type: "task",
+               body: trim_param(params["body"] || ""),
+               title: trim_param(params["title"])
+             }) do
+          {:ok, note} ->
+            conn
+            |> put_status(:created)
+            |> json(%{success: true, message: "Annotation added", note_id: note.id})
+
+          {:error, cs} ->
+            {:error, cs}
+        end
     end
   end
 
@@ -359,19 +367,15 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   POST /api/v1/tasks/:id/sessions - Link a session to a task.
   """
   def link_session(conn, %{"id" => task_id} = params) do
-    case params["session_id"] do
-      nil ->
-        {:error, :bad_request, "session_id is required"}
-
-      session_id ->
-        case Tasks.get_task(task_id) do
-          {:ok, _task} ->
-            maybe_link_session(task_id, session_id)
-            json(conn, %{success: true, message: "Session linked to task #{task_id}"})
-
-          {:error, :not_found} ->
-            {:error, :bad_request, "Invalid task ID"}
-        end
+    with {:ok, session_id} <- require_session_id_param(params["session_id"]),
+         {:ok, task} <- Tasks.get_task(task_id),
+         {:ok, int_id} <- resolve_link_session_id(session_id) do
+      Tasks.link_session_to_task(task.id, int_id)
+      json(conn, %{success: true, message: "Session linked to task #{task.id}"})
+    else
+      {:error, :no_session} -> {:error, :bad_request, "session_id is required"}
+      {:error, :not_found} -> {:error, :not_found, "Task not found"}
+      {:error, :not_found, msg} -> {:error, :not_found, msg}
     end
   end
 
@@ -381,7 +385,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def unlink_session(conn, %{"id" => task_id, "uuid" => session_uuid}) do
     case Tasks.get_task(task_id) do
       {:error, :not_found} ->
-        {:error, :bad_request, "Invalid task ID"}
+        {:error, :not_found, "Task not found"}
 
       {:ok, task} ->
         int_id = resolve_session_id(session_uuid)
@@ -490,14 +494,20 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   defp parse_tag_id(_), do: {:error, :bad_request, "tag_id is required"}
 
-  defp maybe_mark_member_done(nil), do: :ok
-  defp maybe_mark_member_done(""), do: :ok
+  # Shared nil-guard resolver helper: resolve session_id to int_id and invoke fun.
+  # Returns :ok if session_id is nil/"", or if resolve fails.
+  defp with_session_int_id(nil, _fun), do: :ok
+  defp with_session_int_id("", _fun), do: :ok
 
-  defp maybe_mark_member_done(session_id) do
+  defp with_session_int_id(session_id, fun) do
     case Helpers.resolve_session_int_id(session_id) do
-      {:ok, int_id} -> Teams.mark_member_done_by_session(int_id)
+      {:ok, int_id} -> fun.(int_id)
       _ -> :ok
     end
+  end
+
+  defp maybe_mark_member_done(session_id) do
+    with_session_int_id(session_id, &Teams.mark_member_done_by_session/1)
   end
 
   # Sets intent on the calling session after task completion.
@@ -506,16 +516,25 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   defp set_session_intent("", _intent), do: :ok
 
   defp set_session_intent(session_id, intent) do
-    case Helpers.resolve_session_int_id(session_id) do
-      {:ok, int_id} ->
-        session = Sessions.get_session!(int_id)
-        Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
+    with_session_int_id(session_id, fn int_id ->
+      case Sessions.get_session(int_id) do
+        {:ok, session} ->
+          Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
+        {:error, :not_found} ->
+          :ok
+      end
+    end)
+  end
 
-      _ ->
-        :ok
+  defp require_session_id_param(nil), do: {:error, :no_session}
+  defp require_session_id_param(""), do: {:error, :no_session}
+  defp require_session_id_param(id), do: {:ok, id}
+
+  defp resolve_link_session_id(session_id) do
+    case resolve_session_id(session_id) do
+      nil -> {:error, :not_found, "Session not found"}
+      int_id -> {:ok, int_id}
     end
-  rescue
-    _ -> :ok
   end
 
   defp resolve_session_id(sid) do

@@ -181,6 +181,57 @@ defmodule EyeInTheSky.Events do
   def tasks_changed, do: broadcast("tasks", :tasks_changed)
 
   # ---------------------------------------------------------------------------
+  # Note events — topic: "note:<note_id>"
+  # ---------------------------------------------------------------------------
+
+  @doc "Subscribe to events for a specific note (e.g. editor sync updates)."
+  def subscribe_note(note_id), do: sub(record_topic(:note, note_id))
+
+  @doc "Unsubscribe from events for a specific note."
+  def unsubscribe_note(note_id), do: unsub(record_topic(:note, note_id))
+
+  @doc "Note content was updated (e.g. by the editor sync watcher)."
+  def note_updated(note), do: broadcast(record_topic(:note, note.id), {:note_updated, note})
+
+  # ---------------------------------------------------------------------------
+  # Prompt events — topic: "prompt:<prompt_id>"
+  # ---------------------------------------------------------------------------
+
+  @doc "Subscribe to events for a specific prompt."
+  def subscribe_prompt(prompt_id), do: sub(record_topic(:prompt, prompt_id))
+
+  @doc "Unsubscribe from events for a specific prompt."
+  def unsubscribe_prompt(prompt_id), do: unsub(record_topic(:prompt, prompt_id))
+
+  @doc "Prompt content was updated (e.g. by the editor sync watcher)."
+  def prompt_updated(prompt),
+    do: broadcast(record_topic(:prompt, prompt.id), {:prompt_updated, prompt})
+
+  # ---------------------------------------------------------------------------
+  # Editor sync failure — record-specific topic
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Subscribe to editor sync failure events for a record.
+
+  Type is `:note`, `:prompt`, or `:task`.
+  """
+  def subscribe_editor_sync(type, record_id), do: sub(record_topic(type, record_id))
+
+  @doc "Unsubscribe from editor sync failure events for a record."
+  def unsubscribe_editor_sync(type, record_id), do: unsub(record_topic(type, record_id))
+
+  @doc """
+  An EditorSync watcher failed to write changes back to the DB.
+
+  Broadcasts on the record-specific topic so the LiveView that owns the
+  selection can show a flash message without subscribing to a global error bus.
+  """
+  def editor_sync_failed(type, record_id, reason) do
+    broadcast(record_topic(type, record_id), {:editor_sync_failed, type, record_id, reason})
+  end
+
+  # ---------------------------------------------------------------------------
   # Agent identity events — topic: "agents"
   # ---------------------------------------------------------------------------
 
@@ -462,4 +513,9 @@ defmodule EyeInTheSky.Events do
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)
   defp unsub(topic), do: Phoenix.PubSub.unsubscribe(@pubsub, topic)
+
+  # Centralized topic construction for record-specific events.
+  # Singular prefix ("note:", "prompt:", "task:") distinguishes from the
+  # plural collection topics ("tasks:", "tasks:<project_id>").
+  defp record_topic(type, id), do: "#{type}:#{id}"
 end

@@ -1,8 +1,8 @@
 /**
  * InfiniteScroll hook
  *
- * Attaches a scroll listener to #main-content and fires "load_more"
- * when within 200px of the bottom.
+ * Uses IntersectionObserver to fire "load_more" when the sentinel element
+ * enters the viewport, regardless of which ancestor is the scroll container.
  *
  * Required data attributes on the hook element:
  *   data-has-more="true|false"  - whether more items exist server-side
@@ -11,30 +11,34 @@
 export const InfiniteScroll = {
   mounted() {
     this._loading = false
-    this._container = document.getElementById("main-content")
-    if (!this._container) return
+    this._isIntersecting = false
 
-    this._handleScroll = () => {
-      if (this._loading || !this._hasMore()) return
-      const { scrollTop, scrollHeight, clientHeight } = this._container
-      if (scrollHeight - scrollTop - clientHeight < 200) {
+    this._observer = new IntersectionObserver((entries) => {
+      const entry = entries[0]
+      this._isIntersecting = entry.isIntersecting
+      if (entry.isIntersecting && this._hasMore() && !this._loading) {
         this._loading = true
         this.pushEvent("load_more", {})
       }
-    }
+    }, { threshold: 0 })
 
-    this._container.addEventListener("scroll", this._handleScroll, { passive: true })
+    this._observer.observe(this.el)
   },
 
   updated() {
     requestAnimationFrame(() => {
       this._loading = false
+      // Re-trigger if sentinel is still visible after items loaded
+      if (this._hasMore() && this._isIntersecting) {
+        this._loading = true
+        this.pushEvent("load_more", {})
+      }
     })
   },
 
   destroyed() {
-    if (this._container && this._handleScroll) {
-      this._container.removeEventListener("scroll", this._handleScroll)
+    if (this._observer) {
+      this._observer.disconnect()
     }
   },
 

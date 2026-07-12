@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
 
   alias EyeInTheSky.Events
   alias EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Live.Shared.PromptsHelpers
 
@@ -83,13 +84,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
   end
 
   @impl true
-  def handle_event("set_detail_tab", %{"tab" => "preview"}, socket),
-    do: {:noreply, assign(socket, :detail_tab, :preview)}
-
-  def handle_event("set_detail_tab", %{"tab" => "raw"}, socket),
-    do: {:noreply, assign(socket, :detail_tab, :raw)}
-
-  def handle_event("set_detail_tab", _params, socket), do: {:noreply, socket}
+  def handle_event("set_detail_tab", params, socket),
+    do: ViewHelpers.handle_set_detail_tab(params, socket)
 
   @impl true
   def handle_event("set_notify_on_stop", params, socket),

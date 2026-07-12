@@ -170,6 +170,7 @@ defmodule EyeInTheSky.SDK.MessageHandler do
   defmacro __using__(_opts) do
     quote do
       @behaviour EyeInTheSky.SDK.MessageHandler
+      alias EyeInTheSky.SDK.MessageHandler
 
       @impl EyeInTheSky.SDK.MessageHandler
       def on_session_id(sid, state), do: %{state | session_id: sid}
@@ -185,7 +186,7 @@ defmodule EyeInTheSky.SDK.MessageHandler do
 
       @impl EyeInTheSky.SDK.MessageHandler
       def on_abnormal_exit(status, _state),
-        do: {:error, EyeInTheSky.SDK.MessageHandler.default_exit_reason(status)}
+        do: {:error, MessageHandler.default_exit_reason(status)}
 
       @impl EyeInTheSky.SDK.MessageHandler
       def on_stream_error(reason, _state), do: {:error, reason}

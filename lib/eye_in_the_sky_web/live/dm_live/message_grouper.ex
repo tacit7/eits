@@ -19,6 +19,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
 
   @tail_window 10
   @tool_types ~w(tool_use tool_result bash output)
+  # Stream types that represent a call (as opposed to a result/output).
+  @call_stream_types ~w(tool_use bash)
 
   # Tools whose input carries a file_path we want to surface in the summary.
   @file_tools ~w(Write Edit Read)
@@ -63,11 +65,24 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
   The common case (standalone assistant message) produces exactly one new row.
   A tool event appended to an existing cluster produces one updated row
   (same id → morphdom patches in place, not delete+reinsert).
+
+  ## Stable cluster identity across the tail-window boundary
+
+  When a cluster spans more than #{@tail_window} consecutive events, the naive
+  approach of grouping only the last #{@tail_window} messages would produce a
+  new `first_id` each time the window slides, creating orphan rows in the stream.
+  Instead, `diff_from_cached_tail/2` walks back from the window boundary to find
+  the true start of any cluster that extends before the window, then groups from
+  that start. This gives the cluster a stable `cluster-row-<true_first_id>` that
+  never changes as new events are appended.
   """
   def diff_from_cached_tail(cached_old_tail, new_messages) do
+    window_start = max(0, length(new_messages) - @tail_window)
+    cluster_start = find_cluster_start(new_messages, window_start)
+
     new_tail_rows =
       new_messages
-      |> Enum.take(-@tail_window)
+      |> Enum.drop(cluster_start)
       |> group_events()
       |> Enum.map(&to_stream_row/1)
 
@@ -114,7 +129,15 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       nil,
       fn {msg, prev_role}, acc ->
         stream_type = get_in(msg.metadata || %{}, ["stream_type"]) || ""
-        is_tool = stream_type in @tool_types or body_is_tool_message?(msg.body)
+
+        # Body-format detection is role-scoped: user/system prose that happens
+        # to start with "> `Name`" or "Tool: X" must not be clustered.
+        # Use Map.get to handle test stubs that may lack :sender_role.
+        sender_role = Map.get(msg, :sender_role)
+
+        is_tool =
+          stream_type in @tool_types or
+            (sender_role not in ~w(user system) and body_is_tool_message?(msg.body))
 
         cond do
           is_tool and is_nil(acc) ->
@@ -142,6 +165,42 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
   # Private
   # ---------------------------------------------------------------------------
 
+  # Walks back from window_start to find the true start of any cluster that
+  # extends before the tail window. Returns window_start unchanged when the
+  # first tail message is not a tool event (no cross-boundary cluster).
+  defp find_cluster_start(all_messages, window_start) do
+    if window_start == 0 do
+      0
+    else
+      first_tail_msg = Enum.at(all_messages, window_start)
+
+      if tool_event?(first_tail_msg) do
+        pre_reversed = all_messages |> Enum.take(window_start) |> Enum.reverse()
+
+        tool_run =
+          Enum.reduce_while(pre_reversed, 0, fn msg, n ->
+            if tool_event?(msg), do: {:cont, n + 1}, else: {:halt, n}
+          end)
+
+        window_start - tool_run
+      else
+        window_start
+      end
+    end
+  end
+
+  # Returns true when a message should be treated as a tool event for clustering.
+  # Applies the same role-aware body heuristic as group_events/1.
+  defp tool_event?(nil), do: false
+
+  defp tool_event?(msg) do
+    stream_type = get_in(msg.metadata || %{}, ["stream_type"]) || ""
+    sender_role = Map.get(msg, :sender_role)
+
+    stream_type in @tool_types or
+      (sender_role not in ~w(user system) and body_is_tool_message?(msg.body))
+  end
+
   defp flush_cluster({:cluster, events}) do
     events = Enum.reverse(events)
     first = List.first(events)
@@ -152,12 +211,18 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
         DateTime.diff(last.inserted_at, first.inserted_at, :millisecond)
       end
 
+    call_count = count_tool_calls(events)
+    result_only = call_count == 0
+    # When all events are results/outputs (no calls), display the result count
+    # rather than "0 calls" — the UI uses result_only: true to label it correctly.
+    display_count = if result_only, do: length(events), else: call_count
     tool_groups = build_tool_groups(events)
 
     cluster =
       {:cluster, events,
        %{
-         count: length(events),
+         count: display_count,
+         result_only: result_only,
          tool_groups: tool_groups,
          first_at: first.inserted_at,
          duration_ms: if(duration_ms && duration_ms > 1000, do: duration_ms)
@@ -188,6 +253,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
   #   > `ToolName` args...   (session_reader format)
   #   Tool: ToolName\n{json} (Tool: format)
   # These messages have no stream_type metadata but should still be clustered.
+  # Callers are responsible for restricting this to non-user/system roles.
   defp body_is_tool_message?(nil), do: false
 
   defp body_is_tool_message?(body) do
@@ -210,6 +276,39 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       true ->
         nil
     end
+  end
+
+  # Counts actual tool calls in a cluster — not raw events.
+  # A tool_use event = 1 call. A tool_result/output event = 0 calls (it's a response).
+  # A body-format message may contain multiple calls (counted via regex scan).
+  defp count_tool_calls(events) do
+    Enum.reduce(events, 0, fn msg, acc ->
+      stream_type = get_in(msg.metadata || %{}, ["stream_type"]) || ""
+
+      cond do
+        stream_type in @call_stream_types ->
+          acc + 1
+
+        stream_type in @tool_types ->
+          # Result/output type — does not count as a call
+          acc
+
+        body_is_tool_message?(msg.body) ->
+          acc + count_calls_in_body(msg.body)
+
+        true ->
+          acc
+      end
+    end)
+  end
+
+  defp count_calls_in_body(body) do
+    trimmed = String.trim(body)
+    # Each `> `Name`` line is one call (session_reader format)
+    backtick = length(Regex.scan(~r/^> `[^`]+`/m, trimmed))
+    # Each `Tool: ` header line is one call (Tool: format)
+    tool_colon = length(Regex.scan(~r/^Tool: /m, trimmed))
+    backtick + tool_colon
   end
 
   defp build_cluster_summary(first_id, events) do

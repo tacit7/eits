@@ -18,6 +18,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
     ]
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Settings
 
   # ---------------------------------------------------------------------------
   # Lifecycle
@@ -50,7 +51,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
       else
         socket
         |> assign(:show_claude_drawer, false)
-        |> assign(:claude_model, "sonnet")
+        |> assign(:claude_model, Settings.default_model())
         |> maybe_assign_web_project(assigns.project_id)
       end
 
@@ -137,13 +138,13 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
                 phx-target={@myself}
               >
                 <option value="opus" selected={@claude_model == "opus"}>
-                  Opus 4.6 &bull; Most capable for complex work
+                  Opus 4.8 &bull; Most capable for complex work
                 </option>
                 <option value="sonnet" selected={@claude_model == "sonnet"}>
-                  Sonnet 4.5 &bull; Best for everyday tasks
+                  Sonnet 5 &bull; Best for everyday tasks
                 </option>
                 <option value="sonnet[1m]" selected={@claude_model == "sonnet[1m]"}>
-                  Sonnet 4.5 (1M) &bull; 1M context window
+                  Sonnet 5 (1M) &bull; 1M context window
                 </option>
                 <option value="haiku" selected={@claude_model == "haiku"}>
                   Haiku 4.5 &bull; Fastest for quick answers

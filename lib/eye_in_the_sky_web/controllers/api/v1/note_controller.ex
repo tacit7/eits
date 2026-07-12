@@ -67,16 +67,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
         {:error, :not_found, "Note not found"}
 
       {:ok, note} ->
-        json(conn, %{
-          note_id: to_string(note.id),
-          parent_id: note.parent_id,
-          parent_type: note.parent_type,
-          title: note.title,
-          body: note.body,
-          starred: note.starred || false,
-          source_session_uuid: note.source_session_uuid,
-          created_at: to_string(note.created_at)
-        })
+        json(conn, ApiPresenter.present_note(note))
     end
   end
 
@@ -149,13 +140,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
 
         case Notes.update_note(note, attrs) do
           {:ok, updated} ->
-            json(conn, %{
-              success: true,
-              id: updated.id,
-              body: updated.body,
-              title: updated.title,
-              starred: updated.starred || false
-            })
+            json(conn, ApiPresenter.present_note(updated))
 
           {:error, changeset} ->
             conn

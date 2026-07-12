@@ -364,23 +364,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
     name = String.trim(name)
 
     socket =
-      if name != "" do
-        case Sessions.get_session(session_id) do
-          {:ok, session} ->
-            case Sessions.update_session(session, %{name: name}) do
-              {:ok, _} ->
-                socket
-
-              {:error, reason} ->
-                Logger.warning("Failed to rename session #{session_id}: #{inspect(reason)}")
-                put_flash(socket, :error, "Failed to rename session")
-            end
-
-          {:error, _} ->
-            socket
-        end
-      else
+      with true <- name != "",
+           {:ok, session} <- Sessions.get_session(session_id),
+           {:ok, _} <- Sessions.update_session(session, %{name: name}) do
         socket
+      else
+        false -> socket
+        {:error, :not_found} -> socket
+        {:error, reason} ->
+          Logger.warning("Failed to rename session #{session_id}: #{inspect(reason)}")
+          put_flash(socket, :error, "Failed to rename session")
       end
 
     {:noreply, assign(socket, :editing_session_id, nil) |> reload_sessions()}

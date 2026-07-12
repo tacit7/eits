@@ -15,6 +15,8 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
   attr :current_path, :string, default: "/notes"
   attr :selected_ids, :any, default: %MapSet{}
   attr :select_mode, :boolean, default: false
+  attr :installed_editors, :list, default: []
+  attr :preferred_editor, :string, default: "code"
 
   def notes_list(assigns) do
     ~H"""
@@ -210,6 +212,21 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                       <.icon name="hero-arrows-pointing-out" class="size-3.5" /> Open full editor
                     </.link>
                   </li>
+                  <%= if @installed_editors != [] do %>
+                    <% preferred = Enum.find(@installed_editors, &(&1.id == @preferred_editor)) || List.first(@installed_editors) %>
+                    <li>
+                      <button
+                        type="button"
+                        phx-click="open_in_editor"
+                        phx-value-editor={preferred && preferred.id}
+                        phx-value-id={note.id}
+                        class="flex items-center gap-2 text-xs"
+                      >
+                        <.icon name="hero-arrow-top-right-on-square" class="size-3.5" />
+                        Open in {preferred && preferred.label}
+                      </button>
+                    </li>
+                  <% end %>
                   <li class="mt-1 border-t border-base-content/8 pt-1">
                     <button
                       type="button"

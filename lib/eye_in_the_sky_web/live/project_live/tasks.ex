@@ -1,12 +1,15 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   use EyeInTheSkyWeb, :live_view
 
+  alias EyeInTheSky.Editors
   alias EyeInTheSky.Events
   alias EyeInTheSky.{Notes, Tasks}
+  alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Components.FilterSheet
   alias EyeInTheSkyWeb.Components.TaskCard
   alias EyeInTheSkyWeb.Components.TasksBulkActions
   alias EyeInTheSkyWeb.ControllerHelpers
+  alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.BulkHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   alias EyeInTheSkyWeb.Live.Shared.TasksListHelpers
@@ -48,6 +51,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       |> assign(:loaded_tasks, [])
       |> assign(:state_counts, %{})
       |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
+      |> assign(:installed_editors, Editors.detect_installed())
+      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
     socket =
       if connected?(socket) do
@@ -78,14 +83,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
     socket =
       if connected?(socket) do
-        task = Tasks.get_task_by_uuid_or_id!(task_id)
-        notes = Notes.list_notes_for_task(task.id)
+        case Tasks.get_task_by_uuid_or_id(task_id) do
+          {:ok, task} ->
+            notes = Notes.list_notes_for_task(task.id)
 
-        socket
-        |> assign(:selected_task, task)
-        |> assign(:task_notes, notes)
-        |> assign(:task_detail_focus, nil)
-        |> assign(:show_task_detail_drawer, true)
+            socket
+            |> assign(:selected_task, task)
+            |> assign(:task_notes, notes)
+            |> assign(:task_detail_focus, nil)
+            |> assign(:show_task_detail_drawer, true)
+
+          {:error, :not_found} ->
+            put_flash(socket, :error, "Task not found")
+        end
       else
         socket
       end
@@ -237,6 +247,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     do: {:noreply, NotificationHelpers.set_notify_on_stop(socket, params)}
 
   @impl true
+  def handle_event("open_in_editor", %{"editor" => editor_id, "id" => id_str}, socket) do
+    case Integer.parse(id_str) do
+      {id, ""} ->
+        if Phoenix.LiveView.connected?(socket) do
+          Events.unsubscribe_editor_sync(:task, id)
+          Events.subscribe_editor_sync(:task, id)
+        end
+
+        ViewHelpers.handle_open_in_editor_record(:task, id, editor_id, socket)
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid task ID")}
+    end
+  end
+
+  def handle_event("open_in_editor", _params, socket) do
+    {:noreply, put_flash(socket, :error, "No task selected")}
+  end
+
+  @impl true
   def handle_info({:task_updated, task}, socket) do
     loaded_ids = socket.assigns.loaded_task_ids
     task_key = task.uuid || to_string(task.id)
@@ -246,6 +276,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     else
       {:noreply, load_tasks(socket)}
     end
+  end
+
+  def handle_info({:editor_sync_failed, :task, _id, _reason}, socket) do
+    {:noreply, put_flash(socket, :error, "Editor sync failed — check your editor")}
   end
 
   def handle_info(_, socket), do: {:noreply, socket}
@@ -423,6 +457,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
       toggle_event="toggle_task_detail_drawer"
       update_event="update_task"
       delete_event="delete_task"
+      installed_editors={@installed_editors}
+      preferred_editor={@preferred_editor}
     />
 
     <TasksBulkActions.archive_confirm_modal

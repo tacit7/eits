@@ -96,18 +96,23 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
     title = String.trim(title)
 
     if title != "" do
-      task = Tasks.get_task_by_uuid_or_id!(task_id)
-      items = Tasks.list_checklist_items(task.id)
-      next_position = if items == [], do: 0, else: length(items)
+      case Tasks.get_task_by_uuid_or_id(task_id) do
+        {:ok, task} ->
+          items = Tasks.list_checklist_items(task.id)
+          next_position = if items == [], do: 0, else: length(items)
 
-      case Tasks.create_checklist_item(%{task_id: task.id, title: title, position: next_position}) do
-        {:ok, _} ->
-          updated_task = Tasks.get_task!(task.id)
-          send(self(), {:checklist_updated, updated_task})
-          {:noreply, assign(socket, :task, updated_task)}
+          case Tasks.create_checklist_item(%{task_id: task.id, title: title, position: next_position}) do
+            {:ok, _} ->
+              updated_task = Tasks.get_task!(task.id)
+              send(self(), {:checklist_updated, updated_task})
+              {:noreply, assign(socket, :task, updated_task)}
 
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to add checklist item")}
+            {:error, _} ->
+              {:noreply, put_flash(socket, :error, "Failed to add checklist item")}
+          end
+
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, "Task not found")}
       end
     else
       {:noreply, socket}
@@ -125,7 +130,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
         {:noreply, assign(socket, :task, updated_task)}
 
       {:error, _} ->
-        {:noreply, socket}
+        {:noreply, put_flash(socket, :error, "Failed to toggle checklist item")}
     end
   end
 
@@ -140,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
         {:noreply, assign(socket, :task, updated_task)}
 
       {:error, _} ->
-        {:noreply, socket}
+        {:noreply, put_flash(socket, :error, "Failed to delete checklist item")}
     end
   end
 end

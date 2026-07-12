@@ -3,7 +3,7 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   Validates parameters for spawning a new agent via the REST API.
   """
 
-  alias EyeInTheSky.{Agents, Sessions}
+  alias EyeInTheSky.{Agents, Sessions, Settings}
   alias EyeInTheSky.Agents.ModelConfig
   alias EyeInTheSky.Utils.ToolHelpers
 
@@ -36,6 +36,7 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
     end
   end
 
+  defp default_model_for_provider("claude"), do: Settings.default_model()
   defp default_model_for_provider("codex"), do: ModelConfig.default_model("codex")
   defp default_model_for_provider("pi"), do: nil
   defp default_model_for_provider(_), do: "haiku"

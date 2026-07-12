@@ -38,8 +38,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @valid_tabs ~w(general editor auth workflow pricing system desktop providers)
 
-  @known_editors EyeInTheSky.Editors.all_ids()
-
   # Function, not attribute: compile-time ~ expansion bakes the build-machine home dir.
   defp allowed_editor_roots, do: [Path.expand("~/.claude")]
 
@@ -186,25 +184,27 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   @impl true
   def handle_event("open_in_editor", %{"path" => path}, socket) when byte_size(path) > 0 do
     editor = Settings.get("preferred_editor") || "code"
-
     allowed? = Enum.any?(allowed_editor_roots(), &path_within?(path, &1))
 
-    cond do
-      editor not in @known_editors ->
-        {:noreply, put_flash(socket, :error, "Editor #{inspect(editor)} is not allowed")}
+    if allowed? do
+      case EyeInTheSky.Editors.open(editor, path) do
+        {:ok, label} ->
+          {:noreply, put_flash(socket, :info, "Opening in #{label}...")}
 
-      not File.exists?(path) ->
-        {:noreply, put_flash(socket, :error, "Path does not exist")}
+        {:error, :unknown_editor} ->
+          {:noreply, put_flash(socket, :error, "Editor #{inspect(editor)} is not configured")}
 
-      not allowed? ->
-        {:noreply, put_flash(socket, :error, "Path is outside allowed directories")}
+        {:error, :not_installed} ->
+          {:noreply, put_flash(socket, :error, "Editor #{inspect(editor)} is not installed")}
 
-      true ->
-        Task.Supervisor.start_child(EyeInTheSky.TaskSupervisor, fn ->
-          System.cmd(editor, [path], stderr_to_stdout: true)
-        end)
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, "File not found")}
 
-        {:noreply, put_flash(socket, :info, "Opening in #{editor}...")}
+        {:error, :not_allowed} ->
+          {:noreply, put_flash(socket, :error, "Path not allowed")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Path is outside allowed directories")}
     end
   end
 
@@ -215,55 +215,46 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @impl true
   def handle_event("save_setting", %{"key" => key, "value" => value}, socket) do
-    # Convert seconds to milliseconds for timeout storage; 0 means no timeout
-    value =
-      if key == "cli_idle_timeout_ms" do
-        case parse_int(value) do
-          nil -> value
-          secs -> to_string(secs * 1000)
+    if key == "theme" do
+      {:noreply, apply_theme_setting(socket, value)}
+    else
+      # Convert seconds to milliseconds for timeout storage; 0 means no timeout
+      value =
+        if key == "cli_idle_timeout_ms" do
+          case parse_int(value) do
+            nil -> value
+            secs -> to_string(secs * 1000)
+          end
+        else
+          value
         end
-      else
-        value
-      end
 
-    Settings.put(key, value)
-    settings = Settings.all()
+      Settings.put(key, value)
 
-    socket =
-      socket
-      |> assign(:settings, settings)
-      |> flash_saved(key)
+      socket =
+        socket
+        |> reload_settings()
+        |> flash_saved(key)
 
-    socket =
-      cond do
-        key == "theme" ->
-          push_event(socket, "apply_theme", %{theme: value})
+      socket =
+        cond do
+          key == "cm_font_size" ->
+            push_event(socket, "apply_cm_settings", %{cm_font_size: value})
 
-        key == "cm_font_size" ->
-          push_event(socket, "apply_cm_settings", %{cm_font_size: value})
+          key == "cm_tab_size" ->
+            push_event(socket, "apply_cm_settings", %{cm_tab_size: value})
 
-        key == "cm_tab_size" ->
-          push_event(socket, "apply_cm_settings", %{cm_tab_size: value})
+          true ->
+            socket
+        end
 
-        true ->
-          socket
-      end
-
-    {:noreply, socket}
+      {:noreply, socket}
+    end
   end
 
   @impl true
   def handle_event("set_theme", %{"theme" => theme}, socket) do
-    Settings.put("theme", theme)
-    settings = Settings.all()
-
-    socket =
-      socket
-      |> assign(:settings, settings)
-      |> flash_saved("theme")
-      |> push_event("apply_theme", %{theme: theme})
-
-    {:noreply, socket}
+    {:noreply, apply_theme_setting(socket, theme)}
   end
 
   @impl true
@@ -279,16 +270,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       end
     end)
 
-    settings = Settings.all()
-    {:noreply, socket |> assign(:settings, settings) |> flash_saved("pricing")}
+    {:noreply, socket |> reload_settings() |> flash_saved("pricing")}
   end
 
   @impl true
   def handle_event("reset_setting", %{"key" => key}, socket) do
     Settings.reset(key)
-    settings = Settings.all()
-
-    {:noreply, socket |> assign(:settings, settings) |> put_flash(:info, "Reset to default")}
+    {:noreply, socket |> reload_settings() |> put_flash(:info, "Reset to default")}
   end
 
   @impl true
@@ -299,10 +287,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     |> Enum.filter(fn {k, _} -> String.starts_with?(k, "pricing_") end)
     |> Enum.each(fn {k, _} -> Settings.reset(k) end)
 
-    settings = Settings.all()
-
     {:noreply,
-     socket |> assign(:settings, settings) |> put_flash(:info, "Pricing reset to defaults")}
+     socket |> reload_settings() |> put_flash(:info, "Pricing reset to defaults")}
   end
 
   @impl true
@@ -310,8 +296,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     current = Settings.get("cm_vim") || "false"
     new_val = if current == "true", do: "false", else: "true"
     Settings.put("cm_vim", new_val)
-    settings = Settings.all()
-    socket = socket |> assign(:settings, settings) |> flash_saved("cm_vim")
+    socket = socket |> reload_settings() |> flash_saved("cm_vim")
     {:noreply, push_event(socket, "apply_cm_settings", %{cm_vim: new_val})}
   end
 
@@ -319,8 +304,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("toggle_setting", %{"key" => key}, socket) do
     current = Settings.get_boolean(key)
     Settings.put(key, to_string(!current))
-    settings = Settings.all()
-    {:noreply, socket |> assign(:settings, settings) |> flash_saved(key)}
+    {:noreply, socket |> reload_settings() |> flash_saved(key)}
   end
 
   @impl true
@@ -345,6 +329,20 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("pi_refresh_models", _params, socket) do
     ModelDiscoveryCache.refresh_async()
     {:noreply, assign(socket, :pi_model_status, :loading)}
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private helpers — settings application, Pi operations, rendering
+  # ---------------------------------------------------------------------------
+
+  defp apply_theme_setting(socket, theme) do
+    Settings.put("theme", theme)
+    settings = Settings.all()
+
+    socket
+    |> assign(:settings, settings)
+    |> flash_saved("theme")
+    |> push_event("apply_theme", %{theme: theme})
   end
 
   # Runs the blocking harness IPC in a supervised Task so the LiveView socket
@@ -392,8 +390,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @impl true
   def handle_info({:settings_changed, _key, _value}, socket) do
-    settings = Settings.all()
-    {:noreply, assign(socket, :settings, settings)}
+    {:noreply, reload_settings(socket)}
   end
 
   @impl true
@@ -445,6 +442,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   defp load_db_info do
     Settings.db_info()
+  end
+
+  defp reload_settings(socket), do: assign(socket, :settings, Settings.all())
+
+  defp apply_theme_setting(socket, theme) do
+    Settings.put("theme", theme)
+
+    socket
+    |> reload_settings()
+    |> flash_saved("theme")
+    |> push_event("apply_theme", %{theme: theme})
   end
 
   @impl true

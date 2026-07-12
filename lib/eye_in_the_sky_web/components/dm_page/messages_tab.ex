@@ -262,7 +262,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
 
     stream_type = get_in(assigns.message.metadata || %{}, ["stream_type"])
     segments = parse_body_segments(assigns.message.body)
-    body_is_tool_calls = segments != [] and Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+
+    body_is_tool_calls =
+      role not in [:user, :system] and segments != [] and
+        Enum.all?(segments, &match?({:tool_call, _, _}, &1))
+
     is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
     is_same_sender = assigns.prev_role != nil && assigns.prev_role == assigns.message.sender_role
     is_new_turn = assigns.prev_role != nil && assigns.prev_role != assigns.message.sender_role
@@ -342,17 +346,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     data-utc={to_utc_string(@message.inserted_at)}
                     phx-hook="LocalTime"
                   />
-                  <div class="ml-auto opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 flex items-center gap-0.5">
-                    <button
-                      data-copy-btn
-                      data-copy-text={@message.body}
-                      class="p-1 rounded text-base-content/25 hover:text-base-content/55 hover:bg-base-content/8 transition-colors"
-                      title="Copy message"
-                      aria-label="Copy message"
-                    >
-                      <.icon name="hero-clipboard-document-mini" class="size-3.5" />
-                    </button>
-                  </div>
                 </div>
                 <%!-- Body --%>
                 <div class={[
@@ -362,6 +355,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   <.message_body message={@message} compact={false} search_query={@search_query} />
                 </div>
                 <.message_attachments attachments={@message.attachments || []} />
+                <%!-- Copy button - bottom, always present, hover-revealed --%>
+                <.copy_btn text={@message.body} class={@show_header && "ml-7"} />
               </div>
             <% else %>
               <%!-- ── Agent message ── --%>
@@ -387,26 +382,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     data-utc={to_utc_string(@message.inserted_at)}
                     phx-hook="LocalTime"
                   />
-                  <div class="ml-auto opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 flex items-center gap-0.5">
-                    <button
-                      data-copy-btn
-                      data-copy-text={@message.body}
-                      class="p-1 rounded text-base-content/25 hover:text-base-content/55 hover:bg-base-content/8 transition-colors"
-                      title="Copy message"
-                      aria-label="Copy message"
-                    >
-                      <.icon name="hero-clipboard-document-mini" class="size-3.5" />
-                    </button>
-                  </div>
                 </div>
                 <%!-- Body --%>
                 <div class={[
                   "break-words",
-                  @tier == :primary &&
+                  @tier != :secondary &&
                     "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content",
-                  @tier == :secondary && "text-[var(--text-secondary)] text-sm",
-                  @tier not in [:primary, :secondary] &&
-                    "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content"
+                  @tier == :secondary && "text-[var(--text-secondary)] text-sm"
                 ]}>
                   <.message_body message={@message} compact={false} search_query={@search_query} />
                 </div>
@@ -418,6 +400,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 >
                   <.message_metrics message={@message} />
                 </div>
+                <%!-- Copy button - bottom, all non-secondary tiers, hover-revealed --%>
+                <.copy_btn :if={@tier != :secondary} text={@message.body} />
               </div>
             <% end %>
           <% end %>
@@ -540,6 +524,31 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   # ---------------------------------------------------------------------------
   # cluster_summary component
   # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # copy_btn component
+  # ---------------------------------------------------------------------------
+
+  attr :text, :string, required: true
+  attr :class, :any, default: nil
+
+  defp copy_btn(assigns) do
+    ~H"""
+    <div class={["flex justify-end mt-1", @class]}>
+      <div class="opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150">
+        <button
+          data-copy-btn
+          data-copy-text={@text}
+          class="p-1 rounded text-base-content/25 hover:text-base-content/55 hover:bg-base-content/8 transition-colors"
+          title="Copy message"
+          aria-label="Copy message"
+        >
+          <.icon name="hero-clipboard-document-mini" class="size-3.5" />
+        </button>
+      </div>
+    </div>
+    """
+  end
 
   attr :data, :map, required: true
 

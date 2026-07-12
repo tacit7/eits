@@ -215,55 +215,57 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @impl true
   def handle_event("save_setting", %{"key" => key, "value" => value}, socket) do
-    # Convert seconds to milliseconds for timeout storage; 0 means no timeout
-    value =
-      if key == "cli_idle_timeout_ms" do
-        case parse_int(value) do
-          nil -> value
-          secs -> to_string(secs * 1000)
+    if key == "theme" do
+      {:noreply, apply_theme_setting(socket, value)}
+    else
+      # Convert seconds to milliseconds for timeout storage; 0 means no timeout
+      value =
+        if key == "cli_idle_timeout_ms" do
+          case parse_int(value) do
+            nil -> value
+            secs -> to_string(secs * 1000)
+          end
+        else
+          value
         end
-      else
-        value
-      end
 
-    Settings.put(key, value)
-    settings = Settings.all()
+      Settings.put(key, value)
+      settings = Settings.all()
 
-    socket =
-      socket
-      |> assign(:settings, settings)
-      |> flash_saved(key)
+      socket =
+        socket
+        |> assign(:settings, settings)
+        |> flash_saved(key)
 
-    socket =
-      cond do
-        key == "theme" ->
-          push_event(socket, "apply_theme", %{theme: value})
+      socket =
+        cond do
+          key == "cm_font_size" ->
+            push_event(socket, "apply_cm_settings", %{cm_font_size: value})
 
-        key == "cm_font_size" ->
-          push_event(socket, "apply_cm_settings", %{cm_font_size: value})
+          key == "cm_tab_size" ->
+            push_event(socket, "apply_cm_settings", %{cm_tab_size: value})
 
-        key == "cm_tab_size" ->
-          push_event(socket, "apply_cm_settings", %{cm_tab_size: value})
+          true ->
+            socket
+        end
 
-        true ->
-          socket
-      end
-
-    {:noreply, socket}
+      {:noreply, socket}
+    end
   end
 
   @impl true
   def handle_event("set_theme", %{"theme" => theme}, socket) do
+    {:noreply, apply_theme_setting(socket, theme)}
+  end
+
+  defp apply_theme_setting(socket, theme) do
     Settings.put("theme", theme)
     settings = Settings.all()
 
-    socket =
-      socket
-      |> assign(:settings, settings)
-      |> flash_saved("theme")
-      |> push_event("apply_theme", %{theme: theme})
-
-    {:noreply, socket}
+    socket
+    |> assign(:settings, settings)
+    |> flash_saved("theme")
+    |> push_event("apply_theme", %{theme: theme})
   end
 
   @impl true

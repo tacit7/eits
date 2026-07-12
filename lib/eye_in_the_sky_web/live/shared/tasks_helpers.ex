@@ -22,30 +22,40 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
   end
 
   def handle_open_task_detail(%{"task_id" => task_id} = params, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    notes = Notes.list_notes_for_task(task.id)
-    focus = Map.get(params, "focus")
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        notes = Notes.list_notes_for_task(task.id)
+        focus = Map.get(params, "focus")
 
-    {:noreply,
-     socket
-     |> assign(:selected_task, task)
-     |> assign(:task_notes, notes)
-     |> assign(:task_detail_focus, focus)
-     |> assign(:show_task_detail_drawer, true)}
+        {:noreply,
+         socket
+         |> assign(:selected_task, task)
+         |> assign(:task_notes, notes)
+         |> assign(:task_detail_focus, focus)
+         |> assign(:show_task_detail_drawer, true)}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
+    end
   end
 
   def handle_open_task_detail(_params, socket), do: {:noreply, socket}
 
   # Variant for LiveViews that use an `active_overlay` atom rather than a boolean drawer assign.
   def handle_open_task_detail_with_overlay(%{"task_id" => task_id}, socket, overlay_value) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    notes = Notes.list_notes_for_task(task.id)
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        notes = Notes.list_notes_for_task(task.id)
 
-    {:noreply,
-     socket
-     |> assign(:selected_task, task)
-     |> assign(:task_notes, notes)
-     |> assign(:active_overlay, overlay_value)}
+        {:noreply,
+         socket
+         |> assign(:selected_task, task)
+         |> assign(:task_notes, notes)
+         |> assign(:active_overlay, overlay_value)}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
+    end
   end
 
   def handle_open_task_detail_with_overlay(_params, socket, _overlay_value),
@@ -120,36 +130,53 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
 
   def handle_delete_task(params, socket, reload_fn) do
     task_id = extract_task_id(params)
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    do_task_mutation(task, &Tasks.delete_task_with_associations/1, socket, reload_fn, "Failed to delete task")
+
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        do_task_mutation(task, &Tasks.delete_task_with_associations/1, socket, reload_fn, "Failed to delete task")
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
+    end
   end
 
   def handle_archive_task(params, socket, reload_fn) do
     task_id = extract_task_id(params)
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    do_task_mutation(task, &Tasks.archive_task/1, socket, reload_fn, "Failed to archive task")
+
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        do_task_mutation(task, &Tasks.archive_task/1, socket, reload_fn, "Failed to archive task")
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
+    end
   end
 
   def handle_add_task_annotation(%{"task_id" => task_id, "body" => body}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    body = String.trim(body)
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        body = String.trim(body)
 
-    if body != "" do
-      case Notes.create_note(%{
-             parent_type: "task",
-             parent_id: task.uuid || to_string(task.id),
-             body: body
-           }) do
-        {:ok, _note} ->
-          notes = Notes.list_notes_for_task(task.id)
-          {:noreply, assign(socket, :task_notes, notes)}
+        if body != "" do
+          case Notes.create_note(%{
+                 parent_type: "task",
+                 parent_id: task.uuid || to_string(task.id),
+                 body: body
+               }) do
+            {:ok, _note} ->
+              notes = Notes.list_notes_for_task(task.id)
+              {:noreply, assign(socket, :task_notes, notes)}
 
-        {:error, changeset} ->
-          Logger.error("Failed to create task annotation: #{inspect(changeset.errors)}")
-          {:noreply, put_flash(socket, :error, "Failed to save annotation")}
-      end
-    else
-      {:noreply, socket}
+            {:error, changeset} ->
+              Logger.error("Failed to create task annotation: #{inspect(changeset.errors)}")
+              {:noreply, put_flash(socket, :error, "Failed to save annotation")}
+          end
+        else
+          {:noreply, socket}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
     end
   end
 

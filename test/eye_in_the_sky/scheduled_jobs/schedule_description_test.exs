@@ -58,8 +58,28 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduleDescriptionTest do
       assert "Mon, Wed, Fri at 9 AM" == SD.describe(cron("0 9 * * 1,3,5"))
     end
 
+    test "mixed list of ranges and singles" do
+      assert "Mon, Wed-Fri at 9 AM" == SD.describe(cron("0 9 * * 1,3-5"))
+    end
+
     test "specific day of month" do
       assert "Day 15 at 9 AM" == SD.describe(cron("0 9 15 * *"))
+    end
+
+    test "frequency restricted to specific weekdays combines instead of dropping" do
+      assert "Weekdays, Every 4h" == SD.describe(cron("0 */4 * * 1-5"))
+    end
+
+    test "minute-step frequency restricted to specific weekdays combines instead of dropping" do
+      assert "Weekends, Every 15m" == SD.describe(cron("*/15 * * * 0,6"))
+    end
+
+    test "out-of-range hour is rejected by the real parser, not mis-described" do
+      assert "0 99 * * *" == SD.describe(cron("0 99 * * *"))
+    end
+
+    test "out-of-range minute is rejected by the real parser" do
+      assert "99 9 * * *" == SD.describe(cron("99 9 * * *"))
     end
 
     test "day and month" do
@@ -107,6 +127,10 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduleDescriptionTest do
     test "invalid expression returns nil" do
       assert nil == SD.preview("bad cron")
       assert nil == SD.preview("invalid")
+    end
+
+    test "out-of-range field returns nil, not a mis-described phrase" do
+      assert nil == SD.preview("0 99 * * *")
     end
 
     test "non-binary returns nil" do

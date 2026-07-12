@@ -67,15 +67,9 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduleDescription do
   unrecognized expressions so the caller can hide the hint.
   """
   def preview(expr) when is_binary(expr) do
-    case CrontabParser.parse(expr) do
-      {:ok, _} ->
-        case analyze_cron(expr) do
-          {:ok, desc} -> desc
-          :error -> nil
-        end
-
-      {:error, _} ->
-        nil
+    case analyze_cron(expr) do
+      {:ok, desc} -> desc
+      :error -> nil
     end
   end
 
@@ -98,9 +92,14 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduleDescription do
   # Cron — returns {:ok, description} | :error
   # ---------------------------------------------------------------------------
 
+  # Validates against the real crontab parser first — rejects out-of-range or
+  # malformed fields (e.g. hour 99) that a naive split-and-parse would happily
+  # mis-describe — then hand-parses the 5 fields into a phrase.
   defp analyze_cron(expr) when is_binary(expr) do
-    case String.split(String.trim(expr), ~r/\s+/) do
-      [min, hour, dom, mon, dow] -> describe_fields(min, hour, dom, mon, dow)
+    with {:ok, _} <- CrontabParser.parse(expr),
+         [min, hour, dom, mon, dow] <- String.split(String.trim(expr), ~r/\s+/) do
+      describe_fields(min, hour, dom, mon, dow)
+    else
       _ -> :error
     end
   end
@@ -109,17 +108,27 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduleDescription do
 
   defp describe_fields(min, hour, dom, mon, dow) do
     every_day? = dom == "*" and mon == "*" and dow == "*"
+    day = day_label(dow, dom, mon)
 
     case frequency(min, hour) do
-      # A pure frequency ("Every 15m", "Hourly") only stands alone when it runs
-      # every day — otherwise it must combine with the day/month qualifier.
+      # A pure frequency ("Every 15m", "Hourly") stands alone when it runs
+      # every day. When day/month is restricted (e.g. "0 */4 * * 1-5"), the
+      # frequency must combine with the day qualifier instead of being
+      # dropped — the old fall-through-to-clock_time path silently discarded
+      # it since clock_time can't parse a "*/4" step as a plain hour.
       freq when is_binary(freq) and every_day? ->
         {:ok, freq}
 
+      freq when is_binary(freq) ->
+        {:ok, combine_freq(freq, day)}
+
       _ ->
-        combine(clock_time(min, hour), day_label(dow, dom, mon))
+        combine(clock_time(min, hour), day)
     end
   end
+
+  defp combine_freq(freq, nil), do: freq
+  defp combine_freq(freq, day), do: "#{day}, #{freq}"
 
   # Recurring-frequency phrasings. Returns a string or nil.
   defp frequency("*", "*"), do: "Every minute"
@@ -175,17 +184,21 @@ defmodule EyeInTheSky.ScheduledJobs.ScheduleDescription do
   defp format_dow("0,6"), do: "Weekends"
   defp format_dow("6,0"), do: "Weekends"
 
+  # Handles plain lists ("1,3,5"), plain ranges ("1-5"), and mixed lists of
+  # ranges + singles ("1,3-5" -> "Mon, Wed-Fri") — each comma-separated token
+  # is resolved independently instead of assuming the whole field is one kind.
   defp format_dow(dow) do
-    cond do
-      String.contains?(dow, ",") ->
-        dow |> String.split(",") |> Enum.map_join(", ", &day_name/1)
+    dow
+    |> String.split(",")
+    |> Enum.map_join(", ", &format_dow_token/1)
+  end
 
-      String.contains?(dow, "-") ->
-        [start_day, end_day] = String.split(dow, "-", parts: 2)
-        "#{day_name(start_day)}-#{day_name(end_day)}"
-
-      true ->
-        day_name(dow)
+  defp format_dow_token(token) do
+    if String.contains?(token, "-") do
+      [start_day, end_day] = String.split(token, "-", parts: 2)
+      "#{day_name(start_day)}-#{day_name(end_day)}"
+    else
+      day_name(token)
     end
   end
 

@@ -13,12 +13,7 @@ defmodule EyeInTheSkyWeb.Components.NewDmPage do
   def new_dm_page(assigns) do
     ~H"""
     <div class="flex flex-col h-full items-center justify-center bg-base-100">
-      <div class="w-full max-w-2xl px-4 flex flex-col gap-6">
-        <div class="text-center">
-          <h1 class="text-xl font-semibold text-base-content">New conversation</h1>
-          <p class="text-sm text-base-content/40 mt-1">Send a message to start an agent session.</p>
-        </div>
-
+      <div class="w-full max-w-2xl px-4">
         <form
           phx-submit="send_message"
           class="rounded-2xl border border-[var(--border-subtle)] focus-within:border-primary/40 bg-[var(--surface-composer)] shadow-sm outline-none transition-colors"
@@ -69,6 +64,7 @@ defmodule EyeInTheSkyWeb.Components.NewDmPage do
         </form>
       </div>
     </div>
+
     """
   end
 end

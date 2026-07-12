@@ -133,6 +133,7 @@ defmodule EyeInTheSkyWeb.Router do
       live "/components", ComponentsLive, :index
       live "/terminal", TerminalLive, :index
       live "/mockup", MockupLive, :index
+      live "/dm/new", DmLive, :new
       live "/dm/:session_id", DmLive, :show
       live "/notes/new", NoteLive.New, :new
       live "/notes/:id/edit", NoteLive.Edit, :edit

@@ -154,6 +154,78 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     )
   end
 
+  @doc "All UI assigns for /dm/new — same keys/types as assign_essential_defaults/2."
+  def assign_new_session_defaults(socket) do
+    effective = JsonSettings.effective_settings(%{}, %{})
+
+    socket
+    |> assign(:page_title, "New conversation")
+    |> assign(:session, nil)
+    |> assign(:agent, nil)
+    |> assign(:session_id, nil)
+    |> assign(:session_uuid, nil)
+    |> assign(:agent_id, nil)
+    |> assign(:session_status, nil)
+    |> assign(:hide_mobile_header, true)
+    |> assign(:active_tab, "messages")
+    |> assign(:session_ref, nil)
+    |> assign(:processing, false)
+    |> assign(:selected_model, Settings.default_model())
+    |> assign(:selected_effort, "medium")
+    |> assign(:active_overlay, nil)
+    |> assign(:show_live_stream, get_in(effective, ["general", "show_live_stream"]) || false)
+    |> assign(:slash_items, SlashItems.build())
+    |> assign(:diff_cache, %{})
+    |> assign(:commits_view, :list)
+    |> assign(:diff_mode, :unified)
+    |> assign(:cumulative_diff, nil)
+    |> assign(:reload_timer, nil)
+    |> assign(:thinking_enabled, get_in(effective, ["general", "thinking_enabled"]) || false)
+    |> assign(:show_thinking_blocks, false)
+    |> assign(:max_budget_usd, get_in(effective, ["general", "max_budget_usd"]))
+    |> assign(:session_cli_opts, [])
+    |> assign(:compacting, false)
+    |> assign(:message_search_query, "")
+    |> assign(:session_context, nil)
+    |> assign(:reloading, false)
+    |> assign(:active_timer, nil)
+    |> assign(:codex_raw_lines, [])
+    |> assign(:notify_on_stop, get_in(effective, ["general", "notify_on_stop"]) || false)
+    |> assign(:dm_settings_scope, "session")
+    |> assign(:dm_settings_subtab, "general")
+    |> assign(:dm_settings_effective, effective)
+    |> assign(:dm_settings_session_overrides, %{})
+    |> assign(:dm_settings_agent_overrides, %{})
+    |> assign(:syncing, true)
+    |> assign(:stream_content, "")
+    |> assign(:stream_tool, nil)
+    |> assign(:stream_thinking, nil)
+    |> assign(:total_tokens, 0)
+    |> assign(:total_cost, 0.0)
+    |> assign(:context_used, 0)
+    |> assign(:context_window, 0)
+    |> assign(:message_limit, @default_message_limit)
+    |> assign(:has_more_messages, false)
+    |> assign(:selected_task, nil)
+    |> assign(:task_notes, [])
+    |> assign(:workflow_states, [])
+    |> assign(:current_task, :not_loaded)
+    |> assign(:queued_prompts, [])
+    |> assign(:tasks, [])
+    |> assign(:commits, [])
+    |> assign(:notes, [])
+    |> assign(:pty_pid, nil)
+    |> assign(:pty_pending_launch, false)
+    |> assign(:pty_launched_at, nil)
+    |> assign(:tauri_dropped_files, [])
+    |> allow_upload(:files,
+      accept: ~w(.jpg .jpeg .png .gif .pdf .txt .md .csv .json .xml .html),
+      max_entries: 10,
+      max_file_size: 50_000_000,
+      auto_upload: true
+    )
+  end
+
   # Connected-only — runs DB queries and GenServer calls after WebSocket upgrade.
   def assign_connected_defaults(socket, session) do
     stream_content =

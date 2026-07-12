@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   # Returns :disabled | :running | :failed | :healthy for a job row.
   def job_row_state(job, running_ids, last_run_map) do
     cond do
-      job.enabled != 1 -> :disabled
+      job.enabled != true -> :disabled
       MapSet.member?(running_ids, job.id) -> :running
       Map.get(last_run_map, job.id) == "failed" -> :failed
       true -> :healthy

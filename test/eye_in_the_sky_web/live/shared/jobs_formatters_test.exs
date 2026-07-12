@@ -50,4 +50,42 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormattersTest do
       assert "?" == JobsFormatters.format_schedule(nil)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # job_row_state/3 — enabled is a real :boolean column (see ScheduledJob
+  # schema), not 0/1. `job.enabled != 1` previously misclassified every
+  # enabled job as :disabled because `true != 1` in Elixir (different types
+  # never compare equal), regardless of the job's actual state.
+  # ---------------------------------------------------------------------------
+
+  describe "job_row_state/3" do
+    test "enabled job with no activity is :healthy" do
+      assert :healthy ==
+               JobsFormatters.job_row_state(%{id: 1, enabled: true}, MapSet.new(), %{})
+    end
+
+    test "disabled job is :disabled regardless of other state" do
+      assert :disabled ==
+               JobsFormatters.job_row_state(%{id: 1, enabled: false}, MapSet.new(), %{})
+    end
+
+    test "enabled job currently running is :running" do
+      assert :running ==
+               JobsFormatters.job_row_state(%{id: 1, enabled: true}, MapSet.new([1]), %{})
+    end
+
+    test "enabled job whose last run failed is :failed" do
+      assert :failed ==
+               JobsFormatters.job_row_state(%{id: 1, enabled: true}, MapSet.new(), %{
+                 1 => "failed"
+               })
+    end
+
+    test "disabled takes priority over running/failed" do
+      assert :disabled ==
+               JobsFormatters.job_row_state(%{id: 1, enabled: false}, MapSet.new([1]), %{
+                 1 => "failed"
+               })
+    end
+  end
 end

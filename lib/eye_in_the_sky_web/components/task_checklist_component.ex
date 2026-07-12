@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
         {:noreply, assign(socket, :task, updated_task)}
 
       {:error, _} ->
-        {:noreply, socket}
+        {:noreply, put_flash(socket, :error, "Failed to toggle checklist item")}
     end
   end
 
@@ -145,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
         {:noreply, assign(socket, :task, updated_task)}
 
       {:error, _} ->
-        {:noreply, socket}
+        {:noreply, put_flash(socket, :error, "Failed to delete checklist item")}
     end
   end
 end

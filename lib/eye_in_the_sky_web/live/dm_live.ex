@@ -806,11 +806,20 @@ defmodule EyeInTheSkyWeb.DmLive do
   def render(%{live_action: :new} = assigns) do
     ~H"""
     <NewDmPage.new_dm_page
+      uploads={@uploads}
       processing={@processing}
       selected_model={@selected_model}
       provider={@provider}
       selected_effort={@selected_effort}
       active_overlay={@active_overlay}
+      slash_items={@slash_items}
+      thinking_enabled={@thinking_enabled}
+      show_thinking_blocks={@show_thinking_blocks}
+      max_budget_usd={@max_budget_usd}
+      context_used={@context_used}
+      context_window={@context_window}
+      total_cost={@total_cost}
+      session_cli_opts={@session_cli_opts}
     />
     """
   end

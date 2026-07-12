@@ -1,70 +1,46 @@
 defmodule EyeInTheSkyWeb.Components.NewDmPage do
   use EyeInTheSkyWeb, :html
 
-  import EyeInTheSkyWeb.Components.ModelSelector, only: [model_selector: 1]
-  alias EyeInTheSkyWeb.Helpers.ModelHelpers
+  import EyeInTheSkyWeb.Components.DmPage.MessageComposer, only: [message_composer: 1]
 
-  attr :processing, :boolean, default: false
+  attr :uploads, :map, required: true
   attr :selected_model, :string, required: true
   attr :provider, :string, default: "claude"
   attr :selected_effort, :string, default: "medium"
   attr :active_overlay, :any, default: nil
+  attr :processing, :boolean, default: false
+  attr :slash_items, :list, default: []
+  attr :thinking_enabled, :boolean, default: false
+  attr :show_thinking_blocks, :boolean, default: false
+  attr :max_budget_usd, :any, default: nil
+  attr :context_used, :integer, default: 0
+  attr :context_window, :integer, default: 0
+  attr :total_cost, :float, default: 0.0
+  attr :session_cli_opts, :list, default: []
 
   def new_dm_page(assigns) do
     ~H"""
-    <div class="flex flex-col h-full items-center justify-center bg-base-100">
-      <div class="w-full max-w-2xl px-4">
-        <form
-          phx-submit="send_message"
-          class="rounded-2xl border border-[var(--border-subtle)] focus-within:border-primary/40 bg-[var(--surface-composer)] shadow-sm outline-none transition-colors"
-          id="new-session-form"
-        >
-          <%!-- Textarea --%>
-          <div class="px-3 pt-3 pb-1">
-            <textarea
-              id="new-session-composer"
-              name="body"
-              rows="3"
-              placeholder="What do you want to work on?"
-              class="w-full bg-transparent border-0 outline-none focus:ring-0 text-[13px] resize-none min-h-[80px] max-h-60 overflow-y-auto placeholder:text-base-content/30 p-0 leading-relaxed"
-              autocomplete="off"
-              disabled={@processing}
-              autofocus
-            ></textarea>
-          </div>
-
-          <%!-- Bottom toolbar --%>
-          <div class="flex items-center gap-2 px-3 pb-2 pt-1">
-            <%!-- Left: empty for now — effort/plan could go here later --%>
-            <div class="flex-1" />
-
-            <%!-- Right: model selector + send --%>
-            <div class="flex items-center gap-2 ml-auto">
-              <.model_selector
-                id="new-session-model-selector"
-                entries={ModelHelpers.entries_for_provider(@provider)}
-                selected_provider={@provider}
-                selected_model={@selected_model}
-                allow_provider_switch?={false}
-                event="select_model"
-                disabled?={@processing}
-                placement={:up}
-              />
-
-              <button
-                type="submit"
-                disabled={@processing}
-                class="flex items-center justify-center gap-1.5 px-3 h-7 min-h-[44px] rounded-lg bg-primary/80 text-primary-content hover:bg-primary transition-colors text-[12px] font-semibold disabled:opacity-40"
-                id="new-session-send-button"
-              >
-                Send <kbd class="text-[10px] font-mono opacity-55 leading-none">↵</kbd>
-              </button>
-            </div>
-          </div>
-        </form>
+    <div class="flex flex-col h-full bg-base-100">
+      <div class="flex-1" />
+      <div class="px-4 pb-4">
+        <.message_composer
+          uploads={@uploads}
+          selected_model={@selected_model}
+          provider={@provider}
+          selected_effort={@selected_effort}
+          active_overlay={@active_overlay}
+          processing={@processing}
+          slash_items={@slash_items}
+          thinking_enabled={@thinking_enabled}
+          show_thinking_blocks={@show_thinking_blocks}
+          max_budget_usd={@max_budget_usd}
+          context_used={@context_used}
+          context_window={@context_window}
+          total_cost={@total_cost}
+          session_cli_opts={@session_cli_opts}
+        />
       </div>
     </div>
-
     """
   end
 end

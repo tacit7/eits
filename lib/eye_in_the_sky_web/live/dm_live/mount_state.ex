@@ -171,6 +171,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:session_ref, nil)
     |> assign(:processing, false)
     |> assign(:selected_model, Settings.default_model())
+    |> assign(:provider, "claude")
     |> assign(:selected_effort, "medium")
     |> assign(:active_overlay, nil)
     |> assign(:show_live_stream, get_in(effective, ["general", "show_live_stream"]) || false)

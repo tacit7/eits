@@ -805,7 +805,13 @@ defmodule EyeInTheSkyWeb.DmLive do
   @impl true
   def render(%{live_action: :new} = assigns) do
     ~H"""
-    <NewDmPage.new_dm_page processing={@processing} selected_model={@selected_model} />
+    <NewDmPage.new_dm_page
+      processing={@processing}
+      selected_model={@selected_model}
+      provider={@provider}
+      selected_effort={@selected_effort}
+      active_overlay={@active_overlay}
+    />
     """
   end
 

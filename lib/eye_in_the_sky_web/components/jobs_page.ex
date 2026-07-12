@@ -420,6 +420,20 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   defp check_job_access(_job, _project_id), do: :ok
 
   # ---------------------------------------------------------------------------
+  # CSS Helper Functions
+  # ---------------------------------------------------------------------------
+
+  defp run_status_dot_class("completed"), do: "bg-success"
+  defp run_status_dot_class("failed"), do: "bg-error"
+  defp run_status_dot_class("running"), do: "bg-info animate-pulse"
+  defp run_status_dot_class(_), do: "bg-base-content/15"
+
+  defp run_status_text_class("completed"), do: "text-success/80"
+  defp run_status_text_class("failed"), do: "text-error/80"
+  defp run_status_text_class("running"), do: "text-info/80"
+  defp run_status_text_class(_), do: "text-base-content/60"
+
+  # ---------------------------------------------------------------------------
   # Template
   # ---------------------------------------------------------------------------
 
@@ -536,36 +550,20 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         )
       ]}>
         <%= if @active_tab == :all_jobs do %>
-          <%= if @project_id do %>
-            <%!-- Project view: merged list with "global" inline tag for global jobs --%>
-            <.jobs_table
-              jobs={(@project_jobs || []) ++ (@global_jobs || [])}
-              expanded_job_id={@expanded_job_id}
-              runs={@runs}
-              running_ids={@running_ids}
-              last_run_map={@last_run_map}
-              last_failed_runs={@last_failed_runs}
-              last_n_runs_map={@last_n_runs_map}
-              scope="overview"
-              show_origin={true}
-              bulk_selected_jobs={@bulk_selected_jobs}
-              target={@myself}
-            />
-          <% else %>
-            <.jobs_table
-              jobs={@jobs}
-              expanded_job_id={@expanded_job_id}
-              runs={@runs}
-              running_ids={@running_ids}
-              last_run_map={@last_run_map}
-              last_failed_runs={@last_failed_runs}
-              last_n_runs_map={@last_n_runs_map}
-              scope="overview"
-              show_origin={true}
-              bulk_selected_jobs={@bulk_selected_jobs}
-              target={@myself}
-            />
-          <% end %>
+          <% job_list = if @project_id, do: (@project_jobs || []) ++ (@global_jobs || []), else: @jobs %>
+          <.jobs_table
+            jobs={job_list}
+            expanded_job_id={@expanded_job_id}
+            runs={@runs}
+            running_ids={@running_ids}
+            last_run_map={@last_run_map}
+            last_failed_runs={@last_failed_runs}
+            last_n_runs_map={@last_n_runs_map}
+            scope="overview"
+            show_origin={true}
+            bulk_selected_jobs={@bulk_selected_jobs}
+            target={@myself}
+          />
         <% end %>
       </div>
 
@@ -723,12 +721,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                       title={run.status}
                       class={[
                         "size-2.5 rounded-full flex-shrink-0",
-                        case run.status do
-                          "completed" -> "bg-success"
-                          "failed" -> "bg-error"
-                          "running" -> "bg-info animate-pulse"
-                          _ -> "bg-base-content/15"
-                        end
+                        run_status_dot_class(run.status)
                       ]}
                     />
                   <% end %>
@@ -745,23 +738,13 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                     <div class="py-2 flex items-center gap-3">
                       <span class={[
                         "size-2 rounded-full flex-shrink-0",
-                        case run.status do
-                          "completed" -> "bg-success"
-                          "failed" -> "bg-error"
-                          "running" -> "bg-info animate-pulse"
-                          _ -> "bg-base-content/20"
-                        end
+                        run_status_dot_class(run.status)
                       ]} />
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
                           <span class={[
                             "text-xs font-medium",
-                            case run.status do
-                              "completed" -> "text-success/80"
-                              "failed" -> "text-error/80"
-                              "running" -> "text-info/80"
-                              _ -> "text-base-content/60"
-                            end
+                            run_status_text_class(run.status)
                           ]}>
                             {String.capitalize(run.status)}
                           </span>

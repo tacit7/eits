@@ -230,11 +230,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
         end
 
       Settings.put(key, value)
-      settings = Settings.all()
 
       socket =
         socket
-        |> assign(:settings, settings)
+        |> reload_settings()
         |> flash_saved(key)
 
       socket =
@@ -271,16 +270,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       end
     end)
 
-    settings = Settings.all()
-    {:noreply, socket |> assign(:settings, settings) |> flash_saved("pricing")}
+    {:noreply, socket |> reload_settings() |> flash_saved("pricing")}
   end
 
   @impl true
   def handle_event("reset_setting", %{"key" => key}, socket) do
     Settings.reset(key)
-    settings = Settings.all()
-
-    {:noreply, socket |> assign(:settings, settings) |> put_flash(:info, "Reset to default")}
+    {:noreply, socket |> reload_settings() |> put_flash(:info, "Reset to default")}
   end
 
   @impl true
@@ -291,10 +287,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     |> Enum.filter(fn {k, _} -> String.starts_with?(k, "pricing_") end)
     |> Enum.each(fn {k, _} -> Settings.reset(k) end)
 
-    settings = Settings.all()
-
     {:noreply,
-     socket |> assign(:settings, settings) |> put_flash(:info, "Pricing reset to defaults")}
+     socket |> reload_settings() |> put_flash(:info, "Pricing reset to defaults")}
   end
 
   @impl true
@@ -302,8 +296,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     current = Settings.get("cm_vim") || "false"
     new_val = if current == "true", do: "false", else: "true"
     Settings.put("cm_vim", new_val)
-    settings = Settings.all()
-    socket = socket |> assign(:settings, settings) |> flash_saved("cm_vim")
+    socket = socket |> reload_settings() |> flash_saved("cm_vim")
     {:noreply, push_event(socket, "apply_cm_settings", %{cm_vim: new_val})}
   end
 
@@ -311,8 +304,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   def handle_event("toggle_setting", %{"key" => key}, socket) do
     current = Settings.get_boolean(key)
     Settings.put(key, to_string(!current))
-    settings = Settings.all()
-    {:noreply, socket |> assign(:settings, settings) |> flash_saved(key)}
+    {:noreply, socket |> reload_settings() |> flash_saved(key)}
   end
 
   @impl true
@@ -398,8 +390,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @impl true
   def handle_info({:settings_changed, _key, _value}, socket) do
-    settings = Settings.all()
-    {:noreply, assign(socket, :settings, settings)}
+    {:noreply, reload_settings(socket)}
   end
 
   @impl true
@@ -451,6 +442,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   defp load_db_info do
     Settings.db_info()
+  end
+
+  defp reload_settings(socket), do: assign(socket, :settings, Settings.all())
+
+  defp apply_theme_setting(socket, theme) do
+    Settings.put("theme", theme)
+
+    socket
+    |> reload_settings()
+    |> flash_saved("theme")
+    |> push_event("apply_theme", %{theme: theme})
   end
 
   @impl true

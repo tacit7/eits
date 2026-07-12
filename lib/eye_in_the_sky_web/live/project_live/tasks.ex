@@ -83,14 +83,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
 
     socket =
       if connected?(socket) do
-        task = Tasks.get_task_by_uuid_or_id!(task_id)
-        notes = Notes.list_notes_for_task(task.id)
+        case Tasks.get_task_by_uuid_or_id(task_id) do
+          {:ok, task} ->
+            notes = Notes.list_notes_for_task(task.id)
 
-        socket
-        |> assign(:selected_task, task)
-        |> assign(:task_notes, notes)
-        |> assign(:task_detail_focus, nil)
-        |> assign(:show_task_detail_drawer, true)
+            socket
+            |> assign(:selected_task, task)
+            |> assign(:task_notes, notes)
+            |> assign(:task_detail_focus, nil)
+            |> assign(:show_task_detail_drawer, true)
+
+          {:error, :not_found} ->
+            put_flash(socket, :error, "Task not found")
+        end
       else
         socket
       end

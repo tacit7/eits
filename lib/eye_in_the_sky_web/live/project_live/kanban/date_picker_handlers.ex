@@ -11,32 +11,37 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlers do
   alias EyeInTheSkyWeb.Live.Shared.KanbanFilters
 
   def handle_open_date_picker(%{"task_id" => task_id}, socket) do
-    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
-    today = Date.utc_today()
+    case EyeInTheSky.Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        today = Date.utc_today()
 
-    selected =
-      case task.due_at do
-        nil -> nil
-        dt -> dt |> DateTime.to_date() |> Date.to_iso8601()
-      end
+        selected =
+          case task.due_at do
+            nil -> nil
+            dt -> dt |> DateTime.to_date() |> Date.to_iso8601()
+          end
 
-    {year, month} =
-      case task.due_at do
-        nil ->
-          {today.year, today.month}
+        {year, month} =
+          case task.due_at do
+            nil ->
+              {today.year, today.month}
 
-        dt ->
-          dt = DateTime.to_date(dt)
-          {dt.year, dt.month}
-      end
+            dt ->
+              dt = DateTime.to_date(dt)
+              {dt.year, dt.month}
+          end
 
-    {:noreply,
-     socket
-     |> assign(:show_date_picker, true)
-     |> assign(:date_picker_task, task)
-     |> assign(:date_picker_year, year)
-     |> assign(:date_picker_month, month)
-     |> assign(:date_picker_selected, selected)}
+        {:noreply,
+         socket
+         |> assign(:show_date_picker, true)
+         |> assign(:date_picker_task, task)
+         |> assign(:date_picker_year, year)
+         |> assign(:date_picker_month, month)
+         |> assign(:date_picker_selected, selected)}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
+    end
   end
 
   def handle_close_date_picker(socket) do
@@ -58,33 +63,42 @@ defmodule EyeInTheSkyWeb.ProjectLive.Kanban.DatePickerHandlers do
   end
 
   def handle_save_due_date(%{"task_id" => task_id, "due_at" => due_at_str}, socket) do
-    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
-    due_at = if due_at_str == "", do: nil, else: due_at_str
+    case EyeInTheSky.Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        due_at = if due_at_str == "", do: nil, else: due_at_str
 
-    case EyeInTheSky.Tasks.update_task(task, %{due_at: due_at, updated_at: DateTime.utc_now()}) do
-      {:ok, _updated} ->
-        {:noreply,
-         socket
-         |> assign(:show_date_picker, false)
-         |> KanbanFilters.load_tasks()}
+        case EyeInTheSky.Tasks.update_task(task, %{due_at: due_at, updated_at: DateTime.utc_now()}) do
+          {:ok, _updated} ->
+            {:noreply,
+             socket
+             |> assign(:show_date_picker, false)
+             |> KanbanFilters.load_tasks()}
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not update due date")}
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not update due date")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
     end
   end
 
   def handle_remove_due_date(%{"task_id" => task_id}, socket) do
-    task = EyeInTheSky.Tasks.get_task_by_uuid_or_id!(task_id)
+    case EyeInTheSky.Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        case EyeInTheSky.Tasks.update_task(task, %{due_at: nil, updated_at: DateTime.utc_now()}) do
+          {:ok, _updated} ->
+            {:noreply,
+             socket
+             |> assign(:show_date_picker, false)
+             |> KanbanFilters.load_tasks()}
 
-    case EyeInTheSky.Tasks.update_task(task, %{due_at: nil, updated_at: DateTime.utc_now()}) do
-      {:ok, _updated} ->
-        {:noreply,
-         socket
-         |> assign(:show_date_picker, false)
-         |> KanbanFilters.load_tasks()}
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not remove due date")}
+        end
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not remove due date")}
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
     end
   end
 

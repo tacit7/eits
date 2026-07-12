@@ -117,16 +117,24 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperRegressionTest do
              "expected ≤2 changed rows, got #{length(changed_12)}: #{inspect(Enum.map(changed_12, & &1.id))}"
     end
 
-    test "no duplicate cluster row ids across old and new tail after id shift" do
+    test "no shifted cluster row id leaks after tail-window boundary" do
       events_14 = Enum.map(1..14, &tool_msg/1)
       {_c14, cached_14} = MessageGrouper.diff_from_cached_tail([], events_14)
+
+      old_cluster_id = cluster_row_id_of(cached_14)
 
       events_15 = events_14 ++ [tool_msg(15)]
       {changed_15, _new_15} = MessageGrouper.diff_from_cached_tail(cached_14, events_15)
 
-      all_ids = Enum.map(cached_14 ++ changed_15, & &1.id)
-      assert all_ids == Enum.uniq(all_ids),
-             "duplicate row ids detected: #{inspect(all_ids)}"
+      changed_cluster_ids =
+        changed_15
+        |> Enum.map(& &1.id)
+        |> Enum.filter(&String.starts_with?(&1, "cluster-row-"))
+
+      for id <- changed_cluster_ids do
+        assert id == old_cluster_id,
+               "cluster id shifted from #{old_cluster_id} to #{id}; stale row leaked"
+      end
     end
   end
 

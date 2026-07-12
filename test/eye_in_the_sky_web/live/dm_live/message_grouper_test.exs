@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperTest do
   # ---------------------------------------------------------------------------
 
   describe "diff_from_cached_tail/2 — stable cluster identity" do
-    test "12 consecutive tool events: new_tail cluster ID stays cluster-row-1 as window slides" do
+    test "12 consecutive tool events: cluster ID never changes as window slides" do
       # Build a run of 12 consecutive tool events (exceeds @tail_window = 10).
       messages = Enum.map(1..12, &tool_msg/1)
 
@@ -56,14 +56,23 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperTest do
       # last_stream_tail is set to the rows from grouped_rows([msg1..msg10]).
       initial_tail = messages |> Enum.take(10) |> MessageGrouper.grouped_rows()
 
-      # Message 11 arrives.
-      {_changed11, tail11} =
+      # Message 11 arrives — window slides to [msg2..msg11].
+      {changed11, tail11} =
         MessageGrouper.diff_from_cached_tail(initial_tail, Enum.take(messages, 11))
 
       # Message 12 arrives.
-      {_changed12, tail12} = MessageGrouper.diff_from_cached_tail(tail11, messages)
+      {changed12, tail12} = MessageGrouper.diff_from_cached_tail(tail11, messages)
 
-      # The new_tail cluster ID must be cluster-row-1 throughout.
+      # Any cluster row emitted in changed must use the stable ID (never shifted).
+      for row <- changed11, row.type == :cluster do
+        assert row.id == "cluster-row-1"
+      end
+
+      for row <- changed12, row.type == :cluster do
+        assert row.id == "cluster-row-1"
+      end
+
+      # The tail must also use the stable ID.
       cluster_in_tail11 = Enum.find(tail11, &(&1.type == :cluster))
       cluster_in_tail12 = Enum.find(tail12, &(&1.type == :cluster))
       assert cluster_in_tail11.id == "cluster-row-1"
@@ -89,15 +98,15 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperTest do
       assert orphan_summaries == []
     end
 
-    test "new_tail cluster includes ALL events, not just window slice" do
+    test "changed cluster row includes ALL events (not just window slice)" do
       messages = Enum.map(1..11, &tool_msg/1)
       initial_tail = messages |> Enum.take(10) |> MessageGrouper.grouped_rows()
 
-      {_changed, new_tail} = MessageGrouper.diff_from_cached_tail(initial_tail, messages)
+      {changed, _new_tail} = MessageGrouper.diff_from_cached_tail(initial_tail, messages)
 
-      cluster_row = Enum.find(new_tail, &(&1.type == :cluster))
+      cluster_row = Enum.find(changed, &(&1.type == :cluster))
       event_ids = Enum.map(cluster_row.data, & &1.id)
-      # new_tail cluster must hold all 11 events, not just the window slice.
+      # The updated cluster row in changed must hold all 11 events.
       assert event_ids == Enum.to_list(1..11)
     end
 

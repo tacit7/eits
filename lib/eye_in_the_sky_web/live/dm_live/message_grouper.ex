@@ -87,10 +87,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       |> Enum.map(&to_stream_row/1)
 
     old_by_id = Map.new(cached_old_tail, &{&1.id, &1})
-    # Only emit rows whose IDs are absent from the old tail — morphdom updates
-    # existing IDs in place on next mount; emitting same-ID updates here would
-    # cause the concatenated (old ++ changed) set to have duplicate IDs.
-    changed = Enum.filter(new_tail_rows, fn row -> not Map.has_key?(old_by_id, row.id) end)
+    changed = Enum.filter(new_tail_rows, fn row -> Map.get(old_by_id, row.id) != row end)
 
     {changed, new_tail_rows}
   end

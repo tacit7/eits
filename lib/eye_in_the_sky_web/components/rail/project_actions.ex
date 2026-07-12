@@ -230,6 +230,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
+  def handle_new_session_navigate(%{"project_id" => project_id}, socket) do
+    if EyeInTheSky.Settings.get_boolean("dm_use_pty") do
+      handle_new_session(%{"project_id" => project_id}, socket)
+    else
+      {:noreply, push_navigate(socket, to: "/dm/new?project_id=#{project_id}")}
+    end
+  end
+
   # Called by handle_event("folder_picked") in rail.ex — payload comes from the
   # Tauri pick_folder JS bridge after the user selects a folder.
   # If the path already exists as a project, switch to it rather than failing silently.

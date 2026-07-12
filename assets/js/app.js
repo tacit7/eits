@@ -239,20 +239,39 @@ window.addEventListener("phx:copy_to_clipboard", (e) => {
 // (data-copy-btn attribute). Uses capture phase so we can stop propagation
 // before <summary> toggles the <details>. Swaps the button's icon to a
 // checkmark for a couple seconds so the click has visible feedback.
+// stopPropagation + preventDefault run unconditionally so repeated clicks
+// during the copied-feedback interval never toggle the containing <details>
+// or submit a form.
 const COPY_BTN_CHECK_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5" aria-hidden="true">' +
   '<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>'
+const COPY_BTN_ERROR_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-error/70" aria-hidden="true">' +
+  '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>'
 
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-copy-btn]")
-  if (!btn || btn.dataset.copied) return
+  if (!btn) return
+  // Always suppress propagation and default so a repeated click during the
+  // copied-feedback interval never toggles the containing <details> or submits
+  // a surrounding form.
   e.stopPropagation()
   e.preventDefault()
+  if (btn.dataset.copied) return
   const text = btn.dataset.copyText ?? ""
-  navigator.clipboard?.writeText(text).then(() => {
+  if (!navigator.clipboard) return
+  navigator.clipboard.writeText(text).then(() => {
     btn.dataset.copied = "1"
     const originalHtml = btn.innerHTML
     btn.innerHTML = COPY_BTN_CHECK_ICON
+    setTimeout(() => {
+      btn.innerHTML = originalHtml
+      delete btn.dataset.copied
+    }, 1500)
+  }).catch(() => {
+    btn.dataset.copied = "1"
+    const originalHtml = btn.innerHTML
+    btn.innerHTML = COPY_BTN_ERROR_ICON
     setTimeout(() => {
       btn.innerHTML = originalHtml
       delete btn.dataset.copied

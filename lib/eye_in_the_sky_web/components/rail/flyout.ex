@@ -183,7 +183,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           <%= if @active_section == :sessions do %>
             <%= if @sidebar_project do %>
               <.header_action_btn
-                phx-click="new_session"
+                phx-click="new_session_navigate"
                 phx-value-project_id={@sidebar_project.id}
                 title={"New session in #{@sidebar_project.name}"}
               />

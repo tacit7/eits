@@ -80,6 +80,14 @@ defmodule EyeInTheSky.Agents.AgentManager do
   end
 
   @doc """
+  Creates agent and session DB records only. Does not start the worker or send any prompt.
+  The worker starts on the first `continue_session/3` call via SessionBridge.ensure_worker_running/2.
+  """
+  def create_agent_without_start(opts) do
+    RecordBuilder.create_records(opts)
+  end
+
+  @doc """
   Creates an agent + session and starts the AgentWorker with the initial message.
 
   ## Options

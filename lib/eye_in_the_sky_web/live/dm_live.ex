@@ -6,6 +6,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   alias EyeInTheSky.Pi.ModelDiscoveryCache
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
   alias EyeInTheSkyWeb.Components.DmPage
+  alias EyeInTheSkyWeb.Components.NewDmPage
 
   alias EyeInTheSkyWeb.DmLive.{
     Actions,
@@ -38,6 +39,29 @@ defmodule EyeInTheSkyWeb.DmLive do
   # Ink calls setRawMode(true) async; writes before that land while ICRNL is
   # active and \r gets converted to \n (insert newline, not submit).
   @pty_stdin_grace_ms 3_000
+
+  @impl true
+  def mount(params, _session, socket) when not is_map_key(params, "session_id") do
+    new_session_project_id =
+      case Integer.parse(params["project_id"] || "") do
+        {id, ""} -> id
+        _ -> nil
+      end
+
+    case new_session_project_id && EyeInTheSky.Projects.get_project(new_session_project_id) do
+      {:ok, project} ->
+        socket =
+          socket
+          |> assign(:live_action, :new)
+          |> assign(:new_session_project_id, project.id)
+          |> MountState.assign_new_session_defaults()
+
+        {:ok, socket}
+
+      _ ->
+        {:ok, redirect(socket, to: "/")}
+    end
+  end
 
   @impl true
   def mount(%{"session_id" => session_id_param} = params, _session, socket) do
@@ -292,7 +316,14 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   def handle_event("send_message", %{"body" => body}, socket) when body != "" do
     {server_cmds, session_opts, clean_body} = SlashCommands.parse(body)
-    socket = SlashCommands.apply_server_commands(server_cmds, socket)
+
+    socket =
+      if socket.assigns.live_action == :new do
+        socket
+      else
+        SlashCommands.apply_server_commands(server_cmds, socket)
+      end
+
     socket = SlashCommands.apply_session_opts(session_opts, socket)
 
     trimmed = String.trim(clean_body)
@@ -477,6 +508,26 @@ defmodule EyeInTheSkyWeb.DmLive do
       )
 
   def handle_event("kill_session", _params, socket), do: handle_kill_session(socket)
+
+  # ---------------------------------------------------------------------------
+  # handle_params — pop one-shot pending message on :show navigation
+  # ---------------------------------------------------------------------------
+
+  @impl true
+  def handle_params(_params, _uri, %{assigns: %{live_action: :show}} = socket) do
+    session_id = socket.assigns.session_id
+
+    if connected?(socket) && is_integer(session_id) do
+      case EyeInTheSky.PendingSessionMessages.pop(session_id) do
+        nil -> :ok
+        {body, send_opts} -> send(self(), {:auto_send, body, send_opts})
+      end
+    end
+
+    {:noreply, socket}
+  end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   # ---------------------------------------------------------------------------
   # handle_info: message reload (event-driven, debounced)
@@ -703,6 +754,12 @@ defmodule EyeInTheSkyWeb.DmLive do
      |> push_event("pty_output", %{data: Base.encode64("\r\n[process exited]\r\n")})}
   end
 
+  def handle_info({:auto_send, body, send_opts}, socket) do
+    existing = socket.assigns[:session_cli_opts] || []
+    socket = assign(socket, :session_cli_opts, Keyword.merge(existing, send_opts))
+    EyeInTheSkyWeb.DmLive.MessageHandlers.handle_send_message(body, socket)
+  end
+
   def handle_info(msg, socket) do
     Logger.debug("Unhandled message in DM LiveView: #{inspect(msg)}")
     {:noreply, socket}
@@ -746,6 +803,12 @@ defmodule EyeInTheSkyWeb.DmLive do
   # ---------------------------------------------------------------------------
 
   @impl true
+  def render(%{live_action: :new} = assigns) do
+    ~H"""
+    <NewDmPage.new_dm_page processing={@processing} selected_model={@selected_model} />
+    """
+  end
+
   def render(assigns) do
     ~H"""
     <div id="dm-live-root" class="flex flex-col flex-1 min-h-0">

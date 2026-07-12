@@ -265,6 +265,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("new_session", params, socket),
     do: ProjectActions.handle_new_session(params, socket)
 
+  def handle_event("new_session_navigate", params, socket),
+    do: ProjectActions.handle_new_session_navigate(params, socket)
+
   def handle_event("start_rename_project", params, socket),
     do: ProjectActions.handle_start_rename(params, socket)
 

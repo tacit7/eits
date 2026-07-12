@@ -29,52 +29,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           |> assign_empty_project_data()
 
         if connected?(socket) do
-          tasks_task = Task.async(fn -> Tasks.list_tasks_for_project(project_id) end)
-
-          active_sessions_task =
-            Task.async(fn ->
-              Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
-            end)
-
-          recent_notes_task =
-            Task.async(fn -> Notes.list_notes_for_project(project_id, limit: 5) end)
-
-          agent_count_task =
-            Task.async(fn -> Agents.count_agents_for_project(project_id) end)
-
-          session_ids_task =
-            Task.async(fn -> Sessions.count_and_ids_for_project(project_id) end)
-
-          claude_files_task = Task.async(fn -> scan_claude_files(project.path) end)
-
-          tasks = Task.await(tasks_task)
-          active_sessions = Task.await(active_sessions_task)
-          recent_notes = Task.await(recent_notes_task)
-          {agent_count, working_agent_count} = Task.await(agent_count_task)
-          {session_count, session_ids} = Task.await(session_ids_task)
-          claude_files = Task.await(claude_files_task)
-
-          recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
-          open_tasks = Enum.count(tasks, &is_nil(&1.completed_at))
-          done_tasks = Enum.count(tasks, & &1.completed_at)
-
-          recent_tasks =
-            tasks
-            |> Enum.sort_by(& &1.created_at, {:desc, DateTime})
-            |> Enum.take(5)
-
-          socket
-          |> assign(:tasks, tasks)
-          |> assign(:recent_tasks, recent_tasks)
-          |> assign(:active_sessions, active_sessions)
-          |> assign(:recent_notes, recent_notes)
-          |> assign(:agent_count, agent_count)
-          |> assign(:working_agent_count, working_agent_count)
-          |> assign(:session_count, session_count)
-          |> assign(:recent_commits, recent_commits)
-          |> assign(:open_tasks, open_tasks)
-          |> assign(:done_tasks, done_tasks)
-          |> assign(:claude_files, claude_files)
+          load_project_data(socket, project)
         else
           socket
         end
@@ -105,6 +60,57 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     |> assign(:open_tasks, 0)
     |> assign(:done_tasks, 0)
     |> assign(:claude_files, [])
+  end
+
+  defp load_project_data(socket, project) do
+    project_id = project.id
+
+    tasks_task = Task.async(fn -> Tasks.list_tasks_for_project(project_id) end)
+
+    active_sessions_task =
+      Task.async(fn ->
+        Sessions.list_project_sessions_with_agent(project_id, active_only: true, limit: 5)
+      end)
+
+    recent_notes_task =
+      Task.async(fn -> Notes.list_notes_for_project(project_id, limit: 5) end)
+
+    agent_count_task =
+      Task.async(fn -> Agents.count_agents_for_project(project_id) end)
+
+    session_ids_task =
+      Task.async(fn -> Sessions.count_and_ids_for_project(project_id) end)
+
+    claude_files_task = Task.async(fn -> scan_claude_files(project.path) end)
+
+    tasks = Task.await(tasks_task)
+    active_sessions = Task.await(active_sessions_task)
+    recent_notes = Task.await(recent_notes_task)
+    {agent_count, working_agent_count} = Task.await(agent_count_task)
+    {session_count, session_ids} = Task.await(session_ids_task)
+    claude_files = Task.await(claude_files_task)
+
+    recent_commits = Commits.list_commits_for_sessions(session_ids, limit: 10)
+    open_tasks = Enum.count(tasks, &is_nil(&1.completed_at))
+    done_tasks = Enum.count(tasks, & &1.completed_at)
+
+    recent_tasks =
+      tasks
+      |> Enum.sort_by(& &1.created_at, {:desc, DateTime})
+      |> Enum.take(5)
+
+    socket
+    |> assign(:tasks, tasks)
+    |> assign(:recent_tasks, recent_tasks)
+    |> assign(:active_sessions, active_sessions)
+    |> assign(:recent_notes, recent_notes)
+    |> assign(:agent_count, agent_count)
+    |> assign(:working_agent_count, working_agent_count)
+    |> assign(:session_count, session_count)
+    |> assign(:recent_commits, recent_commits)
+    |> assign(:open_tasks, open_tasks)
+    |> assign(:done_tasks, done_tasks)
+    |> assign(:claude_files, claude_files)
   end
 
   @impl true

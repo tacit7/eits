@@ -24,40 +24,45 @@ defmodule EyeInTheSkyWeb.DmLive.TaskHandlers do
   Requires assigns: `:session`, `:agent`
   """
   def handle_start_agent_for_task(%{"task_id" => task_id}, socket) do
-    task = Tasks.get_task_by_uuid_or_id!(task_id)
-    session = socket.assigns.session
-    agent = socket.assigns.agent
+    case Tasks.get_task_by_uuid_or_id(task_id) do
+      {:ok, task} ->
+        session = socket.assigns.session
+        agent = socket.assigns.agent
 
-    project_id = agent.project_id
+        project_id = agent.project_id
 
-    project_path =
-      case SessionHelpers.resolve_project_path(session, agent) do
-        {:ok, path} -> path
-        _ -> nil
-      end
+        project_path =
+          case SessionHelpers.resolve_project_path(session, agent) do
+            {:ok, path} -> path
+            _ -> nil
+          end
 
-    task_prompt = AgentHelpers.build_task_prompt(task)
+        task_prompt = AgentHelpers.build_task_prompt(task)
 
-    opts =
-      [
-        description: task.title,
-        instructions: task_prompt,
-        model: Settings.default_model()
-      ]
-      |> maybe_opt(:project_id, project_id)
-      |> maybe_opt(:project_path, project_path)
+        opts =
+          [
+            description: task.title,
+            instructions: task_prompt,
+            model: Settings.default_model()
+          ]
+          |> maybe_opt(:project_id, project_id)
+          |> maybe_opt(:project_path, project_path)
 
-    case AgentManager.create_agent(opts) do
-      {:ok, %{session: new_session}} ->
-        Tasks.link_session_to_task(task.id, new_session.id)
+        case AgentManager.create_agent(opts) do
+          {:ok, %{session: new_session}} ->
+            Tasks.link_session_to_task(task.id, new_session.id)
 
-        {:noreply,
-         socket
-         |> assign(:active_overlay, nil)
-         |> put_flash(:info, "Agent spawned for: #{String.slice(task.title, 0..40)}")}
+            {:noreply,
+             socket
+             |> assign(:active_overlay, nil)
+             |> put_flash(:info, "Agent spawned for: #{String.slice(task.title, 0..40)}")}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to spawn agent: #{inspect(reason)}")}
+        end
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
     end
   end
 end

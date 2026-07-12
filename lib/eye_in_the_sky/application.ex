@@ -83,7 +83,9 @@ defmodule EyeInTheSky.Application do
           # Registry for EditorSync watchers (one per record, keyed by {type, id})
           {Registry, keys: :unique, name: EyeInTheSky.EditorSync.Registry},
           # DynamicSupervisor for EditorSync file-watcher GenServers
-          {DynamicSupervisor, name: EyeInTheSky.EditorSync.Supervisor, strategy: :one_for_one}
+          {DynamicSupervisor, name: EyeInTheSky.EditorSync.Supervisor, strategy: :one_for_one},
+          # One-shot ETS store for pending initial DM messages (consumed on first read)
+          EyeInTheSky.PendingSessionMessages
         ]
 
     iam_seeds =

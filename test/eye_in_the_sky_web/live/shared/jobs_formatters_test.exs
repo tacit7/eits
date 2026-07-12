@@ -23,6 +23,16 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormattersTest do
                JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "900"})
     end
 
+    test "interval in seconds" do
+      assert "Every 30s" ==
+               JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "30"})
+    end
+
+    test "interval with non-numeric value returns raw" do
+      assert "bad" ==
+               JobsFormatters.format_schedule(%{schedule_type: "interval", schedule_value: "bad"})
+    end
+
     test "cron delegates to the shared describer" do
       assert "Daily at 3 AM" ==
                JobsFormatters.format_schedule(%{

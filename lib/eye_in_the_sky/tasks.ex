@@ -472,15 +472,6 @@ defmodule EyeInTheSky.Tasks do
         task_ids = repo.all(task_ids_query)
         {:ok, task_ids}
       end)
-      |> Ecto.Multi.run(:delete_task_tags, fn repo, %{get_task_ids: task_ids} ->
-        repo.delete_all(from(tt in "task_tags", where: tt.task_id in ^task_ids))
-      end)
-      |> Ecto.Multi.run(:delete_task_sessions, fn repo, %{get_task_ids: task_ids} ->
-        repo.delete_all(from(ts in "task_sessions", where: ts.task_id in ^task_ids))
-      end)
-      |> Ecto.Multi.run(:delete_commit_tasks, fn repo, %{get_task_ids: task_ids} ->
-        repo.delete_all(from(ct in "commit_tasks", where: ct.task_id in ^task_ids))
-      end)
       |> Ecto.Multi.run(:delete_tasks, fn repo, %{get_task_ids: task_ids} ->
         {deleted, _} = repo.delete_all(from(t in Task, where: t.id in ^task_ids))
         {:ok, deleted}

@@ -219,6 +219,28 @@ defmodule EyeInTheSky.AgentWorkerEvents do
     Logger.warning("[#{session_id}] Result has no text content")
   end
 
+  @doc "Hook exited non-zero — persist as a warning message in the session transcript."
+  def on_hook_failure(session_id, provider, hook_name, exit_code, stderr) do
+    body = String.trim(stderr || "")
+    body = if body == "", do: "(no output)", else: String.slice(body, 0..2000)
+
+    metadata = %{
+      "stream_type" => "hook_failure",
+      "hook_name" => hook_name,
+      "exit_code" => exit_code
+    }
+
+    case Messages.record_incoming_reply(session_id, provider, body, metadata: metadata) do
+      {:ok, _} ->
+        Logger.warning("[#{session_id}] Hook failure stored: #{hook_name} exit=#{exit_code}")
+
+      {:error, reason} ->
+        Logger.warning(
+          "[#{session_id}] Failed to store hook failure: #{inspect(reason)}"
+        )
+    end
+  end
+
   @doc "Provider conversation ID changed — sync to DB (synchronous: ordering is critical)."
   def on_provider_conversation_id_changed(session_id, old_id, new_id) do
     case Sessions.get_session(session_id) do

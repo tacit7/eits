@@ -455,17 +455,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
     conv_share = max(0.0, ratio - system_share - files_share)
 
     # Color band
-    {bar_color, label_color} =
+    {bar_color, label_color, progress_color} =
       cond do
-        pct < 60 -> {"bg-base-content/25", "text-base-content/30"}
-        pct < 85 -> {"bg-warning/70", "text-warning/70"}
-        true -> {"bg-error/70", "text-error/70"}
+        pct < 60 -> {"bg-base-content/25", "text-base-content/30", "progress-primary"}
+        pct < 85 -> {"bg-warning/70", "text-warning/70", "progress-warning"}
+        true -> {"bg-error/70", "text-error/70", "progress-error"}
       end
-
-    # 10-cell bar fill
-    filled_float = ratio * 10.0
-    filled_floor = trunc(filled_float)
-    partial_frac = filled_float - filled_floor
 
     assigns =
       assigns
@@ -476,41 +471,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       |> Map.put(:conv_share, conv_share)
       |> Map.put(:bar_color, bar_color)
       |> Map.put(:label_color, label_color)
-      |> Map.put(:filled_floor, filled_floor)
-      |> Map.put(:partial_frac, partial_frac)
+      |> Map.put(:progress_color, progress_color)
 
     ~H"""
     <div class="relative dropdown dropdown-top">
-      <%!-- Trigger: 10-cell segmented meter --%>
+      <%!-- Trigger: progress bar --%>
       <button
         type="button"
         phx-click="toggle_context_meter"
-        class={"flex items-end gap-px h-3.5 cursor-pointer group " <> @label_color}
+        class={"cursor-pointer flex items-center " <> @label_color}
         title={"#{format_number(@context_used)} / #{format_number(@context_window)} tokens — click for details"}
         aria-label="Context window usage"
       >
-        <%= for i <- 0..9 do %>
-          <span class={[
-            "w-[3px] rounded-sm transition-colors",
-            cond do
-              i < @filled_floor ->
-                "h-full " <> @bar_color
-
-              i == @filled_floor and @partial_frac > 0.02 ->
-                "relative h-full bg-base-content/10 overflow-hidden"
-
-              true ->
-                "h-full bg-base-content/10"
-            end
-          ]}>
-            <%= if i == @filled_floor and @partial_frac > 0.02 do %>
-              <span
-                class={"absolute bottom-0 left-0 right-0 " <> @bar_color}
-                style={"height: #{round(@partial_frac * 100)}%"}
-              />
-            <% end %>
-          </span>
-        <% end %>
+        <progress
+          class={"progress h-1.5 w-20 " <> @progress_color}
+          value={round(@pct)}
+          max="100"
+        />
       </button>
 
       <%!-- Popover --%>
@@ -530,30 +507,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
             </span>
           </div>
 
-          <%!-- Segmented bar (3-segment continuous) --%>
-          <div class="flex h-1.5 rounded-full overflow-hidden mb-2 bg-base-content/[0.06]">
-            <%= if @system_share > 0 do %>
-              <span
-                class="bg-base-content/30 h-full"
-                style={"width: #{round(@system_share * 100)}%"}
-                title="System + tools"
-              />
-            <% end %>
-            <%= if @conv_share > 0 do %>
-              <span
-                class={"h-full " <> @bar_color}
-                style={"width: #{round(@conv_share * 100)}%"}
-                title="Conversation"
-              />
-            <% end %>
-            <%= if @files_share > 0 do %>
-              <span
-                class="bg-info/50 h-full"
-                style={"width: #{round(@files_share * 100)}%"}
-                title="Latest files"
-              />
-            <% end %>
-          </div>
+          <%!-- Progress bar --%>
+          <progress
+            class={"progress w-full h-1.5 mb-2 " <> @progress_color}
+            value={round(@pct)}
+            max="100"
+          />
 
           <%!-- Legend --%>
           <div class="space-y-1 mb-3">

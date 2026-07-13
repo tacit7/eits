@@ -92,7 +92,10 @@ defmodule EyeInTheSky.Codex.CLI do
     * `:prompt` (required) - the user prompt (positional arg after flags)
     * `:resume` - `--resume <thread_id>`
     * `:model` - `-m <model>`
-    * `:full_auto` - `--full-auto` (default: true)
+    * `:full_auto` - current equivalent of the removed `--full-auto` shortcut
+      (`--sandbox workspace-write` plus approval policy `on-request`)
+    * `:sandbox` - `--sandbox <mode>`
+    * `:ask_for_approval` - approval policy passed through `-c`
     * `:bypass_sandbox` - `--dangerously-bypass-approvals-and-sandbox` (default: true; overrides full_auto)
     * `:max_turns` - not directly supported by Codex; ignored
 
@@ -132,13 +135,27 @@ defmodule EyeInTheSky.Codex.CLI do
         args
       end
 
-    # Bypass sandbox takes precedence over full_auto
+    # Bypass takes precedence. Current Codex versions removed --full-auto, so
+    # expand that legacy setting to its supported sandbox/approval equivalent.
+    full_auto =
+      Keyword.get_lazy(opts, :full_auto, fn ->
+        is_nil(opts[:sandbox]) and is_nil(opts[:ask_for_approval])
+      end)
+
     args =
-      if Keyword.get(opts, :bypass_sandbox, true) do
-        args ++ ["--dangerously-bypass-approvals-and-sandbox"]
-      else
-        full_auto = Keyword.get(opts, :full_auto, true)
-        if full_auto, do: args ++ ["--full-auto"], else: args
+      cond do
+        Keyword.get(opts, :bypass_sandbox, true) ->
+          args ++ ["--dangerously-bypass-approvals-and-sandbox"]
+
+        full_auto ->
+          args
+          |> add_sandbox("workspace-write")
+          |> add_approval_policy("on-request")
+
+        true ->
+          args
+          |> add_sandbox(opts[:sandbox])
+          |> add_approval_policy(opts[:ask_for_approval])
       end
 
     # Inject EITS env vars via shell_environment_policy.set so they're
@@ -175,6 +192,19 @@ defmodule EyeInTheSky.Codex.CLI do
       args
     end
   end
+
+  defp add_sandbox(args, nil), do: args
+  defp add_sandbox(args, sandbox), do: args ++ ["--sandbox", to_string(sandbox)]
+
+  defp add_approval_policy(args, nil), do: args
+
+  # on-failure was accepted by older Codex releases but is no longer a valid
+  # policy. Preserve legacy saved settings with the closest current behavior.
+  defp add_approval_policy(args, "on-failure"),
+    do: add_approval_policy(args, "on-request")
+
+  defp add_approval_policy(args, policy),
+    do: args ++ ["-c", ~s(approval_policy="#{policy}")]
 
   # ---------------------------------------------------------------------------
   # Binary cache
@@ -223,7 +253,10 @@ defmodule EyeInTheSky.Codex.CLI do
 
         flags = Enum.slice(args, 0..(length(args) - 2)//1)
         cmd_string = "codex " <> Enum.join(flags, " ") <> prompt_summary
-        Logger.warning("[spawn] Codex path=#{project_path} model=#{opts[:model]} cmd=#{cmd_string}")
+
+        Logger.warning(
+          "[spawn] Codex path=#{project_path} model=#{opts[:model]} cmd=#{cmd_string}"
+        )
 
         env = build_env(opts)
 
@@ -256,7 +289,6 @@ defmodule EyeInTheSky.Codex.CLI do
           project_path: project_path,
           model: opts[:model]
         })
-
 
         {:ok, port, session_ref}
 

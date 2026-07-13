@@ -59,14 +59,46 @@ defmodule EyeInTheSky.Codex.CLITest do
       refute "--full-auto" in args
     end
 
-    test "full_auto: true with bypass_sandbox: false includes --full-auto" do
+    test "full_auto: true uses current CLI sandbox and approval equivalents" do
       args = CLI.build_args(prompt: "x", full_auto: true, bypass_sandbox: false)
-      assert "--full-auto" in args
+      refute "--full-auto" in args
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["--sandbox", "workspace-write"]))
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(approval_policy="on-request")]))
+    end
+
+    test "disabling bypass without explicit modes keeps the legacy full-auto default" do
+      args = CLI.build_args(prompt: "x", bypass_sandbox: false)
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["--sandbox", "workspace-write"]))
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(approval_policy="on-request")]))
     end
 
     test "full_auto: false with bypass_sandbox: false omits --full-auto" do
       args = CLI.build_args(prompt: "x", full_auto: false, bypass_sandbox: false)
       refute "--full-auto" in args
+    end
+
+    test "explicit sandbox and approval settings reach codex exec" do
+      args =
+        CLI.build_args(
+          prompt: "x",
+          bypass_sandbox: false,
+          sandbox: "read-only",
+          ask_for_approval: "on-request"
+        )
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["--sandbox", "read-only"]))
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(approval_policy="on-request")]))
     end
   end
 

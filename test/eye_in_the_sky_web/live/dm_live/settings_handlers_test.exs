@@ -94,7 +94,9 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
 
       fresh = Sessions.get!(session.id)
       assert fresh.settings["anthropic"]["permission_mode"] == "plan"
-      assert result.assigns.dm_settings_session_overrides["anthropic"]["permission_mode"] == "plan"
+
+      assert result.assigns.dm_settings_session_overrides["anthropic"]["permission_mode"] ==
+               "plan"
     end
 
     test "session write persists exact integer value to DB" do
@@ -153,6 +155,7 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
 
       fresh_agent = Agents.get_agent!(agent.id)
       assert fresh_agent.settings["anthropic"]["permission_mode"] == "bypassPermissions"
+
       assert result.assigns.dm_settings_agent_overrides["anthropic"]["permission_mode"] ==
                "bypassPermissions"
     end
@@ -373,6 +376,37 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
       assert result.assigns.thinking_enabled === true
     end
 
+    test "agent toggle uses agent value when session override conflicts" do
+      agent = Factory.create_agent(%{settings: %{"general" => %{"show_live_stream" => false}}})
+
+      session =
+        Factory.create_session(agent, %{
+          settings: %{"general" => %{"show_live_stream" => true}}
+        })
+
+      socket =
+        build_socket(
+          base_socket_assigns(session, agent)
+          |> Map.merge(%{
+            dm_settings_effective: %{"general" => %{"show_live_stream" => true}},
+            dm_settings_agent_overrides: %{"general" => %{"show_live_stream" => false}},
+            dm_settings_session_overrides: %{"general" => %{"show_live_stream" => true}},
+            show_live_stream: true
+          })
+        )
+
+      {:noreply, result} =
+        SettingsHandlers.handle_setting_toggle("agent", "general.show_live_stream", socket)
+
+      refute Map.has_key?(result.assigns.flash, "error")
+
+      fresh_agent = Agents.get_agent!(agent.id)
+      assert fresh_agent.settings["general"]["show_live_stream"] === true
+
+      fresh_session = Sessions.get!(session.id)
+      assert fresh_session.settings["general"]["show_live_stream"] === true
+    end
+
     test "returns error flash for unknown key" do
       session = Factory.new_session()
       socket = build_socket(base_socket_assigns(session))
@@ -463,7 +497,9 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
       socket =
         build_socket(
           base_socket_assigns(session, agent_with_settings)
-          |> Map.put(:dm_settings_agent_overrides, %{"anthropic" => %{"permission_mode" => "plan"}})
+          |> Map.put(:dm_settings_agent_overrides, %{
+            "anthropic" => %{"permission_mode" => "plan"}
+          })
         )
 
       {:noreply, result} = SettingsHandlers.handle_reset_settings("agent", socket)

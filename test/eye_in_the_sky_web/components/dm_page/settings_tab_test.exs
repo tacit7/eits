@@ -296,6 +296,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
       html = render_settings(subtab: "invalid_subtab")
       assert html =~ "Model"
       assert html =~ "Display"
+
+      document = LazyHTML.from_fragment(html)
+
+      assert LazyHTML.attribute(
+               LazyHTML.query(document, "#dm-subtab-general"),
+               "class"
+             ) == ["tab tab-active"]
     end
 
     test "nil subtab falls back to general section" do

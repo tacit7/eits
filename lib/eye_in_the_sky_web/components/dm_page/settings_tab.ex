@@ -28,16 +28,19 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     scoped_effective =
       if assigns.scope == "agent", do: assigns.agent_effective, else: assigns.effective
 
-    assigns = assign(assigns, :scoped_effective, scoped_effective)
+    assigns =
+      assigns
+      |> assign(:scoped_effective, scoped_effective)
+      |> assign(:active_subtab, active_subtab(assigns.subtab, assigns.session.provider))
 
     ~H"""
     <div class="space-y-4" id="dm-settings-tab">
       <.scope_toggle scope={@scope} agent={@agent} />
 
-      <.subtab_nav subtab={@subtab} provider={@session.provider} />
+      <.subtab_nav subtab={@active_subtab} provider={@session.provider} />
 
       <div class="bg-base-200 rounded-xl shadow-sm">
-        <%= case active_subtab(@subtab, @session.provider) do %>
+        <%= case @active_subtab do %>
           <% "general" -> %>
             <.general_section
               scope={@scope}
@@ -182,6 +185,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   attr :scope, :string, required: true
   attr :session, :map, required: true
   attr :session_state, :map, required: true
+
   # Scope-appropriate effective map — agent-only when scope="agent", merged when scope="session".
   attr :effective, :map, default: %{}
   attr :overrides, :list, default: []
@@ -562,21 +566,33 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--bare"
         description="Starts Claude minimally — skips CLAUDE.md discovery, plugins, and skills. Recommended for fast-starting automated scripts."
       >
-        <.toggle key="anthropic.bare" scope={@scope} checked={setting_val(@effective, "anthropic.bare") == true} />
+        <.toggle
+          key="anthropic.bare"
+          scope={@scope}
+          checked={setting_val(@effective, "anthropic.bare") == true}
+        />
       </.row>
       <.row
         label="Verbose"
         help="--verbose"
         description="Shows every step Claude takes — internal reasoning and exactly which tools it calls with what data."
       >
-        <.toggle key="anthropic.verbose" scope={@scope} checked={setting_val(@effective, "anthropic.verbose") == true} />
+        <.toggle
+          key="anthropic.verbose"
+          scope={@scope}
+          checked={setting_val(@effective, "anthropic.verbose") == true}
+        />
       </.row>
       <.row
         label="Include partial messages"
         help="--include-partial-messages"
         description="With streaming output, includes in-progress fragments of Claude's response as they are generated."
       >
-        <.toggle key="anthropic.include_partial_messages" scope={@scope} checked={setting_val(@effective, "anthropic.include_partial_messages") == true} />
+        <.toggle
+          key="anthropic.include_partial_messages"
+          scope={@scope}
+          checked={setting_val(@effective, "anthropic.include_partial_messages") == true}
+        />
       </.row>
     </.section>
     """
@@ -593,7 +609,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--no-session-persistence"
         description="Prevents the session from being saved to local history — cannot be resumed or rewound later."
       >
-        <.toggle key="anthropic.no_session_persistence" scope={@scope} checked={setting_val(@effective, "anthropic.no_session_persistence") == true} />
+        <.toggle
+          key="anthropic.no_session_persistence"
+          scope={@scope}
+          checked={setting_val(@effective, "anthropic.no_session_persistence") == true}
+        />
       </.row>
       <.row
         label="Chrome integration"
@@ -612,14 +632,22 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="--sandbox"
         description="Enforces strict OS-level boundaries on the Bash tool — limits which files Claude can read/write and which sites it can visit."
       >
-        <.toggle key="anthropic.sandbox" scope={@scope} checked={setting_val(@effective, "anthropic.sandbox") == true} />
+        <.toggle
+          key="anthropic.sandbox"
+          scope={@scope}
+          checked={setting_val(@effective, "anthropic.sandbox") == true}
+        />
       </.row>
       <.row
         label="Dangerously skip permissions"
         help="--dangerously-skip-permissions"
         description="Bypasses all permission prompts so Claude works autonomously. Use only in isolated environments (Docker, VMs) — Claude could delete files or run dangerous commands."
       >
-        <.toggle key="anthropic.dangerously_skip_permissions" scope={@scope} checked={setting_val(@effective, "anthropic.dangerously_skip_permissions") == true} />
+        <.toggle
+          key="anthropic.dangerously_skip_permissions"
+          scope={@scope}
+          checked={setting_val(@effective, "anthropic.dangerously_skip_permissions") == true}
+        />
       </.row>
     </.section>
     """
@@ -650,7 +678,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         />
       </.row>
       <.row label="Full auto" help="--full-auto (local automation shortcut)">
-        <.toggle key="openai.full_auto" scope={@scope} checked={setting_val(@effective, "openai.full_auto") == true} />
+        <.toggle
+          key="openai.full_auto"
+          scope={@scope}
+          checked={setting_val(@effective, "openai.full_auto") == true}
+        />
       </.row>
       <.row
         label="Dangerously bypass approvals & sandbox"

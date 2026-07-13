@@ -8,7 +8,7 @@ defmodule EyeInTheSky.Settings.DmSettings do
   Converts the effective settings map to a keyword list of CLI opts for the
   given provider. Returns an empty list for unknown providers or empty maps.
 
-  For `"claude"` and other non-codex providers, maps `anthropic.*` keys.
+  For `"claude"`, maps `anthropic.*` keys.
   For `"codex"`, maps `openai.*` keys.
   """
   @spec to_provider_opts(map() | nil, String.t()) :: keyword()
@@ -21,11 +21,13 @@ defmodule EyeInTheSky.Settings.DmSettings do
     |> openai_opts()
   end
 
-  def to_provider_opts(effective, _provider) when is_map(effective) do
+  def to_provider_opts(effective, "claude") when is_map(effective) do
     effective
     |> Map.get("anthropic", %{})
     |> anthropic_opts()
   end
+
+  def to_provider_opts(_effective, _provider), do: []
 
   # ---------------------------------------------------------------------------
   # Private
@@ -63,11 +65,12 @@ defmodule EyeInTheSky.Settings.DmSettings do
 
   defp anthropic_opts(_), do: []
 
-  # Only :full_auto and :bypass_sandbox are consumed by Codex.CLI.
   # Include boolean false values explicitly so RuntimeContext.build/3 can
   # distinguish "user set this to false" from "not specified".
   defp openai_opts(openai) when is_map(openai) do
     []
+    |> maybe_put(:ask_for_approval, openai["ask_for_approval"])
+    |> maybe_put(:sandbox, openai["sandbox"])
     |> maybe_put(:full_auto, openai["full_auto"])
     |> maybe_put(:bypass_sandbox, openai["dangerously_bypass_approvals_and_sandbox"])
   end

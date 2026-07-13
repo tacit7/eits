@@ -188,6 +188,19 @@ defmodule EyeInTheSky.Settings.DmSettingsTest do
       assert opts[:full_auto] == true
     end
 
+    test "maps sandbox and approval policy" do
+      effective = %{
+        "openai" => %{
+          "sandbox" => "read-only",
+          "ask_for_approval" => "on-request"
+        }
+      }
+
+      opts = DmSettings.to_provider_opts(effective, "codex")
+      assert opts[:sandbox] == "read-only"
+      assert opts[:ask_for_approval] == "on-request"
+    end
+
     test "maps dangerously_bypass_approvals_and_sandbox to :bypass_sandbox" do
       effective = %{"openai" => %{"dangerously_bypass_approvals_and_sandbox" => true}}
       opts = DmSettings.to_provider_opts(effective, "codex")
@@ -223,6 +236,18 @@ defmodule EyeInTheSky.Settings.DmSettingsTest do
       opts = DmSettings.to_provider_opts(effective, "codex")
       refute Keyword.has_key?(opts, :permission_mode)
       assert opts[:full_auto] == true
+    end
+  end
+
+  describe "to_provider_opts/2 — unsupported providers" do
+    test "does not apply Claude settings to Pi" do
+      effective = %{"anthropic" => %{"permission_mode" => "plan"}}
+      assert DmSettings.to_provider_opts(effective, "pi") == []
+    end
+
+    test "does not apply Claude settings to unknown providers" do
+      effective = %{"anthropic" => %{"permission_mode" => "plan"}}
+      assert DmSettings.to_provider_opts(effective, "unknown") == []
     end
   end
 end

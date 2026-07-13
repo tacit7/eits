@@ -26,7 +26,8 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlers do
   end
 
   def handle_setting_toggle(scope, key, socket) do
-    current = JsonSettings.get_setting(socket.assigns.dm_settings_effective || %{}, key)
+    settings = toggle_settings_for_scope(scope, socket.assigns)
+    current = JsonSettings.get_setting(settings, key)
     new_value = not (current == true)
 
     case persist_setting_update(scope, key, new_value, socket.assigns) do
@@ -38,6 +39,13 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlers do
          put_flash(socket, :error, "Setting update failed: #{format_setting_error(reason)}")}
     end
   end
+
+  defp toggle_settings_for_scope("agent", assigns) do
+    JsonSettings.effective_settings(assigns.dm_settings_agent_overrides || %{}, %{})
+  end
+
+  defp toggle_settings_for_scope(_scope, assigns),
+    do: assigns.dm_settings_effective || %{}
 
   def handle_reset_settings(scope, socket) do
     case reset_scoped_settings(scope, socket.assigns) do

@@ -394,6 +394,68 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlersTest do
       assert result.assigns.show_live_stream == true
       assert result.assigns.thinking_enabled == true
     end
+
+    # session_cli_opts propagation tests
+    test "session_cli_opts is updated after a setting change for claude session" do
+      agent = Factory.create_agent()
+      session = Factory.create_session(agent, %{provider: "claude"})
+
+      socket =
+        build_socket(%{
+          session: session,
+          agent: nil,
+          dm_settings_effective: %{},
+          dm_settings_agent_overrides: %{},
+          dm_settings_session_overrides: %{},
+          show_live_stream: false,
+          thinking_enabled: false,
+          max_budget_usd: nil,
+          notify_on_stop: false,
+          session_cli_opts: []
+        })
+
+      {:noreply, result} =
+        SettingsHandlers.handle_setting_update_with_value(
+          "session",
+          "anthropic.permission_mode",
+          "plan",
+          socket
+        )
+
+      assert Map.has_key?(result.assigns, :session_cli_opts)
+      assert result.assigns.session_cli_opts[:permission_mode] == "plan"
+    end
+
+    test "session_cli_opts contains bypass_sandbox: false for codex after explicit disable" do
+      agent = Factory.create_agent()
+      session = Factory.create_session(agent, %{provider: "codex"})
+
+      socket =
+        build_socket(%{
+          session: session,
+          agent: nil,
+          dm_settings_effective: %{},
+          dm_settings_agent_overrides: %{},
+          dm_settings_session_overrides: %{},
+          show_live_stream: false,
+          thinking_enabled: false,
+          max_budget_usd: nil,
+          notify_on_stop: false,
+          session_cli_opts: []
+        })
+
+      {:noreply, result} =
+        SettingsHandlers.handle_setting_update_with_value(
+          "session",
+          "openai.dangerously_bypass_approvals_and_sandbox",
+          "false",
+          socket
+        )
+
+      assert Map.has_key?(result.assigns, :session_cli_opts)
+      assert Keyword.has_key?(result.assigns.session_cli_opts, :bypass_sandbox)
+      assert result.assigns.session_cli_opts[:bypass_sandbox] == false
+    end
   end
 
   describe "format_setting_error/1" do

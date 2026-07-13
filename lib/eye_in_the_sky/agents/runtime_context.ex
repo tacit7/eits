@@ -54,7 +54,7 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
   reach `CLI.build_args` for flags like `--add-dir`, `--mcp-config`, etc.
   """
   @spec build(session_id :: integer(), provider :: String.t(), opts :: keyword()) :: t()
-  def build(session_id, provider, opts) do
+  def build(session_id, provider, opts) when is_list(opts) do
     extra = Keyword.drop(opts, @known_keys)
 
     %{
@@ -66,12 +66,22 @@ defmodule EyeInTheSky.Agents.RuntimeContext do
       max_budget_usd: opts[:max_budget_usd],
       agent: opts[:agent],
       eits_workflow: opts[:eits_workflow],
-      bypass_sandbox: opts[:bypass_sandbox] || provider == "codex",
+      bypass_sandbox: resolve_bypass_sandbox(opts, provider),
       content_blocks: ModelCapabilities.filter_blocks(opts[:content_blocks] || [], opts[:model]),
       message_id: opts[:message_id],
       dm_metadata: opts[:dm_metadata],
       context: opts[:context],
       extra_cli_opts: extra
     }
+  end
+
+  # Distinguish "explicitly set to false" from "not provided at all".
+  # `opts[:bypass_sandbox] || provider == "codex"` is wrong because
+  # `false || true == true`, silently ignoring the user's explicit disable.
+  defp resolve_bypass_sandbox(opts, provider) do
+    case Keyword.fetch(opts, :bypass_sandbox) do
+      {:ok, val} -> val
+      :error -> provider == "codex"
+    end
   end
 end

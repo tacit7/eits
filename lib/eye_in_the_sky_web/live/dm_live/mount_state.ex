@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   alias EyeInTheSky.OrchestratorTimers
   alias EyeInTheSky.{Projects, Tasks}
   alias EyeInTheSky.Settings
+  alias EyeInTheSky.Settings.DmSettings
   alias EyeInTheSky.Settings.JsonSettings
   alias EyeInTheSkyWeb.Helpers.PubSubHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
@@ -89,6 +90,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     agent_overrides = (agent && agent.settings) || %{}
     session_overrides = session.settings || %{}
     effective = JsonSettings.effective_settings(agent_overrides, session_overrides)
+    provider = session.provider || "claude"
 
     # NOTE: read keys directly from `effective` — Schema.defaults guarantees
     # every general.* key is populated, so a literal `false` is preserved.
@@ -110,7 +112,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:thinking_enabled, get_in(effective, ["general", "thinking_enabled"]))
     |> assign(:show_thinking_blocks, false)
     |> assign(:max_budget_usd, get_in(effective, ["general", "max_budget_usd"]))
-    |> assign(:session_cli_opts, [])
+    |> assign(:session_cli_opts, DmSettings.to_provider_opts(effective, provider))
     |> assign(:compacting, session.status == "compacting")
     |> assign(:message_search_query, "")
     |> assign(:session_context, nil)

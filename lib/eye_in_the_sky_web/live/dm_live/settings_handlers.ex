@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlers do
   import Phoenix.LiveView, only: [put_flash: 3]
 
   alias EyeInTheSky.{Agents, Sessions}
+  alias EyeInTheSky.Settings.DmSettings
   alias EyeInTheSky.Settings.JsonSettings
 
   def handle_scope_change(scope, socket) do
@@ -89,9 +90,9 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlers do
 
   # Build the full assign map after a settings write. CRITICAL: this updates
   # both the dm_settings_* introspection assigns AND the runtime assigns
-  # (:thinking_enabled, :max_budget_usd, :show_live_stream, :notify_on_stop)
-  # that message handlers and stream code read. Without this, settings changes
-  # only take effect on remount.
+  # (:thinking_enabled, :max_budget_usd, :show_live_stream, :notify_on_stop,
+  # :session_cli_opts) that message handlers and stream code read.
+  # Without this, settings changes only take effect on remount.
   defp build_settings_assigns(
          written_scope,
          fresh_record,
@@ -101,6 +102,7 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlers do
        ) do
     effective = JsonSettings.effective_settings(agent_settings, session_settings)
     general = Map.get(effective, "general", %{})
+    provider = (assigns.session && assigns.session.provider) || "claude"
 
     # Preserve current runtime values when the effective key is nil (e.g.
     # max_budget_usd has nil as a legitimate "no limit" default).
@@ -111,7 +113,8 @@ defmodule EyeInTheSkyWeb.DmLive.SettingsHandlers do
       show_live_stream: Map.get(general, "show_live_stream", assigns.show_live_stream),
       thinking_enabled: Map.get(general, "thinking_enabled", assigns.thinking_enabled),
       max_budget_usd: Map.get(general, "max_budget_usd", assigns.max_budget_usd),
-      notify_on_stop: Map.get(general, "notify_on_stop", assigns.notify_on_stop)
+      notify_on_stop: Map.get(general, "notify_on_stop", assigns.notify_on_stop),
+      session_cli_opts: DmSettings.to_provider_opts(effective, provider)
     }
 
     case written_scope do

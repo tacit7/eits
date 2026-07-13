@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.NewDmPage do
     ~H"""
     <div class="flex flex-col h-full bg-base-100">
       <div class="flex-1" />
-      <div class="px-4 pb-4">
+      <div class="max-w-[860px] mx-auto w-full px-5 pb-7 pt-3 safe-inset-bottom">
         <.message_composer
           uploads={@uploads}
           selected_model={@selected_model}

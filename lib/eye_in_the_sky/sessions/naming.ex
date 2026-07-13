@@ -5,16 +5,18 @@ defmodule EyeInTheSky.Sessions.Naming do
 
   import Ecto.Query
   alias EyeInTheSky.{Events, Repo}
+  alias EyeInTheSky.Claude.BinaryLocator
   alias EyeInTheSky.Sessions.Session
 
-  @api_url "https://api.anthropic.com/v1/messages"
   @model "claude-haiku-4-5-20251001"
   @max_prompt_chars 200
   @max_name_chars 60
+  @timeout_ms 15_000
 
-  @system_prompt "You are a chat-session namer. Output ONLY a short descriptive name " <>
-                   "(3–6 words, noun-preferring, no quotes, no markdown, no trailing punctuation). " <>
-                   "Nothing else — just the name on a single line."
+  @prompt_template "Output ONLY a short descriptive name for this chat session " <>
+                     "(3–6 words, noun-preferring, no quotes, no markdown, no trailing punctuation). " <>
+                     "Nothing else — just the name on a single line.\n\n" <>
+                     "Opening message:\n\n"
 
   @doc """
   Non-fatal auto-name. Only writes if the session name still equals `fallback_name` —
@@ -35,11 +37,8 @@ defmodule EyeInTheSky.Sessions.Naming do
            ) do
       Events.broadcast_rail_session_updated(updated_session)
     else
-      {:error, :no_api_key} ->
-        Logger.debug(
-          "auto-naming skipped for session #{session_id}: no ANTHROPIC_API_KEY configured"
-        )
-
+      {:error, :no_binary} ->
+        Logger.debug("auto-naming skipped for session #{session_id}: claude binary not found")
         :ok
 
       _ ->
@@ -49,47 +48,45 @@ defmodule EyeInTheSky.Sessions.Naming do
 
   @doc "Returns `{:ok, name}` or `{:error, reason}`. Never raises."
   def generate_name(body) do
-    api_key = System.get_env("ANTHROPIC_API_KEY", "")
+    case BinaryLocator.find() do
+      {:error, reason} ->
+        Logger.debug("auto-naming: claude binary not found: #{inspect(reason)}")
+        {:error, :no_binary}
 
-    if api_key == "" do
-      {:error, :no_api_key}
-    else
-      prompt_text = String.slice(body, 0, @max_prompt_chars)
+      {:ok, claude_bin} ->
+        prompt = @prompt_template <> String.slice(body, 0, @max_prompt_chars)
 
-      case Req.post(@api_url,
-             json: %{
-               model: @model,
-               max_tokens: 20,
-               system: @system_prompt,
-               messages: [
-                 %{
-                   role: "user",
-                   content: "Name this chat session based on the opening message:\n\n#{prompt_text}"
-                 }
-               ]
-             },
-             headers: [
-               {"x-api-key", api_key},
-               {"anthropic-version", "2023-06-01"}
-             ],
-             receive_timeout: 10_000
-           ) do
-        {:ok, %{status: 200, body: %{"content" => [%{"text" => text} | _]}}} ->
-          name =
-            text
-            |> String.trim()
-            |> String.trim("\"")
-            |> String.trim("'")
-            |> String.slice(0, @max_name_chars)
+        task =
+          Task.async(fn ->
+            System.cmd(
+              claude_bin,
+              ["-p", prompt, "--model", @model, "--no-session-persistence"],
+              stderr_to_stdout: false
+            )
+          end)
 
-          if name == "", do: {:error, :empty_name}, else: {:ok, name}
+        case Task.yield(task, @timeout_ms) || Task.shutdown(task) do
+          {:ok, {output, 0}} ->
+            name =
+              output
+              |> String.trim()
+              |> String.trim("\"")
+              |> String.trim("'")
+              |> String.slice(0, @max_name_chars)
 
-        {:ok, %{status: status}} ->
-          {:error, {:api_error, status}}
+            if name == "", do: {:error, :empty_name}, else: {:ok, name}
 
-        {:error, reason} ->
-          {:error, reason}
-      end
+          {:ok, {error_output, exit_code}} ->
+            Logger.warning(
+              "auto-naming CLI failed: exit=#{exit_code} output=#{inspect(String.slice(error_output, 0, 200))}"
+            )
+
+            {:error, {:cli_error, exit_code}}
+
+          nil ->
+            Logger.warning("auto-naming timed out after #{@timeout_ms}ms")
+            {:error, :timeout}
+        end
     end
   end
 end

@@ -25,18 +25,15 @@ defmodule EyeInTheSky.Sessions.Naming do
   def try_auto_name(session_id, body, fallback_name) do
     Logger.debug("auto-naming: starting for session=#{session_id} fallback=#{inspect(fallback_name)}")
 
+    name_query =
+      if is_nil(fallback_name) do
+        from(s in Session, where: s.id == ^session_id and is_nil(s.name), select: s)
+      else
+        from(s in Session, where: s.id == ^session_id and s.name == ^fallback_name, select: s)
+      end
+
     with {:ok, generated_name} <- generate_name(body),
-         {1, [updated_session]} <-
-           Repo.update_all(
-             from(s in Session,
-               where:
-                 s.id == ^session_id and
-                   ((is_nil(^fallback_name) and is_nil(s.name)) or
-                    (not is_nil(^fallback_name) and s.name == ^fallback_name)),
-               select: s
-             ),
-             set: [name: generated_name]
-           ) do
+         {1, [updated_session]} <- Repo.update_all(name_query, set: [name: generated_name]) do
       Logger.info("auto-naming: session=#{session_id} named #{inspect(generated_name)}")
       Events.broadcast_rail_session_updated(updated_session)
     else

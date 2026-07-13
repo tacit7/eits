@@ -231,6 +231,9 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         not Enum.any?(segments, &match?({:tool_call, _, _}, &1)) and
         String.trim(body) != ""
 
+    hook_name = get_in(assigns.message.metadata || %{}, ["hook_name"])
+    exit_code = get_in(assigns.message.metadata || %{}, ["exit_code"])
+
     assigns =
       assigns
       |> assign(:segments, segments)
@@ -240,6 +243,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       |> assign(:dm_info, dm_info)
       |> assign(:bash_fallback, bash_fallback)
       |> assign(:bash_body, body)
+      |> assign(:hook_name, hook_name)
+      |> assign(:exit_code, exit_code)
 
     ~H"""
     <div class={[
@@ -247,6 +252,19 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       !@compact && "mt-1",
       @compact && @stream_type != "tool_result" && "mt-0.5"
     ]}>
+      <%= if @stream_type == "hook_failure" do %>
+        <div class="flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 px-2.5 py-2">
+          <.icon name="hero-exclamation-triangle" class="size-3.5 text-warning/80 mt-0.5 flex-shrink-0" />
+          <div class="min-w-0 space-y-1">
+            <p class="text-mini font-mono font-semibold text-warning/80">
+              Hook failed: {@hook_name} (exit {@exit_code})
+            </p>
+            <%= if String.trim(@bash_body) not in ["", "(no output)"] do %>
+              <pre class="text-mini text-base-content/50 font-mono whitespace-pre-wrap break-words overflow-x-auto">{@bash_body}</pre>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
       <%= if @dm_info do %>
         <div class="flex items-center gap-1.5 flex-wrap mb-1">
           <%= if @dm_info[:session_id] && @dm_info[:session_id] != "" do %>

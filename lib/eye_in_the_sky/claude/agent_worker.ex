@@ -341,6 +341,24 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     {:noreply, %{state | stream: stream}}
   end
 
+  # Hook failure — save to DB as a warning message so it appears in the DM transcript
+  @impl true
+  def handle_info(
+        {:claude_message, ref,
+         %Message{type: :hook_failure, content: stderr, metadata: meta}},
+        %__MODULE__{sdk_ref: ref} = state
+      ) do
+    WorkerEvents.on_hook_failure(
+      state.session_id,
+      state.provider,
+      meta.hook_name,
+      meta.exit_code,
+      stderr
+    )
+
+    {:noreply, state}
+  end
+
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %__MODULE__{sdk_ref: ref} = state) do

@@ -11,16 +11,18 @@ defmodule EyeInTheSky.Editors do
   not by re-searching PATH at launch time.
   """
 
+  # type: :gui   — launches as a standalone windowed process; no terminal needed.
+  # type: :terminal — must run inside a terminal emulator (see EyeInTheSky.Terminals).
   @editors [
-    %{id: "code", label: "VS Code", bin: "code"},
-    %{id: "cursor", label: "Cursor", bin: "cursor"},
-    %{id: "zed", label: "Zed", bin: "zed"},
-    %{id: "nvim", label: "Neovim", bin: "nvim"},
-    %{id: "vim", label: "Vim", bin: "vim"},
-    %{id: "hx", label: "Helix", bin: "hx"},
-    %{id: "subl", label: "Sublime Text", bin: "subl"},
-    %{id: "emacs", label: "Emacs", bin: "emacs"},
-    %{id: "nano", label: "nano", bin: "nano"}
+    %{id: "code", label: "VS Code", bin: "code", type: :gui},
+    %{id: "cursor", label: "Cursor", bin: "cursor", type: :gui},
+    %{id: "zed", label: "Zed", bin: "zed", type: :gui},
+    %{id: "subl", label: "Sublime Text", bin: "subl", type: :gui},
+    %{id: "nvim", label: "Neovim", bin: "nvim", type: :terminal},
+    %{id: "vim", label: "Vim", bin: "vim", type: :terminal},
+    %{id: "hx", label: "Helix", bin: "hx", type: :terminal},
+    %{id: "emacs", label: "Emacs", bin: "emacs", type: :terminal},
+    %{id: "nano", label: "nano", bin: "nano", type: :terminal}
   ]
 
   # Paths allowed to be opened in an external editor.
@@ -77,11 +79,21 @@ defmodule EyeInTheSky.Editors do
   def open(editor_id, path) when is_binary(editor_id) and is_binary(path) do
     dirs = build_search_dirs()
 
-    with {:ok, %{label: label} = ed} <- fetch_editor(editor_id),
+    with {:ok, %{label: label, type: type} = ed} <- fetch_editor(editor_id),
          {:ok, cmd} <- fetch_cmd(ed, dirs),
          :ok <- check_allowed(path),
          :ok <- check_exists(path) do
-      launch(cmd, path)
+      case type do
+        :terminal ->
+          # Terminal editors must run inside a terminal emulator.
+          terminal_id = EyeInTheSky.Settings.get("preferred_terminal") || "iterm2"
+          dir = Path.dirname(path)
+          EyeInTheSky.Terminals.open(terminal_id, "#{cmd} #{shell_escape(path)}", dir)
+
+        :gui ->
+          launch(cmd, path)
+      end
+
       {:ok, label}
     end
   end
@@ -187,6 +199,12 @@ defmodule EyeInTheSky.Editors do
       {:ok, %File.Stat{type: :regular, mode: mode}} -> Bitwise.band(mode, 0o111) != 0
       _ -> false
     end
+  end
+
+  # POSIX single-quote escaping so the path survives being embedded in a
+  # shell command string passed to a terminal emulator.
+  defp shell_escape(str) do
+    "'" <> String.replace(str, "'", "'\\''") <> "'"
   end
 
   defp mac_app_names("code"), do: ["Visual Studio Code"]

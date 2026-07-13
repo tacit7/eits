@@ -220,12 +220,11 @@ defmodule EyeInTheSky.Claude.CLI do
       {:ok, claude_path} ->
         args = Args.build_args(opts)
 
-        Logger.info(
-          "Spawning Claude in #{project_path}: claude #{Enum.join(Args.safe_log_args(args), " ")}"
-        )
-
-        Logger.info(
-          "CLI env: CLAUDE_CODE_EFFORT_LEVEL=#{inspect(opts[:effort_level])} max_budget_usd=#{inspect(opts[:max_budget_usd])}"
+        Logger.warning(
+          "[spawn] Claude path=#{project_path} model=#{opts[:model]} " <>
+            "effort=#{inspect(opts[:effort_level])} budget=#{inspect(opts[:max_budget_usd])} " <>
+            "permission_mode=#{inspect(opts[:permission_mode])} " <>
+            "args=#{Enum.join(Args.safe_log_args(args), " ")}"
         )
 
         {port, _handler_pid, session_ref} =
@@ -236,8 +235,6 @@ defmodule EyeInTheSky.Claude.CLI do
           use_script: Keyword.get(opts, :use_script, true),
           model: opts[:model]
         })
-
-        Logger.info("[telemetry] cli.spawn project_path=#{project_path} model=#{opts[:model]}")
 
         {:ok, port, session_ref}
 

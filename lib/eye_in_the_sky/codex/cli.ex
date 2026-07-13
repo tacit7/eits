@@ -223,7 +223,7 @@ defmodule EyeInTheSky.Codex.CLI do
 
         flags = Enum.slice(args, 0..(length(args) - 2)//1)
         cmd_string = "codex " <> Enum.join(flags, " ") <> prompt_summary
-        Logger.info("[Codex.CLI] Spawning in #{project_path}: #{cmd_string}")
+        Logger.warning("[spawn] Codex path=#{project_path} model=#{opts[:model]} cmd=#{cmd_string}")
 
         env = build_env(opts)
 
@@ -257,9 +257,6 @@ defmodule EyeInTheSky.Codex.CLI do
           model: opts[:model]
         })
 
-        Logger.info(
-          "[telemetry] codex.cli.spawn project_path=#{project_path} model=#{opts[:model]}"
-        )
 
         {:ok, port, session_ref}
 

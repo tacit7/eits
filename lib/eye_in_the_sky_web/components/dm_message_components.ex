@@ -71,14 +71,28 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         text -> text
       end
 
-    assigns = assign(assigns, :metrics_text, metrics_text)
+    cache_pct = cache_hit_pct(get_in(assigns.message.metadata || %{}, ["usage"]))
+
+    assigns =
+      assigns
+      |> assign(:metrics_text, metrics_text)
+      |> assign(:cache_pct, cache_pct)
 
     ~H"""
-    <%= if @metrics_text != "" do %>
-      <div class="mt-1 px-1">
-        <span class="text-[11px] font-mono tabular-nums text-base-content/40">
-          {@metrics_text}
-        </span>
+    <%= if @metrics_text != "" or @cache_pct do %>
+      <div class="mt-1 px-1 flex items-center gap-0">
+        <%= if @metrics_text != "" do %>
+          <span class="text-[11px] font-mono tabular-nums text-base-content/40">
+            {@metrics_text}
+          </span>
+        <% end %>
+        <%= if @cache_pct do %>
+          <span class="inline-flex items-center gap-0.5 text-[11px] font-mono tabular-nums text-base-content/40">
+            <%= if @metrics_text != "" do %> · <% end %>
+            <.icon name="hero-circle-stack" class="size-3" />
+            {@cache_pct}%
+          </span>
+        <% end %>
       </div>
     <% end %>
     """
@@ -118,6 +132,24 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   end
 
   defp format_metrics(_), do: ""
+
+  # Returns the cache hit percentage as an integer (e.g. 30) when
+  # cache_read_input_tokens > 0, nil otherwise. Used by message_metrics/1
+  # to render the hero-circle-stack icon + percentage inline.
+  defp cache_hit_pct(nil), do: nil
+
+  defp cache_hit_pct(usage) when is_map(usage) do
+    read = usage["cache_read_input_tokens"] || 0
+    created = usage["cache_creation_input_tokens"] || 0
+    plain = usage["input_tokens"] || 0
+    total = plain + read + created
+
+    if total > 0 and read > 0 do
+      round(read / total * 100)
+    end
+  end
+
+  defp cache_hit_pct(_), do: nil
 
   # ---------------------------------------------------------------------------
   # message_attachments
@@ -199,6 +231,9 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         not Enum.any?(segments, &match?({:tool_call, _, _}, &1)) and
         String.trim(body) != ""
 
+    hook_name = get_in(assigns.message.metadata || %{}, ["hook_name"])
+    exit_code = get_in(assigns.message.metadata || %{}, ["exit_code"])
+
     assigns =
       assigns
       |> assign(:segments, segments)
@@ -208,6 +243,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       |> assign(:dm_info, dm_info)
       |> assign(:bash_fallback, bash_fallback)
       |> assign(:bash_body, body)
+      |> assign(:hook_name, hook_name)
+      |> assign(:exit_code, exit_code)
 
     ~H"""
     <div class={[
@@ -215,6 +252,19 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       !@compact && "mt-1",
       @compact && @stream_type != "tool_result" && "mt-0.5"
     ]}>
+      <%= if @stream_type == "hook_failure" do %>
+        <div class="flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 px-2.5 py-2">
+          <.icon name="hero-exclamation-triangle" class="size-3.5 text-warning/80 mt-0.5 flex-shrink-0" />
+          <div class="min-w-0 space-y-1">
+            <p class="text-mini font-mono font-semibold text-warning/80">
+              Hook failed: {@hook_name} (exit {@exit_code})
+            </p>
+            <%= if String.trim(@bash_body) not in ["", "(no output)"] do %>
+              <pre class="text-mini text-base-content/50 font-mono whitespace-pre-wrap break-words overflow-x-auto">{@bash_body}</pre>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
       <%= if @dm_info do %>
         <div class="flex items-center gap-1.5 flex-wrap mb-1">
           <%= if @dm_info[:session_id] && @dm_info[:session_id] != "" do %>

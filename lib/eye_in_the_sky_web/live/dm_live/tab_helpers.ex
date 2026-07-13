@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}
+  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Sessions, Tasks}
   alias EyeInTheSkyWeb.DmLive.MessageGrouper
   alias EyeInTheSkyWeb.Live.Shared.SafeStreamHelper
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
@@ -119,6 +119,17 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
         end
       end)
     )
+    |> assign(
+      :session_init_data,
+      maybe_load_tab_data(tab, "tools", socket.assigns[:session_init_data], fn ->
+        # Re-read from DB to get the freshest cli_init snapshot. The worker
+        # stores init data in session.settings["cli_init"] on every job start.
+        case Sessions.get_session(session_id) do
+          {:ok, session} -> (session.settings || %{})["cli_init"]
+          _ -> nil
+        end
+      end)
+    )
   end
 
   def reload_tasks(socket) do
@@ -230,6 +241,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       input = entry["inputTokens"] || 0
       cache_read = entry["cacheReadInputTokens"] || 0
       cache_creation = entry["cacheCreationInputTokens"] || 0
+      output = entry["outputTokens"] || 0
 
       # Claude Code reports contextWindow: 200k even for 1M models.
       # Detect 1M from the model key suffix (e.g. "claude-opus-4-7[1m]").
@@ -240,7 +252,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
           entry["contextWindow"] || @default_context_window
         end
 
-      used = input + cache_read + cache_creation
+      used = input + cache_read + cache_creation + output
 
       if used > ctx_window do
         Logger.warning(
@@ -257,7 +269,8 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     input = usage["input_tokens"] || 0
     cache_read = usage["cache_read_input_tokens"] || 0
     cache_creation = usage["cache_creation_input_tokens"] || 0
-    used = input + cache_read + cache_creation
+    output = usage["output_tokens"] || 0
+    used = input + cache_read + cache_creation + output
 
     # If usage exceeds 200k, the session must be on a 1M model
     ctx_window =

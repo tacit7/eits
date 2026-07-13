@@ -59,6 +59,13 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
       />
       <:item
+        label="Tools"
+        active={@active_tab == "tools"}
+        on_click="change_tab"
+        value="tools"
+        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+      />
+      <:item
         label="Settings"
         active={@active_tab == "settings"}
         on_click="change_tab"

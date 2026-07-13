@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.Modals.NewChannel, only: [new_channel_modal: 1]
 
   alias EyeInTheSky.Claude.RateLimitClient
-  alias EyeInTheSky.{Notifications, Projects}
+  alias EyeInTheSky.{Editors, Notifications, Projects, Settings}
   alias EyeInTheSkyWeb.Components.NewSessionModal
 
   alias EyeInTheSkyWeb.Components.Rail.{
@@ -111,7 +111,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         show_new_channel_form: false,
         prefill_agent_slug: nil,
         prefill_agent_name: nil,
-        disable_auth: Application.get_env(:eye_in_the_sky, :disable_auth, false)
+        disable_auth: Application.get_env(:eye_in_the_sky, :disable_auth, false),
+        preferred_editor_label: preferred_editor_label()
       )
 
     # Skip DB queries on the dead render (mount runs twice — static + connected).
@@ -123,6 +124,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       Events.subscribe_rail_notifications_refresh()
       Events.subscribe_rail_projects_refresh()
       Events.subscribe_rail_channels_refresh()
+      Events.subscribe_settings()
 
       {:ok,
        assign(socket,
@@ -197,6 +199,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     {:noreply, assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
   end
 
+  def handle_info({:settings_changed, "preferred_editor", _val}, socket) do
+    {:noreply, assign(socket, :preferred_editor_label, preferred_editor_label())}
+  end
+
+  def handle_info({:settings_changed, _key, _val}, socket), do: {:noreply, socket}
+
   @impl true
   def handle_event("toggle_section", params, socket) do
     {:noreply, new_socket} = SectionActions.handle_toggle_section(params, socket)
@@ -264,6 +272,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   def handle_event("new_session", params, socket),
     do: ProjectActions.handle_new_session(params, socket)
+
+  def handle_event("new_session_navigate", params, socket),
+    do: ProjectActions.handle_new_session_navigate(params, socket)
 
   def handle_event("start_rename_project", params, socket),
     do: ProjectActions.handle_start_rename(params, socket)
@@ -733,6 +744,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         flyout_file_children={@flyout_file_children}
         flyout_file_error={@flyout_file_error}
         flyout_usage={@flyout_usage}
+        preferred_editor_label={@preferred_editor_label}
       />
 
       <%!-- ── Channel modal ── --%>
@@ -796,5 +808,14 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       />
     </div>
     """
+  end
+
+  defp preferred_editor_label do
+    editor_id = Settings.get("preferred_editor") || "code"
+
+    case Editors.find(editor_id) do
+      %{label: label} -> label
+      nil -> editor_id
+    end
   end
 end

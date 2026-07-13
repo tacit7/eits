@@ -11,8 +11,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   @claude_premium_aliases ["opus[1m]", "sonnet[1m]"]
   @claude_default_slug "claude-opus-4-8"
 
-  @codex_primary_slugs ~w(gpt-5.5 gpt-5.4 gpt-5.4-mini)
-  @codex_default_slug "gpt-5.5"
+  @codex_primary_slugs ~w(gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna)
+  @codex_default_slug "gpt-5.6-sol"
 
   defdelegate valid_model_combos, to: ModelConfig
 
@@ -60,14 +60,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def codex_models do
     [
+      {"gpt-5.6-sol", "GPT-5.6 Sol"},
+      {"gpt-5.6-terra", "GPT-5.6 Terra"},
+      {"gpt-5.6-luna", "GPT-5.6 Luna"},
       {"gpt-5.5", "GPT-5.5"},
       {"gpt-5.4", "GPT-5.4"},
-      {"gpt-5.4-mini", "GPT-5.4 Mini"},
-      {"gpt-5.3-codex", "GPT-5.3 Codex"},
-      {"gpt-5.2-codex", "GPT-5.2 Codex"},
-      {"gpt-5.2", "GPT-5.2"},
-      {"gpt-5.1-codex-max", "GPT-5.1 Codex Max"},
-      {"gpt-5.1-codex-mini", "GPT-5.1 Codex Mini"}
+      {"gpt-5.4-mini", "GPT-5.4 Mini"}
     ]
   end
 
@@ -76,15 +74,16 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def codex_models_with_meta do
     [
-      {"gpt-5.5", "GPT-5.5", "Newest frontier · complex coding, computer use (default)",
+      {"gpt-5.6-sol", "GPT-5.6 Sol", "Latest frontier agentic coding model (default)",
        "text-warning"},
-      {"gpt-5.4", "GPT-5.4", "Flagship frontier for professional work", "text-warning"},
-      {"gpt-5.4-mini", "GPT-5.4 Mini", "Fast and cheap for subagents", "text-info"},
-      {"gpt-5.3-codex", "GPT-5.3 Codex", "Industry-leading coding model", "text-info"},
-      {"gpt-5.2-codex", "GPT-5.2 Codex", "Frontier Codex-optimized", "text-info"},
-      {"gpt-5.2", "GPT-5.2", "Long-running agents", "text-info"},
-      {"gpt-5.1-codex-max", "GPT-5.1 Codex Max", "Deep reasoning, large context", "text-success"},
-      {"gpt-5.1-codex-mini", "GPT-5.1 Codex Mini", "Cheaper and faster", "text-success"}
+      {"gpt-5.6-terra", "GPT-5.6 Terra", "Balanced agentic coding model for everyday work",
+       "text-warning"},
+      {"gpt-5.6-luna", "GPT-5.6 Luna", "Fast and affordable agentic coding model", "text-info"},
+      {"gpt-5.5", "GPT-5.5", "Frontier model for complex coding, research, and real-world work",
+       "text-info"},
+      {"gpt-5.4", "GPT-5.4", "Strong model for everyday coding", "text-info"},
+      {"gpt-5.4-mini", "GPT-5.4 Mini", "Small, fast, and cost-efficient for simpler tasks",
+       "text-success"}
     ]
   end
 
@@ -223,7 +222,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   @doc """
   Returns the default model slug for a provider.
   """
-  def default_model_for("codex"), do: "gpt-5.5"
+  def default_model_for("codex"), do: "gpt-5.6-sol"
   def default_model_for("pi"), do: nil
   def default_model_for(_), do: "claude-opus-4-8"
 

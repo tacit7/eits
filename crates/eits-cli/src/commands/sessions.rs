@@ -81,6 +81,18 @@ pub enum SessionsCmd {
         project_id: Option<String>,
         #[arg(long = "worktree-path")]
         worktree_path: Option<String>,
+        /// Raw model string (e.g. "claude-opus-4-5")
+        #[arg(long)]
+        model: Option<String>,
+        /// Structured model name (authoritative field)
+        #[arg(long = "model-name")]
+        model_name: Option<String>,
+        /// Model provider (e.g. "anthropic", "openai")
+        #[arg(long = "model-provider")]
+        model_provider: Option<String>,
+        /// Model version string
+        #[arg(long = "model-version")]
+        model_version: Option<String>,
     },
     /// End a session (defaults uuid to the current session identity)
     End {
@@ -309,6 +321,10 @@ pub fn run(
             ended_at,
             project_id,
             worktree_path,
+            model,
+            model_name,
+            model_provider,
+            model_version,
         } => {
             let uuid = resolve_self(cfg, &uuid)?;
             let mut updates = serde_json::Map::new();
@@ -347,6 +363,18 @@ pub fn run(
             }
             if let Some(w) = &worktree_path {
                 updates.insert("worktree_path".into(), json!(w));
+            }
+            if let Some(m) = &model {
+                updates.insert("model".into(), json!(m));
+            }
+            if let Some(mn) = &model_name {
+                updates.insert("model_name".into(), json!(mn));
+            }
+            if let Some(mp) = &model_provider {
+                updates.insert("model_provider".into(), json!(mp));
+            }
+            if let Some(mv) = &model_version {
+                updates.insert("model_version".into(), json!(mv));
             }
             let resp = client.patch(&format!("/sessions/{uuid}"), Value::Object(updates))?;
             if quiet {

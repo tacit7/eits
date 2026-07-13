@@ -9,23 +9,22 @@ defmodule EyeInTheSky.Codex.Models do
   # When adding a model here, also update the valid models list in scripts/eits
   # (case pattern ~line 1683 and the help text ~line 1610).
   @context_windows %{
+    "gpt-5.6-sol" => 1_050_000,
+    "gpt-5.6-terra" => 1_050_000,
+    "gpt-5.6-luna" => 1_050_000,
     "gpt-5.5" => 1_050_000,
-    "gpt-5.4" => 1_000_000,
-    "gpt-5.3-codex" => 400_000,
-    "gpt-5.2" => 400_000,
-    "gpt-5.1-codex-max" => 400_000,
-    "gpt-5.2-codex" => 400_000,
-    "gpt-5.1-codex-mini" => 400_000
+    "gpt-5.4" => 1_050_000,
+    "gpt-5.4-mini" => 1_050_000
   }
 
   # Max output tokens per model (where known)
   @max_output_tokens %{
+    "gpt-5.6-sol" => 128_000,
+    "gpt-5.6-terra" => 128_000,
+    "gpt-5.6-luna" => 128_000,
     "gpt-5.5" => 128_000,
-    "gpt-5.3-codex" => 128_000,
-    "gpt-5.2" => 128_000,
-    "gpt-5.1-codex-max" => 128_000,
-    "gpt-5.2-codex" => 128_000,
-    "gpt-5.1-codex-mini" => 128_000
+    "gpt-5.4" => 128_000,
+    "gpt-5.4-mini" => 128_000
   }
 
   @doc """

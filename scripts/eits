@@ -1691,7 +1691,7 @@ Valid models (--provider claude, default):
               claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5-20250929
 
 Valid models (--provider codex):
-  gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
+  gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.4, gpt-5.4-mini
 
 Valid models (--provider gemini):
   gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
@@ -1707,7 +1707,7 @@ NOTES:
   - --provider and --model are validated locally before hitting the API. Passing an
     invalid combo exits immediately with a clear error message.
   - Provider/model pairs are not cross-compatible. --provider codex --model sonnet
-    is invalid; use --model gpt-5.4 for Codex.
+    is invalid; use --model gpt-5.6-sol for Codex.
   - $EITS_PROJECT_ID is used as the default --project-id. In spawned agents it must
     be set explicitly in the instructions string — it is not injected as an OS env var
     for Claude sessions (Codex injects it via cli.ex automatically).
@@ -1768,8 +1768,8 @@ USAGE
           codex)
             if [[ -n "$model" ]]; then
               case "$model" in
-                gpt-5.5|gpt-5.4|gpt-5.2-codex|gpt-5.1-codex-max|gpt-5.4-mini|gpt-5.3-codex|gpt-5.2) ;;
-                *) die "invalid model '$model' for provider 'codex'. Valid: gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2" ;;
+                gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini) ;;
+                *) die "invalid model '$model' for provider 'codex'. Valid: gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.4, gpt-5.4-mini" ;;
               esac
             fi ;;
           gemini)

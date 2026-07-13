@@ -58,6 +58,12 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions do
 
     case create_fn.(opts) do
       {:ok, %{session: session}} ->
+        if description && description != "" do
+          Task.start(fn ->
+            EyeInTheSky.Sessions.Naming.try_auto_name(session.id, description, session.name)
+          end)
+        end
+
         session = Sessions.preload_project(session)
 
         socket =

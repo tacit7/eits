@@ -30,30 +30,29 @@ defmodule EyeInTheSky.Agents.ModelConfig do
 
   @doc """
   Returns the list of Codex model slugs.
+
+  Keep in sync with:
+  - `EyeInTheSkyWeb.Helpers.ModelHelpers.codex_models/0` (UI dropdown)
+  - `scripts/eits` codex model case (~line 1771)
   """
   def codex_models do
     [
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
       "gpt-5.5",
       "gpt-5.4",
-      "gpt-5.4-mini",
-      "gpt-5.3-codex",
-      "gpt-5.2-codex",
-      "gpt-5.2",
-      "gpt-5.1-codex-max",
-      "gpt-5.1-codex-mini",
-      # backward compat for sessions spawned before the unified list
-      "gpt-5.1",
-      "gpt-5-codex-mini"
+      "gpt-5.4-mini"
     ]
   end
 
   @doc """
   Returns the default model slug for a provider.
   Claude: resolved from Settings.default_model() (user-configured)
-  Codex: "gpt-5.5"
+  Codex: "gpt-5.6-sol"
   Pi: nil (no default; model must be specified explicitly from discovery)
   """
-  def default_model("codex"), do: "gpt-5.5"
+  def default_model("codex"), do: "gpt-5.6-sol"
   def default_model("pi"), do: nil
 
   # Pi models are format-validated ("<pi-provider>/<model-id>"); the true list

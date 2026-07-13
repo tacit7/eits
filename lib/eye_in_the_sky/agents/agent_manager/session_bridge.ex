@@ -23,7 +23,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
     case Registry.lookup(@registry, {:session, session_id}) do
       [{pid, provider}] ->
         if Process.alive?(pid) do
-          Logger.debug(
+          Logger.warning(
             "ensure_worker_running: found existing worker for session_id=#{session_id}, pid=#{inspect(pid)}, provider=#{provider}"
           )
 
@@ -33,7 +33,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
         end
 
       [] ->
-        Logger.info(
+        Logger.warning(
           "🔍 ensure_worker_running: no worker found for session_id=#{session_id}, starting new worker"
         )
 
@@ -42,14 +42,14 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
   end
 
   defp start_worker(session_id, extra_opts) do
-    Logger.info("🚀 start_worker: loading session.id=#{session_id}")
+    Logger.warning("🚀 start_worker: loading session.id=#{session_id}")
 
     with {:ok, session} <- Sessions.get_session(session_id),
          {:ok, agent} <- Agents.get_agent(session.agent_id),
          provider when not is_nil(provider) <- normalize_provider(session.provider),
          {:ok, session} <- ensure_session_uuid(session, provider),
          {:ok, project_path} <- resolve_project_path(session, agent) do
-      Logger.info(
+      Logger.warning(
         "✅ start_worker: loaded session.uuid=#{session.uuid}, agent.id=#{agent.id}, project_path=#{project_path}"
       )
 
@@ -179,12 +179,12 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
   defp start_child(session, provider, opts, evicted?) do
     case DynamicSupervisor.start_child(@supervisor, {AgentWorker, opts}) do
       {:ok, pid} ->
-        Logger.info("✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}")
+        Logger.warning("✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}")
 
         {:ok, pid, provider}
 
       {:error, {:already_started, pid}} ->
-        Logger.info(
+        Logger.warning(
           "spawn_worker: already started for session.id=#{session.id}, pid=#{inspect(pid)}"
         )
 
@@ -193,7 +193,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
       {:error, :max_children} when not evicted? ->
         case evict_parked_worker() do
           {:ok, evicted_session_id} ->
-            Logger.info(
+            Logger.warning(
               "spawn_worker: AgentSupervisor full — evicted parked worker session.id=#{evicted_session_id} to make room for session.id=#{session.id}"
             )
 

@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,
-    only: [connected?: 1, put_flash: 3, push_event: 3, stream_insert: 3]
+    only: [connected?: 1, put_flash: 3, push_event: 3, push_navigate: 2, stream_insert: 3]
 
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Claude.SessionImporter
@@ -21,6 +21,11 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   require Logger
 
   @reload_debounce_ms 300
+
+  def handle_send_message(body, %{assigns: %{live_action: :new}} = socket) do
+    body = String.trim(body)
+    if body == "", do: {:noreply, socket}, else: do_spawn_new_session(body, socket)
+  end
 
   def handle_send_message(body, socket) do
     model = socket.assigns.selected_model
@@ -58,6 +63,13 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
           {:ok, _admission} ->
             Logger.info("Message forwarded to AgentManager for session=#{session_id}")
             UploadHelpers.persist_upload_attachments(uploaded_files, message.id)
+
+            if socket.assigns.session.name in ["New Chat", nil] do
+              fallback = socket.assigns.session.name
+              Task.start(fn ->
+                EyeInTheSky.Sessions.Naming.try_auto_name(session_id, full_body, fallback)
+              end)
+            end
 
             {:noreply,
              socket
@@ -329,6 +341,41 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
         {:error, reason} -> Logger.warning("Failed to clean up upload #{path}: #{reason}")
       end
     end)
+  end
+
+  defp do_spawn_new_session(body, socket) do
+    fallback_name = String.slice(body, 0, 60)
+    model = socket.assigns.selected_model
+    project_id = socket.assigns.new_session_project_id
+
+    with {:ok, project} <- EyeInTheSky.Projects.get_project(project_id) do
+      create_opts = [
+        description: fallback_name,
+        model: model,
+        project_id: project.id,
+        project_path: project.path,
+        eits_workflow: "0"
+      ]
+
+      send_opts = (socket.assigns[:session_cli_opts] || []) |> Keyword.put(:eits_workflow, "0")
+
+      case AgentManager.create_agent_without_start(create_opts) do
+        {:ok, %{session: session}} ->
+          EyeInTheSky.PendingSessionMessages.put(session.id, body, send_opts)
+
+          Task.start(fn ->
+            EyeInTheSky.Sessions.Naming.try_auto_name(session.id, body, fallback_name)
+          end)
+
+          {:noreply, push_navigate(socket, to: "/dm/#{session.id}")}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to create session: #{inspect(reason)}")}
+      end
+    else
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Project not found.")}
+    end
   end
 
   defp create_user_message(session_id, body, provider) do

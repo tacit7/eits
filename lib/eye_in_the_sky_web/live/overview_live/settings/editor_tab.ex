@@ -46,6 +46,24 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
                 />
               </form>
             </div>
+            <div class="flex items-center justify-between px-5 py-4">
+              <div>
+                <p class="text-sm font-medium text-base-content">Preferred Terminal</p>
+                <p class="text-xs text-base-content/50 mt-0.5">
+                  Used when opening terminal editors (vim, nvim, helix…)
+                </p>
+              </div>
+              <form phx-change="save_setting" class="flex items-center gap-2">
+                <input type="hidden" name="key" value="preferred_terminal" />
+                <select class="select select-bordered select-sm w-40 min-h-[44px]" name="value">
+                  <%= for %{id: val, label: label} <- EyeInTheSky.Terminals.all() do %>
+                    <option value={val} selected={@settings["preferred_terminal"] == val}>
+                      {label}
+                    </option>
+                  <% end %>
+                </select>
+              </form>
+            </div>
           </div>
         </div>
       </section>

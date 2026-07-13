@@ -30,7 +30,7 @@ defmodule EyeInTheSky.Pi.CLI do
       session_ref = Keyword.get(opts, :session_ref, make_ref())
       idle_timeout_ms = EyeInTheSky.CLI.Port.resolve_idle_timeout(opts, @default_idle_timeout_ms)
 
-      Logger.info("[Pi.CLI] Spawning harness in #{project_path}: #{exe} #{Enum.join(args, " ")}")
+      Logger.warning("[spawn] Pi path=#{project_path} cmd=#{exe} #{Enum.join(args, " ")}")
 
       port =
         Port.open(

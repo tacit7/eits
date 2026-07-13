@@ -56,8 +56,32 @@ defmodule EyeInTheSky.Claude.Parser do
     {:session_id, session_id}
   end
 
-  defp parse_event(%{"type" => "system", "subtype" => "init", "session_id" => session_id}) do
-    {:session_id, session_id}
+  defp parse_event(%{"type" => "system", "subtype" => "init", "session_id" => session_id} = event) do
+    data = %{
+      "session_id" => session_id,
+      "tools" => event["tools"] || [],
+      "plugins" => event["plugins"] || [],
+      "agents" => event["agents"] || [],
+      "skills" => event["skills"] || [],
+      "mcp_servers" => event["mcp_servers"] || [],
+      "model" => event["model"],
+      "permission_mode" => event["permissionMode"],
+      "fast_mode_state" => event["fast_mode_state"],
+      "claude_code_version" => event["claudeCodeVersion"] || event["claude_code_version"]
+    }
+
+    {:session_init, data}
+  end
+
+  defp parse_event(%{
+         "type" => "system",
+         "subtype" => "hook_response",
+         "exit_code" => exit_code,
+         "hook_name" => hook_name
+       } = event)
+       when is_integer(exit_code) and exit_code != 0 do
+    stderr = event["stderr"] || event["output"] || ""
+    {:ok, Message.hook_failure(hook_name, exit_code, stderr)}
   end
 
   defp parse_event(%{"type" => "system"}) do
@@ -69,16 +93,27 @@ defmodule EyeInTheSky.Claude.Parser do
     parse_stream_event(event)
   end
 
-  defp parse_event(%{"type" => "assistant", "message" => %{"content" => content}}) do
+  defp parse_event(%{"type" => "assistant", "message" => %{"content" => content} = message}) do
     text = extract_text_from_content(content)
     tool_name = extract_tool_from_content(content)
 
+    # Per-turn token stats — bounded by contextWindow, unlike the result event's
+    # cumulative modelUsage which accumulates cache_read_input_tokens across turns.
+    turn_meta =
+      with model when is_binary(model) <- message["model"],
+           usage when is_map(usage) <- message["usage"] do
+        %{turn_model: model, turn_usage: usage}
+      else
+        _ -> %{}
+      end
+
     cond do
       tool_name ->
-        {:ok, Message.tool_use(tool_name, %{}, %{text: text})}
+        msg = Message.tool_use(tool_name, %{}, %{text: text})
+        {:ok, %{msg | metadata: Map.merge(msg.metadata, turn_meta)}}
 
       text != "" ->
-        {:ok, Message.text(text, false)}
+        {:ok, %{Message.text(text, false) | metadata: turn_meta}}
 
       true ->
         :skip

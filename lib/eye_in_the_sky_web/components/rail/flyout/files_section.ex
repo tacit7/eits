@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
   attr :file_children, :map, default: %{}
   attr :file_error, :string, default: nil
   attr :sidebar_project, :any, default: nil
+  attr :preferred_editor_label, :string, default: "External Editor"
 
   def files_content(assigns) do
     assigns =
@@ -69,6 +70,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
               data-ctx-path={node.path}
               data-ctx-name={node.name}
               data-ctx-abs-path={Path.join(@sidebar_project.path, node.path)}
+              data-ctx-editor-label={@preferred_editor_label}
               class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-xs text-base-content/55 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
               style={"padding-left: #{indent + 20}px"}
             >

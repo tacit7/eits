@@ -85,7 +85,7 @@ export const REGISTRY = {
         : [
             { label: 'Open', icon: 'hero-arrow-up-right', run: (c) => c.push('file_open', { path: d.ctxPath }) },
             {
-              label: 'Open in External Editor',
+              label: `Open in ${d.ctxEditorLabel || 'External Editor'}`,
               icon: 'hero-code-bracket',
               run: (c) => c.push('open_file_in_editor', { path: d.ctxPath }),
             },
@@ -259,9 +259,9 @@ export const REGISTRY = {
     { sep: true },
     { label: 'Copy session ID', icon: 'hero-document-duplicate', run: (c) => c.copy(String(d.ctxId)) },
     {
-      label: 'Copy deeplink',
+      label: 'Copy link',
       icon: 'hero-link',
-      run: (c) => c.copy(`eits://sessions/${d.ctxUuid || d.ctxId}`),
+      run: (c) => c.copy(`eits://dm/${d.ctxUuid || d.ctxId}`),
     },
     ...(d.ctxWorktree
       ? [
@@ -296,7 +296,10 @@ export const REGISTRY = {
       })),
     },
     { sep: true },
-    { label: 'Copy task ID', icon: 'hero-document-duplicate', run: (c) => c.copy(d.ctxIntId || d.ctxId) },
+    { label: 'Copy link', icon: 'hero-document-duplicate', run: (c) => c.copy(`eits://tasks/${d.ctxId}`) },
+    ...(d.ctxSessionUuid
+      ? [{ label: 'Chat with agent', icon: 'hero-chat-bubble-left-ellipsis', run: (c) => c.navigate(`/dm/${d.ctxSessionUuid}`) }]
+      : []),
     { sep: true },
     {
       label: 'Delete task',

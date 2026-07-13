@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   alias EyeInTheSkyWeb.Components.DmPage.NotesTab
   alias EyeInTheSkyWeb.Components.DmPage.SettingsTab
   alias EyeInTheSkyWeb.Components.DmPage.TasksTab
+  alias EyeInTheSkyWeb.Components.DmPage.ToolsTab
 
   @tabs [
     {"messages", "hero-chat-bubble-left-right", "Chat"},
@@ -18,6 +19,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
     {"commits", "hero-code-bracket", "Commits"},
     {"notes", "hero-document-text", "Notes"},
     {"context", "hero-document-magnifying-glass", "Context"},
+    {"tools", "hero-wrench-screwdriver", "Tools"},
     {"settings", "hero-cog-6-tooth", "Settings"}
   ]
 
@@ -58,6 +60,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :overlay_data, :map, default: %{active_overlay: nil, active_timer: nil, reloading: false}
   attr :syncing, :boolean, default: false
   attr :pty_pid, :any, default: nil
+  attr :session_init_data, :map, default: nil
 
   defp normalize_message_data(message_data) do
     Map.merge(
@@ -470,6 +473,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               <NotesTab.notes_tab notes={@notes} />
             <% "context" -> %>
               <ContextTab.context_tab session_context={@session_context} />
+            <% "tools" -> %>
+              <ToolsTab.tools_tab session_init_data={@session_init_data} />
             <% "settings" -> %>
               <SettingsTab.settings_tab
                 scope={@dm_settings_scope}

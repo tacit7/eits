@@ -4,28 +4,28 @@ defmodule EyeInTheSky.Codex.ModelsTest do
   alias EyeInTheSky.Codex.Models
 
   describe "context_window/1" do
-    test "returns 1_000_000 for gpt-5.4" do
-      assert Models.context_window("gpt-5.4") == 1_000_000
+    test "returns 1_050_000 for gpt-5.6-sol" do
+      assert Models.context_window("gpt-5.6-sol") == 1_050_000
     end
 
-    test "returns 400_000 for gpt-5.3-codex" do
-      assert Models.context_window("gpt-5.3-codex") == 400_000
+    test "returns 1_050_000 for gpt-5.6-terra" do
+      assert Models.context_window("gpt-5.6-terra") == 1_050_000
     end
 
-    test "returns 400_000 for gpt-5.2" do
-      assert Models.context_window("gpt-5.2") == 400_000
+    test "returns 1_050_000 for gpt-5.6-luna" do
+      assert Models.context_window("gpt-5.6-luna") == 1_050_000
     end
 
-    test "returns 400_000 for gpt-5.1-codex-max" do
-      assert Models.context_window("gpt-5.1-codex-max") == 400_000
+    test "returns 1_050_000 for gpt-5.5" do
+      assert Models.context_window("gpt-5.5") == 1_050_000
     end
 
-    test "returns 400_000 for gpt-5.2-codex" do
-      assert Models.context_window("gpt-5.2-codex") == 400_000
+    test "returns 1_050_000 for gpt-5.4" do
+      assert Models.context_window("gpt-5.4") == 1_050_000
     end
 
-    test "returns 400_000 for gpt-5.1-codex-mini" do
-      assert Models.context_window("gpt-5.1-codex-mini") == 400_000
+    test "returns 1_050_000 for gpt-5.4-mini" do
+      assert Models.context_window("gpt-5.4-mini") == 1_050_000
     end
 
     test "returns nil for unknown model" do
@@ -42,25 +42,20 @@ defmodule EyeInTheSky.Codex.ModelsTest do
   end
 
   describe "context_percent/2" do
-    test "calculates 25.0% for gpt-5.4 with 250_000 tokens" do
-      assert Models.context_percent("gpt-5.4", 250_000) == 25.0
+    test "calculates ~9.5% for gpt-5.4 with 100_000 tokens" do
+      assert Models.context_percent("gpt-5.4", 100_000) == 9.5
     end
 
-    test "calculates 12.5% for gpt-5.3-codex with 50_000 tokens" do
-      assert Models.context_percent("gpt-5.3-codex", 50_000) == 12.5
-    end
-
-    test "calculates 100.0% at full context window" do
-      assert Models.context_percent("gpt-5.4", 1_000_000) == 100.0
+    test "calculates 100.0% at full context window for gpt-5.4" do
+      assert Models.context_percent("gpt-5.4", 1_050_000) == 100.0
     end
 
     test "calculates 0.0% for zero tokens" do
       assert Models.context_percent("gpt-5.4", 0) == 0.0
     end
 
-    test "rounds to one decimal place" do
-      # 1 / 400_000 * 100 = 0.00025 -> rounds to 0.0
-      assert Models.context_percent("gpt-5.2", 1) == 0.0
+    test "calculates correct percent for gpt-5.6-sol" do
+      assert Models.context_percent("gpt-5.6-sol", 105_000) == 10.0
     end
 
     test "returns nil for unknown model" do
@@ -74,35 +69,31 @@ defmodule EyeInTheSky.Codex.ModelsTest do
     test "returns nil when model is empty string" do
       assert Models.context_percent("", 1000) == nil
     end
-
-    test "calculates correct percent for gpt-5.1-codex-mini" do
-      assert Models.context_percent("gpt-5.1-codex-mini", 40_000) == 10.0
-    end
   end
 
   describe "max_output_tokens/1" do
-    test "returns 128_000 for gpt-5.3-codex" do
-      assert Models.max_output_tokens("gpt-5.3-codex") == 128_000
+    test "returns 128_000 for gpt-5.6-sol" do
+      assert Models.max_output_tokens("gpt-5.6-sol") == 128_000
     end
 
-    test "returns 128_000 for gpt-5.2" do
-      assert Models.max_output_tokens("gpt-5.2") == 128_000
+    test "returns 128_000 for gpt-5.6-terra" do
+      assert Models.max_output_tokens("gpt-5.6-terra") == 128_000
     end
 
-    test "returns 128_000 for gpt-5.1-codex-max" do
-      assert Models.max_output_tokens("gpt-5.1-codex-max") == 128_000
+    test "returns 128_000 for gpt-5.6-luna" do
+      assert Models.max_output_tokens("gpt-5.6-luna") == 128_000
     end
 
-    test "returns 128_000 for gpt-5.2-codex" do
-      assert Models.max_output_tokens("gpt-5.2-codex") == 128_000
+    test "returns 128_000 for gpt-5.5" do
+      assert Models.max_output_tokens("gpt-5.5") == 128_000
     end
 
-    test "returns 128_000 for gpt-5.1-codex-mini" do
-      assert Models.max_output_tokens("gpt-5.1-codex-mini") == 128_000
+    test "returns 128_000 for gpt-5.4" do
+      assert Models.max_output_tokens("gpt-5.4") == 128_000
     end
 
-    test "returns nil for gpt-5.4 (not in max output map)" do
-      assert Models.max_output_tokens("gpt-5.4") == nil
+    test "returns 128_000 for gpt-5.4-mini" do
+      assert Models.max_output_tokens("gpt-5.4-mini") == 128_000
     end
 
     test "returns nil for unknown model" do

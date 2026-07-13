@@ -14,6 +14,7 @@ defmodule EyeInTheSky.Claude.Message do
           | :error
           | :session_start
           | :result
+          | :hook_failure
 
   @type t :: %__MODULE__{
           type: message_type(),
@@ -80,5 +81,18 @@ defmodule EyeInTheSky.Claude.Message do
   """
   def result(text, metadata \\ %{}) do
     %__MODULE__{type: :result, content: text, metadata: metadata}
+  end
+
+  @doc """
+  Create a hook failure message. Content is the stderr/output from the hook.
+
+  Metadata keys: hook_name (string), exit_code (integer)
+  """
+  def hook_failure(hook_name, exit_code, stderr) do
+    %__MODULE__{
+      type: :hook_failure,
+      content: stderr,
+      metadata: %{hook_name: hook_name, exit_code: exit_code}
+    }
   end
 end

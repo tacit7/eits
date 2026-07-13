@@ -457,8 +457,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
     # Color band
     {bar_color, label_color, progress_color} =
       cond do
-        pct < 60 -> {"bg-base-content/25", "text-base-content/30", "progress-primary"}
-        pct < 85 -> {"bg-warning/70", "text-warning/70", "progress-warning"}
+        pct < 35 -> {"bg-success/70", "text-success/70", "progress-success"}
+        pct < 65 -> {"bg-warning/70", "text-warning/70", "progress-warning"}
         true -> {"bg-error/70", "text-error/70", "progress-error"}
       end
 

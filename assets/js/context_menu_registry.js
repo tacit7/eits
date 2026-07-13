@@ -261,7 +261,7 @@ export const REGISTRY = {
     {
       label: 'Copy deeplink',
       icon: 'hero-link',
-      run: (c) => c.copy(`eits://sessions/${d.ctxUuid || d.ctxId}`),
+      run: (c) => c.copy(`eits://dm/${d.ctxUuid || d.ctxId}`),
     },
     ...(d.ctxWorktree
       ? [

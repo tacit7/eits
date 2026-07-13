@@ -224,7 +224,7 @@ describe('item action contract (event + payload)', () => {
   })
 
   it('Copy deeplink still uses the uuid', () => {
-    expect(run('session', S, 'Copy deeplink').copy).toEqual(['eits://sessions/uuid-abc'])
+    expect(run('session', S, 'Copy deeplink').copy).toEqual(['eits://dm/uuid-abc'])
   })
 
   it('session Archive pushes archive_session with a numeric session_id', () => {

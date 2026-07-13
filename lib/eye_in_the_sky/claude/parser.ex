@@ -69,16 +69,27 @@ defmodule EyeInTheSky.Claude.Parser do
     parse_stream_event(event)
   end
 
-  defp parse_event(%{"type" => "assistant", "message" => %{"content" => content}}) do
+  defp parse_event(%{"type" => "assistant", "message" => %{"content" => content} = message}) do
     text = extract_text_from_content(content)
     tool_name = extract_tool_from_content(content)
 
+    # Per-turn token stats — bounded by contextWindow, unlike the result event's
+    # cumulative modelUsage which accumulates cache_read_input_tokens across turns.
+    turn_meta =
+      with model when is_binary(model) <- message["model"],
+           usage when is_map(usage) <- message["usage"] do
+        %{turn_model: model, turn_usage: usage}
+      else
+        _ -> %{}
+      end
+
     cond do
       tool_name ->
-        {:ok, Message.tool_use(tool_name, %{}, %{text: text})}
+        msg = Message.tool_use(tool_name, %{}, %{text: text})
+        {:ok, %{msg | metadata: Map.merge(msg.metadata, turn_meta)}}
 
       text != "" ->
-        {:ok, Message.text(text, false)}
+        {:ok, %{Message.text(text, false) | metadata: turn_meta}}
 
       true ->
         :skip

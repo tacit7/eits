@@ -43,6 +43,8 @@ defmodule EyeInTheSky.Claude.SDK do
 
   require Logger
 
+  @default_context_window 200_000
+
   @type ref :: reference()
   @type opts :: keyword()
 
@@ -216,16 +218,30 @@ defmodule EyeInTheSky.Claude.SDK do
 
   @impl MessageHandler
   def handle_message(message, state) do
-    send(state.caller_pid, {:claude_message, state.sdk_ref, message})
-    {:continue, state}
+    new_state = maybe_track_turn_usage(message, state)
+    send(new_state.caller_pid, {:claude_message, new_state.sdk_ref, message})
+    {:continue, new_state}
   end
+
+  # Track the last assistant message's per-turn usage so handle_result can use
+  # it instead of the cumulative modelUsage from the result event.
+  defp maybe_track_turn_usage(%Message{metadata: %{turn_model: model, turn_usage: usage}}, state)
+       when is_binary(model) and is_map(usage) do
+    Map.put(state, :last_turn_usage, {model, usage})
+  end
+
+  defp maybe_track_turn_usage(_, state), do: state
 
   @impl MessageHandler
   def handle_result(data, state) do
     %{sdk_ref: sdk_ref, caller_pid: caller_pid, session_id: session_id} = state
 
     result_text = data[:result]
-    metadata = Map.drop(data, [:result])
+    # Prefer last per-turn usage over the cumulative session totals in modelUsage.
+    # cache_read_input_tokens in modelUsage accumulates across all turns and inflates
+    # beyond contextWindow on long sessions, causing the context meter to show 100%.
+    model_usage = build_turn_model_usage(Map.get(state, :last_turn_usage), data[:model_usage])
+    metadata = data |> Map.drop([:result]) |> Map.put(:model_usage, model_usage)
     text_len = if(result_text, do: String.length(result_text), else: 0)
     duration = metadata[:duration_ms] || 0
     cost = metadata[:total_cost_usd] || 0
@@ -286,4 +302,27 @@ defmodule EyeInTheSky.Claude.SDK do
     MessageHandler.finalize_after_terminal_event(sdk_ref, final_session_id, @loop_opts)
     :ok
   end
+
+  # Build model_usage from last per-turn assistant event stats.
+  # Per-turn cache_read_input_tokens is bounded by contextWindow; the cumulative
+  # value from modelUsage in the result event grows unboundedly across turns.
+  defp build_turn_model_usage({model, turn_usage}, cumulative) do
+    ctx_window =
+      case cumulative do
+        %{^model => %{"contextWindow" => w}} when is_integer(w) -> w
+        _ -> @default_context_window
+      end
+
+    %{
+      model => %{
+        "inputTokens" => turn_usage["input_tokens"] || 0,
+        "cacheReadInputTokens" => turn_usage["cache_read_input_tokens"] || 0,
+        "cacheCreationInputTokens" => turn_usage["cache_creation_input_tokens"] || 0,
+        "outputTokens" => turn_usage["output_tokens"] || 0,
+        "contextWindow" => ctx_window
+      }
+    }
+  end
+
+  defp build_turn_model_usage(nil, cumulative), do: cumulative
 end

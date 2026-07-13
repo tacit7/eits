@@ -230,6 +230,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
       input = entry["inputTokens"] || 0
       cache_read = entry["cacheReadInputTokens"] || 0
       cache_creation = entry["cacheCreationInputTokens"] || 0
+      output = entry["outputTokens"] || 0
 
       # Claude Code reports contextWindow: 200k even for 1M models.
       # Detect 1M from the model key suffix (e.g. "claude-opus-4-7[1m]").
@@ -240,7 +241,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
           entry["contextWindow"] || @default_context_window
         end
 
-      used = input + cache_read + cache_creation
+      used = input + cache_read + cache_creation + output
 
       if used > ctx_window do
         Logger.warning(
@@ -257,7 +258,8 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     input = usage["input_tokens"] || 0
     cache_read = usage["cache_read_input_tokens"] || 0
     cache_creation = usage["cache_creation_input_tokens"] || 0
-    used = input + cache_read + cache_creation
+    output = usage["output_tokens"] || 0
+    used = input + cache_read + cache_creation + output
 
     # If usage exceeds 200k, the session must be on a 1M model
     ctx_window =

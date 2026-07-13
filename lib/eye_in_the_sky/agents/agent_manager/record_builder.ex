@@ -60,7 +60,7 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
   end
 
   defp resolve_description(opts) do
-    opts[:description] || "Agent session"
+    opts[:description] || "New Chat"
   end
 
   defp resolve_project_id(opts) do

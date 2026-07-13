@@ -1165,6 +1165,73 @@ eits agents spawn --agent setup-guardian --member-name alice --team-name builder
 
 ---
 
+## /dm/new Session Flow
+
+The `/dm/new` route provides a blank page where the user composes an opening message before a Claude session exists. Three components coordinate this pre-flight flow:
+
+### AgentManager.create_agent_without_start/1
+
+Creates agent and session DB records only. **Does not start the AgentWorker or send any prompt.** The worker starts on the first `continue_session/3` call via `SessionBridge.ensure_worker_running/2`.
+
+```elixir
+def create_agent_without_start(opts) do
+  RecordBuilder.create_records(opts)
+end
+```
+
+**Purpose:** When the user submits the opening message from `/dm/new`, the system pre-creates DB records so the session has an ID to attach the pending message to, then starts the Claude process lazily. This avoids spawning a process before the user has even typed anything.
+
+### PendingSessionMessages (`lib/eye_in_the_sky/pending_session_messages.ex`)
+
+A GenServer-backed ETS table that buffers the initial message body and send options between the LiveView handler (which stores them) and the process that actually starts the Claude worker (which consumes them).
+
+**Key properties:**
+- Table name: `:pending_session_messages`
+- TTL: 60 seconds (entries expire if not consumed)
+- Pop is atomic — `ets:take/2` retrieves and removes in a single operation
+
+**API:**
+
+| Function | Description |
+|----------|-------------|
+| `put(session_id, body, send_opts \\ [])` | Store body + opts for a session ID. Overwrites any existing entry. |
+| `pop(session_id)` | Atomically retrieve and delete. Returns `{body, send_opts}` or `nil` if absent or expired. |
+
+**Flow:**
+1. `/dm/new` LiveView's send handler calls `PendingSessionMessages.put(session_id, body, opts)`
+2. `SessionBridge.ensure_worker_running/2` is called on the first message send
+3. Worker startup path calls `PendingSessionMessages.pop(session_id)` to retrieve the initial message
+4. If nil (TTL expired), the message is dropped silently — no re-send
+
+### Sessions.Naming — Haiku Auto-Naming (`lib/eye_in_the_sky/sessions/naming.ex`)
+
+After a `/dm/new` session is created and the first message is sent, the system asynchronously calls `Sessions.Naming.try_auto_name/3` to generate a short descriptive name via `claude-haiku-4-5-20251001`.
+
+**Configuration:**
+- Model: `claude-haiku-4-5-20251001` (fast, cheap — appropriate for a background naming call)
+- Max prompt chars fed to the model: 200
+- Max name length written to DB: 60 characters
+- API timeout: 10 seconds
+
+**Key functions:**
+
+```elixir
+# Non-fatal. Only writes if the session name still equals fallback_name —
+# the WHERE clause makes the guard atomic (no TOCTOU).
+Sessions.Naming.try_auto_name(session_id, body, fallback_name)
+
+# Returns {:ok, name} or {:error, reason}. Never raises.
+Sessions.Naming.generate_name(body)
+```
+
+**Race guard:** `try_auto_name/3` uses an atomic `update_all` with a `WHERE name = ^fallback_name` condition. If the user manually renames the session between creation and the Haiku call completing, the DB write is a no-op — no clobber.
+
+**Failure modes:** All errors (no API key, HTTP error, empty response) are silently swallowed — the session just keeps its fallback name. Auto-naming is best-effort.
+
+**PubSub:** On a successful name write, `Events.broadcast_rail_session_updated/1` fires so the rail sidebar updates immediately without a page refresh.
+
+---
+
 ## PTY Session Creation
 
 Two behaviors govern how sessions are created and launched from the web UI.

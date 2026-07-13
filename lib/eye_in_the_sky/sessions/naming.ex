@@ -61,7 +61,8 @@ defmodule EyeInTheSky.Sessions.Naming do
             System.cmd(
               claude_bin,
               ["-p", prompt, "--model", @model, "--no-session-persistence"],
-              stderr_to_stdout: false
+              stderr_to_stdout: false,
+              env: [{"EITS_WORKFLOW", "0"}]
             )
           end)
 

@@ -17,12 +17,22 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   attr :session_state, :map, required: true
   attr :notify_on_stop, :boolean, default: false
   attr :overrides, :list, default: []
+  # Full merged effective (defaults ⊕ agent ⊕ session). Used when scope="session".
   attr :effective, :map, default: %{}
+  # Agent-only effective (defaults ⊕ agent, no session override). Used when scope="agent".
+  attr :agent_effective, :map, default: %{}
 
   def settings_tab(assigns) do
+    # Render inputs from the scope-appropriate effective map so agent scope shows
+    # agent-level values instead of the session-merged result.
+    scoped_effective =
+      if assigns.scope == "agent", do: assigns.agent_effective, else: assigns.effective
+
+    assigns = assign(assigns, :scoped_effective, scoped_effective)
+
     ~H"""
     <div class="space-y-4" id="dm-settings-tab">
-      <.scope_toggle scope={@scope} />
+      <.scope_toggle scope={@scope} agent={@agent} />
 
       <.subtab_nav subtab={@subtab} provider={@session.provider} />
 
@@ -33,19 +43,28 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
               scope={@scope}
               session={@session}
               session_state={@session_state}
-              notify_on_stop={@notify_on_stop}
+              effective={@scoped_effective}
               overrides={@overrides}
             />
           <% "anthropic" -> %>
-            <.anthropic_section scope={@scope} effective={@effective} />
+            <.anthropic_section scope={@scope} effective={@scoped_effective} />
           <% "openai" -> %>
-            <.openai_section scope={@scope} effective={@effective} />
+            <.openai_section scope={@scope} effective={@scoped_effective} />
+          <% _ -> %>
+            <.general_section
+              scope={@scope}
+              session={@session}
+              session_state={@session_state}
+              effective={@scoped_effective}
+              overrides={@overrides}
+            />
         <% end %>
       </div>
 
       <div class="flex items-center justify-end gap-2 pb-2">
         <button
           type="button"
+          id="dm-settings-reset"
           class="btn btn-ghost btn-xs text-base-content/60"
           phx-click="reset_dm_settings"
           phx-value-scope={@scope}
@@ -60,6 +79,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   # -- scope toggle ----------------------------------------------------------
 
   attr :scope, :string, required: true
+  attr :agent, :map, default: nil
 
   defp scope_toggle(assigns) do
     ~H"""
@@ -73,6 +93,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <div class="join">
         <button
           type="button"
+          id="dm-scope-session"
           class={[
             "join-item btn btn-sm",
             if(@scope == "session", do: "btn-primary", else: "btn-ghost")
@@ -84,9 +105,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         </button>
         <button
           type="button"
+          id="dm-scope-agent"
           class={["join-item btn btn-sm", if(@scope == "agent", do: "btn-primary", else: "btn-ghost")]}
           phx-click="dm_setting_scope"
           phx-value-scope="agent"
+          disabled={is_nil(@agent)}
         >
           Agent default
         </button>
@@ -113,13 +136,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     <div role="tablist" class="tabs tabs-bordered">
       <.subtab_button subtab={@subtab} value="general" label="General" />
       <.subtab_button
-        :if={@provider != "codex"}
+        :if={@provider == "claude"}
         subtab={@subtab}
         value="anthropic"
         label="Claude flags"
       />
       <.subtab_button
-        :if={@provider != "claude"}
+        :if={@provider == "codex"}
         subtab={@subtab}
         value="openai"
         label="Codex flags"
@@ -136,6 +159,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     ~H"""
     <button
       type="button"
+      id={"dm-subtab-#{@value}"}
       role="tab"
       class={["tab", @subtab == @value && "tab-active"]}
       phx-click="dm_setting_subtab"
@@ -146,17 +170,20 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     """
   end
 
-  # If provider doesn't match the chosen subtab, fall back to "general".
-  defp active_subtab("anthropic", "codex"), do: "general"
-  defp active_subtab("openai", "claude"), do: "general"
-  defp active_subtab(subtab, _), do: subtab
+  # Falls back to "general" when the chosen subtab is incompatible with the provider
+  # or is an unknown/nil value.
+  defp active_subtab("anthropic", provider) when provider != "claude", do: "general"
+  defp active_subtab("openai", provider) when provider != "codex", do: "general"
+  defp active_subtab(subtab, _) when subtab in ["general", "anthropic", "openai"], do: subtab
+  defp active_subtab(_, _), do: "general"
 
   # -- GENERAL ---------------------------------------------------------------
 
   attr :scope, :string, required: true
   attr :session, :map, required: true
   attr :session_state, :map, required: true
-  attr :notify_on_stop, :boolean, required: true
+  # Scope-appropriate effective map — agent-only when scope="agent", merged when scope="session".
+  attr :effective, :map, default: %{}
   attr :overrides, :list, default: []
 
   defp general_section(assigns) do
@@ -186,7 +213,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="Session halts once spend exceeds this"
         override={"max_budget_usd" in @overrides}
       >
-        <.num_input key="general.max_budget_usd" scope={@scope} value={@session_state.max_budget_usd} />
+        <.num_input
+          key="general.max_budget_usd"
+          scope={@scope}
+          value={get_in(@effective, ["general", "max_budget_usd"])}
+          step="any"
+          min="0"
+        />
       </.row>
     </.section>
 
@@ -201,7 +234,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.toggle
           key="general.show_live_stream"
           scope={@scope}
-          checked={@session_state[:show_live_stream] != false}
+          checked={get_in(@effective, ["general", "show_live_stream"]) != false}
         />
       </.row>
       <.row
@@ -212,7 +245,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.toggle
           key="general.thinking_enabled"
           scope={@scope}
-          checked={@session_state.thinking_enabled || false}
+          checked={get_in(@effective, ["general", "thinking_enabled"]) == true}
         />
       </.row>
     </.section>
@@ -225,7 +258,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="Desktop notification when the agent goes idle"
         override={"notify_on_stop" in @overrides}
       >
-        <.toggle key="general.notify_on_stop" scope={@scope} checked={@notify_on_stop} />
+        <.toggle
+          key="general.notify_on_stop"
+          scope={@scope}
+          checked={get_in(@effective, ["general", "notify_on_stop"]) == true}
+        />
       </.row>
     </.section>
     """
@@ -282,6 +319,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
           scope={@scope}
           value={setting_val(@effective, "anthropic.max_turns")}
           placeholder="No limit"
+          step="1"
+          min="1"
         />
       </.row>
       <.row
@@ -297,6 +336,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         />
       </.row>
       <.row
+        :if={@scope == "session"}
         label="From PR"
         help="--from-pr"
         description="Resumes a conversation linked to a GitHub pull request. Sessions are auto-linked when you use gh pr create while Claude is working."
@@ -687,6 +727,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     ~H"""
     <input
       type="checkbox"
+      id={"dm-setting-#{@key}"}
       class="toggle toggle-sm toggle-primary"
       checked={@checked}
       phx-click="dm_setting_update"
@@ -700,13 +741,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   attr :scope, :string, required: true
   attr :value, :any, default: nil
   attr :placeholder, :string, default: ""
+  attr :step, :string, default: "any"
+  attr :min, :string, default: "0"
 
   defp num_input(assigns) do
     ~H"""
     <input
       type="number"
-      step="0.01"
-      min="0"
+      id={"dm-setting-#{@key}"}
+      step={@step}
+      min={@min}
       value={@value}
       placeholder={@placeholder}
       phx-blur="dm_setting_update"
@@ -726,6 +770,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     ~H"""
     <input
       type="text"
+      id={"dm-setting-#{@key}"}
       value={@value}
       placeholder={@placeholder}
       phx-blur="dm_setting_update"
@@ -743,6 +788,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   defp text_area(assigns) do
     ~H"""
     <textarea
+      id={"dm-setting-#{@key}"}
       rows="2"
       phx-blur="dm_setting_update"
       phx-value-scope={@scope}
@@ -760,6 +806,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   defp select_input(assigns) do
     ~H"""
     <select
+      id={"dm-setting-#{@key}"}
       class="select select-bordered select-sm w-56 text-sm"
       phx-change="dm_setting_update"
       phx-value-scope={@scope}

@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
   use EyeInTheSkyWeb, :html
 
+  alias EyeInTheSky.Settings.JsonSettings
   alias EyeInTheSkyWeb.Components.DmPage.ActionMenu
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
   alias EyeInTheSkyWeb.Components.DmPage.Composer
@@ -70,10 +71,24 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   end
 
   def dm_page(assigns) do
+    # Compute agent-only effective settings (defaults ⊕ agent, no session override).
+    # @agent is the session struct; @agent_record is the actual agent struct.
+    agent_settings = (assigns.agent_record && assigns.agent_record.settings) || %{}
+    session_settings = (assigns.agent && assigns.agent.settings) || %{}
+
+    # Override indicators: leaf keys the session has explicitly set.
+    overrides =
+      Enum.flat_map(session_settings, fn
+        {_ns, map} when is_map(map) -> Map.keys(map)
+        _ -> []
+      end)
+
     assigns =
       assigns
       |> assign(:tabs, @tabs)
       |> update(:message_data, &normalize_message_data/1)
+      |> assign(:dm_settings_agent_effective, JsonSettings.effective_settings(agent_settings, %{}))
+      |> assign(:dm_settings_overrides, overrides)
 
     ~H"""
     <div
@@ -484,6 +499,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 session_state={@session_state}
                 notify_on_stop={@notify_on_stop}
                 effective={@dm_settings_effective}
+                agent_effective={@dm_settings_agent_effective}
+                overrides={@dm_settings_overrides}
               />
             <% _ -> %>
               <.messages_tab_content

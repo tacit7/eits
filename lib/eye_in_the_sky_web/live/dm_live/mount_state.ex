@@ -43,9 +43,17 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
         |> assign(:sidebar_project, nil)
 
       pid ->
-        socket
-        |> assign(:sidebar_tab, :dm)
-        |> assign(:sidebar_project, Projects.get_project!(pid))
+        case Projects.get_project(pid) do
+          {:ok, project} ->
+            socket
+            |> assign(:sidebar_tab, :dm)
+            |> assign(:sidebar_project, project)
+
+          {:error, _} ->
+            socket
+            |> assign(:sidebar_tab, :dm)
+            |> assign(:sidebar_project, nil)
+        end
     end
   end
 

@@ -4,13 +4,27 @@ defmodule EyeInTheSky.PendingSessionMessages do
 
   @table :pending_session_messages
   @ttl_ms 60_000
+  @sweep_interval_ms 60_000
 
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
   @impl true
   def init(_opts) do
     :ets.new(@table, [:named_table, :public, :set])
+    schedule_sweep()
     {:ok, %{}}
+  end
+
+  @impl true
+  def handle_info(:sweep, state) do
+    now = System.monotonic_time(:millisecond)
+    :ets.select_delete(@table, [{{:_, :_, :"$1"}, [{:<, :"$1", now}], [true]}])
+    schedule_sweep()
+    {:noreply, state}
+  end
+
+  defp schedule_sweep do
+    Process.send_after(self(), :sweep, @sweep_interval_ms)
   end
 
   @doc "Store body + send_opts for session_id. Overwrites any existing entry. TTL: 60s."

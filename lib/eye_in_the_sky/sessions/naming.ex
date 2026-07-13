@@ -1,6 +1,8 @@
 defmodule EyeInTheSky.Sessions.Naming do
   @moduledoc false
 
+  require Logger
+
   import Ecto.Query
   alias EyeInTheSky.{Events, Repo}
   alias EyeInTheSky.Sessions.Session
@@ -30,7 +32,15 @@ defmodule EyeInTheSky.Sessions.Naming do
            ) do
       Events.broadcast_rail_session_updated(updated_session)
     else
-      _ -> :ok
+      {:error, :no_api_key} ->
+        Logger.debug(
+          "auto-naming skipped for session #{session_id}: no ANTHROPIC_API_KEY configured"
+        )
+
+        :ok
+
+      _ ->
+        :ok
     end
   end
 

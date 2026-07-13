@@ -54,11 +54,11 @@ pct  = min(used / context_window * 100, 100.0)
 
 Rendered in `composer.ex` in the message toolbar:
 
-| pct         | Color                     |
-|-------------|---------------------------|
-| < 60%       | `text-base-content/30`    |
-| 60% – 80%   | `text-warning/70`         |
-| ≥ 80%       | `text-error/70`           |
+| pct      | Color                  |
+|----------|------------------------|
+| < 35%    | `bg-success` / green   |
+| 35–65%   | `bg-warning` / yellow  |
+| ≥ 65%    | `bg-error` / red       |
 
 Tooltip shows: `{used} / {context_window} tokens used`.
 

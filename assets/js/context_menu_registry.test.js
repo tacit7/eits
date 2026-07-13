@@ -225,12 +225,26 @@ describe('item action contract (event + payload)', () => {
     expect(run('session', S, 'Copy session ID').copy).toEqual(['42'])
   })
 
-  it('Copy deeplink still uses the uuid', () => {
-    expect(run('session', S, 'Copy deeplink').copy).toEqual(['eits://dm/uuid-abc'])
+  it('Copy link (session) uses the eits://dm/ scheme with the uuid', () => {
+    expect(run('session', S, 'Copy link').copy).toEqual(['eits://dm/uuid-abc'])
   })
 
   it('session Archive pushes archive_session with a numeric session_id', () => {
     expect(run('session', S, 'Archive').push).toEqual([['archive_session', { session_id: 42 }]])
+  })
+
+  it('task Copy link copies eits://tasks/<uuid>', () => {
+    expect(run('task', { ctxId: 'task-uuid-1', ctxIntId: '42' }, 'Copy link').copy).toEqual(['eits://tasks/task-uuid-1'])
+  })
+
+  it('task Chat with agent navigates to /dm/<session-uuid> when ctxSessionUuid is set', () => {
+    expect(
+      run('task', { ctxId: 'task-uuid-1', ctxSessionUuid: 'sess-uuid-9' }, 'Chat with agent').navigate
+    ).toEqual(['/dm/sess-uuid-9'])
+  })
+
+  it('task Chat with agent is absent when ctxSessionUuid is not set', () => {
+    expect(itemsFor('task', { ctxId: 'task-uuid-1' }, false).some((i) => i.label === 'Chat with agent')).toBe(false)
   })
 
   it('task Move-to child pushes move_task with a stringified state_id', () => {

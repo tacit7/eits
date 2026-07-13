@@ -259,7 +259,7 @@ export const REGISTRY = {
     { sep: true },
     { label: 'Copy session ID', icon: 'hero-document-duplicate', run: (c) => c.copy(String(d.ctxId)) },
     {
-      label: 'Copy deeplink',
+      label: 'Copy link',
       icon: 'hero-link',
       run: (c) => c.copy(`eits://dm/${d.ctxUuid || d.ctxId}`),
     },
@@ -296,7 +296,10 @@ export const REGISTRY = {
       })),
     },
     { sep: true },
-    { label: 'Copy task ID', icon: 'hero-document-duplicate', run: (c) => c.copy(d.ctxIntId || d.ctxId) },
+    { label: 'Copy link', icon: 'hero-document-duplicate', run: (c) => c.copy(`eits://tasks/${d.ctxId}`) },
+    ...(d.ctxSessionUuid
+      ? [{ label: 'Chat with agent', icon: 'hero-chat-bubble-left-ellipsis', run: (c) => c.navigate(`/dm/${d.ctxSessionUuid}`) }]
+      : []),
     { sep: true },
     {
       label: 'Delete task',

@@ -114,6 +114,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                   data-ctx="task"
                   data-ctx-id={task.uuid || to_string(task.id)}
                   data-ctx-int-id={task.id}
+                  data-ctx-session-uuid={case task.sessions do [s | _] -> s.uuid; _ -> nil end}
                   {if col_idx == 0,
                     do: %{
                       "data-vim-list-item" => "",

@@ -52,6 +52,13 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
         case result do
           {:ok, session} ->
             Events.session_started(session)
+
+            if body = params["description"] do
+              Task.start(fn ->
+                EyeInTheSky.Sessions.Naming.try_auto_name(session.id, body, session.name)
+              end)
+            end
+
             {:ok, %{session: session, agent: agent}}
 
           {:error, changeset} ->

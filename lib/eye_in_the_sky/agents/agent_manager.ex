@@ -38,6 +38,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   """
   def create_pty_session(opts) do
     with {:ok, %{agent: agent, session: session}} <- RecordBuilder.create_records(opts) do
+      maybe_auto_name(session, opts)
       session_key = "dm-#{session.uuid}"
 
       {:ok, pty_pid} =
@@ -84,7 +85,10 @@ defmodule EyeInTheSky.Agents.AgentManager do
   The worker starts on the first `continue_session/3` call via SessionBridge.ensure_worker_running/2.
   """
   def create_agent_without_start(opts) do
-    RecordBuilder.create_records(opts)
+    with {:ok, %{agent: agent, session: session}} <- RecordBuilder.create_records(opts) do
+      maybe_auto_name(session, opts)
+      {:ok, %{agent: agent, session: session}}
+    end
   end
 
   @doc """
@@ -103,6 +107,7 @@ defmodule EyeInTheSky.Agents.AgentManager do
   """
   def create_agent(opts) do
     with {:ok, %{agent: agent, session: session}} <- RecordBuilder.create_records(opts) do
+      maybe_auto_name(session, opts)
       instructions = InstructionBuilder.build(opts)
 
       Logger.info("📤 create_agent: sending initial message to session.id=#{session.id}")
@@ -134,6 +139,19 @@ defmodule EyeInTheSky.Agents.AgentManager do
           mark_agent_failed(agent)
           {:error, {:send_failed, reason}}
       end
+    end
+  end
+
+  defp maybe_auto_name(session, opts) do
+    body = opts[:instructions] || opts[:description]
+
+    if is_binary(body) && body != "" do
+      session_id = session.id
+      fallback = session.name
+
+      Task.start(fn ->
+        EyeInTheSky.Sessions.Naming.try_auto_name(session_id, body, fallback)
+      end)
     end
   end
 

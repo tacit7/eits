@@ -110,7 +110,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           "#{get_in(metadata, ["usage", "output_tokens"])} out",
         metadata["duration_ms"] &&
           "#{:erlang.float_to_binary(metadata["duration_ms"] * 1.0 / 1000, decimals: 1)}s",
-        metadata["num_turns"] && "#{metadata["num_turns"]} turns"
+        metadata["num_turns"] && "#{metadata["num_turns"]} turns",
+        cache_hit_text(metadata["usage"])
       ]
       |> Enum.reject(&is_nil/1)
 
@@ -118,6 +119,25 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   end
 
   defp format_metrics(_), do: ""
+
+  # Returns a cache hit annotation like "💾 30%" when there's a meaningful
+  # cache read percentage, nil otherwise. Only shown when cache_read > 0 so
+  # cold-cache turns don't clutter the metrics line.
+  defp cache_hit_text(nil), do: nil
+
+  defp cache_hit_text(usage) when is_map(usage) do
+    read = usage["cache_read_input_tokens"] || 0
+    created = usage["cache_creation_input_tokens"] || 0
+    plain = usage["input_tokens"] || 0
+    total = plain + read + created
+
+    if total > 0 and read > 0 do
+      pct = round(read / total * 100)
+      "💾 #{pct}%"
+    end
+  end
+
+  defp cache_hit_text(_), do: nil
 
   # ---------------------------------------------------------------------------
   # message_attachments

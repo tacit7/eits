@@ -23,6 +23,8 @@ defmodule EyeInTheSky.Sessions.Naming do
   the DB WHERE clause makes the guard atomic (no TOCTOU).
   """
   def try_auto_name(session_id, body, fallback_name) do
+    Logger.debug("auto-naming: starting for session=#{session_id} fallback=#{inspect(fallback_name)}")
+
     with {:ok, generated_name} <- generate_name(body),
          {1, [updated_session]} <-
            Repo.update_all(
@@ -35,13 +37,23 @@ defmodule EyeInTheSky.Sessions.Naming do
              ),
              set: [name: generated_name]
            ) do
+      Logger.info("auto-naming: session=#{session_id} named #{inspect(generated_name)}")
       Events.broadcast_rail_session_updated(updated_session)
     else
       {:error, :no_binary} ->
         Logger.debug("auto-naming skipped for session #{session_id}: claude binary not found")
         :ok
 
-      _ ->
+      {:error, reason} ->
+        Logger.warning("auto-naming failed for session=#{session_id}: #{inspect(reason)}")
+        :ok
+
+      {0, _} ->
+        Logger.debug("auto-naming: session=#{session_id} name already changed, skipping write")
+        :ok
+
+      other ->
+        Logger.warning("auto-naming: unexpected result for session=#{session_id}: #{inspect(other)}")
         :ok
     end
   end
@@ -54,6 +66,7 @@ defmodule EyeInTheSky.Sessions.Naming do
         {:error, :no_binary}
 
       {:ok, claude_bin} ->
+        Logger.debug("auto-naming: using binary #{claude_bin}")
         prompt = @prompt_template <> String.slice(body, 0, @max_prompt_chars)
 
         task =

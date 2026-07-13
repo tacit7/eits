@@ -25,7 +25,10 @@ defmodule EyeInTheSky.Sessions.Naming do
          {1, [updated_session]} <-
            Repo.update_all(
              from(s in Session,
-               where: s.id == ^session_id and s.name == ^fallback_name,
+               where:
+                 s.id == ^session_id and
+                   ((is_nil(^fallback_name) and is_nil(s.name)) or
+                    (not is_nil(^fallback_name) and s.name == ^fallback_name)),
                select: s
              ),
              set: [name: generated_name]

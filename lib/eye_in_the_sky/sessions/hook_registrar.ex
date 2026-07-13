@@ -29,7 +29,7 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
         session_attrs = %{
           uuid: session_uuid,
           agent_id: agent.id,
-          name: params["name"],
+          name: params["name"] || "New Chat",
           description: params["description"],
           status: "working",
           started_at: DateTime.utc_now(),

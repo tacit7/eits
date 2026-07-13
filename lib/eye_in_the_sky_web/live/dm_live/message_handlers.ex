@@ -64,9 +64,10 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
             Logger.info("Message forwarded to AgentManager for session=#{session_id}")
             UploadHelpers.persist_upload_attachments(uploaded_files, message.id)
 
-            if socket.assigns.session.name == "New Chat" do
+            if socket.assigns.session.name in ["New Chat", nil] do
+              fallback = socket.assigns.session.name
               Task.start(fn ->
-                EyeInTheSky.Sessions.Naming.try_auto_name(session_id, full_body, "New Chat")
+                EyeInTheSky.Sessions.Naming.try_auto_name(session_id, full_body, fallback)
               end)
             end
 

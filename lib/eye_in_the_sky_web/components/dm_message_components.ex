@@ -71,14 +71,28 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         text -> text
       end
 
-    assigns = assign(assigns, :metrics_text, metrics_text)
+    cache_pct = cache_hit_pct(get_in(assigns.message.metadata || %{}, ["usage"]))
+
+    assigns =
+      assigns
+      |> assign(:metrics_text, metrics_text)
+      |> assign(:cache_pct, cache_pct)
 
     ~H"""
-    <%= if @metrics_text != "" do %>
-      <div class="mt-1 px-1">
-        <span class="text-[11px] font-mono tabular-nums text-base-content/40">
-          {@metrics_text}
-        </span>
+    <%= if @metrics_text != "" or @cache_pct do %>
+      <div class="mt-1 px-1 flex items-center gap-0">
+        <%= if @metrics_text != "" do %>
+          <span class="text-[11px] font-mono tabular-nums text-base-content/40">
+            {@metrics_text}
+          </span>
+        <% end %>
+        <%= if @cache_pct do %>
+          <span class="inline-flex items-center gap-0.5 text-[11px] font-mono tabular-nums text-base-content/40">
+            <%= if @metrics_text != "" do %> · <% end %>
+            <.icon name="hero-circle-stack" class="size-3" />
+            {@cache_pct}%
+          </span>
+        <% end %>
       </div>
     <% end %>
     """
@@ -110,8 +124,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
           "#{get_in(metadata, ["usage", "output_tokens"])} out",
         metadata["duration_ms"] &&
           "#{:erlang.float_to_binary(metadata["duration_ms"] * 1.0 / 1000, decimals: 1)}s",
-        metadata["num_turns"] && "#{metadata["num_turns"]} turns",
-        cache_hit_text(metadata["usage"])
+        metadata["num_turns"] && "#{metadata["num_turns"]} turns"
       ]
       |> Enum.reject(&is_nil/1)
 
@@ -120,24 +133,23 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
   defp format_metrics(_), do: ""
 
-  # Returns a cache hit annotation like "💾 30%" when there's a meaningful
-  # cache read percentage, nil otherwise. Only shown when cache_read > 0 so
-  # cold-cache turns don't clutter the metrics line.
-  defp cache_hit_text(nil), do: nil
+  # Returns the cache hit percentage as an integer (e.g. 30) when
+  # cache_read_input_tokens > 0, nil otherwise. Used by message_metrics/1
+  # to render the hero-circle-stack icon + percentage inline.
+  defp cache_hit_pct(nil), do: nil
 
-  defp cache_hit_text(usage) when is_map(usage) do
+  defp cache_hit_pct(usage) when is_map(usage) do
     read = usage["cache_read_input_tokens"] || 0
     created = usage["cache_creation_input_tokens"] || 0
     plain = usage["input_tokens"] || 0
     total = plain + read + created
 
     if total > 0 and read > 0 do
-      pct = round(read / total * 100)
-      "💾 #{pct}%"
+      round(read / total * 100)
     end
   end
 
-  defp cache_hit_text(_), do: nil
+  defp cache_hit_pct(_), do: nil
 
   # ---------------------------------------------------------------------------
   # message_attachments

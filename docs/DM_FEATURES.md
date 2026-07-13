@@ -3150,3 +3150,199 @@ All Anthropic/OpenAI settings inputs now use `setting_val`:
 **Files:**
 - `lib/eye_in_the_sky_web/components/dm_page.ex` — DmPage component passes `dm_settings_effective`
 - `lib/eye_in_the_sky_web/components/dm_page/settings_tab.ex` — SettingsTab receives `effective` attr, all subsections and inputs use `setting_val` helper
+
+---
+
+## Session Auto-Naming
+
+**Commits:** `89f5ca56` (merge), `33106b6a`
+
+When a new session is created from `/dm/new`, the session is automatically named based on the user's opening message using Haiku, mirroring the Tauri desktop app naming lifecycle.
+
+### Flow
+
+1. User clicks **+** on the sessions flyout → navigates to `/dm/new?project_id=X`
+2. User types a first message and submits the form
+3. `MessageHandlers.do_spawn_new_session/2` runs:
+   - Sets `fallback_name = String.slice(body, 0, 60)` (first 60 chars of the message)
+   - Creates agent + session records via `AgentManager.create_agent_without_start/1` (DB records only — no worker started yet)
+   - Stores `{body, send_opts}` in `PendingSessionMessages` ETS store (60 s TTL, atomic `pop/1`)
+   - Fires `Task.start` to run `Sessions.Naming.try_auto_name/3` asynchronously
+   - `push_navigate` to `/dm/:session_id`
+4. `DmLive` mounts on `/dm/:session_id`, `handle_params/3` pops `{body, send_opts}` from `PendingSessionMessages` and sends `{:auto_send, body, send_opts}` to self
+5. `handle_info({:auto_send, body, send_opts})` merges `send_opts` into `:session_cli_opts` and calls `MessageHandlers.handle_send_message/2` — this starts the `AgentWorker`
+6. Concurrently, `try_auto_name/3` calls the Anthropic API and writes the generated name back
+
+### Naming Module (`Sessions.Naming`)
+
+**File:** `lib/eye_in_the_sky/sessions/naming.ex`
+
+| Field | Value |
+|-------|-------|
+| Model | `claude-haiku-4-5-20251001` |
+| Prompt window | First 200 chars of opening message |
+| Max name length | 60 chars |
+| Max tokens (response) | 20 |
+| API timeout | 10 s |
+| Auth | `ANTHROPIC_API_KEY` env var (non-fatal if absent) |
+
+**System prompt:**
+```
+You are a chat-session namer. Output ONLY a short descriptive name
+(3–6 words, noun-preferring, no quotes, no markdown, no trailing punctuation).
+Nothing else — just the name on a single line.
+```
+
+**Atomic write guard:** `try_auto_name/3` uses a `WHERE name = fallback_name` clause in `Repo.update_all`. If the user renames the session before Haiku responds, the update is a no-op — no TOCTOU race.
+
+**Non-fatal:** Any error path (missing API key, network timeout, API error, empty response) is silently swallowed via `else _ -> :ok`. The session retains the fallback name (first 60 chars of opening message) on failure.
+
+**PubSub:** On a successful write, `Events.broadcast_rail_session_updated/1` fires, updating the session name in the rail flyout in real time.
+
+### PendingSessionMessages (`EyeInTheSky.PendingSessionMessages`)
+
+**File:** `lib/eye_in_the_sky/pending_session_messages.ex`
+
+ETS-backed one-shot store that bridges the gap between session creation (on `/dm/new`) and the first message send (after navigate to `/dm/:id`). Prevents the message body from living in the URL.
+
+| Function | Behavior |
+|----------|----------|
+| `put(session_id, body, send_opts)` | Stores `{body, send_opts}` with 60 s TTL |
+| `pop(session_id)` | Atomic `:ets.take` — returns `{body, send_opts}` or `nil`, consumed once |
+
+`send_opts` carries `eits_workflow: "0"` plus any session-level CLI opts the user had active (plan mode, sandbox, etc.).
+
+### Why No Worker on Create
+
+`create_agent_without_start/1` calls only `RecordBuilder.create_records/1` — it does not start an `AgentWorker`. The worker starts on the first `continue_session/3` call inside `handle_send_message`, which runs after the navigate. This avoids a race where the worker would start with no message to process.
+
+**Files:**
+- `lib/eye_in_the_sky/sessions/naming.ex` — Haiku API call, atomic DB write, PubSub broadcast
+- `lib/eye_in_the_sky/pending_session_messages.ex` — ETS one-shot store, 60 s TTL
+- `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex` — `do_spawn_new_session/2`, `:new` handler
+- `lib/eye_in_the_sky_web/live/dm_live.ex` — `handle_params/3` pops pending message, `handle_info({:auto_send})` sends it
+- `lib/eye_in_the_sky_web/components/new_dm_page.ex` — `/dm/new` composer UI (bottom-pinned, full controls)
+- `lib/eye_in_the_sky_web/components/rail/flyout.ex` — `+` button routes to `/dm/new?project_id=X`
+
+---
+
+## /dm/new: Blank Composer for New Sessions
+
+**Commits:** `f7220927`, `4369d4ed`, `89f5ff92`, `89f5ca56`, `368aaab9`, `927c7ea0`, `33106b6a`
+
+### Overview
+
+`/dm/new?project_id=<id>` is a blank DM page where users compose the first message before a session is created. The session is created only when the user sends, keeping the session list clean and naming the session from the opening message.
+
+### Route
+
+```
+GET /dm/new
+```
+
+Added to `router.ex`. Requires a `?project_id=<integer>` query parameter. Renders the existing `DmLive` LiveView under the `:new` action.
+
+### DmLive :new Action
+
+**File:** `lib/eye_in_the_sky_web/live/dm_live.ex`
+
+Mount clause (`mount/3`) dispatched when no `session_id` param is present:
+1. Parses `project_id` from query params
+2. Calls `Projects.get_project/1` — redirects to `/` if the project doesn't exist or the param is missing
+3. Assigns `:live_action` = `:new`, `:new_session_project_id`, and all default composer assigns via `MountState.assign_new_session_defaults/1`
+
+`handle_params/3` is a no-op for `:new` (only fires the ETS drain on `:show` navigation).
+
+`render/1` dispatches to `NewDmPage.new_dm_page/1` when `live_action == :new`.
+
+### NewDmPage Component
+
+**File:** `lib/eye_in_the_sky_web/components/new_dm_page.ex`
+
+A minimal composer-only page with no title, subtitle, or session metadata:
+- Rounded border matching the DM composer design
+- Model selector pill (reads `selected_model` from assigns)
+- Send button
+- `processing` spinner state
+
+The page intentionally has no heading — the composer floats in a blank screen, ready for input.
+
+### Send Handler: Spawning the Session
+
+**File:** `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex`
+
+`handle_send_message/2` has a new clause for `live_action: :new`:
+1. Trims the body; ignores empty sends
+2. Calls `AgentManager.create_agent_without_start/1` — creates the `Agent` + `Session` DB records without starting a Claude worker process
+3. Stores the body in `PendingSessionMessages` (ETS, 60 s TTL) keyed by `session.id`
+4. Spawns a background `Task` to auto-name the session via `Sessions.Naming.try_auto_name/3`
+5. Calls `push_navigate/2` to redirect to `/dm/<session_id>`
+
+When `DmLive` mounts for that session ID (`:show`), `handle_params/3` calls `PendingSessionMessages.pop/1`, which returns `{body, send_opts}`. A `send/2` to `self()` queues `{:auto_send, body, send_opts}`, which `handle_info/2` delivers as a normal `send_message` — this starts the Claude worker and sends the first prompt.
+
+### AgentManager.create_agent_without_start/1
+
+**File:** `lib/eye_in_the_sky/agents/agent_manager.ex`
+
+```elixir
+def create_agent_without_start(opts) do
+  RecordBuilder.create_records(opts)
+end
+```
+
+Creates the `Agent` and `Session` DB rows (same as `create_agent/1`) but does **not** start the AgentWorker. The worker is started on the first `continue_session` call via `SessionBridge.ensure_worker_running/2`, which happens when `handle_send_message` processes the `{:auto_send, ...}` message.
+
+### PendingSessionMessages ETS Store
+
+**File:** `lib/eye_in_the_sky/pending_session_messages.ex`
+
+GenServer-backed ETS table (`:pending_session_messages`) that buffers the initial message body and send opts until the session mounts and drains them.
+
+| Function | Behavior |
+|----------|----------|
+| `put(session_id, body, send_opts)` | Stores `{body, send_opts}` with a 60 s monotonic TTL; overwrites any existing entry |
+| `pop(session_id)` | Atomically deletes and returns `{body, send_opts}`, or `nil` if absent or expired |
+
+The 60 s TTL handles the case where a user navigates away before the redirect completes — the pending entry expires without leaving stale data.
+
+### Sessions.Naming: Haiku Auto-Naming
+
+**File:** `lib/eye_in_the_sky/sessions/naming.ex`
+
+Calls `claude-haiku-4-5` via the Anthropic Messages API to generate a concise 3–6 word session name from the opening message body.
+
+```
+try_auto_name(session_id, body, fallback_name)
+```
+
+- Sends the first 200 characters of `body` to Haiku with a strict system prompt: output only the name, nothing else
+- Uses an atomic `UPDATE … WHERE name = ^fallback_name` to avoid overwriting a user-edited name (no TOCTOU window)
+- Broadcasts `Events.broadcast_rail_session_updated/1` on success so the rail sidebar updates immediately
+- Silent on failure (`:no_api_key`, API error, empty response) — `fallback_name` (first 60 chars of body) stays
+
+Requires `ANTHROPIC_API_KEY` in the server environment. The renaming task runs in a detached `Task` so it never blocks the redirect.
+
+### Rail: New Session Navigation
+
+**File:** `lib/eye_in_the_sky_web/components/rail/project_actions.ex`
+
+`handle_new_session_navigate/2` checks the `dm_use_pty` setting:
+- **`true`** → creates agent immediately and navigates to `/dm/<id>` (existing fast-path)
+- **`false`** (default) → navigates to `/dm/new?project_id=<id>` (blank composer flow)
+
+This setting controls whether users land on a ready-to-talk session (PTY mode) or the blank composer first.
+
+### Files
+
+| File | Role |
+|------|------|
+| `lib/eye_in_the_sky_web/router.ex` | `GET /dm/new` route |
+| `lib/eye_in_the_sky_web/live/dm_live.ex` | `:new` mount clause, `handle_params`, `handle_info({:auto_send})`, render branch |
+| `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` | `assign_new_session_defaults/1` |
+| `lib/eye_in_the_sky_web/live/dm_live/message_handlers.ex` | `handle_send_message` `:new` clause, `do_spawn_new_session/2` |
+| `lib/eye_in_the_sky_web/components/new_dm_page.ex` | Blank composer component |
+| `lib/eye_in_the_sky/agents/agent_manager.ex` | `create_agent_without_start/1` |
+| `lib/eye_in_the_sky/pending_session_messages.ex` | ETS body buffer GenServer |
+| `lib/eye_in_the_sky/sessions/naming.ex` | Haiku auto-naming via Anthropic API |
+| `lib/eye_in_the_sky_web/components/rail/project_actions.ex` | `handle_new_session_navigate/2` routing |
+| `test/eye_in_the_sky_web/live/dm_live_new_test.exs` | LiveView + PendingSessionMessages + Naming tests |

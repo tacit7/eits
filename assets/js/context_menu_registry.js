@@ -85,7 +85,7 @@ export const REGISTRY = {
         : [
             { label: 'Open', icon: 'hero-arrow-up-right', run: (c) => c.push('file_open', { path: d.ctxPath }) },
             {
-              label: 'Open in External Editor',
+              label: `Open in ${d.ctxEditorLabel || 'External Editor'}`,
               icon: 'hero-code-bracket',
               run: (c) => c.push('open_file_in_editor', { path: d.ctxPath }),
             },

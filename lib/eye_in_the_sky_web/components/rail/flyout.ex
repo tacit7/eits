@@ -62,6 +62,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
   attr :flyout_file_children, :map, default: %{}
   attr :flyout_file_error, :string, default: nil
   attr :flyout_usage, :any, default: nil
+  attr :preferred_editor_label, :string, default: "External Editor"
 
   def flyout(assigns) do
     ~H"""
@@ -331,6 +332,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 file_children={@flyout_file_children}
                 file_error={@flyout_file_error}
                 sidebar_project={@sidebar_project}
+                preferred_editor_label={@preferred_editor_label}
               />
             <% nil -> %>
               <%!-- transient nil state during restore_rail_state round-trip; render nothing --%>

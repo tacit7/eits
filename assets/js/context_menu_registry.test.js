@@ -92,11 +92,13 @@ describe('item action contract (event + payload)', () => {
   it('file: directories have no Open/Open-in-editor/Rename, files do', () => {
     const dir = itemsFor('file', { ctxPath: 'src', ctxIsDir: 'true' }, false)
     const file = itemsFor('file', { ctxPath: 'src/app.js', ctxIsDir: undefined }, false)
+    const fileWithEditor = itemsFor('file', { ctxPath: 'src/app.js', ctxIsDir: undefined, ctxEditorLabel: 'VS Code' }, false)
     expect(dir.some((i) => i.label === 'Open')).toBe(false)
-    expect(dir.some((i) => i.label === 'Open in External Editor')).toBe(false)
+    expect(dir.some((i) => i.label?.startsWith('Open in'))).toBe(false)
     expect(dir.some((i) => i.label === 'Rename…')).toBe(false)
     expect(file.some((i) => i.label === 'Open')).toBe(true)
     expect(file.some((i) => i.label === 'Open in External Editor')).toBe(true)
+    expect(fileWithEditor.some((i) => i.label === 'Open in VS Code')).toBe(true)
     expect(file.some((i) => i.label === 'Rename…')).toBe(true)
   })
 

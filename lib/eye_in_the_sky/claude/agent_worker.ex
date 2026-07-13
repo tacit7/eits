@@ -359,6 +359,16 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     {:noreply, state}
   end
 
+  # Session init data arrived — store in session settings for the Tools tab
+  @impl true
+  def handle_info(
+        {:claude_session_init, ref, data},
+        %__MODULE__{sdk_ref: ref} = state
+      ) do
+    WorkerEvents.on_session_init(state.session_id, data)
+    {:noreply, state}
+  end
+
   # Other SDK messages (text deltas, tool use, thinking, etc.) - broadcast for live streaming
   @impl true
   def handle_info({:claude_message, ref, %Message{} = msg}, %__MODULE__{sdk_ref: ref} = state) do
@@ -475,6 +485,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
 
   @impl true
   def handle_info({:claude_error, _ref, _reason}, state), do: {:noreply, state}
+
+  @impl true
+  def handle_info({:claude_session_init, _ref, _data}, state), do: {:noreply, state}
 
   @impl true
   def handle_info(:retry_start, %__MODULE__{status: :retry_wait, queue: [_ | _]} = state) do

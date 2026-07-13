@@ -56,8 +56,21 @@ defmodule EyeInTheSky.Claude.Parser do
     {:session_id, session_id}
   end
 
-  defp parse_event(%{"type" => "system", "subtype" => "init", "session_id" => session_id}) do
-    {:session_id, session_id}
+  defp parse_event(%{"type" => "system", "subtype" => "init", "session_id" => session_id} = event) do
+    data = %{
+      "session_id" => session_id,
+      "tools" => event["tools"] || [],
+      "plugins" => event["plugins"] || [],
+      "agents" => event["agents"] || [],
+      "skills" => event["skills"] || [],
+      "mcp_servers" => event["mcp_servers"] || [],
+      "model" => event["model"],
+      "permission_mode" => event["permissionMode"],
+      "fast_mode_state" => event["fast_mode_state"],
+      "claude_code_version" => event["claudeCodeVersion"] || event["claude_code_version"]
+    }
+
+    {:session_init, data}
   end
 
   defp parse_event(%{

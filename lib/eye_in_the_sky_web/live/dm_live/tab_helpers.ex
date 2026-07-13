@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
 
   import Phoenix.Component, only: [assign: 3]
 
-  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Tasks}
+  alias EyeInTheSky.{Commits, Contexts, Messages, Notes, Sessions, Tasks}
   alias EyeInTheSkyWeb.DmLive.MessageGrouper
   alias EyeInTheSkyWeb.Live.Shared.SafeStreamHelper
   alias EyeInTheSkyWeb.Live.Shared.SessionHelpers
@@ -116,6 +116,17 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
         case Contexts.get_session_context(session_id) do
           {:ok, ctx} -> ctx
           {:error, :not_found} -> nil
+        end
+      end)
+    )
+    |> assign(
+      :session_init_data,
+      maybe_load_tab_data(tab, "tools", socket.assigns[:session_init_data], fn ->
+        # Re-read from DB to get the freshest cli_init snapshot. The worker
+        # stores init data in session.settings["cli_init"] on every job start.
+        case Sessions.get_session(session_id) do
+          {:ok, session} -> (session.settings || %{})["cli_init"]
+          _ -> nil
         end
       end)
     )

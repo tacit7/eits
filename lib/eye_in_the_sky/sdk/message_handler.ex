@@ -369,6 +369,12 @@ defmodule EyeInTheSky.SDK.MessageHandler do
       {:session_id, sid} ->
         {:cont, module.on_session_id(sid, state)}
 
+      {:session_init, data} ->
+        sid = data["session_id"]
+        new_state = if sid, do: module.on_session_id(sid, state), else: state
+        send(caller_pid, {:claude_session_init, sdk_ref, data})
+        {:cont, new_state}
+
       {:result, data} ->
         # handle_result is responsible for calling finalize_after_terminal_event,
         # which drains remaining output lines and calls stop_and_unregister.

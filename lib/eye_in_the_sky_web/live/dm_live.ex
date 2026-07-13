@@ -888,6 +888,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         dm_settings_effective={@dm_settings_effective}
         syncing={@syncing}
         session_cli_opts={@session_cli_opts}
+        session_init_data={@session_init_data}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

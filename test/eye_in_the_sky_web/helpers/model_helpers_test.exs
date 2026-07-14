@@ -216,8 +216,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
   # ---------------------------------------------------------------------------
 
   describe "default_model_for/1" do
-    test "\"codex\" returns gpt-5.5" do
-      assert ModelHelpers.default_model_for("codex") == "gpt-5.5"
+    test "\"codex\" returns gpt-5.6-sol" do
+      assert ModelHelpers.default_model_for("codex") == "gpt-5.6-sol"
     end
 
     test "\"claude\" returns claude-opus-4-8" do
@@ -347,17 +347,18 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       refute Enum.any?(entries, & &1.premium?)
     end
 
-    test "gpt-5.5, gpt-5.4, gpt-5.4-mini are primary; rest are legacy", %{entries: entries} do
+    test "gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna are primary; rest are legacy", %{entries: entries} do
       by_slug = Map.new(entries, &{&1.slug, &1})
-      assert by_slug["gpt-5.5"].legacy? == false
-      assert by_slug["gpt-5.4"].legacy? == false
-      assert by_slug["gpt-5.4-mini"].legacy? == false
-      assert by_slug["gpt-5.3-codex"].legacy? == true
-      assert by_slug["gpt-5.1-codex-max"].legacy? == true
+      assert by_slug["gpt-5.6-sol"].legacy? == false
+      assert by_slug["gpt-5.6-terra"].legacy? == false
+      assert by_slug["gpt-5.6-luna"].legacy? == false
+      assert by_slug["gpt-5.5"].legacy? == true
+      assert by_slug["gpt-5.4"].legacy? == true
+      assert by_slug["gpt-5.4-mini"].legacy? == true
     end
 
-    test "default is gpt-5.5", %{entries: entries} do
-      assert [%{slug: "gpt-5.5"}] = Enum.filter(entries, & &1.default?)
+    test "default is gpt-5.6-sol", %{entries: entries} do
+      assert [%{slug: "gpt-5.6-sol"}] = Enum.filter(entries, & &1.default?)
     end
   end
 

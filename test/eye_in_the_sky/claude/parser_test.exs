@@ -31,7 +31,7 @@ defmodule EyeInTheSky.Claude.ParserTest do
       assert {:session_id, "abc-123"} = Parser.parse_stream_line(line)
     end
 
-    test "system init event returns session_id tuple" do
+    test "system init event returns session_init tuple with data map" do
       line =
         Jason.encode!(%{
           "type" => "system",
@@ -39,7 +39,8 @@ defmodule EyeInTheSky.Claude.ParserTest do
           "session_id" => "abc-123"
         })
 
-      assert {:session_id, "abc-123"} = Parser.parse_stream_line(line)
+      assert {:session_init, data} = Parser.parse_stream_line(line)
+      assert data["session_id"] == "abc-123"
     end
 
     test "system event without subtype returns :skip" do

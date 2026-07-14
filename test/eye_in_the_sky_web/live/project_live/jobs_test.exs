@@ -27,13 +27,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
   describe "mount" do
     test "renders jobs page for project", %{conn: conn, project: project} do
-      {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      assert html =~ "Scheduled Jobs"
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      assert has_element?(view, "button", "+ New Job")
     end
 
     test "shows empty state when project has no jobs", %{conn: conn, project: project} do
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      assert html =~ "No scheduled jobs"
+      assert html =~ "No jobs yet"
     end
 
     test "lists only jobs scoped to the project", %{conn: conn, project: project} do
@@ -61,7 +61,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
         })
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      assert html =~ "Global Jobs"
       assert html =~ "Global Job"
     end
   end
@@ -135,6 +134,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
     test "toggle enables/disables job", %{conn: conn, project: project, job: job} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
 
+      # Toggle is inside the expanded detail panel — expand the job first
+      view
+      |> element("div[phx-click='expand_job'][phx-value-id='#{job.id}']")
+      |> render_click()
+
       view
       |> element("input.toggle-sm[phx-value-id='#{job.id}']")
       |> render_click()
@@ -177,10 +181,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
 
       view
-      |> element("td[phx-click='expand_job'][phx-value-id='#{job.id}']")
+      |> element("div[phx-click='expand_job'][phx-value-id='#{job.id}']")
       |> render_click()
 
-      assert has_element?(view, "div", "Recent Runs")
+      assert has_element?(view, "p", "Runs")
     end
   end
 

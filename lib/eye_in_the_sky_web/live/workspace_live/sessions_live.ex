@@ -122,6 +122,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
         show={@show_new_session_drawer}
         projects={@projects}
         current_project={nil}
+        workspace_id={@workspace.id}
         toggle_event="toggle_new_session_drawer"
         submit_event="create_new_session"
         title="New Agent"

@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
     """
   end
 
-  defp back_path(%{assigns: %{project: %{id: id}}}), do: ~p"/projects/#{id}/teams"
+  defp back_path(%{project: %{id: id}}), do: ~p"/projects/#{id}/teams"
   defp back_path(_), do: ~p"/"
 
   defp load_team_detail(team) do

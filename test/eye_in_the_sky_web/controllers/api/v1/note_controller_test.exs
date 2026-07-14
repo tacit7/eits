@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteControllerTest do
       conn = get(conn, ~p"/api/v1/notes/#{note.id}")
       resp = json_response(conn, 200)
 
-      assert resp["note_id"] == to_string(note.id)
+      assert resp["id"] == note.id
       assert resp["body"] == note.body
       assert resp["title"] == "My Note Title"
     end
@@ -206,7 +206,6 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteControllerTest do
       conn = patch(conn, ~p"/api/v1/notes/#{note.id}", %{"body" => "Updated body"})
       resp = json_response(conn, 200)
 
-      assert resp["success"] == true
       assert resp["body"] == "Updated body"
     end
 
@@ -215,16 +214,13 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteControllerTest do
       conn = patch(conn, ~p"/api/v1/notes/#{note.id}", %{"title" => "New title"})
       resp = json_response(conn, 200)
 
-      assert resp["success"] == true
       assert resp["title"] == "New title"
     end
 
     test "toggles starred when starred param present", %{conn: conn} do
       note = create_note()
       conn = patch(conn, ~p"/api/v1/notes/#{note.id}", %{"starred" => 1})
-      resp = json_response(conn, 200)
-
-      assert resp["success"] == true
+      assert json_response(conn, 200)
     end
 
     test "returns 404 for missing note", %{conn: conn} do

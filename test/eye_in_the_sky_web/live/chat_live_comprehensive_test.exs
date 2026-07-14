@@ -80,6 +80,14 @@ defmodule EyeInTheSkyWeb.ChatLiveComprehensiveTest do
         started_at: DateTime.utc_now() |> DateTime.to_iso8601()
       })
 
+    # Add the deterministic web UI session as a member of both channels so that
+    # send_channel_message's channel_member? check (Channels.member?) passes.
+    # Creating a channel with session_id does NOT create a ChannelMember record.
+    web_ui_session_id = Sessions.ensure_web_ui_session()
+    {:ok, web_ui_agent} = Agents.get_agent_by_uuid("00000000-0000-0000-0000-000000000001")
+    Channels.add_member(channel.id, web_ui_agent.id, web_ui_session_id)
+    Channels.add_member(channel2.id, web_ui_agent.id, web_ui_session_id)
+
     %{
       conn: conn,
       project: project,

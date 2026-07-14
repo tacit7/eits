@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
     test "search form is rendered on the page", %{conn: conn, project: project} do
       {:ok, lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
-      assert has_element?(lv, "#top-bar-generic-search")
+      assert has_element?(lv, "#prompts-top-bar-search")
     end
   end
 
@@ -79,8 +79,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
 
       {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
-      # Prompts navigate via links, not phx-click events
-      assert has_element?(lv, "a[href*='#{prompt.uuid}']")
+      # Prompt rows expose a data-ctx-path attribute with the UUID-based path.
+      # The navigate <.link> only renders in the detail panel (after select_prompt).
+      assert has_element?(lv, "[data-ctx-path*='#{prompt.uuid}']")
       assert render(lv) =~ "Clickable Prompt"
     end
   end

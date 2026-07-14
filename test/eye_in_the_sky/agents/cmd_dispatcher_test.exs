@@ -75,7 +75,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
   # dispatch_all runs synchronously in test mode (async_tasks_sync: true).
   defp dispatch(line, session_id) do
     {cmd_lines, _clean} = CmdDispatcher.extract_commands(line)
-    CmdDispatcher.dispatch_all(cmd_lines, session_id)
+    CmdDispatcher.dispatch_all(cmd_lines, session_id, nil)
   end
 
   # ---------------------------------------------------------------------------

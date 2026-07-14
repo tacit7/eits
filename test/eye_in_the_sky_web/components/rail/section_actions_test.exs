@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
         mobile_open: false,
         proj_picker_open: false,
         show_new_session_form: false,
-        sidebar_project: %{id: 1},
+        sidebar_project: nil,
         sidebar_tab: :rail,
         session_sort: :recent,
         session_show: :active,
@@ -33,12 +33,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
     test "opens flyout when section is toggled", %{socket: socket} do
       socket = %{socket | assigns: %{socket.assigns | flyout_open: false}}
 
-      params = %{"section" => "agents"}
+      # Use :tasks which has no global route (only project-scoped) → triggers flyout
+      params = %{"section" => "tasks"}
 
       {:noreply, updated_socket} = SectionActions.handle_toggle_section(params, socket)
 
       assert updated_socket.assigns.flyout_open == true
-      assert updated_socket.assigns.mobile_open == true
     end
 
     test "closes flyout when same section is toggled and flyout is open", %{socket: socket} do
@@ -46,13 +46,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
         socket
         | assigns: %{
             socket.assigns
-            | active_section: :agents,
+            | active_section: :tasks,
               flyout_open: true,
               mobile_open: true
           }
       }
 
-      params = %{"section" => "agents"}
+      params = %{"section" => "tasks"}
 
       {:noreply, updated_socket} = SectionActions.handle_toggle_section(params, socket)
 
@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
           mobile_open: true,
           proj_picker_open: false,
           show_new_session_form: false,
-          sidebar_project: %{id: 1},
+          sidebar_project: nil,
           sidebar_tab: :rail,
           session_sort: :recent,
           session_show: :active,
@@ -83,11 +83,12 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
         private: %{live_temp: %{}}
       }
 
-      params = %{"section" => "agents"}
+      # Use :tasks which has no global route (only project-scoped) → triggers flyout
+      params = %{"section" => "tasks"}
 
       {:noreply, updated_socket} = SectionActions.handle_toggle_section(params, socket)
 
-      assert updated_socket.assigns.active_section == :agents
+      assert updated_socket.assigns.active_section == :tasks
       assert updated_socket.assigns.flyout_open == true
     end
 

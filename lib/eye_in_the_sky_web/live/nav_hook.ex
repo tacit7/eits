@@ -29,9 +29,9 @@ defmodule EyeInTheSkyWeb.NavHook do
       |> Enum.map(&%{id: &1.id, name: &1.name})
 
     # live_render-embedded views (e.g. Rail) don't support :handle_params hooks
-    # because they're not mounted via live/3 in the router. Guard by the private
-    # :router key — router-mounted views always have it; embedded views don't.
-    router_mounted? = Map.get(socket.private, :router) != nil
+    # because they're not mounted via live/3 in the router. Guard by the :router
+    # struct field — router-mounted views always have it set; embedded views don't.
+    router_mounted? = socket.router != nil
 
     socket =
       socket

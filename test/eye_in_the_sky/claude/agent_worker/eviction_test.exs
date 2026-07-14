@@ -73,7 +73,11 @@ defmodule EyeInTheSky.Claude.AgentWorker.EvictionTest do
 
   describe "live worker" do
     test "a freshly started idle worker is evictable, then evict_if_parked terminates it" do
-      session_id = System.unique_integer([:positive])
+      # Use a negative session_id to avoid colliding with real DB session IDs
+      # (PostgreSQL sequences are always positive). Concurrent tests in other
+      # files register real session IDs in AgentRegistry; a positive unique_integer
+      # can overlap with them, causing a spurious "{pid, claude}" result on lookup.
+      session_id = -System.unique_integer([:positive])
       {:ok, pid} = start_idle_worker(session_id)
 
       assert [{^pid, "claude"}] = Registry.lookup(AgentRegistry, {:session, session_id})
@@ -83,8 +87,11 @@ defmodule EyeInTheSky.Claude.AgentWorker.EvictionTest do
       assert :ok = AgentWorker.evict_if_parked(pid)
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1_000
       refute Process.alive?(pid)
-      # transient + :normal exit ⇒ not restarted ⇒ deregistered
-      assert [] = Registry.lookup(AgentRegistry, {:session, session_id})
+      # transient + :normal exit ⇒ not restarted ⇒ deregistered.
+      # Registry deregistration is driven by a process monitor inside the Registry
+      # process. The test receives its :DOWN before the Registry processes its own,
+      # so poll briefly (up to 500ms) rather than asserting immediately.
+      assert poll_until(fn -> Registry.lookup(AgentRegistry, {:session, session_id}) == [] end, 500)
     end
 
     test "a dead pid reports not-evictable / busy instead of crashing the caller" do
@@ -119,5 +126,24 @@ defmodule EyeInTheSky.Claude.AgentWorker.EvictionTest do
 
   defp safe_terminate(pid) do
     if Process.alive?(pid), do: DynamicSupervisor.terminate_child(AgentSupervisor, pid)
+  end
+
+  # Poll `fun` every 10ms until it returns truthy or `timeout_ms` elapses.
+  defp poll_until(fun, timeout_ms) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    poll_loop(fun, deadline)
+  end
+
+  defp poll_loop(fun, deadline) do
+    if fun.() do
+      true
+    else
+      if System.monotonic_time(:millisecond) >= deadline do
+        false
+      else
+        Process.sleep(10)
+        poll_loop(fun, deadline)
+      end
+    end
   end
 end

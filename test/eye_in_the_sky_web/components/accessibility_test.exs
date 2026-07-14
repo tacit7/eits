@@ -45,6 +45,7 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityTest do
         name: "Test Session",
         agent_id: nil,
         project_name: "web",
+        git_worktree_path: nil,
         started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
         ended_at: nil,
         last_activity_at: nil,

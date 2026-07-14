@@ -60,11 +60,18 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       # Load projects fresh from the DB instead of trusting the host's assign —
       # hosts load projects once at mount, so a project created after mount
       # (e.g. via the rail's folder picker) never appears in the dropdown
-      # until the page reloads.
+      # until the page reloads. Scope by workspace_id when provided so that
+      # workspace-scoped hosts don't leak other workspaces' projects.
+      projects =
+        case assigns[:workspace_id] do
+          nil -> Projects.list_projects_for_sidebar()
+          workspace_id -> Projects.list_projects_for_workspace(workspace_id)
+        end
+
       {:ok,
        socket
        |> assign(Map.put(assigns, :available_agents, available_agents))
-       |> assign(:projects, Projects.list_projects_for_sidebar())}
+       |> assign(:projects, projects)}
     end
   end
 

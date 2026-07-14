@@ -195,10 +195,10 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         text: text,
         metadata: metadata,
         channel_id: channel_id,
-        source_uuid: source_uuid,
-        job_context: job_context
-      })
+        source_uuid: source_uuid
+      } = params)
       when is_binary(text) do
+    job_context = Map.get(params, :job_context)
     if String.trim(text) in ["", "[NO_RESPONSE]"] do
       Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
     else

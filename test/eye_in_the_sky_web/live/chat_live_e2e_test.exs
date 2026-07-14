@@ -49,6 +49,11 @@ defmodule EyeInTheSkyWeb.ChatLiveE2ETest do
         session_id: web_execution_agent.id
       })
 
+    # send_channel_message checks Channels.member? (ChannelMember table).
+    # Creating a channel with session_id does NOT create a ChannelMember record —
+    # must add explicitly so the web UI session can send messages.
+    Channels.add_member(channel.id, web_chat_agent.id, web_execution_agent.id)
+
     %{
       conn: conn,
       project: project,

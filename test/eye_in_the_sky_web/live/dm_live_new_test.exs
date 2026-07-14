@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Live.DmLiveNewTest do
       {:ok, _view, html} = live(conn, "/dm/new?project_id=#{project.id}")
 
       assert html =~ "New conversation"
-      assert html =~ ~s(id="new-session-composer")
+      assert html =~ ~s(id="message-form")
     end
 
     test "shows default model name", %{conn: conn} do
@@ -154,6 +154,7 @@ defmodule EyeInTheSkyWeb.Live.DmLiveNewTest do
   # ── Sessions.Naming unit tests ──────────────────────────────────────────
 
   describe "Sessions.Naming.generate_name/1" do
+    @tag :host_dependent
     test "returns {:error, :no_api_key} when ANTHROPIC_API_KEY is empty" do
       original = System.get_env("ANTHROPIC_API_KEY")
 
@@ -184,6 +185,11 @@ defmodule EyeInTheSkyWeb.Live.DmLiveNewTest do
       assert reloaded.name == "My Manual Name"
     end
 
+    # This test expects empty ANTHROPIC_API_KEY to prevent Claude naming.
+    # On dev machines, Claude CLI uses Max plan OAuth and ignores the empty key,
+    # so naming succeeds and the assertion fails. Tag host_dependent so it only
+    # runs in CI environments where the claude binary is absent.
+    @tag :host_dependent
     test "updates name when current name still equals fallback", %{session: session} do
       {:ok, session} = Sessions.update_session(session, %{name: "initial fallback"})
 

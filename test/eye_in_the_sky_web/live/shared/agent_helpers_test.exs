@@ -43,14 +43,14 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentHelpersTest do
   # ---------------------------------------------------------------------------
 
   describe "handle_start_agent_for_task/2" do
-    test "raises for unknown task_id" do
-      # get_task_by_uuid_or_id! is not rescued inside the function — it propagates.
+    test "sets error flash for unknown task_id" do
       project = project_fixture()
       socket = build_socket(project)
 
-      assert_raise Ecto.NoResultsError, fn ->
+      {:noreply, result_socket} =
         AgentHelpers.handle_start_agent_for_task(%{"task_id" => "99999999"}, socket)
-      end
+
+      assert result_socket.assigns.flash["error"] == "Task not found"
     end
 
     test "always returns {:noreply, socket} tuple for a valid task" do

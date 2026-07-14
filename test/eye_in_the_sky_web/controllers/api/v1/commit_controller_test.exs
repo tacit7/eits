@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
     test "filters by agent_id", %{conn: conn} do
       agent = create_agent()
       session = create_session(agent)
-      commit = create_commit(session)
+      commit = create_commit(session, %{agent_id: agent.id})
 
       conn = get(conn, ~p"/api/v1/commits?agent_id=#{agent.uuid}")
       resp = json_response(conn, 200)

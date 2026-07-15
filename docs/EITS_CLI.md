@@ -173,7 +173,9 @@ eits sessions create --session-id <uuid> [--name <n>] [--description <d>] \
 eits sessions update <uuid> [--status <s>] [--intent <text>] \
   [--entrypoint <e>] [--name <name>] [--description <desc>] \
   [--clear-entrypoint] [--ended-at <ISO8601>] \
-  [--worktree-path <path>]
+  [--worktree-path <path>] \
+  [--model <raw-model-string>] [--model-name <name>] \
+  [--model-provider <provider>] [--model-version <version>]
 
 eits sessions end <uuid> [--final-status <completed|failed|waiting>]
 
@@ -210,6 +212,8 @@ eits sessions reopen [<uuid|self>]
 `--parent` is independent and can combine with any other filter.
 
 `sessions get <uuid>` returns a rich response that includes the session, linked tasks, notes (last 5, body truncated), and commits (last 5) in a single call.
+
+`sessions update` model flags: `--model` sets the raw model string as reported by the CLI (e.g. `claude-opus-4-5`). `--model-name` is the authoritative structured name used for display. `--model-provider` sets the provider (e.g. `anthropic`, `openai`). `--model-version` sets the version string. All four map directly to the corresponding fields in the REST PATCH body.
 
 ---
 

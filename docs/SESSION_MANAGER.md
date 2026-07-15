@@ -522,7 +522,8 @@ def register_from_hook(params, project_id)
 2. **Parse model info** — Extracts model provider and name via `ModelInfo.parse_model_string/1`
 3. **Create session** — Calls either `Sessions.create_session_with_model/1` or `Sessions.create_session/1` depending on whether model_name was parsed
 4. **Fire event** — On success, fires `Events.session_started/1` for downstream listeners
-5. **Return result** — Returns `{:ok, %{session: session, agent: agent}}` on success, or `{:error, :agent | :session, changeset}` on failure
+5. **Trigger auto-naming** — If `params["description"]` is present, spawns a `Task.start` to call `Sessions.Naming.try_auto_name/3` asynchronously (commit a15ffb70)
+6. **Return result** — Returns `{:ok, %{session: session, agent: agent}}` on success, or `{:error, :agent | :session, changeset}` on failure
 
 **Error handling:**
 - Returns `{:error, :agent, changeset}` if agent creation fails
@@ -624,7 +625,9 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 
 **Endpoints using `resolve_session/1`:**
 - `PATCH /api/v1/sessions/:uuid` — Update session status, read_only intent, and other fields (lifecycle hooks)
-  - Parameters: `status`, `status_reason`, `intent`, `read_only`, `entrypoint`, `name`, `description`
+  - Parameters: `status`, `status_reason`, `intent`, `read_only`, `entrypoint`, `name`, `description`, `model`, `model_name`, `model_provider`, `model_version`
+  - Model fields: `model` (raw model string, e.g. `"claude-opus-4-5"`), `model_name` (authoritative structured name), `model_provider` (e.g. `"anthropic"`, `"openai"`), `model_version` (version string)
+  - CLI (eitsr): `eitsr sessions update <uuid> --model <str> --model-name <str> --model-provider <str> --model-version <str>`
 - `POST /api/v1/sessions/:uuid/tool_event` — Record tool event
 - `POST /api/v1/sessions/:uuid/end` — End session with final status
 - `POST /api/v1/sessions/:uuid/complete` — Mark session completed and sync team member (NEW)
@@ -1205,7 +1208,7 @@ A GenServer-backed ETS table that buffers the initial message body and send opti
 
 ### Sessions.Naming — Haiku Auto-Naming (`lib/eye_in_the_sky/sessions/naming.ex`)
 
-After a `/dm/new` session is created and the first message is sent, the system asynchronously calls `Sessions.Naming.try_auto_name/3` to generate a short descriptive name via `claude-haiku-4-5-20251001`.
+After a session is created and a first body (instructions or description) is available, the system asynchronously calls `Sessions.Naming.try_auto_name/3` to generate a short descriptive name via `claude-haiku-4-5-20251001`.
 
 **Configuration:**
 - Model: `claude-haiku-4-5-20251001` (fast, cheap — appropriate for a background naming call)
@@ -1225,6 +1228,30 @@ Sessions.Naming.generate_name(body)
 ```
 
 **Race guard:** `try_auto_name/3` uses an atomic `update_all` with a `WHERE name = ^fallback_name` condition. If the user manually renames the session between creation and the Haiku call completing, the DB write is a no-op — no clobber.
+
+**`indeterminate_datatype` fix (commit 879b2359):** The previous implementation used a single Ecto query with a combined SQL predicate (`(is_nil(^fallback_name) and is_nil(s.name)) or (not is_nil(^fallback_name) and s.name == ^fallback_name)`). PostgreSQL could not infer the type for the `^fallback_name` binding and raised `indeterminate_datatype`. The fix branches in Elixir before building the query:
+
+```elixir
+name_query =
+  if is_nil(fallback_name) do
+    from(s in Session, where: s.id == ^session_id and is_nil(s.name), select: s)
+  else
+    from(s in Session, where: s.id == ^session_id and s.name == ^fallback_name, select: s)
+  end
+
+{1, [updated_session]} <- Repo.update_all(name_query, set: [name: generated_name])
+```
+
+Each branch produces a query whose types are unambiguous to PostgreSQL.
+
+**Call sites (centralized as of commit a15ffb70, extended in bd118c38):** Auto-naming is triggered from `AgentManager`, `HookRegistrar`, and new-agent form action modules. Five paths exist:
+- `AgentManager.create_pty_session/1` — PTY sessions
+- `AgentManager.create_agent_without_start/1` — pre-flight `/dm/new` sessions
+- `AgentManager.create_agent/1` — SDK agent sessions
+- `HookRegistrar.register_from_hook/2` — startup-hook–registered sessions (uses `params["description"]`)
+- `ProjectLive.Sessions.Actions` / `WorkspaceLive.Sessions.Actions` — sessions launched from the new agent form; fires `try_auto_name` asynchronously when the form description is non-empty (commit bd118c38)
+
+All four call a private `maybe_auto_name/2` helper (or equivalent `Task.start` in HookRegistrar) and only fire when the body/description is a non-empty binary.
 
 **Failure modes:** All errors (no API key, HTTP error, empty response) are silently swallowed — the session just keeps its fallback name. Auto-naming is best-effort.
 

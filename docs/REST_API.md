@@ -91,6 +91,10 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
 | `read_only` | boolean | no | Session intent: `true` for read-only (review mode), `false` for work mode |
 | `worktree_path` | string | no | Absolute path to the git worktree for this session. Stored as `git_worktree_path` in DB. Set by agents after `git worktree add` |
+| `model` | string | no | Raw model string as reported by the Claude CLI (e.g. `"claude-opus-4-5"`). |
+| `model_name` | string | no | Structured model name — authoritative field for display and filtering (e.g. `"claude-opus-4-5"`). |
+| `model_provider` | string | no | Model provider identifier (e.g. `"anthropic"`, `"openai"`). |
+| `model_version` | string | no | Model version string (e.g. `"20250929"`). |
 
 **Response:** `200 OK`
 

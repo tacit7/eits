@@ -534,6 +534,58 @@ end
 
 ---
 
+## Logging
+
+### Log Level Convention (dev.exs)
+
+`config/dev.exs` sets the global log level to `:warning`:
+
+```elixir
+config :logger, level: :warning
+```
+
+This silences all `Logger.debug` and `Logger.info` calls in development. The rationale is noise reduction — most debug/info chatter is not useful during normal development.
+
+**Consequence:** Any log line you want visible in dev must be `Logger.warning/1` or higher.
+
+### Session Spawn Logs Must Be `Logger.warning`
+
+Session lifecycle events are operationally important and must remain visible even with the `:warning` floor. These are the current promoted callsites:
+
+| Module | Log event | Level |
+|--------|-----------|-------|
+| `SessionBridge` | `ensure_worker_running` — found existing worker | `warning` |
+| `SessionBridge` | `ensure_worker_running` — no worker found, starting new | `warning` |
+| `SessionBridge` | `start_worker` — loading session | `warning` |
+| `SessionBridge` | `start_worker` — loaded session + agent | `warning` |
+| `SessionBridge` | `spawn_worker` — started | `warning` |
+| `SessionBridge` | `spawn_worker` — already started | `warning` |
+| `SessionBridge` | `spawn_worker` — evicted parked worker | `warning` |
+| `Claude.CLI` | `[spawn]` — provider spawn | `warning` |
+| `Codex.CLI` | `[spawn]` — provider spawn | `warning` |
+| `Pi.CLI` | `[spawn]` — provider spawn | `warning` |
+
+**Rule:** Any log message in the session spawn / worker lifecycle path must use `Logger.warning`. Do not use `Logger.info` or `Logger.debug` for these — they will be silenced in dev.
+
+### Claude CLI Spawn Log Format
+
+The Claude CLI spawn log is a single line consolidating all relevant options:
+
+```
+[spawn] Claude path=<project_path> model=<model> effort=<effort_level> budget=<max_budget_usd> permission_mode=<permission_mode> args=<cli_args>
+```
+
+Example:
+```
+[warn] [spawn] Claude path=/Users/user/project model=claude-opus-4-7 effort="high" budget=nil permission_mode=nil args=--output-format stream-json --verbose
+```
+
+Previously this was two separate `Logger.info` lines (one for args, one for CLI env/telemetry). They were collapsed into a single `Logger.warning` for scanability and to survive the `:warning` level floor.
+
+**Rule:** When adding new spawn-time diagnostics for Claude, append to this single `[spawn]` line rather than adding a second log call.
+
+---
+
 ## Context Safety Patterns
 
 **Problem:** User input flowing through contexts can crash the server if not validated.
@@ -1702,6 +1754,10 @@ Key functions:
 - Worktrees reuse existing paths on repeated `prepare_session_worktree/2` calls
 - Dirty state check filters untracked files (`git status --porcelain` with `??` filter) — untracked files are irrelevant since worktrees branch from HEAD
 - Promotes agent from pending to running on successful SDK start via `promote_agent_if_pending/1` (synchronous for test sandbox safety)
+
+**Auto-Naming (centralized):** All three `AgentManager` creation paths (`create_pty_session/1`, `create_agent_without_start/1`, `create_agent/1`) call the private `maybe_auto_name/2` helper immediately after record creation. It fires `Sessions.Naming.try_auto_name/3` in an async `Task` when `opts[:instructions]` or `opts[:description]` is a non-empty string. `HookRegistrar` performs the same call for sessions registered via Claude Code hooks (using `params["description"]`).
+
+**Rule:** Do not call `Sessions.Naming.try_auto_name/3` from LiveView action modules or controllers. Auto-naming belongs in `AgentManager` and `HookRegistrar` — the two infrastructure entry points that own session creation. LiveView action modules (`ProjectLive.Sessions.Actions`, `WorkspaceLive.Sessions.Actions`) must not duplicate this logic.
 
 ---
 

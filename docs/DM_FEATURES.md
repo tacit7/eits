@@ -2248,6 +2248,129 @@ Settings handlers were extracted into a dedicated `SettingsHandlers` module (com
 - `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — initialization with effective settings computation
 - `priv/repo/migrations/20260504112139_add_settings_to_sessions_and_agents.exs` — migration adding settings JSONB columns
 
+### DmSettings: Settings-to-CLI-Opts Bridge (commits `7dea1b91`, `a9da2669`, `620532f0`)
+
+Three bug-fix commits wired effective settings all the way through to provider CLI opts, fixed scope display, and hardened the UI.
+
+**`DmSettings` module (commit `7dea1b91`):**
+
+`EyeInTheSky.Settings.DmSettings` is a new pure (no DB calls) module that converts an effective settings map into a keyword list of provider CLI opts:
+
+```elixir
+DmSettings.to_provider_opts(effective, "claude")
+# → [permission_mode: "plan", max_turns: 10, bare: true, ...]
+
+DmSettings.to_provider_opts(effective, "codex")
+# → [full_auto: false, bypass_sandbox: false, ...]
+
+DmSettings.to_provider_opts(effective, "pi")  # or any unknown provider
+# → []
+```
+
+- Claude provider: maps all `anthropic.*` keys to CLI opts (permission_mode, max_turns, fallback_model, system_prompt, bare, verbose, sandbox, skip_permissions, chrome, etc.)
+- Codex provider: maps `openai.*` keys (full_auto, bypass_sandbox, sandbox, ask_for_approval)
+- Pi and unknown providers: return `[]` (no-op)
+- `nil` settings values are filtered out; boolean `false` is preserved (important for `bypass_sandbox: false`)
+- `chrome` string `"on"/"off"` converted to `true/false`
+
+**`session_cli_opts` derived from settings (commit `7dea1b91`):**
+
+Previously `session_cli_opts` was always initialized to `[]` on mount. Now:
+- `MountState` calls `DmSettings.to_provider_opts(effective, provider)` on mount, so settings are applied immediately on page load
+- `SettingsHandlers.build_settings_assigns/4` also calls `DmSettings.to_provider_opts` after any settings change, so updated settings take effect on the next message without a remount
+
+**`bypass_sandbox` resolution bug fix (commit `7dea1b91`):**
+
+`RuntimeContext.build/3` had `bypass_sandbox: opts[:bypass_sandbox] || provider == "codex"`. Because `false || true == true`, explicitly disabling bypass for a Codex session was silently ignored. Fixed with `Keyword.fetch/2` to distinguish nil (not set) from false (explicitly disabled):
+
+```elixir
+defp resolve_bypass_sandbox(opts, provider) do
+  case Keyword.fetch(opts, :bypass_sandbox) do
+    {:ok, val} -> val       # user explicitly set it — respect false
+    :error -> provider == "codex"  # not set — default by provider
+  end
+end
+```
+
+**Scope-aware display (commit `a9da2669`):**
+
+The Settings tab now renders inputs from the correct effective map for the active scope:
+- **Session scope:** Uses the full merged effective map (defaults ⊕ agent ⊕ session)
+- **Agent scope:** Uses agent-only effective map (defaults ⊕ agent, no session overrides)
+
+Previously both scopes read from the merged effective map, so agent-scope inputs showed session-overridden values. The `dm_page.ex` component computes `dm_settings_agent_effective` (agent.settings only) and passes it alongside the merged `dm_settings_effective`. The `settings_tab` component picks `scoped_effective` based on the active scope.
+
+General section inputs (`show_live_stream`, `thinking_enabled`, `max_budget_usd`, `notify_on_stop`) were also updated to read from `scoped_effective` instead of `session_state` assigns.
+
+**Provider tab visibility fix (commit `a9da2669`):**
+
+Tab visibility conditions changed from `!= provider` to `== provider`:
+- "Claude flags" tab only shown when `provider == "claude"` (was hidden only for codex, showed for pi)
+- "Codex flags" tab only shown when `provider == "codex"` (was hidden only for claude, showed for pi)
+- Pi sessions now show only the General tab
+
+**Subtab fallback guard (commit `a9da2669`):**
+
+`active_subtab/2` now guards against nil and unknown subtabs, and provider mismatches for all three providers. A `catch-all` clause prevents `CaseClauseError`. Unknown or nil subtabs fall back to "general".
+
+**Agent scope toggle uses agent-only map (commit `620532f0`):**
+
+`SettingsHandlers.handle_setting_toggle/3` previously read the current value from `dm_settings_effective` (the merged map) regardless of scope. When scope is "agent", it now reads from `JsonSettings.effective_settings(dm_settings_agent_overrides, %{})` so the toggle flips the agent's own value, not the session-merged value.
+
+**Stable DOM IDs (commit `a9da2669`):**
+
+All interactive controls now have predictable IDs for testing and browser automation:
+- Scope buttons: `dm-scope-session`, `dm-scope-agent`
+- Subtab buttons: `dm-subtab-general`, `dm-subtab-anthropic`, `dm-subtab-openai`
+- Reset button: `dm-settings-reset`
+- All inputs/toggles/selects: `dm-setting-<dotted.key>` (e.g., `dm-setting-anthropic.permission_mode`)
+
+**Agent scope button disabled when no agent (commit `a9da2669`):**
+
+The "Agent default" scope button is `disabled` when no agent record is associated with the session.
+
+**`from_pr` row session-scoped (commit `a9da2669`):**
+
+The "From PR" row in the Claude flags subtab is only rendered when `scope == "session"`. It is hidden in agent scope because the schema restricts it to session-level writes only.
+
+**`max_turns` integer constraint (commit `a9da2669`):**
+
+The `max_turns` number input now uses `step="1" min="1"` (positive integer) instead of `step="0.01" min="0"` (float).
+
+**Codex CLI: `--full-auto` removal (commit `620532f0`):**
+
+Newer Codex versions removed `--full-auto`. The `Codex.CLI` module now expands the legacy `full_auto` setting to its current equivalent:
+- `full_auto: true` → `--sandbox workspace-write -c approval_policy="on-request"`
+- `full_auto: false` with explicit sandbox/approval → uses the provided values
+- `on-failure` approval policy (legacy) is mapped to `on-request`
+
+`DmSettings.to_provider_opts` for Codex was also extended to map `openai.sandbox` → `:sandbox` and `openai.ask_for_approval` → `:ask_for_approval`.
+
+**`extra_cli_opts` merge fix (commit `620532f0`):**
+
+Provider strategy `build_opts` functions previously concatenated `base_opts ++ optional_opts ++ extra`, so `extra_cli_opts` entries appended as duplicates instead of overriding. Changed to `Keyword.merge(base_opts ++ optional_opts, extra, ...)` with a custom resolver:
+- `:append_system_prompt`: concatenates EITS prompt and custom prompt with `\n\n`
+- All other keys: `extra_cli_opts` value wins
+
+**Test coverage:**
+- `test/eye_in_the_sky/settings/dm_settings_test.exs` — 27 unit tests for `DmSettings.to_provider_opts/2` covering Claude, Codex, and unknown providers
+- `test/eye_in_the_sky/agents/runtime_context_test.exs` — 4 tests for `bypass_sandbox` resolution including the `false || true` edge case
+- `test/eye_in_the_sky_web/live/dm_live/settings_handlers_test.exs` — 2 integration tests for `session_cli_opts` propagation after setting changes; 1 test for agent-scope toggle using agent-only map
+- `test/eye_in_the_sky_web/components/dm_page/settings_tab_test.exs` — 38 focused component tests for scope display, tab visibility, fallback subtab, stable DOM IDs
+- `test/eye_in_the_sky/claude/provider_strategy_settings_test.exs` — 2 tests verifying `extra_cli_opts` override strategy defaults for both Claude and Codex
+- `test/eye_in_the_sky/codex/cli_test.exs` — updated tests: `--full-auto` replaced with sandbox/approval-policy equivalents
+
+**Files:**
+- `lib/eye_in_the_sky/settings/dm_settings.ex` — new `DmSettings` module
+- `lib/eye_in_the_sky/agents/runtime_context.ex` — `resolve_bypass_sandbox/2` fix
+- `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — session_cli_opts from effective settings on mount
+- `lib/eye_in_the_sky_web/live/dm_live/settings_handlers.ex` — session_cli_opts updated on setting change; agent-scope toggle reads agent map
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — computes `dm_settings_agent_effective` and `dm_settings_overrides`
+- `lib/eye_in_the_sky_web/components/dm_page/settings_tab.ex` — scope-aware effective map, Pi tab fix, subtab fallback, stable IDs, from_pr guard, max_turns constraint
+- `lib/eye_in_the_sky/claude/provider_strategy/claude.ex` — `build_opts` uses `Keyword.merge` with custom resolver
+- `lib/eye_in_the_sky/claude/provider_strategy/codex.ex` — `build_opts` uses `Keyword.merge`
+- `lib/eye_in_the_sky/codex/cli.ex` — `--full-auto` replaced with `--sandbox`/approval-policy expansion
+
 ---
 
 ## DM Component Refactoring

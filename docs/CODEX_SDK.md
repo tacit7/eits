@@ -401,13 +401,50 @@ By default, all Codex sessions bypass sandbox approval checks and tooling restri
 
 2. **Codex.CLI.build_args/1**: Defaults `bypass_sandbox` option to `true`:
    ```elixir
-   if Keyword.get(opts, :bypass_sandbox, true) do
-     args ++ ["--dangerously-bypass-approvals-and-sandbox"]
-   else
-     full_auto = Keyword.get(opts, :full_auto, true)
+   cond do
+     Keyword.get(opts, :bypass_sandbox, true) ->
+       args ++ ["--dangerously-bypass-approvals-and-sandbox"]
+     full_auto ->
+       args |> add_sandbox("workspace-write") |> add_approval_policy("on-request")
+     true ->
+       args |> add_sandbox(opts[:sandbox]) |> add_approval_policy(opts[:ask_for_approval])
+   end
    ```
 
 This allows Codex agents to use file modifications, shell commands, and other restricted operations by default. To opt out (use approval requirements), explicitly pass `bypass_sandbox: false` when starting a session.
+
+### `--full-auto` Removed
+
+Current Codex releases removed the `--full-auto` shortcut flag. `Codex.CLI` now expands the legacy `:full_auto` setting to its current equivalent:
+
+- `--sandbox workspace-write` — allows the agent to read/write within the workspace
+- `-c approval_policy="on-request"` — requests approval only when the agent needs it
+
+The `:full_auto` option in `build_args/1` is computed lazily: if neither `:sandbox` nor `:ask_for_approval` is explicitly provided, `full_auto` defaults to `true` (preserving prior behavior). When `:full_auto` is explicitly `false`, neither sandbox nor approval policy flags are added, so callers must supply `:sandbox` and `:ask_for_approval` directly.
+
+The deprecated `"on-failure"` approval policy is transparently upgraded to `"on-request"` to handle legacy saved settings.
+
+### Supported `build_args/1` Options
+
+| Option | CLI flag | Notes |
+|--------|----------|-------|
+| `:bypass_sandbox` | `--dangerously-bypass-approvals-and-sandbox` | Default `true`; takes precedence over all other sandbox/approval opts |
+| `:full_auto` | Expands to `--sandbox workspace-write` + `-c approval_policy="on-request"` | Computed `true` when neither `:sandbox` nor `:ask_for_approval` is set |
+| `:sandbox` | `--sandbox <mode>` | Applied when `bypass_sandbox: false` and `full_auto: false` |
+| `:ask_for_approval` | `-c approval_policy="<policy>"` | Applied when `bypass_sandbox: false` and `full_auto: false`; `"on-failure"` is normalized to `"on-request"` |
+
+### DM-Scoped Provider Settings
+
+`DmSettings.to_provider_opts/2` maps `openai.*` keys from the DM settings store to Codex CLI keyword opts at session start time. The following keys are now forwarded:
+
+| Settings key | Keyword opt | Description |
+|--------------|-------------|-------------|
+| `openai.sandbox` | `:sandbox` | Sandbox mode (e.g. `"read-only"`, `"workspace-write"`) |
+| `openai.ask_for_approval` | `:ask_for_approval` | Approval policy (e.g. `"on-request"`, `"never"`) |
+| `openai.full_auto` | `:full_auto` | Legacy full-auto shortcut |
+| `openai.dangerously_bypass_approvals_and_sandbox` | `:bypass_sandbox` | Full bypass |
+
+These opts are merged into `extra_cli_opts` via `RuntimeContext.build/3` and forwarded through `ProviderStrategy.Codex.build_opts/2` using `Keyword.merge/2`, so DM-scoped settings override strategy defaults. The `"claude"` provider maps `anthropic.*` keys instead; unknown providers return `[]`.
 
 ## JSONL Event Types
 

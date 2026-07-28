@@ -89,6 +89,26 @@ LiveViews mount twice (disconnected + connected). Only do side effects when `con
 - timers
 - DB writes / external calls
 
+### Detecting Router-Mounted vs Embedded LiveViews
+
+Use `socket.router` (a struct field) — **not** `socket.private[:router]` (a private map lookup) — to check whether a LiveView was mounted via the router.
+
+Router-mounted views (wired through `live/3` in the router) always have `socket.router` set to the router module. Views embedded with `live_render/3` (e.g., Rail) do not — `socket.router` is `nil`.
+
+**Why this matters:** Certain hooks (e.g., `handle_params`) are only safe to attach on router-mounted views. Calling them on embedded views crashes or silently misbehaves.
+
+**Pattern (commit 0b3b6085 — NavHook):**
+
+```elixir
+# ❌ Old: private map lookup — fragile, internal API
+router_mounted? = Map.get(socket.private, :router) != nil
+
+# ✅ Correct: struct field — stable, documented
+router_mounted? = socket.router != nil
+```
+
+**Rule:** Always use `socket.router != nil` to guard router-only socket behaviour. Never read from `socket.private` for router detection.
+
 ### Safe Resource Lookups in LiveViews
 
 Use the safe `get_project/1` (returns `{:ok, project} | {:error, :not_found}`) instead of `get_project!/1` (raises) when loading resources based on user input (params, route IDs). This allows proper error handling in `mount/3` without crashing the session.

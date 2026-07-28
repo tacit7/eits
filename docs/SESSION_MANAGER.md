@@ -1259,6 +1259,24 @@ All four call a private `maybe_auto_name/2` helper (or equivalent `Task.start` i
 
 ---
 
+## NewSessionModal — Workspace-Scoped Project Dropdown
+
+`NewSessionModal` (`lib/eye_in_the_sky_web/components/new_session_modal.ex`) loads the project dropdown fresh from the DB on mount (not from the host's stale assigns). When a `workspace_id` attr is provided, it scopes the query to that workspace; when nil, it falls back to the full sidebar list:
+
+```elixir
+projects =
+  case assigns[:workspace_id] do
+    nil          -> Projects.list_projects_for_sidebar()
+    workspace_id -> Projects.list_projects_for_workspace(workspace_id)
+  end
+```
+
+`WorkspaceLive.Sessions` passes `workspace_id={@workspace.id}` to the modal so the project dropdown only shows projects belonging to the current workspace. Without this scoping, the dropdown would expose projects from other workspaces to the user.
+
+**Why fresh DB load:** Host LiveViews load projects once at mount. A project created after that mount (e.g., via the rail's folder picker) would never appear in the dropdown until the page reloads. The modal bypasses the host's stale assigns with a direct query on every open.
+
+---
+
 ## PTY Session Creation
 
 Two behaviors govern how sessions are created and launched from the web UI.

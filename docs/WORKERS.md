@@ -176,9 +176,11 @@ When an agent is spawned to handle a channel-routed prompt, its result is saved 
   - Logs error: `"DB save failed: <reason>"` (distinct message for monitoring)
 
 **Backward Compatibility:**
-- If `job_context` key is absent (callers not yet updated), falls through to normal path via matching on `not is_map_key(params, :job_context)`
-- If `job_context` is nil or missing `reply_mode`, normal path is used
-- Existing agents unaffected
+- `job_context` is optional in `on_result_received/2`. It is fetched via `Map.get(params, :job_context)` after the pattern match, so callers that do not supply it receive `nil` and fall through to the normal path — the function no longer rejects calls where `job_context` is absent.
+- If `job_context` is nil or missing `reply_mode`, normal path is used.
+- Existing agents unaffected.
+
+**Commit:** 0b3b6085 (`agent_worker_events.ex: make job_context optional in on_result_received/2`)
 
 **Code locations:**
 - `lib/eye_in_the_sky/agent_worker_events.ex` — `on_result_received/2` guard and unified `save_result/5`

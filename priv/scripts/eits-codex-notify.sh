@@ -64,7 +64,7 @@ case "$hook_event_name" in
   PreToolUse)
     # Claude parity: enforce EITS workflow on Edit/Write and run worktree guard for Bash.
     case "$tool_name" in
-      Edit|Write)
+      Edit|Write|apply_patch)
         run_hook "$SCRIPT_DIR/eits-pre-tool-use.sh"
         ;;
       Bash)
@@ -80,6 +80,9 @@ case "$hook_event_name" in
     ;;
   PreCompact)
     run_hook "$SCRIPT_DIR/eits-pre-compact.sh"
+    ;;
+  PostCompact)
+    run_hook "$SCRIPT_DIR/eits-post-compact.sh"
     ;;
   SessionEnd)
     run_hook "$SCRIPT_DIR/eits-session-end.sh"

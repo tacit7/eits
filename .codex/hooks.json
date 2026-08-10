@@ -1,70 +1,121 @@
 {
-  "SessionStart": [
-    {
-      "hooks": [
-        {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
-          "timeout": 15,
-          "statusMessage": "Updating EITS session status..."
-        }
-      ]
-    }
-  ],
-  "UserPromptSubmit": [
-    {
-      "hooks": [
-        {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
-          "timeout": 10,
-          "statusMessage": "Updating EITS session status..."
-        }
-      ]
-    }
-  ],
-  "PreToolUse": [
-    {
-      "matcher": "Bash",
-      "hooks": [
-        {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
-          "timeout": 15,
-          "statusMessage": "Checking EITS tool guard..."
-        }
-      ]
-    }
-  ],
-  "PostToolUse": [
-    {
-      "matcher": "Bash",
-      "hooks": [
-        {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
-          "timeout": 15,
-          "statusMessage": "Updating EITS tool state..."
-        }
-      ]
-    }
-  ],
-  "PreCompact": [
-    {
-      "hooks": [
-        {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
-          "timeout": 10,
-          "statusMessage": "Marking EITS session compacting..."
-        }
-      ]
-    }
-  ],
-  "Stop": [
-    {
-      "hooks": [
-        {
-          "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
-          "timeout": 30,
-          "statusMessage": "Updating EITS session status..."
-        }
-      ]
-    }
-  ]
+  "description": "Project-scoped Codex hooks for EITS lifecycle tracking and IAM guardrails.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15,
+            "statusMessage": "Updating EITS session status..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10,
+            "statusMessage": "Updating EITS session status..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15,
+            "statusMessage": "Checking EITS tool guard..."
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking EITS IAM guard..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15,
+            "statusMessage": "Updating EITS tool state..."
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking EITS IAM result..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10,
+            "statusMessage": "Marking EITS session compacting..."
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10,
+            "statusMessage": "Saving EITS compact summary..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 30,
+            "statusMessage": "Completing EITS session..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 30,
+            "statusMessage": "Updating EITS session status..."
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking EITS IAM stop policy..."
+          }
+        ]
+      }
+    ]
+  }
 }

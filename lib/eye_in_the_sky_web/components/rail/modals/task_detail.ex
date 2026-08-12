@@ -9,14 +9,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
   attr :total, :integer, required: true
 
   def task_detail_modal(assigns) do
-    task_link =
-      if assigns.task && assigns.task.project_id do
-        "/projects/#{assigns.task.project_id}/tasks?task_id=#{assigns.task.id}"
-      else
-        "/projects"
-      end
-
-    assigns = assign(assigns, :task_link, task_link)
+    assigns = assign(assigns, :task_link, task_link(assigns.task))
 
     ~H"""
     <div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
@@ -92,4 +85,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
   defp task_state_label(3), do: "Done"
   defp task_state_label(4), do: "In Review"
   defp task_state_label(_), do: "Unknown"
+
+  defp task_link(%{project_id: project_id, id: id}) when not is_nil(project_id) do
+    "/projects/#{project_id}/tasks?task_id=#{id}"
+  end
+
+  defp task_link(%{uuid: uuid}) when is_binary(uuid) and uuid != "" do
+    "/workspace/tasks?uuid=#{uuid}"
+  end
+
+  defp task_link(%{id: id}), do: "/workspace/tasks?uuid=#{id}"
 end

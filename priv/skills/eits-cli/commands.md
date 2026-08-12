@@ -10,9 +10,10 @@ eits tasks start <id>          # DEPRECATED — prints a warning; use claim inst
 eits tasks complete <id> --message "Summary" [--commit <sha>] [--commit <sha2> ...]
 eits tasks annotate <id> --body "..."
 eits tasks update <id> [--state <alias|id>] [--title "..."] [--description "..."] [--priority <p>] [--due-at <iso8601>]
-eits tasks list [--all] [-p <project>] [-s <session>] [-l <limit>] [--tag <id|name>] [-q <query>] [--mine]
+eits tasks list [--all] [-p <project>] [-s <session>] [-l <limit>] [--tag <id|name>] [--team <team_id>] [-q <query>] [--mine]
+eits tasks status --team <team_id> [-l <limit>] [--json]  # task-centric team view with linked session_ids
 eits tasks get <id>
-eits tasks create --title "..." [--description "..."] [-p <project_id>]
+eits tasks create --title "..." [--description "..."] [-p <project_id>] [--team <team_id>]
 eits tasks active [--json]     # requires session context; visibility helper: In Progress + In Review tasks for current session
 # Use --json when you need task IDs for follow-up. Note: In Review does not satisfy the write hook.
 eits tasks bulk-update --ids <id,...> [--state <alias|id>] [--priority <p>] [--title "..."]

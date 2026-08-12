@@ -1,10 +1,10 @@
 # eits CLI
 
-The eits CLI is available in two implementations: **eitsr** (Rust, Phase 1 families) and **bash eits** (comprehensive). `eitsr` is installed on PATH as the default and provides better performance, JSON-native output, and strict error handling. Bash `eits` remains available as a fallback for all other subcommands.
+The `eits` command is the Rust CLI. It provides better performance, JSON-native output, strict error handling, and owns the Phase 1 command families directly. Legacy Bash remains available as `eits-extras` for subcommands that have not been ported yet.
 
-## eitsr — Rust Implementation (Phase 1)
+## eits — Rust Implementation (Phase 1)
 
-`eitsr` is a Rust rewrite of the eits CLI covering the **Phase 1 command families**:
+`eits` is the Rust rewrite of the EITS CLI covering the **Phase 1 command families**:
 
 - `tasks` — task queries and mutations (CRUD, state transitions, tagging)
 - `dm` — direct messages (send, read, list, inbox, wait)
@@ -13,7 +13,7 @@ The eits CLI is available in two implementations: **eitsr** (Rust, Phase 1 famil
 - `notes` — note queries and mutations (list, get, create, update, add)
 - `whoami` — identity resolution (session/agent UUIDs and IDs)
 
-Any subcommand outside Phase 1 (e.g., `agents`, `projects`, `channels`, `teams`, `jobs`, `search`, `hooks`, `skills`, `worktree`) automatically falls through to bash `scripts/eits`, so `eitsr` is a drop-in superset of bash eits.
+Any subcommand outside Phase 1 (e.g., `agents`, `projects`, `channels`, `teams`, `jobs`, `search`, `hooks`, `skills`, `worktree`) automatically falls through to the legacy `eits-extras` script, so `eits` remains the single command users and agents call. The `eitsr` binary target remains as a compatibility alias during the transition.
 
 ### Output Format
 
@@ -54,21 +54,21 @@ With `--quiet`, only the ID:
 
 ### Key Differences from Bash eits
 
-1. **JSON-only stdout** — all responses are JSON (even errors); never plain text tables or shell-friendly output. Use bash eits for human-readable table output.
+1. **JSON-only stdout for Rust-owned commands** — all Rust-owned responses are JSON (even errors); never plain text tables or shell-friendly output. Legacy extras may still emit their historical formats until ported.
 
 2. **Strict config validation** — missing or malformed `EITS_URL` exits immediately with a usage error (exit 2) instead of defaulting silently.
 
 3. **Compact JSON default** — responses are one-line JSON unless `--pretty` or `EITS_PRETTY=1`. Bash eits pretty-prints by default.
 
-4. **Retries built-in** — HTTP client retries 429/503 with exponential backoff (same logic as bash eits). No separate `queue` commands needed — annotations that fail are queued locally like bash eits.
+4. **Retries built-in** — HTTP client retries 429/503 with exponential backoff. No separate `queue` commands needed — annotations that fail are queued locally like the legacy CLI.
 
-5. **No fallback for unknown flags** — `eitsr --unknown-flag` is a usage error (exit 2), not silently ignored. Bash eits may accept or ignore unknown flags depending on context.
+5. **No fallback for unknown flags** — `eits --unknown-flag` is a usage error (exit 2), not silently ignored. Legacy extras may accept or ignore unknown flags depending on context.
 
-6. **Numeric string coercion** — eitsr does NOT coerce numeric-looking strings the way bash eits does (only ID-suffixed fields are integers). This prevents ambiguity in responses.
+6. **Numeric string coercion** — Rust-owned commands do NOT coerce numeric-looking strings the way Bash did (only ID-suffixed fields are integers). This prevents ambiguity in responses.
 
 ### Environment Variables
 
-Same as bash eits. eitsr respects:
+The Rust CLI respects:
 
 ```bash
 EITS_URL                 # API endpoint (default: http://localhost:5001/api/v1)
@@ -79,17 +79,19 @@ EITS_AGENT_UUID          # Agent UUID
 EITS_PROJECT_ID          # Project context
 EITS_PRETTY=1            # Pretty-print JSON (same as --pretty flag)
 EITS_COMPACT=1           # Single-line JSON (default)
+EITS_EXTRAS              # Optional path to legacy extras executable
+EITS_CODEX_ENV_FILE      # Optional Codex session env file
 ```
 
 ### Opt-In / Cutover Strategy
 
-Agents and users may opt into `eitsr` per-session while bash eits remains the default CLI for all sessions. Internally, CLAUDE.md and example scripts are documented for eitsr; Codex and other orchestrators will migrate gradually to avoid breaking existing workflows.
+`eits` is the default command and should resolve to the Rust binary. `scripts/eits` is a Rust-first launcher for repo development, while `scripts/eits-extras` preserves the legacy Bash implementation for fallback subcommands. Installers should place the Rust binary at `~/.local/bin/eits` and the legacy fallback at `~/.local/bin/eits-extras`.
 
 ---
 
-## bash eits
+## Legacy eits-extras
 
-Bash script at `scripts/eits`. Talks to the Eye in the Sky REST API.
+Bash script at `scripts/eits-extras`. It is kept for unported command families and should be invoked by Rust fallback, not called directly for normal agent workflows.
 
 ## Setup
 
@@ -108,7 +110,7 @@ export EITS_AGENT_UUID=<agent-uuid>          # agent UUID; auto-registered by st
 export EITS_PROJECT_ID=<project-id>          # project context; required for many spawned agents; can be overridden with --project-id flag
 ```
 
-**Session Auto-Registration:** The startup hook automatically registers new sessions via `eits sessions create` for both interactive (`cli`) and headless (`sdk-cli`) agent sessions. The `eits-init` skill is a fallback for server-down scenarios only, not a mandatory initialization step. All agents use the `eits` script directly (no EITS-CMD directives).
+**Session Auto-Registration:** The startup hook automatically registers new sessions via `eits sessions create` for both interactive (`cli`) and headless (`sdk-cli`) agent sessions. The `eits-init` skill is a fallback for server-down scenarios only, not a mandatory initialization step. All agents use the `eits` command directly (no EITS-CMD directives).
 
 Requires `curl` and `jq`.
 
@@ -153,7 +155,7 @@ Each rate-limit evaluation emits a `[:eits, :rate_limit, :check]` telemetry even
 
 ## sessions
 
-**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+**Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
 eits sessions list [--search <q>] [--name <partial>] [--status <s>] \
@@ -219,16 +221,19 @@ eits sessions reopen [<uuid|self>]
 
 ## tasks
 
-**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+**Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
 # List / filter
 eits tasks list [--project <id>] [--session <uuid>] [--q <query>|--search <query>] \
   [--state <id>] [--state-name <todo|in-progress|done|in-review>] \
-  [--agent <uuid>] [--mine|--assigned] [--created-by] [--all] [--limit <n>]
+  [--agent <uuid>] [--team <id>] [--mine|--assigned] [--created-by] [--all] [--limit <n>]
+eits tasks status --team <id> [--limit <n>] [--json]
 # Default: lists current session's tasks AND scopes to current project (EITS_PROJECT_ID or path=$PWD fallback)
 # --all: bypass session scope only (list all sessions in current project; project scope always applies)
 # --project <id>: explicit project override disables implicit session scope (lists project-wide tasks)
+# --team <id>: task-centric team view; bypasses implicit session and project/path scoping and includes linked session_ids
+# tasks status --team <id>: convenience alias for a task-centric team status list
 # --mine / --assigned: tasks where current session is the active executor (linked via task_sessions after claim)
 # --created-by: tasks created by the current session (via created_by_session_id)
 #
@@ -246,10 +251,10 @@ eits tasks mine [--json]
 
 # Get
 eits tasks get <id>
-# Fetches a single task. eitsr now correctly includes server-envelope siblings
+# Fetches a single task. Rust eits now correctly includes server-envelope siblings
 # (project_id, annotations, state_id) grafted into the task object for lossless
-# normalization. Previously, these fields could read as null via eitsr but
-# correctly via bash eits (regression fix for ticket 8108).
+# normalization. Previously, these fields could read as null via Rust eits but
+# correctly via legacy eits-extras (regression fix for ticket 8108).
 
 # Create
 eits tasks create --title <t> [--description <d>] [--project <id>] \
@@ -312,7 +317,7 @@ eits tasks sessions <id>
 # Tag a task
 eits tasks tag <task_id> <tag_id>
 # Attach an existing tag to a task. Tag IDs can be listed with `eits tags list`.
-# Available in: eitsr (Rust, JSON output) and bash eits (Phase 1 port, previously missing in eitsr)
+# Available in: eits (Rust, JSON output) and legacy eits-extras (Phase 1 port, previously missing in Rust)
 
 # List workflow states
 eits tasks states
@@ -411,7 +416,7 @@ Default output groups results by entity type with headers and counts. Use `--jso
 
 ## notes
 
-**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+**Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
 eits notes list [--session <uuid>] [--task <id>] [--project <id>] \
@@ -536,11 +541,14 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 **Valid models by provider:**
 
 `--provider claude` (default):
-- claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001
+- Current known Claude slugs: claude-sonnet-5, claude-fable-5, claude-opus-4-8, claude-haiku-4-5-20251001
+- Older Claude slugs such as claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6, and claude-sonnet-4-5-20250929 remain accepted for existing sessions
 - Aliases: opus, opus[1m], sonnet, sonnet[1m], haiku
+- New Claude slugs beginning with `claude-` are accepted because provider model names change frequently
 
 `--provider codex`:
-- gpt-5.5, gpt-5.4, gpt-5.2-codex, gpt-5.1-codex-max, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2
+- Current known Codex slugs: gpt-5.6-sol, gpt-5.6-tenna, gpt-5.6-luna, gpt-5.5, gpt-5.4, gpt-5.4-mini
+- New Codex/OpenAI slugs beginning with `gpt-` are accepted because provider model names change frequently
 
 `--provider gemini`:
 - gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
@@ -553,7 +561,7 @@ eits agents spawn --instructions <text> | --instructions-file <path> \
 
 ## commits
 
-**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+**Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
 eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] \
@@ -598,7 +606,7 @@ eits jobs delete <id>
 
 ## dm
 
-**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+**Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
 eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json]
@@ -805,7 +813,7 @@ Each team member has two status fields:
 
 ## me
 
-**Available in:** eitsr (Rust, JSON output) and bash eits (table output)
+**Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
 eits me

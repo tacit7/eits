@@ -15,7 +15,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
 
   @doc """
   GET /api/v1/tasks - List tasks.
-  Query params: project_id, agent_id, session_id, q (search), limit,
+  Query params: project_id, team_id, agent_id, session_id, q (search), limit,
                 since (duration string), stale_since (duration string)
   """
   def index(conn, params) do
@@ -97,6 +97,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     case parse_int(tag_id, nil) do
       nil -> []
       tag_int_id -> Tasks.list_tasks_for_tag(tag_int_id, opts)
+    end
+  end
+
+  defp fetch_tasks_by_filter(%{"team_id" => team_id}, opts) do
+    case parse_int(team_id, nil) do
+      nil -> []
+      team_int_id -> Tasks.list_tasks_for_team_with_sessions(team_int_id, opts)
     end
   end
 
@@ -520,6 +527,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       case Sessions.get_session(int_id) do
         {:ok, session} ->
           Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
+
         {:error, :not_found} ->
           :ok
       end

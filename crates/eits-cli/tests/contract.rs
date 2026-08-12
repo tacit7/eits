@@ -1,9 +1,16 @@
 mod common;
 use assert_cmd::Command;
 
+fn scrub_codex_identity(cmd: &mut Command) -> &mut Command {
+    cmd.env_remove("EITS_CODEX_ENV_FILE")
+        .env_remove("EITS_CODEX_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID")
+        .env_remove("CODEX_SESSION_ID")
+}
+
 #[test]
 fn usage_error_is_json_envelope_exit_2() {
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .args(["tasks", "get"]) // missing required id
         .assert()
@@ -15,7 +22,7 @@ fn usage_error_is_json_envelope_exit_2() {
 
 #[test]
 fn help_is_human_text_exit_0() {
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .args(["--help"])
         .assert()
@@ -25,7 +32,7 @@ fn help_is_human_text_exit_0() {
 
 #[test]
 fn bare_invocation_is_json_usage_envelope_exit_2() {
-    let out = Command::cargo_bin("eitsr").unwrap().assert().code(2);
+    let out = Command::cargo_bin("eits").unwrap().assert().code(2);
     let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
     let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
     assert_eq!(v["code"], "usage");
@@ -33,7 +40,7 @@ fn bare_invocation_is_json_usage_envelope_exit_2() {
 
 #[test]
 fn unknown_global_flag_before_known_subcommand_is_usage_exit_2() {
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .args(["--bogus", "tasks", "list"])
         .assert()
@@ -57,7 +64,7 @@ fn help_output_matches_goldens() {
         (&["whoami", "--help"], "help_whoami.txt"),
     ];
     for (args, golden) in cases {
-        let out = Command::cargo_bin("eitsr")
+        let out = Command::cargo_bin("eits")
             .unwrap()
             .args(*args)
             .assert()
@@ -71,7 +78,7 @@ fn help_output_matches_goldens() {
 #[test]
 fn get_maps_404_to_envelope_on_stdout_exit_1() {
     let srv = common::serve(vec![(404, r#"{"error":"Task not found"}"#)]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["tasks", "get", "999"])
@@ -94,7 +101,7 @@ fn retries_503_then_succeeds_chatter_on_stderr_only() {
         (503, "{}"),
         (200, r#"{"task":{"id":1,"title":"t","state":"Done"}}"#),
     ]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_RETRY_BASE_MS", "10")
@@ -109,7 +116,7 @@ fn retries_503_then_succeeds_chatter_on_stderr_only() {
 #[test]
 fn headers_sent_only_when_env_set() {
     let srv = common::serve(vec![(200, r#"{"task":{"id":1}}"#)]);
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_SESSION_UUID", "u-123")
@@ -128,8 +135,8 @@ fn headers_sent_only_when_env_set() {
         .any(|(k, v)| k == "authorization" && v == "Bearer k"));
 
     let srv2 = common::serve(vec![(200, r#"{"task":{"id":1}}"#)]);
-    Command::cargo_bin("eitsr")
-        .unwrap()
+    let mut cmd = Command::cargo_bin("eits").unwrap();
+    scrub_codex_identity(&mut cmd)
         .env("EITS_URL", &srv2.url)
         .env_remove("EITS_SESSION_UUID")
         .env_remove("EITS_API_KEY")
@@ -152,7 +159,7 @@ fn get_normalizes_bash_style_duplicated_envelope_to_single_task_key() {
         200,
         r#"{"task":{"id":5,"title":"x"},"id":5,"title":"x"}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["tasks", "get", "5"])
@@ -172,7 +179,7 @@ fn begin_quiet_prints_bare_task_id() {
         (200, r#"{"task_id":42}"#),
         (200, r#"{"task":{"id":42,"state":"In Progress"}}"#),
     ]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env_remove("EITS_SESSION_UUID")
@@ -192,7 +199,7 @@ fn begin_accepts_string_task_id_from_server() {
         (200, r#"{"task_id":"42"}"#),
         (200, r#"{"task":{"id":42,"state":"In Progress"}}"#),
     ]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env_remove("EITS_SESSION_UUID")
@@ -205,9 +212,89 @@ fn begin_accepts_string_task_id_from_server() {
 }
 
 #[test]
+fn create_sends_team_id_when_team_flag_is_present() {
+    let srv = common::serve(vec![(201, r#"{"success":true,"task_id":"42"}"#)]);
+    let mut cmd = Command::cargo_bin("eits").unwrap();
+    let out = scrub_codex_identity(&mut cmd)
+        .env("EITS_URL", &srv.url)
+        .env("EITS_PROJECT_ID", "7")
+        .env("EITS_SESSION_ID", "99")
+        .env_remove("EITS_SESSION_UUID")
+        .args([
+            "--quiet",
+            "tasks",
+            "create",
+            "--title",
+            "Assigned team task",
+            "--team",
+            "720",
+        ])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert_eq!(stdout.trim(), "42");
+
+    let reqs = srv.finish();
+    assert_eq!(reqs.len(), 1);
+    assert_eq!(reqs[0].method, "POST");
+    assert_eq!(reqs[0].path, "/api/v1/tasks");
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(body["title"], "Assigned team task");
+    assert_eq!(body["team_id"], "720");
+    assert_eq!(body["project_id"], "7");
+    assert_eq!(body["session_id"], "99");
+}
+
+#[test]
+fn tasks_list_team_sends_team_id_without_default_session_scope() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"tasks":[{"id":8991,"title":"Fix rail","team_id":720,"session_ids":[6858]}]}"#,
+    )]);
+    let mut cmd = Command::cargo_bin("eits").unwrap();
+    let out = scrub_codex_identity(&mut cmd)
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_ID", "99")
+        .env_remove("EITS_SESSION_UUID")
+        .env_remove("EITS_PROJECT_ID")
+        .args(["tasks", "list", "--team", "720"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["items"][0]["id"], 8991);
+    assert_eq!(v["items"][0]["session_ids"][0], 6858);
+
+    let reqs = srv.finish();
+    assert_eq!(reqs[0].method, "GET");
+    assert_eq!(reqs[0].path, "/api/v1/tasks?team_id=720&limit=200");
+}
+
+#[test]
+fn tasks_status_team_uses_team_task_endpoint() {
+    let srv = common::serve(vec![(
+        200,
+        r#"{"tasks":[{"id":8991,"title":"Fix rail","team_id":720,"session_ids":[6858]}]}"#,
+    )]);
+    let out = Command::cargo_bin("eits")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["tasks", "status", "--team", "720"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["items"][0]["team_id"], 720);
+
+    let reqs = srv.finish();
+    assert_eq!(reqs[0].method, "GET");
+    assert_eq!(reqs[0].path, "/api/v1/tasks?team_id=720&limit=500");
+}
+
+#[test]
 fn complete_already_done_short_circuits_with_single_request() {
     let srv = common::serve(vec![(200, r#"{"task":{"state_id":3}}"#)]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["tasks", "complete", "5", "--message", "done"])
@@ -227,7 +314,7 @@ fn complete_already_done_short_circuits_when_state_id_is_a_string() {
     // Same class of bug as begin_accepts_string_task_id_from_server: the
     // server has been observed sending state_id as a numeric string.
     let srv = common::serve(vec![(200, r#"{"task":{"state_id":"3"}}"#)]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["tasks", "complete", "5", "--message", "done"])
@@ -246,7 +333,7 @@ fn complete_already_done_short_circuits_when_state_id_is_a_string() {
 fn annotate_failure_after_retries_queues_pending_annotation() {
     let home = tempfile::tempdir().unwrap();
     let srv = common::serve(vec![(500, "{}")]);
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_RETRY_BASE_MS", "10")
@@ -265,7 +352,7 @@ fn annotate_failure_after_retries_queues_pending_annotation() {
 
 #[test]
 fn connection_refused_exits_3() {
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", "http://127.0.0.1:1/api/v1")
         .env("EITS_RETRY_BASE_MS", "10")
@@ -281,7 +368,7 @@ fn notes_list_normalizes_results_key() {
         200,
         r#"{"success":true,"results":[{"id":1,"title":"a"},{"id":2,"title":"b"}]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env_remove("EITS_SESSION_UUID")
@@ -309,7 +396,7 @@ fn commits_list_since_time_sends_created_at_since_param_and_filters_client_side(
             {"id":2,"commit_hash":"new","inserted_at":"2099-01-01T00:00:00Z"}
         ]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["commits", "list", "--since-time", "1h"])
@@ -335,7 +422,7 @@ fn commits_list_since_time_excludes_items_missing_a_timestamp() {
         200,
         r#"{"commits":[{"id":1,"commit_hash":"no-ts"}]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["commits", "list", "--since-time", "1h"])
@@ -352,7 +439,7 @@ fn commits_create_duplicate_reports_already_tracked_exit_0() {
         200,
         r#"{"commits":[],"duplicates":[{"commit_hash":"abc123","status":"duplicate"}],"errors":[],"already_tracked":true}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args([
@@ -372,7 +459,7 @@ fn commits_create_mixed_batch_reports_partial_with_both_arrays_exit_0() {
         200,
         r#"{"commits":[{"id":9,"commit_hash":"new1","commit_message":null}],"duplicates":[{"commit_hash":"old1","status":"duplicate"}],"errors":[]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args([
@@ -394,7 +481,7 @@ fn commits_create_created_plus_errors_reports_partial_with_all_three_exit_0() {
         200,
         r#"{"commits":[{"id":9,"commit_hash":"new1","commit_message":null}],"duplicates":[],"errors":[{"hash":["is invalid"]}]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args([
@@ -416,7 +503,7 @@ fn commits_create_pure_errors_still_exits_1_validation() {
         200,
         r#"{"commits":[],"duplicates":[],"errors":[{"hash":["is invalid"]}]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["commits", "create", "--agent", "agent-1", "--hash", "bad"])
@@ -428,12 +515,32 @@ fn commits_create_pure_errors_still_exits_1_validation() {
 }
 
 #[test]
+fn commits_create_html_error_reports_json_with_commit_hint() {
+    let srv = common::serve(vec![(400, "<html><body>bad request</body></html>")]);
+    let out = Command::cargo_bin("eits")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .args(["commits", "create", "--agent", "agent-1", "--hash", "bad"])
+        .assert()
+        .code(1);
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["code"], "validation");
+    assert_eq!(v["status"], 400);
+    assert_eq!(v["error"], "server returned HTML — check server logs");
+    assert!(v["hint"]
+        .as_str()
+        .unwrap()
+        .contains("commits API returned HTML instead of JSON"));
+}
+
+#[test]
 fn notes_add_quiet_prints_bare_id() {
     let srv = common::serve(vec![(
         200,
         r#"{"id":7,"parent_type":"session","parent_id":"s-1","title":"","body":"hi","starred":false}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_SESSION_UUID", "s-1")
@@ -447,7 +554,7 @@ fn notes_add_quiet_prints_bare_id() {
 #[test]
 fn sessions_list_normalizes_from_results_key() {
     let srv = common::serve(vec![(200, r#"{"results":[{"uuid":"a-1","name":"one"}]}"#)]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_PROJECT_ID", "1")
@@ -466,7 +573,7 @@ fn sessions_list_normalizes_from_sessions_key() {
         200,
         r#"{"sessions":[{"uuid":"b-2","name":"two"},{"uuid":"b-3","name":"three"}]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_PROJECT_ID", "1")
@@ -482,7 +589,7 @@ fn sessions_list_normalizes_from_sessions_key() {
 #[test]
 fn sessions_create_quiet_prints_bare_uuid() {
     let srv = common::serve(vec![(200, r#"{"session":{"uuid":"new-uuid-1"}}"#)]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args([
@@ -500,7 +607,7 @@ fn sessions_create_quiet_prints_bare_uuid() {
 
 #[test]
 fn sessions_list_mine_and_search_is_usage_error_exit_2() {
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", "http://127.0.0.1:1")
         .env("EITS_SESSION_UUID", "s-1")
@@ -515,7 +622,7 @@ fn sessions_list_mine_and_search_is_usage_error_exit_2() {
 #[test]
 fn sessions_end_defaults_uuid_to_session_identity() {
     let srv = common::serve(vec![(200, r#"{"status":"ended"}"#)]);
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_SESSION_UUID", "self-uuid-9")
@@ -530,7 +637,7 @@ fn sessions_end_defaults_uuid_to_session_identity() {
 #[test]
 fn sessions_create_project_flag_sends_project_name_key() {
     let srv = common::serve(vec![(200, r#"{"session":{"uuid":"s-1"}}"#)]);
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args([
@@ -552,7 +659,7 @@ fn sessions_create_project_flag_sends_project_name_key() {
 #[test]
 fn sessions_update_project_id_flag_sends_project_id_key() {
     let srv = common::serve(vec![(200, r#"{"status":"ok"}"#)]);
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["sessions", "update", "s-1", "--project-id", "42"])
@@ -566,14 +673,22 @@ fn sessions_update_project_id_flag_sends_project_id_key() {
 
 #[test]
 fn sessions_get_self_resolves_to_session_uuid() {
-    let srv = common::serve(vec![(200, r#"{"uuid":"resolved-uuid"}"#)]);
-    Command::cargo_bin("eitsr")
+    let srv = common::serve(vec![(
+        200,
+        r#"{"session":{"uuid":"resolved-uuid","name":"Codex CLI"}}"#,
+    )]);
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_SESSION_UUID", "resolved-uuid")
         .args(["sessions", "get", "self"])
         .assert()
         .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["uuid"], "resolved-uuid");
+    assert_eq!(v["name"], "Codex CLI");
+    assert!(v.get("session").is_none(), "sessions get stays top-level");
     let reqs = srv.finish();
     assert_eq!(reqs[0].path, "/api/v1/sessions/resolved-uuid");
 }
@@ -581,7 +696,7 @@ fn sessions_get_self_resolves_to_session_uuid() {
 #[test]
 fn sessions_create_omits_absent_optional_fields() {
     let srv = common::serve(vec![(200, r#"{"session":{"uuid":"s-1"}}"#)]);
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["sessions", "create", "--session-id", "s-1"])
@@ -608,7 +723,7 @@ fn dm_send_holds_lock_and_times_out_when_already_locked() {
     let _ = std::fs::remove_dir(&lock_path); // clean slate in case of a prior crash
     std::fs::create_dir(&lock_path).unwrap();
 
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", "http://127.0.0.1:1/api/v1")
         .env("EITS_SESSION_UUID", identity)
@@ -629,7 +744,7 @@ fn dm_inbox_normalizes_messages_key_and_sends_from_and_limit_params() {
         200,
         r#"{"session_id":1,"count":1,"messages":[{"id":5,"from_session_id":2,"body":"hi"}]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_SESSION_UUID", "s-1")
@@ -656,7 +771,7 @@ fn dm_inbox_normalizes_messages_key_and_sends_from_and_limit_params() {
 
 #[test]
 fn dm_send_bad_metadata_is_usage_error_exit_2() {
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", "http://127.0.0.1:1/api/v1")
         .env("EITS_SESSION_UUID", "s-1")
@@ -683,7 +798,7 @@ fn dm_send_posts_exact_payload_keys_and_releases_lock_after() {
     let lock_path = std::path::PathBuf::from(format!("/tmp/eits_dm_{identity}.lock"));
     let _ = std::fs::remove_dir(&lock_path);
 
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_SESSION_UUID", identity)
@@ -708,8 +823,8 @@ fn dm_send_posts_exact_payload_keys_and_releases_lock_after() {
 
 #[test]
 fn dm_wait_requires_session() {
-    let out = Command::cargo_bin("eitsr")
-        .unwrap()
+    let mut cmd = Command::cargo_bin("eits").unwrap();
+    let out = scrub_codex_identity(&mut cmd)
         .env("EITS_URL", "http://127.0.0.1:1/api/v1")
         .env_remove("EITS_SESSION_UUID")
         .env_remove("EITS_SESSION_ID")
@@ -724,7 +839,7 @@ fn dm_wait_requires_session() {
 #[test]
 fn dm_wait_sends_session_timeout_and_since_params() {
     let srv = common::serve(vec![(200, r#"{"items":[],"count":0}"#)]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args([
@@ -757,7 +872,7 @@ fn dm_wait_defaults_session_from_identity_and_prints_arrived_dm() {
         200,
         r#"{"items":[{"id":9,"body":"hi","from_session_id":2,"to_session_id":1}],"count":1}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_SESSION_UUID", "s-1")
@@ -771,7 +886,11 @@ fn dm_wait_defaults_session_from_identity_and_prints_arrived_dm() {
 
     let reqs = srv.finish();
     assert!(reqs[0].path.contains("session=s-1"));
-    assert!(reqs[0].path.contains("timeout=25"), "default timeout: {}", reqs[0].path);
+    assert!(
+        reqs[0].path.contains("timeout=25"),
+        "default timeout: {}",
+        reqs[0].path
+    );
 }
 
 #[test]
@@ -780,7 +899,7 @@ fn sessions_archive_dry_run_lists_without_posting() {
         200,
         r#"{"sessions":[{"uuid":"a-1","name":"one","status":"waiting"},{"uuid":"a-2","name":"two","status":"waiting"}]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["sessions", "archive", "--status", "waiting", "--dry-run"])
@@ -804,7 +923,7 @@ fn tasks_get_grafts_envelope_siblings_into_task() {
         200,
         r#"{"success":true,"task":{"id":8108,"title":"t","state_id":1},"project_id":1,"annotations":[{"id":1,"body":"x"}]}"#,
     )]);
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_URL", &srv.url)
         .args(["tasks", "get", "8108"])

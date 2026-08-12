@@ -13,12 +13,16 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       title: task.title,
       description: task.description,
       priority: task.priority,
+      project_id: task.project_id,
+      team_id: task.team_id,
       state: loaded_field(task.state, :name),
       state_id: task.state_id,
-      session_id: case task.sessions do
-        sessions when is_list(sessions) -> sessions |> List.first() |> then(&(&1 && &1.id))
-        _ -> nil
-      end,
+      session_id:
+        case task.sessions do
+          sessions when is_list(sessions) -> sessions |> List.first() |> then(&(&1 && &1.id))
+          _ -> nil
+        end,
+      session_ids: task.session_ids,
       due_at: task.due_at,
       created_at: format_dt(task.created_at),
       updated_at: format_dt(task.updated_at)

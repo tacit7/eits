@@ -13,7 +13,7 @@ This skill has three files:
 - **`commands.md`** — full command syntax and flags for every subcommand
 - **`gotchas.md`** — environment issues, known bugs, and failure modes
 
-The `eits` bash script is the sole interface to the EITS REST API. It defaults to `http://localhost:5001/api/v1`; override with `EITS_URL`. All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the same `eits` script. Do not use deprecated EITS-CMD directives.
+The `eits` command is the Rust CLI and the sole interface agents should call for EITS work. It defaults to `http://localhost:5001/api/v1`; override with `EITS_URL`. All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the same `eits` command. Legacy Bash remains available only as the Rust fallback executable (`eits-extras`) for subcommands not yet ported. Do not use deprecated EITS-CMD directives.
 
 ## Live Session Context
 
@@ -95,6 +95,7 @@ If blocked:
 ```bash
 # Check what's active (use --json when you need task IDs for follow-up)
 eits tasks active --json
+eits tasks status --team <team_id> --json   # task-centric team view with linked session_ids
 
 # Start a new task
 eits tasks begin --title "Describe the work"

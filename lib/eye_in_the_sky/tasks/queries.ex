@@ -140,8 +140,8 @@ defmodule EyeInTheSky.Tasks.Queries do
   Returns team tasks with their linked session IDs from task_sessions.
   Each task has a :session_ids key with a list of session integer IDs.
   """
-  def list_tasks_for_team_with_sessions(team_id) do
-    tasks = list_tasks_for_team(team_id)
+  def list_tasks_for_team_with_sessions(team_id, opts \\ []) do
+    tasks = list_tasks_for_team(team_id, opts)
     task_ids = Enum.map(tasks, & &1.id)
 
     session_rows =

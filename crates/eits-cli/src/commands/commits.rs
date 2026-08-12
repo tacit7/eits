@@ -51,9 +51,9 @@ fn resolve_agent_id(
             return Ok(a);
         }
     }
-    if let Ok(a) = std::env::var("EITS_AGENT_UUID") {
+    if let Some(a) = &cfg.agent_uuid {
         if !a.is_empty() {
-            return Ok(a);
+            return Ok(a.to_string());
         }
     }
     if let Some(uuid) = &cfg.session_uuid {
@@ -66,7 +66,7 @@ fn resolve_agent_id(
         }
     }
     Err(EitsError::usage(
-        "agent_id is required (or set EITS_AGENT_UUID)",
+        "agent_id is required (set EITS_AGENT_UUID, EITS_CODEX_ENV_FILE, or EITS_CODEX_SESSION_ID; if the Codex session id is unknown, ask the user for it)",
     ))
 }
 
@@ -178,7 +178,15 @@ pub fn run(
             if !messages.is_empty() {
                 payload["commit_messages"] = json!(messages);
             }
-            let resp = client.post("/commits", payload)?;
+            let resp = client.post("/commits", payload).map_err(|err| {
+                if err.message.contains("server returned HTML") {
+                    err.with_hint(
+                        "commits API returned HTML instead of JSON; verify EITS_URL points at /api/v1 and check the server-side API error path",
+                    )
+                } else {
+                    err
+                }
+            })?;
 
             let commits = resp
                 .get("commits")

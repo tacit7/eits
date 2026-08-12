@@ -144,7 +144,7 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
   end
 
   defp deliver_channel_notification(session_id, sender_session_id, dm_body, channel_id) do
-    case DMDelivery.deliver_and_persist(session_id, sender_session_id, dm_body, %{
+    case DMDelivery.deliver_or_persist(session_id, sender_session_id, dm_body, %{
            channel_id: channel_id,
            channel_notification: true
          }) do
@@ -181,11 +181,10 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelMessageController do
       |> Enum.filter(fn m ->
         m.session_id &&
           m.session_id != sender_session_id &&
-          m.session &&
-          m.session.status not in Sessions.terminated_statuses()
+          m.session
       end)
       |> Enum.each(fn member ->
-        case DMDelivery.deliver_and_persist(
+        case DMDelivery.deliver_or_persist(
                member.session_id,
                sender_session_id,
                dm_body,

@@ -47,7 +47,10 @@ defmodule EyeInTheSky.Tasks do
   defdelegate list_tasks_for_sessions(session_ids), to: EyeInTheSky.Tasks.Queries
   defdelegate list_session_ids_for_task(task_id), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_for_team(team_id), to: EyeInTheSky.Tasks.Queries
-  defdelegate list_tasks_for_team_with_sessions(team_id), to: EyeInTheSky.Tasks.Queries
+
+  defdelegate list_tasks_for_team_with_sessions(team_id, opts \\ []),
+    to: EyeInTheSky.Tasks.Queries
+
   defdelegate get_current_task_for_session(session_id), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks_for_session(session_id), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_created_by_session(session_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
@@ -305,10 +308,15 @@ defmodule EyeInTheSky.Tasks do
         {:ok, count}
       end)
       |> Ecto.Multi.run(:add_new_session, fn repo, _changes ->
-        {count, _} = repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+        {count, _} =
+          repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+
         {:ok, count}
       end)
-      |> Ecto.Multi.update(:update_task, Task.changeset(task, %{state_id: in_progress_id, updated_at: now}))
+      |> Ecto.Multi.update(
+        :update_task,
+        Task.changeset(task, %{state_id: in_progress_id, updated_at: now})
+      )
       |> Ecto.Multi.run(:clear_session_intent, fn repo, _changes ->
         # Clear intent on the claiming session in the same transaction.
         # This prevents stale "done" intent from a prior task from appearing valid
@@ -391,9 +399,18 @@ defmodule EyeInTheSky.Tasks do
   def delete_task_with_associations(%Task{} = task) do
     result =
       Ecto.Multi.new()
-      |> Ecto.Multi.delete_all(:delete_task_tags, from(t in "task_tags", where: t.task_id == ^task.id))
-      |> Ecto.Multi.delete_all(:delete_task_sessions, from(t in "task_sessions", where: t.task_id == ^task.id))
-      |> Ecto.Multi.delete_all(:delete_commit_tasks, from(t in "commit_tasks", where: t.task_id == ^task.id))
+      |> Ecto.Multi.delete_all(
+        :delete_task_tags,
+        from(t in "task_tags", where: t.task_id == ^task.id)
+      )
+      |> Ecto.Multi.delete_all(
+        :delete_task_sessions,
+        from(t in "task_sessions", where: t.task_id == ^task.id)
+      )
+      |> Ecto.Multi.delete_all(
+        :delete_commit_tasks,
+        from(t in "commit_tasks", where: t.task_id == ^task.id)
+      )
       |> Ecto.Multi.delete(:delete_task, task)
       |> Repo.transaction()
 

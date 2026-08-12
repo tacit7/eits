@@ -1,6 +1,6 @@
 Task queries and mutations
 
-Usage: eitsr tasks [OPTIONS] <COMMAND>
+Usage: eits tasks [OPTIONS] <COMMAND>
 
 Commands:
   list          List tasks (session-scoped by default; pass --all to see everything)
@@ -11,6 +11,7 @@ Commands:
   annotate      Add an annotation to a task
   update        Patch task fields
   search        Full-text task search
+  status        Task-centric team status view
   states        Show workflow state ids, names, and accepted aliases
   create        Create a task without claiming it
   claim         Claim an existing task (link session + set In Progress)

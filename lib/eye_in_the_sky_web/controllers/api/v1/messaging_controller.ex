@@ -235,14 +235,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     SessionResolver.resolve(raw)
   end
 
-  # waiting = sdk-cli session ended and queued for resume; DM will be delivered on next wakeup
-  @receivable_statuses ~w(working idle waiting)
-
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:ok, from_session} <- resolve_dm_sender(from_raw),
          :ok <- check_sender_not_terminated(from_session),
-         {:ok, to_session} <- resolve_dm_receiver(to_raw),
-         :ok <- check_receiver_reachable(to_session) do
+         {:ok, to_session} <- resolve_dm_receiver(to_raw) do
       response_required = params["response_required"] in [true, "true", "1", 1]
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
@@ -266,7 +262,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       case Messages.find_recent_dm(to_session.id, dm_body, seconds: 30) do
         nil ->
-          case DMDelivery.deliver_and_persist(to_session.id, from_session.id, dm_body, metadata) do
+          delivery_result =
+            DMDelivery.deliver_or_persist(to_session.id, from_session.id, dm_body, metadata)
+
+          case delivery_result do
             {:ok, msg} ->
               maybe_send_test_message_auto_reply(from_session, to_session, params["message"])
               dm_success(conn, to_session, msg)
@@ -335,10 +334,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       {:error, :receiver_not_found} ->
         {:error, :not_found, "Target session not found"}
-
-      {:error, :receiver_not_receivable} ->
-        {:error, :unprocessable_entity,
-         "Target session is terminated (completed or failed) and cannot receive DMs"}
     end
   end
 
@@ -354,12 +349,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       {:ok, session} -> {:ok, session}
       {:error, :not_found} -> {:error, :receiver_not_found}
     end
-  end
-
-  defp check_receiver_reachable(session) do
-    if session.status in @receivable_statuses,
-      do: :ok,
-      else: {:error, :receiver_not_receivable}
   end
 
   defp dm_success(conn, to_session, msg) do

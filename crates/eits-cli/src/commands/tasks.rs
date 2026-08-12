@@ -20,6 +20,9 @@ pub enum TasksCmd {
         query: Option<String>,
         #[arg(long)]
         tag: Option<String>,
+        /// List tasks for a team id.
+        #[arg(long)]
+        team: Option<String>,
         #[arg(long)]
         mine: bool,
         #[arg(long)]
@@ -85,6 +88,17 @@ pub enum TasksCmd {
         #[arg(long)]
         state: Option<String>,
     },
+    /// Task-centric team status view
+    Status {
+        /// Team id to inspect.
+        #[arg(long)]
+        team: String,
+        #[arg(short = 'l', long)]
+        limit: Option<String>,
+        /// Accepted for parity with other task read commands; output is always JSON.
+        #[arg(short = 'j', long = "json")]
+        json_flag: bool,
+    },
     /// Show workflow state ids, names, and accepted aliases
     States,
     /// Create a task without claiming it
@@ -93,6 +107,8 @@ pub enum TasksCmd {
         title: String,
         #[arg(short = 'p', long)]
         project: Option<String>,
+        #[arg(long)]
+        team: Option<String>,
         #[arg(short = 'd', long)]
         description: Option<String>,
         #[arg(long)]
@@ -186,7 +202,7 @@ pub fn run(
             // The server's envelope carries project_id / annotations / state_id
             // as SIBLINGS of .task, not inside it — graft them into the task
             // object so normalization is lossless (found via ticket 8108: a
-            // task's project_id read as null through eitsr but 1 through bash).
+            // task's project_id read as null through eits but 1 through bash).
             let mut task = v.get("task").cloned().unwrap_or_else(|| v.clone());
             if let Some(obj) = task.as_object_mut() {
                 for key in ["project_id", "annotations", "state_id"] {
@@ -218,6 +234,7 @@ pub fn run(
             limit,
             query,
             tag,
+            team,
             mine,
             all,
             json_flag: _,
@@ -257,6 +274,10 @@ pub fn run(
                     }
                 }
             }
+            let team_flag = team.is_some();
+            if let Some(t) = &team {
+                qs.push(("team_id".into(), t.clone()));
+            }
             if let Some(q) = &query {
                 qs.push(("q".into(), uri_encode(q)));
             }
@@ -275,13 +296,13 @@ pub fn run(
                 qs.push(("session_id".into(), identity.to_string()));
             }
             // Default session scope: only when nothing else already scoped the query.
-            if !all && session.is_none() && !mine_flag && !tag_flag {
+            if !all && session.is_none() && !mine_flag && !tag_flag && !team_flag {
                 if let Some(identity) = cfg.session_identity() {
                     qs.push(("session_id".into(), identity.to_string()));
                 }
             }
             // Project default: explicit --project wins, else EITS_PROJECT_ID, else cwd.
-            if !project_flag {
+            if !project_flag && !team_flag {
                 if let Some(pid) = &cfg.project_id {
                     qs.push(("project_id".into(), pid.clone()));
                 } else if let Ok(cwd) = std::env::current_dir() {
@@ -297,6 +318,17 @@ pub fn run(
                 .collect::<Vec<_>>()
                 .join("&");
             let resp = client.get(&format!("/tasks?{query_string}"))?;
+            output::print_json(&items_and_count(&resp, &["tasks", "results"]), pretty);
+            Ok(())
+        }
+
+        TasksCmd::Status {
+            team,
+            limit,
+            json_flag: _,
+        } => {
+            let limit = limit.unwrap_or_else(|| "500".into());
+            let resp = client.get(&format!("/tasks?team_id={team}&limit={limit}"))?;
             output::print_json(&items_and_count(&resp, &["tasks", "results"]), pretty);
             Ok(())
         }
@@ -547,6 +579,7 @@ pub fn run(
         TasksCmd::Create {
             title,
             project,
+            team,
             description,
             priority,
         } => {
@@ -556,6 +589,7 @@ pub fn run(
                 "title": title,
                 "description": description.unwrap_or_default(),
                 "project_id": project_id,
+                "team_id": team,
                 "priority": priority,
                 "session_id": identity,
             });

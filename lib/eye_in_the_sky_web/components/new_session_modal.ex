@@ -40,39 +40,54 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def update(assigns, socket) do
-    # When the form is open, skip parent re-renders entirely to prevent DOM patches from
-    # disrupting the modal (e.g. PubSub-driven list updates closing the form). Only update
-    # uploads when they actually change so image previews stay current.
-    if socket.assigns[:show] && assigns[:show] do
-      new_uploads = Map.get(assigns, :file_uploads)
+    modal_open? = socket.assigns[:show] && assigns[:show]
 
-      if socket.assigns[:file_uploads] == new_uploads do
-        {:ok, socket}
-      else
-        {:ok, assign(socket, :file_uploads, new_uploads)}
+    project_path = if assigns[:current_project], do: assigns[:current_project].path
+
+    available_agents =
+      cond do
+        Map.has_key?(assigns, :available_agents) ->
+          assigns.available_agents
+
+        modal_open? ->
+          socket.assigns[:available_agents]
+
+        true ->
+          Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
       end
-    else
-      project_path = if assigns[:current_project], do: assigns[:current_project].path
 
-      available_agents =
-        Map.get_lazy(assigns, :available_agents, fn -> list_agents(project_path) end)
+    file_uploads = Map.get(assigns, :file_uploads)
 
-      # Load projects fresh from the DB instead of trusting the host's assign —
-      # hosts load projects once at mount, so a project created after mount
-      # (e.g. via the rail's folder picker) never appears in the dropdown
-      # until the page reloads. Scope by workspace_id when provided so that
-      # workspace-scoped hosts don't leak other workspaces' projects.
-      projects =
-        case assigns[:workspace_id] do
-          nil -> Projects.list_projects_for_sidebar()
-          workspace_id -> Projects.list_projects_for_workspace(workspace_id)
-        end
+    # Load projects fresh from the DB instead of trusting the host's assign —
+    # hosts load projects once at mount, so a project created after mount
+    # (e.g. via the rail's folder picker) never appears in the dropdown
+    # until the page reloads. Scope by workspace_id when provided so that
+    # workspace-scoped hosts don't leak other workspaces' projects.
+    projects =
+      case assigns[:workspace_id] do
+        nil -> Projects.list_projects_for_sidebar()
+        workspace_id -> Projects.list_projects_for_workspace(workspace_id)
+      end
 
-      {:ok,
-       socket
-       |> assign(Map.put(assigns, :available_agents, available_agents))
-       |> assign(:projects, projects)}
-    end
+    socket =
+      socket
+      |> assign(assigns |> Map.delete(:available_agents) |> Map.delete(:file_uploads))
+      |> assign(:available_agents, available_agents)
+      |> assign(:projects, projects)
+
+    socket =
+      case Map.has_key?(assigns, :file_uploads) do
+        false ->
+          socket
+
+        true when modal_open? and socket.assigns[:file_uploads] == file_uploads ->
+          socket
+
+        true ->
+          assign(socket, :file_uploads, file_uploads)
+      end
+
+    {:ok, socket}
   end
 
   @impl true

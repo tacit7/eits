@@ -183,4 +183,44 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
       refute render(view) =~ "not-a-real-model"
     end
   end
+
+  describe "update/2" do
+    test "merges parent updates while preserving open modal state" do
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{
+          __changed__: %{},
+          show: true,
+          toggle_event: "toggle_new_session",
+          submit_event: "create_session",
+          prompts: [],
+          projects: [%{id: 1, name: "Original Project"}],
+          current_project: nil,
+          available_agents: [{"local-agent", "Local Agent", :global}],
+          selected_model: "claude-sonnet-4-6",
+          selected_provider: "claude",
+          selected_prompt_id: "prompt-1",
+          prefill_text: "Existing prompt text",
+          file_uploads: %{agent_images: %{entries: [], ref: "old-ref"}}
+        }
+      }
+
+      new_uploads = %{agent_images: %{entries: [%{client_name: "shot.png"}], ref: "new-ref"}}
+
+      {:ok, result_socket} =
+        NewSessionModal.update(
+          %{
+            show: true,
+            button_text: "Launch from refresh",
+            current_project: %{id: 2, name: "Updated Project", path: "/tmp/updated"},
+            file_uploads: new_uploads
+          },
+          socket
+        )
+
+      assert result_socket.assigns.button_text == "Launch from refresh"
+      assert result_socket.assigns.current_project.id == 2
+      assert result_socket.assigns.available_agents == [{"local-agent", "Local Agent", :global}]
+      assert result_socket.assigns.file_uploads == new_uploads
+    end
+  end
 end

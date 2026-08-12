@@ -6,7 +6,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   use Phoenix.LiveComponent
   import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, modal_header: 1]
-  import EyeInTheSkyWeb.Helpers.ModelHelpers, only: [normalize_model_alias: 1, all_model_entries: 0]
+
+  import EyeInTheSkyWeb.Helpers.ModelHelpers,
+    only: [normalize_model_alias: 1, all_model_entries: 0]
+
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
   import EyeInTheSkyWeb.Components.CliFlags, only: [path_fields: 1, boolean_flags: 1]
   import EyeInTheSkyWeb.Components.ModelSelector, only: [model_selector: 1]
@@ -40,7 +43,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def update(assigns, socket) do
-    modal_open? = socket.assigns[:show] && assigns[:show]
+    modal_open? =
+      Map.get(socket.assigns, :show, false) == true and Map.get(assigns, :show, false) == true
 
     project_path = if assigns[:current_project], do: assigns[:current_project].path
 
@@ -76,15 +80,14 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       |> assign(:projects, projects)
 
     socket =
-      case Map.has_key?(assigns, :file_uploads) do
-        false ->
+      if Map.has_key?(assigns, :file_uploads) do
+        if modal_open? and socket.assigns[:file_uploads] == file_uploads do
           socket
-
-        true when modal_open? and socket.assigns[:file_uploads] == file_uploads ->
-          socket
-
-        true ->
+        else
           assign(socket, :file_uploads, file_uploads)
+        end
+      else
+        socket
       end
 
     {:ok, socket}

@@ -446,15 +446,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   defp reload_settings(socket), do: assign(socket, :settings, Settings.all())
 
-  defp apply_theme_setting(socket, theme) do
-    Settings.put("theme", theme)
-
-    socket
-    |> reload_settings()
-    |> flash_saved("theme")
-    |> push_event("apply_theme", %{theme: theme})
-  end
-
   @impl true
   def render(assigns) do
     ~H"""

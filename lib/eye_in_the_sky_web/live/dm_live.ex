@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.DmLive do
   use EyeInTheSkyWeb, :live_view
 
-  alias EyeInTheSky.{Agents, Events, Notes, Sessions}
+  alias EyeInTheSky.{Agents, Events, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
   alias EyeInTheSky.Pi.ModelDiscoveryCache
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}

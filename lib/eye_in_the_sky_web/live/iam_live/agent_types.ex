@@ -86,21 +86,15 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
         {:noreply, put_flash(socket, :error, "Select at least one document.")}
 
       true ->
-        socket =
-          case IAM.attach_documents_to_agent_type(agent_type, selected_docs) do
-            {:ok, _count} ->
-              socket
-              |> put_flash(:info, "Document(s) attached to \"#{agent_type}\".")
-              |> assign(:show_add_form, false)
-              |> assign(:add_agent_type, "")
-              |> assign(:add_selected_docs, [])
-              |> assign_agent_types()
+        {:ok, _count} = IAM.attach_documents_to_agent_type(agent_type, selected_docs)
 
-            {:error, _reason} ->
-              socket
-              |> put_flash(:error, "Failed to attach document(s) to \"#{agent_type}\". No changes were made.")
-              |> assign_agent_types()
-          end
+        socket =
+          socket
+          |> put_flash(:info, "Document(s) attached to \"#{agent_type}\".")
+          |> assign(:show_add_form, false)
+          |> assign(:add_agent_type, "")
+          |> assign(:add_selected_docs, [])
+          |> assign_agent_types()
 
         {:noreply, socket}
     end

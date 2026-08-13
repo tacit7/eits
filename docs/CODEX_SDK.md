@@ -20,16 +20,16 @@ The following Claude models are available for agent spawning and DM sessions:
 
 | Model | Display Name | Description |
 |-------|--------------|-------------|
-| `claude-opus-4-8` | Opus 4.8 (Default) | Most capable model for complex work · 1M context |
-| `claude-sonnet-4-6` | Sonnet 4.6 | Efficient for routine tasks · 1M context |
-| `sonnet[1m]` | Sonnet 4.6 (1M context) | Extended context version · $3/$15 per Mtok (usage credits) |
+| `claude-sonnet-5` | Sonnet 5 (Default) | Efficient for routine tasks |
+| `claude-fable-5` | Fable 5 | Most capable for your hardest and longest-running tasks |
+| `claude-opus-4-8` | Opus 5 | Best for everyday, complex tasks |
 | `claude-haiku-4-5-20251001` | Haiku 4.5 | Fastest for quick answers |
 
-The `claude-opus-4-8`, `claude-sonnet-4-6`, and `claude-haiku-4-5-20251001` are the recommended production-ready models. The `sonnet[1m]` variant provides an extended 1M token context window for tasks requiring larger context, though it draws from usage credits instead of Max plan benefits.
+The curated UI list follows the current Claude picker, but EITS spawn validation accepts new `claude-*` slugs as they appear. The `opus[1m]` and `sonnet[1m]` aliases remain available for extended-context sessions.
 
 **Model Aliasing**: Short aliases like `"opus"`, `"sonnet"`, `"haiku"` are normalized to their full slugs at spawn time. The alias resolution is:
 - `"opus"` → `claude-opus-4-8`
-- `"sonnet"` → `claude-sonnet-4-6`
+- `"sonnet"` → `claude-sonnet-5`
 - `"haiku"` → `claude-haiku-4-5-20251001`
 
 Older Claude models (Opus 4.7, 4.6, 4.5, Sonnet 4.5, etc.) remain in `ModelConfig.claude_models/0` for backward compatibility with stored sessions but are not shown in the new agent form or DM model menu.
@@ -40,23 +40,25 @@ The following Codex models are available for agent spawning:
 
 | Model | Display Name | Context Window | Max Output | Description |
 |-------|--------------|-----------------|------------|-------------|
+| `gpt-5.6-sol` | GPT-5.6 Sol (Default) | 1,050,000 tokens | 128k tokens | Latest frontier agentic coding model |
+| `gpt-5.6-tenna` | GPT-5.6 Tenna | 1,050,000 tokens | 128k tokens | Balanced agentic coding model for everyday work |
+| `gpt-5.6-luna` | GPT-5.6 Luna | 1,050,000 tokens | 128k tokens | Fast and affordable agentic coding model |
 | `gpt-5.5` | GPT-5.5 | 1,050,000 tokens | 128k tokens | Frontier model for complex coding, research, and real-world work |
-| `gpt-5.3-codex` | GPT-5.3 Codex (Default) | 400,000 tokens | 128k tokens | Coding-optimized model · recommended for code generation and review |
-| `gpt-5.4` | GPT-5.4 | 1,000,000 tokens | — | Strong model for everyday coding |
-| `gpt-5.2` | GPT-5.2 | 400,000 tokens | 128k tokens | Optimized for professional work and long-running agents |
+| `gpt-5.4` | GPT-5.4 | 1,050,000 tokens | 128k tokens | Strong model for everyday coding |
 | `gpt-5.4-mini` | GPT-5.4 Mini | — | — | Small, fast, and cost-efficient for simpler tasks |
 
-The display list is curated to five production models. Older models (GPT-5.2 Codex, GPT-5.1 variants, etc.) remain in `ModelConfig.codex_models/0` for backward compatibility but are not shown in new agent forms.
+The display list is curated to current production models. Spawn validation accepts new `gpt-*` slugs as they appear; older models (GPT-5.3 Codex, GPT-5.2 Codex, GPT-5.1 variants, etc.) remain in `ModelConfig.codex_models/0` for backward compatibility but are not shown in new agent forms.
 
-**When adding a new Codex model**, update both:
+**When adding a new Codex model to the curated display catalog**, update:
 - `lib/eye_in_the_sky/codex/models.ex` — add context window and max output token metadata to `@context_windows` and `@max_output_tokens` maps
-- `scripts/eits` — add the model to the valid models list (line ~1610 in help text, line ~1683 in case pattern for validation)
+- `lib/eye_in_the_sky_web/helpers/model_helpers.ex` — add label, description, and primary/legacy placement
+- `scripts/eits` — update help text examples if the current recommended set changes
 
 ### Model Defaults
 
 When a session is spawned without an explicit model choice:
-- **Claude sessions**: Default to `claude-opus-4-8` (via `ModelHelpers.default_model_for/1`)
-- **Codex sessions**: Default to `gpt-5.3-codex` (via `ModelHelpers.default_model_for/1`)
+- **Claude sessions**: Default to `claude-sonnet-5` in UI helpers; API spawns use the user-configured `Settings.default_model()` alias, which defaults to `sonnet`
+- **Codex sessions**: Default to `gpt-5.6-sol` (via `ModelHelpers.default_model_for/1` / `ModelConfig.default_model/1`)
 - **Gemini sessions**: Default to `gemini-2.5-flash`
 
 ## Architecture
@@ -546,16 +548,29 @@ Without this flag, `.codex/hooks.json` is ignored and sessions run without EITS 
 
 ### Hook Configuration (.codex/hooks.json)
 
-All lifecycle hooks are consolidated through a single script `eits-codex-notify.sh`, which routes events to session-specific helper scripts and status updates:
+The `hooks.json` file uses a nested `"hooks"` object at the top level (not a flat structure) and requires `"type": "command"` on each hook entry. A top-level `"description"` field documents the file's purpose:
 
-| Hook | Trigger | Script | Purpose |
-|------|---------|--------|---------|
-| `SessionStart` | Session initialization (startup/resume/compact) | `eits-codex-notify.sh` | Route startup/resume bookkeeping; mark session idle unless resuming after a crashed agent |
-| `UserPromptSubmit` | User submits a prompt to Codex | `eits-codex-notify.sh` | Mark session as `"working"` |
-| `PreToolUse` | Before a tool is invoked | `eits-codex-notify.sh` | Check tool guards (e.g., block `rm` on unsafe paths) |
-| `PostToolUse` | After a Bash tool completes | `eits-codex-notify.sh` | Log git commits and record tool activity |
-| `PreCompact` | Before context compaction | `eits-codex-notify.sh` | Mark session as `"compacting"` |
-| `Stop` | Session ends (user stop, error, etc.) | `eits-codex-notify.sh` | Mark session `"idle"`, enforce final annotation |
+```json
+{
+  "description": "Project-scoped Codex hooks for EITS lifecycle tracking and IAM guardrails.",
+  "hooks": { ... }
+}
+```
+
+Most lifecycle events route through `eits-codex-notify.sh`. `PreToolUse`, `PostToolUse`, and `Stop` additionally run `codex-iam-guard.sh` as a second command in the same hook array.
+
+| Hook | Matcher | Scripts | Purpose |
+|------|---------|---------|---------|
+| `SessionStart` | — | `eits-codex-notify.sh` | Startup/resume bookkeeping; mark session idle |
+| `UserPromptSubmit` | — | `eits-codex-notify.sh` | Mark session as `"working"` |
+| `PreToolUse` | `Bash\|apply_patch\|Edit\|Write` | `eits-codex-notify.sh`, `codex-iam-guard.sh` | Tool guards + IAM deny check |
+| `PostToolUse` | `Bash\|apply_patch\|Edit\|Write` | `eits-codex-notify.sh`, `codex-iam-guard.sh` | Commit logging + IAM post-check |
+| `PreCompact` | — | `eits-codex-notify.sh` | Mark session as `"compacting"` |
+| `PostCompact` | — | `eits-codex-notify.sh` | Save compact summary via `eits-post-compact.sh` |
+| `SessionEnd` | — | `eits-codex-notify.sh` | Run `eits-session-end.sh` on session termination |
+| `Stop` | — | `eits-codex-notify.sh`, `codex-iam-guard.sh` | Mark session `"idle"`, enforce final annotation + IAM stop policy |
+
+`eits-codex-notify.sh` also dispatches `apply_patch` into the `Edit|Write` guard path for `PreToolUse`.
 
 All hooks call the same `eits-codex-notify.sh` dispatcher script, which:
 1. Parses the JSON input from Codex to extract the hook event name
@@ -564,6 +579,33 @@ All hooks call the same `eits-codex-notify.sh` dispatcher script, which:
 4. Runs guards and validation checks (PreToolUse)
 
 This design allows all hook responsibilities to be managed and tested in one place while delegating session-specific logic to focused helper scripts.
+
+### IAM Guard (codex-iam-guard.sh)
+
+`priv/scripts/codex-iam-guard.sh` adapts the EITS IAM decision endpoint for Codex hooks. The Claude Code IAM hook returns a response shape that includes Claude-specific allow/fail-open fields that Codex may not support; this script translates it into the minimal output Codex expects.
+
+**Request flow:**
+1. Reads the hook payload from stdin (5 s timeout)
+2. Validates JSON and extracts `hook_event_name`
+3. POSTs the payload to `$EITS_URL/api/v1/iam/decide` (3 s curl timeout)
+4. Translates the IAM response into Codex-compatible output
+
+**Fail-open conditions** — exits 0 without output on:
+- `EITS_WORKFLOW=0` env var
+- `curl` or `jq` not on PATH
+- Stdin timeout or empty/non-JSON payload
+- Missing `hook_event_name` field
+- Non-2xx HTTP response or non-JSON body
+
+**Response translation by event:**
+
+| Event | IAM `deny` / `continue: false` | IAM `additionalContext` present | Otherwise |
+|-------|---------------------------------|---------------------------------|-----------|
+| `PreToolUse` | Emits `permissionDecision: "deny"` with reason | Emits `additionalContext` only | No output (allow) |
+| `PostToolUse` | Emits `decision: "block"` with reason | Emits `additionalContext` as advisory | No output |
+| `Stop` | Emits `decision: "block"` with reason | Emits `additionalContext` as block reason | No output |
+
+The adapter never forwards Claude-only allow/fail-open fields, preventing Codex from treating unsupported hook output as an error.
 
 ## Key Modules
 

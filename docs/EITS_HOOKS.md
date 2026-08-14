@@ -1,13 +1,19 @@
 # EITS Hook Scripts
 
-Claude Code integration scripts that manage session lifecycle, context injection, and tool-use enforcement.
+Claude Code and Codex integration scripts that manage session lifecycle,
+context injection, task workflow enforcement, and tool-use guardrails.
 
-**Location:** `priv/scripts/eits-*.sh` (canonical) → installed to `~/.config/eits/hooks/`
-**Registered in:** `~/.claude/settings.json`
+**Claude script location:** `priv/scripts/eits-*.sh` (canonical) → installed
+to `~/.config/eits/hooks/`
+**Claude registration:** `~/.claude/settings.json`
+**Codex registration:** `.codex/hooks.json` → symlink to
+`priv/hooks/codex/hooks.json`
 
 ---
 
 ## Installation
+
+### Claude Code
 
 EITS hooks are automatically registered using the `eits hooks install` command:
 
@@ -32,9 +38,38 @@ Removes all EITS-managed hook entries from `~/.claude/settings.json` but leaves 
 
 ---
 
+### Codex
+
+Codex hooks are project-scoped. The repo-owned hook configuration is:
+
+```bash
+priv/hooks/codex/hooks.json
+```
+
+The project should expose it through `.codex/hooks.json`:
+
+```bash
+mkdir -p .codex
+ln -sfn ../priv/hooks/codex/hooks.json .codex/hooks.json
+```
+
+Codex must also have hooks enabled in `~/.codex/config.toml`:
+
+```toml
+[features]
+hooks = true
+```
+
+Codex hooks use the same Rust-first `eits` CLI as agents and humans. Do not
+document or add new direct hook calls to `eitsr` or `scripts/eits-extras`; the
+legacy extras path is an internal fallback owned by the Rust CLI.
+
+---
+
 ## Session Status Lifecycle
 
-Status transitions are driven by **two layers**: the Elixir backend and Claude Code hooks. Understanding which layer does what is critical.
+Status transitions are driven by **two layers**: the Elixir backend and
+provider hooks. Understanding which layer does what is critical.
 
 ### Backend (Elixir — `agent_worker_events.ex`)
 
@@ -44,13 +79,17 @@ Status transitions are driven by **two layers**: the Elixir backend and Claude C
 
 ### Hooks (bash)
 
-Hooks handle the secondary status transitions around session start, end, and error cases.
+Hooks handle the secondary status transitions around session start, turn start,
+turn stop, compaction, session end, and error cases.
 
 | Status | Source | Trigger |
 |--------|--------|---------|
-| `working` | `UserPromptSubmit` hook (`eits-prompt-submit.sh`) | Each user prompt |
-| `working` | `SessionStart` hook (`eits-session-startup.sh` / `eits-session-resume.sh`) | Session start/resume |
+| `working` | Claude `UserPromptSubmit` hook (`eits-prompt-submit.sh`) | Each user prompt |
+| `working` | Codex `UserPromptSubmit` hook (`codex-prompt-working.sh`) | Each user prompt |
+| `working` | Claude `SessionStart` hook (`eits-session-startup.sh` / `eits-session-resume.sh`) | Session start/resume |
 | `idle` | AgentWorker backend (`on_sdk_completed`) | Turn completes, only if currently `working` |
+| `idle` | Codex `SessionStart` via dispatcher | Codex session is registered but no prompt is running yet |
+| `idle` | Codex `Stop` hook (`codex-session-stop.sh`) | Codex turn stops |
 | `waiting` | `SessionEnd` hook (`eits-session-end.sh`) for `sdk-cli` | Process exits |
 | `completed` | `SessionEnd` hook (`eits-session-end.sh`) for `cli` | Process exits |
 | `failed` | AgentWorker (`on_max_retries_exceeded` / `on_session_failed`) | Error |
@@ -81,6 +120,10 @@ echo "$CONTEXT"   # injected directly into conversation context
 
 `PreToolUse` hooks use `permissionDecision` to allow or deny tool calls instead of `additionalContext`.
 
+Codex does not use `CLAUDE_ENV_FILE`, but it still receives the SessionStart
+context block printed by `eits-session-startup.sh` through the Codex hook
+dispatcher.
+
 ---
 
 ## CLAUDE_ENV_FILE
@@ -101,6 +144,32 @@ echo "EITS_PROJECT_ID=$PROJECT_ID"   >> "$CLAUDE_ENV_FILE"
 | `EITS_URL` | startup | REST API base URL |
 | `EITS_ENTRYPOINT` | startup / resume | CLI entrypoint identifier |
 
+## Codex Env Files
+
+Codex has no `CLAUDE_ENV_FILE` equivalent. During Codex `SessionStart`,
+`eits-codex-notify.sh` dispatches to `eits-session-startup.sh`, which writes a
+session-specific env file:
+
+```bash
+~/.eits/codex/sessions/<session_id>.env
+```
+
+The file is mode `0600`, lives under a mode `0700` directory, and stores
+non-secret session identity:
+
+| Variable | Purpose |
+|---|---|
+| `EITS_URL` | REST API base URL |
+| `EITS_SESSION_UUID` | Codex session/thread UUID |
+| `EITS_SESSION_ID` | Integer EITS session ID, when resolved |
+| `EITS_AGENT_UUID` | Agent UUID, when resolved |
+| `EITS_AGENT_ID` | Integer agent ID, when resolved |
+| `EITS_PROJECT_ID` | Integer project ID, when resolved |
+
+The Rust `eits` CLI auto-loads this file when `EITS_CODEX_SESSION_ID`,
+`CODEX_THREAD_ID`, or `CODEX_SESSION_ID` is set. If a Codex session has no
+session id available, the agent should ask the user for it rather than guessing.
+
 ---
 
 ## Workflow Guard
@@ -117,6 +186,31 @@ Set `EITS_WORKFLOW=0` to disable all hook behavior for a session.
 
 ## Session Lifecycle Hooks
 
+### Codex Dispatcher — `eits-codex-notify.sh`
+
+Codex runs one dispatcher hook for lifecycle, compaction, tool-use, and stop
+events. The dispatcher loads `~/.eits/codex/sessions/<session_id>.env` when it
+can infer a session id from `EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, or
+`CODEX_SESSION_ID`, then maps Codex payloads to the shared EITS hook scripts.
+
+| Codex event | Dispatcher behavior |
+|---|---|
+| `SessionStart` `startup` / `clear` | Runs `eits-session-startup.sh` with `EITS_SESSION_START_STATUS=idle` |
+| `SessionStart` `resume` | Runs `eits-session-resume.sh` with `EITS_SESSION_START_STATUS=idle` |
+| `SessionStart` `compact` | Runs `eits-session-compact.sh`, `eits-session-startup.sh`, and `eits-agent-working.sh` |
+| `UserPromptSubmit` | Runs `codex-prompt-working.sh` |
+| `PreToolUse` `Edit` / `Write` / `apply_patch` | Runs `eits-pre-tool-use.sh` |
+| `PreToolUse` `Bash` | Runs `eits-rm-worktree-guard.sh` |
+| `PreToolUse` all matched tools | Runs `eits-nats-tool-pre.sh` after the tool-specific guard |
+| `PostToolUse` | Runs `eits-post-tool-use.sh` and `codex-post-commit.sh` |
+| `PreCompact` | Runs `eits-pre-compact.sh` |
+| `PostCompact` | Runs `eits-post-compact.sh` |
+| `SessionEnd` | Runs `eits-session-end.sh` |
+| `Stop` | Runs `codex-session-stop.sh` |
+
+The dispatcher also sets `CLAUDE_CODE_ENTRYPOINT` from `EITS_ENTRYPOINT` for
+shared scripts that still branch on the Claude variable.
+
 ### SessionStart (startup / clear) — `eits-session-startup.sh`
 
 Fires when a new session starts or is cleared (`/clear`).
@@ -129,6 +223,10 @@ Fires when a new session starts or is cleared (`/clear`).
 5. Writes `$SESSION_ID` to `.git/eits-session` (used by post-commit hook)
 6. Updates session status to `working` via `eits sessions update --status working`
 7. Echoes a `$CONTEXT` markdown block to stdout for injection
+
+For Codex, the dispatcher sets `EITS_SESSION_START_STATUS=idle` so a newly
+opened or resumed Codex session appears idle until `UserPromptSubmit` marks it
+working. The same startup script also writes the Codex env file described above.
 
 ---
 
@@ -216,6 +314,22 @@ Fires after `eits-session-stop.sh`. Safety net for tasks left open.
 
 ## Tool-Use Hooks
 
+### Codex IAM Guard — `codex-iam-guard.sh`
+
+Codex `PreToolUse`, `PostToolUse`, and `Stop` groups also run
+`codex-iam-guard.sh`. It posts the raw Codex hook payload to
+`$EITS_URL/iam/decide` and adapts the backend response to Codex-compatible
+hook output.
+
+Behavior:
+
+1. Fails open when `curl`, `jq`, stdin JSON, or the IAM endpoint is unavailable.
+2. Preserves `PreToolUse` denies as `permissionDecision: "deny"`.
+3. Preserves advisory `additionalContext` when returned by IAM.
+4. Converts blocking `PostToolUse` / `Stop` results into Codex
+   `{ "decision": "block", "reason": "..." }` output.
+5. Suppresses Claude-only allow/fail-open fields that Codex may reject.
+
 ### PreToolUse (Edit|Write) — `eits-pre-tool-use.sh`
 
 Fires before any `Edit` or `Write` tool call. Enforces the EITS workflow.
@@ -251,6 +365,19 @@ Fires after every Bash tool call. Filters for git commit commands.
 
 Silent — exits 0, no feedback to Claude.
 
+### Codex PostToolUse Commit Logging — `codex-post-commit.sh`
+
+Codex also runs `codex-post-commit.sh` after `PostToolUse`. It reads the Codex
+payload shape (`tool_name` and `tool_input.command`), filters for Bash commands
+that contain `git commit`, resolves `HEAD` in `EITS_PROJECT_DIR` or the current
+directory, and calls:
+
+```bash
+eits commits create --hash "$HASH" --message "$MSG"
+```
+
+Failures are intentionally ignored so commit logging never blocks the turn.
+
 ---
 
 ### UserPromptSubmit — `eits-prompt-submit.sh`
@@ -259,6 +386,27 @@ Fires before Claude processes each user prompt.
 
 **What it does:**
 - Sets session to `working` via `eits sessions update --status working` (async)
+
+### Codex UserPromptSubmit — `codex-prompt-working.sh`
+
+Fires before Codex processes each user prompt.
+
+**What it does:**
+- Reads `session_id` from the Codex hook payload.
+- Sets that session to `working` via `eits sessions update --status working`
+  in the background.
+
+### Codex Stop — `codex-session-stop.sh`
+
+Fires after a Codex turn stops.
+
+**What it does:**
+1. Ignores recursive stop-hook payloads with `stop_hook_active=true`.
+2. Lists in-progress tasks linked to the Codex session.
+3. Blocks with exit `2` if any in-progress task exists, because Codex has no
+   transcript path equivalent for checking whether the task was annotated this
+   turn.
+4. Sets the session to `idle` in the background.
 
 ---
 
@@ -319,3 +467,121 @@ Sets session to `compacting` before context compaction begins so the UI can show
 ```
 
 > **Note:** The IAM curl hook (`http://127.0.0.1:34877/api/v1/iam/hook`) handles PreToolUse, PostToolUse, and Stop. It enforces IAM policies — see [IAM_HOOK_INSTALL.md](IAM_HOOK_INSTALL.md) for details.
+
+## Current Codex hooks.json Registration
+
+The repo-owned Codex registration lives at `priv/hooks/codex/hooks.json`.
+Project checkouts should expose it through `.codex/hooks.json` as a symlink.
+Commands are intentionally repo-absolute in the generated JSON today.
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
